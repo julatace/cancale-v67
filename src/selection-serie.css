@@ -1,0 +1,47 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA SÉLECTION EN SÉRIE (11 nov., lot actions-serie) — src/composants/SelectionSerie.jsx
+   ═══════════════════════════════════════════════════════════════════════════
+   Les jetons du thème seulement (clair et sombre suivent, portail compris). UNE
+   couleur d'accent, réservée à ce qui est coché (§7). Cibles de 44 px au doigt. */
+.vrm-serie-case { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; min-height: 32px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.vrm-serie-case input { width: 20px; height: 20px; margin: 0; accent-color: var(--vrm-accent, #0071E3); cursor: pointer; }
+/* Sur la vignette : dans son coin, la ligne garde sa grille. */
+:has(> .vrm-serie-case-photo) { position: relative; }
+.vrm-serie-case-photo { position: absolute; top: 2px; left: 2px; z-index: 2; width: 28px; min-height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--vrm-surface, #fff) 82%, transparent); }
+[data-serie-coche="1"] .vrm-serie-case-photo { background: var(--vrm-surface, #fff); }
+/* À la souris : la case attend, discrète, et s'affirme au survol de la ligne ou dès qu'une ligne est cochée. */
+@media (hover: hover) and (pointer: fine) {
+  .vrm-serie-case[data-serie-actif="0"] { opacity: .35; }
+  [data-serie-ligne]:hover .vrm-serie-case, .vrm-serie-case:focus-within { opacity: 1; }
+}
+/* Au doigt : la case n'apparaît qu'une fois la sélection ouverte (appui long). */
+@media (pointer: coarse) {
+  .vrm-serie-case:not(.vrm-serie-case-photo) { width: 44px; min-height: 44px; }
+  .vrm-serie-case-photo { width: 32px; min-height: 32px; }
+  .vrm-serie-case[data-serie-actif="0"] { display: none; }
+  [data-serie-ligne] { -webkit-touch-callout: none; }
+}
+[data-serie-coche="1"] { box-shadow: inset 3px 0 0 var(--vrm-accent, #0071E3); background-color: var(--vrm-b-teinte, rgba(0,113,227,.06)) !important; }
+
+.vrm-serie-barre {
+  position: fixed; z-index: 46; left: 50%; transform: translateX(-50%);
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  width: min(640px, calc(100vw - 24px)); box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
+  border-radius: 16px; background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); box-shadow: 0 10px 30px rgba(0,0,0,.18);
+}
+.vrm-serie-barre[data-serie-fermee] { flex-direction: row; align-items: center; bottom: calc(96px + env(safe-area-inset-bottom)); }   /* au-dessus de la pilule « Annuler » */
+.vrm-serie-tete { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.vrm-serie-tete b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: auto; }
+.vrm-serie-resume { margin: 0; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); flex: 1; }
+.vrm-serie-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 767px) {
+  .vrm-serie-barre { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .vrm-serie-barre[data-serie-fermee] { bottom: calc(150px + env(safe-area-inset-bottom)); }
+  .vrm-serie-actions > .vrm-b { flex: 1 1 auto; }
+  .vrm-main:has(.vrm-serie-case[data-serie-actif="1"])::after { content: ''; display: block; height: 140px; }
+}
+/* Boîte e-mails : la case à gauche de la ligne (un <li> qui porte un bouton plein). */
+.vrm-boite-item > .vrm-serie-case { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); z-index: 3; }
+.vrm-boite-item:has(> .vrm-serie-case) > .vrm-boite-ligne { padding-left: 46px !important; }

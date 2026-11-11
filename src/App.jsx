@@ -15,6 +15,8 @@ import {stockageParcours,garderReprise} from './repriseEcran.js';
 // (11 nov., reprise-ecrans) La reprise SYNCHRONISÉE, par compte VRM (src/repriseSynchro.js).
 import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches } from './repriseSynchro.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
+import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie, avecSerie } from './composants/SelectionSerie.jsx';
+import { trierSerie, resumeSerie, csvDe } from './selectionSerie.js';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
@@ -33571,6 +33573,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tx = o && (o._fromEmail ? o._txMail : o.transaction_id);
     return tx == null ? null : { tx: String(tx), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(tx)) || [] };
   }).filter(Boolean), [ventesAffichees, ventesMax, commandesParTx]);
+  // (11 nov., lot actions-serie) Ventes : sélectionner plusieurs lignes, agir une fois (src/selectionSerie.js).
+  const ordreVentesSerie = useMemo(() => ventesAffichees.map(o => String(o.transaction_id)), [ventesAffichees]);
+  const serieVentes = useSelectionSerie(ordreVentesSerie, { nom: 'ventes' });
+  const actionsSerieVentes = () => {
+    const parTx = new Map(ventesAffichees.map(o => [String(o.transaction_id), o]));
+    const lignes = (cles) => cles.map(k => parTx.get(k)).filter(Boolean);
+    const annulee = (o) => classifyOrderStatus(o.status) === 'cancelled';
+    return [
+      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', faire: async (cles) => {
+        // Les bordereaux prêts du lot « Tout imprimer » (même clé : le n° de transaction).
+        const prets = new Set(lignesLotTous().filter(l => l.cochable !== false).map(l => String(l.cle)));
+        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets.has(String(o.transaction_id)) ? true : 'pas de bordereau prêt');
+        if (ok.length) await batchBordereaux(new Set(ok.map(o => String(o.transaction_id))));
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'bordereau préparé', plusieurs: 'bordereaux préparés' });
+      } },
+      { k: 'depose', libelle: 'Je dépose', icone: 'check', faire: (cles) => {
+        // L'écriture de « Colis déposé » (`gesteColisFait`), en UN geste ⇒ UN « Annuler ».
+        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true);
+        const ops = [];
+        for (const o of ok) {
+          const k = String(o.transaction_id), b = bordsParTxn[k], kb = b ? bordKey(b) : null;
+          if (!shipDone[k]) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: Date.now(), avant: shipDone[k] });
+          if (kb) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: 1, avant: bordsShipped[kb] });
+        }
+        if (ops.length) gesteVrm(ok.length > 1 ? `${ok.length} colis déposés` : 'Colis déposé', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'déposée', plusieurs: 'déposées' });
+      } },
+      { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
+        const L = lignes(cles);
+        const csv = csvDe(['Date', 'Compte', 'Article', 'N°', 'Prix (€)', 'État', 'N° de transaction'],
+          L.map(o => { const e = effEntry(o); return [o.date && Number.isFinite(new Date(o.date).getTime()) ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._acc ? accNameOf(o._acc) : '', o.title || '', (e && e.numero) || '', o.price && o.price.amount != null ? Number(o.price.amount).toFixed(2).replace('.', ',') : '', o.status_title || o.status || '', String(o.transaction_id)]; }));
+        telechargerFichier(csv, `ventes-${dateLocaleISO()}.csv`, 'text/csv;charset=utf-8');
+        return resumeSerie({ faits: L, pasFaits: [] }, { un: 'vente exportée', plusieurs: 'ventes exportées' });
+      } },
+      { k: 'facture', libelle: 'Facture Pro', icone: 'receipt', faire: async (cles) => {
+        const L = lignes(cles);
+        const txDe = (o) => String(o._fromEmail ? o._txMail : o.transaction_id);
+        const m = await import('./FacturePro.jsx');
+        const r = await m.envoyerFacturesSerie(DEPS_FACTURE, L.map(txDe), sales.items);
+        if (!r) return { annule: true };
+        return resumeSerie(r, { un: 'facture envoyée', plusieurs: 'factures envoyées' });
+      } },
+    ];
+  };
   const groupeFactureCle = useMemo(() => groupeFacture.map((v) => v.tx + ':' + (v.commandes || []).length).join(','), [groupeFacture]);
   // Une recherche ou un changement de filtre repart du haut : sinon on garderait
   // « 240 affichées » sur une liste qui n'en compte plus que trois.
@@ -36287,6 +36333,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     });
   };
+  // (11 nov., lot actions-serie) Masquer EN SÉRIE : la même écriture que `masquerAchat`
+  // (une entrée de `vinted_purchases_hidden` par achat), en UN geste ⇒ UN « Annuler » qui
+  // remet tous les achats à leur place. Rien chez Vinted.
+  const masquerAchats = (liste) => {
+    const deja = achatsMasques();
+    const L = (liste || []).filter(o => o && o.transaction_id != null && !deja.has(String(o.transaction_id)));
+    if (!L.length) return 0;
+    const txs = L.map(o => String(o.transaction_id));
+    let avant = null, avantCache = null;
+    gesteVrm(L.length > 1 ? `${L.length} achats masqués` : 'Achat masqué', txs.map(tx => ({ k: ACHATS_MASQUES, type: 'ensemble', id: tx, apres: true, avant: false })), {}, (sens) => {
+      const n = achatsMasques(); for (const tx of txs) { if (sens === 'apres') n.add(tx); else n.delete(tx); }
+      _achatsMasques = [...n];
+      const enleve = new Set(txs);
+      setBuys(prev => {
+        if (!prev || !prev.items) return prev;
+        if (sens === 'apres') { avant = prev.items; return { ...prev, items: prev.items.filter(x => !enleve.has(String(x.transaction_id))) }; }
+        return avant ? { ...prev, items: avant.filter(x => enleve.has(String(x.transaction_id)) || prev.items.some(y => String(y.transaction_id) === String(x.transaction_id))) } : prev;
+      });
+      const c = _acctCache['purchased'];
+      if (c) {
+        if (sens === 'apres') { avantCache = c.items || []; c.items = avantCache.filter(x => !enleve.has(String(x.transaction_id))); }
+        else if (avantCache) { const l = c.items || []; c.items = avantCache.filter(x => enleve.has(String(x.transaction_id)) || l.some(y => String(y.transaction_id) === String(x.transaction_id))); }
+        _persistAcctCache();
+      }
+    });
+    return L.length;
+  };
+  // (11 nov., lot actions-serie) « J'ai retiré » EN SÉRIE : l'écriture de `markPickupDone`
+  // (`vinted_pickup_done[tx]`), en UN geste. Seul un colis AU POINT RELAIS se retire.
+  const markPickupDoneSerie = (liste) => {
+    const L = (liste || []).filter(o => o && o.transaction_id != null);
+    if (!L.length) return 0;
+    const t = new Date().toISOString();
+    gesteVrm(L.length > 1 ? `${L.length} colis retirés` : 'Colis retiré', L.map(o => ({ k: 'vinted_pickup_done', type: 'cle', id: String(o.transaction_id), apres: t, avant: pickupDone[String(o.transaction_id)] })), { vinted_pickup_done: setPickupDone });
+    return L.length;
+  };
   const achatsAffiches = useMemo(() => {
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
@@ -36330,6 +36412,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   };
   useEffect(() => { setAchatsMax(60); }, [aFilter, ordSearchDiff, periode]);
+  // (11 nov., lot actions-serie) Sélectionner plusieurs achats, agir une fois (src/selectionSerie.js).
+  const ordreAchatsSerie = useMemo(() => achatsAffiches.map(x => String(x.o.transaction_id)), [achatsAffiches]);
+  const serieAchats = useSelectionSerie(ordreAchatsSerie, { nom: 'achats' });
+  // Les actions : la même écriture que le geste unitaire, ligne par ligne, et un résumé honnête.
+  const actionsSerieAchats = () => {
+    const parTx = new Map(achatsAffiches.map(x => [String(x.o.transaction_id), x]));
+    const lignes = (cles) => cles.map(k => parTx.get(k)).filter(Boolean);
+    return [
+      { k: 'retire', libelle: 'Retiré', icone: 'check', variante: 'primaire', faire: (cles) => {
+        const { ok, pasFaits } = trierSerie(lignes(cles), ({ o, st }) => {
+          if (st.step === 0) return 'annulé';
+          if (st.retour) return 'en retour';
+          if (pickupDone[String(o.transaction_id)] || st.step >= 4) return 'déjà retiré';
+          return st.step === 3 ? true : 'pas au point relais';
+        });
+        markPickupDoneSerie(ok.map(x => x.o));
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'retiré', plusieurs: 'retirés' });
+      } },
+      { k: 'relier', libelle: 'Relier', icone: 'link', faire: (cles) => {
+        // Relier = désigner LA paire de l'achat : c'est toujours SON tap (§5, jamais par
+        // ressemblance). La série l'amène à la file « Sans achat relié » (une suggestion
+        // par annonce, « Relier · 32 € » en un tap) et dit ce qui est déjà relié.
+        const { ok, pasFaits } = trierSerie(lignes(cles), ({ o, st }) => st.step === 0 ? 'annulé' : buyNumByTxn[String(o.transaction_id)] != null ? 'déjà relié' : true);
+        if (!ok.length) return resumeSerie({ faits: [], pasFaits }, { un: 'à relier', plusieurs: 'à relier' });
+        demanderVue('sansachat'); if (onNav) onNav('cat_annonces');
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'à relier dans « Sans achat relié »', plusieurs: 'à relier dans « Sans achat relié »' });
+      } },
+      { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
+        const L = lignes(cles);
+        const csv = csvDe(['Date', 'Compte', 'Article', 'N°', 'Prix payé (€)', 'État', 'N° de transaction'],
+          L.map(({ o, st }) => [o.date && Number.isFinite(new Date(o.date).getTime()) ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._acc ? accNameOf(o._acc) : '', o.title || '', buyNumByTxn[String(o.transaction_id)] ?? '', montantCommande(o).toFixed(2).replace('.', ','), st.label || '', String(o.transaction_id)]));
+        telechargerFichier(csv, `achats-${dateLocaleISO()}.csv`, 'text/csv;charset=utf-8');
+        return resumeSerie({ faits: L, pasFaits: [] }, { un: 'achat exporté', plusieurs: 'achats exportés' });
+      } },
+      { k: 'masquer', libelle: 'Masquer', icone: 'eyeOff', faire: (cles) => {
+        const deja = achatsMasques();
+        const { ok, pasFaits } = trierSerie(lignes(cles), ({ o }) => deja.has(String(o.transaction_id)) ? 'déjà masqué' : true);
+        masquerAchats(ok.map(x => x.o));
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'masqué', plusieurs: 'masqués' });
+      } },
+    ];
+  };
 
 
   // ⚠️⚠️ L'ORDRE DES TESTS EST LA RÈGLE (4 octobre). Avant, « transit » passait
@@ -39487,6 +39611,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (11 nov., lot ventes-lot) le résumé du lot (articles, N°, parts, achats) — lu après le premier rendu.
     const lot = lotDeVente(o);
     deps.push(lot ? JSON.stringify([lot.lu, lot.attente, lot.passu, lot.n, lot.mode, (lot.articles || []).map((a) => [a.item, a.num, a.par, a.part, a.achat, a.conflit ? 1 : 0])]) : '');
+    deps.push(serieVentes.actif ? (serieVentes.estCoche(tx) ? 2 : 1) : 0);   // (lot actions-serie) coché ⇒ la ligne se redessine
     return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv, lot };
   };
   // ── (10 nov., lots BB et BI) « LITIGES EN COURS » ET « RETOURS PAR MODÈLE » ─────────────
@@ -42924,6 +43049,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             à l'identique — la note « vue par e-mail » d'un compte, un refus de facture commun. */}
         {[...ventesEmailTete.values()].map((g) => <NoteVentesEmailTete key={g.uid} g={g} nom={g.acc ? accNameOf(g.acc) : ''}/>)}
         <FactureRaisonsTete deps={DEPS_FACTURE} ventes={groupeFacture}/>
+        {ventesAffichees.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieVentes}/></div>}
+        <BarreSerie serie={serieVentes} actions={actionsSerieVentes()} rendreIcone={iconeApp}/>
         <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
@@ -43154,8 +43281,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ]}>{(gp, tiroirG) => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={lot && lot.lu ? lot.nums : (num?[num]:[])} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
-                {...gp} glisse={tiroirG} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
+              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={lot && lot.lu ? lot.nums : (num?[num]:[])} plateforme="vinted" photo={photo} photoNoeud={<><CaseSerie serie={serieVentes} cle={txL} etiquette={o.title} surPhoto/>{photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<PhotoVente src={photo} size={46} portrait/>}</>} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
+                {...avecSerie(gp, serieVentes.ligne(txL))} glisse={tiroirG} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
@@ -44761,6 +44888,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>
         {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>Tous sur <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
+        {tranche.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieAchats}/></div>}
+        <BarreSerie serie={serieAchats} actions={actionsSerieAchats()} rendreIcone={iconeApp}/>
         <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
           {tranche.map(({o,tk,st},i)=>{
             const cancelled = st.step===0;
@@ -44770,8 +44899,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
             <React.Fragment key={o.transaction_id}>
             {i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
-            <div className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
+            <div {...serieAchats.ligne(String(o.transaction_id))} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
+                <CaseSerie serie={serieAchats} cle={String(o.transaction_id)} etiquette={o.title} surPhoto/>
                 {orderPhoto(o)&&!achatPhKo.has(orderPhoto(o))?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>{ const u=orderPhoto(o); setAchatPhKo(s=>{ if(s.has(u)) return s; const n=new Set(s); n.add(u); return n; }); }}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
               </div>
               <div className="vrm-buy-main">
