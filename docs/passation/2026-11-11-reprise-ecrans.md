@@ -56,5 +56,48 @@ l'écran » (vues + compte choisi) dès qu'il y en a deux. 44 px au doigt, neutr
 ligne elle-même porte « Réinitialiser » (choix de cette session, à revoir si Julien le veut ailleurs).
 Le compte retenu reste dit par sa rangée « Tous · compte… » (inchangée).
 
+### Un défaut trouvé en route (corrigé)
+Au passage en arrière-plan, la reprise partait par `save`, dont l'écriture LOCALE attend 500 ms : l'app
+fermée aussitôt (iOS) perdait la recherche (banc `iphone-reprise` R3 rouge). `viderSave(k)` (App.jsx) fait
+tout de suite la sauvegarde en attente d'UNE clé, par le même chemin (fusion, file d'envoi, nuage) ; appelé
+seulement pour `vrm_reprise_ecrans`, au passage en arrière-plan / `pagehide`.
+
 ## Preuves
-Voir la fin du fichier (mis à jour à la fin de la session).
+- `npm run build` vert.
+- `node scripts/audit-reprise-synchro.cjs` : **34/34** ; `--prouve` : **15/15 mutations attrapées**
+  (recherche 60 j, écran 60 j, lien ignoré, autre vendeur, le moins frais gagne, bandeau muet, « Voir plus »
+  synchronisés, clé hors SYNC_KEYS, sans délai, écrit au montage, adopte un réglage touché, adopte après un
+  geste, bandeau absent, écrans gardés périmés, C9 « choix seul » perdu). Sur l'arbre d'`origin/main` :
+  rouge (module absent).
+- `audit-reprise-ecran` : 30/30 et 12/12 mutations (ses deux contrôles de câblage suivent le nouveau départ
+  `ecranAOuvrir` et l'écriture hors montage ; son rouge « balayage du bord », présent en début de session, est
+  vert après la fusion de `main`).
+- `audit-{variables,tdz,coherence,identite,icones,textes-courts,fonctions-api,secrets,bancs}` verts.
+  `audit-coherence` exige l'historique complet de `main` (clone superficiel ⇒ « historique illisible ») :
+  vert après `git fetch --unshallow`.
+- `fusion-echelle --verifier` : mon fichier CSS est sur l'échelle ; 92 autres fichiers de `main` ne le sont
+  pas (déjà le cas). ⚠️ Sans `--verifier`, ce script RÉÉCRIT 93 fichiers : lancé une fois par erreur,
+  annulé aussitôt (`git checkout -- .`).
+- **Banc `scripts/bancs/reprise-ecrans.cjs`** (deux contextes Playwright, ordinateur 1512 px + iPhone 390 px
+  tactile, même compte, base à état `_base-ecritures.cjs`, données inventées) : **28/28 vert après** ;
+  **15 KO sur le build d'`origin/main`** (archive, même banc, `BANC_DIST`). Une version intermédiaire sans
+  `onCloudReady` avait P2–P4 rouges (l'iPhone neuf restait sur Ma journée) : la reprise au nuage lu à
+  l'ouverture est bien ce qui les fait passer. Mesuré : 9 lettres tapées ⇒ 1 écriture de `main`.
+- Captures regardées : ordinateur (Annonces, « Affiché avec Recherche · Tri · Réinitialiser l'écran »),
+  iPhone (Annonces repris, Ventes « Finalisées » et site Vinted repris, Ma journée après 30 min, Achats par
+  lien).
+- Mode sombre regardé (iPhone 390, bandeau lisible sur ses jetons).
+- **Bancs voisins, avant / après identiques** (build d'`origin/main` contre ce lot) : `deux-appareils` 12 KO
+  des deux côtés (parties C et D : le chemin « Outils → Compléter les prix d'achat » a changé sur `main`) ;
+  `navigation-tache` 7 KO des deux côtés, `iphone-reprise` 15 KO des deux côtés (structure du menu
+  « Plus » / colonne : Vendre · Gérer · Moi, lots AC/AL). Partie R d'`iphone-reprise` (la reprise du 5 nov.) :
+  16/16 après.
+
+## Ce qui reste
+- Aucune écriture en base réelle, aucune PR : la branche attend d'être fusionnée.
+- Sur ses deux appareils (geste de Julien, une fois fusionné) : poser un filtre sur l'ordinateur, ouvrir
+  l'iPhone dans les 30 min — même écran, même filtre, et la ligne « Affiché avec … » pour l'effacer.
+- La fusion du nuage tranche champ par champ (`fusion3`) : si les DEUX appareils changent la MÊME vue entre
+  deux synchronisations, c'est celle de l'appareil qui écrit qui gagne (pas forcément la plus récente).
+  Rare et sans perte de donnée ; à revoir seulement si cela gêne.
+- « Réinitialiser » vit dans la ligne « Affiché avec … » (aucun menu propre à chaque écran n'existe).
