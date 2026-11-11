@@ -167,3 +167,22 @@ test('/api/compte?mode=discord-deja : une ligne vrm_discord plantée par un tier
   const vraie = await jouer([{ owner: B, discord: 'victime', avatar: AV, pid: '', signatureAvatar: signerAvatarPublic(B, 'victime', '', AV) }]);
   assert.equal(vraie.corps && vraie.corps.trouve, true, 'la vraie ligne signée n’est plus reconnue');
 });
+
+// (11 nov.) Le serveur d'envoi de « Ma facture » est choisi par le vendeur : un
+// nom qui RÉSOUT vers une adresse interne (127.0.0.1.nip.io, …) ne doit ouvrir
+// aucune connexion depuis le serveur de VRM.
+test('smtp : un serveur d’envoi qui résout vers une adresse interne n’est jamais contacté', async () => {
+  const net = await import('node:net');
+  const m = await import('../../api/_lib/smtp.js');
+  let connexions = 0;
+  const serveur = net.createServer((s) => { connexions++; s.end('220 interne\r\n'); });
+  await new Promise((ok) => serveur.listen(0, '127.0.0.1', ok));
+  const port = serveur.address().port;
+  try {
+    const r = await m.envoyerSmtp({ seulementConnexion: true, hote: 'localhost', port, utilisateur: 'u', motDePasse: 'p', de: 'a@exemple.fr', a: 'b@exemple.fr', sujet: 's', texte: 't' });
+    assert.equal(connexions, 0, 'le serveur de VRM s’est connecté à une adresse interne');
+    assert.notEqual(r && r.issue, 'connecte');
+  } finally { serveur.close(); }
+  assert.equal(m.adressePublique('8.8.8.8'), true);
+  for (const ip of ['127.0.0.1', '10.0.0.1', '172.20.0.1', '192.168.1.1', '169.254.169.254', '::1', 'fd12::1', '::ffff:10.0.0.1']) assert.equal(m.adressePublique(ip), false, ip);
+});
