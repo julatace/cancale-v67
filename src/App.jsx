@@ -18521,8 +18521,8 @@ function EnAttenteEnvoi() {
     const off = onSyncChange(() => maj());
     const f = () => maj();
     const st = (e) => { if (!e || e.key === CLE_FILE || e.key === null) maj(); };
-    window.addEventListener('vrm:file-envoi', f); window.addEventListener('online', f); window.addEventListener('offline', f); window.addEventListener('storage', st);
-    return () => { off(); window.removeEventListener('vrm:file-envoi', f); window.removeEventListener('online', f); window.removeEventListener('offline', f); window.removeEventListener('storage', st); };
+    window.addEventListener('vrm:file-envoi', f); window.addEventListener('vrm:gestes-hl', f); window.addEventListener('online', f); window.addEventListener('offline', f); window.addEventListener('storage', st);
+    return () => { off(); window.removeEventListener('vrm:file-envoi', f); window.removeEventListener('vrm:gestes-hl', f); window.removeEventListener('online', f); window.removeEventListener('offline', f); window.removeEventListener('storage', st); };
   }, []);
   // (8 nov.) Sans abonnement (aperçu) : la base refuse d'écrire, exprès — ce
   // n'est pas un envoi « en attente » ; la carte de l'aperçu dit pourquoi.
@@ -18530,6 +18530,9 @@ function EnAttenteEnvoi() {
   let n = 0; try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; }
   const horsLigneMesure = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (!n || !(horsLigneMesure || _syncInfo.etat === 'error')) return null;
+  // (11 nov.) Hors ligne, la pastille des gestes (« Hors ligne · N gestes en attente ») le dit déjà :
+  // le même nombre ne s'écrit pas deux fois (§7).
+  if (horsLigneMesure && _gestesHL.owner === AUTH.user?.id && _gestesHL.attente > 0) return null;
   const reseau = horsLigneMesure || /connexion|répondu|réponse|réessaie|ne répond pas/.test(_syncInfo.raison || '');
   const quand = reseau ? 'dès que le réseau revient' : 'dès que la base les accepte';
   return (
