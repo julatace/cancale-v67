@@ -191,6 +191,12 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           if (pop1) await pop1.close().catch(() => {});
           const un = await attendre(pg, () => { try { const v = JSON.parse(localStorage.getItem('vrm_repub_main') || '{}'); return Object.keys(v).length ? Object.keys(v).sort().join(',') : null; } catch (_) { return null; } });
           dit(un === '9103', `E ${T} « Vinted ↗ » d’une carte : le suivi de CETTE paire seulement (par son identifiant)`, un);
+          // (11 nov., « gagner du temps ») le même clic a COPIÉ la description de CETTE paire.
+          const descAttendue = await pg.evaluate(() => { const d = document.querySelector('[data-kit-paire="9103"] [data-kit-desc]'); return d ? d.innerText.trim() : null; });
+          const pp = await pressePapier(pg);
+          const copieOk = await pg.getAttribute('[data-kit-ouvrir-paire="9103"]', 'data-kit-ouvrir-copie');
+          const lue9103 = await pg.getAttribute('[data-kit-paire="9103"]', 'data-kit-lue');
+          dit(lue9103 === '1' && copieOk === '1' && pp != null && descAttendue && pp.trim() === descAttendue, `E ${T} « Vinted ↗ » copie aussi la description de cette paire (un geste de moins)`, { copieOk, pp: pp && pp.slice(0, 60), descAttendue: descAttendue && descAttendue.slice(0, 60) });
           // ── N : « Ouvrir Vinted » note le suivi ──
           const [pop] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-kit-ouvrir-vinted]')]);
           if (pop) await pop.close().catch(() => {});

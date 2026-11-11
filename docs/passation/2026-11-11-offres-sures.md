@@ -4,8 +4,9 @@ Branche `claude/offres-sures`. Ses mots (11 nov.) : « Pour les offres automatiq
 peux faire mieux. Tu peux regarder comment ne jamais te faire ban stp. » « Je veux que dans Republier
 tu mettes la repu à la main, que tout soit parfait stp. »
 
-Rien dans `vinted-sync-extension/` (une autre session publie la 5.340) : ce qui doit changer dans
-l'extension est écrit pour une **5.341** dans `2026-11-11-anti-ban.md` §5.
+Première session : rien dans l'extension (étude écrite pour « 5.341 »). **Reprise (même jour) :
+extension 5.342.0** — la 5.341 (dates de versement) a été prise par une autre session ; la branche
+`claude/extension-5341` a été FUSIONNÉE ici d'abord (vrai merge), la 5.342 la contient. Voir §5.
 Aucune règle du moteur ni décision de Julien n'est changée : éteint par défaut, offre ≥ « Accepter
 dès » acceptée 3 à 20 min après (hasard), < « Refuser sous » refusée, garde des autres plateformes,
 3 offres par visite, 50 actions/h (réserve 5).
@@ -116,3 +117,57 @@ offres auto, P9 seulement quand il est sur Vinted, P10 plafond par jour.
 ## Geste de Julien
 
 Aucun. À regarder : Messages → Favoris & offres → « Offres auto ».
+
+
+## 5. Reprise du 11 nov. (après l'arrêt de la première session) — extension 5.342.0
+
+### Fait (P1, P3, P4 de l'étude ; P2 non fait)
+- **P1 — le moteur répond depuis l'onglet.** `repondreOffre` : accepter / refuser ET le message de
+  refus partent par `vintedPage` (cookies de vinted.fr, jeton csrf de la page, aucun `Authorization`).
+  Sans onglet vinted.fr (ou navigateur sans injection, Orion) : RIEN ne part, l'offre reste prévue
+  (pas « faite »), dit une fois par offre dans le journal (« ouvre vinted.fr dans Chrome »).
+- **Ses clics** (Répondre, Accepter, Refuser, Faire une offre — `executerPourApp`, relais du téléphone
+  compris) : depuis l'onglet s'il est ouvert ; sinon comme avant (service worker). **Tranché** : un
+  clic est un geste humain, un à la fois ; le bloquer sans onglet casserait les réponses depuis le
+  téléphone. Un onglet qui a quitté Vinted pendant le geste : rien ne part.
+- **P3 — freins.** Le moteur ne répond à aucune offre tant que le compte est freiné (`lireFreinRepub`,
+  le frein de Republier) ; un refus « restreint / suspendu » sur une offre pose ce frein (24 h) ; tout
+  refus de Vinted arrête le passage (avant : il continuait à l'offre suivante). **Tranché** : un refus
+  ordinaire (offre expirée) ne freine PAS Republier 30 min, il arrête seulement le passage.
+- **P4 — la virgule.** `seuilOffreLu` : « 45,5 » = 45,5 (avant : NaN, mini ignoré). L'app :
+  capacité `offrespage` (5.342.0) ; l'aperçu lit la virgule SEULEMENT pour une extension 5.342
+  (`extSait`), sinon il dit « seuil illisible » comme avant ; « Corriger » reste (anciennes extensions).
+- Garde-fous inchangés : `garde` avant chaque réponse, 50/h (réserve 5), une requête à la fois
+  (`vintedPage` passe par `requeteVinted`), pause 429/403, délai aléatoire 3–20 min, chaque offre une
+  fois, 3 par visite, éteint par défaut.
+- Version : `CODE_VERSION`, manifeste, `lbc-inject`/`lbc-relay`, `EXT_ATTENDUE`, Orion = 5.342.0 ;
+  zips régénérés (`scripts/zip-extension.cjs`).
+- **P2 pas fait** (`vrm_stop_tout` lu par l'extension) : une clé et une capacité nouvelles, app +
+  extension ; reste pour un lot suivant. « Tout arrêter » éteint déjà offres et favoris auto.
+
+### « Gagner du temps » (principe de Julien) — gestes comptés
+| parcours | avant | après |
+|---|---|---|
+| Republier à la main, par paire dans le kit | 4 (photos · Vinted ↗ · N° · description) | **3** (« Vinted ↗ » copie aussi la description) — 10 paires : 40 → 30 |
+| Ouvrir « Republier à la main » depuis Actions | lien discret SOUS les tuiles | même nombre de clics, **en tête** (rien à chercher) |
+| Arrêter tout l'automatique | éteindre les offres (Annonces → Outils → interrupteur → confirmer) + arrêter le mode auto des favoris compte par compte | **2** (« Tout arrêter » → confirmer), tous les comptes |
+| Régler « Accepter dès » sur 10 paires | une carte d'annonce par paire (≈ 3 gestes chacune, ≈ 30) | ≈ 13 (Offres auto, 10 champs en liste) ou la série (cocher → « Régler en série ») |
+| Anciens seuils à virgule | ignorés sans un mot (aucun geste possible) | **1** (« Corriger ») ; avec 5.342 : 0 |
+| Accepter une offre depuis l'onglet | 0 (le fond) | 0 (l'onglet) |
+
+### Preuves (reprise)
+- `npm run build` vert.
+- `audit-offres-sures` : **42 contrôles** verts ; `--prouve` **24/24 mutations** rouges (dont 7
+  sur le vrai fond : virgule ignorée, réponse du fond, offre sans onglet marquée faite, frein ignoré,
+  refus en série, geste de l'app toujours au fond, geste bloqué sans onglet) ; sur la tête d'avant la
+  reprise (`git archive 01ffc6d0`) : **7 rouges** (A1b, B1–B5, C8).
+- Audits verts : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
+  extension-zip, extension-navigateurs, moteur-offres (24), exec (21), argent-vinted, relais (32),
+  offres-auto (26), offres-garde (25), offres, jauge-journal, confiance (39), republier,
+  republier-kit (17), republier-main (36), annonces-actions (69), versement-rapide (20).
+- Banc `offres-auto` : **83 OK, 0 KO** (clair : extension 5.342 ⇒ « 45,5 » lu ; sombre : 5.341 ⇒
+  « seuil illisible »). Bancs `republier-kit` / `republier-main` : voir la fin du récit.
+
+### Geste de Julien
+Installer l'extension **5.342.0** (remplacer le dossier, ⟳ dans chaque Chrome). Garder un onglet
+vinted.fr ouvert : les offres auto partent de là (sans onglet, elles attendent).

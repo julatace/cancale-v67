@@ -1230,7 +1230,9 @@ function CarteKit({ x, regs, copie, copies, copier, domaine, ouverte, onOuvrir }
       <ol className="vrm-kit-gestes vrm-kit-etapes">
         <li data-kit-etape="photos">{nPh > 0 ? <Bouton variante={pretes && !ph.enregistre ? 'primaire' : 'secondaire'} icone={ph && ph.enregistre ? 'check' : 'image'} data-kit-photos={p.id} data-kit-photos-n={nPh} data-kit-photos-fait={ph && ph.enregistre ? ph.enregistre : undefined} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libelle}</Bouton>
           : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-photo="">Photos pas lues</span>}</li>
-        <li data-kit-etape="vinted"><Bouton variante={ouverte ? 'discret' : 'secondaire'} icone={ouverte ? 'check' : 'link'} data-kit-ouvrir-paire={p.id} href={`https://${domaine}/items/new`} target="_blank" rel="noopener noreferrer" onClick={onOuvrir}>{ouverte ? 'Vinted ouvert' : 'Vinted ↗'}</Bouton></li>
+        {/* (11 nov., « gagner du temps ») « Vinted ↗ » COPIE AUSSI la description : un geste de moins
+            par paire (il colle en arrivant sur « Vendre »). « Description » reste pour la recopier. */}
+        <li data-kit-etape="vinted"><Bouton variante={ouverte ? 'discret' : 'secondaire'} icone={ouverte ? 'check' : 'link'} data-kit-ouvrir-paire={p.id} data-kit-ouvrir-copie={descOk ? '1' : '0'} href={`https://${domaine}/items/new`} target="_blank" rel="noopener noreferrer" onClick={() => { if (descOk) copier(kD, ann.description); onOuvrir(); }}>{ouverte ? (descOk ? 'Description copiée' : 'Vinted ouvert') : 'Vinted ↗'}</Bouton></li>
         <li data-kit-etape="coller" className="vrm-kit-coller">
           {num ? bouton(kN, num, num, 'copy', { 'data-kit-copier-num': p.id, 'aria-label': `Copier le ${num}` }) : <span className="vrm-rm-muet vrm-kit-sans" data-kit-sans-num="">Sans N°</span>}
           {descOk ? bouton(kD, 'Description', ann.description, 'copy', { 'data-kit-copier-desc': p.id, 'aria-label': 'Copier la description' }) : null}
@@ -1291,7 +1293,7 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
       {/* Le conseil, en tête : une phrase, trois gestes. */}
       <div className="vrm-kit-conseil" data-kit-conseil="">
         <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
-        <div><b>Le plus sûr : tu publies toi-même.</b><span>Par paire : photos, Vinted, puis N° et description.</span></div>
+        <div><b>Le plus sûr : tu publies toi-même.</b><span>Photos, puis « Vinted ↗ » : description déjà copiée.</span></div>
       </div>
       <div className="vrm-kit-barre">
         <span className="vrm-rm-muet" data-kit-couverture={`${cv.lues}/${cv.n}`}>{cv.enCours ? 'Lecture des fiches…' : cv.lues === cv.n ? `${n} description${n > 1 ? 's' : ''} prête${n > 1 ? 's' : ''}` : `Descriptions lues : ${cv.lues} sur ${cv.n}`}</span>

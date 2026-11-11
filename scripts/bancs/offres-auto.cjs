@@ -9,7 +9,8 @@ require('./_porte-banc.cjs');
 //   A. l'aperçu dit ce que le moteur ferait de chaque offre en attente :
 //      48 € sur N°2 (dès 45) ⇒ « Acceptée 3 à 20 min après » ; 20 € sur N°4 (refus
 //      sous 30) ⇒ « Refusée » ; 40 € sur N°5 (aucune règle) ⇒ « Aucune règle » ;
-//      50 € sur N°3 (mini « 45,5 » : le moteur l'ignore) ⇒ « seuil illisible » ;
+//      50 € sur N°3 (mini « 45,5 ») ⇒ « Acceptée » avec l'extension 5.342 (clair),
+//      « seuil illisible » avec une 5.341 qui l'ignore (sombre) ;
 //   S. « Corriger » rend le seuil lisible (N°3 ⇒ 45.5, l'offre passe « Acceptée ») ;
 //      un seuil tapé « 39,5 » sur N°5 s'écrit 39.5 et l'aperçu suit ; « Régler en
 //      série · 2 » ouvre la feuille Prix mini ;
@@ -72,7 +73,9 @@ const offre = (oid, item, titre, prix, uid = 111) => ({ id: `harvest_${uid}_conv
       const { ctx, pg, journal, tel } = await NV.ouvrir(nav, { W, sombre, base, tab: 'journee' });
       const api = [];
       await pg.route('**/api/compte?mode=favoris*', (r) => { const u = new URL(r.request().url()); let b = {}; try { b = JSON.parse(r.request().postData() || '{}'); } catch (_) {} api.push({ uid: u.searchParams.get('uid'), action: b.action || 'GET' }); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, vue: {} }) }); });
-      await pg.addInitScript(PONT, { version: VERSION });
+      // 5.342 lit « 45,5 » ; une extension plus ancienne (servie en sombre) l'ignore.
+      const vExt = sombre ? '5.341.0' : VERSION, virgule = vExt === VERSION;
+      await pg.addInitScript(PONT, { version: vExt });
       await pg.addInitScript((frein) => { try { localStorage.setItem('vrm_freins_vus', JSON.stringify([frein])); } catch (_) {} }, { vu: t - 2 * 3600000, jusqua: t - 2 * 3600000 + 15 * 60000 });
       try {
         // ── O : l'écran, par Annonces → Outils (le lien) ──
@@ -97,7 +100,8 @@ const offre = (oid, item, titre, prix, uid = 111) => ({ id: `harvest_${uid}_conv
         dit(gComplet ? /^accepter\|.*Acceptée 3 à 20 min après/.test(dec['111_301'] || '') : /^garde\|.*Pas acceptée · un site pas relu/.test(dec['111_301'] || ''), `A ${tag} : 48 € sur N°2 (dès 45) ⇒ ${gComplet ? '« Acceptée 3 à 20 min après »' : 'garde incomplète publiée par l’app : « Pas acceptée · un site pas relu »'}`, dec['111_301']);
         dit(/^refuser\|.*Refusée/.test(dec['111_302'] || ''), `A ${tag} : 20 € sur N°4 (refus sous 30) ⇒ « Refusée »`, dec['111_302']);
         dit(/^sans\|.*Aucune règle/.test(dec['111_303'] || ''), `A ${tag} : 40 € sur N°5 sans seuil ⇒ « Aucune règle »`, dec['111_303']);
-        dit(/^sans\|.*seuil illisible/.test(dec['111_304'] || ''), `A ${tag} : mini « 45,5 » (ignoré par le moteur) ⇒ « seuil illisible », jamais « Acceptée »`, dec['111_304']);
+        if (virgule) dit(new RegExp('^' + ACC + '\\|').test(dec['111_304'] || ''), `A ${tag} : extension ${vExt} : mini « 45,5 » lu 45,5 ⇒ 50 € « ${ACC} »`, dec['111_304']);
+        else dit(/^sans\|.*seuil illisible/.test(dec['111_304'] || ''), `A ${tag} : extension ${vExt} : mini « 45,5 » (ignoré par elle) ⇒ « seuil illisible », jamais « Acceptée »`, dec['111_304']);
         dit(await pg.locator('[data-oa-rien-envoye]').count() === 1, `A ${tag} : « Aperçu : rien n’est envoyé d’ici »`);
         await attendre(400); await pg.screenshot({ path: path.join(SHOTS, `offres-auto-${tag}-1-haut.png`) });
         // ── P : jauge, alerte, journée calme ──
