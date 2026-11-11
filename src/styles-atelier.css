@@ -43,7 +43,7 @@
 .vrm-day-stock-links button { border:0; background:transparent; color:var(--vrm-ink); cursor:pointer; padding:8px 0; font-family:inherit; font-size:12px; font-weight:500; }
 /* (30 oct.) À la souris dès 768 px (coque ordinateur), le bonjour est le grand
    titre : « Ma journée » au-dessus le redisait (Edge en demi-écran). */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
  .vrm-day-layout>.vrm-screen-head { display:none; }
  /* Le bonjour est la ligne de titre : il réserve la place de l'île qui flotte
     au-dessus (« Modifier » passait dessous, revue Edge du 30 oct.). */
