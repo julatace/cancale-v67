@@ -228,7 +228,9 @@ async function main() {
           const { ctx, pg, errs } = await preparer(b, vp, sombre);
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
           await pg.locator('[data-guide-importer-geste]').first().waitFor({ timeout: 20000 });
-          dit((await pg.locator('[data-guide-etape]').count()) === 5, `${T} le guide garde ses 5 étapes comptées (l’import est à part)`);
+          const tot = await pg.evaluate(() => { const e = document.querySelector('[data-guide-progres]'); return e ? Number(e.getAttribute('data-guide-progres').split('/')[1]) : -1; });
+          const rangs = await pg.locator('[data-parcours-rang]').count();
+          dit(tot > 0 && rangs === tot && (await pg.locator('[data-parcours-rang="importer"]').count()) === 0, `${T} l’import est à part : les étapes comptées ne changent pas (${rangs}/${tot})`);
           dit((await hauteur(pg, '[data-guide-importer-geste]')) >= 44, `${T} « Importer mon stock » ≥ 44 px`);
           await pg.locator('[data-guide-importer]').first().scrollIntoViewIfNeeded();
           await capture(pg, `guide-importer-${suffixe}`);

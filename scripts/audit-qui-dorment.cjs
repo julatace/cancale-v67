@@ -82,7 +82,7 @@ async function audit(src, bavard) {
   // chaîne de ternaires (`) : annSort==='sleeping' ? (`), la grille dans le DERNIER
   // « sinon ». Même règle : dans cette vue, la liste, et la grille seulement ailleurs.
   dit(/\{annSort==='sleeping' \? \(\s*<QuiDorment /.test(code)
-    || /\) : annSort==='sleeping' \? \(\s*<QuiDorment [^\n]*\n(?:(?!\) : )[^\n]*\n)*?\s*\) : \(<>\s*<div className="vrm-ledger-heading[^\n]*\n\s*<div className="vrm-ann-grid/.test(code), 'la liste remplace la grille dans cette vue');
+    || /\) : annSort==='sleeping' \? \(\s*<QuiDorment [^\n]*\n(?:(?!\) : )[^\n]*\n)*?\s*\) : \(<>\s*<div className="vrm-ledger-heading[^\n]*\n(?:\s*\{\}\s*\n)*\s*<div className="vrm-ann-grid/.test(code), 'la liste remplace la grille dans cette vue');   // (11 nov.) un commentaire JSX (vidé en `{}`) peut précéder la grille (lot AM)
   const menu = (/\{dortAgir && \(\(\)=>\{[\s\S]*?<\/SheetShell>/.exec(code) || [''])[0];
   dit(/versRepub\('modifier'\)/.test(menu) && /versRepub\('recreer'\)/.test(menu) && /setRepubReprise\(\[String\(it\.id\)\]\); setRepubAction\(act\);/.test(menu),
     'Baisser le prix / Republier ouvrent l’atelier Republier existant (« modifier » / « recréer ») avec CET article pré-choisi');

@@ -49,7 +49,7 @@ function Preuve({ type, p }) {
 }
 
 function Carte({ c, Photo, onDossier = null }) {
-  const P = Photo || ((x) => <img {...x} alt=""/>);
+  const P = Photo || (() => null);   // (11 nov.) sans la règle des photos (PhotoVinted), aucune <img> brute
   const ph = c.preuves && c.preuves.photo && c.preuves.photo.etat === 'ok' ? c.preuves.photo.src : '';
   const tuile = <span className="vrm-lit-tuile" aria-hidden="true">{ICONES.photo}</span>;
   return (

@@ -120,7 +120,7 @@ export function VerificationInstallation({ verif, onGeste, lienGeste = () => '',
   );
 }
 
-export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, onExemple = null, onMasquer = null, onVerifier = null, onPlusTard = null, numerotation = null, verification = null, onOuvrirVerification = null, Pop = null, onImporter = null }) {
+export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, onExemple = null, onMasquer = null, onVerifier = null, onPlusTard = null, numerotation = null, verification = null, onOuvrirVerification = null, Pop = null }) {
   if (!guide) return null;
   const { etapes, faites, total, courante } = guide;
   return (
@@ -170,13 +170,6 @@ export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, on
         })}
       </ol>
       {verification}
-      {/* (11 nov.) FACULTATIF, hors des étapes comptées : il arrive d'un tableur ou d'un autre logiciel. */}
-      {onImporter ? (
-        <div className="vrm-guide-exemple" data-guide-importer="">
-          <p>Tu arrives d’un tableur ou d’un autre logiciel&nbsp;? Importe ton stock et tes ventes passées. Rien n’est enregistré avant ton «&nbsp;Importer&nbsp;».</p>
-          <button type="button" className="vrm-b vrm-b-secondaire" data-guide-importer-geste="" onClick={onImporter}>Importer mon stock</button>
-        </div>
-      ) : null}
       {(onExemple || onMasquer || onOuvrirVerification) && (
         <div className="vrm-guide-pied">
           {onExemple ? (
