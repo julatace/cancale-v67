@@ -36,9 +36,18 @@ if (process.argv.includes('--recopie')) {
 (async () => {
   console.log('── 1. La copie serveur est la règle de l’app');
   const copie = fs.existsSync(COPIE) ? fs.readFileSync(COPIE, 'utf8') : '';
-  dit(copie === TETE + fs.readFileSync(SRC, 'utf8'), 'api/_lib/vente-lot-regle.js = src/venteLot.js au caractère près', copie ? 'le code diffère — `--recopie`' : 'absente');
-  const L = await import('file://' + SRC);
+  const source = fs.existsSync(SRC) ? fs.readFileSync(SRC, 'utf8') : null;
+  dit(source != null && copie === TETE + source, 'api/_lib/vente-lot-regle.js = src/venteLot.js au caractère près', source == null ? 'src/venteLot.js absent' : copie ? 'le code diffère — `--recopie`' : 'absente');
+  const L = source == null ? null : await import('file://' + SRC).catch((e) => { dit(false, 'src/venteLot.js se charge', e.message); return null; });
   const S = await import('file://' + COPIE).catch(() => ({}));
+  if (L) await regles(L, S);
+  else dit(false, 'la règle des ventes en lot existe (sections 2 à 7 non jouées)');
+  appli();
+  console.log(`\n${ok} ✅ · ${ko} ❌`);
+  process.exit(ko ? 1 : 0);
+})();
+
+async function regles(L, S) {
 
   const tx = (items, extra = {}) => ({ payload: { transaction: { id: 9000001, items_count: items.length, order: { items }, ...extra } } });
   const art = (id, title, prix, photo, size) => ({ id, title, price: prix == null ? null : { amount: String(prix), currency_code: 'EUR' }, photos: photo ? [{ url: photo }] : [], size_title: size || null });
@@ -143,7 +152,9 @@ if (process.argv.includes('--recopie')) {
     }
     dit(typeof S.resumeVenteLot === 'function', 'la copie serveur se charge');
   }
+}
 
+function appli() {
   console.log('── 8. L’app branche la règle');
   {
     const app = require('./_source-app.cjs').sourceApp().replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
@@ -155,7 +166,4 @@ if (process.argv.includes('--recopie')) {
     dit(/numeroDeItem: \(id\) => \{ if \(onlineAnnonceIds\.has\(String\(id\)\)\) return null;/.test(app) && !/numeroDe\w*: \([^)]*\) => [^;]*title/.test(app), 'aucune voie par titre ; une annonce encore en ligne n’est jamais un article vendu');
     dit(/'vrm_lot_liens',/.test(app), '« Relier » est synchronisé (vrm_lot_liens)');
   }
-
-  console.log(`\n${ok} ✅ · ${ko} ❌`);
-  process.exit(ko ? 1 : 0);
-})();
+}
