@@ -46,6 +46,7 @@ export default {
   "visuels.rien": "Nothing is posted: you do the sharing.",
   "visuels.taille": "Size {t}",
   "visuels.image": "Image {i} of {n}",
+  "visuels.dessin": "Drawing…",
   "visuels.actionDesc": "A square and a story, to share.",
   // ── nav
   "nav.achats": "Purchases",

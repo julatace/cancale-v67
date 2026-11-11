@@ -51,6 +51,7 @@ export default {
   "visuels.rien": "Rien n’est publié : c’est toi qui partages.",
   "visuels.taille": "Taille {t}",
   "visuels.image": "Image {i} sur {n}",
+  "visuels.dessin": "Dessin…",
   "visuels.actionDesc": "Un carré et une story, à partager.",
   // ── nav
   "nav.achats": "Achats",

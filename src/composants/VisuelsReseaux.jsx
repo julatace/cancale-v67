@@ -80,12 +80,14 @@ export default function VisuelsReseaux({ articles, lot = false, lirePhoto, regla
   const dehors = enCours ? [] : prets.filter((a) => !a.lues.length);
   const extrasKo = !enCours && seule && dedans.length ? Math.max(0, Math.min((liste[0].photos || []).length, PHOTOS_MAX_SEULE) - dedans[0].lues.length) : 0;
 
+  // La clé des réglages DESSINÉS : l'aperçu dit « dessin » tant que l'image montrée n'est pas celle des réglages.
+  const cleVoulue = `${format}|${modele}|${accent}|${boutique}|${dedans.map((a) => a.cle + ':' + a.lues.join('.')).join(',')}`;
   // Le dessin : une image par page.
   const [images, setImages] = React.useState(null);   // null = rien · [{ url, blob, nom }]
   const [refus, setRefus] = React.useState(false);
   React.useEffect(() => {
     if (enCours || !dedans.length) { setImages(null); return undefined; }
-    let vivant = true; const urls = [];
+    let vivant = true; const urls = []; const voulu = cleVoulue;
     (async () => {
       const pages = seule ? [dedans] : pagesLot(dedans, format);
       const res = [];
@@ -104,12 +106,13 @@ export default function VisuelsReseaux({ articles, lot = false, lirePhoto, regla
         const url = URL.createObjectURL(blob); urls.push(url);
         res.push({ url, blob, nom: nomFichier(format, i, pages.length) });
       }
-      if (vivant) { setRefus(false); setImages(res); } else urls.forEach((u) => URL.revokeObjectURL(u));
+      if (vivant) { setRefus(false); setImages(res.length ? Object.assign(res, { cle: voulu }) : null); } else urls.forEach((u) => URL.revokeObjectURL(u));
     })();
     return () => { vivant = false; urls.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enCours, photos, format, modele, accent, boutique, liste, seule, lot]);
 
+  const dessin = !enCours && dedans.length > 0 && !refus && (!images || images.cle !== cleVoulue);
   const ranger = (patch) => { try { onReglages && onReglages({ ...reglagesValides({ format, modele, accent, boutique }), ...patch }); } catch (_) {} };
   const fichiers = () => (images || []).map((im) => new File([im.blob], im.nom, { type: 'image/png' }));
   const peutPartager = (() => { try { return !!(navi && typeof navi.canShare === 'function' && images && images.length && navi.canShare({ files: fichiers() })); } catch (_) { return false; } })();
@@ -149,8 +152,9 @@ export default function VisuelsReseaux({ articles, lot = false, lirePhoto, regla
           </label>
         </div>
 
-        <div className="vrm-vis-apercu" data-visuels-apercu={enCours ? 'lecture' : images ? String(images.length) : refus ? 'refus' : 'aucun'} data-visuels-format-vu={format}>
+        <div className="vrm-vis-apercu" data-visuels-apercu={enCours ? 'lecture' : dessin ? 'dessin' : images ? String(images.length) : refus ? 'refus' : 'aucun'} data-visuels-format-vu={format}>
           {enCours ? <div className="vrm-vis-attente" role="status" data-visuels-lecture="">{tr('visuels.lecture', { n: lues, total: voulues.length })}</div>
+            : dessin && !images ? <div className="vrm-vis-attente" role="status" data-visuels-dessin="">{tr('visuels.dessin')}</div>
             : images ? images.map((im, i) => <img key={im.url} src={im.url} alt={tr('visuels.image', { i: i + 1, n: images.length })} className={`vrm-vis-img vrm-vis-img-${format}`} data-visuels-image={i + 1}/>)
             : <div className="vrm-vis-vide" role="status" data-visuels-vide={refus ? 'refus' : 'aucune'}>
                 <b>{refus ? tr('visuels.refus') : tr('visuels.aucune')}</b>

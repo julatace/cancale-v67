@@ -91,11 +91,11 @@ async function dessinerPhotos(b) {
 }
 
 async function page(b, T, photos, { refuse = new Set(), vue = 'vinted_annonces' } = {}) {
-  const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: 'light', acceptDownloads: true });
+  const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: 'light', locale: 'fr-FR', acceptDownloads: true });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ n, tactile }) => { try {
-    if (!sessionStorage.getItem('__banc')) { sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); }
+    if (!sessionStorage.getItem('__banc')) { sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_langue', JSON.stringify('fr')); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); }
     window.__partages = [];
     if (tactile) {
       Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => !!(d && Array.isArray(d.files) && d.files.length) });
@@ -158,7 +158,7 @@ const lireImages = (pg) => pg.evaluate(async () => {
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     petites: [...s.querySelectorAll('button, input')].filter((x) => !x.disabled && x.getBoundingClientRect().width > 0).map((x) => { const r = x.getBoundingClientRect(); return Math.min(r.width, r.height); }).filter((h) => h < 43.5).length };
 });
-const attendreImages = (pg, n = 1) => pg.waitForFunction((n) => { const a = document.querySelector('[data-visuels-apercu]'); const v = a && a.getAttribute('data-visuels-apercu'); return v && v !== 'lecture' && (v === 'aucun' || v === 'refus' || Number(v) >= n) && [...document.querySelectorAll('[data-visuels-image]')].every((i) => i.complete); }, n, { timeout: 20000 });
+const attendreImages = (pg, n = 1) => pg.waitForFunction((n) => { const a = document.querySelector('[data-visuels-apercu]'); const v = a && a.getAttribute('data-visuels-apercu'); return v && v !== 'lecture' && v !== 'dessin' && (v === 'aucun' || v === 'refus' || Number(v) >= n) && [...document.querySelectorAll('[data-visuels-image]')].every((i) => i.complete); }, n, { timeout: 20000 });
 const ranger = (nom, im) => { if (!CAPT || !im) return; fs.mkdirSync(CAPT, { recursive: true }); fs.writeFileSync(path.join(CAPT, nom + '.png'), Buffer.from(im.b64, 'base64')); };
 
 (async () => {

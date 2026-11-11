@@ -46,6 +46,7 @@ export default {
   "visuels.rien": "Niente viene pubblicato: condividi tu.",
   "visuels.taille": "Taglia {t}",
   "visuels.image": "Immagine {i} di {n}",
+  "visuels.dessin": "Disegno…",
   "visuels.actionDesc": "Un quadrato e una story, da condividere.",
   // ── nav
   "nav.achats": "Acquisti",
