@@ -199,9 +199,11 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
         const rA = await lire(pg);
         dit(rA.nAbo === 0 && /corbeille/i.test(pil) && (await pg.locator('[data-pilule-annuler]').count()) > 0, 'supprimer un abonnement : la ligne part, la pilule dit « Mis à la corbeille » et offre « Annuler »', pil.replace(/\s+/g, ' '));
         await pg.click('[data-pilule-annuler]');
-        await pg.waitForTimeout(1500);
-        const stA = await stocke(); const rB = await lire(pg);
-        dit(rB.nAbo === 1 && stA && JSON.stringify(stA.abo) === JSON.stringify(avant.abo) && !Object.keys(stA.corb).length, '« Annuler » remet la ligne exacte (écran et `vrm_compta`), corbeille vide', `${rB.nAbo} · ${stA && stA.abo.length}`);
+        // (11 nov., rouges A) Pas un délai fixe (§6.5) : la remise passe par la file du geste ; sous charge
+        // 1,5 s ne suffisait pas (rouge intermittent). On attend l'état (8 s au plus), puis on juge.
+        let stA = null, rB = null;
+        for (let i = 0; i < 32; i++) { stA = await stocke(); rB = await lire(pg); if (rB.nAbo === 1 && stA && JSON.stringify(stA.abo) === JSON.stringify(avant.abo) && !Object.keys(stA.corb).length) break; await pg.waitForTimeout(250); }
+        dit(rB.nAbo === 1 && stA && JSON.stringify(stA.abo) === JSON.stringify(avant.abo) && !Object.keys(stA.corb).length, '« Annuler » remet la ligne exacte (écran et `vrm_compta`), corbeille vide', `${rB.nAbo} · ${stA && stA.abo.length} · corbeille ${stA ? Object.keys(stA.corb).length : '?'}`);
         await pg.click('[data-abo] [data-compta-supprimer]');
         await pg.waitForTimeout(6500);
         const stS = await stocke(); const rS = await lire(pg);
