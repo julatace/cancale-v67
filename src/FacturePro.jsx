@@ -267,7 +267,10 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   const prochainN = etat && Number.isInteger(etat.prochain) ? etat.prochain : null;
   const numeroExemple = numeroFacture(cfg.prefixe, anneeParis(Date.now()), prochainN || 1);
   let apercu = null;
-  try { apercu = contenuApercu(cfg, EXEMPLE, { numero: numeroExemple, emiseLe: Date.now() }).contenu; } catch (_) { apercu = null; }
+  // (11 nov., lot DJ2) L'article d'exemple suit ce qu'il vend (une basket seulement pour Sneakers).
+  let exemple = EXEMPLE;
+  try { if (deps && typeof deps.vendActuel === 'function' && deps.vendActuel() !== 'sneakers' && typeof deps.exemples === 'function') exemple = { ...EXEMPLE, designation: deps.exemples().annonce.titre + ' (exemple)' }; } catch (_) { exemple = EXEMPLE; }
+  try { apercu = contenuApercu(cfg, exemple, { numero: numeroExemple, emiseLe: Date.now() }).contenu; } catch (_) { apercu = null; }
   const mentionsKo = apercu ? new Set(mentionsManquantes(apercu)) : new Set();
   const societe = estSociete(cfg.forme);
   const champ = ({ k, label, aide, type = 'text', placeholder, mode, auto, large: lg = false, majuscules = false }) => (
