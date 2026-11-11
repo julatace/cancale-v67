@@ -4,6 +4,8 @@ import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neu
 import { RappelsSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
+// (11 nov., lot journee-perso) « Ma journée » : le MÊME éditeur que « Modifier ma journée ».
+import { JourneePersoSetting } from '../App.jsx';
 import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrière après une mauvaise manipulation
 import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
@@ -1958,6 +1960,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:tr('reglages.affichage-mode.lib'), desc:tr('reglages.affichage-mode.desc'), val: profilV.mode === 'simple' ? tr('reglages.affichage.simple') : tr('reglages.affichage.complet'), data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
       // (9 nov., Julien) L'objectif du mois : un montant de VENDU à viser (vide par défaut). La barre fine de
       // Ma journée (et de chaque carte qui la montre) lit CE réglage (`vrm_objectif_mois`, synchronisé).
+      // (11 nov., lot journee-perso) Ma journée : montrer, cacher, ranger ses cartes (src/journeePerso.js) — synchronisé.
+      { id:'ma-journee', type:'panneau', nu:true, ic:'soleilLevant', lib:'Ma journée', desc:'Montrer, cacher et ranger les cartes de Ma journée.', data:{ 'data-reglage-journee-perso':'' }, el:<JourneePersoSetting/> },
       { id:'objectif-mois', type:'panneau', nu:true, ic:'chart', lib:tr('reglages.objectif-mois.lib'), desc:tr('reglages.objectif-mois.desc'), val: valObjectif, data:{ 'data-reglage-objectif': objectifR ? objectifR.type : 'aucun' }, el:<ObjectifMoisSetting/> },
       // (11 nov., lot traduction) La langue de VRM (src/i18n/) : Français · English · Español · Italiano · Deutsch.
       { id:'langue', type:'panneau', nu:true, ic:'langue', lib:tr('reglages.langue.lib'), desc:tr('reglages.langue.desc'), val: NOMS_LANGUES[langueCourante()] || '', data:{ 'data-reglage-langue': langueCourante() }, el:<LangueSetting/> },

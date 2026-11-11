@@ -217,8 +217,17 @@ export function aUnTemoin(t, cmd, temoins, opts = {}) {
 //   · plus de témoin libre (un témoin = un carton) ⇒ `seul` : un autre colis, À RETIRER, compté.
 // Rien n'est relié par le titre ; la moitié n'hérite d'aucune identité (ni code, ni n°, ni photo) : la
 // décision ne porte que sur le COMPTE (un carton une fois) et sur la phrase qui la dit.
-export function apparierTemoins(cands, { temoinActif, commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J } = {}) {
-  const items = (cands || []).map((c, i) => ({ ...c, i, ms: arriveeMs(c.t), ws: temoinsDe(c.t, c.cmd, c.temoins, { commandeDe, fenetreJ }) }));
+// (11 nov., Julien : « bcp de colis qui ne sont pas dans les retraits » — mesuré : 13 achats que VINTED dit encore
+// « colis déposé en bureau de Poste ou point relais » (action attendue), sans n° de suivi, appariés à un colis Mondial
+// Relay du même point DÉJÀ RETIRÉ ⇒ classés « sans doute fini » et sortis des retraits.) Un achat que sa propre
+// commande dit ENCORE EN ATTENTE au point (`attendEncore`, par SA conversation — une identité) ne peut pas être un
+// colis déjà retiré : il ne s'apparie qu'à un témoin encore montré ; sinon il est un colis à part, à retirer.
+export function apparierTemoins(cands, { temoinActif, commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J, attendEncore = () => false } = {}) {
+  const items = (cands || []).map((c, i) => {
+    let ws = temoinsDe(c.t, c.cmd, c.temoins, { commandeDe, fenetreJ });
+    if (c.cmd && attendEncore(c.cmd)) ws = ws.filter((w) => temoinActif(w));
+    return { ...c, i, ms: arriveeMs(c.t), ws };
+  });
   const pris = new Set();
   const ordre = [...items].sort((a, b) => (Number.isFinite(a.ms) ? a.ms : Infinity) - (Number.isFinite(b.ms) ? b.ms : Infinity) || a.i - b.i);
   const ecart = (x, w) => { const aw = arriveeMs(w); return Number.isFinite(x.ms) && Number.isFinite(aw) ? Math.abs(aw - x.ms) : Infinity; };
@@ -234,7 +243,7 @@ export function apparierTemoins(cands, { temoinActif, commandeDe = () => null, f
   }
   return out;
 }
-export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion = (m, s) => ({ ...s, ...m }), temoins = null, sansIdentite = null, temoinActif = null } = {}) {
+export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion = (m, s) => ({ ...s, ...m }), temoins = null, sansIdentite = null, temoinActif = null, attendEncore = () => false } = {}) {
   const parTx = new Map(); const garde = []; const cmds = [];
   for (const t of liste || []) {
     const c = commandeDe(t); const k = c && c.transaction_id != null ? String(c.transaction_id) : '';
@@ -252,7 +261,7 @@ export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion =
   if (Array.isArray(temoins) && typeof temoinActif === 'function') {
     const cands = [];
     garde.forEach((t, i) => { if (t.source === 'vinted-commande' && (!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))) cands.push({ t, cmd: cmds[i], temoins, i }); });
-    apparierTemoins(cands, { temoinActif, commandeDe }).forEach((r, k) => apparie.set(cands[k].i, r));
+    apparierTemoins(cands, { temoinActif, commandeDe, attendEncore }).forEach((r, k) => apparie.set(cands[k].i, r));
   }
   garde.forEach((t, i) => {
     if (t.source === 'vinted-commande' && (!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))) {
