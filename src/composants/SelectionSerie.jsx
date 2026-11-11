@@ -9,6 +9,7 @@
 //     sélection est ouverte, un tap coche au lieu d'ouvrir la ligne) ;
 //   · `<BarreSerie>` : « N sélectionnés », « Tout sélectionner », les actions,
 //     « Annuler » — en portail (une feuille au-dessus d'elle reste au-dessus, §7).
+import { lancerTravail } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) l'API unique des actions longues
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { BoutonBase as Bouton } from './Bouton.jsx';
@@ -139,7 +140,16 @@ export function BarreSerie({ serie, actions = [], unite = { un: 'sélectionné',
     if (!n || occupe || a.desactive) return;
     setOccupe(true);
     try {
-      const r = await a.faire(serie.choisies);
+      // (11 nov., lot suivi-travail) Une action en série qui dure (bordereaux, factures…) fige VRM avec
+      // la feuille « VRM travaille » ; finie sous 1 s et sans souci, rien ne s'affiche (src/suiviTravail.js).
+      const { valeur: r, resultats } = await lancerTravail({ sorte: `serie-${serie.nom || ''}`, titre: `${a.libelle} · ${n}`, executer: async (o) => {
+        const v = await a.faire(serie.choisies);
+        if (v && typeof v === 'object' && v.annule) { o.noter('Annulé'); return v; }
+        const txt = typeof v === 'string' ? v : (v && v.texte) || '';
+        if (txt) o.noter(txt);
+        return v;
+      } });
+      if (resultats && resultats.action && resultats.action.etat === 'refus' && r === undefined) { setResume('Pas fait : ' + resultats.action.raison); setOccupe(false); return; }
       if (r && typeof r === 'object' && r.annule) { setOccupe(false); return; }
       setResume(typeof r === 'string' ? r : (r && r.texte) || '');
       if (!(r && r.garder)) serie.vider();
