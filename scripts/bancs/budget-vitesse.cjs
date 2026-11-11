@@ -2,7 +2,8 @@
 //  BUDGET DE VITESSE — l'app ne peut plus redevenir lente sans qu'on le voie
 //  (11 nov. 2026). Lancer : npm run build && node scripts/bancs/budget-vitesse.cjs
 //
-//  Par écran principal, à 390 px (téléphone, processeur ×4), on mesure ce qui ne
+//  Par écran principal, à 390 px (téléphone tactile, processeur non ralenti — voir plus
+//  bas), on mesure ce qui ne
 //  dépend PAS de la vitesse de la machine (les machines de CI sont partagées : un
 //  temps en millisecondes y varie du simple au double, aucun seuil de temps ici) :
 //    · lectures   : nombre de lectures (GET) de NOTRE base jusqu'au calme ;
@@ -39,6 +40,14 @@
 //  budget est remesuré jusqu'à n fois, chaque mesure jugée sur son meilleur essai).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs');
+// Processeur NON ralenti (vitesse.cjs émule ×4 au téléphone) : on juge des COMPTES, pas
+// des temps, et ces comptes dépendent du temps processeur — le partage des lectures
+// (src/lecturesPartagees.js) ne réunit deux lectures identiques que si la seconde part
+// moins de 2 s après la première. Mesuré le 11 nov. : ×4 sur une machine chargée
+// (charge 15), Ventes passe de 16 à 21 lectures en double sans une ligne de code changée.
+// Sans ralentissement, le temps est celui du réseau simulé (150 ms, fixe). `VITESSE_CPU=4`
+// le remet (pour comparer).
+if (!process.env.VITESSE_CPU) process.env.VITESSE_CPU = '1';
 const V = require('./vitesse.cjs');
 
 const FICHIER = path.join(__dirname, 'budget-vitesse.json');
