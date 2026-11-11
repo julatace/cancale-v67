@@ -52,7 +52,12 @@ La feuille se monte seule (`SuiviTravailCoque` dans `AppCoeur`) : rien à monter
 ## Preuves
 
 - `node scripts/audit-suivi-travail.cjs --prouve` : **56 ✅ · 0 ❌**, dont 8 mutations toutes rouges (temps restant inventé, pseudo laissé, annonce en cours déclarée faite au rechargement, « fait » d'avant le départ accepté, pause sans fin, issue inconnue = réussie, Republier « double » compté réussi, feuille au-dessus des confirmations). Sur la tête d'avant (9d7d1b7a) l'audit n'existe pas et ses contrôles B (branchements, montage) y seraient tous rouges.
-- Banc `scripts/bancs/suivi-travail.cjs` (vraie feuille + vrai magasin, harnais esbuild, 390 tactile / 1512, clair / sombre) : voir la section « État » ci-dessous.
+- Banc `scripts/bancs/suivi-travail.cjs` (vraie feuille + vrai magasin, harnais esbuild `scripts/bancs/suivi-travail/harnais.jsx`, jauge bouchonnée, 390 tactile / 1512, clair / sombre, `SHOTS=dossier`, `THEMES`) : **64 ✅ · 0 ❌** — gel `inert`, clic derrière perdu, Échap et retour sans effet, `beforeunload`, « 2 sur 4 », étape en cours, « environ 4 min » au rythme réel, compte à rebours, question posée pendant le travail répondable, pause / reprise, Arrêter confirmé, récapitulatif, Fermer dégèle et garde, rechargement ⇒ Interrompu / à vérifier. Mutation (inert et beforeunload retirés) ⇒ 4 rouges. Captures regardées (390 clair, 1512 sombre, fin, interrompu) : deux défauts vus et corrigés (pied collant qui laissait passer le journal dessous ; police sans repli hors coque).
+- `npm run build` vert.
+
+## ÉTAT
+
+Livré, poussé, `origin/main` déjà fusionné (rien de neuf au moment de la fin). Rien de rouge connu. Pas vérifié en vrai : le rendu DANS l'app complète (le banc monte la feuille seule) — à regarder au premier Republier réel.
 - Audits communs : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction — verts.
 
 ## Pièges
