@@ -134,6 +134,140 @@
       "racines": [
         "JourneeHorsLigne"
       ]
+    },
+    {
+      "fichier": "coeur/FeuillesCompta2.jsx",
+      "sorte": "ecran",
+      "feuille": true,
+      "precharger": true,
+      "_note": "les petites feuilles de Comptabilite (une condition chacune, ouvertes sur un geste)",
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "showLister",
+          "nom": "FeuilleShowLister"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "lotView",
+          "nom": "FeuilleLotView"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "showSourcing",
+          "nom": "FeuilleShowSourcing"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "showTreasury",
+          "nom": "FeuilleShowTreasury"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "iaOpen",
+          "nom": "FeuilleIaOpen"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "linkPickFor",
+          "nom": "FeuilleLinkPickFor"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "tourneeOpen",
+          "nom": "FeuilleTourneeOpen"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "showDisputes",
+          "nom": "FeuilleShowDisputes"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "renumOpen",
+          "nom": "FeuilleRenumOpen"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "inventOpen",
+          "nom": "FeuilleInventOpen"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "auditOpen",
+          "nom": "FeuilleAuditOpen"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "lotOpen",
+          "nom": "FeuilleLotOpen"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "repubMainOuvert",
+          "nom": "FeuilleRepubMainOuvert"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "qrView",
+          "nom": "FeuilleQrView"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "relayPicker",
+          "nom": "FeuilleRelayPicker"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "bordResult",
+          "nom": "FeuilleBordResult"
+        }
+      ]
+    },
+    {
+      "fichier": "coeur/VueReglagesCoque.jsx",
+      "sorte": "ecran",
+      "precharger": true,
+      "vues": [
+        {
+          "composant": "AppCoeur",
+          "condition": "tab==='settings'",
+          "nom": "VueReglagesCoque"
+        }
+      ]
+    }
+  ],
+  "_differes": "Composants importés par App.jsx et rendus seulement en JSX, ouverts sur un geste (jamais au premier écran) : leur fichier sort du premier chargement. attente : rien (défaut) | feuille | squelette.",
+  "differes": [
+    {
+      "nom": "ImportStockReglage"
+    },
+    {
+      "nom": "Visionneuse",
+      "attente": "feuille"
+    },
+    {
+      "nom": "ModeRelais",
+      "attente": "feuille"
+    },
+    {
+      "nom": "ModeDepot",
+      "attente": "feuille"
+    },
+    {
+      "nom": "ExpliqueMondialRelay"
+    },
+    {
+      "nom": "LecturesMondialRelay"
+    },
+    {
+      "nom": "ReventeModele"
+    },
+    {
+      "nom": "ChoixEmballageColis"
+    },
+    {
+      "nom": "PiloteFavorisAuto"
     }
   ]
 }

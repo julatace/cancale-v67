@@ -110,6 +110,8 @@ function sourceApp(racine) {
   // (11 nov.) Ce que scripts/decouper-app-2.cjs pose dans App.jsx (racines paresseuses, préchargements,
   // import d'un module « pur », sa marque) : chaque ligne finit par « // ⟦découpe 2⟧ » ou EST la marque.
   out = out.replace(/^[^\n]*\/\/ ⟦découpe 2⟧[^\n]*\n/gm, '');
+  // (11 nov., reprise) Un import DIFFÉRÉ (decouper-app-2.cjs, `differes`) : sa ligne d'origine est gardée, préfixée.
+  out = out.replace(/^\/\/ ⟦différé⟧ /gm, '');
   // Chaque balise `// ⟦→ ecrans/X.jsx #k⟧` reprend le morceau qui était là.
   // (Une balise peut voyager DANS un morceau parti plus tard vers un autre écran : on recommence
   // tant qu'une balise trouve son morceau.)

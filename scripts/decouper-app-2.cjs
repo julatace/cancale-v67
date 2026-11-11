@@ -65,6 +65,7 @@ const APPLIQUER = args.includes('--appliquer');
 const SEULEMENT = (opt('--seulement', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
 const RAPPORT = opt('--rapport', null);
 
+const PRECHARGER_AIDE = "const prechargerAuRepos = (charger) => { try { if (typeof window === 'undefined') return; setTimeout(() => { const go = () => { try { charger().catch(() => {}); } catch (_) {} }; if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(go, { timeout: 8000 }); else go(); }, 4000); } catch (_) {} }; // ⟦découpe 2⟧";
 const compact = (code) => generate(parser.parseExpression(code, { plugins: ['jsx'] }), { compact: true, comments: false }).code;
 const compactNode = (n) => generate(n, { compact: true, comments: false }).code;
 const ko = (n) => Math.round(n / 1024);
@@ -565,12 +566,12 @@ function decouper(src, mod, appFile) {
     // écran n'attend pas ses octets ; le jour où on y va, il est déjà là).
     if (mod.precharger) lignes += `\nprechargerAuRepos(() => import('./${modRel}')); // ⟦découpe 2⟧`;
     const marque = '// ⟦découpe 2⟧ racines et vues paresseuses (scripts/decouper-app-2.cjs)';
-    const aide = "const prechargerAuRepos = (charger) => { try { if (typeof window === 'undefined') return; setTimeout(() => { const go = () => { try { charger().catch(() => {}); } catch (_) {} }; if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(go, { timeout: 8000 }); else go(); }, 4000); } catch (_) {} }; // ⟦découpe 2⟧";
+    const aide = PRECHARGER_AIDE;
     if (out.includes(marque)) out = out.replace(marque, marque + '\n' + lignes);
     else {
       const m1 = '// ⟦démarrage léger⟧ racines paresseuses';
       if (!out.includes(m1)) throw new Error('ancre « ⟦démarrage léger⟧ racines paresseuses » absente d’App.jsx');
-      out = out.replace(m1, marque + '\n' + aide + '\n' + lignes + '\n' + m1);
+      out = out.replace(m1, marque + '\n' + (out.includes('const prechargerAuRepos = ') ? '' : aide + '\n') + lignes + '\n' + m1);
     }
     const marqueExp = '// ⟦démarrage léger⟧ emprunts des écrans à la demande';
     const re = /\/\/ ⟦démarrage léger⟧ emprunts des écrans à la demande\nexport \{ ([^}]*) \};\n/;
@@ -591,6 +592,114 @@ function decouper(src, mod, appFile) {
   }
   R.ecrit = { module: texteModule };
   return { src: out, R, modAbs, texteModule };
+}
+
+
+// ── imports DIFFÉRÉS (11 nov., reprise) ──────────────────────────────────────
+// Un composant importé STATIQUEMENT par App.jsx et rendu seulement en JSX (`<Nom …/>`) devient
+// `const Nom = aLaDemande(() => import('./X.jsx'))` : son fichier (et ce que lui seul importe) sort
+// du premier chargement. Refusé si : il sert hors JSX (appelé, passé en valeur, lu au chargement
+// du module), si son fichier — ou un fichier que lui seul amène — fait autre chose que déclarer à
+// son chargement (il tournerait plus tard qu'avant), importe une feuille de style (la cascade
+// changerait d'ordre) ou un paquet qu'App.jsx n'importe pas lui-même.
+// Texte : la ligne d'import d'origine reste, préfixée `// ⟦différé⟧ ` (scripts/_source-app.cjs
+// retire le préfixe) ; ce qui est posé finit par `// ⟦découpe 2⟧`.
+function modulePur(fichier, appImports, vus, raisons) {
+  if (vus.has(fichier)) return; vus.add(fichier);
+  if (appImports.has(fichier)) return;            // déjà chargé au démarrage par App.jsx lui-même
+  // une feuille de style reste importée par App.jsx À LA PLACE de l'import différé (la cascade ne bouge pas)
+  if (/\.css$/.test(fichier)) { (raisons.css = raisons.css || []).push(fichier); return; }
+  if (!/\.(jsx?|mjs)$/.test(fichier)) { raisons.push(`${path.basename(fichier)} : fichier non JS`); return; }
+  let t; try { t = fs.readFileSync(fichier, 'utf8'); } catch (_) { raisons.push(`${fichier} illisible`); return; }
+  let ast; try { ast = parser.parse(t, { sourceType: 'module', plugins: ['jsx'] }); } catch (e) { raisons.push(`${path.basename(fichier)} ne se lit pas`); return; }
+  for (const st of ast.program.body) {
+    if (st.type === 'ImportDeclaration' || ((st.type === 'ExportNamedDeclaration' || st.type === 'ExportAllDeclaration') && st.source)) {
+      const v = st.source.value;
+      if (v.startsWith('.')) { let abs = path.resolve(path.dirname(fichier), v.replace(/\?.*$/, '')); if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) for (const e of ['.js', '.jsx', '/index.js']) if (fs.existsSync(abs + e)) { abs += e; break; } if (/\?/.test(v)) { raisons.push(`${path.basename(fichier)} importe ${v}`); continue; } modulePur(abs, appImports, vus, raisons); }
+      else if (!appImports.has('paquet:' + v.split('/').slice(0, v.startsWith('@') ? 2 : 1).join('/'))) raisons.push(`${path.basename(fichier)} importe le paquet ${v} (qu'App.jsx n'importe pas)`);
+      continue;
+    }
+    let d = st;
+    if (st.type === 'ExportNamedDeclaration') { if (!st.declaration) continue; d = st.declaration; }
+    if (st.type === 'ExportDefaultDeclaration') { d = st.declaration; if (/^(FunctionDeclaration|ClassDeclaration)$/.test(d.type)) { if (!instructionSansEffet(d)) raisons.push(`${path.basename(fichier)} ligne ${st.loc.start.line}`); continue; } if (!sansEffet(d)) raisons.push(`${path.basename(fichier)} ligne ${st.loc.start.line} : export default avec effet`); continue; }
+    if (!instructionSansEffet(d)) raisons.push(`${path.basename(fichier)} ligne ${st.loc.start.line} : fait autre chose que déclarer au chargement`);
+  }
+}
+function differer(src, liste, appFile) {
+  const A = analyser(src);
+  const R = { fichier: 'imports différés', sorte: 'differe', differes: [], absents: [], refus: [], deja: false };
+  const resoudre = (v) => { let abs = path.resolve(path.dirname(appFile), v); if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) for (const e of ['.js', '.jsx', '/index.js']) if (fs.existsSync(abs + e)) { abs += e; break; } return abs; };
+  const appImports = new Set();
+  for (const st of A.body) if (st.type === 'ImportDeclaration') { const v = st.source.value; if (v.startsWith('.')) appImports.add(resoudre(v.replace(/\?.*$/, ''))); else appImports.add('paquet:' + v.split('/').slice(0, v.startsWith('@') ? 2 : 1).join('/')); }
+  const marque = '// ⟦démarrage léger⟧ racines paresseuses';
+  const posMarque = src.indexOf(marque);
+  if (posMarque < 0) { R.refus.push('ancre « ⟦démarrage léger⟧ racines paresseuses » absente'); return { src, R }; }
+  // par déclaration d'import : les spécificateurs différés
+  const parDecl = new Map(); const lignes = []; const cssDe = new Map(); const prech = new Set();
+  for (const it of liste) {
+    const nom = it.nom;
+    if (new RegExp(`^// ⟦différé⟧ .*\\b${nom}\\b`, 'm').test(src) && new RegExp(`^const ${nom} = aLaDemande\\(`, 'm').test(src)) { R.absents.push(`${nom} (déjà différé)`); continue; }
+    const b = A.bindings[nom];
+    if (!b || b.kind !== 'module') { R.absents.push(`${nom} (pas un import d'App.jsx)`); continue; }
+    const decl = b.path.parentPath.node, sp = b.path.node;
+    if (!decl.source.value.startsWith('.')) { R.refus.push(`${nom} : importé du paquet ${decl.source.value}`); continue; }
+    if (sp.type === 'ImportNamespaceSpecifier') { R.refus.push(`${nom} : import * as`); continue; }
+    const pb = [];
+    for (const r of b.referencePaths) {
+      const par = r.parentPath;
+      if (!(par.isJSXOpeningElement() || par.isJSXClosingElement())) pb.push(`utilisé hors JSX ligne ${r.node.loc.start.line} (${par.node.type})`);
+      else if (!r.getFunctionParent() && r.node.start < posMarque) pb.push(`rendu au chargement du module ligne ${r.node.loc.start.line}`);
+    }
+    if (!b.referencePaths.length) pb.push('jamais rendu');
+    const raisons = []; modulePur(resoudre(decl.source.value), new Set([...appImports].filter((x) => x !== resoudre(decl.source.value))), new Set(), raisons);
+    // un import d'App.jsx qu'on ne garde QUE pour ce composant : son fichier n'est plus « chargé par App »
+    if (raisons.length) pb.push(...raisons.slice(0, 4).map((x) => 'son module : ' + x));
+    if (pb.length) { R.refus.push(`${nom} : ${[...new Set(pb)].join(' ; ')}`); continue; }
+    if (!parDecl.has(decl)) parDecl.set(decl, new Set());
+    parDecl.get(decl).add(nom);
+    cssDe.set(decl, [...new Set([...(cssDe.get(decl) || []), ...(raisons.css || [])])]);
+    const importe = sp.type === 'ImportDefaultSpecifier' ? 'default' : (sp.imported.name || sp.imported.value);
+    // L'attente : « rien » par défaut (un bandeau qui rend souvent null, un bouton dans une ligne : un
+    // squelette clignoterait), « feuille » (la pastille « Ouverture… »), « squelette » (3 lignes grises).
+    const attente = it.attente || (it.feuille ? 'feuille' : 'rien');
+    if (!/^(rien|feuille|squelette)$/.test(attente)) { R.refus.push(`${nom} : attente « ${attente} » inconnue`); continue; }
+    const charge = `() => import('${decl.source.value}')${importe === 'default' ? '' : `.then((m) => ({ default: m.${importe} }))`}`;
+    lignes.push(attente === 'rien' ? `const ${nom} = aLaDemandeSansAttente(${charge}); // ⟦découpe 2⟧` : `const ${nom} = aLaDemande(${charge}${attente === 'feuille' ? ', true' : ''}); // ⟦découpe 2⟧`);
+    prech.add(decl.source.value);
+    R.differes.push({ nom, de: decl.source.value });
+  }
+  if (!lignes.length) return { src, R };
+  const edits = [];
+  for (const [decl, noms] of parDecl) {
+    // début de la ligne de l'import (le préfixe se pose en tête de CHAQUE ligne de l'import)
+    const deb = src.lastIndexOf('\n', decl.start - 1) + 1;
+    if (src.slice(deb, decl.start).trim()) { R.refus.push(`${[...noms].join(', ')} : l'import ne commence pas sa ligne`); return { src, R: { ...R, differes: [] } }; }
+    let fin = src.indexOf('\n', decl.end); if (fin < 0) fin = src.length;   // la ligne ENTIÈRE (son commentaire de fin compris)
+    const texte = src.slice(deb, fin);
+    let rep = texte.split('\n').map((l) => '// ⟦différé⟧ ' + l).join('\n');
+    const restent = decl.specifiers.filter((x) => !noms.has(x.local.name));
+    // Le module resterait importé au démarrage par ses autres noms : rien de gagné, un Suspense de plus.
+    if (restent.length && !(liste.find((it) => noms.has(it.nom)) || {}).memeSiReste) { R.refus.push(`${[...noms].join(', ')} : ${decl.source.value} reste importé par App.jsx (${restent.map((x) => x.local.name).join(', ')}) — rien de gagné`); R.differes = R.differes.filter((d) => !noms.has(d.nom)); for (const n of noms) { const k = lignes.findIndex((l) => l.startsWith(`const ${n} = `)); if (k >= 0) lignes.splice(k, 1); } if (![...parDecl.keys()].some((d) => d !== decl && d.source.value === decl.source.value)) prech.delete(decl.source.value); continue; }
+    if (restent.length) {
+      const def = restent.find((x) => x.type === 'ImportDefaultSpecifier');
+      const nommes = restent.filter((x) => x.type === 'ImportSpecifier').map((x) => { const im = x.imported.name || JSON.stringify(x.imported.value); return im === x.local.name ? im : `${im} as ${x.local.name}`; });
+      const ns = restent.find((x) => x.type === 'ImportNamespaceSpecifier');
+      const parts = []; if (def) parts.push(def.local.name); if (ns) parts.push(`* as ${ns.local.name}`); if (nommes.length) parts.push(`{ ${nommes.join(', ')} }`);
+      rep += `\nimport ${parts.join(', ')} from ${JSON.stringify(decl.source.value)}; // ⟦découpe 2⟧`;
+    }
+    for (const c of cssDe.get(decl) || []) { let r = path.relative(path.dirname(appFile), c).split(path.sep).join('/'); if (!r.startsWith('.')) r = './' + r; rep += `\nimport '${r}'; // (8 nov.) style de ${decl.source.value}, gardé à sa place (son écran est chargé à la demande)`; }
+    edits.push([deb, fin, rep]);
+  }
+  if (!lignes.length) return { src, R };
+  edits.sort((a, b) => b[0] - a[0]);
+  let out = src; for (const [a, z, r] of edits) out = out.slice(0, a) + r + out.slice(z);
+  // Chaque module différé est demandé au repos, 4 s après l'ouverture (le jour où il s'affiche, il est là).
+  const aides = [
+    "const aLaDemandeSansAttente = (charger) => { const Paresseux = lazy(charger); return function MorceauSansAttente(props) { return <Suspense fallback={null}><Paresseux {...props}/></Suspense>; }; }; // ⟦découpe 2⟧",
+  ];
+  if (!out.includes('const prechargerAuRepos = ')) aides.push(PRECHARGER_AIDE);
+  out = out.replace(marque, '// ⟦découpe 2⟧ imports différés (scripts/decouper-app-2.cjs)\n' + aides.join('\n') + '\n' + lignes.join('\n') + '\n' + [...prech].map((v) => `prechargerAuRepos(() => import('${v}')); // ⟦découpe 2⟧`).join('\n') + '\n' + marque);
+  return { src: out, R };
 }
 
 // ── exécution du plan ───────────────────────────────────────────────────────
@@ -614,6 +723,13 @@ function main() {
     }
     delete r.R.ecrit; rapports.push(r.R);
   }
+  if (Array.isArray(plan.differes) && plan.differes.length && (!SEULEMENT.length || SEULEMENT.includes('differes'))) {
+    try {
+      const r = differer(src, plan.differes, APP);
+      if (r.src !== src) { parser.parse(r.src, { sourceType: 'module', plugins: ['jsx'] }); src = r.src; }
+      rapports.push(r.R);
+    } catch (e) { rapports.push({ fichier: 'imports différés', refus: ['erreur : ' + (e && e.stack || e)] }); }
+  }
   const apres = Buffer.byteLength(src);
   // rapport
   console.log(`App.jsx : ${ko(avant)} Ko → ${ko(apres)} Ko (${ko(avant - apres)} Ko partis dans ${ecrits.size} module(s))`);
@@ -624,6 +740,7 @@ function main() {
     if (R.racines && R.racines.length) parts.push(`racines ${R.racines.join(', ')}`);
     if (R.vues && R.vues.length) parts.push(`vues ${R.vues.map((v) => `${v.nom} (${ko(v.taille)} Ko, ${v.valeursPassees} valeurs passées)`).join(', ')}`);
     if (R.deplaces && R.deplaces.length) parts.push(`${R.deplaces.length} instruction(s) de tête`);
+    if (R.differes && R.differes.length) parts.push(`${R.differes.length} différé(s) : ${R.differes.map((d) => d.nom).join(', ')}`);
     console.log(tete + (R.tailleModule ? ` : ${ko(R.tailleModule)} Ko` : '') + (parts.length ? ' — ' + parts.join(' ; ') : ''));
     for (const a of R.absents || []) console.log('    absent : ' + a);
     for (const x of R.refus || []) console.log('    REFUSÉ : ' + x);
@@ -636,4 +753,4 @@ function main() {
   console.log('écrit : App.jsx +', [...ecrits.keys()].map((f) => path.relative(RACINE, f)).join(', '));
 }
 if (require.main === module) main();
-module.exports = { analyser, decouper, sansEffet, instructionSansEffet, trouverVue, lectureVue, lectureVueExport: (A, f, E) => lectureVue(A, f, E) };
+module.exports = { analyser, decouper, differer, modulePur, sansEffet, instructionSansEffet, trouverVue, lectureVue, lectureVueExport: (A, f, E) => lectureVue(A, f, E) };

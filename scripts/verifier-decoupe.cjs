@@ -75,8 +75,10 @@ function structure(R) {
   for (const f of fichiersReels(R)) {
     const t = fs.readFileSync(f, 'utf8');
     const ast = parser.parse(t, { sourceType: 'module', plugins: ['jsx'], errorRecovery: false });
+    // (11 nov.) les lignes POSÉES par l'outil (« // ⟦découpe 2⟧ » : aides aLaDemandeSansAttente…) ne comptent pas : le texte d'origine est prouvé égal par l'étape texte
+    const posees = new Set(); t.split('\n').forEach((l, i) => { if (/\/\/ ⟦découpe 2⟧/.test(l)) posees.add(i + 1); });
     traverse(ast, {
-      JSXOpeningElement(p) { let n = p.node.name; let nom = n.type === 'JSXIdentifier' ? n.name : n.type === 'JSXMemberExpression' ? (n.object.name || '?') + '.' + n.property.name : '?'; if (/^[A-Z]/.test(nom) || nom.includes('.')) rendus.set(nom, (rendus.get(nom) || 0) + 1); },
+      JSXOpeningElement(p) { if (posees.has(p.node.loc.start.line)) return; let n = p.node.name; let nom = n.type === 'JSXIdentifier' ? n.name : n.type === 'JSXMemberExpression' ? (n.object.name || '?') + '.' + n.property.name : '?'; if (/^[A-Z]/.test(nom) || nom.includes('.')) rendus.set(nom, (rendus.get(nom) || 0) + 1); },
       BinaryExpression(p) { const l = p.node.left; if (p.node.operator === '===' && l.type === 'Identifier') { if (l.name === 'tab') tab++; if (l.name === 'curSub') curSub++; } },
       JSXExpressionContainer(p) { const e = p.node.expression; if (e && e.type === 'LogicalExpression' && e.operator === '&&') { let g = e.left; while (g.type === 'LogicalExpression') g = g.left; if (g.type === 'BinaryExpression' && g.left.type === 'Identifier' && /^(tab|curSub)$/.test(g.left.name)) branches++; } },
     });
