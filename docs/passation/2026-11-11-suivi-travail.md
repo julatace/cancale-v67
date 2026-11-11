@@ -25,7 +25,29 @@ Branche `claude/suivi-travail`. Aucune PR, aucune fusion sur `main`. **Aucun cha
 | Retirer des autres sites | `retirerDesAutresSites` (`src/App.jsx`) — voies enveloppées | demande au site · retrait accepté |
 | Mode vacances | `src/ModeVacances.jsx` (`lancer`) | envoi · état relu (le compte n'est jamais nommé) |
 
-## API (pour le lot « Publier partout »)
+## Élargissement (précision de Julien, 11 nov.) : TOUTE action en cours
+
+« Dès qu'il y a une action en cours, fige VRM avec une fenêtre qui s'ouvre avec une barre de progression. »
+⇒ **une API unique, `lancerTravail`** (src/suiviTravail.js), que n'importe quel écran appelle. Une action qui finit sous ~1 s (`seuilMs`, défaut 1000) et sans souci ne fige rien et ne laisse rien (`suivi.oublier`) ; sinon la feuille s'ouvre et reste sur le récapitulatif. Une question posée pendant le travail (confirmation, feuille de placement du tampon…) est **relevée au-dessus** de la feuille (MutationObserver sur `<body>` : un nœud ajouté après le gel passe à z 15001), sans quoi une action qui attend une réponse resterait bloquée derrière.
+Branché en plus : **toute action de la barre « N sélectionnés »** (`BarreSerie` → `lancerTravail`, une action) et **Tout imprimer / bordereaux** (`batchBordereaux` : chaque PDF lu, refusé avec le geste, puis « dans le PDF à imprimer ✓ » sur la réponse de la fusion). Mode d'emploi recopié dans `docs/passation/COORDINATION-AGENTS.md` (branche `claude/coordination`, cb7f9d500).
+**Pas branché ici (à faire par leurs lots avec l'API)** : messages aux favoris (envoi, mode auto lancé), baisses Leboncoin / Vestiaire, import d'historique lancé à la main, exports comptables / registres, restauration, Publier partout, eBay complet.
+
+### `lancerTravail` — mode d'emploi
+```js
+import { lancerTravail } from '../suiviTravail.js';
+const r = await lancerTravail({
+  titre, sorte, etapes,                 // étapes d'UN article (facultatif)
+  articles: [{ id, num, titre }],       // OU total: N ; OU rien = une seule action
+  uid, entreMs, seuilMs = 1000,
+  executer: async (article, o) => {     // une seule action : executer(o)
+    o.etape(cle, detail); o.noter(texte, ton); o.pause(ms, raison); o.doitSArreter();
+    return { etat: 'ok'|'main'|'refus'|'saute', raison, geste, lien, arreterTout };
+  },                                    // true/rien ⇒ ok · false ⇒ refus · exception ⇒ refus · { annule: true } ⇒ rien gardé
+});
+// r = { statut: 'fini'|'arrete'|'pause'|'occupe', resultats, valeur }
+```
+
+## API bas niveau (boucle pilotée par l'état React, comme Republier)
 
 ```js
 import { suivi, suivreJob } from '../suiviTravail.js';
@@ -51,8 +73,8 @@ La feuille se monte seule (`SuiviTravailCoque` dans `AppCoeur`) : rien à monter
 
 ## Preuves
 
-- `node scripts/audit-suivi-travail.cjs --prouve` : **56 ✅ · 0 ❌**, dont 8 mutations toutes rouges (temps restant inventé, pseudo laissé, annonce en cours déclarée faite au rechargement, « fait » d'avant le départ accepté, pause sans fin, issue inconnue = réussie, Republier « double » compté réussi, feuille au-dessus des confirmations). Sur la tête d'avant (9d7d1b7a) l'audit n'existe pas et ses contrôles B (branchements, montage) y seraient tous rouges.
-- Banc `scripts/bancs/suivi-travail.cjs` (vraie feuille + vrai magasin, harnais esbuild `scripts/bancs/suivi-travail/harnais.jsx`, jauge bouchonnée, 390 tactile / 1512, clair / sombre, `SHOTS=dossier`, `THEMES`) : **64 ✅ · 0 ❌** — gel `inert`, clic derrière perdu, Échap et retour sans effet, `beforeunload`, « 2 sur 4 », étape en cours, « environ 4 min » au rythme réel, compte à rebours, question posée pendant le travail répondable, pause / reprise, Arrêter confirmé, récapitulatif, Fermer dégèle et garde, rechargement ⇒ Interrompu / à vérifier. Mutation (inert et beforeunload retirés) ⇒ 4 rouges. Captures regardées (390 clair, 1512 sombre, fin, interrompu) : deux défauts vus et corrigés (pied collant qui laissait passer le journal dessous ; police sans repli hors coque).
+- `node scripts/audit-suivi-travail.cjs --prouve` : **67 ✅ · 0 ❌** (L1–L7 : l'API unique — rapide sans rien, refus montré, `arreterTout`, occupé, exception, annulé, valeur rendue), dont 10 mutations (+ « action rapide avec un refus jamais montrée », « la suite part après un refus pour tout »), et les 8 premières toutes rouges (temps restant inventé, pseudo laissé, annonce en cours déclarée faite au rechargement, « fait » d'avant le départ accepté, pause sans fin, issue inconnue = réussie, Republier « double » compté réussi, feuille au-dessus des confirmations). Sur la tête d'avant (9d7d1b7a) l'audit n'existe pas et ses contrôles B (branchements, montage) y seraient tous rouges.
+- Banc `scripts/bancs/suivi-travail.cjs` (vraie feuille + vrai magasin, harnais esbuild `scripts/bancs/suivi-travail/harnais.jsx`, jauge bouchonnée, 390 tactile / 1512, clair / sombre, `SHOTS=dossier`, `THEMES`) : **68 ✅ · 0 ❌** — gel `inert`, clic derrière perdu, Échap et retour sans effet, `beforeunload`, « 2 sur 4 », étape en cours, « environ 4 min » au rythme réel, compte à rebours, question posée pendant le travail répondable (confirmation à z 20000, et feuille de l’pp à z 1000 relevée au-dessus), pause / reprise, Arrêter confirmé, récapitulatif, Fermer dégèle et garde, rechargement ⇒ Interrompu / à vérifier. Mutation (inert et beforeunload retirés) ⇒ 4 rouges. Captures regardées (390 clair, 1512 sombre, fin, interrompu) : deux défauts vus et corrigés (pied collant qui laissait passer le journal dessous ; police sans repli hors coque).
 - `npm run build` vert.
 
 ## ÉTAT
