@@ -534,6 +534,24 @@ export const courbeVendu = (sources, sel, p, regles, maintenant = Date.now()) =>
 export const SEL_OBJECTIF = { site: 'toutes', compte: null, periode: null };
 export const valeurObjectif = (obj, sources, regles, maintenant = Date.now()) => {
   if (!obj) return null;
-  const id = obj.type === 'ventes' ? 'ventes' : 'vendu';
+  const id = CHIFFRE_OBJECTIF[obj.type] || 'vendu';
   return valeurChiffre(id, { id, p: 'mois' }, sources, SEL_OBJECTIF, regles, maintenant);
+};
+// (11 nov., lot objectifs-mois) Le chiffre de chaque mesure : vendu (date de vente),
+// bénéfice brut (seulement les ventes au prix d'achat connu), nombre de ventes.
+export const CHIFFRE_OBJECTIF = { ca: 'vendu', benefice: 'brut', ventes: 'ventes' };
+// La MÊME valeur pour un mois PLEIN passé [de, a) — la proposition (3 derniers mois)
+// et le bilan de fin de mois. `couvert` : une vente au moins est lue AVANT ce mois
+// (sinon l'historique commence peut-être au milieu : un « 0 » n'y prouve rien) ;
+// le bénéfice, lui, n'est publié que depuis le 1er janvier de l'an passé.
+export const valeurObjectifMois = (type, sources, regles, bornes, maintenant = Date.now()) => {
+  const id = CHIFFRE_OBJECTIF[type];
+  if (!id || !bornes) return null;
+  const p = { de: bornes.de, a: bornes.a };
+  const x = valeurChiffre(id, { id, p }, sources, { ...SEL_OBJECTIF, periode: p }, regles, maintenant);
+  const S = sources || {};
+  const L = S.vendu && Array.isArray(S.vendu.lignes) ? S.vendu.lignes : [];
+  let couvert = L.some((l) => Number(l.ts) < bornes.de);
+  if (id === 'brut') couvert = couvert && new Date(bornes.de).getFullYear() >= new Date(maintenant).getFullYear() - 1 && !!(S.joursBenef && S.joursBenef.jours);
+  return { ...x, couvert };
 };

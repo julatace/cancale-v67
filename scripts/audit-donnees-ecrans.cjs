@@ -204,7 +204,8 @@ const charger = (noms, ctx) => {
 
   console.log('\n── G2 / D2 · Les dates écrites');
   await essaie('dateJourFr / dateFr', async () => {
-    const c = charger(['dateJourFr', 'dateFr'], { Date, Number, isFinite });
+    // (11 nov.) dateJourFr garde ses deux formats créés une fois (`let _fmtJourSemaine…`, 9 nov., vitesse)
+    const c = charger(['dateJourFr', 'dateFr'], { Date, Number, isFinite, Intl, _fmtJourSemaine: null, _fmtMoisLong: null });
     dit(typeof c.dateJourFr === 'function' && c.dateJourFr(new Date(2026, 10, 1, 9)) === 'dimanche 1er novembre', '« dimanche 1er novembre »', c.dateJourFr ? c.dateJourFr(new Date(2026, 10, 1, 9)) : 'absente');
     dit(typeof c.dateJourFr === 'function' && c.dateJourFr(new Date(2026, 10, 2, 9)) === 'lundi 2 novembre', '« lundi 2 novembre »');
     dit(/const dateStr = dateJourFr\(new Date\(\)\);/.test(APPc), 'Ma journée l’écrit par cette règle');
