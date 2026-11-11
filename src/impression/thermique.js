@@ -139,22 +139,37 @@ export function carteEncre(pixels, w, h, { seuil = 235, k = 3 } = {}) {
 // Un FILET (trait de découpe, cadre) : une ligne ou colonne de cellules dont
 // l'encre est FINE (≤ 2 cellules d'épaisseur) et longue (≥ 60 % du côté). Il
 // ne compte pas comme du contenu : rogner sur lui garderait la feuille entière.
-function estFiletLigne(c, y, x0, x1) { let n = 0; for (let x = x0; x < x1; x++) n += c.m[y * c.cw + x]; return n >= (x1 - x0) * 0.6; }
-function estFiletColonne(c, x, y0, y1) { let n = 0; for (let y = y0; y < y1; y++) n += c.m[y * c.cw + x]; return n >= (y1 - y0) * 0.6; }
+// Pointillés compris (une découpe en tirets couvre ~50 % du côté) : ≥ 35 % du côté encrés, et
+// les rangées à 3 cellules de part et d'autre presque VIDES (≤ 5 %) — une ligne de texte, elle,
+// a de l'encre au-dessus et au-dessous d'elle : elle n'est jamais un filet.
+const couvLigne = (c, y, x0, x1) => { if (y < 0 || y >= c.ch) return 0; let n = 0; for (let x = x0; x < x1; x++) n += c.m[y * c.cw + x]; return n / Math.max(1, x1 - x0); };
+const couvColonne = (c, x, y0, y1) => { if (x < 0 || x >= c.cw) return 0; let n = 0; for (let y = y0; y < y1; y++) n += c.m[y * c.cw + x]; return n / Math.max(1, y1 - y0); };
+function estFiletLigne(c, y, x0, x1) { return couvLigne(c, y, x0, x1) >= 0.35 && couvLigne(c, y - 3, x0, x1) <= 0.05 && couvLigne(c, y + 3, x0, x1) <= 0.05; }
+function estFiletColonne(c, x, y0, y1) { return couvColonne(c, x, y0, y1) >= 0.35 && couvColonne(c, x - 3, y0, y1) <= 0.05 && couvColonne(c, x + 3, y0, y1) <= 0.05; }
 // Masque des filets de DÉCOUPE : un filet (rangée ou colonne) près d'un BORD de la
 // zone (≤ `bord` cellules) est retiré — sauf s'il a son pendant au bord opposé :
 // c'est alors le CADRE de l'étiquette, qui est gardé. Un filet au milieu de la
 // zone est du contenu (un trait de l'étiquette), toujours gardé.
 function sansFilets(c, R, bord) {
   const m = c.m.slice(), { x0, y0, x1, y1 } = R;
-  const lignes = [], cols = [];
-  for (let y = y0; y < y1; y++) if (estFiletLigne(c, y, x0, x1)) lignes.push(y);
-  for (let x = x0; x < x1; x++) if (estFiletColonne(c, x, y0, y1)) cols.push(x);
   const b = bord == null ? Math.max(2, Math.round((Math.min(x1 - x0, y1 - y0)) * 0.06)) : bord;
-  const haut = lignes.filter((y) => y - y0 < b), bas = lignes.filter((y) => y1 - 1 - y < b);
-  const gauche = cols.filter((x) => x - x0 < b), droite = cols.filter((x) => x1 - 1 - x < b);
-  if (!(haut.length && bas.length)) for (const y of [...haut, ...bas]) for (let x = x0; x < x1; x++) m[y * c.cw + x] = 0;
-  if (!(gauche.length && droite.length)) for (const x of [...gauche, ...droite]) for (let y = y0; y < y1; y++) m[y * c.cw + x] = 0;
+  // L'étendue (début, fin) de l'encre d'une rangée / colonne.
+  const etendueL = (y) => { let a = -1, z = -1; for (let x = x0; x < x1; x++) if (c.m[y * c.cw + x]) { if (a < 0) a = x; z = x; } return [a, z]; };
+  const etendueC = (x) => { let a = -1, z = -1; for (let y = y0; y < y1; y++) if (c.m[y * c.cw + x]) { if (a < 0) a = y; z = y; } return [a, z]; };
+  const lignes = [], cols = [];
+  for (let y = y0; y < y1; y++) if (estFiletLigne(c, y, x0, x1)) lignes.push({ p: y, e: etendueL(y) });
+  for (let x = x0; x < x1; x++) if (estFiletColonne(c, x, y0, y1)) cols.push({ p: x, e: etendueC(x) });
+  // Le pendant : un filet au bord opposé de MÊME étendue (± 3 % du côté) — le cadre.
+  const pendant = (f, autres, cote) => autres.some((g) => Math.abs(g.e[0] - f.e[0]) <= cote * 0.03 && Math.abs(g.e[1] - f.e[1]) <= cote * 0.03);
+  const trier = (liste, a0, a1, cote, efface) => {
+    const debut = liste.filter((f) => f.p - a0 < b), fin = liste.filter((f) => a1 - 1 - f.p < b);
+    for (const f of debut) if (!pendant(f, fin, cote)) efface(f.p);
+    for (const f of fin) if (!pendant(f, debut, cote)) efface(f.p);
+  };
+  const retires = { lignes: [], cols: [] };
+  trier(lignes, y0, y1, x1 - x0, (y) => { retires.lignes.push(y); for (let x = x0; x < x1; x++) m[y * c.cw + x] = 0; });
+  trier(cols, x0, x1, y1 - y0, (x) => { retires.cols.push(x); for (let y = y0; y < y1; y++) m[y * c.cw + x] = 0; });
+  m.retires = retires;
   return m;
 }
 // La boîte de l'encre UTILE dans `rect` (pixels), filets écartés, élargie de
@@ -165,8 +180,13 @@ export function boiteEncre(carte, rect, pad = 0) {
   let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
   for (let y = R.y0; y < R.y1; y++) for (let x = R.x0; x < R.x1; x++) if (m[y * carte.cw + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   if (x1 < 0) return null;
-  const bx = Math.max(rect.x, x0 * k - pad), by = Math.max(rect.y, y0 * k - pad);
-  const bX = Math.min(rect.x + rect.w, (x1 + 1) * k + pad), bY = Math.min(rect.y + rect.h, (y1 + 1) * k + pad);
+  let bx = Math.max(rect.x, x0 * k - pad), by = Math.max(rect.y, y0 * k - pad);
+  let bX = Math.min(rect.x + rect.w, (x1 + 1) * k + pad), bY = Math.min(rect.y + rect.h, (y1 + 1) * k + pad);
+  // Le blanc gardé autour s'arrête AVANT un filet de découpe retiré (un bout de pointillé au
+  // bord de l'étiquette imprimée ne sert à rien) — jamais en deçà du contenu.
+  const r = m.retires || { lignes: [], cols: [] };
+  for (const y of r.lignes) { const py = y * k; if (py < y0 * k && py + k > by) by = Math.min(y0 * k, py + k); if (py >= (y1 + 1) * k && py < bY) bY = Math.max((y1 + 1) * k, py); }
+  for (const x of r.cols) { const px = x * k; if (px < x0 * k && px + k > bx) bx = Math.min(x0 * k, px + k); if (px >= (x1 + 1) * k && px < bX) bX = Math.max((x1 + 1) * k, px); }
   return { x: bx, y: by, w: bX - bx, h: bY - by };
 }
 
@@ -185,8 +205,8 @@ function coupeMilieu(carte, R, axe, gouttiere) {
   // court LE LONG de la coupe — une colonne (ou rangée) dont l'encre couvre ≥ 60 % du
   // côté sans épaisseur (ses voisines à 2 cellules sont vides) en fait partie.
   const brut = (a) => { let n = 0; for (let b = b0; b < b1; b++) n += m[axe === 'x' ? b * carte.cw + a : a * carte.cw + b]; return n; };
-  const vide = (a) => { const n = brut(a); if (n === 0) return true; const L2 = b1 - b0; if (n < L2 * 0.25) return false;
-    const voisinVide = (o) => a + o < a0 || a + o >= a1 || brut(a + o) === 0; return (voisinVide(-2) || voisinVide(-3)) && (voisinVide(2) || voisinVide(3)); };
+  const vide = (a) => { const n = brut(a), L2 = b1 - b0; if (n <= L2 * 0.02) return true; /* une découpe qui la CROISE */ if (n < L2 * 0.25) return false;
+    const voisinVide = (o) => a + o < a0 || a + o >= a1 || brut(a + o) <= L2 * 0.02; return (voisinVide(-2) || voisinVide(-3)) && (voisinVide(2) || voisinVide(3)); };
   let best = null, i = lo;
   while (i < hi) {
     if (!vide(i)) { i++; continue; }
@@ -218,9 +238,38 @@ export function decouperFeuille(carte, rect, codes, { minCote, gouttiere }) {
   }
   const etiquettes = parts.filter(aCode);
   if (parts.length < 2 || etiquettes.length < 2) return null;
+  // ⚠️ UNE GRANDE ÉTIQUETTE A AUSSI DES BLANCS EN TRAVERS (entre l'adresse et le QR) : coupée là,
+  // elle donnerait deux « étiquettes » — le code-barres sur l'une, le QR sur l'autre. Une planche
+  // de N étiquettes, elle, répète la MÊME étiquette : on n'accepte la coupe que si tous les
+  // morceaux ont la même taille (± 15 %) et les mêmes codes aux mêmes places (± 12 %).
+  const codesDe = (r) => (codes || []).filter((q) => q.x + q.w / 2 > r.x && q.x + q.w / 2 < r.x + r.w && q.y + q.h / 2 > r.y && q.y + q.h / 2 < r.y + r.h)
+    .map((q) => ({ cx: (q.x + q.w / 2 - r.x) / r.w, cy: (q.y + q.h / 2 - r.y) / r.h, a: (q.w * q.h) / (r.w * r.h) })).sort((a, b) => a.cy - b.cy || a.cx - b.cx);
+  const ref = etiquettes[0], cr = codesDe(ref);
+  const pareil = (r) => {
+    if (Math.abs(r.w - ref.w) > ref.w * 0.15 || Math.abs(r.h - ref.h) > ref.h * 0.15) return false;
+    const c = codesDe(r); if (c.length !== cr.length) return false;
+    return c.every((q, i) => Math.abs(q.cx - cr[i].cx) <= 0.12 && Math.abs(q.cy - cr[i].cy) <= 0.12);
+  };
+  if (!etiquettes.every(pareil)) return null;
   return etiquettes;
 }
 
+// Les morceaux d'un même code (un code-barres repéré en deux blocs à cause d'une barre plus
+// claire) : les boîtes à moins de `ecart` l'une de l'autre sont fondues en une.
+export function fusionnerProches(boites, ecart) {
+  const b = (boites || []).map((q) => ({ ...q }));
+  let change = true;
+  while (change) {
+    change = false;
+    for (let i = 0; i < b.length && !change; i++) for (let j = i + 1; j < b.length && !change; j++) {
+      const p = b[i], q = b[j];
+      if (p.x - ecart <= q.x + q.w && q.x - ecart <= p.x + p.w && p.y - ecart <= q.y + q.h && q.y - ecart <= p.y + p.h) {
+        const x = Math.min(p.x, q.x), y = Math.min(p.y, q.y); b[i] = { x, y, w: Math.max(p.x + p.w, q.x + q.w) - x, h: Math.max(p.y + p.h, q.y + q.h) - y }; b.splice(j, 1); change = true;
+      }
+    }
+  }
+  return b;
+}
 // ── LA TAILLE DU MODULE D'UN CODE ─────────────────────────────────────────
 // La plus petite barre (ou case) d'un code repéré, en pixels : on suit des
 // lignes (et des colonnes) à travers la zone, on note la longueur de chaque

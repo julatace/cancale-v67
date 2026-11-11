@@ -378,7 +378,7 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
-import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
+import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
 import './comptes-lies.css';
@@ -12654,7 +12654,9 @@ const isolerZone = async (PL, page, r) => {
 const analyserZone = async (PL, page, r, { decouper = false } = {}) => {
   const d = await isolerZone(PL, page, r), rendu = await rendrePremierePage(d, TH_RENDU), S = rendu.s;
   const carte = carteEncre(rendu.pixels, rendu.w, rendu.h, { seuil: 235, k: 3 });
-  const codesPx = zonesCodesTampon(rendu).map((q) => ({ x: q.x * S, y: q.y * S, w: q.w * S, h: q.h * S }));
+  // Un CODE, ici, mesure au moins 8 × 15 mm (un code-barres de transporteur, un QR) : un
+  // titre en gras (« Mondial Relay », « 24R ») a les alternances d'un code, pas sa taille.
+  const codesPx = fusionnerProches(zonesCodesTampon(rendu), 3 * MM_PT).filter((q) => Math.min(q.w, q.h) >= 8 * MM_PT && Math.max(q.w, q.h) >= 15 * MM_PT).map((q) => ({ x: q.x * S, y: q.y * S, w: q.w * S, h: q.h * S }));
   const parts = decouper ? decouperFeuille(carte, { x: 0, y: 0, w: rendu.w, h: rendu.h }, codesPx, { minCote: 80 * MM_PT * S, gouttiere: 4 * MM_PT * S }) : null;
   const versPdf = (b) => ({ x: r.x + b.x / S, y: r.y + (rendu.h - b.y - b.h) / S, w: b.w / S, h: b.h / S });
   const etiquettes = (parts || [{ x: 0, y: 0, w: rendu.w, h: rendu.h }]).map((z) => {
@@ -12800,7 +12802,9 @@ const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, cho
   const reg = (impression && impression.reg) || reglageImpressionChoisi(), imp = { ...(impression || {}), reg };
   const first = src.getPages()[0];
   let z = thermique ? zoneEtiquette(PL, first) : { ok: false };
-  if (thermique && !z.ok) {
+  // Pas su, ou une zone qui ne fait qu'un QUART de la feuille (le cadre d'UNE des étiquettes
+  // d'une A4 à 2 ou 4) : la feuille entière est découpée d'après l'encre et les codes.
+  if (thermique && (!z.ok || (z.via !== 'page' && z.part != null && z.part < 0.4 && !(z.etiquettes && z.etiquettes.length > 1)))) {
     try {
       const { width: W, height: H } = first.getSize();
       const a = await analyserZone(PL, first, { x: 0, y: 0, w: W, h: H }, { decouper: true });
