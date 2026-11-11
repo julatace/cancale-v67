@@ -31,13 +31,14 @@
   border-radius: 16px; background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
   border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); box-shadow: 0 10px 30px rgba(0,0,0,.18);
 }
-.vrm-serie-barre[data-serie-fermee] { flex-direction: row; align-items: center; }
+.vrm-serie-barre[data-serie-fermee] { flex-direction: row; align-items: center; bottom: calc(96px + env(safe-area-inset-bottom)); }   /* au-dessus de la pilule « Annuler » */
 .vrm-serie-tete { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .vrm-serie-tete b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: auto; }
 .vrm-serie-resume { margin: 0; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); flex: 1; }
 .vrm-serie-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 767px) {
   .vrm-serie-barre { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .vrm-serie-barre[data-serie-fermee] { bottom: calc(150px + env(safe-area-inset-bottom)); }
   .vrm-serie-actions > .vrm-b { flex: 1 1 auto; }
   .vrm-main:has(.vrm-serie-case[data-serie-actif="1"])::after { content: ''; display: block; height: 140px; }
 }
