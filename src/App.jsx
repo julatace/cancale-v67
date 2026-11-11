@@ -54875,9 +54875,9 @@ function AppCoeur() {
             la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
-        {tab==='journee'&&uidInstantane&&<CaptureJournee uid={uidInstantane}/>}
-        {tab==='cat_bord'&&uidInstantane&&<CaptureColis uid={uidInstantane}/>}
-        {tab==='ventes'&&uidInstantane&&<CaptureVentes uid={uidInstantane}/>}
+        {tab==='journee'&&uidInstantane&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
+        {tab==='cat_bord'&&uidInstantane&&<GardeEcran nom="capture-cat_bord"><CaptureColis uid={uidInstantane}/></GardeEcran>}
+        {tab==='ventes'&&uidInstantane&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
