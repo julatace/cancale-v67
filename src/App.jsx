@@ -70,6 +70,9 @@ import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
 // ⟦→ ecrans/Reglages.jsx #3⟧
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+// (11 nov., lot suivi-commandes) Le suivi des commandes en cours : dernier statut, incohérences datées.
+import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier} from '../api/_lib/suivi-commandes.js';
+import SuiviCommande from './SuiviCommande.jsx';
 // ⟦→ ecrans/Reglages.jsx #4⟧
 import './notif-reglages.css';
 // ⟦→ ecrans/Reglages.jsx #5⟧
@@ -6722,7 +6725,8 @@ const fetchCapturedLabelMetas = async (uid) => {
 // requête la plus coûteuse de la base (`pg_stat_statements`). Même adresse ⇒
 // `lecturesPartagees` n'en fait partir qu'un. Chaque fonction garde SA règle
 // (« pas su » : `{}` pour l'un, `null` pour l'autre), rien d'autre ne change.
-const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title';
+// (11 nov.) + `cap` (l'heure de la lecture) : une incohérence ne se fonde que sur une lecture DATÉE (api/_lib/suivi-commandes.js).
+const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title,cap:meta->>capturedAt';
 // ── L'ÉTAT DE LA TRANSACTION, PLUS FRAIS QUE LA LISTE DES VENTES (17 oct.) ──
 // Plainte de Julien : « la vente nike air max 1 blanc noir et rouge nB546 est un
 // LITIGE et elle réapparaît dans les colis à faire ». Mesuré (lecture seule) :
@@ -6748,7 +6752,7 @@ let TXN_ETATS_LU;
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
-const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') }); };
+const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); };
 const lireEtatsTxn = async () => { try { const rows = await lireTout(TXN_META_SELECT); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
 const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
@@ -39594,6 +39598,72 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
     });
   };
+  // ── (11 nov., lot suivi-commandes) LE SUIVI D'UNE COMMANDE EN COURS ────────────────────────
+  // Julien : « intègre les numéros de suivi sur les commandes en cours […] pour voir la
+  // cohérence ». Le n° vient d'une IDENTITÉ prouvée (le bordereau de SA transaction, `b.suivi` ;
+  // la vente Vestiaire, `v.suivi` ; le suivi Vinted / la saisie reliée d'un achat) — jamais d'un
+  // titre (§5). Les trois sources : la ligne du transporteur (`depart_` d'une vente, `transp_`
+  // d'un achat), l'e-mail du MÊME n°, Vinted (l'état de la transaction, lu et daté). La règle :
+  // api/_lib/suivi-commandes.js. « Pas su » n'est jamais une incohérence.
+  const emailDuSuivi = (k) => { if (!k || !Array.isArray(tracking)) return null; for (const t of tracking) if (t && suiviDeLigne(t) === k) return t; return null; };
+  const msOu = (v) => { if (Number.isFinite(v)) return v; const x = Date.parse(String(v || '')); return Number.isFinite(x) ? x : null; };
+  const vintedDeTx = (tx) => {
+    const e = etatTxn(tx); if (!e) return null;
+    const cap = msOu(e.cap);
+    // 450 finalisée ; 220 / ≥ 430 : fin ou blocage (ni « finalisée » ni « pas finalisée ») ; sinon en cours.
+    const finalisee = e.s === 450 ? true : (e.s === 220 || e.s >= 430) ? null : false;
+    return { texte: e.ss || '', at: msOu(e.su), cap, luAt: cap, finalisee, retour: e.s === 440 };
+  };
+  const raisonPasLuVente = (carrier, tr) => {
+    const nom = (tr && tr.nom) || (carrier ? nomTransporteur(carrier) : '');
+    if (carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''))) return 'Mondial Relay ne se lit pas pour un colis vendu. Vinted et les e-mails font foi.';
+    if (carrier === 'chronopost' || carrier === 'vinted') return `Pas encore lu chez ${nomTransporteur(carrier)}.`;
+    return nom ? `${nom} ne se lit pas ici. Vinted et les e-mails font foi.` : 'Transporteur pas encore connu.';
+  };
+  const suiviVente = (x) => {
+    const su = normaliserSuivi((x && x.b && x.b.suivi) || (x && x.v && x.v.suivi) || '');
+    if (!su) return null;
+    const dep = vcLoc0.departs instanceof Map ? (vcLoc0.departs.get(su) || null) : null;
+    const tx = x.o && x.o.transaction_id != null ? String(x.o.transaction_id) : (x.b && x.b.transaction ? String(x.b.transaction) : '');
+    const vt = x.site === 'vinted' && tx ? vintedDeTx(tx) : null;
+    const em = emailDuSuivi(su);
+    const now = Date.now();
+    const statut = dernierStatut({ transporteur: dep, email: em ? { status: em.status, receivedAt: em.receivedAt, lieu: em.lieu } : null, vinted: vt && vt.texte ? vt : null, sens: 'sortant', maintenant: now });
+    const coche = x.site === 'vinted' && tx ? (shipDone[tx] || null) : (x.site === 'vestiaire' && x.v ? ((vcCarte('vrm_vc_colis_done') || {})[String(x.v.id)] || null) : null);
+    const envoye = coche ? { at: msOu(coche), source: 'colis-fait' } : null;
+    const imp = x.site === 'vinted' ? ((tx && bordsPrinted[tx]) || (x.b && bordsPrinted[bordKey(x.b)]) || null) : null;
+    const lim = x.lim || null;
+    const inc = incoherencesVente({ depart: dep, envoye, imprime: imp ? { at: msOu(imp) } : null, limiteMs: lim && Number.isFinite(lim.at) ? lim.at : null, limiteSure: !!(lim && lim.limite === 'email'), vinted: vt, maintenant: now });
+    const enCours = estEnCours({ transporteur: dep, finalisee: !!(vt && vt.finalisee) });
+    const carrier = (dep && dep.carrier) || carrierLisible((x.tr && (x.tr.cle || x.tr.nom)) || '', su) || '';
+    const lien = lienPublic(lienSuivi, (x.tr && (x.tr.cle || x.tr.nom)) || carrier, su);
+    return { su, dep, statut, inc, enCours, lien, raison: statut ? '' : raisonPasLuVente(carrier, x.tr) };
+  };
+  const suiviAchat = (o, su, carrier) => {
+    const k = normaliserSuivi(su); if (!k) return null;
+    const t = transpMap instanceof Map ? (transpMap.get(k) || null) : null;
+    const vt = o && o.transaction_id != null ? vintedDeTx(String(o.transaction_id)) : null;
+    const inc = incoherencesAchat({ transp: t, vinted: vt, maintenant: Date.now() });
+    return { su: k, inc, lien: lienPublic(lienSuivi, (t && t.carrier) || carrier || '', k, codePostalLu(emailDuSuivi(k) || {})) };
+  };
+  // Les commandes EN COURS qui ont une incohérence prouvée (Ma journée : « N à vérifier »). Les MÊMES
+  // règles que les cartes (`suiviVente`, `suiviAchat`) : Ventes · Envoyés, et les achats en route
+  // (pas encore au relais, pas annulés, pas en retour — ceux-là ont leur place).
+  const commandesAVerifier = () => {
+    const ventes = [], achats = [];
+    try { for (const x of listeEnvoyes()) { const sv = suiviVente(x); if (sv && sv.inc.length) ventes.push({ cle: x.cle, photo: x.photo, incoherences: sv.inc }); } } catch (_) {}
+    try {
+      for (const o of (buysBase || [])) {
+        const tk = trackForBuy(o); const st = achatStage(o, tk);
+        if (!st || st.step === 0 || st.retour || st.step < 1 || st.step >= 4) continue;
+        const e = entreeSuiviAchat(o);
+        const su = (tk && tk.suivi) || suivisAchat(o, indexSuivisAchats)[0] || ''; if (!su) continue;
+        const sa = suiviAchat(o, su, (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '');
+        if (sa && sa.inc.length) achats.push({ cle: 'a:' + o.transaction_id, photo: orderPhoto(o), incoherences: sa.inc });
+      }
+    } catch (_) {}
+    return { ventes, achats, n: nbAVerifier([...ventes, ...achats]) || 0 };
+  };
   // La coque monte sous « À retirer » les outils de retrait (suivi à la main,
   // e-mails, « Tout est OK ») : elle apprend ici l'onglet réellement montré.
   const ongletReporte = React.useRef(null);
@@ -41351,7 +41421,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              // (11 nov., lot suivi-commandes) LES COMMANDES À VÉRIFIER : une incohérence PROUVÉE entre Vinted,
+              // les e-mails et le transporteur (api/_lib/suivi-commandes.js). Ambre : c'est un geste.
+              const aVerifier = commandesAVerifier();
+              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (aVerifier.n ? 1 : 0);
+              const carteAVerifier = () => {
+                const tous = [...aVerifier.ventes, ...aVerifier.achats];
+                const titre = `${aVerifier.n} ${aVerifier.n > 1 ? 'commandes' : 'commande'} à vérifier`;
+                const un = tous[0] && tous[0].incoherences[0];
+                const note = aVerifier.n === 1 && un ? un.texte : [aVerifier.ventes.length ? `${aVerifier.ventes.length} vente${aVerifier.ventes.length > 1 ? 's' : ''}` : '', aVerifier.achats.length ? `${aVerifier.achats.length} achat${aVerifier.achats.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+                return (
+                  <button key="suivi-a-verifier" type="button" className="vrm-day-task vrm-fu-tache" data-journee-suivi-verifier={String(aVerifier.n)} data-n={String(aVerifier.n)}
+                    data-suivi-ventes={String(aVerifier.ventes.length)} data-suivi-achats={String(aVerifier.achats.length)}
+                    title={`${titre}\n${note}`} aria-label={`${titre} — ${note}`}
+                    onClick={() => { if (aVerifier.ventes.length) { poserCible({ type: 'colonne', colonne: 'partis' }, 'ventes'); if (onNav) onNav('cat_bord'); } else if (onNav) onNav('cat_achats'); }}>
+                    <PileVignettes srcs={tous.map((x) => x.photo).filter(Boolean)} n={aVerifier.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="truck" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="suivi-verifier">{note}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
+                  </button>
+                );
+              };
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
               const carteARelier = () => {
@@ -41479,6 +41568,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ...(deuxFois.length ? [{ el: carteDeuxFois() }] : []),
                 ...cases.map((x) => ({ el: carteCase(x) })),
                 ...(comptesARelierJour.length ? [{ el: carteARelier() }] : []),
+                ...(aVerifier.n ? [{ el: carteAVerifier() }] : []),
                 ...(sortiesStock.length ? [{ el: carteSortieStock() }] : []),
                 ...(cyclesJ.length ? [{ el: carteCycles(cyclesJ) }] : []),
                 ...autres.map((j, i) => ({ el: tache(j, i) })),
@@ -43752,7 +43842,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
                   // (2 nov.) Le transporteur LU (logo + nom), puis ce qu'il dit.
                   const trA = transporteurColis((tk && tk.carrier) || (e && e.transporteur) || '', su);
-                  return su ? <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)} style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}><PastilleTransporteur t={trA} C={C}/><LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/></div> : null; })()}
+                  // (11 nov., lot suivi-commandes) + le n° copiable, « Suivre ↗ » et l'incohérence prouvée (ambre, un geste).
+                  // Le statut reste dit par `LigneTransporteur` (source, heure) : pas deux fois. Au relais ⇒ « À retirer ».
+                  const sa = su ? suiviAchat(o, su, (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '') : null;
+                  return su ? <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)} style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}><PastilleTransporteur t={trA} C={C}/><LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/>{sa ? <SuiviCommande C={C} cle={'a:' + o.transaction_id} suivi={sa.su} lien={sa.lien} incoherences={sa.inc} sansStatut toast={toast}/> : null}</div> : null; })()}
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
                     qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
@@ -46566,6 +46659,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* (7 nov., design) La frise n'est posée que quand une étape est FAITE : quatre traits gris
                         sous chaque carte « à envoyer » ne disaient rien (« rien d'imprimé » se lit sur le bouton). */}
                     {fuColis.some((x) => x.fait) ? <Frise etapes={fuColis} cle={String(e.txn||e.key)} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+                    {/* (11 nov., lot suivi-commandes) « Bordereau imprimé, pas encore déposé. Limite demain. » — seulement
+                        PROUVÉ (imprimé daté, lu chez le transporteur après, pas pris en charge, limite LUE dans l'e-mail). */}
+                    {(()=>{ if (posted) return null; const sv = b && b.suivi ? suiviVente({ site: 'vinted', o, b, lim: e.lim, tr: trV }) : null;
+                      const inc = sv ? sv.inc.filter((z) => z.code === 'imprime-pas-depose') : [];
+                      return inc.length ? <SuiviCommande C={C} cle={String(e.txn||e.key)} suivi={sv.su} lien={sv.lien} statut={sv.statut} incoherences={inc} raison={sv.raison} toast={toast}/> : null; })()}
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
                           logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du
@@ -46811,8 +46909,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                         <Frise etapes={frise} cle={x.cle} className="vrm-colis-frise" label="Où en est le colis"/>
                         {/* (5 nov., chantier D) « Suivre » sur un colis parti dont le n° est lu (le bordereau) : le geste qu'on y vient chercher. */}
-                        {(() => { const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || ''; const suivre = su ? <BoutonSuivreColis transporteur={(x.tr && x.tr.cle) || ''} suivi={su} enLigne court attrs={{'data-colis-envoye-suivre': x.cle}}/> : null;
-                          return (annuler || suivre) ? <div className="vrm-colis-actions" style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',marginTop:10}}>{suivre}{annuler}</div> : null; })()}
+                        {/* (11 nov., lot suivi-commandes) Le n° copiable, « Suivre ↗ », le DERNIER statut lu (source,
+                            heure) et l'incohérence prouvée (ambre, un geste) — sur chaque colis encore en cours. Un
+                            colis livré ou finalisé n'en garde que l'incohérence (« livré, Vinted pas finalisé »). */}
+                        {(() => { const sv = suiviVente(x);
+                          const bloc = sv && (sv.enCours || sv.inc.length) ? <SuiviCommande C={C} cle={x.cle} suivi={sv.su} lien={sv.lien} statut={sv.statut} incoherences={sv.inc} raison={sv.raison} toast={toast}/> : null;
+                          const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || '';
+                          const suivre = su && !bloc ? <BoutonSuivreColis transporteur={(x.tr && x.tr.cle) || ''} suivi={su} enLigne court attrs={{'data-colis-envoye-suivre': x.cle}}/> : null;
+                          return <>{bloc}{(annuler || suivre) ? <div className="vrm-colis-actions" style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',marginTop:10}}>{suivre}{annuler}</div> : null}</>; })()}
                       </div>
                     </React.Fragment>
                   );
