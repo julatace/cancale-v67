@@ -84,6 +84,9 @@ const EMOJI = /\p{Extended_Pictographic}/u;
 
 (async () => {
   process.env.VRM_OWNER_UID = J;
+  // (11 nov.) Ce banc juge le regroupement PAR GENRE, pas la fenêtre du résumé
+  // (audit-notifs-groupees) : chaque notification part seule.
+  if (process.env.VRM_NOTIF_FENETRE === undefined) process.env.VRM_NOTIF_FENETRE = '0';
   process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
   process.env.SUPABASE_SERVICE_KEY = 'cle-de-service-de-banc';
   const webpush = require(path.join(NM, 'web-push'));
@@ -231,7 +234,7 @@ const EMOJI = /\p{Extended_Pictographic}/u;
   await essaie('W — le réveil', async () => {
     const W = await import('file://' + path.join(R, 'api', '_lib', 'reveil-calme.js'));
     const t = Date.parse(parisA(8, 10));
-    const une = { seq: 4, at: new Date(t - 3 * 3600e3).toISOString(), famille: 'arrives', cat: 'colis', titre: 'Ton colis Mondial Relay t’attend', texte: 'Tabac de banc · code 454602', url: '/?tab=cat_bord&cible=retrait&suivi=12345678', etat: 'calme' };
+    const une = { seq: 4, at: new Date(t - 3 * 3600e3).toISOString(), famille: 'arrives', cat: 'colis', titre: 'Ton colis Mondial Relay t’attend', texte: 'Tabac de banc · code 454602', url: '/?tab=achats&cible=retrait&suivi=12345678', etat: 'calme' };
     const r1 = W.resumeReveil({ prefs: {}, journal: { entrees: [une] }, lu: {}, dejaJour: null, maintenant: t });
     dit(r1.envoyer && r1.title === une.titre && r1.url === une.url, 'W1 sans réglage (calme par défaut), UNE gardée : elle sonne telle quelle, sur son colis', JSON.stringify(r1));
     const r2 = W.resumeReveil({ prefs: {}, journal: { entrees: [une, { ...une, seq: 5, famille: 'ventes', cat: 'vente' }] }, lu: {}, dejaJour: null, maintenant: t });
@@ -242,9 +245,9 @@ const EMOJI = /\p{Extended_Pictographic}/u;
     const SN = await import('file://' + path.join(R, 'src', 'journalNotifs.js'));
     const t0 = Date.parse('2026-11-08T10:00:00Z');
     const brut = { entrees: [
-      { seq: 3, at: new Date(t0).toISOString(), famille: 'poster', cat: 'expedier', genre: 'bordereau', titre: '📦 Bordereau prêt à imprimer', texte: 'A', url: '/?tab=cat_bord', etat: 'envoyee' },
+      { seq: 3, at: new Date(t0).toISOString(), famille: 'poster', cat: 'expedier', genre: 'bordereau', titre: '📦 Bordereau prêt à imprimer', texte: 'A', url: '/?tab=ventes', etat: 'envoyee' },
       { seq: 2, at: new Date(t0 - 6e5).toISOString(), famille: 'ventes', cat: 'vente', genre: 'vente', titre: '💸 Vendu !', texte: 'B', url: '/?tab=ventes', etat: 'envoyee' },
-      { seq: 1, at: new Date(t0 - 9e5).toISOString(), famille: 'poster', cat: 'expedier', genre: 'bordereau', titre: '📦 Bordereau prêt à imprimer', texte: 'C', url: '/?tab=cat_bord', etat: 'envoyee' },
+      { seq: 1, at: new Date(t0 - 9e5).toISOString(), famille: 'poster', cat: 'expedier', genre: 'bordereau', titre: '📦 Bordereau prêt à imprimer', texte: 'C', url: '/?tab=ventes', etat: 'envoyee' },
     ] };
     const l = SN.entreesDuJournal(brut);
     dit(l.every((e) => !EMOJI.test(e.titre)), 'K1 une entrée rangée avant le 8 nov. perd ses emoji dans la cloche', l.map((e) => e.titre).join(' | '));

@@ -225,7 +225,32 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await pg.waitForTimeout(500);
           const p = ecrits.find((l) => l.id === 'push_prefs');
           dit(!!p && p.data.calme && p.data.calme.actif === false && p.data.familles && p.data.familles.messages === false, `${T} · F3 heures calmes coupées ⇒ push_prefs.calme.actif:false écrit, le reste de la ligne GARDÉ`, JSON.stringify(p && p.data));
-          dit(await pg.locator('[data-np-regrouper] [role="switch"]').count() === 1, `${T} · F5 « Regrouper »`);
+          // (11 nov., lot `notifs-groupees`) Regrouper : Non · 15 · 30 · 60 min (15 par défaut),
+          // et l'heure du résumé du soir (Auto par défaut). Chaque choix écrit la ligne entière.
+          const fen0 = await pg.locator('[data-np-fenetre]').getAttribute('data-np-fenetre').catch(() => null);
+          const choix = await pg.locator('[data-np-fenetre-choix]').evaluateAll((l) => l.map((e) => e.getAttribute('data-np-fenetre-choix')));
+          dit(fen0 === '15' && choix.join(',') === 'non,15,30,60', `${T} · F5 « Regrouper » : 15 min par défaut ; Non · 15 · 30 · 60`, `${fen0} · ${choix}`);
+          ecrits.length = 0;
+          await pg.locator('[data-np-fenetre-choix="30"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const g30 = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!g30 && g30.data.groupe && g30.data.groupe.fenetre === 30 && g30.data.regrouper === true && g30.data.familles && g30.data.familles.messages === false
+            && await pg.locator('[data-np-fenetre="30"]').count() === 1, `${T} · F5b « 30 min » ⇒ push_prefs.groupe.fenetre:30, le reste GARDÉ`, JSON.stringify(g30 && g30.data));
+          await pg.locator('[data-np-fenetre-choix="non"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const gnon = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!gnon && gnon.data.regrouper === false && await pg.locator('[data-np-regrouper="off"]').count() === 1, `${T} · F5c « Non » ⇒ regrouper:false (chaque notification seule)`, JSON.stringify(gnon && gnon.data));
+          const soir0 = await pg.locator('[data-np-soir]').getAttribute('data-np-soir').catch(() => null);
+          await pg.locator('[data-np-soir-choix="21:00"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const s21 = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(soir0 === 'auto' && !!s21 && s21.data.resumeSoir === '21:00' && s21.data.regrouper === false, `${T} · F5d résumé du soir « Auto » par défaut ; « 21 h » ⇒ resumeSoir:'21:00'`, `${soir0} · ${JSON.stringify(s21 && s21.data)}`);
+          await pg.locator('[data-np-soir-choix="auto"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const sa = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!sa && !('resumeSoir' in sa.data), `${T} · F5e « Auto » retire l’heure (le passage habituel)`, JSON.stringify(sa && sa.data));
+          await pg.locator('[data-np-fenetre-choix="15"]').click().catch(() => {});
+          await pg.waitForTimeout(400);
           const rel = await pg.evaluate(() => { const e = document.querySelector('[data-relances-essai]'); return e ? { etat: e.getAttribute('data-relances-essai'), codes: e.querySelectorAll('code').length } : null; });
           dit(!!rel && rel.etat === 'non-configure' && rel.codes === 4, `${T} · F6 e-mails de l’essai : « pas configurés » et ce qui manque (au propriétaire)`, JSON.stringify(rel));
           const m = await mesurer(pg, mobile, '.vrm-set');

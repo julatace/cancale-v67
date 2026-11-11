@@ -389,7 +389,9 @@ export async function sendPushToAll(payload) {
   const t = instantNotif();
   const duVendeur = !!familleDe(cat);
   const cleIdem = duVendeur && !maj ? cleDuJour({ cle: cleBrute, tag: brut.tag, title: notif.title }, t) : null;
-  const fenetre = duVendeur ? fenetreGroupe(prefs) : 0;
+  // `VRM_NOTIF_FENETRE` : posée par les bancs seulement (scripts/_horloge-notif.cjs), jamais en production.
+  const fenBanc = typeof process !== 'undefined' && process.env ? process.env.VRM_NOTIF_FENETRE : undefined;
+  const fenetre = !duVendeur ? 0 : (fenBanc !== undefined && fenBanc !== '' && Number.isFinite(Number(fenBanc)) ? Math.min(Number(fenBanc), fenetreGroupe(prefs)) : fenetreGroupe(prefs));
   const attendre = !!genre && !maj && !estUrgent({ cat, echeance }, t);
   const ranger = async (etat) => {
     if (!cat || !owner) return null;

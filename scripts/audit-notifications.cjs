@@ -160,7 +160,7 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
     dit(pushes.length === 1, 'B1 « Votre colis … est disponible » : UNE notification', resume());
     dit(p.title === "Ton colis Mondial Relay t'attend", 'B2 titre exact « Ton colis Mondial Relay t’attend » (8 nov. : sans emoji)', p.title);
     dit(p.body === "Tabac du Quai, Portville · code 454602 · jusqu'au 12/11", 'B3 corps exact « Tabac du Quai, Portville · code 454602 · jusqu’au 12/11 »', p.body);
-    dit(p.url === '/?tab=cat_bord&cible=retrait&suivi=84603328', 'B4 le toucher ouvre Colis → À retirer, SUR ce colis', p.url);
+    dit(p.url === '/?tab=achats&cible=retrait&suivi=84603328', 'B4 le toucher ouvre Achats → À retirer, SUR ce colis (11 nov.)', p.url);
     dit(p.tel === TEL_J, 'B5 sur le téléphone du vendeur de l’adresse de réception', p.tel);
     prepare();
     await recoit(VG_LIBERE('1UW1T3JAAW7UK', 'N58590'));

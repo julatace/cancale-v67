@@ -179,7 +179,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(p.title === 'Demain : 2 colis à déposer', 'le titre dit « Demain : 2 colis à déposer » (1 limite lue demain + 1 en retard ; l’eBay dû dans 4 jours, la limite ESTIMÉE de demain et le colis coché « posté » ne sont pas dits)', p.title);
     dit(/^1 colis à déposer avant 23 h 59 demain\./.test(p.body || '') && /1 déjà en retard/.test(p.body || '') && !/2 déjà en retard|à poster/.test(p.body || ''), 'le corps : l’heure LUE de la limite de demain, puis 1 déjà en retard — le bordereau du colis coché « posté » n’est pas compté', p.body);
     dit((p.title || '').length <= 40 && (p.body || '').length <= 170, 'la forme passe par api/_lib/push.js (titre ≤ 40, corps ≤ 170)');
-    dit(p.url === '/?tab=cat_bord&cible=colonne&colonne=prets', 'le clic ouvre Colis, sur la colonne « Prêts à imprimer » (31 oct.)', p.url);
+    dit(p.url === '/?tab=ventes&cible=colonne&colonne=prets', 'le clic ouvre Ventes · À expédier, sur la colonne « Prêts à imprimer » (31 oct. ; 11 nov.)', p.url);
     dit(b.length === 0, 'B n’a rien à poster ⇒ rien pour B', `B=${b.length}`);
     const lect = lus.filter((u) => /orders_sold|email_bord|ebay_orders|ebay_comptes|vinted_accounts|soir_reminder_dedup/.test(u));
     dit(lect.length > 0 && lect.every((u) => /owner=eq\./.test(u)), 'toutes les lectures portent owner=eq.<vendeur>', `${lect.length} lectures`);
@@ -226,7 +226,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(p.title === 'Demain : 1 retrait, 1 offre', 'le titre : 1 retrait (dernier jour LU demain), 1 offre (Vestiaire, reçue, expire demain)', p.title);
     dit(/Dernier jour pour retirer ton colis à Tabac des Halles\./.test(p.body || '') && !/Vannes|Bar Test/.test(p.body || ''), 'le corps nomme le point du colis de demain — pas celui dont le dernier jour est aujourd’hui (le matin l’a dit)', p.body);
     dit(/1 offre Vestiaire expire avant demain soir\./.test(p.body || '') && !/Vinted/.test(p.body || ''), 'l’offre envoyée par lui et celle qui expire dans 3 jours ne sont pas dites ; aucune offre Vinted (elles n’expirent pas)', p.body);
-    dit(p.url === '/?tab=cat_bord&cible=retrait&suivi=30000077', 'le toucher ouvre la carte de CE colis à retirer (son n° de suivi)', p.url);
+    dit(p.url === '/?tab=achats&cible=retrait&suivi=30000077', 'le toucher ouvre la carte de CE colis à retirer (son n° de suivi)', p.url);
     reset();
     V.B.vcOffres = { n101: offreVc('101', Date.parse('2026-10-22T13:00:00Z')) };
     await lancer(SOIR);

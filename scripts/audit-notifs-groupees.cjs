@@ -100,6 +100,7 @@ const plus = (iso, min) => new Date(Date.parse(iso) + min * 60e3).toISOString();
   process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
   process.env.SUPABASE_SERVICE_KEY = 'cle-de-service-de-banc';
   process.env.CRON_SECRET = 'secret-de-banc';
+  delete process.env.VRM_NOTIF_FENETRE;           // ce banc juge LA fenêtre
   const webpush = require(path.join(NM, 'web-push'));
   webpush.sendNotification = async (sub, body) => { pushes.push(JSON.parse(body)); return { statusCode: 201 }; };
   const P = await import('file://' + path.join(R, 'api', '_lib', 'push.js'));
