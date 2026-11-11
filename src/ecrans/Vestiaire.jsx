@@ -3,6 +3,7 @@
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { ordreRecent, quandVestiaire } from '../ordreRecent.js';
 import { STYLE_FLOU, vcFloute } from '../flouCompte.js';
+import { ListeParCompte } from '../GroupesComptes.jsx'; // (11 nov.) lignes floutées regroupées par compte
 import { lienDe, vcReliable } from '../lienVestiaire.js';
 import React, { useState, useEffect } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
@@ -307,7 +308,8 @@ function AnnoncesVestiaire() {
         {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
             (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
         <section className="vrm-lbc-catalog vrm-vc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
-          <ul>{liste.map(({ id, it, num, etat, label, brut }) => {
+          {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
+          <ul><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={liste} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
             const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
@@ -328,7 +330,7 @@ function AnnoncesVestiaire() {
                 <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
               </li>
             );
-          })}</ul>
+          }}/></ul>
         </section>
         {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
             la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par
@@ -751,7 +753,9 @@ function VentesVestiaire({ comptes }) {
         <div className="vrm-ventes-liste" data-vc-ventes-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Versé</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
-          {liste.slice(0, 30).map((v, i) => <LigneVenteVc key={v.id} i={i} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>)}
+          {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
+          <ListeParCompte lignes={liste.slice(0, 30)} ouvert={vcOuvert} floute={(v) => vcFloute(vcOuvert, v.compte)} compteDe={(v) => String(v.compte == null ? '' : v.compte).trim()} unite="vente" libelle="Compte ouvert sur Vestiaire" nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})}
+            rendre={(v, i) => <LigneVenteVc key={v.id} i={i} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>}/>
         </div>
         {liste.length > 30 ? <div style={style}>Les 30 plus récentes sont montrées (sur {liste.length}).</div> : null}
       </div>

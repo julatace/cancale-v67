@@ -67,6 +67,8 @@ import { bilanEnLigneLbc, etatEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC
 import './ebay-annonces.css';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
+import { grouperParCompte, entreesGroupees } from './regroupeComptes.js'; // (11 nov., agent2-regroupe-comptes) lignes floutées regroupées par compte
+import { TeteGroupeCompte, useDepliesComptes, ListeParCompte } from './GroupesComptes.jsx';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';   // (11 nov., lot DJ6)
@@ -21920,7 +21922,8 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
     <ScreenHead icon="cash" title="Ventes"/>
     <FiltresVentes plateforme="leboncoin" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
     <FiabiliteVentes perimetre="Leboncoin · ventes finalisées" lignes={visibles.map(o=>{const info=infoVente(o);return {incluse:lbcFinalisee(o)&&!lbcAnnulee(o),achatConnu:info.achat!=null,prixConnu:o.price!=null&&String(o.price).trim()!==''&&Number.isFinite(Number(o.price)),valide:info.benef!=null,fraisSuivis:false};})}/>
-    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o} {...infoVente(o)} floute={lbcFloute(lbcOuvert, o.account)}/>)}</div>
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden'}}><ListeParCompte lignes={visibles} ouvert={lbcOuvert} floute={(o)=>lbcFloute(lbcOuvert, o.account)} compteDe={(o)=>idCompteLbcApp(o.account)} unite="vente" libelle="Compte ouvert sur Leboncoin" nomDe={(id)=>nomCompteLbcGroupe(annLbc, id)}
+      rendre={(o)=><CarteLbc key={o.txId} o={o} {...infoVente(o)} floute={lbcFloute(lbcOuvert, o.account)}/>}/></div>
     {!visibles.length && <p style={{fontSize:12,color:C.muted,padding:'12px 0'}}>Aucune vente dans cette sélection.</p>}
     {lbcVentes.inconnues>0 && <details style={{marginTop:12,fontSize:12,color:C.muted}}><summary>Transactions à confirmer ({lbcVentes.inconnues})</summary><p>Ouvre tes transactions sur Leboncoin pour lire leur côté acheteur ou vendeur.</p></details>}
   </div>;
@@ -21934,6 +21937,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const achats = (lbcVentes.achats || []);
   // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
   const lbcOuvert = useCompteLbcOuvert();
+  const annLbc = useAnnuaireLbc(); // (11 nov.) le nom de chaque compte, pour les groupes par compte
   // (17 oct., revue) La section « Achats » est toujours dans la navigation :
   // rendre `null` laissait un écran BLANC sous le titre (vu au rendu). Une
   // liste vide a une cause, et une cause se dit — jamais lu (« — ») n'est pas
@@ -21958,7 +21962,10 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
   // (9 nov., soir, lot AJ) La règle unique (src/ordreRecent.js) : date d'achat lue, tous comptes mélangés.
   const tsAchat = (o) => quandLeboncoin(o);
-  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{ordreRecent(arr, tsAchat).map(o => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />)}</div>;
+  // (11 nov.) Regroupée par compte quand un compte Leboncoin est ouvert (src/regroupeComptes.js, suit le flou).
+  // Appelée comme une fonction : `ListeParCompte` garde son état (comptes dépliés) d'un rendu à l'autre.
+  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}><ListeParCompte lignes={ordreRecent(arr, tsAchat)} ouvert={lbcOuvert} floute={(o) => lbcFloute(lbcOuvert, o.account)} compteDe={(o) => idCompteLbcApp(o.account)} unite="achat" libelle="Compte ouvert sur Leboncoin" nomDe={(id) => nomCompteLbcGroupe(annLbc, id)}
+    rendre={(o) => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />}/></div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
       {/* (27 oct., « pareil que Vinted ») Plus de second titre « Achats
@@ -21980,7 +21987,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       )}
       {enRoute.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '6px 0 0' }}>En cours de livraison ({enRoute.length})</div>
-        <Liste arr={enRoute}/>
+        {Liste({ arr: enRoute })}
         {/* (17 oct.) OÙ ARRIVE LE CODE D'UN COLIS LEBONCOIN. Mesuré sur sa base :
             une transaction Leboncoin ne porte NI point de retrait NI code (champs
             captés : statut, transporteur, prix). Le code vient de l'e-mail du
@@ -21991,11 +21998,11 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       </>)}
       {recus.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Reçus ({recus.length})</div>
-        <Liste arr={recus}/>
+        {Liste({ arr: recus })}
       </>)}
       {annules.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Annulés / remboursés ({annules.length})</div>
-        <Liste arr={annules}/>
+        {Liste({ arr: annules })}
       </>)}
     </div>
   );
@@ -23654,7 +23661,9 @@ function AchatsVestiaire() {
         <div data-vc-achats-resume="" style={style}>
           {liste.length} achat{liste.length > 1 ? 's' : ''} vu{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}. Hors totaux : tes prix d'achat, tu les saisis.
         </div>
-        {liste.slice(0, 30).map((v) => (
+        {/* (11 nov.) Regroupés par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
+        <ListeParCompte lignes={liste.slice(0, 30)} ouvert={vcOuvert} floute={(v) => vcFloute(vcOuvert, v.compte)} compteDe={(v) => String(v.compte == null ? '' : v.compte).trim()} unite="achat" libelle="Compte ouvert sur Vestiaire" nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})}
+          rendre={(v) => (
           <div key={v.id} data-vc-achat={v.id} data-vc-achat-suivi={v.suivi || ''} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, ...(vcFloute(vcOuvert, v.compte) ? STYLE_FLOU : {}) }}>
             <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
             <div style={{ fontSize: 12, color: C.muted }}>
@@ -23664,7 +23673,7 @@ function AchatsVestiaire() {
             </div>
             {v.suivi ? <BoutonSuivreColis transporteur={v.transporteur} suivi={v.suivi}/> : null}
           </div>
-        ))}
+        )}/>
       </div>
     );
   }
@@ -33925,6 +33934,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // juge sur `groupeFacture` avec la règle de la ligne). Placés après `ventesMax` (TDZ, §4.6).
   // (lot AJ) Les ventes sans date lue vont en bas (src/ordreRecent.js) : où elles commencent, combien — dit une fois.
   const ventesSansDate = useMemo(() => ({ i: debutSansDate(ventesAffichees, quandCommandeVinted), n: nbSansDate(ventesAffichees, quandCommandeVinted) }), [ventesAffichees]);
+  // (11 nov., Julien : « les ventes ne sont pas regroupées ») Un compte mis en avant ⇒ ses ventes d'abord
+  // (« Compte choisi : X · N ventes »), puis UN groupe replié par autre compte (src/regroupeComptes.js : il suit
+  // `estFloute`, la règle du flou ; l'ordre par date est gardé DANS chaque groupe). `selEff` vide ⇒ `null` : la
+  // liste reste comme avant. Rien ne sort de `ventesAffichees` (totaux, compteurs, série inchangés).
+  const depComptes = useDepliesComptes();
+  const groupesVentes = useMemo(() => grouperParCompte(ventesAffichees, { ouvert: selEff, floute: estFloute, compteDe: uidLigne }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ventesAffichees, selEff]);
+  const ventesGroupees = useMemo(() => entreesGroupees(groupesVentes, { deplies: depComptes.deplies, quand: quandCommandeVinted, max: ventesMax, maxCompte: depComptes.maxCompte }), [groupesVentes, depComptes.deplies, depComptes.maxCompte, ventesMax]);
+  // D'où vient le compte mis en avant — la MÊME règle que le flou (`compteEffectif`) : son choix d'abord, sinon
+  // le compte ouvert dans Chrome. Choisi ≠ Chrome ⇒ un geste pour passer au compte de Chrome.
+  const nomUidGroupe = (u) => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : ''; };
+  const groupeChoisi = !!compteSel && compteSel !== '*' && String(compteSel) === selEff;
+  const teteGroupe = (e, k, unite) => <TeteGroupeCompte key={'gc-' + k + '-' + (e.compte || e.tete || e.suite || '')} e={e} unite={unite}
+    libelle={groupeChoisi ? 'Compte choisi' : 'Compte ouvert dans Chrome'} nomOuvert={nomUidGroupe(selEff)} nomDe={nomUidGroupe}
+    onBasculer={depComptes.basculer} onSuite={depComptes.plus}
+    geste={e.tete === 'ouvert' && groupeChoisi && compteConnecte && String(compteConnecte) !== selEff && typeof setCompteSel === 'function'
+      ? <button type="button" className="vrm-gc-geste" data-groupe-chrome={String(compteConnecte)} onClick={() => setCompteSel(String(compteConnecte))}>Chrome : {nomUidGroupe(compteConnecte) || '—'} ›</button> : null}/>;
   const ventesEmailTete = useMemo(() => groupesVentesEmailEnTete(ventesAffichees.slice(0, ventesMax)), [ventesAffichees, ventesMax]);
   const groupeFacture = useMemo(() => ventesAffichees.slice(0, ventesMax).map((o) => {
     const tx = o && (o._fromEmail ? o._txMail : o.transaction_id);
@@ -36748,6 +36775,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [achatsMax, setAchatsMax] = useState(60);
   // (lot AJ) Les achats sans date lue vont en bas (src/ordreRecent.js) : dit une fois.
   const achatsSansDate = useMemo(() => ({ i: debutSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)), n: nbSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)) }), [achatsAffiches]);
+  // (11 nov.) Achats regroupés par compte, la MÊME règle que les ventes (src/regroupeComptes.js, suit le flou).
+  // Pas dans « Colis à retirer » (les colis ne se rangent pas par compte, sujet Colis).
+  const achatsGroupees = useMemo(() => modeRetraits ? null : entreesGroupees(grouperParCompte(achatsAffiches, { ouvert: selEff, floute: (x) => estFloute(x.o), compteDe: (x) => uidLigne(x.o) }),
+    { deplies: depComptes.deplies, quand: (x) => quandCommandeVinted(x.o), max: achatsMax, maxCompte: depComptes.maxCompte }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [achatsAffiches, selEff, modeRetraits, depComptes.deplies, depComptes.maxCompte, achatsMax]);
   const [achatsOutilsOuverts, setAchatsOutilsOuverts] = useState(false);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
@@ -43623,7 +43656,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               (`ordSearchDiff` est en retard) : `LigneVenteVinted` garde alors la
               ligne déjà peinte. Le rendu différé, lui, refait tout comme avant
               — aucun comportement ne change. */}
-          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{ const gel = ordSearch!==ordSearchDiff; return <React.Fragment key={o.transaction_id}>{i === ventesSansDate.i ? <LigneSansDate n={ventesSansDate.n}/> : null}<LigneVenteVinted o={o} i={i} gel={gel} pre={gel?null:preparerLigneVente(o)} rendre={(o,i,pre)=>{
+          {(ventesGroupees ? ventesGroupees.entrees : ventesAffichees.slice(0, ventesMax)).map((o,i)=>{ if (ventesGroupees) { if (o.ligne === undefined) return o.sansDate != null ? <LigneSansDate key={'gc-sd-' + i} n={o.sansDate}/> : teteGroupe(o, i, 'vente'); o = o.ligne; } const gel = ordSearch!==ordSearchDiff; return <React.Fragment key={o.transaction_id}>{!ventesGroupees && i === ventesSansDate.i ? <LigneSansDate n={ventesSansDate.n}/> : null}<LigneVenteVinted o={o} i={i} gel={gel} pre={gel?null:preparerLigneVente(o)} rendre={(o,i,pre)=>{
             if (!pre) pre = preparerLigneVente(o);
             const st = classifyOrderStatus(o.status);
             const hidden = pre.hidden;
@@ -43879,11 +43912,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             iPhone, la page passait de 46 209 px (cinquante-quatre écrans) à
             une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
             TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
+        {/* (11 nov.) Groupées par compte : la tranche porte sur les ventes NETTES ; les autres comptes suivent, repliés. */}
+        {ventesGroupees ? (ventesGroupees.nets > ventesGroupees.netsDessinees && (
+          <Bouton variante="secondaire" plein data-groupe-suite-nettes={ventesGroupees.nets - ventesGroupees.netsDessinees} onClick={()=>React.startTransition(()=>setVentesMax(n=>n+120))} style={{marginTop:10}}>
+            Afficher {Math.min(120,ventesGroupees.nets-ventesGroupees.netsDessinees) > 1 ? `les ${Math.min(120,ventesGroupees.nets-ventesGroupees.netsDessinees)} suivantes` : 'la suivante'}{ventesGroupees.nets-ventesGroupees.netsDessinees > 120 ? ` · encore ${ventesGroupees.nets-ventesGroupees.netsDessinees-120} après` : ''}
+          </Bouton>)) : <>
         {ventesAffichees.length > ventesMax && (
           <Bouton variante="secondaire" plein onClick={()=>React.startTransition(()=>setVentesMax(n=>n+120))} style={{marginTop:10}}>
             Afficher {Math.min(120,ventesAffichees.length-ventesMax) > 1 ? `les ${Math.min(120,ventesAffichees.length-ventesMax)} suivantes` : 'la suivante'}{ventesAffichees.length-ventesMax > 120 ? ` · encore ${ventesAffichees.length-ventesMax-120} après` : ''}
           </Bouton>
         )}
+        </>}
         {/* (29 oct., « un peu moche ») Les contrôles passent SOUS la liste : avant la
             première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
         <section className="vrm-ventes-controles" data-ventes-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
@@ -45445,22 +45484,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             et un seul bouton « ⋯ » au doigt (suivre et code de retrait passent
             dans ce menu sur téléphone). Le compte se nomme UNE fois en tête
             quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
-        {(()=>{ const tranche = achatsAffiches.slice(0, achatsMax);
-          const cptes = [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
+        {(()=>{ const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
+          const cptes = achatsGroupees ? [] : [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>
         {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>Tous sur <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
         {tranche.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieAchats}/></div>}
         <BarreSerie serie={serieAchats} actions={actionsSerieAchats()} rendreIcone={iconeApp}/>
         <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
-          {tranche.map(({o,tk,st},i)=>{
+          {tranche.map((x,i)=>{
+            if (achatsGroupees && x.ligne === undefined) return x.sansDate != null ? <LigneSansDate key={'gc-sd-' + i} n={x.sansDate}/> : teteGroupe(x, i, 'achat');
+            const {o,tk,st} = achatsGroupees ? x.ligne : x;
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
             <React.Fragment key={o.transaction_id}>
-            {i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
+            {!achatsGroupees && i === achatsSansDate.i ? <LigneSansDate n={achatsSansDate.n}/> : null}
             <div {...serieAchats.ligne(String(o.transaction_id))} className="vrm-buy-row" data-cible={attrCible(['achat',String(o.transaction_id)])} data-achat-tx={String(o.transaction_id)} data-ordre-t={tsCommande(o) || ''} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null),...(achatMenu!=null&&achatMenu===String(o.transaction_id||'')?{zIndex:42}:null)}}>{/* (8 nov.) la ligne dont le menu ⋯ est ouvert passe AU-DESSUS des suivantes : une ligne pressée (:active, scale) ou atténuée (opacité) devient un contexte d'empilement, et la ligne suivante recouvrait son menu (banc recu-achat) */}
               <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 <CaseSerie serie={serieAchats} cle={String(o.transaction_id)} etiquette={o.title} surPhoto/>
@@ -45584,11 +45625,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ MÊME RÈGLE QUE LES VENTES : on dessine une tranche, le bouton
             porte le TOTAL, rien n'est caché. Mesuré : l'onglet « Tous »
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
+        {achatsGroupees ? (achatsGroupees.nets > achatsGroupees.netsDessinees && (
+          <Bouton variante="secondaire" plein data-groupe-suite-nettes={achatsGroupees.nets - achatsGroupees.netsDessinees} onClick={()=>setAchatsMax(n=>n+120)} style={{marginTop:10}}>
+            {achatsGroupees.nets - achatsGroupees.netsDessinees <= 120 ? `Voir les ${achatsGroupees.nets - achatsGroupees.netsDessinees} derniers` : 'Voir plus'} — {achatsGroupees.netsDessinees} affichés sur {achatsGroupees.nets.toLocaleString('fr-FR')}
+          </Bouton>)) : <>
         {achatsAffiches.length > achatsMax && (
           <Bouton variante="secondaire" plein onClick={()=>setAchatsMax(n=>n+120)} style={{marginTop:10}}>
             {achatsAffiches.length - achatsMax <= 120 ? `Voir les ${achatsAffiches.length - achatsMax} derniers` : 'Voir plus'} — {achatsMax} affichés sur {achatsAffiches.length.toLocaleString('fr-FR')}
           </Bouton>
         )}
+        </>}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
             sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
         {/* (31 oct., soir) Les reçus d'achat : sur « Achats », pas sur « Colis à retirer ». */}
@@ -50749,6 +50795,8 @@ function annonceLbcEnVente(ad, vendues) {
 //     ligne »). Pas su (pas de preuve, date illisible, aucun compte) ⇒ rien
 //     n'est sauté.
 const idCompteLbcApp = (x) => String(x || '').replace(/^lbc-account:/i, '');
+// (11 nov.) Le nom d'un compte Leboncoin dans l'en-tête de son groupe : la règle `nomCompteVente` (src/plateformes.js).
+const nomCompteLbcGroupe = (annuaire, id) => nomCompteVente('leboncoin', { account: id }, { leboncoin: annuaire && typeof annuaire === 'object' ? annuaire : {} });
 // (5 nov.) Le compte Leboncoin d'UNE vente, écrit sur sa ligne. Par IDENTITÉ
 // seulement (§5) : le compte que l'extension a joint à la vente (la session de
 // la liste « Mes transactions », `account`/`accountName`), sinon le compte de

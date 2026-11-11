@@ -1839,7 +1839,7 @@ function LeboncoinScreen() {
         </div>
       ) : null}
       {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
-      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} aConfirmerDe={(ad) => !!(data.lbcAConfirmer && data.lbcAConfirmer.ids.includes(String(ad && ad.id)))} confirmer={nAConf > 0 ? (() => {
+      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} compteOuvert={lbcOuvert} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} aConfirmerDe={(ad) => !!(data.lbcAConfirmer && data.lbcAConfirmer.ids.includes(String(ad && ad.id)))} confirmer={nAConf > 0 ? (() => {
         const pe = pauseEtat(), A = data.lbcAConfirmer;
         return <>{A.jamais ? 'Ta liste « Mes annonces » n’a jamais été lue en entier' : `Ta liste « Mes annonces » a été ${quandLectureLbc(A.lu)}`} : « à confirmer », pas comptées, rien effacé.{' '}
           {pe === 'absente'
