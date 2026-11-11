@@ -37738,6 +37738,57 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (le même que celui des lignes de `declarables`) : le rapport du mois et le registre
   // annuel y lisent le prix d'achat et le N°. `autresBenefice` pas su ⇒ carte vide (rien inventé).
   const autresParIdRapport = useMemo(() => new Map((autresBenefice || []).map((x) => [String(x.id), x])), [autresBenefice]);
+  // ── (11 nov., lot tva-marge) LA TVA SUR MARGE — publiée pour Argent → Factures (src/tvaMarge.js) ──
+  // SEULEMENT pour qui a choisi « TVA sur la marge » dans Ma facture (`tva_regime`, jamais deviné) :
+  // sinon rien n'est publié et l'ancienne publication est retirée (rien ne change pour les autres).
+  // Les ventes : celles du CA déclaré (`declarables`, datées au versement / à la vente / à la
+  // commande, jamais au mois de la déclaration URSSAF). Le prix d'achat : celui qu'IL a saisi sur
+  // la paire reliée PAR IDENTITÉ (`effEntry` pour Vinted, `autresParIdRapport` pour les autres —
+  // les mêmes que le rapport du mois), jamais deviné. Le prix de vente : ce que l'acheteur a payé
+  // pour l'article — eBay et Vestiaire par la règle des factures (`venteAutre` : `lineItemCost`,
+  // `sellerPrice`), JAMAIS l'argent reçu (`l.eur`, frais retirés). Une source pas lue ⇒ `partiel`.
+  useEffect(() => {
+    if (declarables === undefined) return;
+    let mort = false;
+    const partiel = [];
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) partiel.push('vinted');
+    if (declarables === null) partiel.push('versements');
+    if (lbcLu !== true) partiel.push('leboncoin');
+    if (!Array.isArray(ebayCmd)) partiel.push('ebay');
+    if (!Array.isArray(ventesVc)) partiel.push('vestiaire');
+    if (!Array.isArray(autresBenefice)) partiel.push('achats-autres');
+    const src = declarables || declRapport;
+    const lignesV = [...(src.lignes || []), ...(src.aDater || []).map((l) => ({ ...l, ts: null })),
+      ...((declarables && declarables.ecartees) || []).filter((x) => x && x.manque).map((x) => ({ ...x, eur: null, sansPrix: true }))];
+    const ebayParId = new Map((Array.isArray(ebayCmd) ? ebayCmd : []).filter((e) => e && e.orderId).map((e) => [String(e.orderId), e]));
+    const vcParId = new Map((Array.isArray(ventesVc) ? ventesVc : []).filter((v) => v && v.id).map((v) => [String(v.id), v]));
+    Promise.all([import('./FacturePro.jsx'), import('./tvaMarge.js'), import('./facturePro/sources.js')]).then(async ([fp, tm, so]) => {
+      const regime = await fp.regimeTvaFiche(DEPS_FACTURE);
+      if (mort || regime === null) return;                 // fiche pas lue : on ne touche à rien
+      if (regime !== 'marge') { tm.retirerTvaMarge(); return; }
+      const c = (eur) => (eur != null && Number.isFinite(Number(eur)) ? Math.round(Number(eur) * 100) : null);
+      const lignes = lignesV.map((l) => {
+        const id = String(l.id || '');
+        let prixC = null, achatC = null, num = '';
+        if (l.plateforme === 'Vinted' && l.o) {
+          const e = effEntry(l.o);
+          achatC = c(achatDe(e)); num = (e && e.numero) || '';
+          const d = l.o.price && l.o.price.currency_code;
+          prixC = l.sansPrix || (d && d !== 'EUR') ? null : c(montantCommandeLu(l.o));
+        } else {
+          const a = autresParIdRapport.get(id);
+          if (a) { achatC = a.achat != null ? c(a.achat) : null; num = a.num || ''; }
+          if (id.startsWith('ebay:')) { const r = so.venteAutre('ebay', ebayParId.get(id.slice(5))); prixC = r && r.ok ? r.centimes : null; }
+          else if (id.startsWith('vestiaire:')) { const r = so.venteAutre('vestiaire', vcParId.get(id.slice(10))); prixC = r && r.ok ? r.centimes : null; }
+          else if (!l.sansPrix) prixC = c(l.eur);           // Leboncoin, ventes importées : le prix de la vente
+        }
+        return { id, plateforme: l.plateforme || '', titre: l.titre || '', num, ts: l.ts || 0, prixC, achatC };
+      });
+      tm.publierTvaMarge(lignes, { owner: AUTH.user?.id || '', partiel });
+    }).catch(() => {});
+    return () => { mort = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [declarables, declRapport, sales.failedUids, lbcLu, ebayCmd, ventesVc, autresParIdRapport, numeros, saleOv, buyByNum]);
   const totals = useMemo(() => {
     // ⚠️ LES TOTAUX SUIVENT LA PÉRIODE AFFICHÉE. Sans ça, filtrer sur « ce mois »
     // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
