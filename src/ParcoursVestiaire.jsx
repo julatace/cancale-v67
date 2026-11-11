@@ -18,6 +18,29 @@ const courts = () => Object.fromEntries([...ETAPES.map((k) => [k, tr('vcParcours
 const moisLisible = (ym) => { const [a, m] = String(ym || '').split('-').map(Number); if (!a || !m) return ''; try { return dateI18n(new Date(a, m - 1, 15), { month: 'long', year: 'numeric' }); } catch (_) { return ym; } };
 const jourLisible = (t) => { const x = typeof t === 'number' ? t : Date.parse(t || ''); if (!Number.isFinite(x) || x <= 0) return ''; try { return dateI18n(new Date(x), { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
 
+// Le moment où l'argent arrive : UNE ligne, dans « L'argent » du récapitulatif (pas deux fois sur l'écran, §7).
+export function LigneArgentVc({ v }) {
+  const p = parcoursVenteVc(v);
+  if (!p) return null;
+  const a = p.argent;
+  const texte = a.etat === 'verse' ? tr('vcParcours.argent.verse', { jour: jourLisible(a.t), mois: moisLisible(a.mois) })
+    : a.etat === 'estime' ? tr('vcParcours.argent.estime', { quand: a.texte })
+      : tr('vcParcours.argent.passu');
+  return (
+    <div className="vrm-recap-ligne" data-vc-parcours-argent={a.etat} data-vc-parcours-mois={a.mois || ''}>
+      <dt>{tr('vcParcours.argent.titre')}</dt>
+      <dd><small>{texte}</small></dd>
+    </div>
+  );
+}
+
+// L'étape EN COURS chez Vestiaire, pour la phrase du récapitulatif quand le mot de Vestiaire n'est pas rangé.
+export function etapeEnCoursVc(v, colisFait = null) {
+  const p = parcoursVenteVc(v, colisFait);
+  const x = p && p.etapes.find((e) => e.etat === 'encours');
+  return x && x.cle !== 'envoye' ? tr('vcParcours.etape.' + x.cle) : '';
+}
+
 export default function ParcoursVestiaire({ v, colisFait = null }) {
   const p = parcoursVenteVc(v, colisFait);
   if (!p) return null;
@@ -29,12 +52,8 @@ export default function ParcoursVestiaire({ v, colisFait = null }) {
     if (x.etat === 'avenir') return tr('vcParcours.etat.avenir');
     return x.mot ? tr('vcParcours.etat.passuMot', { mot: x.mot }) : tr('vcParcours.etat.passu');
   };
-  const a = p.argent;
-  const argent = a.etat === 'verse' ? tr('vcParcours.argent.verse', { jour: jourLisible(a.t), mois: moisLisible(a.mois) })
-    : a.etat === 'estime' ? tr('vcParcours.argent.estime', { quand: a.texte })
-      : tr('vcParcours.argent.passu');
   return (
-    <section className="vrm-recap-parcours" aria-label={tr('vcParcours.titre')} data-vc-parcours={p.refusee ? 'refusee' : 'lu'}>
+    <section className="vrm-recap-details vrm-recap-parcours" aria-label={tr('vcParcours.titre')} data-vc-parcours={p.refusee ? 'refusee' : 'lu'}>
       <h3 className="vrm-recap-titre">{tr('vcParcours.titre')}</h3>
       <Frise etapes={frise} cle={'vcp' + String(v.id || '')} className="vrm-fu-ligne-frise" label={tr('vcParcours.titre')}/>
       <dl>
@@ -44,10 +63,6 @@ export default function ParcoursVestiaire({ v, colisFait = null }) {
             <dd>{etat(x)}</dd>
           </div>
         ))}
-        <div className="vrm-recap-ligne" data-vc-parcours-argent={a.etat} data-vc-parcours-mois={a.mois || ''}>
-          <dt>{tr('vcParcours.argent.titre')}</dt>
-          <dd>{argent}</dd>
-        </div>
       </dl>
     </section>
   );

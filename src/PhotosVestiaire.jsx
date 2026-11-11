@@ -9,6 +9,7 @@
 import React from 'react';
 import { photosExigeesVc } from './photosVestiaire.js';
 import { tr } from './i18n/index.js';
+import './styles-vestiaire-plus.css';
 
 export function textePhotosManquantes(r) {
   return r.manque.map((k) => tr('vcPhotos.vue.' + k)).join(', ');

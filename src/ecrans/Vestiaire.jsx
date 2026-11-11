@@ -21,7 +21,7 @@ import { FermeAuRetour, InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, B
 
 // ⟦← App.jsx #1⟧
 import { preuvesFriseVc, preuvesFriseEbay } from "../friseSites.js";
-import ParcoursVestiaire from "../ParcoursVestiaire.jsx";
+import ParcoursVestiaire, { LigneArgentVc, etapeEnCoursVc } from "../ParcoursVestiaire.jsx";
 import PhotosVestiaire, { textePhotosManquantes } from "../PhotosVestiaire.jsx";
 const BaissePrixVestiaire = aLaDemande(() => import("../BaissePrixVestiaire.jsx"));
 import { photosExigeesVc } from "../photosVestiaire.js";
@@ -658,6 +658,8 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       : mot === 'controle' ? { gras: 'Contrôle par Vestiaire.', suite: 'Vestiaire vérifie l’article avant de l’envoyer à l’acheteur.' }
       : ici === 'argent' ? { gras: 'Terminée.', suite: 'Vestiaire a versé l’argent.' }
       : ici === 'livree' ? { gras: 'Livrée.', suite: 'L’argent arrive quand Vestiaire le verse.' }
+      // (11 nov.) Un mot de Vestiaire non rangé (« IN_PROGRESS ») : l'étape EN COURS lue dans sa frise, s'il y en a une.
+      : etapeEnCoursVc(v, fait || null) ? { gras: `${etapeEnCoursVc(v, fait || null)}.`, suite: '' }
       : { gras: `${v.label || 'En cours'}.`, suite: '' };
     return <>
       <header className="vrm-recap-tete">
@@ -686,7 +688,8 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
           <div className="vrm-recap-ligne"><dt>Vestiaire te verse</dt><dd data-prix-vente={lb.verse != null ? Math.round(lb.verse * 100) : undefined}>{lb.verse != null ? eurosRecap(lb.verse) : '— pas sûr'}</dd></div>
           {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap onSaisir={(p) => poserAchatVc(v.num, p)}/> : '—'}</dd></div> : null}
           {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={lb.benefice != null ? lb.benefice.toFixed(2) : undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur"><span className="vrm-recap-montant">{lb.benefice == null ? '—' : eurosRecap(lb.benefice)}</span></span>{lb.etat === 'prix' ? <small> montant versé pas sûr</small> : null}</dd></div> : null}
-          {v.paiementEstime ? <div className="vrm-recap-ligne"><dt>Paiement estimé</dt><dd>{v.paiementEstime}</dd></div> : null}
+          {/* (11 nov., lot vestiaire-plus) Le moment où l'argent arrive (versé ⇒ le mois du CA ; estimé ⇒ pas encore dans le CA). */}
+          {!vcVenteAnnulee(v) ? <LigneArgentVc v={v}/> : null}
         </dl>
       </section>
       <section className="vrm-recap-details" aria-label="Détails">

@@ -12,6 +12,7 @@ import { lignesBaisseVc, issueBaisseVc, etatRecettePrixVc } from './baissePrixVe
 import { tr } from './i18n/index.js';
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
+import './styles-vestiaire-plus.css';
 
 const cc = (x) => String(x || '').replace(/-(\w)/g, (m, c) => c.toUpperCase());
 const pauseEntre = () => {

@@ -98,10 +98,10 @@ const PONT = ({ version }) => {
 };
 
 async function preparer(b, vp, sombre) {
-  const ctx = await b.newContext({ viewport: vp, colorScheme: sombre ? 'dark' : 'light', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', colorScheme: sombre ? 'dark' : 'light', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_visite_vue', 'true'); } catch (_) {} }, sombre);
+  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_langue', 'fr'); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_visite_vue', 'true'); } catch (_) {} }, sombre);
   await pg.addInitScript(PONT, { version: '5.364.0' });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     if (/images\.vestiairecollective\.com|img\.test|vinted\.net/.test(r.request().url())) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#c8b08a"/></svg>' });
@@ -172,9 +172,12 @@ const sain = async (pg, ecran) => {
         await pg.click('[data-vc-vente="V1"] .vrm-ledger-sale-toggle');
         await pg.waitForSelector('[data-vc-parcours]', { timeout: 10000 });
         const p = await pg.evaluate(() => { const s = [...document.querySelectorAll('[data-vc-parcours]')].find((x) => x.offsetParent !== null) || document.querySelector('[data-vc-parcours]');
-          return { etapes: [...s.querySelectorAll('[data-vc-parcours-etape]')].map((x) => x.getAttribute('data-vc-parcours-etape') + ':' + x.getAttribute('data-vc-parcours-etat')).join(','), argent: s.querySelector('[data-vc-parcours-argent]').getAttribute('data-vc-parcours-argent'), t: s.innerText, segs: s.querySelectorAll('[data-fu-etape]').length }; });
+          return { etapes: [...s.querySelectorAll('[data-vc-parcours-etape]')].map((x) => x.getAttribute('data-vc-parcours-etape') + ':' + x.getAttribute('data-vc-parcours-etat')).join(','), argent: (document.querySelector('[data-vc-parcours-argent]') || { getAttribute: () => '' }).getAttribute('data-vc-parcours-argent'), t: (document.querySelector('[data-vc-parcours-argent]') || { innerText: '' }).innerText, phrase: (document.querySelector('[data-recap-phrase]') || { innerText: '' }).innerText, segs: s.querySelectorAll('[data-fu-etape]').length }; });
         dit(p.etapes === 'envoye:fait,arrive:fait,authentification:encours,verdict:avenir,paye:avenir', 'B · le parcours LU : envoyé ✓, arrivé ✓, authentification en cours, validé et payé à venir', p.etapes);
         dit(p.segs === 5 && p.argent === 'estime' && /24 nov\. 2026/.test(p.t) && /pas encore dans le CA/.test(p.t), 'B · la frise (5 étapes) et « Vestiaire estime : 24 nov. 2026 · pas encore dans le CA »', JSON.stringify({ segs: p.segs, a: p.argent }));
+        dit(/Authentification/.test(p.phrase) && !/IN_PROGRESS/.test(p.phrase), 'B · la phrase du haut dit l’étape lue (« Authentification. »), plus le mot brut « IN_PROGRESS »', p.phrase);
+        const nEst = await pg.evaluate(() => (document.body.innerText.match(/24 nov\. 2026/g) || []).length);
+        dit(nEst === 1, 'B · la date estimée écrite UNE fois (§7)', String(nEst));
         await pg.evaluate(() => { const s = document.querySelector('[data-vc-parcours]'); if (s) s.scrollIntoView({ block: 'center' }); });
         await capture(pg, `parcours-${nomVp}`);
         await sain(pg, 'Ventes · récapitulatif');
