@@ -77,7 +77,7 @@
 .vrm-aa-plein .vrm-aa-fond { fill: var(--vrm-ink, #1D1D1F); }
 .vrm-aa-plein text { fill: var(--vrm-surface, #fff); }
 .vrm-aa-ambre .vrm-aa-grand { fill: #B25000; }
-.vrm-aa-rouge .vrm-aa-fond { fill: rgba(255,59,48,.16); stroke: #FF3B30; stroke-width: 1.2; }
+.vrm-aa-double .vrm-aa-fond { fill: color-mix(in srgb, var(--vrm-doublon, #D70015) 16%, transparent); stroke: var(--vrm-doublon, #D70015); stroke-width: 1.2; }
 .vrm-aa-el { transform-box: fill-box; transform-origin: center; }
 .vrm-aa-actif .vrm-aa-fond { stroke: var(--vrm-accent, #0071E3); stroke-width: 1.6; }
 .vrm-aa-actif.vrm-aa-tap { animation: vrm-aa-appui 1000ms cubic-bezier(.2,.8,.2,1) both; }
