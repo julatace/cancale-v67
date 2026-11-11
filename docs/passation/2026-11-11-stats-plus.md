@@ -50,6 +50,22 @@ Règles : `src/statsPlus.js` (assemble les propriétaires, ne lit rien) ; écran
     `stockQuiDort`) ; sans date dites ; 90 j et plus en ambre seulement si non vide.
   - Tes 10 meilleures ventes : vente − prix d'achat (la règle du brut), seulement au prix connu ;
     « classées sur N ventes au prix d'achat connu (sur M) ».
+- **Mes records** (ajout de Julien, reçu en cours de lot) — `recordsDe`, sur TOUT l'historique lu,
+  comptes sélectionnés, recalculé à chaque lecture (rien de rangé) : meilleur mois et meilleure
+  semaine (le vendu, mois/semaine locaux, lundi → lundi ; au moins 2 mois / 2 semaines vendus),
+  meilleure vente (vente − prix d'achat, SEULEMENT parmi les ventes au prix d'achat connu, dit
+  « (N sur M) », au moins 3 au prix connu), vente la plus rapide (mise en ligne → vente, Vinted
+  daté, au moins 3). Un site ou des montants pas lus ⇒ « parmi les ventes lues ». Chaque record se
+  touche : une feuille (les ventes du mois/de la semaine, ou le détail de la vente) et « Voir mes
+  ventes ». Pas de lien direct vers UNE vente (aucune route d'app pour ça aujourd'hui).
+- **Comparer deux comptes** (ajout de Julien) — `colonneCompte` : deux listes de choix (44 px),
+  un tableau à 3 colonnes, compact au téléphone ; ventes et vendu = les lignes de « Quel compte
+  vend le mieux » ; bénéfice connu = `brutParCompte` + couverture (deux comptes Leboncoin
+  partagent un brut ⇒ « — ») ; panier à partir de 3 ventes ; temps pour vendre = médiane
+  `delaisPar` (Vinted seulement, ailleurs « pas sur ce site ») ; taux de vente = `tauxVenteMois`
+  (vendues ÷ (vendues + en ligne aujourd'hui), Vinted, nombre en ligne LU par compte sinon « — »).
+  Seuls les comptes avec au moins une vente sur la période ; le choix est une commodité de cet
+  appareil (`vrm_sp_comparer_comptes`).
 - Déjà là avant ce lot (non refait) : ce qui part vite, quel compte vend le mieux, par plateforme
   (marge), par catégorie, offres (taux, remise), annulations/notes, frais par site, comparer deux
   mois, objectif, vitesse d'envoi, taux de vente et rotation (volet « Ce qui se vend »).
@@ -59,11 +75,11 @@ Règles : `src/statsPlus.js` (assemble les propriétaires, ne lit rien) ; écran
 - `npm run build` vert ; audits `variables, tdz, coherence, identite, icones, textes-courts,
   fonctions-api, secrets, carte-chiffres` verts (carte-chiffres : la ligne REGLES_CARTE acceptée
   avec ses deux règles neuves, exigeant `montantPeriodeUrssaf`).
-- `node scripts/audit-stats-plus.cjs` : 44 verts — exécute chaque règle sur des données inventées
+- `node scripts/audit-stats-plus.cjs` : 57 verts — exécute chaque règle sur des données inventées
   (couverture, pas su, compte exclu, vendu ≠ reçu, 6 cases). Rouge sur `origin/main` (module
-  absent) et sous 7 mutations (`--mutation=achat|pasassez|recu|tranches|six|stock|stockpartiel`).
-- Banc `scripts/bancs/stats-plus.cjs` : 96 verts (390 clair/sombre, 1512 clair/sombre) ; captures
-  regardées (pages 1 et 2 du carrousel, feuille, 1512, âge du stock, meilleures ventes, sombre).
+  absent) et sous 11 mutations (`--mutation=achat|pasassez|recu|tranches|six|stock|stockpartiel|record|recordachat|unmois|tauxlbc`).
+- Banc `scripts/bancs/stats-plus.cjs` : 124 verts (390 clair/sombre, 1512 clair/sombre) ; captures
+  regardées (pages 1 et 2 du carrousel, feuille, 1512, âge du stock, meilleures ventes, records et sa feuille, comparer deux comptes, sombre).
 - Bancs voisins : `stats-vitrine` 112/0 ; `carte-stats` 3 rouges et `journee-premium` 1 rouge —
   les MÊMES sur `origin/main` (grand chiffre de Ma journée caché par la frise depuis le 9 nov. ;
   hauteur de tête), pas de ce lot.

@@ -33,6 +33,10 @@ else if (MUT === 'tranches') muter('sp', 'const n = [dort.datesConnues - s30, s3
 else if (MUT === 'six') muter('cc', 'Math.min(r.c.length, maxCases(page))', 'r.c.length');
 else if (MUT === 'stock') muter('cc', "    if (partiel && !(v.centimes > 0)) return vide('achats');\n", '');
 else if (MUT === 'stockpartiel') muter('cc', "const partiel = !!v.partiel || Number(v.nSans) > 0;", 'const partiel = false;');
+else if (MUT === 'record') muter('sp', "out.vente = T.nCout >= MIN_DONNEES ?", "out.vente = T.n >= MIN_DONNEES ?");
+else if (MUT === 'recordachat') muter('sp', "    if (!connu(l.achat)) continue;\n", '');
+else if (MUT === 'unmois') muter('sp', "if (gs.length < 2) return { pasAssez: true, nGroupes: gs.length };", '');
+else if (MUT === 'tauxlbc') muter('sp', "taux: vinted && Number.isFinite(enLigne) ? tauxVente(c.n, enLigne) : (vinted ? null : undefined),", "taux: tauxVente(c.n, enLigne || 0),");
 else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 const charger = async (texte, nom) => {
@@ -116,6 +120,40 @@ const fichiers = (t, dossier) => t.replace(/from '(\.\.?\/[^']+)'/g, (m, f) => `
   dit(VRk.barres.every((x) => x.recu === null) && VRk.raison === 'absente' && VRk.recuLu === false, 'reçu pas publié : chaque barre « — » (null) avec sa raison, jamais 0');
   const VRp = S.venduEtRecu(barres, (de, a) => M.recuPublieEntre({ ...pub, sources: { vinted: 'lu', ebay: 'pasSu' } }, { de, a }, MAINT));
   dit(VRp.recuComplet === false && VRp.barres[i16].recuPartiel === true, 'un site pas lu : le reçu est un minimum (« au moins »)');
+
+  // ── Mes records ──
+  const VT = [
+    { plateforme: 'Vinted', compte: 'a', ts: T(8, 3), eur: 50 }, { plateforme: 'Vinted', compte: 'a', ts: T(8, 4), eur: 60 },   // sept. : 110
+    { plateforme: 'Vinted', compte: 'a', ts: T(9, 5), eur: 200 },                                                              // oct. : 200 (lun. 5)
+    { plateforme: 'Leboncoin', compte: 'l', ts: T(9, 7), eur: 30 },                                                            // oct. : 230, même semaine que le 5
+    { plateforme: 'Vinted', compte: 'a', ts: T(10, 2), eur: 120 },                                                             // nov. : 120
+  ];
+  const RLV = [
+    { plateforme: 'Vinted', ts: T(9, 5), eur: 200, achat: 120, titre: 'A', enLigne: T(9, 4, 13) },   // 23 h, brut 80
+    { plateforme: 'Vinted', ts: T(9, 9), eur: 150, achat: null, titre: 'B', enLigne: T(9, 1) },    // achat inconnu : 150 € n'est pas un bénéfice
+    { plateforme: 'Vinted', ts: T(10, 2), eur: 120, achat: 20, titre: 'C', enLigne: T(9, 20) },    // brut 100
+    { plateforme: 'Leboncoin', ts: T(8, 3), eur: 50, achat: 10, titre: 'D' },                      // brut 40, pas de date de mise en ligne
+  ];
+  const Rec = S.recordsDe({ vendu: VT, releve: RLV });
+  dit(Rec.mois && Rec.mois.k === '2026-10' && Rec.mois.eur === 230 && Rec.mois.n === 2, 'meilleur mois : octobre, 230 € (2 ventes)', Rec.mois);
+  dit(Rec.semaine && Rec.semaine.eur === 230 && new Date(Rec.semaine.de).getDate() === 5, 'meilleure semaine : celle du lundi 5 octobre, 230 €', Rec.semaine);
+  dit(Rec.vente && Rec.vente.titre === 'C' && Rec.vente.brut === 100 && Rec.vente.nCout === 3 && Rec.vente.n === 4, 'meilleure vente : C (+100 €) parmi 3 au prix connu sur 4 — jamais B (achat inconnu)', Rec.vente);
+  dit(Rec.rapide && Rec.rapide.titre === 'A' && Rec.rapide.heures === 23 && Rec.rapide.nDelai === 3, 'vente la plus rapide : A, 23 h, parmi 3 datées (Leboncoin sans date hors)', Rec.rapide);
+  dit(S.recordsDe({ vendu: VT.slice(4), releve: RLV.slice(0, 2) }).mois.pasAssez === true, 'un seul mois de ventes : pas de « record »');
+  dit(S.recordsDe({ vendu: VT, releve: RLV.slice(0, 2) }).vente.pasAssez === true, 'une seule vente au prix connu : pas de « meilleure vente »');
+  dit(S.recordsDe({ vendu: VT, releve: [RLV[0], RLV[1], { ...RLV[1], ts: T(9, 10) }] }).vente.pasAssez === true, 'trois ventes dont UNE au prix connu : pas de « meilleure vente » (le compte se fait sur les prix connus)');
+  const R0 = S.recordsDe({ vendu: undefined, releve: null });
+  dit(R0.mois === undefined && R0.vente === null, 'trois états : en cours = undefined, pas su = null');
+  dit(S.recordsDe({ vendu: VT.filter((l) => l.compte !== 'l'), releve: RLV }).mois.eur === 200, 'compte exclu (Leboncoin retiré par la coque) : octobre = 200 €');
+
+  // ── Comparer deux comptes ──
+  const tv = SV.tauxVenteMois;
+  const cA = S.colonneCompte({ k: 'Vinted|a', plat: 'Vinted', nom: 'a', n: 4, eur: 210, mediane: 6.5, nDelai: 3 }, { brut: 80, nCout: 2, n: 3 }, 12, tv);
+  dit(cA.panier === 52.5 && cA.brut === 80 && cA.nCout === 2 && cA.nFin === 3, 'compte Vinted : panier 52,50 €, bénéfice connu 80 € (2 sur 3)', cA);
+  dit(cA.delai === 6.5 && cA.taux === 25, 'délai médian 6,5 j ; taux 4 ÷ (4 + 12) = 25 %', cA);
+  const cL = S.colonneCompte({ k: 'Leboncoin|', plat: 'Leboncoin', nom: 'Leboncoin', n: 2, eur: 90, mediane: null, nDelai: 0 }, null, null, tv);
+  dit(cL.panier === null && cL.delai === undefined && cL.taux === undefined && cL.brut === null, 'Leboncoin : 2 ventes ⇒ pas de panier ; délai et taux hors sujet (jamais 0) ; bénéfice pas su', cL);
+  dit(S.colonneCompte({ k: 'Vinted|b', plat: 'Vinted', nom: 'b', n: 3, eur: 30, nDelai: 0 }, null, null, tv).taux === null, 'Vinted au nombre en ligne pas lu : taux « — »');
 
   console.log('── 2. La carte de Ma journée (src/design/carteChiffres.js)');
   dit(M.maxCases('journee') === 6 && M.maxCases('ventes') === 3, 'Ma journée : 6 cases au plus ; les autres pages : 3');

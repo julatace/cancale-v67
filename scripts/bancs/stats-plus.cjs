@@ -250,6 +250,26 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
           const recuZero = await pg.evaluate(() => /Reçu\s*0,00/.test(document.querySelector('.vrm-sp-vr-lu').innerText) && !document.querySelector('[data-sp-vr]').getAttribute('data-sp-vr').split(',').some((x) => /:\d/.test(x)));
           dit(!recuZero, 'reçu pas publié : « — », jamais « 0,00 € »');
         }
+        // Mes records (sur tout l'historique lu) : novembre 297 € > octobre 177 € ; semaine du 26 oct.
+        // = 88 + 72 + 115 = 275 € ; meilleure vente = Air Max 1 (+70 €, 4 sur 5 au prix connu).
+        const Rc = await pg.evaluate(() => { const r = (k) => document.querySelector(`[data-sp-record="${k}"]`); return { mois: r('mois')?.getAttribute('data-sp-record-k'), moisV: r('mois')?.getAttribute('data-sp-record-v'), sem: r('semaine')?.getAttribute('data-sp-record-v'), vente: r('vente')?.getAttribute('data-sp-record-v'), couv: r('vente')?.getAttribute('data-sp-record-couv'), rapide: r('rapide')?.getAttribute('data-sp-record-etat') }; });
+        dit(Rc.mois === '2026-11' && Rc.moisV === '29700' && Rc.sem === '27500', 'records : meilleur mois novembre 297 €, meilleure semaine 275 € (celle du 26 oct.)', JSON.stringify(Rc));
+        dit(Rc.vente === '7000' && Rc.couv === '4/5', 'record : meilleure vente +70 €, parmi 4 ventes au prix d’achat connu sur 5', JSON.stringify(Rc));
+        dit(Rc.rapide === 'pas-assez', 'vente la plus rapide : aucune date de mise en ligne ⇒ « — · pas assez », jamais un faux record', JSON.stringify(Rc));
+        await pg.locator('[data-sp-record="mois"]').click();
+        await pg.locator('[data-sp-record-feuille="mois"]').waitFor({ timeout: 8000 });
+        const nf = await pg.locator('[data-sp-record-feuille="mois"] [data-sp-record-ventes]').getAttribute('data-sp-record-ventes');
+        dit(nf === '4', 'le meilleur mois s’ouvre : ses 4 ventes', String(nf));
+        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `record-mois-${nom}.png`) });
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(500);
+        if (await pg.locator('[data-sp-record-feuille]').count()) { await pg.locator('[data-sp-record-feuille] button[aria-label*="ermer"]').first().click().catch(() => {}); await pg.waitForTimeout(400); }
+        // Comparer deux comptes : boutique_test (Vinted, 3 ventes, 257 €) et Leboncoin (1 vente, 40 €).
+        const Cp = await pg.evaluate(() => { const t = document.querySelector('[data-sp-cmp]'); if (!t) return null; const v = (k, c) => t.querySelector(`[data-sp-cmp-ligne="${k}"] [data-sp-cmp-${c}]`)?.innerText.trim(); return { cle: t.getAttribute('data-sp-cmp'), na: v('ventes', 'a'), nb: v('ventes', 'b'), pb: v('panier', 'b'), db: v('delai', 'b'), sel: t.querySelectorAll('select').length, h: Math.round(t.querySelector('select').getBoundingClientRect().height) }; });
+        dit(!!Cp && Cp.sel === 2 && Cp.h >= 44, 'comparer deux comptes : deux listes de choix de 44 px', JSON.stringify(Cp));
+        dit(!!Cp && Cp.na === '3' && Cp.nb === '1', 'boutique_test 3 ventes · Leboncoin 1 vente (les lignes de « Quel compte vend le mieux »)', JSON.stringify(Cp));
+        dit(!!Cp && /pas assez/.test(Cp.pb) && /pas sur ce site/.test(Cp.db), 'Leboncoin : panier « pas assez », délai « pas sur ce site » — jamais 0', JSON.stringify(Cp));
+        await shot('[data-sv-carte="records"]', 'records');
+        await shot('[data-sv-carte="comparer-comptes"]', 'comparer');
         await shot('[data-sp-en-bref]', 'en-bref');
         await shot('[data-sv-carte="vendu-recu"]', 'vendu-recu');
         await shot('[data-sv-carte="meilleures"]', 'meilleures');
