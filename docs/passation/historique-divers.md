@@ -1397,3 +1397,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot clics-directs)
 
 - **11 nov. · Clics directs** : Ma journée, toucher la pile (photo comprise) ⇒ Ventes, plus de zoom (`data-sans-visionneuse`) ; Ventes, la photo (ligne et détail) s'ouvre DIRECTEMENT dans LA visionneuse (`ouvrirVisionneuse`, toutes les photos de l'article par fichier, `article` ⇒ mode stream), plus de loupe ni de second panneau. Banc `clics-directs` (rouge sur `main`). `docs/passation/2026-11-11-clics-directs.md`. Geste : aucun.
+## Déplacé de CLAUDE.md §9 (11 nov., lot emails-ecran)
+
+- **11 nov. · Ouverture plus légère 2** : transactions et fraîcheur des comptes gardées sur l'appareil, revalidées par leur version de famille (nombre + lignes écrites depuis 6 h, `lireFamilleAvecCopie`) ; version illisible ⇒ lecture d'avant, jamais la copie ; instantané d'Annonces (Vinted, « Tous ») ; 2e ouverture Ma journée 927 → 458 Ko, Annonces 1 108 → 638 Ko ; e-mails de suivi et fiches de page refusés (aucune version sûre). `docs/passation/2026-11-11-ouverture-legere-2.md`. Geste : aucun.

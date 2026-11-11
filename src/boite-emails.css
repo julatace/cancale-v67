@@ -477,3 +477,165 @@
    blanche pleine », revue du 16 oct.) : le gris d'iOS (`--seg-actif`) de Annonces,
    Achats, Messages — elle était la seule pastille blanche pleine de l'app. */
 :root[data-theme="dark"] .vrm-boite .vrm-boite-rubriques button[aria-pressed=true]{background:var(--seg-actif);border-color:transparent;color:var(--seg-actif-texte)}
+
+/* ══ (11 nov., lot emails-ecran) DENSE COMME MAIL SUR MAC ═══════════════════════
+   Julien : « les mails doivent être retravaillés, je n'aime pas trop, surtout sur
+   ordi : tout fait trop gros ». Sur ordinateur : UN panneau à deux colonnes qui
+   remplit la fenêtre (liste 340–400 px à gauche, lecture à droite, un filet entre
+   les deux), chaque colonne défile seule ; listes en 13–14 px, lignes compactes
+   (≤ 64 px), titres raisonnables, lecture ≤ 72 caractères par ligne, l'e-mail HTML
+   à sa taille naturelle. Au téléphone : liste puis lecture plein écran, tailles
+   confortables (44 px au doigt) mais plus de titres énormes. Mesuré par
+   scripts/bancs/emails-densite.cjs. Palette inchangée (bleu rare, ambre, neutres). */
+
+/* ── Le panneau à deux colonnes (ordinateur, ≥ 900 px) ──────────────────────── */
+@media(min-width:900px){
+  .vrm-boite:has(> .vrm-boite-corps-ecran[data-boite-large="1"]),.vrm-boite[data-vue="boite"]{padding-left:0;padding-right:0}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"]{grid-template-columns:clamp(340px,26.5vw,400px) minmax(0,1fr);gap:0;align-items:stretch;height:var(--bx-panneau-h,calc(100vh - 170px));min-height:460px;border-radius:14px;background:var(--bx-carte);box-shadow:var(--bx-ombre);overflow:hidden}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"]>.vrm-boite-liste-col{height:100%;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;border-radius:0;box-shadow:none;border-right:.5px solid var(--bx-filet);scrollbar-width:thin}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"]>.vrm-boite-lecture-col{position:static;top:auto;height:100%;max-height:none;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;border-radius:0;scrollbar-width:thin}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-jour-titre{top:0}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-lecture{border-radius:0;box-shadow:none;background:transparent;padding:0 24px 24px;animation:none}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-lecture>:is(.vrm-boite-haut,.vrm-boite-pieces,.vrm-boite-meta,.vrm-boite-panne,.vrm-boite-etat-bloc){max-width:680px}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-corps-bloc>.vrm-boite-sous,.vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-message>:not([data-boite-origine="html"]):not(.vrm-boite-msg){max-width:680px}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-lecture-barre{position:sticky;top:0;z-index:4;max-width:none;margin:0 -24px 4px;padding:6px 16px;background:var(--bx-carte);box-shadow:0 .5px 0 var(--bx-fin)}
+  /* L'e-mail HTML prend toute la largeur de la colonne : sa taille naturelle tient à 1280 px. */
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-message [data-boite-origine="html"]{margin:0 -24px}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-message [data-boite-origine="html"] .vrm-boite-cadre-images{padding:0 24px}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-cadre-iframe{border-radius:0;box-shadow:0 .5px 0 var(--bx-fin),0 -.5px 0 var(--bx-fin)}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-vide-lecture{height:100%;align-content:center;padding:24px;border-radius:0;box-shadow:none;background:transparent}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-vide-lecture .vrm-boite-dessin{width:84px;height:68px;opacity:.7}
+  .vrm-boite .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-vide-lecture p{font-size:13px}
+}
+/* Le titre de l'écran : raisonnable, pas une affiche. Dans la couche `vrm-premium`
+   (celle qui pose les 40 px, styles-widgets-ios.css) : une règle hors couche ne
+   l'emporte jamais sur un `!important` d'une couche. */
+@layer vrm-premium{
+  @media(min-width:900px){
+    :root:root body .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete h1,.vrm-market-heading h1){font-size:26px!important;letter-spacing:-.02em!important;line-height:1.15!important}
+    :root:root body .vrm-app-shell .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete,[data-titre-ecran-grand]){padding:4px 0 2px!important}
+    :root:root body .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete,.vrm-market-heading) .vrm-phrase-ecran{font-size:13px}
+  }
+}
+
+/* ── La densité au pointeur fin (souris, pavé) ─────────────────────────────── */
+@media(min-width:900px) and (hover:hover) and (pointer:fine){
+  html .vrm-boite{font-size:13px;line-height:1.4}
+  /* `:where` : cette règle de base ne doit jamais battre celles des lignes, puces et pastilles ci-dessous. */
+  html .vrm-boite:where([data-vue="boite"]) button,html .vrm-boite:where([data-vue="boite"]) select{min-height:30px;border-radius:8px;padding:0 12px;font-size:13px}
+  html .vrm-boite .vrm-boite-vues{max-width:300px;margin:0 0 10px;padding:2px;border-radius:9px}
+  html .vrm-boite .vrm-boite-vues button{min-height:26px;border-radius:7px;font-size:13px}
+  /* Les outils de la liste : recherche 30 px, pastilles 26 px, compte 26 px. */
+  html .vrm-boite .vrm-boite-filtres{padding:10px 12px 6px}
+  html .vrm-boite .vrm-boite-cherche{min-height:30px;padding:0 9px;gap:6px;margin:0 0 8px;border-radius:8px}
+  html .vrm-boite .vrm-boite-cherche svg{width:14px;height:14px}
+  :root body .vrm-app-shell .vrm-main .vrm-boite-cherche input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]){min-height:30px!important;font-size:13px!important}
+  html .vrm-boite .vrm-boite-rubriques{gap:4px;margin:0 -12px;padding:0 12px 2px}
+  html .vrm-boite .vrm-boite-rubriques button{min-height:26px;padding:0 10px;gap:5px;font-size:12px}
+  html .vrm-boite .vrm-boite-n{font-size:11px}
+  html .vrm-boite .vrm-boite-ligne-outils{margin-top:6px}
+  html .vrm-boite .vrm-boite-compte select{min-height:26px;padding:0 28px 0 10px;font-size:12px}
+  html .vrm-boite .vrm-boite-compte-chevron{right:10px}
+  html .vrm-boite .vrm-boite-lien,html .vrm-boite .vrm-boite-actualiser{min-height:26px;font-size:12px}
+  html .vrm-boite .vrm-boite-couverture,html .vrm-boite .vrm-boite-aide-recherche{font-size:12px}
+  html .vrm-boite .vrm-boite-arelier{margin:8px 12px 2px;padding:10px 12px;border-radius:10px}
+  html .vrm-boite .vrm-boite-arelier-titre{font-size:13px}
+  html .vrm-boite .vrm-boite-arelier-qui{font-size:12px}
+  /* Les jours : une petite étiquette, pas un titre. */
+  html .vrm-boite .vrm-boite-jour-titre{padding:8px 12px 4px;font-size:12px;font-weight:600;color:var(--bx-doux)}
+  /* La ligne : expéditeur/nature, extrait d'une ligne, pied ; date à droite ; point discret. */
+  html .vrm-boite .vrm-boite-ligne{grid-template-columns:8px 28px minmax(0,1fr) auto;column-gap:8px;min-height:0;padding:7px 12px 7px 4px}
+  html .vrm-boite .vrm-boite-ligne[data-boite-rien="1"]{min-height:0;padding-top:6px;padding-bottom:6px}
+  html .vrm-boite .vrm-boite-point{width:7px;height:7px;margin-top:-16px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-marque,html .vrm-boite .vrm-boite-pile-avatar{width:28px;height:28px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-marque .vrm-logo-site{width:14px;height:14px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-marque .vrm-logo-site[data-logo-site="ebay"]{width:22px;height:22px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-mono{font-size:10px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-marque [data-transporteur-logo]{width:22px!important;height:22px!important}
+  html .vrm-boite .vrm-boite-pile-n{min-width:16px;height:16px;line-height:16px;font-size:10px;right:-5px;bottom:-3px;padding:0 4px}
+  html .vrm-boite .vrm-boite-quoi{font-size:14px;line-height:1.3;letter-spacing:-.006em}
+  html .vrm-boite .vrm-boite-ligne-haut time{font-size:12px}
+  html .vrm-boite .vrm-boite-essentiel{font-size:13px;line-height:1.35}
+  html .vrm-boite .vrm-boite-ligne-pied{font-size:12px;line-height:1.4;margin-top:0;gap:0 10px}
+  html .vrm-boite .vrm-boite-vignette{width:34px;height:34px;border-radius:8px;margin-top:0}
+  /* Le code de retrait sur la ligne : une puce de 26 px, plus un pavé de 44. */
+  html .vrm-boite .vrm-boite-ligne[data-boite-a-code="1"]{padding-bottom:40px}
+  html .vrm-boite .vrm-boite-puce-code{left:48px;bottom:8px;min-height:26px;padding:0 8px 0 10px;gap:6px;border-radius:7px}
+  html .vrm-boite .vrm-boite-puce-chiffres{font-size:14px}
+  html .vrm-boite .vrm-boite-puce-ic svg{width:13px;height:13px}
+  html .vrm-boite .vrm-boite-plus{margin:8px 12px 12px;width:calc(100% - 24px)}
+  html .vrm-boite .vrm-boite-fin{font-size:12px;padding:10px 12px 14px}
+  html .vrm-boite .vrm-boite-sq-ligne{padding-top:8px;padding-bottom:8px}
+  /* La lecture : en-tête sobre, carte compacte, corps en 14 px. */
+  html .vrm-boite .vrm-boite-lecture-barre button{min-height:28px;font-size:13px}
+  html .vrm-boite .vrm-boite-haut{margin:12px 0 18px;gap:10px}
+  html .vrm-boite .vrm-boite-haut-tete{grid-template-columns:36px minmax(0,1fr);gap:10px}
+  html .vrm-boite .vrm-boite-marque.is-grande{width:36px;height:36px}
+  html .vrm-boite .vrm-boite-marque.is-grande .vrm-logo-site{width:18px;height:18px}
+  html .vrm-boite .vrm-boite-titre{font-size:20px;line-height:1.25;letter-spacing:-.015em}
+  html .vrm-boite .vrm-boite-haut-de{font-size:12px}
+  html .vrm-boite .vrm-boite-billet{border-radius:12px}
+  html .vrm-boite .vrm-boite-billet-haut{padding:12px 14px 0}
+  html .vrm-boite .vrm-boite-billet-qui{font-size:13px}
+  html .vrm-boite .vrm-boite-billet-etiq,html .vrm-boite .vrm-boite-billet-bas dt{font-size:11px}
+  html .vrm-boite .vrm-boite-billet-code{padding:4px 14px 12px}
+  html .vrm-boite .vrm-boite-billet-chiffres{font-size:30px}
+  html .vrm-boite .vrm-boite-billet-trou{margin:0 14px}
+  html .vrm-boite .vrm-boite-billet-trou::before{left:-26px}
+  html .vrm-boite .vrm-boite-billet-trou::after{right:-26px}
+  html .vrm-boite .vrm-boite-billet-bas{padding:12px 14px 14px;gap:10px}
+  html .vrm-boite .vrm-boite-billet-bas dd b{font-size:14px}
+  html .vrm-boite .vrm-boite-billet-bas dd span,html .vrm-boite .vrm-boite-billet-sans{font-size:13px}
+  html .vrm-boite .vrm-boite-puce-code.is-grande{min-width:30px;min-height:30px;padding:0 8px}
+  html .vrm-boite .vrm-boite-heros{padding:12px 14px;border-radius:12px;gap:12px}
+  html .vrm-boite .vrm-boite-heros-photo{width:56px;height:56px;border-radius:10px}
+  html .vrm-boite .vrm-boite-heros-montant b{font-size:24px}
+  html .vrm-boite .vrm-boite-heros-montant span,html .vrm-boite .vrm-boite-heros-limite{font-size:13px}
+  html .vrm-boite .vrm-boite-heros-article{font-size:14px}
+  html .vrm-boite .vrm-boite-heros-num{font-size:12px}
+  html .vrm-boite .vrm-boite-details{font-size:13px}
+  html .vrm-boite .vrm-boite-averif{padding:10px 12px;border-radius:10px;font-size:13px}
+  html .vrm-boite .vrm-boite-gestes{gap:6px}
+  html .vrm-boite .vrm-boite-gestes button{min-height:30px;padding:0 14px;border-radius:8px;font-size:13px}
+  html .vrm-boite .vrm-boite-fait,html .vrm-boite .vrm-boite-doux,html .vrm-boite .vrm-boite-sous{font-size:12px}
+  html .vrm-boite .vrm-boite-corps-bloc{padding-top:14px;margin-bottom:16px}
+  html .vrm-boite .vrm-boite-sujet{font-size:15px;margin-bottom:10px}
+  html .vrm-boite .vrm-boite-msg{max-width:34em;font-size:14px;line-height:1.5}
+  html .vrm-boite .vrm-boite-msg .vrm-boite-msg-etiq{font-size:11px}
+  html .vrm-boite .vrm-boite-msg .vrm-boite-msg-note{font-size:12px}
+  html .vrm-boite .vrm-boite-pieces li{grid-template-columns:32px minmax(0,1fr);padding:7px 10px;border-radius:10px;font-size:13px}
+  html .vrm-boite .vrm-boite-pieces li small{font-size:12px}
+  html .vrm-boite .vrm-boite-meta{font-size:11px}
+  html .vrm-boite .vrm-boite-cadre-images{font-size:12px}
+  html .vrm-boite .vrm-boite-cadre-images .vrm-boite-second{min-height:28px;padding:0 10px;border-radius:7px}
+  html .vrm-boite .vrm-boite-etat-titre{font-size:15px}
+  html .vrm-boite .vrm-boite-etat-texte{font-size:13px}
+  html .vrm-boite .vrm-boite-vue-filtree>button{min-height:28px}
+  :root:root body .vrm-app-shell .vrm-main .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-vide-lecture{padding-top:24px!important}
+  :root:root body .vrm-app-shell .vrm-main .vrm-boite-corps-ecran[data-boite-large="1"] .vrm-boite-vide-lecture p{font-size:13px!important}
+}
+
+/* ── Au téléphone et sous 900 px : confortable, plus énorme ─────────────────── */
+@media(max-width:899px){
+  html .vrm-boite .vrm-boite-quoi{font-size:16px}
+  html .vrm-boite .vrm-boite-essentiel{font-size:14px}
+  html .vrm-boite .vrm-boite-ligne{grid-template-columns:8px 36px minmax(0,1fr) auto;padding-top:10px;padding-bottom:10px;min-height:64px}
+  html .vrm-boite .vrm-boite-ligne[data-boite-rien="1"]{min-height:56px;padding-top:8px;padding-bottom:8px}
+  html .vrm-boite .vrm-boite-point{width:8px;height:8px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-marque,html .vrm-boite .vrm-boite-pile-avatar{width:36px;height:36px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-marque .vrm-logo-site{width:18px;height:18px}
+  html .vrm-boite .vrm-boite-ligne .vrm-boite-marque .vrm-logo-site[data-logo-site="ebay"]{width:28px;height:28px}
+  html .vrm-boite .vrm-boite-puce-code{left:60px}
+  html .vrm-boite .vrm-boite-jour-titre{font-size:13px;font-weight:600;color:var(--bx-doux);padding:12px 16px 4px}
+  html .vrm-boite .vrm-boite-cherche input{font-size:16px}
+}
+/* La feuille de lecture (portail, téléphone). */
+.vrm-boite-feuille .vrm-boite-titre{font-size:22px;line-height:1.2}
+.vrm-boite-feuille .vrm-boite-marque.is-grande{width:40px;height:40px}
+.vrm-boite-feuille .vrm-boite-haut-tete{grid-template-columns:40px minmax(0,1fr)}
+.vrm-boite-feuille .vrm-boite-billet-chiffres{font-size:36px}
+.vrm-boite-feuille .vrm-boite-heros-montant b{font-size:28px}
+.vrm-boite-feuille .vrm-boite-heros-article{font-size:16px}
+.vrm-boite-feuille .vrm-boite-gestes button{font-size:16px;min-height:48px}
+.vrm-boite-feuille .vrm-boite-sujet{font-size:16px}
+.vrm-boite-feuille .vrm-boite-msg{font-size:16px;line-height:1.5}
