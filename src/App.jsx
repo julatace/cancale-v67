@@ -65,6 +65,7 @@ import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
 import { SqueletteChargement } from "./Chargement.jsx";
 import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.jsx';
+import { familleEcran, noterEcranVu as noterFamilleVue, prechargerApresOuverture } from './prechargeEcrans.js';   // (11 nov., chargement léger)
 // (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
@@ -293,6 +294,22 @@ const EbayVentes = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ d
 const Garage = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Garage })));
 const StockVinted = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.StockVinted })));
 const Inventory = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Inventory })));
+// (11 nov., chargement léger) Les mêmes morceaux, par famille (src/prechargeEcrans.js) : téléchargés en
+// fond quand l'ouverture est stable, pour les écrans que CET appareil ouvre le plus. Mêmes chemins que
+// ci-dessus : le navigateur ne télécharge chaque morceau qu'une fois.
+const CHARGEURS_ECRANS = {
+  reglages: () => import('./ecrans/Reglages.jsx'),
+  stats: () => import('./ecrans/Stats.jsx'),
+  prix: () => import('./ecrans/PrixMarche.jsx'),
+  compta: () => import('./ecrans/Compta.jsx'),
+  stock: () => import('./ecrans/Stock.jsx'),
+  leboncoin: () => import('./ecrans/Leboncoin.jsx'),
+  ebay: () => import('./ecrans/Ebay.jsx'),
+  vestiaire: () => import('./ecrans/Vestiaire.jsx'),
+  communaute: () => import('./communaute/Communaute.jsx'),
+  operations: () => import('./operations/Operations.jsx'),
+  emails: () => import('./BoiteEmails.jsx'),
+};
 import { createPortal, flushSync } from "react-dom";
 // (5 nov., chantier B) Les composants partagés et l'écriture unique des euros (docs/passation/2026-11-05-chantier-b.md).
 import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from "./format.js";
@@ -51781,6 +51798,12 @@ function AppCoeur() {
   const setCompteSel=(v)=>{ const n=typeof v==='function'?v(compteSel):v; setCompteSelBrut(n); try{ localStorage.setItem(CLE_CHOIX_COMPTES,JSON.stringify(memoriserChoix(lireCarteChoix(),siteCourant,n))); }catch(_){} };
   React.useEffect(()=>{ setCompteSelBrut(choixPourSite(lireCarteChoix(),siteCourant)); },[siteCourant]);
   React.useEffect(()=>{ if(estTacheSite(tab)) retenirFiltre(tab, siteDeTache(tab,platSub)); },[tab,platSub]);
+  // (11 nov., chargement léger) L'écran ouvert est noté (par famille de morceau, sur CET appareil) ; une fois
+  // l'ouverture stable, les deux familles les plus ouvertes ici sont téléchargées en fond (src/prechargeEcrans.js).
+  const familleCourante=familleEcran(tab,siteCourant,platSub);
+  const familleCouranteRef=useRef(familleCourante); familleCouranteRef.current=familleCourante;
+  React.useEffect(()=>{ noterFamilleVue(familleCourante); },[familleCourante]);
+  React.useEffect(()=>prechargerApresOuverture(CHARGEURS_ECRANS,()=>familleCouranteRef.current),[]);
   // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
   // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
   // lignes nettes et en tête, les autres estompées — Julien, 7 octobre).
