@@ -67,7 +67,7 @@ async function ouvrir(nav, etat, { scheme = 'light', largeur = 1512, hauteur = 9
   await pg.route('**/*', (r) => {
     const u = r.request().url();
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
-    return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff;font-family:sans-serif"><header style="height:64px;border-bottom:1px solid #ddd;padding:20px">Une page du site</header><main style="padding:20px;height:2000px">Annonces…</main></body></html>' });
+    return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff;font-family:sans-serif"><header style="height:64px;border-bottom:1px solid #ddd;padding:20px">Une page du site</header><main style="padding:20px;height:2000px">Annonces…</main></body></html>' });
   });
   await pg.goto(url);
   await pg.evaluate(({ e, js, store }) => {
