@@ -99,7 +99,20 @@ AVANT (`origin/main` dans un arbre à part, `git worktree`, le banc copié dedan
   après 42,9/42,5 s). Ce qui fixe « stable » ensuite, c'est la DISPARITION du toast « Numéros en
   double réglés » (minuterie fixe, ~9 s, base du banc) : apparu plus tôt, il disparaît dans la
   fenêtre de mesure ; avant, la mesure s'arrêtait souvent avant qu'il disparaisse. Pas un recul.
-- **Banc `vitesse.cjs`** : voir §5 bis (rempli après la mesure).
+- **Banc `vitesse.cjs`** (avant/après, `VITESSE_TEXTES` / `VITESSE_REFERENCE`) : son contrôle existant
+  « au plus 1 340 Ko de JS et CSS compressés au premier chargement » était **rouge sur `origin/main`
+  (1 496 Ko)** et passe **vert (1 318 Ko)**. Ce banc ne freine pas le téléchargement des fichiers (il
+  compte les octets) : ses temps « utile » ne bougent que dans le bruit (Ma journée 390 : avant 4,6 s ;
+  après 5,2 puis 4,5 s ; 1512 : 3,1 / 3,2 / 3,1 s). Ses autres rouges (lectures refaites, balayages des
+  transactions, « achat d'un ancien compte ») sont les mêmes des deux côtés.
+  **Texte rendu** : la comparaison brute rougit sur Ma journée 390, Ventes 390, Achats 390/1512 — et
+  seulement à cause du toast « Numéros en double réglés » (présent d'un côté ou de l'autre selon sa
+  minuterie, dans les DEUX sens) et d'une heure d'horloge (« vérifié à 14:15 » / « 14:10 »). Toast et
+  heures neutralisés : **Ma journée identique** (390 : 1 254 caractères, 1512 : 1 488), Ventes 390/1512
+  et Achats 1512 identiques ; Achats 390 diffère par le bandeau « 14 numéros portés par deux articles »
+  (le même réglage des doublons, pas encore passé à cet instant).
+- **`verif_visuel`** : exactement les **mêmes 20 rouges** sur `origin/main` et sur la branche
+  (préexistants) ; aucun débordement, aucune erreur d'app.
 
 **Banc neuf `scripts/bancs/precharge-ecrans.cjs`** (390 tactile, CPU ×4, 4G simulée par le serveur
 du banc — l'émulation de Chrome ne freinait pas les morceaux demandés après l'ouverture : 22 ms pour
@@ -114,8 +127,10 @@ appareil neuf, morceau téléchargé au geste en 0,7 s) ; C « économie de donn
   sens (vu sans préchargement aussi). Le texte identique est jugé par `vitesse.cjs`.
 - `scripts/tests/precharge-ecrans.test.mjs` 5/5 (familles, choix, réseau, stockage refusé).
 
-**Audits** : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
-csp — verts. `npm run build` vert (l'avertissement de taille reste : App fait toujours 3,1 Mo).
+**Après le `git merge origin/main`** : JS initial **1 107 Ko gzip** (les lots du jour ont ajouté ~19 Ko
+au morceau App), `poids-initial` vert. **Audits** : variables, tdz, coherence (après
+`git fetch --unshallow` : le clone superficiel rendait l'historique illisible), identite, icones,
+textes-courts, fonctions-api, secrets, csp, transporteurs-parfaits — verts. `npm run build` vert (l'avertissement de taille reste : App fait toujours 3,1 Mo).
 **Captures regardées** (fin de chaque écran, 390, 4G et lent) : Ma journée, Colis, Argent… rendus,
 rien de blanc, rien de changé.
 
