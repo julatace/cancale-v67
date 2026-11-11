@@ -17,16 +17,21 @@ import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { nomCompteVente } from '../plateformes.js';
 import { champsFacultatifs } from '../profilVendeur.js';
-import { InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel } from '../App.jsx';
+import { FermeAuRetour, InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { preuvesFriseVc, preuvesFriseEbay } from "../friseSites.js";
+import ParcoursVestiaire from "../ParcoursVestiaire.jsx";
+import PhotosVestiaire, { textePhotosManquantes } from "../PhotosVestiaire.jsx";
+const BaissePrixVestiaire = aLaDemande(() => import("../BaissePrixVestiaire.jsx"));
+import { photosExigeesVc } from "../photosVestiaire.js";
+import { tr } from "../i18n/index.js";
 // ⟦← App.jsx #2⟧
 // (6 nov., vitesse 2) OffresVestiaire : à la demande.
 import { offresVestiaire, euros } from "../offresVestiaire.js";
 // ⟦← App.jsx #4⟧
 // ⟦→ ecrans/Compta.jsx #5⟧
-import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCourte, LIEN_CLE, LIEN_TARIFS } from "../photoroomCle.js";
+import { cleUtilisable, lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCourte, LIEN_CLE, LIEN_TARIFS } from "../photoroomCle.js";
 // (10 nov., lot S) La facture Pro : Vestiaire ne donne pas le prix payé par l'acheteur (src/FactureAutres.jsx).
 import { DEPS_FACTURE } from '../App.jsx';
 const FactureVcTeteParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureVcTete })));
@@ -247,17 +252,24 @@ function etatAnnonceVc(it, vendueParVente, capturedAt) {
   return f ? { etat: f[0], label: f[2], brut } : { etat: 'autre', label: `Vestiaire : « ${brut} »`, brut };
 }
 // ⟦← App.jsx #8⟧
+// (11 nov.) La vignette d'une ligne de baisse : la photo Vestiaire entière, à la taille de la case.
+const PhotoBaisseVc = ({ src, className }) => <span className={className}><PhotoVc src={src} style={{ width: '100%', height: '100%' }}/></span>;
 function AnnoncesVestiaire() {
   const [d, setD] = useState(undefined);   // undefined en cours · null pas su · objet
+  const [recettePrix, setRecettePrix] = useState(undefined);
+  const [baisseOuverte, setBaisseOuverte] = useState(false);
   const vcOuvert = useCompteVcOuvert();
   // (2 nov., soir) Un N° par annonce, comme Vinted et Leboncoin (src/numerosVestiaire.js).
   const vcLoc = useVcLocal();
   useNumerotationVestiaire();
   const relire = React.useCallback(async () => {
-    const [rl, rv] = await Promise.all([
+    const [rl, rv, rp] = await Promise.all([
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total,inconnu:data->formeInconnue`),
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
+      // (11 nov., 5.364) Baisser un prix : la recette APPRISE de son propre geste sur Vestiaire (jamais devinée).
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_prix_recette&select=appris:data->appris,raison:data->>raison,at:data->>at`),
     ]);
+    setRecettePrix(Array.isArray(rp) ? (rp[0] ? { appris: rp[0].appris === true ? true : rp[0].appris === false ? false : null, raison: rp[0].raison || '' } : {}) : null);
     if (!Array.isArray(rl)) { setD(null); return; }
     const r = rl[0] || {};
     // Les ventes ne servent qu'à PROUVER « vendue » ; illisibles ⇒ on n'en tire rien.
@@ -304,6 +316,13 @@ function AnnoncesVestiaire() {
           {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Paramètres → État des connexions, puis {geste}</>}.</> : null}
           </p>
         </InfoPop>
+        {/* (11 nov., lot vestiaire-plus) Baisser le prix en série, sur SON clic (ext. 5.364) : la feuille dit
+            d'abord si le geste est appris de son propre changement de prix sur Vestiaire. */}
+        {liste.some((l) => l.etat === 'en-ligne') ? <div style={{ margin: '8px 0' }}><Bouton variante="secondaire" icone="tag" data-vc-baisse-ouvrir="" onClick={() => setBaisseOuverte(true)}>{tr('vcBaisse.ouvrir')}</Bouton></div> : null}
+        {baisseOuverte ? <BaissePrixVestiaire annonces={liste.filter((l) => l.etat === 'en-ligne').map(({ id, it, num }) => ({ id, it, num, compte: it.compte || '', titre: it.titre || '', photo: it.photo || '' }))}
+          compteOnglet={vcOuvert || null} recette={recettePrix} cap={extSait('vcprix')} Photo={PhotoBaisseVc} Retour={FermeAuRetour}
+          onBaisser={async (l) => { const r = await vmrCmd({ cmd: 'vcPrix', produit: String(l.id), avantCents: l.avant, apresCents: l.apres }, 60000); return r || { sansReponse: true }; }}
+          onFermer={() => { setBaisseOuverte(false); relire(); }}/> : null}
         {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
             (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
         <section className="vrm-lbc-catalog vrm-vc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
@@ -359,6 +378,11 @@ function PublierVestiaire({ comptes }) {
     setEtiquettes((prev) => { const u = { ...(load('vrm_vc_etiquettes', {}) || {}), ...(prev || {}) }; if (cle) u[String(id)] = cle; else delete u[String(id)]; save('vrm_vc_etiquettes', u); return u; });
     setChoixEtiq('');
   };
+  // (11 nov., lot vestiaire-plus) La clé Photoroom (détourage, Vestiaire seul) : true utilisable · false aucune · null pas su.
+  const [photoroom, setPhotoroom] = React.useState(null);
+  React.useEffect(() => { let vivant = true; if (MULTI_USER && AUTH.user?.id) lirePhotoroom(enTeteSession()).then((x) => { if (vivant) setPhotoroom(x ? cleUtilisable(x) : null); }); return () => { vivant = false; }; }, []);
+  const etatEtiquette = (p) => { const ph = (p.photos || []).filter((u) => clePhotoLbc(u)); const k = etiquettes[String(p.id)] || ''; return k ? (ph.some((u) => clePhotoLbc(u) === k) ? 'choisie' : 'introuvable') : 'pas-choisie'; };
+  const photosDe = (p) => ({ famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, nPhotos: (p.photos || []).length, etiquette: etatEtiquette(p), photoroom });
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [publiees, setPubliees] = React.useState(undefined);   // undefined en cours · null pas su · Set
@@ -459,6 +483,9 @@ function PublierVestiaire({ comptes }) {
     // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) ; la catégorie se choisit sur Vestiaire.
     let achatV = null;
     try { achatV = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[String(p.id)], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatV = null; }
+    // (11 nov., lot vestiaire-plus) Les photos que Vestiaire demande : ce que VRM SAIT manquer est dit AVANT (src/photosVestiaire.js).
+    { const rp = photosExigeesVc(photosDe(p));
+      if (rp.manque.length && !(await askConfirm({ title: tr('vcPhotos.confirme.titre', { n: rp.manque.length }), desc: textePhotosManquantes(rp), ok: tr('vcPhotos.confirme.ok'), cancel: tr('vcPhotos.confirme.annuler') }))) return; }
     if (!(await verifierAvantPublication(problemesAnnonce({ titre: p.title || '', taille: p.taille || '', famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, marque: p.marque || '', nPhotos: (p.photos || []).length, prix: p.prix, achat: achatV , facultatifs: champsFacultatifs(vendActuel()) }, 'vestiaire'), { site: 'vestiaire' }))) return;
     setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
     const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id), publier: auto }, 30000);
@@ -508,6 +535,7 @@ function PublierVestiaire({ comptes }) {
                   </div>
                 );
               })()}
+              <PhotosVestiaire id={p.id} {...photosDe(p)} onEtiquette={(p.photos || []).filter((u) => clePhotoLbc(u)).length >= 2 ? () => setChoixEtiq(p.id) : null}/>
               {choixEtiq === p.id ? (
                 <div data-vc-etiq-choix={p.id} style={{ marginTop: 6 }}>
                   <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>Touche la photo de l'étiquette (2ᵉ sur Vestiaire).</div>
@@ -648,6 +676,10 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
             une ligne de détail sous la frise, datée quand elle l'est. */}
         {etapes ? <RecapFrise etapes={etapes} cle={String(v.id || v.tx || '')}/> : null}
       </section>
+      {/* (11 nov., lot vestiaire-plus) Le parcours CHEZ VESTIAIRE, étape par étape (envoyé → arrivé →
+          authentification → validé/refusé → payé), chaque étape lue (src/parcoursVestiaire.js), et le
+          moment où l'argent arrive (CA daté au versement). Une vente annulée n'a pas de parcours. */}
+      {!vcVenteAnnulee(v) ? <ParcoursVestiaire v={v} colisFait={fait || null}/> : null}
       <section className="vrm-recap-argent" aria-label="L'argent">
         <h3 className="vrm-recap-titre">L'argent</h3>
         <dl>

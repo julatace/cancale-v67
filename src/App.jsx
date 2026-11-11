@@ -660,6 +660,7 @@ import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
 import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
@@ -23386,11 +23387,13 @@ const dateCourteVc = (iso) => { const t = Date.parse(iso || ''); return isFinite
 async function lireVestiaireColis() {
   try {
     // (1er nov.) Relue une fois sur un échec passager (`lireBaseRelue`).
-    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens`);
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings,vc_offres)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens,offres:data->offres`);
     if (!Array.isArray(j)) return null;
     const par = Object.fromEntries(j.map((x) => [x.id, x]));
     return { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, compteur: (par.vc_messages && par.vc_messages.compteur) || null, compteurs: (par.vc_messages && par.vc_messages.compteurs) || null,
-      achats: (par.vc_achats && par.vc_achats.achats) || null, liens: (par.vc_listings && par.vc_listings.liens) || {} };
+      achats: (par.vc_achats && par.vc_achats.achats) || null, liens: (par.vc_listings && par.vc_listings.liens) || {},
+      // (11 nov., lot vestiaire-plus) Les offres reçues, pour Ma journée (src/offresVestiaire.js `offresJourneeVc`).
+      offres: par.vc_offres ? { offres: par.vc_offres.offres || null } : undefined };
   } catch (_) { return null; }
 }
 // ── (1er nov.) LES VENTES VESTIAIRE, POUR LES TOTAUX ET L'ANTI DOUBLE VENTE ──
@@ -42050,7 +42053,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
           }
           if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
-            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'plat_vestiaire', prio: 2.1 }); }
+            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'plat_vestiaire', prio: 2.1 });
+          // (11 nov., lot vestiaire-plus) LES OFFRES VESTIAIRE REÇUES, encore à toi : une ligne par
+          //    offre, celle qui expire le plus tôt d'abord (échéance LUE ; ambre sous 6 h), avec le
+          //    geste « Répondre » (Messages → Vestiaire : Accepter · Refuser · Contre-offre si appris,
+          //    sinon « Répondre sur Vestiaire »). La même liste que Messages (`offresVestiaire`) ;
+          //    pas lue ⇒ rien (Ma journée se tait). Au-delà de 4, le reste est COMPTÉ, jamais caché.
+          const oj = vcEtat && vcEtat.offres ? offresJourneeVc(offresVestiaire(vcEtat.offres)) : null;
+          if (oj) {
+            const liensVc = (vcEtat && vcEtat.liens) || {};
+            oj.lignes.forEach((o, i) => {
+              const num = o.produit ? cleNum(liensVc[o.produit] || '') : '';
+              const article = [num ? `N°${num}` : '', o.titre || tr('journee.vcOffre.article')].filter(Boolean).join(' · ');
+              const reste = o.expire != null ? resteAvantOffre(o.expire) : '';
+              jobs.push({ id: 'vestiaire-offre', n: 1, icon: 'tag', color: o.bientot ? C.warn : C.text, urgent: !!o.bientot, photos: o.photo ? [urlPhotoVc(o.photo)] : null,
+                court: tr('journee.vcOffre.court', { prix: eurosOffre(o.offre) }),
+                detail: o.expire == null ? tr('journee.vcOffre.sansEcheance', { article }) : o.bientot ? tr('journee.vcOffre.expire', { article, reste }) : tr('journee.vcOffre.reste', { article, reste }),
+                action: tr('journee.vcOffre.repondre'), attrs: { 'data-vc-offre-journee': o.id, 'data-vc-offre-expire': o.expire == null ? '' : String(o.expire), 'data-vc-offre-bientot': o.bientot ? '1' : undefined },
+                tab: 'plat_vestiaire', prio: (o.bientot ? 0.25 : 1.25) + i / 1000 });
+            });
+            if (oj.reste > 0) jobs.push({ id: 'vestiaire-offres-reste', n: oj.reste, icon: 'tag', color: C.text, court: tr('journee.vcOffres.autres', { n: oj.reste }), detail: tr('journee.vcOffres.autresDetail'),
+              action: tr('journee.vcOffre.voir'), tab: 'plat_vestiaire', prio: 1.26 + oj.lignes.length / 1000 });
+          } }
         tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
@@ -42494,7 +42518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </span>
         </>);
         const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court; return (
-          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} aria-label={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} aria-label={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} {...(j.attrs||{})} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
             {corpsTache(j, x)}
             <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || VERBES.voir}</span><span aria-hidden="true">›</span></span>
           </button>
