@@ -10,7 +10,7 @@ Remplace, pour l'état, `2026-11-10-passation-generale.md` et `2026-11-09-passat
 
 ## A. Ce que tu as aujourd'hui (en ligne sur vrm.center)
 
-Mis en ligne le 10 nov. (PR #1088 → #1120, toutes vérifiées avant mise en ligne) :
+Mis en ligne le 10 nov. (PR #1088 → #1121, toutes vérifiées avant mise en ligne) :
 
 | domaine | ce qui marche |
 |---|---|
@@ -23,7 +23,7 @@ Mis en ligne le 10 nov. (PR #1088 → #1120, toutes vérifiées avant mise en li
 | **Argent** | Compta + Statistiques réunies (Résumé · Statistiques · Déclarer · Factures) ; mois bouclé ; comparer deux mois ; d'où viennent mes achats ; vitesse d'envoi ; avis Vinted ; factures Pro (à envoyer, envoi auto ÉTEINT, avoir, registre + zip) ; factures Leboncoin/eBay ; facture bilingue ; alerte seuil de TVA ; livre de police |
 | **Partout** | Mon adresse VRM en un parcours 1·2·3·✓ (code Gmail affiché, plus de roue sans fin) ; raccourcis clavier (« ? » pour la liste) et lecteur d'écran ; recherche universelle (identité exacte en tête) ; À trancher en cartes ; corbeille 30 jours ; textes courts (3 séries) |
 | **Offres** | Solo 16,99 € = 1 compte vendeur par plateforme · **Pro 19,99 € = comptes vendeurs illimités** (ta décision de ce soir) ; CGV du 10 nov. |
-| **Extension** | 5.338.0 servie (jauge 50 actions/h, journal, mode vacances appris sur ton geste) |
+| **Extension** | 5.339.0 servie (jauge 50 actions/h, journal, mode vacances appris sur ton geste, infos sous tes annonces sur vinted.fr, calculette sur l'annonce d'un autre vendeur) |
 
 **Fait par toi ce soir** : `CRON_SECRET` (GitHub + Vercel, vérifié : relecture des colis OK) ·
 migrations **028, 030, 024, 025, 026, 027** posées (vérifiées en base) · domaine **recu-vrm.com**
@@ -40,7 +40,7 @@ Le pas à pas détaillé de chaque geste : `docs/passation/2026-11-10-guide-gest
    → ton adresse doit finir par `@recu-vrm.com` → « Envoyer l'e-mail d'essai » → « Reçu ✓ ».
    Si ça ne passe pas : sur Vercel, mettre `EMAIL_INBOUND_SECRET` = la même valeur que ton script Gmail
    (Apps Script → Paramètres du projet → Propriétés), puis Redeploy.
-2. **Installer l'extension 5.338.0** dans chaque Chrome (remplacer le dossier, puis ⟳) et Orion.
+2. **Installer l'extension 5.339.0** dans chaque Chrome (remplacer le dossier, puis ⟳) et Orion.
    Puis, une seule fois sur vinted.fr : mettre un compte en vacances à la main, puis le rouvrir à
    la main (VRM apprend les deux gestes ; Paramètres → Mes comptes → Mode vacances le dira).
 3. **Après l'extension** : migrations **029** puis **023** (Supabase → SQL Editor, copier le fichier
@@ -96,7 +96,6 @@ communes à recopier dans chaque brief sont résumées en F.
 
 | lot | contenu | note |
 |---|---|---|
-| AA | infos sous ses annonces sur vinted.fr + calculette pendant un achat | **extension 5.339** réservée |
 | K | ouverture légère (cache par `data.rev`) | en dernier ; mesurer avant/après |
 | textes courts, 4e série | FavorisVinted.jsx (8, dont « Aucune garantie contre un blocage Vinted » : voir avec Julien), Operations.jsx (9), Communaute.jsx (7), écrans de connexion/installation | chercher chaque libellé dans `scripts/` avant de le changer |
 | logos exacts | Chronopost, Colissimo, InPost, Relais Colis, Shop2Shop, GLS, Colis Privé (aujourd'hui « mot-symbole ») | attendre les captures de Julien ; `DESSINS_TRANSPORTEURS` dans `src/transporteursVisuels.js` |
