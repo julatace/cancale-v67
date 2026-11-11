@@ -136,9 +136,10 @@ async function ouvrir(b, vp, pont, o = {}) {
   return { ctx, pg, errs };
 }
 const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
-  rognes: [...document.querySelectorAll('button,input,a')].filter((e) => { const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1)) return false;
+  rognes: [...document.querySelectorAll('button,input,a')].filter((e) => { const d = e.closest('details:not([open])'); if (d && !e.closest('summary')) return false;   // contenu d'un repli FERMÉ : pas affiché (Chromium lui garde une géométrie)
+    const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1)) return false;
     for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth) return p.getBoundingClientRect().right > document.documentElement.clientWidth + 1; }
-    return true; }).map((e) => { const c = e.closest('[data-remise-vente],[data-lbc-vente],[role=dialog]'); return (e.textContent || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 24) + (c ? ' @' + [...c.attributes].map((x) => x.name).filter((n) => /^data-|role/.test(n)).join('|') : ''); }) }));
+    return true; }).map((e) => { const ch = []; for (let p = e.parentElement, i = 0; p && i < 8; p = p.parentElement, i++) { const at = [...p.attributes].map((x) => x.name).filter((n) => /^data-|role|class/.test(n)).map((n) => n === 'class' ? '.' + String(p.className).split(' ')[0] : n).join(''); if (at) ch.push(at); } const r = e.getBoundingClientRect(); return (e.textContent || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 24) + ` x=${Math.round(r.left)}..${Math.round(r.right)} ` + ch.join(' < '); }) }));
 const ls = (pg, cle) => pg.evaluate((k) => { for (let i = 0; i < localStorage.length; i++) { const n = localStorage.key(i); if (n === k || n.endsWith(':' + k) || n.endsWith('_' + k) && false) { try { return JSON.parse(localStorage.getItem(n)); } catch (_) { return localStorage.getItem(n); } } } return null; }, cle);
 const cmds = (pg, re) => pg.evaluate((s) => window.__cmds.filter((x) => new RegExp(s).test(x)).map((x) => JSON.parse(x)), re);
 const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-plus-${nom}-${vp.width}.png`), fullPage: false });
