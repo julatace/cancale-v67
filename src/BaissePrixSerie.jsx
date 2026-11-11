@@ -191,7 +191,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </div>
         ) : phase === 'confirmer' ? (
           <div className="vrm-bp-bas is-confirmer" data-bp-confirmation={choisies.length}>
-            <p className="vrm-bp-progres">Baisser {choisies.length} prix sur Vinted ? Une annonce à la fois, depuis l’onglet Vinted ouvert.</p>
+            <p className="vrm-bp-progres">Baisser {choisies.length} prix sur {nomSite} ? Une annonce à la fois, depuis l’onglet {nomSite} ouvert.</p>
             <div className="vrm-bp-boutons">
               <button type="button" className="vrm-ao-second" data-bp-annuler="" onClick={() => setPhase('choix')}>Annuler</button>
               <button type="button" className="vrm-ao-principal" data-bp-confirmer="" onClick={lancer}>Oui, baisser</button>
