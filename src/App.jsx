@@ -41157,7 +41157,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
       if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
-      if(only==='messages' && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
+      // (11 nov., lot prix-mini) Le fil « Tous » (FilsTous, `filTous`) ne PREND pas la demande : il n'a pas
+      // d'Offres auto ; elle est pour Messages · Vinted, monté juste après (`cat_msg`).
+      if(only==='messages' && !filTous && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
