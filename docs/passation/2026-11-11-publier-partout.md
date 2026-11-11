@@ -54,3 +54,9 @@ L'annonce Vinted est la source ; VRM la reporte sur Leboncoin, Vestiaire et eBay
   `publierAilleurs.js`). Vestiaire : le prix réglé n'est pas possible par la voie actuelle (l'extension relit
   l'annonce Vinted) — une extension qui accepterait `prix` dans `vcPreparer` le permettrait (réserver 5.359+).
   eBay multi-comptes : le brouillon part sur le compte principal (pas de `compte` posé).
+
+## Précisions de Julien reçues APRÈS l'arrêt (message de la session principale, 11 nov. ~18 h) — à faire à la reprise
+1. Proposer **tous** les paramètres de publication de chaque site. Leboncoin : catégorie, sous-catégorie, critères de la catégorie (marque, taille, couleur, état, matière…), prix, livraison / remise en main propre, lieu, options. Vestiaire : catégorie, marque, taille, état, matière, couleur, prix, authenticité… Un réglage **par défaut** pour tous, puis modifiable **par annonce**. Aujourd'hui, la feuille ne règle que le prix par site et l'état Leboncoin.
+2. Quand VRM ne trouve pas une catégorie, une couleur ou une taille, il la **demande** (jamais inventée). C'est déjà le principe de `lignePartout` (`demandes`), à étendre à chaque champ.
+3. Pendant la publication, VRM reste **figé**, avec le détail de chaque étape et une barre de progression : utiliser le composant commun **`SuiviTravail`** (branche `claude/suivi-travail`, son API dans le fichier de coordination), en le fusionnant ici. N'en pas refaire un autre : `executerPartout(surEtat)` donne déjà l'état par case pour le nourrir.
+4. Les paramètres eBay viennent de **`claude/ebay-complet`** (`src/ebay/parametres.js`) : y brancher la partie eBay (aujourd'hui `preparerBrouillonPartout`, dans `src/ecrans/Ebay.jsx`). Périmètre de cette branche : la feuille + Leboncoin + Vestiaire.
