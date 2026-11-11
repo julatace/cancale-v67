@@ -348,7 +348,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         <textarea ref={refDescLbc} data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
           style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
         <div style={{ fontSize: 12, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
-          La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cet article{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
+          La référence <b style={{ color: C.text }}>{ref}</b> relie l'annonce à cet article{refLbcPresente(desc, ref) ? ' : garde-la.' : ' — enlevée, elle est remise à la fin.'}
         </div>
 
         <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
@@ -376,7 +376,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
 
         <div style={{ position: 'sticky', bottom: 'calc(-18px - env(safe-area-inset-bottom))', background: C.bg, margin: '14px -18px 0', padding: '12px 18px calc(20px + env(safe-area-inset-bottom))', borderTop: `1px solid ${C.border}` }}>
           {(bloque && !fait && !enCours) && <div data-fiche-bloque={bloque.code} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bloque.texte}</div>}
-          {!bloque && !fait && !enCours && saitFiche !== 'ok' && <div data-fiche-version="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>Ton extension ({vmrExtVersion() || 'version ?'}) publiera sa propre version de l'annonce : pour envoyer cette fiche, mets-la à jour ({EXT_CAPACITES.lbcfiche}).</div>}
+          {!bloque && !fait && !enCours && saitFiche !== 'ok' && <div data-fiche-version="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>Ton extension ({vmrExtVersion() || 'version ?'}) publiera sa propre version : mets-la à jour ({EXT_CAPACITES.lbcfiche}).</div>}
           {refus && <div data-fiche-refus="" style={{ fontSize: 12, color: C.warn, lineHeight: 1.45, marginBottom: 8, fontWeight: 600 }}>{refus}</div>}
           <button type="button" data-fiche-publier={grise ? 'grise' : etatFiche} onClick={() => publier(false)} aria-disabled={grise || fait ? 'true' : undefined}
             style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: 'none', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: grise || fait ? 'default' : 'pointer',
@@ -398,7 +398,8 @@ function LbcCroitVendue({ n }) {
   if (!n || extSait('preuves') !== 'retard') return null;
   return (
     <div data-lbc-croit-vendue={n} style={{ fontSize: 13, color: C.text, background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 12, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
-      <b>{n} article{n > 1 ? 's' : ''} revenu{n > 1 ? 's' : ''}</b> (vente remboursée ou annulée) : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendus' : 'le croit encore vendu'} et refuserait de {n > 1 ? 'les' : 'le'} publier — mets-la à jour ({EXT_ATTENDUE}).
+      <b>{n} article{n > 1 ? 's' : ''} revenu{n > 1 ? 's' : ''}</b> : mets l'extension à jour ({EXT_ATTENDUE}) pour {n > 1 ? 'les' : 'le'} publier.{' '}
+      <Pourquoi>Vente remboursée ou annulée : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendus' : 'le croit encore vendu'} et refuserait de {n > 1 ? 'les' : 'le'} publier.</Pourquoi>
     </div>
   );
 }
@@ -1034,7 +1035,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
               </div>
             ))}
           </div>
-          {sansFiche && <div style={{ marginTop: 8, fontSize: 12, color: C.warn, lineHeight: 1.5 }}>Ton extension ne sait pas encore recevoir un prix changé ({EXT_CAPACITES.lbcfiche}) : garde le même prix, ou mets-la à jour.</div>}
+          {sansFiche && <div style={{ marginTop: 8, fontSize: 12, color: C.warn, lineHeight: 1.5 }}>Prix changé : mets l'extension à jour ({EXT_CAPACITES.lbcfiche}), ou garde le même prix.</div>}
         </>}
         {etape === 'envoi' && <>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>Une à la fois. Au moindre doute, tout s'arrête et c'est dit.</div>
@@ -1886,8 +1887,8 @@ function LeboncoinScreen() {
           </div>
           {data.lbcJamaisLu && !data.postedCount && (
             <div style={{ fontSize: 12, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
-              Je n'ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> sur leboncoin.fr une fois, avec l'extension : je les lirai au passage.
-              <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand un article se vend sur Vinted.
+              Annonces Leboncoin pas encore lues : ouvre <b>tes annonces</b> sur leboncoin.fr.{' '}
+              <Pourquoi>Je n'ai pas encore vu tes annonces Leboncoin. Ouvre la page de tes annonces sur leboncoin.fr une fois, avec l'extension : je les lirai au passage. Tant que c'est le cas, je ne peux pas te dire lesquelles retirer quand un article se vend sur Vinted.</Pourquoi>
             </div>
           )}
           {/* ⚠️ « Offre : Gratuit » s'affichait quand AUCUNE offre n'était connue
@@ -1920,12 +1921,13 @@ function LeboncoinScreen() {
             const pe = pauseEtat();
             return (
               <div data-lbc-pas-revues={data.pasRevues} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-                {data.pasRevues} annonce{data.pasRevues > 1 ? 's' : ''} Leboncoin pas revue{data.pasRevues > 1 ? 's' : ''} depuis plus de {data.pasRevuesJours > LBC_REVUE_JOURS ? data.pasRevuesJours : LBC_REVUE_JOURS} jours : je ne sais pas si elle{data.pasRevues > 1 ? 's y sont' : ' y est'} encore, je ne te demande donc pas à quel article {data.pasRevues > 1 ? 'les' : 'la'} relier.{' '}
+                {data.pasRevues} annonce{data.pasRevues > 1 ? 's' : ''} Leboncoin pas revue{data.pasRevues > 1 ? 's' : ''} depuis plus de {data.pasRevuesJours > LBC_REVUE_JOURS ? data.pasRevuesJours : LBC_REVUE_JOURS} jours.{' '}
                 {pe === 'absente'
                   ? <>Ouvre ta page profil Leboncoin : la liste sera relue en entier.</>
                   : pe === 'retard'
                     ? <>Mets l'extension à jour, puis ouvre ta page profil Leboncoin.</>
-                    : <>Ouvre ta page profil Leboncoin {NAV.dans} : la liste sera relue en entier.</>}
+                    : <>Ouvre ta page profil Leboncoin {NAV.dans} : la liste sera relue en entier.</>}{' '}
+                <Pourquoi>Je ne sais pas si elle{data.pasRevues > 1 ? 's y sont' : ' y est'} encore, je ne te demande donc pas à quel article {data.pasRevues > 1 ? 'les' : 'la'} relier.</Pourquoi>
               </div>
             );
           })()}
@@ -1948,7 +1950,8 @@ function LeboncoinScreen() {
             <div data-lbc-retirer-aconfirmer={data.retirerAConfirmer.length}>
               <Titre>{data.retirerAConfirmer.length} vendue{data.retirerAConfirmer.length > 1 ? 's' : ''} ailleurs — encore sur Leboncoin ? À confirmer</Titre>
               <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>
-                {(() => { const lus = data.retirerAConfirmer.map((r) => r.lu).filter((x) => Number.isFinite(x)); return lus.length ? `Ta liste « Mes annonces » a été ${quandLectureLbc(Math.max(...lus))}` : data.retirerAConfirmer.every((r) => r.raison === 'pasrelue') ? 'Aucune annonce relue sur Leboncoin ne porte ce numéro (seulement ta marque « publiée »)' : "Ta liste « Mes annonces » n'a pas encore été lue en entier"; })()} : je ne sais pas si {data.retirerAConfirmer.length > 1 ? 'ces annonces sont' : 'cette annonce est'} encore en ligne, donc je ne te propose pas de supprimer. <a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>Ouvre « Mes annonces » sur Leboncoin</a> : l'extension la relit en entier, et seules celles encore en ligne s'afficheront ici.
+                {(() => { const lus = data.retirerAConfirmer.map((r) => r.lu).filter((x) => Number.isFinite(x)); return lus.length ? `Ta liste « Mes annonces » a été ${quandLectureLbc(Math.max(...lus))}` : data.retirerAConfirmer.every((r) => r.raison === 'pasrelue') ? 'Aucune annonce relue sur Leboncoin ne porte ce numéro (seulement ta marque « publiée »)' : "Ta liste « Mes annonces » n'a pas encore été lue en entier"; })()}. <a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>Ouvre « Mes annonces » sur Leboncoin</a> pour trancher.{' '}
+                <Pourquoi>Je ne sais pas si {data.retirerAConfirmer.length > 1 ? 'ces annonces sont' : 'cette annonce est'} encore en ligne, donc je ne te propose pas de supprimer. L'extension relit « Mes annonces » en entier, et seules celles encore en ligne s'afficheront ici.</Pourquoi>
               </div>
               {data.retirerAConfirmer.slice(0, 30).map((r, i) => (
                 <div key={i} data-lbc-retirer-aconfirmer-num={cleNum(r.numero) || undefined} style={{ fontSize: 13, color: C.text, padding: '3px 0' }}><b>N°{r.numero}</b> · {r.title || '—'} <span style={{ color: C.muted }}>· vendue sur {r.ou}</span></div>
@@ -2001,17 +2004,18 @@ function LeboncoinScreen() {
           const carteDoute = vendues.some((r) => r.sortie) ? 'vendues' : doute.some((r) => r.sortie) ? 'doute' : pause.some((r) => r.sortie) ? 'pause' : null;
           const phraseDoute = nDoute > 0 ? (
             <div data-lbc-retirer-doute={nDoute} style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
-              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, <b>une autre annonce</b> est peut-être encore en ligne. Ouvre ta page profil Leboncoin, chaque compte.
+              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, <b>une autre annonce</b> est peut-être en ligne : ouvre ta page profil Leboncoin.
             </div>
           ) : null;
           return (<>
             {vendues.length > 0 && (<div data-lbc-retirer-bloc="vinted" data-cible="doublon:leboncoin">
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de l'article ne change pas.
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Vente <b>certaine</b> : retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin (référence <b>VRM-N°</b> dans l'annonce).
                   {pausables && se === 'ok' ? <> <span data-lbc-supprimer-geste="ok">Tu peux {vendues.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {vendues.length > 1 ? 'les' : 'la'} mettre en pause (elle se remet en ligne depuis « Mes annonces »), une à la fois.</span></>
                     : pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici (réversible).</span></> : null}
                   {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Paramètres → État des connexions).</span></> : null}
+                  {' '}<Pourquoi>La vente est certaine (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence VRM-N° dans l'annonce. Le numéro de l'article ne change pas.</Pourquoi>
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
                 {carteDoute === 'vendues' ? phraseDoute : null}
@@ -2047,7 +2051,7 @@ function LeboncoinScreen() {
             {pause.length > 0 && (
               <Card>
                 <Titre>{pause.length} en pause sur Vinted</Titre>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Tu les as masquées sur Vinted, elles ne sont pas vendues. Elles restent sur Leboncoin : <b>rien à faire</b>.</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Masquées sur Vinted, pas vendues : elles restent sur Leboncoin, <b>rien à faire</b>.</div>
                 {pause.slice(0, 20).map((r, i) => Ligne(r, i, C.muted))}
                 {carteDoute === 'pause' ? phraseDoute : null}
               </Card>
