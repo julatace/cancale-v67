@@ -28,9 +28,12 @@ function useImportDepart(uids) {
   React.useEffect(() => {
     const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'import') setTour((t) => t + 1); };
     const vis = () => { if (document.visibilityState === 'visible') setTour((t) => t + 1); };
+    // (11 nov., temps réel) La veille a vu une ligne `import_vinted_*` changer (src/tempsReel.js).
+    const neuf = (e) => { const d = e && e.detail; if (d && Array.isArray(d.quoi) && d.quoi.some((q) => q.quoi === 'import')) setTour((t) => t + 1); };
     window.addEventListener('vrm:ext', f);
+    window.addEventListener('vrm:neuf', neuf);
     document.addEventListener('visibilitychange', vis);
-    return () => { window.removeEventListener('vrm:ext', f); document.removeEventListener('visibilitychange', vis); };
+    return () => { window.removeEventListener('vrm:ext', f); window.removeEventListener('vrm:neuf', neuf); document.removeEventListener('visibilitychange', vis); };
   }, []);
   const enCours = etats && Object.values(etats).some((l) => l && (l.etat === 'encours' || l.etat === 'attente' || l.etat === 'pause'));
   React.useEffect(() => {

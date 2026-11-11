@@ -1,0 +1,13 @@
+/* ── « Mis à jour à 14:32 » (11 nov., temps réel, src/VeilleTempsReel.jsx) ──────
+   Du neuf capté par l'extension vient d'arriver à l'écran, sans recharger.
+   Flottante (position fixe) : elle ne pousse rien. Neutre, discrète, sans clic. */
+.vrm-neuf-hote { position: fixed; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 900;
+  display: flex; justify-content: center; pointer-events: none; height: 0; overflow: visible; }
+.vrm-neuf { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 12px; border-radius: 999px;
+  background: var(--d-carte, var(--vrm-card, #fff)); color: var(--d-gris, var(--vrm-muted));
+  box-shadow: var(--d-ombre-flottant, 0 1px 2px rgba(0,0,0,.08), 0 4px 14px rgba(0,0,0,.10));
+  font-size: var(--d-t-12, 12px); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+  animation: vrm-neuf-entre .22s ease-out both; }
+.vrm-neuf-point { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; background: var(--d-gris, var(--vrm-muted)); }
+@keyframes vrm-neuf-entre { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .vrm-neuf { animation: none; } }
