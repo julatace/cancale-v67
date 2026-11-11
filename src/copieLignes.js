@@ -234,3 +234,101 @@ export function heureVu(ts) {
   if (!Number.isFinite(ts)) return null;
   try { return new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }); } catch (_) { return null; }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  LES FAMILLES DE LIGNES (11 nov., lot K suite « ouverture-legere-2 »)
+// ════════════════════════════════════════════════════════════════════════════
+//  Mesuré au banc (`_mesure-demarrage.cjs`, 2e ouverture, 390 px, 4G) : deux
+//  balayages de famille repartaient ENTIERS à chaque ouverture — les transactions
+//  (`like.harvest_%_txn_%`, ~1 200 lignes, ~250 Ko) et la fraîcheur des comptes
+//  (`like.harvest_*`, ~2 700 lignes, ~244 Ko). Sur sa base (lecture seule, 11 nov.) :
+//  1 398 transactions dont 8 réécrites dans les 6 dernières heures ; 2 249 autres
+//  lignes `harvest_*` dont 10.
+//
+//  ⇒ La famille entière est gardée sur l'appareil, chaque ligne avec SA version
+//    (`updated_at`, `capturedAt`, `rev`, `supprime`, `purgedAt`, scalaires de `meta`).
+//    À l'ouverture suivante, sa VERSION se lit en deux petites lectures :
+//      · le NOMBRE de lignes de la famille (`Prefer: count=exact`, une ligne) ;
+//      · les lignes ÉCRITES depuis la copie (`updated_at`/`capturedAt`/`purgedAt`
+//        ≥ X), relues entières (projection de l'appelant), toutes les pages.
+//    X = la plus ancienne de (la plus récente date de la copie, l'heure de la
+//    lecture) moins `FENETRE_FAMILLE_MS` : une horloge d'appareil en retard de
+//    moins de 6 h est couverte ; une date dans le futur ne repousse jamais X.
+//    Copie + lignes écrites = la famille SI le compte tombe juste ; sinon (une
+//    ligne partie, ou écrite avec une date trop vieille) : relue entière.
+//
+//  ⚠️ Comme pour les lignes : version illisible (compte OU lignes écrites) ⇒
+//    JAMAIS la copie ; la lecture d'avant (famille entière) ; ratée aussi ⇒ « pas
+//    su » (`null`), et « Vu à hh:mm · pas relu ». Une famille dont une date n'est
+//    pas au format ISO (`…Z`) n'est jamais gardée : la comparaison serait fausse.
+//    Relue entière au moins une fois par `RELECTURE_ENTIERE_MS` (24 h), quoi qu'il arrive.
+// ════════════════════════════════════════════════════════════════════════════
+export const FENETRE_FAMILLE_MS = 6 * 3600000;
+export const RELECTURE_ENTIERE_MS = 24 * 3600000;
+export const CLE_FAMILLE = '*';
+const RE_ISO = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?Z$/;
+const tsDe = (x) => { const t = Date.parse(x == null ? '' : String(x)); return Number.isFinite(t) ? t : null; };
+// Une ligne dont on sait juger la version : un id, et des dates comparables.
+export const ligneVersionnable = (r) => !!r && typeof r === 'object' && r.id != null && String(r.id) !== ''
+  && (r.cap == null || (typeof r.cap === 'string' && RE_ISO.test(r.cap)))
+  && (r.pg == null || (typeof r.pg === 'string' && RE_ISO.test(r.pg)))
+  && (r.updated_at == null || tsDe(r.updated_at) != null);
+const plusRecente = (rows) => { let m = null; for (const r of rows) for (const t of [tsDe(r.updated_at), tsDe(r.cap), tsDe(r.pg)]) if (t != null && (m == null || t > m)) m = t; return m; };
+// La borne X des lignes écrites depuis la copie.
+export function borneDepuis(copie, fenetreMs = FENETRE_FAMILLE_MS) {
+  const lu = Number(copie && copie.lu);
+  if (!Number.isFinite(lu)) return null;
+  const max = Number(copie.max);
+  return new Date(Math.min(Number.isFinite(max) ? max : lu, lu) - fenetreMs).toISOString();
+}
+const parIdTri = (m) => [...m.values()].sort((a, b) => (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0));
+
+// `lireCompte()` → nombre ou null · `lireDepuis(X)` → lignes ou null · `lireComplet()` → lignes ou null.
+// Rend `{ ok:true, rows, mode:'copie'|'entiere', recues }` ou `{ ok:false }` (pas su).
+export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepuis, lireComplet, stockage, local = null, maintenant = Date.now, fenetreMs = FENETRE_FAMILLE_MS, relectureMs = RELECTURE_ENTIERE_MS }) {
+  const cle = `famille:${famille}`;
+  let copie = null;
+  if (uid && stockage) {
+    try {
+      const e = ((await stockage.lire(uid, famille, [CLE_FAMILLE])) || new Map()).get(CLE_FAMILLE);
+      const v = e && typeof e.v === 'string' ? JSON.parse(e.v) : null;
+      if (v && Number.isFinite(v.n) && Number.isFinite(v.lu) && Number.isFinite(v.entiere) && e.row && Array.isArray(e.row.rows) && e.row.rows.length === v.n) copie = { ...v, rows: e.row.rows };
+    } catch (_) { copie = null; }
+  }
+  const ranger = async (rows, lu, entiere) => {
+    if (!uid || !stockage) return;
+    if (!rows.every(ligneVersionnable)) { try { await stockage.retirer(uid, famille, [CLE_FAMILLE]); } catch (_) {} return; }
+    const row = { rows };
+    if (!gardable(row)) return;
+    try { await stockage.ecrire(uid, famille, [{ id: CLE_FAMILLE, v: JSON.stringify({ n: rows.length, max: plusRecente(rows), lu, entiere }), row }]); } catch (_) {}
+  };
+  const entiere = async () => {
+    const t0 = maintenant();
+    const r = await Promise.resolve().then(() => lireComplet()).catch(() => null);
+    if (!Array.isArray(r)) {
+      if (copie) noterPasRelu([cle], local ? lireVu(local, uid) : null);
+      return { ok: false };
+    }
+    await ranger(r, t0, t0);
+    noterRelu([cle]);
+    if (local && uid) noterVu(local, uid, maintenant());
+    return { ok: true, rows: r, mode: 'entiere', recues: r.length };
+  };
+  const t0 = maintenant();
+  if (!copie || !(t0 - copie.entiere >= 0 && t0 - copie.entiere < relectureMs)) return entiere();
+  const X = borneDepuis(copie, fenetreMs);
+  const n = X ? await Promise.resolve().then(() => lireCompte()).catch(() => null) : null;
+  if (!Number.isFinite(n)) return entiere();
+  const rec = await Promise.resolve().then(() => lireDepuis(X)).catch(() => null);
+  if (!Array.isArray(rec) || !rec.every(ligneVersionnable)) return entiere();
+  const m = new Map(copie.rows.map((r) => [String(r.id), r]));
+  for (const r of rec) m.set(String(r.id), r);
+  // Le compte ne tombe pas juste : une ligne est partie (ou a été écrite avec une
+  // date plus vieille que X) — on ne devine pas laquelle, la famille est relue.
+  if (m.size !== n) return entiere();
+  const rows = parIdTri(m);
+  await ranger(rows, t0, copie.entiere);
+  noterRelu([cle]);
+  if (local && uid) noterVu(local, uid, maintenant());
+  return { ok: true, rows, mode: 'copie', recues: rec.length };
+}
