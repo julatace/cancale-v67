@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.344.0';
+const CODE_VERSION = '5.367.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -12637,6 +12637,262 @@ async function recreerVinted(msg) {
     return await finRepubBrouillon(acc, job);
   } finally { if (!confie && nA - envoyes > 0) await rendreActions(uid, tRes, nA - envoyes); } });
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// CRÉER SUR VINTED DEPUIS UNE FICHE VRM (11 nov., 5.367 — demande validée par Julien)
+// ══════════════════════════════════════════════════════════════════════════════
+// « Les photos, le titre, la taille, l'état, la marque, le prix et le N° sont déjà
+// dans VRM : sur MON clic, prépare l'annonce sur Vinted. » Sur SON clic (une
+// commande par fiche, `creerVintedFiche`), l'extension prépare un BROUILLON sur
+// vinted.fr — jamais une mise en ligne : c'est LUI qui clique « Publier » (sur
+// Vinted, ou depuis VRM : `publierBrouillon`, qui existe déjà).
+// Les briques de Republier, rien de neuf côté Vinted :
+//   · tout part de l'onglet vinted.fr (`vintedPage` : ses cookies, aucun
+//     `Authorization`) ; sans onglet, rien ne part ;
+//   · compte de l'onglet seulement (`gardeStricte`), 50 actions/h (réserve 5) :
+//     le brouillon compte UNE action, réservée avant le premier envoi ; une
+//     requête Vinted à la fois (`avecVinted`) ; pauses tirées au hasard ;
+//   · photos téléversées une par une (`vintedPagePhoto`), puis UN brouillon
+//     (`POST item_upload/drafts`, la forme de Republier) ; refus ⇒ frein, jamais
+//     renvoyé tel quel (`retenirRefus` / `refusDejaVu`) ;
+//   · le brouillon est RANGÉ (`rangerBrouillon`, `parVRM`) : « Publier » depuis
+//     VRM le reconnaît.
+// ⚠️ JAMAIS DEVINÉ : chaque champ du catalogue Vinted (catégorie, taille, état,
+//    couleur, marque) est posé seulement si le texte de la fiche est EXACTEMENT
+//    une valeur de Vinted (casse et accents mis à part) ou si c'est SA réponse,
+//    validée contre ces mêmes valeurs. Sinon VRM S'ARRÊTE avant toute requête et
+//    DEMANDE (`code: 'question'`, les vraies valeurs de Vinted : catalogue capté,
+//    grille de la catégorie, liste des couleurs, marques de ses annonces).
+//    « Je le choisirai sur Vinted » (`'vinted'`) laisse le champ vide dans le
+//    brouillon, et c'est DIT (`aFinir`). Ce que VRM ne connaît pas du tout
+//    (taille du colis, matière…) reste vide et DIT : la page de Vinted le demande.
+// ⚠️ IDENTITÉ (§5) : la fiche est reliée à l'annonce par l'IDENTIFIANT que Vinted
+//    rend pour le brouillon (le même identifiant une fois en ligne) : le N° est
+//    LIÉ à cet identifiant (`panel_num_reserves.items`, la voie du N° affiché à
+//    côté de « Publier »). Un N° déjà porté par une autre annonce ⇒ rien ne part.
+//    Une création dont l'issue est inconnue bloque 30 min la même fiche (jamais
+//    deux brouillons), y compris depuis un autre Chrome (la base est relue).
+const CREER_FICHE = 'vrmCreerFiche';
+const CREER_FICHE_MS = 30 * 60000;
+const PHOTOS_FICHE_MAX = 20;
+const CHAMPS_FICHE = ['catalog_id', 'size', 'condition', 'color', 'brand'];
+const NOM_CHAMP_FICHE = { catalog_id: 'la catégorie', size: 'la taille', condition: "l'état", color: 'la couleur', brand: 'la marque' };
+// Casse, accents, blancs et apostrophes mis à part — rien d'autre (« Très bon état » = « tres bon etat »).
+const libFiche = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
+// Les catégories FINALES du catalogue Vinted capté (`vinted_catalogue`), avec leur chemin.
+function feuillesCatalogueVinted(catalogue) {
+  if (!catalogue || !Array.isArray(catalogue.catalogs)) return [];
+  const out = []; const pile = catalogue.catalogs.map((c) => [c, '']);
+  let n = 0;
+  while (pile.length && n++ < 30000) {
+    const [c, chemin] = pile.pop();
+    if (!c || typeof c !== 'object') continue;
+    const t = String(c.title || '').replace(/\s+/g, ' ').trim();
+    const ici = chemin ? `${chemin} > ${t}` : t;
+    const enfants = Array.isArray(c.catalogs) ? c.catalogs : [];
+    if (enfants.length) { for (const s of enfants) pile.push([s, ici]); continue; }
+    if (Number.isSafeInteger(Number(c.id)) && Number(c.id) > 0 && t) out.push([String(c.id), ici]);
+  }
+  return out.sort((a, b) => a[1].localeCompare(b[1], 'fr'));
+}
+// Les marques de Vinted déjà ACCEPTÉES sur SES annonces de ce compte (recettes) : id ⇒ nom de Vinted.
+async function marquesConnuesVinted(uid) {
+  let r; try { r = await sbGet('app_data?id=eq.vrm_vinted_modele&select=data'); } catch (_) { r = null; }
+  if (r === null) return null;
+  const m = (r && r[0] && r[0].data) || {};
+  const out = {};
+  for (const k of Object.keys(m)) {
+    const e = m[k]; if (!e || !e.corps || (e.uid && String(e.uid) !== String(uid))) continue;
+    try { const o = JSON.parse(e.corps); const d = o && (o.item || o.draft); const id = Number(d && d.brand_id); const nom = d && (typeof d.brand === 'string' ? d.brand : (d.brand && typeof d.brand === 'object' ? d.brand.title : ''));
+      if (Number.isSafeInteger(id) && id > 0 && typeof nom === 'string' && nom.trim() && nom.length <= 60) out[String(id)] = nom.trim(); } catch (_) {}
+  }
+  return out;
+}
+// Les valeurs de Vinted pour UN champ de la fiche (`[[id, nom]]`), ou null (pas de liste sûre).
+async function valeursFiche(uid, acc, champ, it, ctx) {
+  if (champ === 'catalog_id') {
+    try { await chargerCataloguesPlateformes(); } catch (_) {}
+    const f = feuillesCatalogueVinted(_catVinted);
+    if (f.length) return f;
+    return optionsQuestion(uid, 'catalog_id', it).catch(() => null);   // ses catégories déjà acceptées
+  }
+  if (champ === 'size' || champ === 'condition') {
+    const g = ctx.grille; const l = champ === 'size' ? (g && g.options) : (g && g.etats);
+    return Array.isArray(l) && l.length ? l.map((o) => [String(o.id), String(o.t)]) : null;
+  }
+  if (champ === 'color') { const c = ctx.couleurs || {}; const o = Object.entries(c).filter(([id, nom]) => /^\d+$/.test(id) && nom).sort((a, b) => Number(a[0]) - Number(b[0])); return o.length ? o.map(([id, nom]) => [String(id), String(nom)]) : null; }
+  if (champ === 'brand') { const o = Object.entries(ctx.marques || {}).sort((a, b) => a[1].localeCompare(b[1], 'fr')); return o.length ? o : null; }
+  return null;
+}
+// Le texte de la fiche ⇒ UNE valeur de Vinted au libellé exact, sinon rien.
+function valeurExacteFiche(options, texte, champ) {
+  const cible = champ === 'size' ? libelleTaille(texte) : libFiche(texte);
+  if (!cible || !Array.isArray(options)) return '';
+  const lib = (t) => (champ === 'size' ? libelleTaille(t) : libFiche(champ === 'catalog_id' ? String(t).split('>').pop() : t));
+  const plein = champ === 'catalog_id' ? options.filter(([, t]) => libFiche(t) === libFiche(texte)) : [];
+  const ids = [...new Set((plein.length ? plein : options.filter(([, t]) => lib(t) === cible)).map(([id]) => id))];
+  return ids.length === 1 ? ids[0] : '';
+}
+async function verrouFiche(ficheId) {
+  try { const v = ((await chrome.storage.local.get(CREER_FICHE))[CREER_FICHE] || {})[ficheId]; return v && Date.now() - Number(v.at) < CREER_FICHE_MS ? v : (v && v.draftId ? v : null); } catch (_) { return null; }
+}
+async function poserVerrouFiche(ficheId, v) {
+  try { const cur = (await chrome.storage.local.get(CREER_FICHE))[CREER_FICHE] || {}; const t = Date.now();
+    for (const k of Object.keys(cur)) if (!(cur[k] && (cur[k].draftId || t - Number(cur[k].at) < CREER_FICHE_MS))) delete cur[k];
+    if (v) cur[ficheId] = { ...v, at: t }; else delete cur[ficheId];
+    await chrome.storage.local.set({ [CREER_FICHE]: cur }); } catch (_) {}
+}
+// Le N° LIÉ à l'identifiant que Vinted a rendu pour le brouillon (la voie du N° « à côté de Publier »).
+async function lierNumeroFiche(draftId, numero, uid, ficheId) {
+  return unResaALaFois(async () => {
+    const r = await lireResa();
+    if (r === null) { noterDiag('fiche_lien_lecture_ratee'); return { ok: false, raison: 'la base VRM n’a pas répondu' }; }
+    const c = cleNum(numero);
+    const autre = Object.entries(r.items).find(([id, v]) => id !== String(draftId) && v && cleNum(v.numero) === c);
+    if (autre) { noterDiag('fiche_lien_numero_pris'); return { ok: false, raison: `le N°${numero} est déjà relié à une autre annonce` }; }
+    r.items[String(draftId)] = { numero: String(numero), at: new Date().toISOString(), uid: String(uid), fiche: String(ficheId) };
+    for (const n of Object.keys(r.attente)) if (cleNum(n) === c) delete r.attente[n];
+    if (!(await ecrireResa(r))) { noterDiag('fiche_lien_ecriture_ratee'); return { ok: false, raison: 'l’écriture dans la base VRM a échoué' }; }
+    _numsAffichage = null; noterDiag('fiche_liee');
+    return { ok: true };
+  });
+}
+// Une photo de la fiche : `data:image/…;base64,…` (choisie dans VRM) ou une photo Vinted.
+function blobPhotoFiche(u) {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(u || ''));
+  if (!m) return null;
+  try { const bin = atob(m[2]); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], { type: m[1] }); } catch (_) { return null; }
+}
+const photoFicheOk = (u) => /^data:image\/(?:jpeg|png|webp);base64,/.test(String(u || '')) || /^https:\/\/images\d*\.vinted\.net\//i.test(String(u || ''));
+async function creerVintedFiche(msg) {
+  const uid = String(msg.uid || '');
+  const f = msg.fiche && typeof msg.fiche === 'object' ? msg.fiche : null;
+  if (!/^\d+$/.test(uid) || !f || !/^[\w-]{1,40}$/.test(String(f.id || ''))) return { accepte: false, code: 'invalide', raison: 'fiche incomplète' };
+  const ficheId = String(f.id), numero = String(f.numero || '').trim();
+  if (!/^[A-Z]{0,3}\d{1,6}$/.test(cleNum(numero))) return { accepte: false, code: 'numero', raison: 'cette fiche n’a pas de N° lisible — rien n’a été envoyé' };
+  if (msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'créer une annonce sur Vinted demande ta confirmation' };
+  const titre = String(f.titre || '').replace(/\s+/g, ' ').trim();
+  if (!titre || titre.length > 100) return { accepte: false, code: 'titre', raison: 'titre vide ou trop long (100 caractères au plus) — rien n’a été envoyé' };
+  const description = String(f.description || '').replace(/\r/g, '').trim();
+  if (description.length < DESCRIPTION_MIN) return { accepte: false, code: 'description', raison: 'Vinted refuse une description de moins de 5 caractères — complète-la dans la fiche. Rien n’a été envoyé.' };
+  const prix = Math.round(Number(f.prix) * 100) / 100;
+  if (!(isFinite(prix) && prix > 0 && prix < 100000)) return { accepte: false, code: 'prix', raison: 'prix illisible — rien n’a été envoyé' };
+  const photos = (Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string');
+  if (!photos.length) return { accepte: false, code: 'photos', raison: 'ajoute au moins une photo à la fiche — rien n’a été envoyé' };
+  if (photos.length > PHOTOS_FICHE_MAX || !photos.every(photoFicheOk)) return { accepte: false, code: 'photos', raison: `photos illisibles (${PHOTOS_FICHE_MAX} au plus, JPEG, PNG ou WEBP) — rien n’a été envoyé` };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
+  const stop0 = await gardeStricte(uid, acc, { lecture: true });
+  if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
+  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_fiche_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
+  // Jamais deux brouillons pour la même fiche (ce Chrome, puis la base : tous ses Chrome).
+  const v0 = await verrouFiche(ficheId);
+  if (v0 && v0.draftId) return { accepte: false, code: 'deja', draftId: String(v0.draftId), raison: 'cette fiche a déjà son brouillon sur Vinted — rien n’a été envoyé' };
+  if (v0) return { accepte: false, code: 'incertaine', raison: `une création de cette fiche est partie il y a ${Math.max(1, Math.round((Date.now() - Number(v0.at)) / 60000))} min sans réponse claire de Vinted — regarde tes brouillons Vinted avant de réessayer. Rien n’a été envoyé.` };
+  let deja; try { deja = await sbGet(`app_data?id=like.vinted_brouillon_*&data->>ficheId=eq.${encodeURIComponent(ficheId)}&select=id`); } catch (_) { deja = null; }
+  if (deja === null) return { accepte: false, code: 'lecture', raison: 'la base VRM n’a pas répondu : je ne peux pas vérifier que cette fiche n’a pas déjà son brouillon — rien n’a été envoyé' };
+  if (deja.length) { const d = String(deja[0].id).replace('vinted_brouillon_', ''); return { accepte: false, code: 'deja', draftId: d, raison: 'cette fiche a déjà son brouillon sur Vinted — rien n’a été envoyé' }; }
+  // Le N° : jamais celui d'une autre annonce.
+  const main = await lireMain(['vinted_annonce_numeros']);
+  const resa0 = await lireResa();
+  if (main === null || resa0 === null) return { accepte: false, code: 'lecture', raison: 'la base VRM n’a pas répondu : je ne peux pas vérifier le N° — rien n’a été envoyé' };
+  const cN = cleNum(numero);
+  if (Object.values(main.vinted_annonce_numeros || {}).some((e) => e && cleNum(e.numero) === cN) || Object.values(resa0.items).some((e) => e && cleNum(e.numero) === cN)) {
+    noterDiag('fiche_numero_deja_annonce');
+    return { accepte: false, code: 'numero-pris', raison: `le N°${numero} est déjà porté par une annonce Vinted — rien n’a été envoyé` };
+  }
+  // Le catalogue : la fiche au libellé exact, SA réponse validée, sinon la question.
+  const rep = msg.reponses && typeof msg.reponses === 'object' ? msg.reponses : {};
+  const it = { id: null, isbn: null, title: titre, description, price: String(prix), currency: 'EUR', catalog_id: null, brand_id: null, brand: null, color_ids: [], item_attributes: [], package_size_id: null, manufacturer: null, measurement_width: null, measurement_length: null, manufacturer_labelling: null, ai_photo: false, shipment_prices: { domestic: null, international: null } };
+  const aFinir = []; const ctx = {};
+  const texte = { catalog_id: f.categorie, size: f.taille, condition: f.etat, color: f.couleur, brand: f.marque };
+  const question = async (champ, options) => ({ accepte: false, code: 'question', raison: `Choisis ${NOM_CHAMP_FICHE[champ]} sur la liste de Vinted : VRM ne l’a pas trouvé${texte[champ] ? ` (« ${String(texte[champ]).slice(0, 40)} » n’est pas une valeur de Vinted)` : ''}. Rien n’a été envoyé.`, question: { champ, nom: NOM_CHAMP_FICHE[champ], options, num: numero, fiche: ficheId, texte: texte[champ] ? String(texte[champ]).slice(0, 60) : '', autres: [] } });
+  const poser = (champ, v, options) => {
+    const n = Number(v);
+    if (champ === 'catalog_id') it.catalog_id = n;
+    else if (champ === 'color') it.color_ids = [n];
+    else if (champ === 'brand') { it.brand_id = n; const o = options.find(([id]) => id === String(v)); it.brand = o ? o[1] : null; }
+    else { const code = champ === 'condition' ? ((ctx.grille && Array.isArray(ctx.grille.codes) && !ctx.grille.codes.includes('condition') && ctx.grille.codes.includes('status')) ? 'status' : 'condition') : 'size'; it.item_attributes = [...it.item_attributes.filter((x) => x.code !== code), { code, ids: [n] }]; }
+  };
+  for (const champ of CHAMPS_FICHE) {
+    if (champ === 'size' || champ === 'condition') { if (!it.catalog_id) continue; if (!ctx.grille) ctx.grille = await grilleTailles(uid, acc, it.catalog_id, {}); }
+    if (champ === 'color' && !ctx.couleurs) ctx.couleurs = await couleursConnues(uid, acc);
+    if (champ === 'brand' && !ctx.marques) { ctx.marques = await marquesConnuesVinted(uid); if (ctx.marques === null) return { accepte: false, code: 'lecture', raison: 'la base VRM n’a pas répondu — rien n’a été envoyé' }; }
+    const options = await valeursFiche(uid, acc, champ, it, ctx);
+    const r = rep[champ] != null ? String(rep[champ]) : '';
+    if (r === 'vinted') { aFinir.push(NOM_CHAMP_FICHE[champ]); continue; }
+    if (r && options && options.some(([id]) => id === r)) { poser(champ, r, options); continue; }
+    if (r) noterDiag('fiche_reponse_refusee_' + champ);
+    if (champ === 'brand' && !String(texte.brand || '').trim()) continue;   // pas de marque dans la fiche : rien à demander
+    const exact = options ? valeurExacteFiche(options, texte[champ], champ) : '';
+    if (exact) { poser(champ, exact, options); continue; }
+    if (champ === 'size' && ctx.grille && ctx.grille.sansTaille) continue;   // catégorie sans taille
+    if (options && options.length) return question(champ, options.slice(0, 4000));
+    if (champ === 'catalog_id') return { accepte: false, code: 'catalogue-absent', raison: 'VRM ne connaît pas encore les catégories de Vinted : ouvre la page « Vendre » sur vinted.fr une fois (l’extension apprend le catalogue), puis relance. Rien n’a été envoyé.' };
+    aFinir.push(NOM_CHAMP_FICHE[champ]);
+  }
+  aFinir.push('la taille du colis');
+  if (ctx.grille && Array.isArray(ctx.grille.requis)) for (const c of ctx.grille.requis) if (!['size', 'condition', 'status', 'color', 'brand'].includes(c)) aFinir.push(NOM_CHAMP_VINTED[c] || c.replace(/_/g, ' '));
+  // Le même corps déjà REFUSÉ par Vinted : jamais renvoyé (aucune requête).
+  const sig = { ...it, assigned_photos: [{ id: 1 }] };
+  const dv = await refusDejaVu('f' + ficheId, sig);
+  if (dv) return { accepte: false, code: 'refus-deja-vu', raison: `Vinted a déjà refusé exactement cette annonce${dv.raison ? ` (${dv.raison})` : ''} — VRM ne la renvoie pas telle quelle : corrige la fiche, puis relance. Rien n’a été envoyé.` };
+  // UNE action (le brouillon), réservée avant le premier envoi.
+  const recu = {};
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: 1, recu });
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  const tRes = Number(recu.at) || Date.now();
+  let envoye = false;
+  return await avecVinted(async () => { try {
+    { const fr = await lireFreinRepub(uid); if (fr) return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; }
+    suiviRepub('f' + ficheId);
+    const temp = uuidRecreer();
+    const ids = [];
+    for (let i = 0; i < photos.length; i++) {
+      etapeRepub('f' + ficheId, 'photos', { fait: i, total: photos.length });
+      await pauseRepub(i ? 'photo' : 'lecture');
+      let blob = blobPhotoFiche(photos[i]);
+      if (!blob) { try { const r = await fetch(photos[i], { signal: AbortSignal.timeout(30000) }); if (r.ok) blob = await r.blob(); } catch (_) { blob = null; } }
+      if (!blob) return { accepte: true, etape: 'echec', raison: `la photo ${i + 1} n’a pas pu être lue — rien n’a été créé sur Vinted` };
+      try { blob = await photoReglee(blob, null); } catch (e) { return { accepte: true, etape: 'echec', raison: String(e && e.message || e).slice(0, 80) }; }
+      const rp = await vintedPagePhoto(acc, blob, `photo-${i + 1}.jpg`, temp);
+      if (rp && rp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rp) };
+      if (rp && rp.pause) return { accepte: false, code: 'vinted-pause', raison: `${rp.raison || 'Vinted demande de ralentir'} — rien n’a été créé sur Vinted.` };
+      const pid = rp && rp.ok ? idPhotoReponse(rp.json) : null;
+      if (!pid) { noterDiag(`fiche_photo_refusee_${(rp && rp.status) || 0}`); return { accepte: true, etape: 'echec', raison: `Vinted n’a pas accepté la photo ${i + 1} (${(rp && rp.status) || 0}) — rien n’a été créé sur Vinted` }; }
+      ids.push(pid);
+    }
+    const draft = { ...it, temp_uuid: temp, assigned_photos: ids.map((id) => ({ id, orientation: 0 })) };
+    const corps = { draft, feedback_id: null, parcel: null, upload_session_id: temp };
+    etapeRepub('f' + ficheId, 'brouillon');
+    await pauseRepub('brouillon');
+    await poserVerrouFiche(ficheId, { etat: 'envoi', uid });
+    const rb = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corps, { timeoutMs: 60000 });
+    if (rb && rb.sansPage) { await poserVerrouFiche(ficheId, null); return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rb) }; }
+    if (rb && rb.pause) { await poserVerrouFiche(ficheId, null); return { accepte: false, code: 'vinted-pause', raison: `${rb.raison || 'Vinted demande de ralentir'} — rien n’a été créé sur Vinted.` }; }
+    envoye = true;
+    if (!rb || rb.status === 0 || rb.status >= 500) {
+      noterDiag(`fiche_brouillon_flou_${(rb && rb.status) || 0}`);
+      return { accepte: true, etape: 'incertain', raison: 'Vinted n’a pas répondu clairement : le brouillon est PEUT-ÊTRE dans tes brouillons Vinted. Regarde-les avant de réessayer (VRM bloque cette fiche 30 min).' };
+    }
+    if (!rb.ok) {
+      await poserVerrouFiche(ficheId, null);
+      noterDiag(`fiche_brouillon_refuse_${rb.status}`);
+      const m = raisonRefusVinted(rb);
+      await retenirRefus('f' + ficheId, sig, rb); await poserFreinRepub(uid, rb);
+      return { accepte: true, etape: 'echec', champs: codesDuRefus(rb), raison: `Vinted a refusé le brouillon (${rb.status}${m ? ' : ' + String(m).slice(0, 200) : ''}) — rien n’a été créé.` };
+    }
+    const draftId = idDeBrouillon(rb.json);
+    if (!draftId) { noterDiag('fiche_brouillon_sans_id'); return { accepte: true, etape: 'incertain', raison: 'le brouillon est rangé sur Vinted, mais VRM n’a pas pu lire son identifiant : il n’est PAS relié à la fiche. Regarde tes brouillons Vinted (VRM bloque cette fiche 30 min).' }; }
+    await poserVerrouFiche(ficheId, { etat: 'fait', draftId, uid });
+    const corpsCV = { draft: { ...draft, id: Number(draftId) }, feedback_id: null, parcel: null, push_up: false, upload_session_id: temp };
+    const range = await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsCV), titre, prix, nPhotos: ids.length, parVRM: true, ficheId, numero, etat: 'brouillon' });
+    const lien = await lierNumeroFiche(draftId, numero, uid, ficheId);
+    noterDiag('fiche_brouillon_ok');
+    try { notifierApp({ type: 'maj', quoi: 'brouillons', uid }); } catch (_) {}
+    return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, lie: lien.ok === true, lienRaison: lien.ok ? '' : lien.raison, range: range === true, aFinir: [...new Set(aFinir)] };
+  } finally { if (!envoye) await rendreActions(uid, tRes, 1); } });
+}
 // ── LES MISES EN LIGNE PLANIFIÉES (29 oct., « comme Vintex ») ─────────────────
 // Vintex crée le brouillon de la paire 1, supprime l'ancienne, passe à la paire 2,
 // et met la paire 1 en ligne 1 à 3 min après SON brouillon (mesuré : 65 et 163 s).
@@ -12991,13 +13247,14 @@ function sorteCommande(cmd, r) {
   if (cmd === 'republierVinted') return 'modifiee';
   if (cmd === 'publierBrouillon') return 'mise_en_ligne';
   if (cmd === 'recreerVinted' || cmd === 'refaireBrouillon') return r.brouillon ? 'brouillon' : 'republiee';
+  if (cmd === 'creerVintedFiche') return 'brouillon';
   return null;
 }
 async function journalCommande(msg, r) {
   try {
     const s = sorteCommande(msg && msg.cmd, r);
     if (!s) return;
-    const id = msg.cmd === 'publierBrouillon' ? (r.itemId || undefined) : msg.id;
+    const id = msg.cmd === 'publierBrouillon' ? (r.itemId || undefined) : msg.cmd === 'creerVintedFiche' ? r.draftId : msg.id;
     await noterJournal(msg.uid, s, { a: id, b: r.nouvelId, de: r.ancien, vers: s === 'baisse_prix' ? r.prixVu : r.nouveau });
   } catch (_) {}
 }
@@ -14281,6 +14538,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'vacancesVinted') { const r = await mettreVacancesVinted(msg); await journalVacances(msg, r); return r; }
   if (msg && msg.cmd === 'recreerVinted') { const r = await recreerVinted(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'publierBrouillon') { const r = await publierBrouillon(msg); await journalCommande(msg, r); return r; }
+  // 11 nov. (5.367) : créer UN brouillon sur Vinted depuis une fiche VRM, sur son clic (voir `creerVintedFiche`).
+  if (msg && msg.cmd === 'creerVintedFiche') { const r = await creerVintedFiche(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'refaireBrouillon') { const r = await refaireBrouillon(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   // 29 oct. : supprimer UNE annonce Leboncoin, sur son clic confirmé (voir `supprimeLbcDepuisApp`).
