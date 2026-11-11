@@ -5065,6 +5065,9 @@ const lireFamilleCopiee = async (famille, filtre, select) => {
 
 // ── (11 nov., temps réel) LES VERSIONS DES LIGNES DU VENDEUR ÉCRITES DEPUIS X (src/tempsReel.js) ──
 // Scalaires seulement (§4.4), SES lignes (`owner=eq.`), toutes les pages (§4.5) ; ratée ⇒ `null`.
+// Realtime n'est tenté que si la migration 040 est posée (`vrm_temps_reel()` répond `true`).
+const realtimeTempsReelPret = () => fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_temps_reel`, { headers: sbAuth(), cache: 'no-store' })
+  .then((r) => (r.ok ? r.json() : null)).then((v) => v === true).catch(() => false);
 const lireVeilleTempsReel = (uid) => (x) => {
   const q = `%22${encodeURIComponent(x)}%22`;
   return lireTout(`owner=eq.${uid}&or=(updated_at.gt.${q},meta->>capturedAt.gt.${q},meta->>purgedAt.gt.${q})&select=${SEL_VEILLE}`).catch(() => null);
@@ -55523,7 +55526,7 @@ function AppCoeur() {
         {!baseKO && <MentionCopie/>}
         {/* (11 nov., temps réel) La veille des lignes écrites par l'extension (src/tempsReel.js) : ce qui
             change chez le serveur est relu par l'écran qui le montre, sans recharger ; pastille flottante. */}
-        {MULTI_USER && authState.user && authState.user.id && <VeilleTempsReel uid={String(authState.user.id)} lireDepuis={lireVeilleTempsReel(String(authState.user.id))} urlBase={SUPABASE_URL} cleApi={SUPABASE_KEY} jeton={() => (AUTH.session && AUTH.session.access_token) || null}/>}
+        {MULTI_USER && authState.user && authState.user.id && <VeilleTempsReel uid={String(authState.user.id)} lireDepuis={lireVeilleTempsReel(String(authState.user.id))} urlBase={SUPABASE_URL} cleApi={SUPABASE_KEY} jeton={() => (AUTH.session && AUTH.session.access_token) || null} realtimePret={realtimeTempsReelPret}/>}
         {/* (9 nov., lot AG) UNE ligne de fraîcheur en haut de l'app : « Tout est à jour · vérifié il y a N min »,
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place

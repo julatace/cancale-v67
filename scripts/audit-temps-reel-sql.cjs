@@ -24,6 +24,7 @@ const MUTATION = arg('mutation');
 const MUTATIONS = {
   'data-diffusee': (s) => s.replace("'id', new.id,", "'id', new.id, 'data', new.data,"),
   'sans-exception': (s) => s.replace(/  exception when others then\n    null;[^\n]*\n/, ''),
+  'interrupteur-anonyme': (s) => s.replace('revoke all on function public.vrm_temps_reel() from public, anon;', ''),
   'regle-ouverte': (s) => s.replace("and (select realtime.topic()) = 'vrm-lignes:' || (select auth.uid())::text", ''),
 };
 
@@ -109,8 +110,8 @@ try {
   const e = run(essai);
   const lignesEssai = e.out.split('\n').filter(Boolean);
   let rap = null; try { rap = JSON.parse(lignesEssai.find((l) => l.startsWith('{'))); } catch (_) {}
-  juge(e.ok && rap && rap.trig === 1 && rap.pol === 1 && rap.msg === 1, "5. l'essai annulé passe (déclencheur, règle, diffusion)", e.ok ? JSON.stringify(rap) : e.err.slice(0, 200));
-  juge(e.ok && lignesEssai[lignesEssai.length - 1] === '0|0', "5. après l'essai, rien ne reste", lignesEssai[lignesEssai.length - 1]);
+  juge(e.ok && rap && rap.trig === 1 && rap.pol === 1 && rap.fn === true && rap.msg === 1, "5. l'essai annulé passe (déclencheur, règle, diffusion)", e.ok ? JSON.stringify(rap) : e.err.slice(0, 200));
+  juge(e.ok && lignesEssai[lignesEssai.length - 1] === '0|0|0', "5. après l'essai, rien ne reste", lignesEssai[lignesEssai.length - 1]);
 
   Q(sql);
   const v = Q(fs.readFileSync(VERIF, 'utf8'));

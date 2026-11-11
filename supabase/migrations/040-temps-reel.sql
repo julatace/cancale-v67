@@ -59,6 +59,13 @@ create policy vrm_lignes_recevoir on realtime.messages for select to authenticat
   using (realtime.messages.extension = 'broadcast'
          and (select realtime.topic()) = 'vrm-lignes:' || (select auth.uid())::text);
 
+-- L'app ne tente la connexion Realtime QUE si cette fonction répond `true` (une lecture
+-- GET, à l'ouverture) : avant la migration, et dans les bancs, aucune prise n'est ouverte.
+create or replace function public.vrm_temps_reel() returns boolean
+language sql stable set search_path = '' as $$ select true $$;
+revoke all on function public.vrm_temps_reel() from public, anon;
+grant execute on function public.vrm_temps_reel() to authenticated;
+
 commit;
 
 -- ── Annuler (si besoin) ──────────────────────────────────────────────────────
@@ -66,4 +73,5 @@ commit;
 -- drop trigger if exists vrm_signal_ligne on public.app_data;
 -- drop function if exists public.vrm_signal_ligne();
 -- drop policy if exists vrm_lignes_recevoir on realtime.messages;
+-- drop function if exists public.vrm_temps_reel();
 -- commit;
