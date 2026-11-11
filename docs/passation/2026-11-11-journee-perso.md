@@ -120,3 +120,20 @@ cartes du haut se rangent entre elles (`ordreMobile`).
   Ma journée modifiée (« Rien à faire dans tes cartes affichées · 1 geste dans les cartes cachées »,
   « 1 carte cachée »), « Affichée car urgent » en ambre en tête de « Ensuite », juste après l'alerte.
 - Aucune écriture en base réelle ; aucune PR, aucun merge dans `main`.
+
+## Fusion de `claude/integration-11nov-e` (demande de la session principale)
+- Vrai `git merge`, les deux côtés gardés. Ce que leur côté a changé dans Ma journée, et comment c'est
+  rangé dans la règle :
+  - **« À trancher »** (lot DJ4 : carte en tête de « À faire », ouverte en place) ⇒ carte **fixe** du
+    catalogue (`trancher`, interrupteur sans poignée, toujours en tête), cachable (`visJ('trancher')`),
+    comptée dans `nGestesTout` et décomptée cachée.
+  - **« Supprimés de Vinted »** n'est plus rendue (absorbée par « À trancher », `cyclesJ = []`) ⇒ sortie
+    du catalogue (une poignée qui ne fait rien n'est pas pratique).
+  - **« Quoi de neuf »** : une ligne PASSAGÈRE après une mise en ligne ⇒ pas une carte réglable,
+    toujours à sa place (comme la barre d'import) ; « Notifications coupées » reste « En bas ».
+  - La carte sombre de stats-plus (jusqu'à 6 chiffres) est la même carte `chiffres` (fixe).
+- CLAUDE.md : celui de leur côté + la ligne de ce lot ; « Clôturer l'année » (la plus ancienne de §9)
+  déplacée telle quelle dans `historique-divers.md` (58 942 octets).
+- Preuves après fusion : build vert ; audits demandés verts ; `audit-journee-perso` 21/21 mutations ;
+  banc `journee-perso` 99 verts, 0 rouge. Banc `vendeurs-differents` : 10 rouges (A5, A6, A7) —
+  **les mêmes 10 sur `integration-11nov-e` seule** (construite à part) : pas de ce lot.
