@@ -124,6 +124,8 @@ serveur de `dist/`, ouverture d'un écran avec largeur/thème/zoom/lien, axe, ci
 | `color-contrast` | « Ajouter une note » sur le remplissage gris (3,96:1) | en clair #5E5E63 (5,0:1) |
 | idem | « Vendus ailleurs » → « Voir le détail » à opacité 0,7 (2,8:1) | le gris secondaire du thème au lieu de l'opacité |
 | `label-content-name-mismatch` | Ma journée : la carte « Au moins N choses à trancher » (arrivée par `main` pendant ce lot ; le banc l'a vue à la fusion) — « Trancher »/« Fermer » absent du nom | comme les autres cartes : texte entier lu (`vrm-sr-seul`), ligne affichée cachée au lecteur, le mot du geste reste dans le nom ; `data-plein` |
+| `label-content-name-mismatch` | Achats → meilleures sources (arrivée par `main`) : « source : ouvrir ses achats » taisait les chiffres affichés | nommé par ce qu'il montre, « — ouvrir ses achats » lu à la fin |
+| K2 (contour < 3:1) | la case « Sélectionner » des listes (lot actions-serie, arrivée par `main`) : contour de Chrome à 2,97:1 en sombre | contour bleu-texte du thème (`--vrm-accent-texte`) au focus |
 | Z2 (texte coupé, toutes tailles) | Stock : « N°12 » coupé en « N°1… » dans les vignettes de 44 px | pastille resserrée en vignette mini (3 chiffres tiennent), N° entier en `title`, `aria-hidden` (la ligne l'écrit en clair) |
 
 Rien d'autre au zoom 200 % ni au clavier : aucune page ne défile en largeur, chaque écran est
@@ -147,6 +149,16 @@ sur sa pastille, le tri d'Annonces sur son habillage).
 - Captures regardées : zoom 200 % (Stock), confirmation 390 sombre, fiches.
 - `CLAUDE.md` au-dessus de 59 000 octets après la fusion : la ligne la plus ancienne du §9
   (« VRM installable ») est déplacée telle quelle dans `historique-divers.md`.
+
+### ⚠️ Signalé, pas corrigé : la langue de la page en anglais
+
+Depuis le lot « Traduction » (arrivé par `main` pendant ce lot), un navigateur réglé en anglais
+(ou allemand, espagnol, italien) reçoit `<html lang="en">` alors que seule la navigation est
+traduite : le contenu des écrans reste en français. Un lecteur d'écran lit alors du français avec
+une voix anglaise (WCAG 3.1.1). Le banc simule l'utilisateur réel (`locale: 'fr-FR'`, VRM reste sur
+la France, §3) et ne voit donc plus ce cas ; il ne l'a mesuré qu'une fois, en Chromium anglais.
+À trancher par le lot Traduction : soit `lang` reste `fr` tant qu'un écran n'est pas traduit, soit
+chaque morceau traduit porte son `lang`. (Note : §3 de CLAUDE.md dit « pas de traduction ».)
 
 ## Ce qui reste
 

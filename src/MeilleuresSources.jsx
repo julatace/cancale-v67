@@ -115,7 +115,9 @@ export default function MeilleuresSources({ owner = '', Retour = null, ici = 'ar
               <button type="button" className="vrm-ms-ligne" data-ms-source={s.cle} data-ms-rang={i + 1} data-ms-tete={premier === s ? '1' : undefined}
                 data-ms-benefice={s.benefice == null ? '' : String(s.benefice)} data-ms-delai={s.delaiMoyen == null ? '' : String(s.delaiMoyen)}
                 data-ms-articles={s.articles} data-ms-revendus={s.revendus} data-ms-sans-prix={s.sansPrix} data-ms-pas-revendus={s.pasRevendus}
-                onClick={() => setOuverte(s.cle)} aria-label={`${s.libelle} : ouvrir ses achats`}>
+                onClick={() => setOuverte(s.cle)}>
+                {/* (11 nov., lot accessibilité) Nommé par ce qu'il montre (source, chiffres) + le geste lu à la
+                    fin ; un aria-label « source : ouvrir ses achats » taisait les chiffres affichés (WCAG 2.5.3). */}
                 <span className="vrm-ms-nom">{s.libelle}{s.genre ? <span className="vrm-ms-genre"> · {s.genre}</span> : null}</span>
                 <span className="vrm-ms-chiffre">{par === 'vitesse' ? texteDelai(s) : texteBenefice(s)}</span>
                 <span className="vrm-ms-cases">
@@ -125,6 +127,7 @@ export default function MeilleuresSources({ owner = '', Retour = null, ici = 'ar
                 </span>
                 <span className="vrm-ms-sur">{texteCouvertureSource(s)}</span>
                 <span className="vrm-ms-sur" data-ms-attente="">{texteAttente(s)}</span>
+                <span className="vrm-sr-seul"> — ouvrir ses achats</span>
               </button>
             </li>
           ))}

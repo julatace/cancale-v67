@@ -108,8 +108,8 @@ async function ouvrir(b, { largeur, sombre, tab, zoom, url, attente }) {
   ];
   const mobile = largeur < 700;
   const ctx = await b.newContext(zoom
-    ? { bypassCSP: true, viewport: { width: Math.round(largeur / zoom), height: Math.round(950 / zoom) }, deviceScaleFactor: zoom }
-    : { bypassCSP: true, viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile });
+    ? { bypassCSP: true, locale: 'fr-FR', viewport: { width: Math.round(largeur / zoom), height: Math.round(950 / zoom) }, deviceScaleFactor: zoom }
+    : { bypassCSP: true, locale: 'fr-FR', viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile });
   const pg = await ctx.newPage();
   ctx.on('page', (p) => { if (p !== pg) p.close().catch(() => {}); });
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
