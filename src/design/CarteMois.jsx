@@ -46,6 +46,73 @@ export function ChiffreRoule({ valeur }) {
   return <span key={texte} className={'vrm-roule' + (change ? ' is-neuf' : '')}>{valeur}</span>;
 }
 
+
+// ── LE GRAND CHIFFRE QUI TIENT DANS SA PLACE (3 nov. ; partagé le 11 nov., pire cas) ──
+// Comme `adjustsFontSizeToFitWidth` d'iOS : un montant trop long pour sa place
+// (« au moins 101 283,49 € » au téléphone) descend en taille, d'un seul calcul,
+// jusqu'à 22 px au plus bas — jamais coupé net. Rend la fonction de nettoyage.
+export function ajusterChiffre(el, plancher = 22) {
+  // (7 nov., vitesse) Avant : une boucle qui baissait d'1 px et relisait la mise
+  // en page à chaque tour (jusqu'à 16 recalculs par carte, et à chaque
+  // redimensionnement) — ~1,3 s de gel mesuré au téléphone. Maintenant : une
+  // règle de trois sur la largeur, une seule correction au plus, et rien si la
+  // largeur n'a pas changé.
+  let derniere = -1;
+  const ajuste = () => {
+    const largeur = el.clientWidth;
+    if (largeur === derniere) return;
+    derniere = largeur;
+    el.style.removeProperty('font-size');
+    el.style.removeProperty('white-space');
+    el.style.removeProperty('overflow-wrap');
+    el.style.removeProperty('word-break');
+    el.removeAttribute('data-chiffre-replie');
+    const base = parseFloat(getComputedStyle(el).fontSize) || 38;
+    const sw = el.scrollWidth;
+    if (!(sw > largeur + 0.5) || largeur <= 0) return;
+    // (11 nov., pire cas) Posée `!important` : plusieurs feuilles de style fixent la taille du
+    // grand chiffre en `!important` (écran, ordinateur) et écrasaient l'ajustement — « au moins
+    // 1 621 770,50 € » restait à 44 px, coupé net par la carte.
+    let fs = Math.max(plancher, Math.floor(base * largeur / sw));
+    el.style.setProperty('font-size', fs + 'px', 'important');
+    if (el.scrollWidth > el.clientWidth + 0.5 && fs > plancher) { fs = Math.max(plancher, fs - 2); el.style.setProperty('font-size', fs + 'px', 'important'); }
+    // Au plancher et toujours trop long (« au moins 1 621 770,50 € » au téléphone) : il passe à la
+    // ligne à ses espaces (« au moins » au-dessus) — le montant, lui, ne se coupe pas (espaces insécables).
+    if (el.scrollWidth > el.clientWidth + 0.5) {
+      el.style.setProperty('white-space', 'normal', 'important');
+      // Seulement aux espaces : jamais « 101 283,5 / 0 € » (une coupure « n'importe où » héritée).
+      el.style.setProperty('overflow-wrap', 'normal', 'important');
+      el.style.setProperty('word-break', 'normal', 'important');
+      el.setAttribute('data-chiffre-replie', '');   // la borne « au moins » passe sur sa ligne (styles-pire-cas.css)
+      el.style.removeProperty('font-size');
+      const b2 = parseFloat(getComputedStyle(el).fontSize) || 38;
+      if (el.scrollWidth > el.clientWidth + 0.5) el.style.setProperty('font-size', Math.max(plancher, Math.floor(b2 * el.clientWidth / el.scrollWidth)) + 'px', 'important');
+    }
+  };
+  ajuste();
+  if (typeof ResizeObserver === 'undefined') return undefined;
+  const ro = new ResizeObserver(() => ajuste());
+  ro.observe(el.parentElement || el);
+  return () => ro.disconnect();
+}
+
+// Le même ajustement pour un grand chiffre posé hors de `CarteMois` (Ma journée).
+export function GrandChiffre({ className = 'vrm-fu-grand', children, ...attrs }) {
+  const ref = useRef(null);
+  const texte = texteDe(children);
+  useLayoutEffect(() => (ref.current ? ajusterChiffre(ref.current) : undefined), [texte]);
+  return <div ref={ref} className={className} {...attrs}>{children}</div>;
+}
+
+// Le chiffre d'une case (« Vendu · mois ») : le même ajustement, plancher 14 px —
+// « 1 621 771 € » dans une demi-largeur de téléphone ne sort plus de sa case.
+function ChiffreCase({ n, nc }) {
+  const ref = useRef(null);
+  const texte = texteDe(n);
+  useLayoutEffect(() => (ref.current && n != null ? ajusterChiffre(ref.current, 14) : undefined), [texte]);
+  return <b ref={ref} aria-hidden="true" className={n == null ? 'is-vide' : undefined} data-fu-case-chiffre="" style={{ '--nc': nc }}>{n == null ? '—' : <ChiffreRoule valeur={n} />}</b>;
+}
+
 // cases : [{ cle, n, l, titre, raison, onClick, attrs }] — `n` peut être un nœud ; `raison` :
 // la raison courte d'un « — » (ou le manque nommé d'un montant), sous le libellé.
 // (3 nov., carte réglable) `action` : un bouton discret en haut à droite (« Modifier ») ;
@@ -67,29 +134,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
   useLayoutEffect(() => {
     const el = grandRef.current;
     if (!el) return undefined;
-    // (7 nov., vitesse) Avant : une boucle qui baissait d'1 px et relisait la mise
-    // en page à chaque tour (jusqu'à 16 recalculs par carte, et à chaque
-    // redimensionnement) — ~1,3 s de gel mesuré au téléphone. Maintenant : une
-    // règle de trois sur la largeur, une seule correction au plus, et rien si la
-    // largeur n'a pas changé.
-    let derniere = -1;
-    const ajuste = () => {
-      const largeur = el.clientWidth;
-      if (largeur === derniere) return;
-      derniere = largeur;
-      el.style.fontSize = '';
-      const base = parseFloat(getComputedStyle(el).fontSize) || 38;
-      const sw = el.scrollWidth;
-      if (!(sw > largeur + 0.5) || largeur <= 0) return;
-      let fs = Math.max(22, Math.floor(base * largeur / sw));
-      el.style.fontSize = fs + 'px';
-      if (el.scrollWidth > el.clientWidth + 0.5 && fs > 22) { fs = Math.max(22, fs - 2); el.style.fontSize = fs + 'px'; }
-    };
-    ajuste();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(() => ajuste());
-    ro.observe(el.parentElement || el);
-    return () => ro.disconnect();
+    return ajusterChiffre(el);
   }, [valeur, vide]);
   // (5 nov., chantier E1, revue 2.11) « Modifier » chevauchait la courbe de Ventes (posé en
   // absolu au-dessus d'elle). Sur une carte à elle, il est DANS la rangée du surtitre : la
@@ -124,7 +169,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
             // (10 nov., lot P) Au lecteur d'écran : « Vendu · mois : 80 € » — le libellé AVANT le
             // chiffre, et « pas su » à la place d'un « — » muet (§5). Le dessin reste tel quel.
             const lu = `${texteDe(c.l)} : ${c.n == null ? 'pas su' : texteDe(c.n)}${c.raison ? ', ' + texteDe(c.raison) : ''}`;
-            const corps = <><span className="vrm-sr-seul" data-fu-case-lu="">{lu}</span><b aria-hidden="true" className={c.n == null ? 'is-vide' : undefined} style={{ '--nc': Math.max(1, texteDe(c.n).length) }}>{c.n == null ? '—' : <ChiffreRoule valeur={c.n} />}</b><span aria-hidden="true">{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="" aria-hidden="true">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
+            const corps = <><span className="vrm-sr-seul" data-fu-case-lu="">{lu}</span><ChiffreCase n={c.n} nc={Math.max(1, texteDe(c.n).length)} /><span aria-hidden="true">{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="" aria-hidden="true">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;

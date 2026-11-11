@@ -1,0 +1,26 @@
+/* ── PIRE CAS (11 nov.) — ce que les données extrêmes cassaient (banc scripts/bancs/pire-cas.cjs) ──
+   Une règle par défaut mesuré ; rien d'autre ne change de forme. */
+
+/* Dans la couche `vrm-premium` (styles-premium.css) : un `!important` en couche l'emporte sur
+   tout `!important` hors couche, c'est donc là qu'une correction doit se poser pour compter. */
+@layer vrm-premium {
+/* Le chiffre d'une case (« Vendu · mois ») reste DANS sa case : la taille descend (CarteMois.jsx,
+   `ChiffreCase`) et, au plancher, il finit par « … » plutôt que d'être coupé net par le bord. */
+:root:root body .vrm-fu-cases > .vrm-fu-case > b[data-fu-case-chiffre] {
+  max-width: 100% !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;
+}
+
+/* La fiche d'annonce OUVERTE se lit en entier : le titre passe à la ligne (200 caractères, mots
+   allemands sans espace) au lieu d'être tronqué au téléphone. Repliée, la vignette garde ses deux lignes. */
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="1"] [data-titre] {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+  display: block !important; -webkit-line-clamp: unset !important; overflow-wrap: anywhere !important;
+}
+/* Replié (CarteMois.jsx, `ajusterChiffre`) : « au moins » sur sa propre ligne, au-dessus du montant entier. */
+:root:root body [data-chiffre-replie] .vrm-fu-borne { display: block !important; white-space: nowrap !important; vertical-align: baseline !important; line-height: 1.2 !important; }
+} /* fin @layer vrm-premium */
+
+/* E-mails : un nom de compte de 60 caractères sans espace était coupé net par le bord de la ligne.
+   Il se raccourcit en « … » (la ligne entière se touche : la lecture dit « Reçu sur » en entier). */
+.vrm-boite-ligne-pied > .vrm-boite-qui { overflow: hidden; }
+.vrm-boite-qui > .vrm-boite-compte-nom { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

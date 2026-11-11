@@ -168,7 +168,8 @@ function mesurer(racineSel) {
   const vis = (el) => { const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05; };
   const cache = (el) => !!el.closest('[hidden],[inert],[aria-hidden="true"]') || el.closest('[data-banc-ignorer]');
   // Rangées qui défilent d'elles-mêmes : un texte qui sort à droite y est voulu.
-  const defilant = (el) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll)/.test(s.overflowX) && a.scrollWidth > a.clientWidth + 1) return true; } return false; };
+  // (Une page qui défile en hauteur n'est pas une rangée : son débordement horizontal est un défaut.)
+  const defilant = (el) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll)/.test(s.overflowX) && a.scrollWidth > a.clientWidth + 1 && a.scrollHeight <= a.clientHeight + 1) return true; } return false; };
   // Le rectangle visible d'un élément : coupé par ses ancêtres `overflow` non visibles.
   const clip = (el, r) => {
     let x1 = r.left, y1 = r.top, x2 = r.right, y2 = r.bottom;
@@ -192,16 +193,28 @@ function mesurer(racineSel) {
     if (!rs.length) continue;
     for (const r of rs) {
       if (r.bottom < 0 || r.top > H) continue;
-      const c = clip(el, r); if (c.w <= 1 || c.h <= 1) continue;
+      if (el.closest('.vrm-sr,.sr-only,.visually-hidden')) continue;
+      const c = clip(el, r);
+      // Rogné ENTIER à l'horizontale (la hauteur, elle, est visible) : un texte coupé, pas un repli.
+      if (c.w <= 1 && c.h > 1 && r.left < W && r.right > 0) { textes.push({ el, n, c: { ...c, x2: Math.max(c.x1, c.x2), w: 0 }, r, entier: true }); continue; }
+      if (c.w <= 1 || c.h <= 1) continue;
       textes.push({ el, n, c, r });
     }
   }
   // P2 : un texte visible qui sort de l'écran à droite (ou à gauche).
-  for (const t of textes) if ((t.c.x2 > W + 1 || t.c.x1 < -1) && !defilant(t.el) && getComputedStyle(t.el).position !== 'fixed') out.deborde.push(desc(t.el) + ` [${Math.round(t.c.x1)}→${Math.round(t.c.x2)}]`);
+  for (const t of textes) if (!t.entier && (t.c.x2 > W + 1 || t.c.x1 < -1) && !defilant(t.el) && getComputedStyle(t.el).position !== 'fixed') out.deborde.push(desc(t.el) + ` [${Math.round(t.c.x1)}→${Math.round(t.c.x2)}]`);
+  // P4 (rogné) : un texte coupé net par le cadre de son ancêtre (`overflow: hidden`), sans ellipse ni défilement.
+  for (const t of textes) {
+    const coupeX = t.r.right - t.c.x2 > 2 || t.c.x1 - t.r.left > 2;
+    if (!coupeX || defilant(t.el)) continue;
+    let ell = false; for (let a = t.el, d = 0; a && d < 4; a = a.parentElement, d++) if (getComputedStyle(a).textOverflow === 'ellipsis') ell = true;
+    if (!ell && t.c.x2 <= W + 1) out.coupe.push('rogné ' + desc(t.el) + ` [${Math.round(t.r.right)}>${Math.round(t.c.x2)}]`);
+  }
   // P3 : deux textes qui se recouvrent (au moins 30 % de la plus petite hauteur, 4 px de large).
   const empile = (el) => { for (let a = el; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (s.position === 'fixed' || s.position === 'sticky') return a; } return null; };
-  for (let i = 0; i < textes.length && out.chevauche.length < 12; i++) for (let k = i + 1; k < textes.length; k++) {
-    const a = textes[i], b = textes[k];
+  const pleins = textes.filter((t) => !t.entier);
+  for (let i = 0; i < pleins.length && out.chevauche.length < 12; i++) for (let k = i + 1; k < pleins.length; k++) {
+    const a = pleins[i], b = pleins[k];
     if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
     const ix = Math.min(a.c.x2, b.c.x2) - Math.max(a.c.x1, b.c.x1), iy = Math.min(a.c.y2, b.c.y2) - Math.max(a.c.y1, b.c.y1);
     if (ix < 4 || iy < 0.3 * Math.min(a.c.h, b.c.h) || iy < 3) continue;
@@ -216,6 +229,7 @@ function mesurer(racineSel) {
   // P4 : texte coupé (ellipse ou line-clamp) sans moyen de le lire en entier.
   const vu = new Set();
   for (const t of textes) {
+    if (t.entier) continue;
     for (let el = t.el, d = 0; el && d < 3; el = el.parentElement, d++) {
       if (vu.has(el)) break;
       const s = getComputedStyle(el);
@@ -288,6 +302,7 @@ async function main() {
           const { pg, ctx, errs } = await ouvrir(b, { largeur, sombre, tab, nomJeu: jeuNom });
           const fichier = `${jeuNom}-${tab}-${largeur}-${sombre ? 'sombre' : 'clair'}`;
           await capture(pg, fichier);
+          if (process.env.BANC_SONDE) console.log('     sonde :', JSON.stringify(await pg.evaluate(process.env.BANC_SONDE), null, 1).slice(0, 4000));
           await juger(pg, T, nom, { jeuNom, errs });
           if (jeuNom === 'extreme' && !sombre && ['annonces', 'ventes', 'achats', 'garage', 'messages'].includes(tab)) {
             const d = await defiler(pg);
@@ -306,11 +321,17 @@ async function main() {
             } else dit(false, `${T} fiche d’annonce · le bouton « Détails et gestes » existe`);
           }
           if (jeuNom !== 'vide' && tab === 'ventes') {
-            const bt = pg.locator('.vrm-ledger-sale-toggle').first();
+            // « Toutes les ventes » : une ligne = un bouton qui ouvre la fiche de la vente.
+            const bt = pg.locator('[data-toutes-vente], .vrm-ledger-sale-toggle').first();
             if (await bt.count()) {
-              await bt.click(); await pg.waitForTimeout(900);
+              await bt.scrollIntoViewIfNeeded(); await bt.click(); await pg.waitForTimeout(1500);
+              // « Tous » mène à la liste du site ; la ligne de CE site ouvre la fiche de la vente.
+              const l2 = pg.locator('.vrm-ledger-sale-toggle').first();
+              if (await l2.count()) { await l2.scrollIntoViewIfNeeded(); await l2.click(); await pg.waitForTimeout(1200); }
               await capture(pg, fichier + '-fiche-vente');
-              await juger(pg, T, 'fiche de vente', { jeuNom, errs, racine: '.vrm-ledger-drawer-host:not([hidden])' });
+              const r = await pg.evaluate(() => { const d = [...document.querySelectorAll('[role="dialog"]')].filter((x) => x.getClientRects().length && !x.closest('[hidden]')).pop(); if (!d) return null; d.setAttribute('data-banc-fiche', ''); return true; });
+              if (r) await juger(pg, T, 'fiche de vente', { jeuNom, errs, racine: '[data-banc-fiche]' });
+              else dit(false, `${T} fiche de vente · un toucher sur la ligne ouvre la fiche`);
               await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
             } else dit(false, `${T} fiche de vente · une ligne de vente existe`);
             await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: 'B12345' })));
