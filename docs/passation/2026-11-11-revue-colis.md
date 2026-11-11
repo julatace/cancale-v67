@@ -239,3 +239,16 @@ suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 e
   logo gardé, « Tout imprimer » reste à 3. Mutation `VAV_MUTATION=sans-preuve` (la preuve retirée) ⇒ rouge.
 * Banc `ventes-achats-visuel` : L (logo au même endroit, rien sans transporteur lu, plus dans la rangée), V (≤ 16 px sous la
   frise), P ; mutation `VAV_MUTATION=sans-logo` ⇒ L rouge.
+* **Logo aussi à l'ordinateur** : en tête de « compte · date » (colonne Article) sur chaque ligne qui a un transporteur connu ;
+  un seul logo visible par ligne (celui de la ligne « N° · Vinted » au téléphone, celui de la colonne à l'ordinateur).
+* **Preuves (banc `ventes-achats-visuel`, 390 + 1512, clair + sombre)** : 106 conformes ; avant la correction : L rouge
+  (pas de logo sur les lignes à envoyer, à l'ordinateur aucun logo), V rouge (20 px sous la frise, 12 après) ; mutations
+  `VAV_MUTATION=sans-logo` ⇒ L rouge (390 clair et sombre), `VAV_MUTATION=sans-preuve` ⇒ P rouge. Captures 390 et 1512
+  regardées (logos alignés ; au téléphone le compte passe à la ligne sous « N° · Vinted · logo »).
+* **`annonces-ventes-brouillon`** : mutation `AVB_MUTATION=ellipse` ⇒ « date limite lisible » rouge à 390 ET à 1512 (avant :
+  1512 seulement). Restent 2 rouges par décision (1512 : la 1re vente et les étapes d'Achats ne sont plus dans le premier
+  écran, sous les sections « À expédier » / « À retirer » mises en tête par le lot DJ3).
+* **Bancs relancés (dernier build)** : retirer-carte-delai 79, retrait-autre-ville, liens-colis-anciens 42, colis-retirer-propre 126,
+  achats-retraits 84, achats-retirer-site 24, colis-relier-carte 20, colis-a-leur-place 184, journee-perso, selection-bordereaux 54,
+  lot-bordereaux 17 : verts. `colis-fiables` : les 4 rouges déjà rouges sur `main` (ordre des points « Récents » par décision du
+  9 nov., défaut 6) + la garde réseau (appels `auth/v1` vers l'hôte réel, bloqués : le banc ne sert pas `auth/v1`).
