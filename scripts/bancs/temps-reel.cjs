@@ -95,11 +95,13 @@ async function passe(b, { nom, largeur, hauteur, mobile, sombre }) {
     juge(calme.veille.length >= 1 && calme.lourdes.length === 0, `[${nom}] B : au calme (28 s), la veille ne lit que des versions`, `${calme.veille.length} lecture(s) de versions, ${calme.n} lectures, ${calme.Ko} Ko, ${calme.lourdes.length} lourde(s)`);
     const t1 = Date.now();
     ecrireLigne(`harvest_${UID_V}_orders_sold`, (d) => { const v0 = d.payload.my_orders[0]; return { ...d, payload: { ...d.payload, my_orders: [{ ...v0, transaction_id: 22099999901, item_id: 7099999901, title: TITRE, date: new Date().toISOString(), status: 'Le paiement a été validé' }, ...d.payload.my_orders] } }; });
+    // La pastille, saisie à son apparition (elle s'efface après 6 s).
+    const vuPastille = o.pg.waitForSelector('[data-temps-reel-neuf]', { timeout: MAX_MS + 5000 }).then(async () => { const info = await o.pg.evaluate(() => { const e = document.querySelector('[data-temps-reel-neuf]'); if (!e) return null; const s = getComputedStyle(e.parentElement); return { t: e.innerText, pos: s.position }; }); await o.pg.screenshot({ path: path.join(CAPT, `temps-reel-${nom}-pastille.png`) }); return info; }).catch(() => null);
     const ms = await attendreTexte(o.pg, TITRE, t1);
+    const pastille = await vuPastille;
     juge(ms != null && ms < MAX_MS, `[${nom}] V : la vente neuve est à l'écran sans recharger`, ms != null ? `${(ms / 1000).toFixed(1)} s` : 'jamais (35 s)');
     const navs = await o.pg.evaluate(() => performance.getEntriesByType('navigation').length);
     juge(navs === o.navs, `[${nom}] V : aucun rechargement de la page`);
-    const pastille = await o.pg.evaluate(() => { const e = document.querySelector('[data-temps-reel-neuf]'); if (!e) return null; const s = getComputedStyle(e.parentElement); return { t: e.innerText, pos: s.position }; });
     juge(!!pastille && /^Mis à jour à \d{2}:\d{2}$/.test(pastille.t) && pastille.pos === 'fixed', `[${nom}] P : pastille « Mis à jour à hh:mm », flottante`, pastille ? `${pastille.t} · ${pastille.pos}` : 'absente');
     await o.pg.screenshot({ path: path.join(CAPT, `temps-reel-${nom}-ventes.png`) });
     const apres = bilan(o.reqs, t1);
