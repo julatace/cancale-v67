@@ -195,6 +195,10 @@
   .detail .ligne:first-of-type { border-top: 0; padding-top: 0; }
   .lbc-tete { border-top: 0; padding-top: 2px; }
   .outils { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 4px; }
+  /* 5.354 : le mini-résumé du mois, replié sous une ligne discrète (les styles de « Détails »). */
+  .mois .mois-l { margin-top: 0; line-height: 1.45; }
+  .mois .mois-l b { font-weight: 600; color: var(--texte); }
+  .mois .outils { margin-top: 0; }
   .outils .lien { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 13px; cursor: pointer; }
   .outils .lien:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   /* Le logo se DÉPLACE (glisser) et se RÉDUIT en pastille ; la carte s'ouvre du
@@ -446,6 +450,23 @@
     if (f.okAt) return { etat: 'ok', texte: (nom || 'Compte ' + (NOM_SITE[e.plateforme] || '')) + ' · à jour ' + heureCourte(f.okAt), coche: true };
     return { etat: 'attente', texte: (nom || 'Ce compte') + ' · rien envoyé pour l’instant' };
   }
+  // 5.354 : le mini-résumé du mois. Chaque nombre est celui de VRM, ou « — ».
+  let moisOuvert = false;
+  const euros = (n) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+  function ligneMois(m) {
+    const ca = m.ca == null || (m.caAuMoins && !(m.ca > 0)) ? '—' : (m.caAuMoins ? 'au moins ' : '') + euros(m.ca);
+    const nv = m.ventes == null ? '—' : Number(m.ventes).toLocaleString('fr-FR');
+    const ae = m.aExpedier == null ? '—' : (m.aExpedierAuMoins ? 'au moins ' : '') + Number(m.aExpedier).toLocaleString('fr-FR');
+    const ventesMot = m.ventes === 1 ? 'vente' : 'ventes';
+    const note = m.raison === 'mois' ? 'VRM n’a pas encore publié les chiffres de ce mois : ouvre VRM une fois.'
+      : m.raison === 'jamais' ? 'Pas encore de chiffres publiés : ouvre VRM une fois.'
+      : m.maj ? `Chiffres de VRM, publiés ${depuis(m.maj)}${m.aExpedier == null ? ' · colis : ouvre VRM pour les recompter' : ''}.` : '';
+    return `<details class="detail mois" data-mois${moisOuvert ? ' open' : ''}><summary>Ce mois dans VRM</summary>
+      <div class="val mois-l" data-mois-ca="${m.ca == null ? '' : esc(m.ca)}" data-mois-ventes="${m.ventes == null ? '' : esc(m.ventes)}" data-mois-expedier="${m.aExpedier == null ? '' : esc(m.aExpedier)}">Ce mois : <b>${esc(ca)}</b> vendus · <b>${esc(nv)}</b> ${ventesMot} · <b>${esc(ae)}</b> à expédier</div>
+      ${note ? `<div class="val gris" data-mois-note="${esc(m.raison || 'ok')}">${esc(note)}</div>` : ''}
+      <div class="outils"><button class="lien" data-mois-voir>Voir dans VRM</button><button class="lien" data-mois-masquer>Masquer ce résumé</button></div>
+    </details>`;
+  }
   const resumeHtml = (r) => `<div class="resume" data-resume="${esc(r.etat)}" role="status"><span class="d" aria-hidden="true"></span><span class="t">${esc(r.texte)}${r.coche ? ' <span class="coche" aria-label="vérifié">✓</span>' : ''}</span></div>`;
 
   function rendre() {
@@ -625,7 +646,15 @@
     // (Un compte ignoré garde « Capter ce compte » sous les yeux : le moyen de revenir.)
     // (« Connecté à VRM : x — C’est fait » se lit sans rien ouvrir, une fois.)
     const ouvert = resume.etat === 'geste' || ignore || justeConnecte || detailOuvert;
+    // 5.354 (lot extension-resume) : « Ce mois : 1 340 € vendus · 42 ventes · 3 à
+    // expédier » — les chiffres PUBLIÉS par VRM (widget_stats), rien recalculé ici ;
+    // « pas su » ⇒ « — », jamais 0. Absent (compte de l'onglet pas prouvé à ce compte
+    // VRM, eBay, pas connecté) ⇒ rien du tout. Masqué ⇒ « Afficher » dans le détail.
+    const mois = connecte && e.mois && !e.mois.masque ? e.mois : null;
+    const moisMasque = connecte && !!(e.mois && e.mois.masque);
+    const moisHtml = mois ? ligneMois(mois) : '';
     const outils = [
+      moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : '',
       v && v.connecte && !changerCompte ? '<button class="lien" data-changer-vrm>Changer de compte VRM</button>' : '',
       `<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`,
       posPerso ? '<button class="lien" data-replacer-logo>Logo en bas à droite</button>' : '',
@@ -640,6 +669,7 @@
       ${diagnosticLbc}
       ${bascule}
       ${gestes}
+      ${moisHtml}
       <details class="detail" data-detail${ouvert ? ' open' : ''}><summary>Détails</summary>
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       ${lbcVisible ? '' : `<div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>`}
@@ -650,6 +680,21 @@
     const det = carte.querySelector('[data-detail]');
     if (det) det.addEventListener('toggle', () => { if (resume.etat !== 'geste') detailOuvert = det.open; });
     carte.querySelectorAll('[data-ouvrir-ecran]').forEach((el) => el.addEventListener('click', () => { carte.classList.remove('on'); ouvrirEcran(el.getAttribute('data-ouvrir-ecran')); }));
+    const moisD = carte.querySelector('[data-mois]');
+    if (moisD) moisD.addEventListener('toggle', () => { moisOuvert = moisD.open; });
+    const moisVoir = carte.querySelector('[data-mois-voir]');
+    if (moisVoir) moisVoir.addEventListener('click', () => { carte.classList.remove('on'); ouvrirEcran('journee'); });
+    carte.querySelectorAll('[data-mois-masquer],[data-mois-afficher]').forEach((el) => el.addEventListener('click', () => {
+      const masquer = el.hasAttribute('data-mois-masquer');
+      el.disabled = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'resumeMasque', masque: masquer }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.ok) { if (masquer) { e.mois = { masque: true }; moisOuvert = false; rendre(); } else { e.mois = null; rafraichir(); } return; }
+          el.disabled = false;
+        });
+      } catch (_) { el.disabled = false; }
+    }));
     const miniB = carte.querySelector('[data-mini-logo]');
     if (miniB) miniB.addEventListener('click', () => { poserMini(!mini); rendre(); });
     const replacer = carte.querySelector('[data-replacer-logo]');
