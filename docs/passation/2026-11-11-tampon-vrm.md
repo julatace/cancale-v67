@@ -14,8 +14,16 @@ espace libre ; sinon rien.
 - Étiquette introuvable par `zoneEtiquette` ⇒ **aucune mention** (on ne sait pas
   où est l'étiquette à découper : pas de place sûre).
 - Thermique (page 100×150 = l'étiquette) ⇒ jamais de mention.
-- Le tamponnage serveur des emails (`api/_lib/stamp.js`) n'a pas de recherche
-  d'espace libre (pas de rendu) : **inchangé, aucune mention** ici.
+- Le tamponnage serveur des emails (`api/_lib/stamp.js`) : **inchangé**. Vérifié :
+  ce n'est PAS ce que Julien imprime. Sa copie `pdfTamponneB64` n'est lue par
+  personne (`src/App.jsx` « LES OCTETS D'UN BORDEREAU » : `lirePdfLigne` ne lit que
+  `pdfB64` ; le banc `ventes-bordereau` vérifie qu'elle n'est jamais demandée ;
+  l'extension ne fait que la purger). Toute impression passe par
+  `tamponnerBordereau` (app). Les photos de ses bordereaux du 11 nov. le
+  confirment : N° gras + titre sur 2 lignes **sans cadre** (stamp.js trace un
+  cadre noir de 1,5 pt), et sur Chronopost le N° est posé dans le blanc du pavé
+  « Points de proximité » : c'est la recherche de zone libre de l'app, pas une
+  position fixe par format. La mention est donc sur le bon chemin.
 - L'extension ne tamponne pas : **aucune nouvelle version d'extension**.
 
 ## Le code (`src/App.jsx`, région « LE TAMPON DU BORDEREAU »)
@@ -56,5 +64,8 @@ espace libre ; sinon rien.
 ## Reste / geste de Julien
 - Imprimer un vrai bordereau Mondial Relay et un Chronopost pour voir la
   mention en vrai (aucun vrai PDF dans ce dépôt public).
-- L'aperçu « Placer le tampon » ne dessine pas la mention (elle est minuscule
-  et posée seulement à l'impression).
+- L'aperçu « Placer le tampon » (`PlaceurTampon`) ne dessine pas la mention :
+  sa place dépend de celle du cartouche (≥ 25 mm), qu'on glisse au doigt ; la
+  montrer exigerait de refaire la recherche à chaque geste (rendu + zones de
+  codes), et une mention affichée qui bouge ailleurs à l'impression tromperait.
+  Elle reste minuscule et n'est posée qu'à l'impression.
