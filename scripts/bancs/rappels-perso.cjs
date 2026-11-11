@@ -122,6 +122,10 @@ const sansErreur = (journal, quoi) => dit(!journal.erreurs.length && !journal.ht
         const { ctx, pg, journal } = await NV.ouvrir(nav, { W, sombre, base: b, tab: 'journee' });
         await pg.goto(`http://localhost:${NV.PORT}/?tab=journee&num=5&rappel=${rX.id}`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector(`[data-rappel-bandeau="${rX.id}"]`, { timeout: 15000 }).catch(() => {});
+        await pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {}); await attendre(1500);
+        // Le bandeau doit être VU : l'élément au-dessus de son centre est le bandeau lui-même (pas l'écran de chargement).
+        const vu = await pg.evaluate((id) => { const x = document.querySelector(`[data-rappel-bandeau="${id}"]`); if (!x) return false; const r = x.getBoundingClientRect(); const e = document.elementFromPoint(r.left + 20, r.top + r.height / 2); return !!(e && x.contains(e)); }, rX.id);
+        dit(vu, `N ${tag} : le bandeau est au premier plan (rien ne le recouvre)`);
         const bd = await pg.evaluate((id) => { const x = document.querySelector(`[data-rappel-bandeau="${id}"]`); if (!x) return null; const r = x.getBoundingClientRect(); return { etat: x.getAttribute('data-rappel-etat-cible'), t: x.innerText, histoire: !!x.querySelector('[data-rappel-histoire]'), dedans: r.left >= 0 && r.right <= innerWidth + 1 && r.bottom <= innerHeight }; }, rX.id);
         dit(bd && bd.etat === 'vendu' && /vendu entre-temps/.test(bd.t) && bd.histoire && bd.dedans, `N ${tag} : l'annonce VENDUE entre-temps : le bandeau le dit (« Voir son histoire »), pas un écran vide`, JSON.stringify(bd));
         await capture(pg, `N-${tag}-vendu`);
