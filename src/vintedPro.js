@@ -147,3 +147,51 @@ export const SELECT_TXN_PRO = 'id,tx:data->payload->transaction->>id,side:data->
   + 'prix:data->payload->transaction->offer->price->>amount,devise:data->payload->transaction->offer->price->>currency_code,'
   + 'frais:data->payload->transaction->service_fee->>amount,total:data->payload->transaction->total_amount_without_tax->>amount,'
   + 'statut:data->payload->transaction->>status';
+
+// ── 3 bis. LE PRIX D'UNE VENTE PRO DANS LE CA (mesuré le 11 nov.) ─────────────
+// Sur ses 2 comptes Pro, la LISTE des ventes (`my_orders.price`) et la transaction
+// (`offer.price`, le prix de l'article) DIFFÈRENT sur 56 ventes sur 77 (+0,47 € à
+// +1,25 €, ventes de mai à septembre) ; sur ses comptes particuliers elles sont
+// égales 468 fois sur 468. Vinted ne dit pas ce que contient l'écart. Le CA prenait
+// le prix de la liste : sur un compte Pro, un prix que deux lectures de Vinted
+// contredisent n'est PAS su. La règle, posée sur la vente au chargement
+// (`_prixPro`, lu par `ventesDeclarables` — aucun calcul ici n'est deviné) :
+//   · compte pas Pro (ou pas su) ⇒ rien ne change ;
+//   · les deux prix égaux ⇒ compté (`compter: true`) ;
+//   · différents ⇒ le RELEVÉ du porte-monnaie tranche (la ligne de CETTE transaction) :
+//     crédit = prix de la liste ⇒ compté tel quel ; crédit = prix de l'article ⇒ le
+//     prix devient celui de l'article (`_prixListe` garde l'autre) ; sinon, ou pas de
+//     ligne ⇒ mise à part et NOMMÉE (« au moins ») ;
+//   · transaction pas lue ⇒ mise à part (« prix de l'article pas lu »).
+// Une vente DÉJÀ DÉCLARÉE garde sa place (son mois de déclaration) : on ne retire
+// jamais une vente d'une déclaration faite.
+const eurTxt = (c) => (Number.isSafeInteger(c) ? (c / 100).toFixed(2).replace('.', ',') + ' €' : '—');
+export function prixVentePro(o, txn, ligneReleve) {
+  const liste = centimesVinted(o && o.price);
+  if (!txn) return { compter: false, raison: 'prix de l’article pas lu (compte Pro)' };
+  const dev = txt(txn.devise).toUpperCase();
+  if (dev && dev !== 'EUR') return { compter: false, raison: 'autre devise que l’euro' };
+  const art = centimesVinted(txn.prix);
+  if (art == null || liste == null) return { compter: false, raison: 'prix de l’article pas lu (compte Pro)' };
+  if (art === liste) return { compter: true };
+  const cr = ligneReleve ? centimesVinted(ligneReleve.montant) : null;
+  if (cr != null && cr === liste) return { compter: true, tranche: 'releve' };
+  if (cr != null && cr === art) return { compter: true, tranche: 'releve', prixArticle: art };
+  return { compter: false, raison: cr != null
+    ? `deux prix chez Vinted (${eurTxt(liste)} et ${eurTxt(art)}), le relevé dit ${eurTxt(cr)}`
+    : `deux prix chez Vinted (${eurTxt(liste)} et ${eurTxt(art)}) : ouvre ton porte-monnaie Vinted, le relevé tranchera` };
+}
+// Pose `_prixPro` sur les ventes d'UN compte. pro : true · false · null ;
+// txns : Map(tx → scalaires) · null (pas lu) ; releve : Map(tx → ligne) · null.
+export function appliquerPrixPro(items, { pro = null, txns = null, releve = null } = {}) {
+  if (pro !== true || !Array.isArray(items)) return items;
+  return items.map((o) => {
+    if (!o || o.transaction_id == null) return o;
+    const tx = String(o.transaction_id);
+    const r = txns ? prixVentePro(o, txns.get(tx) || null, releve ? releve.get(tx) || null : null)
+      : { compter: false, raison: 'ventes Pro pas lues (réessaie)' };
+    const n = { ...o, _prixPro: r };
+    if (r.prixArticle != null) { n._prixListe = o.price; n.price = { amount: (r.prixArticle / 100).toFixed(2), currency_code: 'EUR' }; }
+    return n;
+  });
+}
