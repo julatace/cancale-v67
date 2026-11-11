@@ -32,9 +32,6 @@ import { previsionUrssaf } from '../previsionUrssaf.js';
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
-<<<<<<< HEAD
-import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
-=======
 // (11 nov., lot rapport-mois) « Rapport du mois » : le PDF (src/rapportMois.js), les lectures de catégories partagées.
 import { AUTH, lireExtrasRepartition } from '../App.jsx';
 import { moisRapportParDefaut, moisRapportChoix, donneesRapportMois, pdfRapportMois, nomFichierRapport, bornesMois, libelleMoisRapport } from '../rapportMois.js';
@@ -44,8 +41,7 @@ import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categ
 import { lireValeurStock } from '../coutVente.js';
 import { bornesPeriode as bornesPeriodeExport, raisonUrssaf } from '../exportComptable.js';
 import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
-import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
->>>>>>> origin/main
+import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).

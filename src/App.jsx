@@ -435,11 +435,7 @@ import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
-<<<<<<< HEAD
-import { lireAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
-=======
-import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
->>>>>>> origin/main
+import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
@@ -28468,12 +28464,9 @@ function EcranMaSemaine({ liveStats, onNav, entete }) {
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
 const LiveStatsCarte = React.createContext(null);
-<<<<<<< HEAD
 // (11 nov.) `true` seulement quand l'absence de tout compte est PROUVÉE (coque, `sansAucunCompte`).
 const SansCompteCarte = React.createContext(false);
 export const useSansCompte = () => React.useContext(SansCompteCarte);
-const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, beneficeDesJours, debutPeriode, decalerPeriode, fmt };
-=======
 // (11 nov., lot stats-plus) + `progressionObjectif` (la barre de l'objectif) et `urssafAPayer` : la
 // MÊME échéance et le MÊME montant que le rappel URSSAF de Ma journée (`montantPeriodeUrssaf`).
 const urssafAPayerCarte = (ligne, maintenant = Date.now()) => {
@@ -28485,7 +28478,6 @@ const urssafAPayerCarte = (ligne, maintenant = Date.now()) => {
   return { ca, apayer, partiel, label: due.label };
 };
 const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, beneficeDesJours, debutPeriode, decalerPeriode, fmt, progressionObjectif, urssafAPayer: urssafAPayerCarte };
->>>>>>> origin/main
 // `page` : une clé de PAGES_CARTE ; `sel` : { site, compte: {uid, login, nom} | null, periode } ;
 // `locaux` : les cases propres de la page ({ id → { nom, court, type, valeur, partiel, onClick, attrs, affiche } }) ;
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).
@@ -56070,12 +56062,8 @@ function AppCoeur() {
   );
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
-<<<<<<< HEAD
     <SansCompteCarte.Provider value={sansAucunCompte}>
-    <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
-=======
     <div className="vrm-app-shell" data-tablette={(ordi && tablette) || undefined} style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
->>>>>>> origin/main
       // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
