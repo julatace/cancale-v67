@@ -57320,7 +57320,7 @@ function AppCoeur() {
         {horsLigne && ONGLETS_HL_DEDIES.includes(tab) ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {horsLigne && tab === 'garage' ? <div data-hors-ligne="stock-inventaire"><BlocInventaireHorsLigne uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></div> : null}
         {baseKO && !horsLigne && <BaseInjoignable/>}
-        {!baseKO && <MentionCopie/>}
+        {!baseKO && !horsLigne && <MentionCopie/>}   {/* (11 nov.) hors ligne, la pastille dit déjà « vu à hh:mm » */}
         {/* (9 nov., lot AG) UNE ligne de fraîcheur en haut de l'app : « Tout est à jour · vérifié il y a N min »,
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
