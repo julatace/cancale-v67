@@ -5,7 +5,8 @@
 //   1 la feuille couvre tout, le reste est `inert` (un clic derrière n'arrive pas)
 //   2 Échap et le retour du navigateur ne ferment rien ; fermer l'onglet DEMANDE (beforeunload)
 //   3 N sur M, barre (aria), étape de l'annonce en cours, « environ », compte à rebours de la pause
-//   4 une confirmation posée APRÈS le gel (askConfirm, z 20000) reste au-dessus et cliquable
+//   4 une confirmation posée APRÈS le gel (askConfirm, z 20000) reste au-dessus et cliquable ;
+//     4b une feuille de l'app plus basse (placement du tampon, z 1000) est relevée au-dessus
 //   5 « Mettre en pause » : la boucle s'arrête entre deux annonces, « Reprendre » la relance
 //   6 « Arrêter » demande confirmation ; « Continuer » ne change rien
 //   7 la fin : récapitulatif (réussies, refusées avec le geste, pas faites), « Fermer » dégèle et garde
@@ -77,6 +78,12 @@ function batir() {
     await p.click('#oui');
     dit(conf && await p.evaluate(() => window.__oui === 1), `${tag} 4 une question posée pendant le travail reste répondable`);
     await p.evaluate(() => document.getElementById('conf').remove());
+    // 4b une feuille de l'app à z 1000 (placement du tampon…) posée pendant le travail : relevée au-dessus
+    await p.evaluate(() => { const d = document.createElement('div'); d.id = 'tampon'; d.innerHTML = '<div style="position:fixed;inset:20% 5%;z-index:1000;background:#eee"><button id="placer" style="width:100%;height:100%">Placer</button></div>'; document.body.appendChild(d); d.querySelector('#placer').addEventListener('click', () => { window.__place = 1; }); });
+    await p.waitForTimeout(100);
+    await p.click('#placer', { timeout: 3000 }).catch(() => {});
+    dit(await p.evaluate(() => window.__place === 1), `${tag} 4b une feuille de l'app ouverte pendant le travail (z 1000) passe au-dessus et répond`);
+    await p.evaluate(() => document.getElementById('tampon').remove());
     // 5
     await p.click('[data-suivi-pause-bouton]');
     const boucle = p.evaluate(() => window.__t.continuer());

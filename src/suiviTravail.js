@@ -62,13 +62,15 @@ export function duree(sec) {
 
 // ── Créer ──────────────────────────────────────────────────────────────────
 // articles : [{ id, num?, titre? }] · etapes : [[cle, libellé], …] (celles d'UNE annonce)
-export function creer({ sorte, titre, etapes = [], articles = [], uid = '', plafond = null, id } = {}, now = Date.now()) {
+export function creer({ sorte, titre, etapes = [], articles = [], uid = '', plafond = null, id, seuilMs = 0 } = {}, now = Date.now()) {
   const vus = new Set();
   const arts = (Array.isArray(articles) ? articles : []).filter((a) => a && a.id != null && !vus.has(String(a.id)) && vus.add(String(a.id)))
     .map((a) => ({ id: String(a.id), num: a.num ? String(a.num).slice(0, 16) : '', titre: nettoyer(a.titre || '', 90), etat: 'attente', etape: '', debutAt: 0, finAt: 0, raison: '', lien: '', geste: '' }));
   const s = {
     v: 1, id: id || `t${now}`, sorte: String(sorte || 'travail'), titre: nettoyer(titre || '', 80), uid: String(uid || ''),
-    debut: now, majAt: now, finAt: 0, statut: 'cours', demande: null, pause: null, plafond: plafond && typeof plafond === 'object' ? plafond : null,
+    debut: now, majAt: now, finAt: 0, statut: 'cours',
+    // La feuille ne s'ouvre qu'après `seuilMs` (une action instantanée ne fige pas VRM).
+    visibleDes: seuilMs > 0 ? now + seuilMs : 0, demande: null, pause: null, plafond: plafond && typeof plafond === 'object' ? plafond : null,
     etapes: (Array.isArray(etapes) ? etapes : []).filter((e) => Array.isArray(e) && e[0]).map((e) => [String(e[0]), String(e[1] || e[0])]),
     articles: arts, journal: [],
   };
@@ -284,6 +286,14 @@ export const suivi = {
     if (!courant || courant.statut === 'cours' || courant.statut === 'pause') return false;
     garderFini(courant); rappels.delete(courant.id); courant = null; annoncer(); return true;
   },
+  // Un travail fini VITE et sans rien à dire (sous le seuil, tout réussi) : il disparaît sans
+  // feuille ni archive (une action instantanée n'est pas un « travail »).
+  oublier: () => {
+    if (!courant || courant.statut === 'cours' || courant.statut === 'pause') return false;
+    rappels.delete(courant.id); courant = null; annoncer(); return true;
+  },
+  // La feuille s'ouvre tout de suite (fin d'un travail court qui a quelque chose à dire).
+  montrer: () => { if (courant && courant.visibleDes) { courant = { ...courant, visibleDes: 0 }; annoncer(); } },
   // Pour les bancs.
   _poser: (s) => { courant = s; annoncer(); },
 };
@@ -371,4 +381,75 @@ export async function suivreJob(t, id, { jobId, lireJobs, depuis = Date.now(), d
     await attendre(pasMs);
   }
   return { fin: 'delai', job: derniere };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// L'API UNIQUE (11 nov., Julien : « dès qu'il y a une action en cours, fige VRM avec une
+// fenêtre qui s'ouvre avec une barre de progression »). N'importe quel écran l'appelle
+// pour une action longue ou multiple ; la feuille se monte seule (AppCoeur).
+//
+//   const r = await lancerTravail({
+//     titre: 'Baisser le prix',            // en tête de la feuille (jamais un pseudo)
+//     sorte: 'baisse-lbc',                 // libre (data-suivi-travail)
+//     etapes: [['envoi', 'Envoi'], ['relu', 'Relu ✓']],   // les étapes d'UN article (facultatif)
+//     articles: [{ id, num, titre }],      // la file ; OU total: N (articles 1..N) ; OU rien (une action)
+//     uid,                                 // facultatif : la jauge 50/h de ce compte Vinted
+//     entreMs: 3000,                       // facultatif : pause de sécurité entre deux articles (compte à rebours)
+//     seuilMs: 1000,                       // la feuille ne s'ouvre qu'après ce délai (défaut 1 s)
+//     executer: async (article, o) => {    // un article (ou l'action entière si pas d'articles)
+//       o.etape('envoi', 'détail');  o.noter('texte');  o.pause(ms, raison);  o.doitSArreter();
+//       return { etat: 'ok' | 'main' | 'refus' | 'saute', raison, geste, lien, arreterTout };
+//     },                                   // rien / true ⇒ ok ; false ⇒ refus ; une exception ⇒ refus (son message)
+//   });
+//   // r = { statut: 'fini'|'arrete'|'pause'|'occupe', resultats: { [id]: issue }, valeur }
+//
+// Garanties : un article à la fois ; « Mettre en pause » / « Arrêter » lus ENTRE deux articles ;
+// `arreterTout` (refus qui vaut pour la suite : 429, plafond) ⇒ le reste « pas fait », dit ;
+// fini sous le seuil et tout réussi ⇒ rien ne s'est affiché, rien n'est archivé ; sinon
+// la feuille montre le récapitulatif jusqu'à « Fermer ». Un autre travail en cours ⇒
+// rien ne part (`statut: 'occupe'`).
+// ═══════════════════════════════════════════════════════════════════════════
+export function issueDe(r) {
+  if (r === false) return { etat: 'refus', raison: 'refusé' };
+  if (r == null || r === true) return { etat: 'ok' };
+  if (typeof r === 'object' && FINIS.has(r.etat)) return r;
+  if (typeof r === 'object' && r.fait === false) return { etat: 'refus', raison: String(r.raison || 'refusé') };
+  return { etat: 'ok' };
+}
+const dormir = (ms) => new Promise((ok) => setTimeout(ok, ms));
+export async function lancerTravail({ titre, sorte = 'travail', etapes = [], articles = null, total = null, uid = '', entreMs = 0, seuilMs = 1000, executer } = {}) {
+  const seul = !Array.isArray(articles) && !(Number(total) > 0);
+  const arts = Array.isArray(articles) ? articles : seul ? [{ id: 'action', titre: titre || '' }] : Array.from({ length: Number(total) }, (_, i) => ({ id: String(i + 1), titre: `${i + 1} sur ${total}` }));
+  const t = suivi.demarrer({ sorte, titre, etapes, articles: arts, uid, seuilMs });
+  if (!t) return { statut: 'occupe', resultats: {} };
+  const resultats = {};
+  let valeur, stop = '';
+  for (let i = 0; i < arts.length; i++) {
+    const a = arts[i]; const id = String(a.id);
+    if (!(await t.continuer())) { stop = 'toi'; break; }
+    t.debut(id);
+    const o = { etape: (cle, detail) => t.etape(id, cle, detail), noter: (texte, ton) => t.noter(texte, id, ton), pause: (ms, raison) => t.pause({ ms, raison }), doitSArreter: t.doitSArreter };
+    let r;
+    try { r = await executer(seul ? o : a, seul ? undefined : o); } catch (e) { r = { etat: 'refus', raison: String((e && e.message) || e || 'erreur').slice(0, 200) }; }
+    if (seul) valeur = r;
+    const iss = seul && r != null && typeof r !== 'boolean' && !(typeof r === 'object' && (FINIS.has(r.etat) || r.fait === false)) ? { etat: 'ok' } : issueDe(r);
+    if (iss.etat === 'ok' && etapes.length) t.etape(id, etapes[etapes.length - 1][0]);
+    t.fin(id, iss); resultats[id] = iss;
+    if (iss.arreterTout) { stop = iss.raison || 'refus'; for (const b of arts.slice(i + 1)) { t.fin(String(b.id), { etat: 'saute', raison: iss.raison || '' }); resultats[String(b.id)] = { etat: 'saute', raison: iss.raison || '' }; } break; }
+    if (entreMs > 0 && i < arts.length - 1) {
+      t.pause({ ms: entreMs, raison: 'Pause de sécurité entre deux' });
+      const fin = Date.now() + entreMs;
+      while (Date.now() < fin && !t.doitSArreter()) await dormir(Math.min(250, fin - Date.now()));
+      t.finPause();
+    }
+  }
+  t.terminer(stop === 'toi' ? 'arrêté par toi' : stop, stop && stop !== 'toi' ? 'arrete' : undefined);
+  const s = t.etat() || courant;
+  const statut = s ? s.statut : 'fini';
+  const toutBon = Object.values(resultats).every((x) => x.etat === 'ok') && Object.keys(resultats).length === arts.length;
+  // Annulé par lui (une confirmation refusée) : rien n'a été fait, rien à montrer ni à garder.
+  if (seul && valeur && typeof valeur === 'object' && valeur.annule) suivi.oublier();
+  else if (s && s.visibleDes && Date.now() < s.visibleDes && toutBon && statut === 'fini') suivi.oublier();
+  else suivi.montrer();
+  return { statut, resultats, valeur };
 }
