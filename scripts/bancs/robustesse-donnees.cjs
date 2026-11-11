@@ -214,7 +214,10 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '').catch(() 
       await H.attendre(async () => (await pg.locator('[data-profil-menu="deconnexion"]').count()) > 0, 8000);
       await pg.locator('[data-profil-menu="deconnexion"]').click();
       await dort(600);
-      await pg.getByRole('button', { name: /^Se déconnecter$/ }).last().click().catch(() => {});
+      // Des écritures de A peuvent encore partir : « Envoyer d'abord » (la question de sûreté).
+      if (await pg.getByRole('button', { name: /Envoyer d’abord/ }).count()) await pg.getByRole('button', { name: /Envoyer d’abord/ }).last().click().catch(() => {});
+      else await pg.getByRole('button', { name: /^Se déconnecter$/ }).last().click().catch(() => {});
+      await H.attendre(async () => !(await pg.evaluate(() => localStorage.getItem('vrm_session')).catch(() => 'x')), 20000);
       // L'app se recharge (300 ms) puis montre l'écran de connexion.
       await dort(1500);
       await H.attendre(async () => (await pg.locator('input[type="email"]').count()) > 0, 15000);
