@@ -16,6 +16,13 @@
   if (window.__vrmCaptureLoaded) return;
   window.__vrmCaptureLoaded = true;
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  // 5.361 (revue, 110-115 — famille « minuteries et écouteurs orphelins ») :
+  // une minuterie permanente de la page s'ARRÊTE quand l'extension a été mise à
+  // jour ou retirée (`chrome.runtime.id` disparu) — sinon elle tournait pour
+  // rien jusqu'à la fermeture de l'onglet, à côté de la nouvelle copie.
+  const extVivante = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  const minuterieVivante = (fn, ms) => { const id = setInterval(() => { if (!extVivante()) { clearInterval(id); return; } try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }, ms); return id; };
+
 
   // Id de l'annonce affichée si on est sur une page article (/items/123456-titre).
   const currentItemId = () => {
@@ -166,7 +173,7 @@
     const id = currentItemId();
     if (id) { captureDate(id); setTimeout(() => captureDate(id), 1500); setTimeout(() => captureDate(id), 4000); }
   };
-  setInterval(() => {
+  minuterieVivante(() => {
     if (!vivant()) return;
     if (location.pathname !== lastPath) { lastPath = location.pathname; onPage(); }
   }, 800);
@@ -316,8 +323,8 @@
   }
   let dernierChemin = '';
   // Une paire numérotée pendant qu'on regarde : on redemande ce qui n'était pas connu.
-  setInterval(() => { demandes.items.clear(); demandes.convs.clear(); demandes.txs.clear(); }, 60000);
-  setInterval(async () => {
+  minuterieVivante(() => { demandes.items.clear(); demandes.convs.clear(); demandes.txs.clear(); }, 60000);
+  minuterieVivante(async () => {
     if (!vivant()) return;
     if (location.pathname !== dernierChemin) { dernierChemin = location.pathname; resaDemandee = estDepot() ? resaDemandee : false; }
     try { await poserNumeroDepot(); await completer(); poserSurLiens(); poserSurPage(); } catch (_) {}

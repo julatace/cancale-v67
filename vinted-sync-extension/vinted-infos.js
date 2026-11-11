@@ -23,6 +23,13 @@
   window.__vrmInfosLoaded = true;
   const R = globalThis.__vrmReglesAchat || null;
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  // 5.361 (revue, 110-115 — famille « minuteries et écouteurs orphelins ») :
+  // une minuterie permanente de la page s'ARRÊTE quand l'extension a été mise à
+  // jour ou retirée (`chrome.runtime.id` disparu) — sinon elle tournait pour
+  // rien jusqu'à la fermeture de l'onglet, à côté de la nouvelle copie.
+  const extVivante = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  const minuterieVivante = (fn, ms) => { const id = setInterval(() => { if (!extVivante()) { clearInterval(id); return; } try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }, ms); return id; };
+
   const demander = (msg) => new Promise((res) => {
     if (!vivant()) return res(null);
     try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vinfos' }, msg), (r) => { void chrome.runtime.lastError; res(r || null); }); } catch (_) { res(null); }
@@ -262,7 +269,7 @@
     tete.addEventListener('click', () => { const o = tete.getAttribute('aria-expanded') !== 'true'; tete.setAttribute('aria-expanded', String(o)); corps.hidden = !o; if (o) montrerStock(); });
   }
 
-  setInterval(async () => {
+  minuterieVivante(async () => {
     if (!vivant()) return;
     try { await demanderInfos(); poserLignesInfos(); poserEncartAchat(); } catch (_) {}
   }, 1200);

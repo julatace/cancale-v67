@@ -11,6 +11,12 @@
 //     publie SANS booster — décision de Julien du 20 septembre. Le bandeau en
 //     bas à gauche dit, pendant ce temps, ce qui est fait.
 (function () {
+  // 5.361 (revue, 110-115 — famille « minuteries et écouteurs orphelins ») :
+  // une minuterie permanente de la page s'ARRÊTE quand l'extension a été mise à
+  // jour ou retirée (`chrome.runtime.id` disparu) — sinon elle tournait pour
+  // rien jusqu'à la fermeture de l'onglet, à côté de la nouvelle copie.
+  const extVivante = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  const minuterieVivante = (fn, ms) => { const id = setInterval(() => { if (!extVivante()) { clearInterval(id); return; } try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }, ms); return id; };
   if (window.__vrmLbcLoaded) return; window.__vrmLbcLoaded = true;
   // ⚠️⚠️ ET SI LE FORMULAIRE DE DÉPÔT VIT DANS UN CADRE (iframe) ? Le script ne
   //    tournait que dans la page du haut (`all_frames: false`) : l'enregistreur
@@ -1580,7 +1586,7 @@
     // retour sur l'onglet.
     document.addEventListener('visibilitychange', () => { if (!document.hidden) demarrer(); });
     let lastUrl = location.href;
-    setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(demarrer, 1200); } }, 2000);
+    minuterieVivante(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(demarrer, 1200); } }, 2000);
   } else {
     // Dans un cadre : la seule chose qui compte est d'enregistrer l'étape.
     captureDepositForm();

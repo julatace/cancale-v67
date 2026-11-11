@@ -526,10 +526,16 @@ function clocheFavorisNative(activer=false,origine){
     const avecChemins = seenDirty && (seenPaths.size || Object.keys(seenRep).length);
     if (!avecChemins && !relConvDirty) return;
     seenDirty = false;
-    let conversation = relConvDirty ? JSON.parse(JSON.stringify(relConv)) : null;
-    // Trop gros pour le fond (il jette au-delà de 200 000 caractères) : on retire
-    // les formes de tête, jamais celles des messages.
-    if (conversation && JSON.stringify(conversation).length > 180000) for (const e of Object.values(conversation.req || {})) delete e.tete;
+    // 5.361 (revue, 106) : une valeur non sérialisable faisait lever à CHAQUE
+    // passage (minuterie) et `relConvDirty` ne retombait jamais ⇒ plus aucun
+    // `seen_urls`. Désormais la copie ratée est jetée et le drapeau retombe.
+    let conversation = null;
+    try {
+      conversation = relConvDirty ? JSON.parse(JSON.stringify(relConv)) : null;
+      // Trop gros pour le fond (il jette au-delà de 200 000 caractères) : on retire
+      // les formes de tête, jamais celles des messages.
+      if (conversation && JSON.stringify(conversation).length > 180000) for (const e of Object.values(conversation.req || {})) delete e.tete;
+    } catch (_) { conversation = null; }
     relConvDirty = false;
     // Les 300 chemins les PLUS RÉCENTS (l'ordre d'insertion d'un Set : le plus
     // ancien d'abord ; garder les premiers jetait ceux qu'on venait de voir).

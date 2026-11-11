@@ -6,6 +6,13 @@
 (function () {
   'use strict';
   const TAG = 'CANCALE_VINTED';
+  // 5.361 (revue, 110-115 — famille « minuteries et écouteurs orphelins ») :
+  // une minuterie permanente de la page s'ARRÊTE quand l'extension a été mise à
+  // jour ou retirée (`chrome.runtime.id` disparu) — sinon elle tournait pour
+  // rien jusqu'à la fermeture de l'onglet, à côté de la nouvelle copie.
+  const extVivante = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  const minuterieVivante = (fn, ms) => { const id = setInterval(() => { if (!extVivante()) { clearInterval(id); return; } try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }, ms); return id; };
+
 
   // ⚠️⚠️ 5.356 (revue de robustesse, critique 4) — LE CANAL PRIVÉ. inject.js
   // (monde MAIN, document_start, AVANT tout script de la page) crée un
@@ -107,7 +114,7 @@
       void (chrome.runtime && chrome.runtime.lastError);
       if (!r || !r.veux) return;
       envoyerCookies();
-      setInterval(() => { if (document.visibilityState !== 'hidden') envoyerCookies(); }, 10000);
+      minuterieVivante(() => { if (document.visibilityState !== 'hidden') envoyerCookies(); }, 10000);
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { dernierEnvoi = null; envoyerCookies(); } });
     });
   } catch (_) {}
