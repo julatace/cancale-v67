@@ -51625,11 +51625,13 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
               : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part, il apparaît ici, sur tous tes sites.</p></>}
           </div>
         : (
-          <div className="vrm-toutes-liste" role="list">
+          <div className="vrm-toutes-liste">
+            {/* (11 nov., lot accessibilité) Plus de role="list"/"listitem" : un <button role="listitem"> n'était plus
+                annoncé comme un bouton (rôle ARIA faux) ; la liste reste une suite de boutons. */}
             {lignes.slice(0, n).map((l, il) => (
               <React.Fragment key={l.cle}>
               {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
-              <button type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
+              <button type="button" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
                 aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
