@@ -233,7 +233,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
               </li>
             ))}
           </ul>
-          {aAnnuler && <p className="vrm-imps-note" data-imps-annuler-phrase="">Tout ce que cet import a créé sera retiré, rien d’autre. {(imports.find((x) => x.id === aAnnuler) || {}).type === 'stock' ? 'Ses N° restent réservés : ils sont peut-être écrits sur tes cartons.' : ''}</p>}
+          {aAnnuler && <p className="vrm-imps-note" data-imps-annuler-phrase="">Tout ce que cet import a créé sera retiré, rien d’autre. {(imports.find((x) => x.id === aAnnuler) || {}).type === 'stock' ? 'Ses N° restent réservés : tu les as peut-être déjà notés sur tes articles.' : ''}</p>}
         </section>
       )}
 
