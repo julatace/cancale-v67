@@ -47,8 +47,43 @@ export const sansEtiquette = (a) => {
 // Toutes les adresses de LIVRAISON possibles, selon le service de réception.
 // ⚠️ On ne lit QUE des champs d'enveloppe/en-tête de destination. Jamais le
 // corps, jamais l'expéditeur.
+// ⚠️⚠️ (11 nov., robustesse) L'ENVELOPPE D'ABORD. `To` et `Cc` sont écrits par
+//    l'EXPÉDITEUR : un e-mail livré à l'adresse A avec `To: <adresse de B>`
+//    partait chez B. Dès que l'enveloppe (adresse à laquelle CET exemplaire a été
+//    LIVRÉ : `envelopeTo`, `envelope.to`, `Delivered-To`, `OriginalRecipient`…)
+//    nomme une adresse qui n'est pas la boîte collective, elle décide SEULE :
+//    To/Cc ne sont pas lus. Une enveloppe qui ne dit que la boîte collective (le
+//    transfert Gmail vers vrm.vinted35@) ne désigne personne : alors seulement
+//    les en-têtes de destination servent, comme avant (sinon TOUT le flux de la
+//    boîte collective partirait en quarantaine) — et la boîte collective seule
+//    ne désigne jamais personne (`resoudreProprietaire`).
+export function enveloppeDeLivraison(body) {
+  const b = body || {};
+  const brut = [
+    b.envelopeTo, b.envelope_to, b['envelope-to'],
+    b.envelope && (b.envelope.to || b.envelope.To),
+    b.OriginalRecipient, b.original_recipient,
+    b.deliveredTo, b['delivered-to'], b['Delivered-To'],
+    b.headers && (b.headers['delivered-to'] || b.headers['Delivered-To']),
+  ];
+  return listeAdresses(brut);
+}
+function listeAdresses(brut) {
+  const out = [];
+  for (const champ of brut) {
+    if (!champ) continue;
+    const liste = Array.isArray(champ) ? champ : String(champ).split(/[,;]/);
+    for (const a of liste) {
+      const n = normAdresse(a);
+      if (n && n.includes('@') && !out.includes(n)) out.push(n);
+    }
+  }
+  return out;
+}
 export function adressesDeLivraison(body, mailNormalise) {
   const b = body || {}, m = mailNormalise || {};
+  const env = enveloppeDeLivraison(b);
+  if (env.some((a) => !estAdresseCollectrice(a))) return env;
   const brut = [
     m.to,
     b.to, b.To, b.recipient, b.Recipient,

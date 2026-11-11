@@ -315,6 +315,20 @@ async function corpsBrut(req) {
   return null;   // déjà analysé en objet : impossible de vérifier, on refuse
 }
 
+// (11 nov., robustesse) L'ÉVÉNEMENT D'UN AUTRE ABONNEMENT QUE CELUI DE LA LIGNE.
+// Un vendeur qui a eu deux abonnements (un premier essai `incomplete_expired`,
+// puis le bon) : un événement tardif du PREMIER écrasait la ligne du second et
+// coupait l'accès. Il ne remplace la ligne que s'il est VIVANT (un nouvel
+// abonnement qui prend la suite) ou si celui de la ligne est déjà terminé.
+// Fonction PURE (scripts/audit-robustesse-serveur.cjs).
+const STATUTS_VIVANTS = ['active', 'trialing', 'past_due'];
+export function evenementDUnAncienAbonnement(avant, ligne) {
+  const idAvant = avant && avant.abonnement_stripe, idNouveau = ligne && ligne.abonnement_stripe;
+  if (!idAvant || !idNouveau || idAvant === idNouveau) return false;
+  if (STATUTS_VIVANTS.includes(String(ligne.statut || ''))) return false;
+  return STATUTS_VIVANTS.includes(String(avant.statut || ''));
+}
+
 // ── Écrire le statut (clé de service — elle seule écrit cette table) ────────
 async function ecrireStatut(owner, ligne, evenementTs) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
@@ -325,12 +339,13 @@ async function ecrireStatut(owner, ligne, evenementTs) {
   // « active » arrivé avant lui).
   let avant = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis`, { headers: h });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis,abonnement_stripe,statut`, { headers: h, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return { ok: false, code: 'lecture' };
     const j = await r.json();
     if (!Array.isArray(j)) return { ok: false, code: 'lecture' };
     avant = j[0] || null;
     if (avant && Number(avant.evenement_ts) > evenementTs) return { ok: true, ignore: 'plus-ancien' };
+    if (evenementDUnAncienAbonnement(avant, ligne)) return { ok: true, ignore: 'ancien-abonnement' };
   } catch (_) { return { ok: false, code: 'lecture' }; }
   // Depuis quand le prélèvement échoue : la base laisse 14 jours (Stripe
   // réessaie pendant ce temps), puis coupe. On garde la PREMIÈRE date d'échec —
@@ -377,17 +392,24 @@ async function ecrireStatut(owner, ligne, evenementTs) {
 // Le propriétaire VRM d'un abonnement Stripe : posé par NOUS dans `metadata`
 // au moment du paiement (depuis une session vérifiée) — jamais deviné. En repli,
 // la ligne qui porte déjà ce client Stripe.
+// ⚠️ (11 nov., robustesse) TROIS ÉTATS : l'owner · '' (personne, constaté) ·
+//    `undefined` (PAS SU : lecture ratée, clé de service absente). Avant, une
+//    panne rendait '' et le webhook répondait 200 « sans propriétaire » : Stripe
+//    ne rejouait plus, le statut n'était jamais écrit et le crédit de parrainage
+//    perdu. Pas su ⇒ 503, Stripe rejoue.
 async function proprietaireDe(sub, client) {
   const m = sub && sub.metadata && sub.metadata.owner;
   if (m && /^[0-9a-f-]{36}$/i.test(m)) return m;
+  if (!client) return '';
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-  if (!client || !SERVICE) return '';
+  if (!SERVICE) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?client_stripe=eq.${encodeURIComponent(client)}&select=owner&limit=1`, { headers: sbCle(SERVICE) });
-    if (!r.ok) return '';
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?client_stripe=eq.${encodeURIComponent(client)}&select=owner&limit=1`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return undefined;
     const j = await r.json();
+    if (!Array.isArray(j)) return undefined;
     return (j[0] && j[0].owner) || '';
-  } catch (_) { return ''; }
+  } catch (_) { return undefined; }
 }
 
 // ── Essai gratuit : UNE seule fois par e-mail ET par compte Vinted ──────────
@@ -436,7 +458,7 @@ async function enregistrerEssai(owner, email, ids, subId) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return false;
   const cles = clesEssai(email, ids);
-  if (!cles.length) return false;
+  if (!cles.length) return true;   // rien à marquer (aucune clé) : ce n’est pas un échec
   const lignes = cles.map((cle) => ({ cle, owner: owner || null, abonnement_stripe: subId || null, cree: new Date().toISOString() }));
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/essais_gratuits?on_conflict=cle`, {
@@ -526,6 +548,7 @@ async function webhook(req, res) {
     // (client Stripe → owner), jamais d'un champ de la facture.
     const client = typeof obj.customer === 'string' ? obj.customer : (obj.customer && obj.customer.id) || '';
     const owner = await proprietaireDe(null, client);
+    if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });
     if (!owner) return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' });
     const p = await factureFilleulPayee(owner, client, obj, PRIX_CGV.centimes);
     if (!p.ok) return repondre(res, 503, { erreur: 'parrainage non crédité', reessayer: true });
@@ -537,6 +560,7 @@ async function webhook(req, res) {
 
   const client = typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || '';
   const owner = await proprietaireDe(sub, client);
+  if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });
   if (!owner) { console.warn('[stripe] abonnement sans propriétaire VRM', sub.id); return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' }); }
   const ecrit = await ecrireStatut(owner, ligneDeLAbonnement(sub, !!ev.livemode), ts);
   // ⚠️ Tant que le statut n'est pas RANGÉ, on ne dit pas « reçu » : un 5xx fait
@@ -547,7 +571,10 @@ async function webhook(req, res) {
   // « trialing » ou une date de fin d'essai), d'après ce qu'on a posé au
   // paiement. Idempotent (clé primaire) : un rejeu de webhook ne double rien.
   if (sub.metadata && sub.metadata.essai && (sub.status === 'trialing' || sub.trial_end)) {
-    await enregistrerEssai(owner, sub.metadata.essai_email, String(sub.metadata.essai_vinted || '').split(',').filter(Boolean), sub.id);
+    // (11 nov., robustesse) Pas enregistré ⇒ 503 : Stripe rejoue (le statut,
+    // déjà rangé, se réécrit à l'identique) — sinon le même e-mail reprenait 7 jours.
+    const essaiNote = await enregistrerEssai(owner, sub.metadata.essai_email, String(sub.metadata.essai_vinted || '').split(',').filter(Boolean), sub.id);
+    if (!essaiNote) return repondre(res, 503, { erreur: 'essai non enregistré', reessayer: true });
   }
   return repondre(res, 200, { recu: true });
 }
