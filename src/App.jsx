@@ -125,6 +125,7 @@ import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actio
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
+import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
 import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
 // (10 nov., lot BC) « Ma semaine » : l'écran du bilan de la semaine (src/maSemaine.js, aucune règle à lui).
 import MaSemaine from "./MaSemaine.jsx";
@@ -15214,6 +15215,8 @@ const suivreCibleTrancher=(clic,cible)=>{ const t0=Date.now(); let clique=!clic;
 // local à cet appareil et à CE compte VRM ; prévient les lecteurs (`vrm:save`).
 // (10 nov., cartes) `ex` : les premières choses, { id, num, photo } (photo de L'ANNONCE, par identité).
 const publierATrancher=(cle,n,ex)=>{ try{ if(publierSourceTrancher(localStorage, AUTH.user?.id, cle, n, Date.now(), ex)) window.dispatchEvent(new CustomEvent('vrm:save',{detail:{k:CLE_A_TRANCHER}})); }catch(_){} };
+// (11 nov., lot sante-donnees) « Santé de tes données » : ce que deux écrans comptent sans le publier ailleurs (src/santeDonnees.js).
+const publierSanteApp=(cle,n)=>{ try{ if(publierSante(localStorage, AUTH.user?.id, cle, n, Date.now())) window.dispatchEvent(new CustomEvent('vrm:save',{detail:{k:CLE_SANTE}})); }catch(_){} };
 const prendreVue=(quoi)=>{ if(DEMANDE_VUE.quoi===quoi && Date.now()-DEMANDE_VUE.at<30000){ DEMANDE_VUE.quoi=null; return true; } return false; };
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
@@ -31163,6 +31166,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ? new Set(accounts.map(a => String(a.vinted_user_id)).filter(u => !masques.has(u))) : null;
     return aConfirmerVisibles(aConfirmerData, { uidsOk });
   }, [aConfirmerData, accounts, accountsReady]);
+  // (11 nov., lot sante-donnees) Le nombre que le bloc « à confirmer » montre, publié pour la Santé
+  // de tes données — seulement LU et sur des comptes lus (sinon rien : « pas su » ≠ 0).
+  useEffect(() => { if (accountsReady && aConfirmer.etat === 'lu') publierSanteApp('colis-a-confirmer', aConfirmer.liste.length); }, [aConfirmer, accountsReady]);
   // Le retrait connu pour CETTE commande — par transaction uniquement.
   const relaisDe = (o) => { const k = String((o && o.transaction_id) || ''); return (k && colisRelais[k]) || null; };
   // (23 oct.) Le COMPTE d'un colis d'e-mail : celui que la route a reconnu
@@ -38186,9 +38192,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return { id: String(r.nouvelle), photo: (it && it.photo) || '', de: r.options && r.options.length === 1 ? r.options[0].numero : '' };
     }));
     if (Array.isArray(sales.items)) publierATrancher('colis-postes', cochesNonPartis.length);
+    // (11 nov., lot sante-donnees) Les annonces « à confirmer » (compte pas relu depuis 24 h), le nombre de `FraicheurAnnonces`.
+    if (lu) publierSanteApp('annonces-a-confirmer', annAConfirmer.length);
     if (only === 'journee' && cycle && Array.isArray(cycle.cartes)) { const cs = cycle.cartes.filter((c) => !cycleRepondus[c.id]); publierATrancher('supprimes-vinted', cs.length, cs.slice(0, 4).map((c) => ({ id: c.id, num: c.numero, photo: c.photo || '' }))); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudReady, listings.items, listings.loading, listings.incomplet, listings.error, sales.items, numAttente, conflitsNum, aEcrireCarton, aVerifierCarton, fileAchat, supprTous, remises, cochesNonPartis, only, cycle, cycleRepondus]);
+  }, [cloudReady, listings.items, listings.loading, listings.incomplet, listings.error, sales.items, numAttente, conflitsNum, aEcrireCarton, aVerifierCarton, fileAchat, supprTous, remises, cochesNonPartis, only, cycle, cycleRepondus, annAConfirmer]);
   // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
   // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
   useEffect(() => { if (curSub === 'ventes' && accounts.length && !buys.items) chargerAchats(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
@@ -53001,6 +53009,7 @@ function AppCoeur() {
       // (11 nov., lot centre-aide) « M'y emmener » d'une fiche d'aide : le panneau de Réglages nommé (liste fermée, src/aideFiches.js).
       { const rg=p.get('reglage'); if(t==='settings'&&rg&&REGLAGES_AIDE.includes(rg)){ DEMANDE_REGLAGE_SOUS.id=rg; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
+      if(t==='settings'&&section==='sante'){ DEMANDE_REGLAGE_SOUS.id='sante'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris'); else if(vue==='republier') demanderVue('republier');
@@ -55383,6 +55392,22 @@ function AppCoeur() {
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
     : null;
+  // (11 nov., lot sante-donnees) Le bouton d'une ligne de « Santé de tes données » (Paramètres,
+  // src/SanteDonnees.jsx) : le MÊME chemin qu'À trancher (`allerTrancher`), plus trois portes —
+  // la saisie en série des prix d'achat (`DEMANDE_SAISIE_PRIX`, celle de « Coût d'achat · 1/184 »),
+  // une rubrique d'E-mails (`ouvrirEmailsRelier`), un panneau de Paramètres (« Tout va bien ? »).
+  // Il OUVRE seulement : aucune correction n'est faite sans son clic là-bas (§2.4, §2.5).
+  // ⚠️ Posé AVANT les retours anticipés (règle des hooks) : `allerTrancher` est défini plus bas, l'effet le lit par sa référence.
+  const allerTrancherRef=useRef(null);
+  useEffect(()=>{
+    const f=(e)=>{ const g=e&&e.detail; if(!g||typeof g!=='object') return;
+      if(g.reglage){ DEMANDE_REGLAGE_SOUS.id=String(g.reglage); try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} setTab('settings'); return; }
+      if(g.saisiePrix) DEMANDE_SAISIE_PRIX.on=true;
+      if(g.emails) ouvrirEmailsRelier(g.emails, g.filtre||'');
+      if(allerTrancherRef.current) allerTrancherRef.current({ geste:g }); };
+    window.addEventListener('vrm:sante-aller',f); return ()=>window.removeEventListener('vrm:sante-aller',f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
   // session on affiche la porte d'entrée au lieu de l'app.
@@ -55442,6 +55467,7 @@ function AppCoeur() {
   // (9 nov., lot AC) Le geste d'une ligne d'« À trancher » : il OUVRE l'écran propriétaire
   // (la vue d'Annonces, l'onglet de Colis) et va au bloc où il tranche — il n'écrit rien.
   const allerTrancher=(l)=>{ const g=l&&l.geste; if(!g) return; if(g.vue) demanderVue(g.vue); if(g.tab==='cat_bord'&&g.onglet) choisirOngletColis(g.onglet); setTab(g.tab); if(g.clic||g.cible) suivreCibleTrancher(g.clic,g.cible); };
+  allerTrancherRef.current=allerTrancher;   // (11 nov., lot sante-donnees) la porte de « Santé de tes données » (son effet est posé avant les retours anticipés)
   // (10 nov., cartes) Le geste BINAIRE fait dans À trancher (src/aTrancher.js `BINAIRES`) :
   // « Oui, chez moi » sur « N°x supprimé de Vinted » = la MÊME écriture que la pilule
   // « Toujours chez moi » de Ma journée (`vrm_cycle_decisions[id]`), en geste annulable :
