@@ -115,7 +115,8 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   dit(!v.ok && v.code === 'prix', 'S3 Vestiaire : ce que Vestiaire verse n’est pas le prix payé ⇒ pas de facture, dit', JSON.stringify(v));
 
   // ── S4/S5 LA ROUTE ───────────────────────────────────────────────────────
-  const CFG = { nom: 'Boutique Banc', forme: 'EI', siret: SIRET, adresse: '1 rue du Banc', codePostal: '35000', ville: 'Rennes', tva_regime: 'franchise', prefixe: 'FA' };
+  // (11 nov., lot DJ1) Les comptes qu'il a dits professionnels (src/facturePro/comptes.js).
+  const CFG = { nom: 'Boutique Banc', forme: 'EI', siret: SIRET, adresse: '1 rue du Banc', codePostal: '35000', ville: 'Rennes', tva_regime: 'franchise', prefixe: 'FA', comptesFacture: { 'leboncoin:compte_banc': true, 'ebay:principal': true, 'ebay:abcdef0123456789': true, 'vestiaire:principal': true } };
   const annee = new Date().getFullYear();
   const raz = () => { base = new Map(); pannes.clear(); ecritures.length = 0;
     base.set(cle(A, 'vrm_pro_facture'), CFG);
@@ -124,6 +125,14 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   const appel = async (corps) => { const r = faireRes(); await R.routeFactureAutre({ method: 'POST' }, r, { vendeur: { id: A }, corps, acces: true, cloisonnee: true }); return r; };
   const ACH = { nom: 'Lucie Banc', adresse: '5 avenue Imaginaire\n13001 Marseille' };
   const compteur = () => (base.get(cle(A, 'vrm_invoice_counter')) || {}).n;
+
+  // (11 nov., lot DJ1) « que sur compte professionnel » : un compte jamais dit pro, ou dit « non » ⇒ 409, aucun numéro pris.
+  for (const [cf, quoi] of [[undefined, 'jamais répondu'], [{ 'leboncoin:compte_banc': false }, 'dit « non »'], [{ 'leboncoin:autre_compte': true }, 'un AUTRE compte dit pro']]) {
+    raz(); base.set(cle(A, 'vrm_pro_facture'), { ...CFG, comptesFacture: cf });
+    base.set(cle(A, 'lbc_ventes'), { ventes: { 123456789: lbc(123456789) }, updatedAt: '2026-11-04' });
+    const res = faireRes(); await R.routeFactureAutre({ method: 'POST' }, res, { vendeur: { id: A }, corps: { action: 'emettre', confirme: true, plateforme: 'leboncoin', ref: '123456789', acheteur: { nom: 'Lucie Banc', adresse: '5 avenue Imaginaire\n13001 Marseille' } }, acces: true, cloisonnee: true });
+    dit(res.code === 409 && res.corps && res.corps.erreur === 'compte' && !base.get(cle(A, 'email_invoice_lbc123456789')) && (base.get(cle(A, 'vrm_invoice_counter')) || {}).n === 5, `C1 compte Leboncoin ${quoi} ⇒ aucune facture (409 « compte »), aucun numéro pris`, JSON.stringify(res.corps));
+  }
 
   raz();
   base.set(cle(A, 'lbc_ventes'), { ventes: { 123456789: lbc(123456789), 223456789: lbc(223456789, { price: 4500, title: 'Autre banc' }) }, updatedAt: '2026-11-04' });
