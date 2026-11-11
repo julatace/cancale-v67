@@ -22,7 +22,7 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
@@ -41,7 +41,7 @@ import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categ
 import { lireValeurStock } from '../coutVente.js';
 import { bornesPeriode as bornesPeriodeExport, raisonUrssaf } from '../exportComptable.js';
 import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
-import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
+import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).
@@ -1681,7 +1681,7 @@ function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
   const minuteur = React.useRef(null);
-  React.useEffect(() => { let mort = false; lireReglage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
+  React.useEffect(() => { let mort = false; lireReglageMontage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
   const ecrire = (next) => {
     if (!cfg) return;                                      // pas lu : on n'écrit rien
     setCfg(next); setStatut('enregistrement…');
@@ -2190,7 +2190,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const [cfg, setCfg] = React.useState(undefined);
   React.useEffect(() => {
     let mort = false;
-    lireReglage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); });
+    lireReglageMontage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); });
     const f = (e) => { if (e && e.detail && typeof e.detail === 'object') setCfg({ ...e.detail }); };
     window.addEventListener('vrm:profil-fiscal', f);
     return () => { mort = true; window.removeEventListener('vrm:profil-fiscal', f); };
@@ -3478,7 +3478,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const { P } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
   const sel = { site: 'toutes', compte: null, periode: null };
-  const v = (id) => valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE);
+  const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });   // « nov. » : le libellé tient sur une ligne au téléphone
   const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
   const aller = (q) => {

@@ -120,8 +120,15 @@ const imp = (f) => import(require('url').pathToFileURL(path.join(SRC, f)).href);
   // phrase (`desc`) — la règle du visuel : « une ligne d'explication au plus, le reste en feuille ».
   // « Sans texte explicatif » se juge donc ainsi : au plus une phrase courte (≤ 90 signes, un seul
   // point final au plus), jamais un paragraphe ni un bloc d'aide.
-  const ligneExport = /\{ id:'donnees', type:'action', ic:'[a-z-]+', lib:'Exporter mes données',(?: desc:'([^'\n]*)',)? onClick:exporterMesDonnees, data:\{ 'data-exporter-donnees':'' \} \}/.exec(APP);
-  const descExport = ligneExport && ligneExport[1] != null ? ligneExport[1] : '';
+  // (11 nov., traduction) La ligne vit dans src/ecrans/Reglages.jsx et ses textes passent par tr() :
+  // ils se lisent dans le français (src/i18n/langues/fr.js, la source), par la clé posée.
+  const REG = APP + '\n' + fs.readFileSync(path.join(SRC, 'ecrans', 'Reglages.jsx'), 'utf8');
+  const FR = fs.readFileSync(path.join(SRC, 'i18n', 'langues', 'fr.js'), 'utf8');
+  const frDe = (cle) => { const m = new RegExp('"' + cle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '":\\s*"([^"]*)"').exec(FR); return m ? m[1] : null; };
+  const txt = (lit, cle) => (lit != null ? lit : cle != null ? frDe(cle) : null);
+  const mExport = /\{ id:'donnees', type:'action', ic:'[a-z-]+', lib:(?:'([^'\n]*)'|tr\('([^']+)'\)),(?: desc:(?:'([^'\n]*)'|tr\('([^']+)'\)),)? onClick:exporterMesDonnees, data:\{ 'data-exporter-donnees':'' \} \}/.exec(REG);
+  const ligneExport = mExport && txt(mExport[1], mExport[2]) === 'Exporter mes données' ? mExport : null;
+  const descExport = ligneExport ? (txt(ligneExport[3], ligneExport[4]) || '') : '';
   dit(!!ligneExport && descExport.length <= 90 && (descExport.match(/[.!?](\s|$)/g) || []).length <= 1, 'X6 Paramètres → « Exporter mes données », sans texte explicatif (une phrase au plus)', descExport ? `« ${descExport} » (${descExport.length} signes)` : '');
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);
   process.exit(ko ? 1 : 0);

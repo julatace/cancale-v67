@@ -15,7 +15,7 @@ import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/c
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay } from '../App.jsx';
+import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -37,6 +37,7 @@ import VitesseEnvoi from "../VitesseEnvoi.jsx";   // (10 nov., lot BM) vitesse d
 import AvisLus from "../AvisVinted.jsx";   // (10 nov., lot BN) les avis Vinted lus   // (10 nov., lot BG) d'où viennent mes achats — un bloc isolé
 // ⟦← App.jsx #5⟧
 import CarteOffres from "../design/CarteOffres.jsx";
+import { GrandChiffre } from "../design/CarteMois.jsx";   // (11 nov., pire cas) un montant long tient dans sa tuile
 import { statsOffres } from "../statsOffres.js";
 import { statsParCategorie, stockParFamille, familleDeVente, cleVente, tableFamilles, ecritureCategoriesMain, afficherCategories, FAMILLES_STATS, titreFamille, CLE_CATEGORIES_MAIN } from '../statsCategories.js';   // (11 nov., lot stats-categories)
 import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
@@ -1318,7 +1319,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
           {A.comptes.map((g) => (
             <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
               <summary className="vrm-sv-annul-ligne">
-                <span className="vrm-sv-nom">{g.compte}</span>
+                <span className="vrm-sv-nom" title={g.compte || undefined}>{g.compte}</span>
                 <span className="vrm-sv-piste"><span style={{ width: `${g.taux ? Math.max(3, g.taux / maxT * 100) : 0}%` }}/></span>
                 <span className="vrm-sv-chiffre">{g.annulees}/{g.n} · {pctTxt(g.taux)}</span>
               </summary>
@@ -1347,7 +1348,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
         : (<div className="vrm-sv-lignes" data-sv-notes={N.etat}>
           {N.comptes.map((c) => (
             <div key={c.uid} className="vrm-sv-note-ligne" data-sv-notes-compte={c.uid} data-etat={c.etat} data-note={c.note == null ? '' : c.note} data-n={c.n == null ? '' : c.n} data-neg={c.neg == null ? '' : c.neg} data-vieux={c.vieux ? '1' : ''}>
-              <span className="vrm-sv-nom">{c.nom}</span>
+              <span className="vrm-sv-nom" title={c.nom || undefined}>{c.nom}</span>
               <span className="vrm-sv-chiffre vrm-sv-note-detail">{c.etat !== 'lu' ? 'pas lu' : <>{pl(c.n, 'avis', 'avis')}{c.neg > 0 ? ` · ${c.neg} négatif${c.neg > 1 ? 's' : ''}` : ''}{c.neu > 0 ? ` · ${c.neu} neutre${c.neu > 1 ? 's' : ''}` : ''}{c.vieux && c.at ? ` · lu le ${jour(c.at)}` : ''}</>}</span>
               <span className="vrm-display vrm-sv-note-val">{c.etat !== 'lu' ? '—' : note(c.note)}</span>
             </div>
@@ -1425,7 +1426,7 @@ function ParCategorie({ vendu, lp, extras, stock, b }) {
         <div className="vrm-sv-lignes vrm-sv-cats" data-sv-etat="lu">
           {S.groupes.map((g) => (
             <div key={g.v} className="vrm-sv-ligne-cat" data-sv-cat={g.v} data-n={g.n} data-eur={Math.round(g.eur * 100)} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-couv={`${g.nCout}/${g.fin}`} data-mediane={g.mediane == null ? '' : g.mediane} data-stock={g.stock == null ? '' : g.stock}>
-              <span className="vrm-sv-nom">{g.titre}</span>
+              <span className="vrm-sv-nom" title={g.titre || undefined}>{g.titre}</span>
               <span className="vrm-sv-piste"><span style={{ width: g.n ? `${Math.max(3, g.n / maxN * 100)}%` : 0 }}/></span>
               <span className="vrm-sv-chiffre vrm-sv-cat-chiffre">{g.n ? `${pl(g.n, 'vente')} · ${fmt(g.eur)}` : 'aucune vente'}</span>
               <span className="vrm-sv-cat-detail">
@@ -1772,6 +1773,7 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
   );
 }
 function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null }) {
+  const sansCompteStats = useSansCompte();   // (11 nov., états vides) aucun compte relié, prouvé par la coque
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
   const { releve, stock, benef, extras, lignes } = useReleveStats();
@@ -1897,7 +1899,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   const tuile = (k, lib, val, sous, attrs, titre) => (
     <div className="vrm-sv-tuile" data-sv-tuile={k} title={titre || undefined} {...(attrs || {})}>
       <div className="vrm-sv-tuile-lib">{lib}</div>
-      <div className="vrm-display vrm-sv-tuile-val" data-vide={val === '—' ? '1' : undefined}>{val}</div>
+      <GrandChiffre className="vrm-display vrm-sv-tuile-val" plancher={16} data-vide={val === '—' ? '1' : undefined}>{typeof val === 'string' ? val.replace(/ (€|%)/g, '\u00a0$1') : val}</GrandChiffre>
       <div className="vrm-sv-tuile-sous">{sous}</div>
     </div>
   );
@@ -2033,7 +2035,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
                   return comptes.length > 1 ? <p className="vrm-sv-note" data-sv-pas-conclu-compte="">Moins de {SEUIL_CONCLUSION} ventes ou égalité : pas de « meilleur compte ».</p> : null; })()}
                 {comptes.slice(0, 6).map((c) => (
                   <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
-                    <span className="vrm-sv-nom">{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
+                    <span className="vrm-sv-nom" title={c.nom || undefined}>{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
                     <span className="vrm-sv-n">{pl(c.n, 'vente')}{(() => {
                       // Un site à plusieurs comptes (deux Leboncoin) n'a qu'un brut commun : rien n'est
                       // attribué à un compte qui ne le porte pas (aucune ligne plutôt qu'un faux).
@@ -2057,7 +2059,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
-      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge}/>
+      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge} sansCompte={sansCompteStats}/>
       {/* (11 nov., lot stats-categories) « Par catégorie » : seulement si DEUX familles sont connues (src/statsCategories.js). */}
       <ParCategorie vendu={Array.isArray(vendu) ? vendu.filter(dansP) : vendu} lp={lp} extras={extras} stock={stock} b={b}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}

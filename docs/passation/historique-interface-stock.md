@@ -3575,3 +3575,7 @@ la plus récente en haut ; ni l'étape ni le compte choisi ne passent devant. Le
 autres onglets sont inchangés. Banc `scripts/bancs/achats-en-route-ordre.cjs`
 (données inventées, deux comptes, 390 tactile et 1512, avec et sans compte choisi) :
 4 verts ; 4 rouges sur le build d'avant (ordre 9301,9303,9302,9304).
+
+## Ligne déplacée de CLAUDE.md §9 (11 nov., tel quel)
+
+- **11 nov. · VRM installable (lot app-installable)** : 2e ouverture instantanée (coquille servie du cache, relue derrière ; seules `/` et `/index.html`, une page statique ne remplace plus l'app) ; nouvelle version ⇒ « Mettre à jour » discret une fois (jamais de rechargement pendant une saisie, `src/miseAJour.js`) ; aide d'installation une fois (iPhone 2 gestes, Android « Installer », `src/aideInstallation.js`) ; écrans de démarrage iPhone clair/sombre, icônes toutes tailles, raccourcis, plus de rechargement au tirer ; clic de notification vers la fenêtre de l'app. `docs/passation/2026-11-11-app-installable.md`. Geste : aucun (reposer l'icône pour le nouvel écran de démarrage).

@@ -24,6 +24,7 @@ import StockExplication from "../StockExplication.jsx";
 import { InventaireStock } from "../InventaireStock.jsx";
 import { InventaireAnnuel } from "../InventaireAnnuel.jsx";   // (10 nov., lot W) l'inventaire de fin d'année
 import { DEMANDE_INVENTAIRE_ANNUEL } from "../inventaireAnnuel.js";   // (11 nov.) ouverte depuis « Clôturer l'année »
+const BANDE_MAX = 60;   // la bande « À ranger » (pire cas, 11 nov.)
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
 
 // ⟦← App.jsx #3⟧
@@ -716,11 +717,16 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <Card style={{ padding: '13px 14px' }}>
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
         <div className="vrm-s2d-resume-n">
-          {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
+          {/* (11 nov., états vides) « au moins 0 » ne se dit jamais (§5) : rien lu et une lecture qui manque ⇒ « — ». */}
+          {lecture === undefined ? '…' : (aa && aa.su && !(aa.auMoins && nAffiche === 0) ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
           <small>{nAffiche === 1 && aa && aa.su ? 'paire en ligne' : 'paires en ligne'}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
         {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
         {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
+        {/* (11 nov., états vides) Aucun compte Vinted relié (liste LUE et vide) : le geste qui remplit le Stock. */}
+        {comptesLus && Array.isArray(accounts) && accounts.length === 0 && lecture !== undefined && <div data-stock-sans-compte="" style={{ marginTop: 10 }}>
+          <Bouton variante="primaire" icone="link" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }}>Relier un compte</Bouton>
+        </div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Annonces pas lues{manqueTxt ? ` (${manqueTxt})` : ''}, rien n'est perdu : ouvre Vinted {NAV.dans}.</div>}
         {/* (9 nov., lot AI — Julien : « ça fait très moche ») UNE ligne courte (rangées · à ranger, et le
             signal de ce qui manque) ; la phrase d'avant, entière, dans sa pop-up. Ambre : un geste à faire. */}
@@ -1083,7 +1089,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>{souris ? 'glisse un article dans une case (ou clique-le, puis une case)' : 'touche un article puis une case'}</span>
         </div>
         <div data-bande-a-ranger="" style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
-          {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
+          {/* (11 nov., pire cas) 60 vignettes au plus dans la bande : 2 000 « à ranger » y dessinaient
+              1 700 photos d'un coup (1,1 s de gel au défilement). Les autres sont dans la liste, plus bas. */}
+          {aRanger.slice(0, BANDE_MAX).map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
               <button type="button" key={f.id} data-a-ranger={cleDeFiche(f)} data-paire-a-ranger={String(f.numero)} data-paire-plateformes={(f.plateformes || []).join(',')} data-paire-aussi={(f.aussi || []).join(',')} {...dragProps(cleDeFiche(f))} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger l’article N°${f.numero}${(f.aussi || []).length ? ' (aussi N°' + f.aussi.join(', N°') + ')' : ''}${f.title ? ' · ' + f.title : ''}${(f.plateformes || []).length && !f.plateformes.includes('vinted') ? ' · seulement sur ' + f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' et ') : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
@@ -1094,6 +1102,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               </button>
             );
           })}
+          {aRanger.length > BANDE_MAX ? <span className="vrm-s2d-bande-reste" data-bande-reste={aRanger.length - BANDE_MAX}>+{aRanger.length - BANDE_MAX}<small>dans la liste</small></span> : null}
         </div>
       </Card>
     )}

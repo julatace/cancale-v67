@@ -462,7 +462,7 @@ import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
-import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
+import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
@@ -528,7 +528,7 @@ import "./styles-onglets-b.css";
 import { comptesARelier, boitesQuiArrivent, phraseARelier } from "./relierCompte.js";
 import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
-import CarteMois from "./design/CarteMois.jsx";
+import CarteMois, { GrandChiffre } from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
 import { poserPastilleIcone } from "./pastilleIcone.js";
@@ -653,6 +653,7 @@ import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, 
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
+import { fetchBorne, raisonStatut, DELAI_ECRITURE_MS, DELAI_LECTURE_MS, NOM_DELAI } from "./reseauBorne.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
@@ -669,6 +670,7 @@ import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille
 import "./styles-profil.css";   // (11 nov., lot DJ6) la photo du profil et son menu
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
+import "./styles-pire-cas.css";   // (11 nov.) pire cas : chiffres et titres extrêmes tenus dans leur place
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -3551,7 +3553,8 @@ const lireLocalSync = () => {
 // `undefined` = pas su (rien ne s'écrit) · `{ existe, data, rev, maj }`.
 const lireNuageComplet = async (owner) => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=owner,data,updated_at`, { headers: sbAuth(), cache: 'no-store' });
+    // (11 nov., réseau instable) Bornée : une lecture qui pend vaut « pas su » (src/reseauBorne.js).
+    const res = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=owner,data,updated_at`, { headers: sbAuth(), cache: 'no-store' }, DELAI_LECTURE_MS);
     if (!res.ok) return undefined;
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length > 1 || rows.some(r => r.owner !== owner) || AUTH.user?.id !== owner) return undefined;
@@ -3705,7 +3708,7 @@ const cloudPush = () => {
         if (c === undefined) { _emitSync('error', 'la base n’a pas répondu'); planifierReprise(); return; }
         noterBaseNuage(c.data, c.existe, c.maj);
       }
-      let fini = false;
+      let fini = false, deja401 = false;
       for (let essai = 0; essai < 6 && !fini; essai++) {
         const { L, brut } = essai === 0 ? premier : lireLocalSync();
         const N = _snapNuage.data || {};
@@ -3731,19 +3734,23 @@ const cloudPush = () => {
         if (!_snapNuage.existe) {
           // Premier jour : la ligne n'existe pas. Une INSERTION sans fusion —
           // 409 ⇒ un autre appareil l'a créée entre-temps : on relit.
-          res = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+          res = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data`, {
             method: 'POST',
             headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
             body: JSON.stringify([withOwner({ id: SUPABASE_ROW, data, updated_at: maj })]),
-          });
+          }, DELAI_ECRITURE_MS);
           if (res.status === 409) res = { ok: true, devance: true };
         } else {
           const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
-          const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
+          // (11 nov., réseau instable) Bornée : une écriture qui pend laissait
+          // `_pushEnVol` vrai pour toujours (plus rien ne partait). Abandonnée,
+          // elle vaut « pas su » ; si la base l'avait écrite, le rejeu est
+          // devancé (`rev`) puis relu et fusionné — rien en double.
+          const r = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
             method: 'PATCH',
             headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
             body: JSON.stringify({ data, updated_at: maj }),
-          });
+          }, DELAI_ECRITURE_MS);
           if (r.ok) { let out = null; try { out = await r.json(); } catch (_) { out = null; } res = Array.isArray(out) ? (out.length >= 1 ? { ok: true } : { ok: true, devance: true }) : { ok: false, status: 0 }; }
           else res = r;
         }
@@ -3790,12 +3797,21 @@ const cloudPush = () => {
         }
         if (code) { _pushBloque = true; _emitSync('refus', 'cet écran est plus ancien que tes données (numérotation) — recharge la page'); signalerNumerosPerimes(code); return; }
         const st = res.status || 0;
-        _emitSync('error', st === 401 || st === 403 ? `la base a refusé l'envoi (${st}) — ta session a peut-être expiré` : st >= 500 ? `la base ne répond pas (${st})` : st ? `la base a répondu ${st}` : 'la base n’a pas répondu');
+        // (11 nov., réseau instable) Un jeton simplement VIEUX (le réseau est
+        // revenu après plus d'une heure) n'est pas un refus : on le renouvelle
+        // et on renvoie, une fois. Renouvellement « pas su » (réseau) ⇒ passager.
+        if (st === 401 && !deja401) {
+          deja401 = true;
+          const rafr = await authRefresh();
+          if (rafr === true && AUTH.user?.id === owner) continue;
+          if (rafr !== false) { _emitSync('error', 'session à renouveler — la base n’a pas répondu, nouvel essai'); planifierReprise(); return; }
+        }
+        _emitSync('error', raisonStatut(st));
         planifierReprise();
         return;
       }
       if (!fini) { _emitSync('error', 'la ligne change sans cesse sur un autre appareil — nouvel essai'); planifierReprise(); }
-    } catch (_) { _emitSync('error', typeof navigator !== 'undefined' && navigator.onLine === false ? 'pas de connexion internet' : 'la base n’a pas répondu'); planifierReprise(); }
+    } catch (e) { _emitSync('error', typeof navigator !== 'undefined' && navigator.onLine === false ? 'pas de connexion internet' : e && e.name === NOM_DELAI ? 'la base n’a pas répondu à temps' : 'la base n’a pas répondu'); planifierReprise(); }
     finally {
       _pushEnVol = false;
       if (_pushRelance) { _pushRelance = false; cloudPush(); }
@@ -3822,7 +3838,7 @@ const relireNuage = (opts = {}) => {
       if (_pushEnVol || _cloudTimer) return false;
       // (6 nov., charge) La VERSION de la numérotation vient dans la MÊME lecture
       // scalaire (même ligne, même minute) : une lecture de moins par minute.
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=rev:data->>rev,maj:updated_at,vnum:data->vrm_numerotation->>version`, { headers: sbAuth(), cache: 'no-store' });
+      const r = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=rev:data->>rev,maj:updated_at,vnum:data->vrm_numerotation->>version`, { headers: sbAuth(), cache: 'no-store' }, DELAI_LECTURE_MS);
       if (!r.ok) return false;
       const rows = await r.json();
       if (!Array.isArray(rows) || rows.length > 1) return false;
@@ -5927,12 +5943,24 @@ try {
 const lireReglage = async (id) => {
   const rendre = (v) => { noterReglage(id, v === null); return v; };
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: sbAuth() });
+    // (11 nov., réseau instable) Bornée : une lecture qui pend vaut « pas su ».
+    const res = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: sbAuth() }, DELAI_LECTURE_MS);
     if (!res.ok) return rendre(null);
     const rows = await res.json();
     if (!Array.isArray(rows)) return rendre(null);   // un 522 Cloudflare rend du HTML
     return rendre((rows[0] && rows[0].data) || {});
   } catch (_) { return rendre(null); }
+};
+// (11 nov., vert-11nov) La lecture AU MONTAGE, partagée : plusieurs cartes d'un même écran lisent la même
+// ligne au même moment (Argent : l'en-tête `useEntreprise`, « Profil fiscal », « Facturation électronique »
+// lisaient `vrm_pro_facture` trois fois — budget-vitesse). UNE requête, la même réponse pour toutes, et
+// seulement tant qu'elle est EN COURS (rien n'est gardé après : la suivante relit). Jamais pour un
+// lire-fusionner-réécrire (qui relit lui-même, `lireReglage`, juste avant d'écrire).
+const _reglagesEnVol = new Map();
+const lireReglageMontage = (id) => {
+  const deja = _reglagesEnVol.get(id); if (deja) return deja;
+  const p = lireReglage(id).finally(() => { if (_reglagesEnVol.get(id) === p) _reglagesEnVol.delete(id); });
+  _reglagesEnVol.set(id, p); return p;
 };
 // ⚠️⚠️ ET LA PHRASE NE S'ÉCRIT QU'UNE FOIS (§7). Vu au rendu le 15 septembre,
 // dans l'état « lecture ratée » : les QUATRE panneaux affichaient chacun le même
@@ -13969,7 +13997,7 @@ const useEntreprise = () => {
   const [e, setE] = React.useState(undefined);
   React.useEffect(() => {
     let mort = false;
-    lireReglage('vrm_pro_facture').then((d) => { if (!mort) setE(d === null ? null : { nom: String(d.nom || '').trim(), siret: String(d.siret || '').trim() }); }).catch(() => { if (!mort) setE(null); });
+    lireReglageMontage('vrm_pro_facture').then((d) => { if (!mort) setE(d === null ? null : { nom: String(d.nom || '').trim(), siret: String(d.siret || '').trim() }); }).catch(() => { if (!mort) setE(null); });
     const suivre = (ev) => { const d = ev && ev.detail; if (d && typeof d === 'object') setE({ nom: String(d.nom || '').trim(), siret: String(d.siret || '').trim() }); };
     window.addEventListener('vrm:profil-fiscal', suivre);
     return () => { mort = true; window.removeEventListener('vrm:profil-fiscal', suivre); };
@@ -18403,10 +18431,29 @@ function EnAttenteEnvoi() {
   }, []);
   // (8 nov.) Sans abonnement (aperçu) : la base refuse d'écrire, exprès — ce
   // n'est pas un envoi « en attente » ; la carte de l'aperçu dit pourquoi.
-  if (lectureSeuleActive()) return null;
+  // (11 nov., réseau instable) Ce qui a été DIT « en attente » se dit ensuite
+  // « Enregistré ✓ » quand le nuage l'a ACCEPTÉ (file vide ET dernière
+  // sauvegarde réussie), 4 s — jamais avant, jamais sur une simple supposition.
+  const dit = React.useRef(false);
+  const [fait, setFait] = React.useState(0);
   let n = 0; try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; }
   const horsLigneMesure = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (!n || !(horsLigneMesure || _syncInfo.etat === 'error')) return null;
+  const montre = !lectureSeuleActive() && !!n && (horsLigneMesure || _syncInfo.etat === 'error');
+  React.useEffect(() => {
+    if (montre) { dit.current = true; if (fait) setFait(0); return undefined; }
+    if (dit.current && !n && _syncInfo.etat === 'synced') { dit.current = false; setFait(Date.now()); }
+    return undefined;
+  });
+  React.useEffect(() => { if (!fait) return undefined; const t = setTimeout(() => setFait(0), 4000); return () => clearTimeout(t); }, [fait]);
+  if (lectureSeuleActive()) return null;
+  if (!montre && fait && !n) return (
+    <div role="status" data-envoi-fait=""
+      style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px',marginBottom:12}}>
+      <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="check" size={16}/></span>
+      <span style={{fontSize:13,color:C.text,lineHeight:1.4}}><b style={{fontWeight:600}}>Enregistré</b><span style={{color:C.muted}}> — tes changements sont arrivés sur VRM.</span></span>
+    </div>
+  );
+  if (!montre) return null;
   const reseau = horsLigneMesure || /connexion|répondu|réponse|réessaie|ne répond pas/.test(_syncInfo.raison || '');
   const quand = reseau ? 'dès que le réseau revient' : 'dès que la base les accepte';
   return (
@@ -28303,7 +28350,7 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
               ? <div className="vrm-fu-grand vrm-jv2-grand is-vide" data-jv2-vendu="">—</div>
               : vSel === 0
                 ? <div className="vrm-jv2-grand is-zero" data-jv2-vendu="0">Rien vendu</div>
-                : <div className="vrm-fu-grand vrm-jv2-grand" data-jv2-vendu={String(Math.round(vSel * 100))} data-partiel={J.vendu.partiel ? '1' : undefined}>{J.vendu.partiel ? <span className="vrm-fu-borne">au moins </span> : null}{montant(vSel)}</div>}
+                : <GrandChiffre className="vrm-fu-grand vrm-jv2-grand" data-jv2-vendu={String(Math.round(vSel * 100))} data-partiel={J.vendu.partiel ? '1' : undefined}>{J.vendu.partiel ? <span className="vrm-fu-borne">au moins </span> : null}{montant(vSel)}</GrandChiffre>}
             <p className="vrm-jv2-faits">
               <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined}>{faitVentes}</span>
               {' '}
@@ -28782,9 +28829,12 @@ function useSourcesCarte(liveStats) {
   const [colisARetirer] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
   const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
   const prep = useEnPreparation(CLES_PREPAREES);
+  // (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque : « aucun compte relié », pas « lecture… ».
+  const sansCompte = React.useContext(SansCompteCarte);
   // (6 nov.) Jamais publié mais un écran ouvert le prépare : « lecture… » (src/preparations.js).
   const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') ? 'passu' : 'encours');
   return React.useMemo(() => ({
+    sansCompte: !!sansCompte,
     // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
     // sans ses lignes) = `undefined`, « lecture… » ; `venduPasSu` = `null`, « pas lu ». Avant,
     // les deux disaient « pas lu » : à chaque ouverture, la carte annonçait une panne.
@@ -28794,7 +28844,7 @@ function useSourcesCarte(liveStats) {
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
     enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
-  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep]);
+  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -28840,6 +28890,9 @@ function EcranMaSemaine({ liveStats, onNav, entete }) {
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
 const LiveStatsCarte = React.createContext(null);
+// (11 nov.) `true` seulement quand l'absence de tout compte est PROUVÉE (coque, `sansAucunCompte`).
+const SansCompteCarte = React.createContext(false);
+export const useSansCompte = () => React.useContext(SansCompteCarte);
 // (11 nov., lot stats-plus) + `progressionObjectif` (la barre de l'objectif) et `urssafAPayer` : la
 // MÊME échéance et le MÊME montant que le rappel URSSAF de Ma journée (`montantPeriodeUrssaf`).
 const urssafAPayerCarte = (ligne, maintenant = Date.now()) => {
@@ -29662,6 +29715,21 @@ const etatOrdersDuCache = (type, accounts) => {
 // libre (`requestIdleCallback`). Un effacement reste écrit tout de suite (ci-dessus).
 let _persistAcctTimer = null;
 const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+// (11 nov., états vides) RETOUR DU RÉSEAU avec des listes gardées « pas relues » (src/copieLignes.js) :
+// les caches de lecture de la session sont vidés AVANT que les écrans se remontent (cet écouteur est posé
+// au chargement du module, avant ceux des écrans) ⇒ ils relisent la base, pas la mémoire de la coupure.
+if (typeof window !== 'undefined') window.addEventListener('online', () => {
+  try {
+    if (!etatCopies()) return;
+    viderCacheLignes(); Object.keys(_acctCache).forEach((k) => delete _acctCache[k]); _persistAcctCache();
+    // Les commandes gardées ne se revalident qu'au préchargement (une fois par ouverture) : on le relance,
+    // par la MÊME règle (`lireAvecCopie`) — réussi, la mention « pas relu » part ; raté, elle reste.
+    _prechargeComptes = null; _prechargeLancePour = ''; prechargerDemarrage();
+    // Les familles gardées (transactions, dates de capture — `lireFamilleCopiee`) : relues par la même
+    // règle ; la mémoire de 60 s des transactions est oubliée d'abord. Lectures seules.
+    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail().catch(() => {});
+  } catch (_) {}
+});
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
   _persistAcctTimer = { idle: false, id: setTimeout(()=>{
     try { if (typeof window.requestIdleCallback === 'function') { _persistAcctTimer = { idle: true, id: window.requestIdleCallback(_persistAcctCache, { timeout: 5000 }) }; return; } } catch(_) {}
@@ -34772,6 +34840,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'ordre de `annShown` est gardé dans chaque compte (src/annoncesGrille.js) ; un compte prend la place de
   // sa première annonce (celui de l'onglet reste en tête). Affichage seulement : rien n'entre ni ne sort.
   const annGroupes = useMemo(() => groupesParCompte(annShown, (it) => String((it && it._acc && it._acc.vinted_user_id) || '')), [annShown]);
+  // (11 nov., pire cas) La grille ne DESSINE que les `annMax` premières vignettes (comme Ventes) :
+  // 2 000 annonces montaient 137 000 nœuds d'un coup, 2 s de gel au défilement du téléphone.
+  // Les comptes, les totaux et l'en-tête de chaque compte portent TOUJOURS sur l'ensemble.
+  const [annMax, setAnnMax] = useVueSession('annonces-limite', 60);
+  const annGroupesVus = useMemo(() => { let reste = annMax; return annGroupes.map((g) => { const items = g.items.slice(0, Math.max(0, reste)); reste -= items.length; return { ...g, tous: g.items.length, items }; }).filter((g) => g.items.length); }, [annGroupes, annMax]);
   // Les annonces que l'alerte « même paire en ligne deux fois » nomme (lot AF, mêmes groupes, §11) : une marque sur leur vignette.
   const annEnDouble = useMemo(() => new Set(groupesDeuxFois.filter((g) => g.length > 1).flat()), [groupesDeuxFois]);
   // La grille de vignettes est montrée pour « Toutes » et ses tris (pas pour les vues à cocher ni les files).
@@ -36507,6 +36580,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
+  /* eslint-disable-next-line */ }, [curSub, cleComptes]);
+  // (11 nov., états vides) RETOUR DU RÉSEAU : des listes gardées sur l'appareil n'ont pas pu être relues
+  // (« Vu à hh:mm · pas relu », src/copieLignes.js) ⇒ l'écran ouvert les relit tout de suite, comme au retour
+  // sur l'app (même chemin, sans requête Vinted). Rien à relire ⇒ rien ne part. La règle de la copie ne change pas.
+  useEffect(() => {
+    const auRetour = () => {
+      if (cache() || !accounts.length || !etatCopies()) return;
+      viderCacheLignes();
+      if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
+      if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
+      if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
+      if (curSub === 'messages' || curSub === 'journee') loadConvs();
+    };
+    window.addEventListener('online', auRetour);
+    return () => window.removeEventListener('online', auRetour);
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── LES VENTES ARRIVENT TOUTES SEULES (2 octobre) ─────────────────────────
   // « Ça doit être presque instantanément mis à jour dès que je fais une
@@ -41704,7 +41792,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const lbcSaitSuppr = extSait('lbcsupprime');
   const planAilleurs = planRetirerAilleurs(vendusAilleurs.v, {
     lbcOk: lbcSaitSuppr === 'ok',
-    lbcPourquoi: lbcSaitSuppr === 'absente' ? 'à faire sur Leboncoin — ici, pas d’extension VRM (ouvre VRM dans ton Chrome pour que VRM la supprime)' : 'à faire sur Leboncoin — ton extension est trop ancienne pour supprimer depuis VRM (mets-la à jour)',
+    lbcPourquoi: lbcSaitSuppr === 'absente' ? `à faire sur Leboncoin — ici, pas d’extension VRM (ouvre VRM ${NAV.dansNu} pour que VRM la supprime)` : 'à faire sur Leboncoin — ton extension est trop ancienne pour supprimer depuis VRM (mets-la à jour)',
     ebayOk: !!(AUTH.session && AUTH.session.access_token),
   });
   const [retraitsAilleurs, setRetraitsAilleurs] = useState(null);   // { plan, res } : le plan tel qu'exécuté, les issues
@@ -46113,11 +46201,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             éléments, mêmes écritures, mêmes data-* (rien n'est retiré, seulement replié). Toucher la PHOTO ouvre la
             visionneuse unique (src/visionneuse.js). L'ordre et la règle « en ligne » ne changent pas (`annShown`). */}
         <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes" data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
-          {annGroupes.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
-          <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.items.length} role="heading" aria-level={3}>
+          {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
+          <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.tous} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
-            <span className="vrm-ann-compte-nom">{nomG || 'Compte Vinted'}</span>
-            <span className="vrm-ann-compte-n">{g.items.length} annonce{g.items.length>1?'s':''}</span>
+            <span className="vrm-ann-compte-nom" title={nomG || undefined}>{nomG || 'Compte Vinted'}</span>
+            <span className="vrm-ann-compte-n">{g.tous} annonce{g.tous>1?'s':''}</span>
           </div>,
           ...g.items.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
@@ -46352,6 +46440,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })]; })}
         </div>
+        {annShown.length > annMax && (
+          <Bouton variante="secondaire" plein data-ann-suite="" onClick={()=>React.startTransition(()=>setAnnMax(n=>n+120))} style={{marginTop:16}}>
+            Afficher {Math.min(120,annShown.length-annMax) > 1 ? `les ${Math.min(120,annShown.length-annMax)} suivantes` : 'la suivante'}{annShown.length-annMax > 120 ? ` · encore ${annShown.length-annMax-120} après` : ''}
+          </Bouton>
+        )}
         </>)}
           </>)}
         {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
@@ -46770,7 +46863,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </>);
         })()}
       </>)}
-      {curSub==='annonces' && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
+      {/* (11 nov., états vides) Aucun compte Vinted lié : rien à vérifier, la carte « Relier un compte » suffit. */}
+      {curSub==='annonces' && !noAcc && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
         <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
         <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
         <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
@@ -46803,8 +46897,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           (src/filUnique.js, src/ecrans/FilsTous.jsx). Les conversations Vinted y entrent avec LES
           règles de la liste Vinted (compte retiré, écarté, conversation retirée) ; un fil Vinted
           s'ouvre dans LE fil d'ici (`openConversation`, ses envois et ses offres). */}
+      {/* (11 nov., états vides) Aucun compte Vinted lié (liste LUE et vide) : la carte et son geste, et la
+          part Vinted des fils est VIDE (rien à lire), pas « Lecture… » à l'infini. */}
+      {curSub==='messages' && filTous && <NoAcc/>}
       {curSub==='messages' && filTous && <FilsTous
-        vinted={convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>({ c, paire: paireDeConv(String(c._acc.vinted_user_id), c.id, null), compte: accName(c._acc) }))}
+        vinted={noAcc ? [] : convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>({ c, paire: paireDeConv(String(c._acc.vinted_user_id), c.id, null), compte: accName(c._acc) }))}
         vintedOuvert={openConv ? String(openConv.acc?.vinted_user_id||'')+':'+String(openConv.convId) : ''}
         ouvrirVinted={(c)=>openConversation(c)} fermerVinted={()=>setOpenConv(null)} rendreVinted={()=>rendreConversation()}
         lireVinted={async (c)=>{ const r=await fetchVintedConversationDetail(c._acc,c.id); if(!r||!r.ok) return null; return normalizeConversationMessages(r.conversation).filter(m=>m.kind==='message'||m.kind==='offer').map(m=>({ t: m.kind==='offer' ? `Offre ${String(m.offre&&m.offre.montant||'').replace('.',',')} €${m.offre&&m.offre.statut?' · '+m.offre.statut:''}` : m.body, at: m.ts, deMoi: m.kind==='message' ? m.mine===true : (m.offre&&m.offre.sens==='envoyee'?true:m.offre&&m.offre.sens==='recue'?false:null) })); }}/>}
@@ -51632,7 +51729,8 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
         ? <PhotoVinted src={it.photo} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
         : <div style={{ width: 48, height: 48, borderRadius: 12, background: C.card2, flexShrink: 0 }}/>}
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+        {/* (11 nov., pire cas) Le titre ENTIER : c'est lui qu'on compare au carton (coupé, « Größe 42 Sportschuh… » ne disait plus quelle paire). */}
+        <div data-verif-titre="" style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{it.title}</div>
         <div style={{ fontSize: 12, color: C.muted }}>
           VRM dit <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
           {it._vrmMasquee ? <> · <span data-verif-masquee>masquée par Vinted</span></> : null}
@@ -51891,7 +51989,10 @@ const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Autho
 // ── LA FACTURE PRO (2 nov.) : les outils de l'app que src/FacturePro.jsx emprunte.
 const ecrireReglage = async (id, data) => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([withOwner({ id, data })]) });
+    // (11 nov., réseau instable) Bornée : « enregistrement… » ne reste jamais affiché
+    // sur une réponse qui ne vient pas. L'écriture est une fusion idempotente : la
+    // rejouer pose la même valeur.
+    const r = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([withOwner({ id, data })]) }, DELAI_ECRITURE_MS);
     if (r.ok) { try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: data })); } catch (_) {} }
     return r.ok;
   } catch (_) { return false; }
@@ -54527,6 +54628,13 @@ function AppCoeur() {
     s.add('vestiaire');
     return s;
   },[accountsLoaded,vintedAccounts,sitesLus,comptesEbay]);
+  // (11 nov., lot états vides) AUCUN COMPTE RELIÉ, PROUVÉ : la liste des comptes Vinted lue et vide, les
+  // lignes Leboncoin/Vestiaire/eBay lues et absentes, aucun compte eBay au registre. Les cases de la carte
+  // ne disent alors plus « lecture… » à l'infini (rien ne sera jamais lu) mais « aucun compte relié ».
+  // Pas su (base KO, lecture en cours ou ratée) ⇒ `false` : jamais deviné.
+  const sansAucunCompte=!!(accountsLoaded && !baseKO && Array.isArray(vintedAccounts) && vintedAccounts.length===0
+    && sitesLus && !sitesLus.leboncoin && !sitesLus.vestiaire && !sitesLus.ebay
+    && Array.isArray(comptesEbay) && !comptesEbay.some(c=>c && !c.implicite));
   // Le badge de Colis : le nombre PUBLIÉ par l'écran qui a toutes les sources
   // (`vrm_colis_aposter`, §11), s'il a moins de 12 h — sinon AUCUN badge (pas
   // su ≠ 0, et jamais un nombre recalculé ici qui contredirait Colis).
@@ -55459,7 +55567,9 @@ function AppCoeur() {
   const [versementsCoque, setVersementsCoque] = useState(undefined);
   useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersementsCoque(m); }).catch(() => { if (!mort) setVersementsCoque(null); }); return () => { mort = true; }; }, [ventesCoque]);
   const liveStatsVus = useMemo(() => {
-    if (!liveStats) return liveStats;
+    // (11 nov., états vides) Les ventes n'ont PAS PU être lues (`null`) et rien d'autre n'a posé `liveStats`
+    // (annonces illisibles aussi) : « pas lu », pas « lecture… » à l'infini — pas su ≠ en cours (§5).
+    if (!liveStats) return ventesCoque === null ? { ...VENDU_PAS_SU } : liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
     if (!Array.isArray(ventesCoque)) return liveStats;
     try {
@@ -56803,6 +56913,7 @@ function AppCoeur() {
   );
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
+    <SansCompteCarte.Provider value={sansAucunCompte}>
     <div className="vrm-app-shell" data-tablette={(ordi && tablette) || undefined} style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
@@ -57412,6 +57523,7 @@ function AppCoeur() {
         * { box-sizing: border-box; }
       `}</style>
     </div>
+    </SansCompteCarte.Provider>
     </LiveStatsCarte.Provider>
   );
 }
@@ -57421,4 +57533,4 @@ export { useJourneePerso, JourneePersoSetting };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
-export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
+export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };

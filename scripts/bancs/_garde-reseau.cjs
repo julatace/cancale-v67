@@ -56,6 +56,12 @@ function argsAvecRegles(o) {
   opts.args = args;
   return opts;
 }
+// (11 nov., vert-11nov) LA LANGUE PAR DÉFAUT DES BANCS : depuis la traduction (src/i18n), l'app suit la
+// langue du navigateur quand le vendeur n'a rien choisi. Un Chromium lancé sans langue prend celle de la
+// machine (en-US sur un runner GitHub, ici aussi) : les bancs, qui jugent l'app en français, voyaient
+// « Today · Listings · Sales ». Un contexte sans `locale` reçoit donc 'fr-FR' (celle de Julien) ; un banc
+// qui veut juger une autre langue la pose lui-même (`locale: 'en-US'`) et la garde.
+const avecLangue = (o) => (o && typeof o === 'object' && o.locale ? o : Object.assign({}, o || {}, { locale: 'fr-FR' }));
 function poserSur(type, chromium) {
   if (!type || type.__vrmGardeReseau) return;
   type.__vrmGardeReseau = true;
@@ -63,12 +69,12 @@ function poserSur(type, chromium) {
   type.launch = async (o, ...r) => {
     const b = await l0(chromium ? argsAvecRegles(o) : o, ...r);
     const nc = b.newContext.bind(b), np = b.newPage.bind(b);
-    b.newContext = async (...x) => surveiller(await nc(...x));
-    b.newPage = async (...x) => { const p = await np(...x); surveiller(p.context()); return p; };
+    b.newContext = async (o, ...x) => surveiller(await nc(avecLangue(o), ...x));
+    b.newPage = async (o, ...x) => { const p = await np(avecLangue(o), ...x); surveiller(p.context()); return p; };
     return b;
   };
   const p0 = type.launchPersistentContext.bind(type);
-  type.launchPersistentContext = async (d, o, ...r) => surveiller(await p0(d, chromium ? argsAvecRegles(o) : o, ...r));
+  type.launchPersistentContext = async (d, o, ...r) => surveiller(await p0(d, avecLangue(chromium ? argsAvecRegles(o) : o), ...r));
 }
 function poserGarde(pw) {
   if (!pw) return;
@@ -88,4 +94,4 @@ function poserFin() {
 poserFin();
 try { poserGarde(require('playwright')); } catch (_) {}
 try { poserGarde(require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); } catch (_) {}
-module.exports = { poserGarde, notesGardeReseau: notes };
+module.exports = { poserGarde, notesGardeReseau: notes, avecLangue };
