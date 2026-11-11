@@ -41690,15 +41690,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const carteTrancher = (j) => {
                 const plein = `${j.court}${j.detail ? '\n' + j.detail : ''}`;
                 return (
-                  <section key="a-trancher" className="vrm-at-journee" data-at-journee={trancherOuvert ? 'ouvert' : 'ferme'} aria-label="À trancher">
+                  <div key="a-trancher" className="vrm-at-journee" data-at-journee={trancherOuvert ? 'ouvert' : 'ferme'} role="group" aria-label="À trancher">
+                    <div className="vrm-day-task-list vrm-accueil-jour">
                     <button type="button" className="vrm-day-task vrm-fu-tache" data-job="a-trancher" data-n={String(j.n)} aria-expanded={trancherOuvert ? 'true' : 'false'}
                       title={plein} aria-label={plein.replace(/\n/g, ' — ')} onClick={() => setTrancherOuvert((o) => !o)}>
                       <PileVignettes srcs={j.photos || []} n={j.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="help" size={20}/>}/>
                       <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{j.court}</span>{j.detail ? <span className="vrm-day-task-note">{j.detail}</span> : null}</span>
                       <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{trancherOuvert ? 'Fermer' : 'Trancher'}</span></span>
                     </button>
-                    {trancherOuvert && aTrancher ? <div className="vrm-at-journee-corps" data-at-journee-corps=""><ATrancher etat={aTrancher} onAller={onAllerTrancher} onTrancher={onTrancherAT} Photo={PhotoVinted} vend={PROFIL_VENDEUR.vend || vendActuel()}/></div> : null}
-                  </section>
+                    </div>
+                    {trancherOuvert && aTrancher ? <div className="vrm-at-journee-corps" data-at-journee-corps=""><ATrancher etat={aTrancher} onAller={onAllerTrancher} onTrancher={onTrancherAT} Photo={PhotoVinted} vend={PROFIL_VENDEUR.vend || vendActuel()} resume={false}/></div> : null}
+                  </div>
                 );
               };
               const carteCycles = (liste) => {
@@ -41783,8 +41785,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const prochainAF = premierAF ? React.cloneElement(premierAF.el, { className: ((premierAF.el.props && premierAF.el.props.className) || '') + ' is-prochain', 'data-prochain': '' }) : null;
               const resteAF = listeAF.filter((x) => x !== premierAF);
               const alertesReste = resteAF.filter((x) => x.alerte), autresReste = resteAF.filter((x) => !x.alerte);
-              return { prochain: prochainAF, trancher: jobTrancher ? carteTrancher(jobTrancher) : null, section: (
+              return { prochain: prochainAF, section: (
                 <section className="vrm-fu-afaire" aria-label="À faire">
+                  {/* (11 nov., lot DJ4) « À trancher » en tête de la liste, ouvert en place. */}
+                  {jobTrancher ? carteTrancher(jobTrancher) : null}
                   {/* (9 nov., Ma journée v2) « Ensuite » : le reste, après la prochaine chose (posée en tête).
                       Le nombre de gestes compte TOUT (la prochaine comprise) : le même compte qu'avant. */}
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">{resteAF.length ? 'Ensuite' : 'À faire'}</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
@@ -41871,7 +41875,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
-            {AF.trancher || null}
             {AF.section}
 
             {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières

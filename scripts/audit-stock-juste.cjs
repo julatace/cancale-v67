@@ -41,6 +41,7 @@ const MUTATIONS = {
   'non-deux-gestes': ['src/cycleArticle.js', "const R = raison == null ? ['sortie', 'Sortie'] :", 'const R ='],
   'case-gardee': ['src/cycleArticle.js', "  if (kn && S[kn]) ops.push(", '  if (false) ops.push('],
   'plus-tard-muet': ['src/cycleArticle.js', '    if (repousseeJusqua(o.plusTard, id, o.maintenant) > 0) { plusTard++; continue; }\n', ''],
+  'pause-annulation': ['src/gesteAnnulable.js', 'if ((pause && pausable()) || visible == null) return;', 'if (pause || visible == null) return;'],
   'pause-sans-fin': ['src/gesteAnnulable.js', "garde = minuterie(() => { garde = null; if (!pause) return; pause = false; if (visible != null) armer(Math.max(1200, resteMs)); }, pauseMax);", 'garde = null;'],
 };
 
@@ -143,6 +144,13 @@ async function main(dir) {
       const id2 = M.lancer({ texte: 'y', cles: ['k'], vue: () => {}, ecrire: async () => ({ ok: true }) });
       await avancer(5200);
       dit(M.etat().visible === null && id2 > 0, 'C3 · le geste SUIVANT part à 5 s (la pause ne lui reste pas)', JSON.stringify(M.etat()));
+      // « Annulation… » / « Annulé » : rien à toucher ⇒ jamais en pause (le clic d'« Annuler » posait la pause).
+      let lacher; const id3 = M.lancer({ texte: 'z', cles: ['q'], vue: () => {}, ecrire: () => new Promise((r) => { lacher = r; }) });
+      await new Promise((r) => setImmediate(r));
+      M.suspendre(true); M.annuler(id3);
+      await avancer(5200);
+      dit(M.etat().visible === null, 'C5 · « Annulation… » sous le pointeur part quand même (rien à y toucher)', JSON.stringify(M.etat()));
+      M.suspendre(false); if (lacher) lacher({ ok: true });
     } finally { Date.now = realNow; }
     const pil = fs.readFileSync(path.join(dir, 'src/PiluleAnnuler.jsx'), 'utf8');
     dit(/document\.activeElement/.test(pil) && /\[v && v\.id, v && v\.etat/.test(pil), 'C4 · la pilule relit son focus RÉEL à chaque changement (un bouton disparu ne laisse pas de focus fantôme)');
