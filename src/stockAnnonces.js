@@ -197,6 +197,25 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendu
     auMoins: su && (manque.length > 0 || sansNumero.ebay > 0 || sansNumero.leboncoin > 0 || sansNumero.vestiaire > 0 || vcNonJugees.length > 0) };
 }
 
+// ⚠️⚠️ (11 nov., lot DJ4 — Julien : « Dans Stock je veux que ce soit que les paires en ligne,
+// une seule si elle est présente sur tous les sites, mais là tu me proposes de vieilles
+// annonces ».) Mesuré sur sa base (lecture seule) : les « vieilles annonces » étaient les
+// articles « à confirmer » (un compte relu le 11 août, un autre le 7 nov. : toute leur liste)
+// et les masquées par Vinted (10, dont 6 de septembre sur un même compte), MÉLANGÉES aux
+// annonces en ligne dans la liste et le compte du Stock. La liste du Stock = `enLigne` seul ;
+// les deux autres sont dites À PART (un repli chacune), jamais mêlées, jamais supprimées.
+// Une paire en ligne sur plusieurs sites reste UN article (réunie par identité plus haut).
+export function partagerParEtat(articles) {
+  const enLigne = [], aConfirmer = [], masquees = [];
+  for (const a of arr(articles)) {
+    if (!a) continue;
+    if (a.etat === 'enligne') enLigne.push(a);
+    else if (a.etat === 'masquee') masquees.push(a);
+    else aConfirmer.push(a);
+  }
+  return { enLigne, aConfirmer, masquees };
+}
+
 // Ce qui est dans une CASE et n'est plus une annonce actuelle : à sortir du
 // carton — jamais disparu en silence.
 //   slots     { [cle]: { m, i } }

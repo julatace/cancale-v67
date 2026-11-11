@@ -69,6 +69,8 @@ jobs:
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
           ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y postgresql)
+          # (11 nov., lot export-comptable) audit-export-zip relit le .xlsx avec openpyxl (python3 -I : paquet système, pas --user).
+          python3 -I -c 'import openpyxl' 2>/dev/null || (sudo apt-get update && sudo apt-get install -y python3-openpyxl)
       - name: Lancer les audits
         env:
           AUDITS_PART: ${{ matrix.part }}/3

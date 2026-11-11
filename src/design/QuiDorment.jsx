@@ -13,6 +13,7 @@
 import React from 'react';
 import { SEUILS_QUI_DORMENT } from '../quiDorment.js';
 import { SEUILS_FAVORIS, texteCompteur } from '../vendrePlus.js';
+import LigneGlissable from '../LigneGlissable.jsx';
 
 // (10 nov., lot C) `selection` (Set d'identifiants) + `onSelection` + `onBaisser` : une case
 // par ligne et « Baisser le prix (N) » — la feuille de baisse en série (src/BaissePrixSerie.jsx).
@@ -54,8 +55,15 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fm
               </div>
             ) : null}
             <ul className="vrm-qd-liste">
+              {/* (11 nov., gestes-glisser) Glisser une ligne vers la gauche : « Baisser » (la feuille de baisse, sa
+                  confirmation — rien ne part au glisser) et « Agir » (le choix existant). Les MÊMES gestes que
+                  « Baisser le prix (N) » et « Agir » : `onBaisser`, `onAgir`. */}
               {liste.map((a) => (
-                <li key={a.id} className="vrm-qd-ligne" data-qd-ligne={a.id} data-qd-age={a.age == null ? '' : a.age} data-qd-vues={a.vues == null ? '' : a.vues} data-qd-favoris={a.favoris == null ? '' : a.favoris} data-qd-coche={avecCases ? (selection.has(a.id) ? '1' : '0') : undefined}>
+                <LigneGlissable key={a.id} cle={a.id} libelle={a.numero ? `N°${a.numero}` : (a.titre || 'annonce')} actions={[
+                  onBaisser ? { cle: 'baisser', libelle: 'Baisser', icone: <IconeBaisse/>, faire: () => onBaisser([a]), data: { 'data-lg-baisser': a.id } } : null,
+                  onAgir ? { cle: 'agir', libelle: 'Agir', icone: <IconePlus/>, faire: () => onAgir(a), data: { 'data-lg-agir': a.id } } : null,
+                ]}>{(gp, tiroirG) => (
+                <li className="vrm-qd-ligne" {...gp} data-qd-ligne={a.id} data-qd-age={a.age == null ? '' : a.age} data-qd-vues={a.vues == null ? '' : a.vues} data-qd-favoris={a.favoris == null ? '' : a.favoris} data-qd-coche={avecCases ? (selection.has(a.id) ? '1' : '0') : undefined}>
                   {avecCases ? <label className="vrm-qd-coche-zone"><input type="checkbox" className="vrm-qd-coche" checked={selection.has(a.id)} onChange={() => basculer(a.id)} data-qd-case={a.id} aria-label={`Cocher ${a.numero ? 'le N°' + a.numero : a.titre || 'cette annonce'}`}/></label> : null}
                   {a.photo ? <img className="vrm-qd-photo" data-vrm-vignette="" src={a.photo} alt="" loading="lazy"/> : <span className="vrm-qd-photo" aria-hidden="true"/>}
                   <span className="vrm-qd-centre">
@@ -69,10 +77,20 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, Segmente, fm
                     {a.compte ? <span className="vrm-qd-sous">{a.compte}</span> : null}
                   </span>
                   <button type="button" className="vrm-qd-agir" data-qd-agir={a.id} aria-haspopup="dialog" onClick={() => onAgir(a)}>Agir</button>
+                  {tiroirG}
                 </li>
+                )}</LigneGlissable>
               ))}
             </ul>
           </>)}
     </section>
   );
+}
+
+// Les deux pictos du tiroir (traits 1,8 px, la grammaire d'ICON_PATHS) : une flèche qui descend, trois points.
+function IconeBaisse() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg>;
+}
+function IconePlus() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg>;
 }

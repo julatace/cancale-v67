@@ -53,3 +53,66 @@
   flex: 0 0 26px; height: 26px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center;
   background: var(--vrm-card2, #F2F2F7); color: var(--vrm-ink, #1D1D1F); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: -2px;
 }
+
+/* ── (11 nov., lot centre-aide) Le geste en cours, allumé par l'animation ── */
+.vrm-aide-etapes > li { transition: background-color 200ms ease-out; }
+.vrm-aide-etapes > li[data-aide-etape-actif] .vrm-aide-etape-n { background: var(--vrm-accent, #0071E3); color: #fff; }
+
+/* ── L'animation : une maquette SVG, jetons seulement (clair et sombre) ── */
+.vrm-aa { position: relative; margin: 4px 0 12px; padding: 0; border-radius: 18px; background: var(--vrm-card2, #F2F2F7); overflow: hidden; }
+.vrm-aa > svg { display: block; width: 100%; height: auto; max-height: 220px; }
+.vrm-aa-pause svg { display: block; width: 14px; height: 14px; }
+.vrm-aa-ecran { fill: var(--vrm-surface, #fff); stroke: var(--vrm-line, rgba(60,60,67,.18)); stroke-width: 1; }
+.vrm-aa-fond { fill: var(--vrm-card2, #F2F2F7); }
+.vrm-aa-cadre .vrm-aa-fond { fill: var(--vrm-bg, #F5F5F7); }
+.vrm-aa-bord { stroke: var(--vrm-line, rgba(60,60,67,.25)); stroke-width: 1; }
+.vrm-aa-vignette .vrm-aa-fond { fill: var(--vrm-line, #E5E5EA); }
+.vrm-aa-ligne { fill: var(--vrm-ink, #1D1D1F); opacity: .72; }
+.vrm-aa-ligne.vrm-aa-discret { opacity: .22; }
+.vrm-aa text { font-family: inherit; fill: var(--vrm-ink, #1D1D1F); font-size: 8px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.vrm-aa .vrm-aa-titre { font-size: 12px; font-weight: 700; letter-spacing: -.02em; }
+.vrm-aa .vrm-aa-fort { font-size: 8.5px; font-weight: 700; }
+.vrm-aa .vrm-aa-grand { font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.vrm-aa .vrm-aa-sous { fill: var(--vrm-muted, #6E6E73); font-weight: 500; font-size: 7.5px; }
+.vrm-aa-plein .vrm-aa-fond { fill: var(--vrm-ink, #1D1D1F); }
+.vrm-aa-plein text { fill: var(--vrm-surface, #fff); }
+.vrm-aa-ambre .vrm-aa-grand { fill: #B25000; }
+.vrm-aa-double .vrm-aa-fond { fill: color-mix(in srgb, var(--vrm-doublon, #D70015) 16%, transparent); stroke: var(--vrm-doublon, #D70015); stroke-width: 1.2; }
+.vrm-aa-el { transform-box: fill-box; transform-origin: center; }
+.vrm-aa-actif .vrm-aa-fond { stroke: var(--vrm-accent, #0071E3); stroke-width: 1.6; }
+.vrm-aa-actif.vrm-aa-tap { animation: vrm-aa-appui 1000ms cubic-bezier(.2,.8,.2,1) both; }
+.vrm-aa-actif.vrm-aa-arrive { animation: vrm-aa-arrive 1000ms cubic-bezier(.2,.8,.2,1) both; }
+.vrm-aa-actif.vrm-aa-part { animation: vrm-aa-part 1000ms cubic-bezier(.4,0,.2,1) both; }
+.vrm-aa-doigt { transition: transform 420ms cubic-bezier(.2,.8,.2,1); }
+.vrm-aa-bout { fill: rgba(29,29,31,.28); stroke: #fff; stroke-width: 1.5; }
+.vrm-aa-onde { fill: none; stroke: var(--vrm-accent, #0071E3); stroke-width: 1.5; animation: vrm-aa-onde 700ms 380ms ease-out both; transform-box: fill-box; transform-origin: center; }
+.vrm-aa-repere circle { fill: var(--vrm-accent, #0071E3); }
+.vrm-aa-repere text { fill: #fff; font-size: 8px; font-weight: 700; }
+@keyframes vrm-aa-appui { 0%, 38% { transform: scale(1); } 50% { transform: scale(.96); } 70%, 100% { transform: scale(1); } }
+@keyframes vrm-aa-arrive { 0% { opacity: 0; transform: translateY(-6px); } 45%, 100% { opacity: 1; transform: none; } }
+@keyframes vrm-aa-part { 0%, 35% { opacity: 1; transform: none; } 80%, 100% { opacity: .15; transform: translateX(12px); } }
+@keyframes vrm-aa-onde { 0% { opacity: .9; transform: scale(.6); } 100% { opacity: 0; transform: scale(2.2); } }
+.vrm-aa-pause {
+  position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 22px;
+  background: none; color: var(--vrm-muted, #6E6E73); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: none;
+}
+.vrm-aa-pause:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -6px; }
+:root[data-theme="dark"] .vrm-aa-bout { fill: rgba(255,255,255,.32); stroke: rgba(0,0,0,.6); }
+:root[data-theme="dark"] .vrm-aa-ambre .vrm-aa-grand { fill: #FF9F0A; }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-aa-doigt, .vrm-aa-actif, .vrm-aa-onde, .vrm-aide-etapes > li { animation: none !important; transition: none !important; }
+}
+
+/* ── « Comment faire… ? » : le champ, les titres, les fiches ── */
+.vrm-aide-cherche {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; margin: 0 0 4px; box-sizing: border-box;
+  border-radius: 12px; background: var(--vrm-card2, #F2F2F7); color: var(--vrm-muted, #6E6E73);
+}
+.vrm-aide-cherche input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: none; outline: none; font: inherit; font-size: 16px; color: var(--vrm-ink, #1D1D1F); padding: 0; }
+.vrm-aide-cherche:focus-within { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3); }
+.vrm-aide-tete { margin: 18px 4px 6px; font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-fiche-ou { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-fiche-etapes { margin: -2px 0 0; padding: 0 16px 0 36px; font-size: 15px; line-height: 1.45; color: var(--vrm-ink, #1D1D1F); }
+.vrm-aide-fiche-etapes > li + li { margin-top: 4px; }
+.vrm-aide-fiche-aller { padding: 10px 16px 14px; }
+.vrm-aide-rien { margin: 4px 4px 0; font-size: 15px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }

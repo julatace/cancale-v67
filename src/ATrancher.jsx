@@ -24,7 +24,7 @@ const Chevron = () => (
 
 // La vignette : la photo de L'ANNONCE (identité) ; sinon son N° ; sinon le nombre de la source.
 function Vignette({ carte, ton, Photo }) {
-  const P = Photo || ((p) => <img {...p} alt=""/>);
+  const P = Photo || (() => null);   // (11 nov.) sans la règle des photos (PhotoVinted), aucune <img> brute
   const tuile = (contenu, attrs = {}) => <span className="vrm-at-tuile" data-ton={ton} {...attrs}>{contenu}</span>;
   // Une chose sans photo (ou dont la photo ne vient pas) : une tuile neutre — le N° est
   // déjà écrit à côté, une fois.
@@ -42,6 +42,19 @@ function Vignette({ carte, ton, Photo }) {
   return tuile(<b>{carte.n}</b>, { 'data-a-trancher-nombre': carte.n });
 }
 
+// (11 nov., lot DJ4) « Tu l'as encore ? » : trois réponses sur place, chacune UN toucher
+// (annulable 5 s). Aucune fenêtre, aucune confirmation, aucune raison demandée.
+export function QuestionChezToi({ carte, onTrancher }) {
+  const b = carte.binaire;
+  return (
+    <div className="vrm-at-gestes is-trois">
+      <button type="button" className="vrm-at-b" data-role="non" data-a-trancher-non={carte.id} onClick={() => onTrancher(carte, 'non')}>{b.non}</button>
+      <button type="button" className="vrm-at-b" data-role="oui" data-a-trancher-oui={carte.id} onClick={() => onTrancher(carte, 'oui')}>{b.oui}</button>
+      <button type="button" className="vrm-at-b" data-role="plus-tard" data-a-trancher-plus-tard={carte.id} onClick={() => onTrancher(carte, 'plus-tard')}>{b.plusTard}</button>
+    </div>
+  );
+}
+
 function Carte({ carte, ton, Photo, onAller, onTrancher, ligne }) {
   const ouvrir = () => onAller && onAller({ ...ligne, geste: carte.geste });
   return (
@@ -54,7 +67,8 @@ function Carte({ carte, ton, Photo, onAller, onTrancher, ligne }) {
           {carte.noms && carte.noms.length ? <span className="vrm-at-noms">{carte.noms.map((n) => <span key={n} className="vrm-at-nom">{n}</span>)}</span> : null}
         </div>
       </div>
-      {carte.binaire && carte.id && onTrancher ? (
+      {carte.binaire && carte.binaire.trois && carte.id && onTrancher ? <QuestionChezToi carte={carte} onTrancher={onTrancher}/>
+      : carte.binaire && carte.id && onTrancher ? (
         <div className="vrm-at-gestes is-deux">
           <button type="button" className="vrm-at-b" data-role="oui" data-a-trancher-oui={carte.id} onClick={() => onTrancher(carte, 'oui')}>{carte.binaire.oui}</button>
           <button type="button" className="vrm-at-b" data-role="non" data-a-trancher-non={carte.id} data-a-trancher-ouvrir={carte.cle} onClick={ouvrir}>{carte.binaire.non}<Chevron/></button>
@@ -68,7 +82,7 @@ function Carte({ carte, ton, Photo, onAller, onTrancher, ligne }) {
   );
 }
 
-export default function ATrancher({ etat, onAller, onTrancher = null, Photo = null, entete = null, vend = 'sneakers' }) {
+export default function ATrancher({ etat, onAller, onTrancher = null, Photo = null, entete = null, resume = true, vend = 'sneakers' }) {
   if (!etat) return null;
   const { total, partiel, manque } = etat;
   const c = cartesATrancher(etat);
@@ -80,7 +94,7 @@ export default function ATrancher({ etat, onAller, onTrancher = null, Photo = nu
   return (
     <div className="vrm-a-trancher vrm-at" data-a-trancher={total} data-a-trancher-partiel={partiel ? '1' : '0'}>
       {entete}
-      {c.groupes.length ? (
+      {resume && c.groupes.length ? (
         <div className="vrm-at-resume" data-a-trancher-resume={total}>
           {partiel ? <span>Au moins</span> : null}
           <b className="vrm-at-total">{total}</b>
@@ -94,7 +108,9 @@ export default function ATrancher({ etat, onAller, onTrancher = null, Photo = nu
             {g.sources.map((s) => (
               <div key={s.cle} className="vrm-at-source" data-a-trancher-ligne={s.cle} data-n={s.n}>
                 {s.cartes.map((k) => <Carte key={k.cle + ':' + (k.id || 'n')} carte={k} ton={s.ton} Photo={Photo} onAller={onAller} onTrancher={onTrancher} ligne={lignes.get(s.cle)}/>)}
-                {s.autres > 0 ? (
+                {s.autres > 0 && s.ensuite ? (
+                  <p className="vrm-at-ensuite" data-a-trancher-ensuite={s.autres}>+ {s.autres} ensuite</p>
+                ) : s.autres > 0 ? (
                   <button type="button" className="vrm-at-autres" data-a-trancher-autres={s.autres} onClick={() => onAller && onAller(lignes.get(s.cle))}>+ {s.autres}<Chevron/></button>
                 ) : null}
               </div>

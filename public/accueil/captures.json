@@ -1,60 +1,72 @@
 {
  "bureau-clair.webp": {
-  "sha256": "d4bb6b0da075cfadd0cc92629e48601c1b7f09570d083ab79ba4e2116419af11",
+  "sha256": "e97e899be98da12b1338825c564493b3d0d8f2e7e84df71755f8222fbdf6eb51",
   "ecran": "journee",
   "largeur": 1440,
   "modeExemple": true
  },
  "bureau-sombre.webp": {
-  "sha256": "0e56e1c0e246a5859dbdf8e6650d147e5fb0bf23fcb52bb8386c1ceca28a3f43",
+  "sha256": "8e70c7a7ed5b42f39377d675c9a1db8bab0a8e358df9bc5472f6682834f95390",
   "ecran": "journee",
   "largeur": 1440,
   "modeExemple": true
  },
  "compta-clair.webp": {
-  "sha256": "968a6998d32c17663a73b6d8a17edf033cad75466614af3a22b5714c020ad217",
+  "sha256": "4fe35fbf80f503f429f59471aa12ef3d8aaccfeecc1db76ae44018abce1eea93",
   "ecran": "compta",
   "largeur": 390,
   "modeExemple": true
  },
  "compta-sombre.webp": {
-  "sha256": "27e622bafd9c04a86db7bc9a97cb5fdeb36b1655aa5709eafc9c35efd400dec6",
+  "sha256": "b3dfb215a88b188507aab03439371e13a84b5017fe47988c9274e339ce026681",
   "ecran": "compta",
   "largeur": 390,
   "modeExemple": true
  },
  "journee-clair.webp": {
-  "sha256": "739b8ceea04dc2b682f63ba66f175130529953112a4ab7bad318f46fb7c64294",
+  "sha256": "9163b3490931b7cea603d79699bcf700d8a6bc653232bbbbcea38b46ca402dbe",
   "ecran": "journee",
   "largeur": 390,
   "modeExemple": true
  },
  "journee-sombre.webp": {
-  "sha256": "9b48b54973aa4c834fd32235748644fc1f499e2b7f700b0490b2e41dafcf8a03",
+  "sha256": "92bf64c6430a9a1d344165aa9fe67c2abdfb4e5edadd0c9d42c406c0419bb0fd",
   "ecran": "journee",
   "largeur": 390,
   "modeExemple": true
  },
+ "messages-clair.webp": {
+  "sha256": "d7445e8e466634ab3a56e6c3ce74d79310461a0339a4df9894ceb83f99da8068",
+  "ecran": "messages",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "messages-sombre.webp": {
+  "sha256": "ffe6f1f6ba8514982ecb69b384dc123cec5fcb1351127a7c2a70589040bf610d",
+  "ecran": "messages",
+  "largeur": 390,
+  "modeExemple": true
+ },
  "numeros-clair.webp": {
-  "sha256": "d1c5874f611c6dee77bd1e09c5e8ae6a2b655da68cb1da00b7e3439cd6b69a5e",
+  "sha256": "27c16a490a01f9f8297e65d1a2991f63997532571e1fb728794b69a7f39a2eaf",
   "ecran": "annonces",
   "largeur": 390,
   "modeExemple": true
  },
  "numeros-sombre.webp": {
-  "sha256": "1d1521aafd9a325db0b0939da3580a8d1a61f3c780a1aead7d236076f9b5879f",
+  "sha256": "312c8fff230880e46cdeb4af394c01c57215771076f3a6912d7f13b63b88af32",
   "ecran": "annonces",
   "largeur": 390,
   "modeExemple": true
  },
  "retirer-clair.webp": {
-  "sha256": "1e855f422d8cbc8af3f3c7428b2ff25dcdfdfbff176815e4e57beb7ed3ab5d2a",
+  "sha256": "38618ee3dcee46dac44a3c9d7d760cfc7e02d50eee6f1a75bd1ba097db27a945",
   "ecran": "cat_bord",
   "largeur": 390,
   "modeExemple": true
  },
  "retirer-sombre.webp": {
-  "sha256": "0d0e13fe3b24137f9528dc8b31dd86bfea5e9d2317be289a07b879e6fb0276fe",
+  "sha256": "20c2a153b562a52a68dff9133a73eb3f61bcb7cb8b9746a38a95c9826d736fd1",
   "ecran": "cat_bord",
   "largeur": 390,
   "modeExemple": true

@@ -54,8 +54,49 @@ export const requeteDeLaVoix = (texte) => {
     if (lireNombre(reste) != null) { lettre = l.toUpperCase(); t = reste; }
   }
   const n = lireNombre(t);
-  if (n == null) return { requete: brut, numero: false };
+  if (n == null) return { requete: taillesEnChiffres(brut), numero: false };
   return { requete: lettre + String(n), numero: true };
+};
+
+// (11 nov., parler à la loupe) Une TAILLE dite en lettres dans un texte libre :
+// « nike taille quarante-deux » ⇒ « nike taille 42 » ; « Nike rouge quarante-deux »
+// ⇒ « Nike rouge 42 » (un nombre de 16 à 50 qui FINIT la phrase). Ailleurs, rien
+// ne change (« deux nike », « douze paires noires » restent des mots) : on ne
+// devine pas, on transcrit seulement ce qui est une taille.
+const MOT_TAILLE = /^(?:taille|pointure|t)$/;
+const estMotNombre = (m) => m in UNITES || m === 'cent' || m === 'cents' || m === 'mille' || m === 'et';
+export const taillesEnChiffres = (texte) => {
+  const mots = String(texte == null ? '' : texte).split(/\s+/).filter(Boolean);
+  // Chaque mot : sa forme lue (sans accents, minuscules) ; « quarante-deux » ⇒ deux mots lus.
+  const lus = mots.map((m) => { const b = sansAccents(m).toLowerCase(); const parts = b.split('-').filter(Boolean); return parts.length && parts.every(estMotNombre) ? parts : null; });
+  const sortie = [];
+  for (let i = 0; i < mots.length;) {
+    if (!lus[i] || lus[i][0] === 'et') { sortie.push(mots[i]); i++; continue; }
+    let j = i, run = [];
+    while (j < mots.length && lus[j]) { run = run.concat(lus[j]); j++; }
+    while (run.length && run[run.length - 1] === 'et') { run.pop(); j--; }   // « … et » en fin : pas un nombre
+    const n = nombreEnMots(run);
+    const apresTaille = i > 0 && MOT_TAILLE.test(sansAccents(mots[i - 1]).toLowerCase());
+    const finit = j === mots.length && i > 0 && n != null && n >= 16 && n <= 50;
+    if (n != null && (apresTaille || finit)) { sortie.push(String(n)); i = j; continue; }
+    sortie.push(mots[i]); i++;
+  }
+  return sortie.join(' ');
+};
+
+// (11 nov., parler à la loupe) Un N° DIT ouvre directement SA fiche — seulement si
+// l'identité est UNIQUE (`cleNum` : « 007 » = « 7 », « B125 » ≠ « 125 ») parmi TOUTES
+// les fiches, et que cette fiche est d'un compte affiché (`okUid`, null = tous).
+// Deux fiches au même N°, aucune, ou une d'un compte écarté ⇒ null : la loupe montre
+// la liste des résultats. Mieux vaut un blanc qu'un faux (§5).
+export const ficheDeLaVoix = (requete, fiches, cleNum, okUid = null) => {
+  const k = requete ? cleNum(String(requete)) : '';
+  if (!k) return null;
+  const fs = Object.values(fiches || {}).filter((f) => f && f.numero != null && String(f.numero).trim() !== '' && cleNum(String(f.numero)) === k);
+  if (fs.length !== 1) return null;
+  const f = fs[0];
+  if (okUid && f.accountId && !okUid.has(String(f.accountId))) return null;
+  return String(f.numero);
 };
 
 // « 124 », « 1 24 » (chiffres séparés par la dictée), ou des mots.
