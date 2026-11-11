@@ -21,7 +21,7 @@
 .vrm-pel-num { position: absolute; left: 4px; bottom: 4px; font-size: 10px; font-weight: 700; color: #fff; background: rgba(0,0,0,.62); border-radius: 8px; padding: 1px 5px; font-variant-numeric: tabular-nums; }
 .vrm-pel-textes { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-pel-titre { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-pel-sous { font-size: 13px; color: var(--pel-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-pel-sous { font-size: 13px; line-height: 1.35; color: var(--pel-gris); overflow-wrap: anywhere; }
 .vrm-pel-sous.is-rouge { color: var(--vrm-doublon, #D70015); font-weight: 600; }
 .vrm-pel-ligne > .vrm-b { flex-shrink: 0; min-height: 44px; }
 .vrm-pel-confirmer { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--pel-trait); padding-top: 12px; }
