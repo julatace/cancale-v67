@@ -174,3 +174,34 @@ suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 e
   imprimer », etc.) doit être prise par le moteur MONTRÉ (`prendImpression`).
 * Achats n'a pas de « Toutes » : Vinted est l'écran d'arrivée et montre TOUS les colis à retirer.
 * CLAUDE.md doit rester < 60 Ko : déplacer telles quelles les plus anciennes lignes du §9 vers historique-divers.
+
+## Suite 3 (11 nov., soir) : fusion de `main` et de `journee-perso` (c69e8b1a), rouges repris
+
+* **Vrai `git merge origin/main`** (robustesse serveur, E3 déjà dedans) : seul conflit `historique-divers.md` (deux côtés gardés).
+* **Vrai `git merge origin/claude/journee-perso`** — la demande la plus RÉCENTE de Julien sur « À retirer » (récit
+  `2026-11-11-bordereaux-transporteurs-retraits.md` §5). SES choix gagnent là où ils croisent les arbitrages :
+  - plus de carte des points relais (`avecCarte={false}`), « Itinéraire » au bout de l'adresse LUE — **arbitrage** : jamais
+    un itinéraire vers un nom seul (adresse pas lue ⇒ pas de lien : chercher un nom, c'est deviner le point) ;
+  - code ÉCRIT sur la ligne + n° de suivi complet, plus de bouton « Code » ni de ligne de sources ; une seule section
+    « À retirer » ; détail sans phrases QR ; achat prouvé en attente qui choisit son témoin d'abord (`achat-arrive-relais.js`) ;
+  - gardé de retraits fiables : « déplacé · selon … à hh:mm » (puce ambre), « Adresse pas lue », ordre Récents / Date limite,
+    Masquer un point ; **« pas confirmé depuis le … » reste sur la ligne en puce ambre** (le seul geste qu'appellent les
+    sources ; les sources elles-mêmes et « vérifié par … » sont dans le détail) ;
+  - titre : **en entier** (lot DJ3, « on ne voit pas tout le titre ») plutôt que « deux lignes » — la règle DJ3 était déjà la
+    plus forte en cascade (`@layer` + `!important`) ; la règle 2 lignes de `styles-retraits-clairs.css` est alignée.
+  - CLAUDE.md : la ligne §9 « Bordereaux, transporteurs, retraits » ajoutée ; la plus ancienne (actions-série) déplacée telle
+    quelle dans `historique-divers.md` (< 59 000 octets).
+* **Audits portés** (règle inchangée) : `audit-retraits-fiables` (le code est écrit sur la ligne, le glisser le copie) ;
+  `audit-traduction` C2 (9 entrées de navigation : Colis a quitté la barre, toutes les clés exigées).
+* **Bancs portés** :
+  - `retraits-fiables` F4 sur l'arbitrage (d) : un 2e colis (41100010) dont l'e-mail du code est daté APRÈS le changement ⇒
+    code montré ; celui d'AVANT (41100009) ⇒ « Code à confirmer », aucun code (règle jamais affaiblie) ; F3/F5/F7 lisent le
+    code écrit, la puce « pas confirmé », et « vérifié par e-mail » dans le détail OUVERT (la ligne fermée ne le porte plus).
+  - `navigation-tache` A : jugé sur `data-nav-entree` et sur le dictionnaire de la langue ACTIVE (`src/i18n/langues/<lang>.js`),
+    jamais une chaîne française en dur (au banc, navigateur anglais : « Today »… est juste).
+  - `colis-envoi` B : « À envoyer » = « Envoyés » au pixel (deux onglets de Ventes) ; Achats · À retirer a SA barre (même
+    forme de bouton). G : « En grand » s'ouvre depuis le détail de la ligne (plus de bouton « Code »).
+  - `annonces-ventes-brouillon` : la date limite ne peut plus être coupée — le TEXTE (Range) doit tenir dans chaque boîte qui
+    rogne, et aucune boîte entre lui et la carte ne porte nowrap + ellipsis (au téléphone la place suffisait, l'ellipse posée
+    passait) ; mutation `AVB_MUTATION=ellipse`. Et « Tes meilleures sources » doit venir APRÈS la liste d'Achats (après les
+    étapes, avant les reçus).

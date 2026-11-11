@@ -169,7 +169,13 @@ const lire = (pg) => pg.evaluate(() => {
         dit(c9 && !c9.code && c9.de === 'a-confirmer' && /TABAC ANCIEN EXEMPLE/.test(c9.ancien), 'F4 code d’un autre e-mail daté AVANT le changement ⇒ « Code à confirmer », jamais montré', J(c9));
         const vieux = L('6A41100000801');
         dit(vieux && vieux.pasConfirme && /pas confirmé depuis le 8 nov/.test(vieux.verifie) && a && !a.pasConfirme, 'F5 vu il y a 4 jours, rien depuis ⇒ « pas confirmé depuis le 8 nov. » (ambre) ; un colis vu hier ne l’est pas', J([vieux, a && a.verifie]));
-        dit(a && /^vérifié par e-mail/.test(a.verifie), 'F7 la ligne dit QUI a vérifié en dernier (« vérifié par e-mail … »)', a && a.verifie);
+        // (intégration journee-perso — Julien : « des infos dans tous les sens ») Les sources et l'heure de la dernière
+        // vérification sont dans le DÉTAIL ouvert de la ligne, plus sur la ligne : on ouvre la ligne et on y lit QUI a vérifié.
+        const sansSources = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.getAttribute('data-cc-carte').includes('41100001')); return !!l && !l.querySelector('[data-rp-detail]') && !l.querySelector('[data-rp-sources-ligne]'); });
+        await pg.locator('.vrm-rpf-ligne[data-cc-carte*="41100001"] button[aria-expanded], .vrm-rpf-ligne[data-cc-carte*="41100001"] .vrm-rpf-tap').first().click().catch(() => {});
+        await pg.waitForSelector('.vrm-rpf-ligne[data-cc-carte*="41100001"] [data-rp-detail] [data-rp-verifie-texte]', { timeout: 8000 }).catch(() => {});
+        const verifDetail = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.getAttribute('data-cc-carte').includes('41100001')); const v = l && l.querySelector('[data-rp-detail] [data-rp-verifie-texte]'); return v ? v.textContent.trim() : ''; });
+        dit(sansSources && /^vérifié par e-mail/.test(verifDetail), 'F7 la ligne fermée ne porte plus ses sources ; ouverte, son détail dit QUI a vérifié en dernier (« vérifié par e-mail … »)', JSON.stringify({ sansSources, verifDetail }));
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1, 'rien ne déborde', `${deb}px`);
         if (SHOTS) {
