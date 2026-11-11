@@ -11683,7 +11683,7 @@ const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null) 
 // (`zoneEtiquette`, + 4 mm), chaque code-barres / QR repéré (+ 5 mm) et une
 // bordure de 6 mm (la marge non imprimable). Étiquette introuvable, page qui
 // EST l'étiquette (10×15, thermique), aperçu indisponible : aucune mention.
-const MENTION = { texte: 'Créé par VRM', taille: 6.5, gris: 0.62, ecart: 25 * 72 / 25.4, etiquette: 4 * 72 / 25.4, codes: 5 * 72 / 25.4, bord: 6 * 72 / 25.4 };
+const MENTION = { texte: 'Créé par vrm.center', taille: 6.5, gris: 0.62, ecart: 25 * 72 / 25.4, etiquette: 4 * 72 / 25.4, codes: 5 * 72 / 25.4, bord: 6 * 72 / 25.4 };
 // Le point PDF → la page AFFICHÉE (l'inverse de `versPdfAffiche`).
 const versAffiche = (b, r, X, Y) => {
   if (r === 90) return { x: Y - b.y, y: X - b.x };
