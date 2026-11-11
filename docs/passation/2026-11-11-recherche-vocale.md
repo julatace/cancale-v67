@@ -80,8 +80,11 @@ directement l'article si son identité est unique (§5).
   court, Annonces en direct + refus sous le champ, sans API aucun micro, aucune erreur
   de page. Au premier passage, mes données de banc portaient DEUX fiches « 124 » :
   l'app n'a rien ouvert (la règle de l'unicité, vue en vrai) — corrigé dans le banc.
-  Mutation bâtie dans l'app (`ficheDeLaVoix` prend la première fiche) : voir le
-  rapport de session (rouge attendu sur « sept »).
+  Mutation bâtie dans l'app (`ficheDeLaVoix` prend la première fiche, build à part,
+  `BANC_DIST`) : **8 rouges** (« sept » ouvre une fiche à 390 et 1512 ; les contrôles
+  suivants tombent derrière la fiche restée ouverte).
+- Après le vrai `git merge origin/main` : build, audits et bancs `parler-loupe`,
+  `dictee` relancés, verts ; `recherche-exacte`, `recherche-unique` (audits) verts.
 - Captures regardées (`$TMPDIR/vrm-bancs/parler-loupe/`) : en direct (390), fiche 124
   (390), refus (1512 sombre), doublon 7 (1512 sombre), aide + « Pourquoi ? » (390),
   refus sous le champ d'Annonces (390).
