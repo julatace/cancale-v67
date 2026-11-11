@@ -47,10 +47,20 @@ Variables : `LARGEURS`, `THEMES`, `ETATS=V,P,B,H`, `ECRANS=journee,…`, `SHOTS=
    règle `lireAvecCopie` (src/copieLignes.js n'est pas modifié). Réussi ⇒ la mention part ; raté ⇒
    elle reste. Plus un écouteur dans l'écran ouvert (même chemin que le retour sur l'app, sans Vinted).
 
+7. **Lecture des ventes RATÉE ⇒ « lecture… » à l'infini** (Ma journée, Annonces, Ventes, Argent,
+   Statistiques, Leboncoin/eBay/Vestiaire) : quand les ventes ne se lisent pas ET que rien d'autre n'a
+   posé `liveStats` (annonces illisibles aussi), `liveStatsVus` restait `null` ⇒ « en cours ». ⇒ les
+   ventes `null` donnent `VENDU_PAS_SU` même sans `liveStats` : « pas lu », jamais « lecture… » (§5).
+8. Base injoignable : l'écran de démarrage reste ~3 s puis part, le bloc s'affiche — aucun rechargement
+   (le banc compte les navigations et vérifie que `#vrm-demarrage` est sorti).
+
 ## Preuves
 
 - Rouge sur `origin/main` (`git archive`, banc copié dedans) : V 390 clair **10 KO** (les « lecture… »,
-  « au moins 0 », Messages) ; H **KO** (« pas relu » reste au retour) ; B Paramètres **KO** (POST de la sonde).
+  « au moins 0 », Messages) ; H **KO** (« pas relu » reste au retour) ; B Paramètres **KO** (POST de la sonde) ;
+  P Ventes et Argent **KO** (« lecture… » après une lecture ratée).
+- Passe complète avant fusion : **1 664 OK, 0 KO** (13 écrans × 4 états × 390/1512 × clair/sombre) ;
+  captures regardées (V, P, B, H ; 390 et 1512 ; clair et sombre).
 - Vert ici : voir la dernière ligne de la passe complète dans le récit de la session (ci-dessous).
 - `npm run build` vert ; audits variables, tdz, identite, icones, textes-courts, fonctions-api, secrets
   verts ; coherence : 1 « non conforme » préexistant (clone superficiel, versions publiées illisibles,
