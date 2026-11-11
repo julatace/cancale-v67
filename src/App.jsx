@@ -8348,9 +8348,13 @@ const montantRecuEbay = (o) => {
   if (f.currency !== 'EUR') return { eur: null, raison: 'devise ' + (f.currency || 'inconnue') };
   return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
 };
-const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne, excluAutre } = {}) => {
+// (11 nov., famille « une règle par notion ») `frais(fiche, plateforme)` : les frais SAISIS sur la fiche
+//    (emballage, port payé par le vendeur, autres…) — la règle de `beneficePaire` (src/beneficePaire.js),
+//    la même que Vinted ; sans ce paramètre, 0 (comportement d'avant).
+const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne, excluAutre, frais = null } = {}) => {
   const out = [], vus = new Set();
   const achatDuNum = (k) => { const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return null; const a = achat(f); return a != null && isFinite(Number(a)) ? Number(a) : null; };
+  const fraisDuNum = (k, pl) => { if (typeof frais !== 'function') return 0; const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return 0; const x = Number(frais(f, pl)); return isFinite(x) ? x : 0; };
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v) || !lbcFinalisee(v)) continue;
     if (excluAutre && excluAutre('leboncoin', v)) continue;   // (3 nov.) compte écarté par son choix
@@ -8358,7 +8362,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     if (!isFinite(eur) || vus.has('lbc:' + v.txId)) continue;
     vus.add('lbc:' + v.txId);
     const nL = numLbc(v);
-    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(nL), frais: 0, num: nL ? String(nL) : '' });
+    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(nL), frais: fraisDuNum(nL, 'Leboncoin'), num: nL ? String(nL) : '' });
   }
   for (const o of (ebay || [])) {
     if (!o || !o.orderId || String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !commandeEbayEngagee(o)) continue;
@@ -8382,7 +8386,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     const eur = montantRecuVc(v).eur;
     if (eur == null) continue;
     vus.add('vestiaire:' + v.id);
-    out.push({ plateforme: 'Vestiaire', id: 'vestiaire:' + v.id, ts: dateVenteVc(v) || NaN, eur, achat: achatDuNum(v.num), frais: 0, num: v.num ? String(v.num) : '' });
+    out.push({ plateforme: 'Vestiaire', id: 'vestiaire:' + v.id, ts: dateVenteVc(v) || NaN, eur, achat: achatDuNum(v.num), frais: fraisDuNum(v.num, 'Vestiaire'), num: v.num ? String(v.num) : '' });
   }
   return out;
 };
@@ -21928,8 +21932,11 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
     //    certain. Le N° reste affiché (l'identité de la vente est connue) ;
     //    seul le bénéfice est tu quand le coût est ambigu.
     const fiche = num ? ficheUniqueDuNumero(numerosFiches, num) : null;
-    const achat = fiche ? prixAchatDe({ numero: num }, buyByNum) : null;
-    const benef = (prix != null && achat != null && !lbcAnnulee(o)) ? prix - achat : null;
+    // (11 nov., famille « une règle par notion ») la règle de la ligne (`beneficeLigneVente` → `beneficePaire`) :
+    //    le prix d'achat de LA fiche (puis son miroir), moins les frais saisis — la même que le total.
+    const r = fiche && prix != null ? beneficeLigneVente(prix, { ...fiche, buyPrice: prixAchatDe(fiche, buyByNum) }, { annulee: lbcAnnulee(o) }) : null;
+    const achat = r ? r.achat : null;
+    const benef = r ? r.benefice : null;
     return { num, benef, achat, compte: compteVenteLbc(o, itemsLbc, annLbc) };
   };
   return <div>
@@ -37445,8 +37452,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbcLu !== true || !Array.isArray(ebayCmd) || !lbcItemsBenef) return null;
     try {
       const liens = load('vrm_lbc_liens', {}) || {};
+      // (11 nov.) les frais saisis sur la fiche, comme Vinted ; Vestiaire verse DÉJÀ sans sa commission (pas comptée deux fois).
+      const fraisFicheAutres = (f, pl) => (pl === 'Vestiaire' ? coutsVente(Object.assign({}, f, { commission: '' })).total : chargesVente(f));
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
         achat: (f) => achatDe(withBuyByNum(f)),
+        frais: fraisFicheAutres,
         numLbc: (v) => numeroLbcIdentite(v, lbcItemsBenef, liens),
         numEbayLigne: (o, li) => numLigneEbay(o, li), excluAutre });
     } catch (_) { return null; }
@@ -37713,14 +37723,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  • DÉBLOQUÉ = ventes finalisées → Vinted a libéré les fonds sur ton solde.
   // Source = statut Vinted moissonné (fiable, se met à jour tout seul).
   const treasury = useMemo(() => {
-    let recu=0, nRecu=0, attente=0, nAttente=0;
-    for (const o of (sales.items || [])) {
-      if (isHidden(o)) continue;
-      const stt = classifyOrderStatus(o.status);
-      const amt = o.price?.amount!=null ? Number(o.price.amount) : 0;
-      if (stt === 'completed') { recu += amt; nRecu += 1; }        // argent réellement reçu (vente finalisée)
-      else if (stt === 'pending') { attente += amt; nAttente += 1; } // en attente de déblocage
-    }
+    // (11 nov., famille « une règle par notion ») « En attente » n'est PLUS calculé ici : c'est l'argent à
+    //    venir (src/argentAVenir.js, `liveStats.aVenir`), la règle du 4 nov. qui a remplacé cette somme des
+    //    statuts « en cours » (220 € de trop mesurés). « Reçu » : prix illisible compté à part (« au moins »).
+    const finalisees = (sales.items || []).filter((o) => !isHidden(o) && classifyOrderStatus(o.status) === 'completed');
+    const recuS = sommeConnue(finalisees, montantCommandeLu);
+    const recu = recuS.total, nRecu = finalisees.length;
     // Argent dépensé = tous les achats (tous comptes) hors annulés + les achats
     // hors Vinted saisis à la main (brocante, fournisseur…).
     let spent=0, nSpent=0;
@@ -37730,7 +37738,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       spent += amt; nSpent += 1;
     }
     for (const b of offBuys) { const p = parseFloat(String(b.price).replace(',','.')); if (!isNaN(p)) { spent += p; nSpent += 1; } }
-    return { recu, nRecu, attente, nAttente, spent, nSpent };
+    return { recu, recuS, nRecu, spent, nSpent };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
   const [showTreasury, setShowTreasury] = useState(false);
@@ -49021,16 +49029,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* ARGENT RÉELLEMENT REÇU */}
               <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:'#16a34a',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>✅ Reçu dans le porte-monnaie</div>
-                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)}&nbsp;€</div>
+                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{texteSomme(treasury.recuS, fmtE0)}</div>
                 <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''}, créditée{treasury.nRecu>1?'s':''} sur ton solde. <b>Sans</b> tes virements vers ta banque.</div>
               </div>
               {/* EN ATTENTE = somme des porte-monnaie Vinted (escrow réel si capté,
                   sinon somme des ventes en cours = argent que Vinted te retient). */}
-              {(()=>{ const useEscrow = walletEscrow && walletEscrow.total>0; const val = useEscrow ? walletEscrow.total : treasury.attente; return (
+              {(()=>{ const useEscrow = walletEscrow && walletEscrow.total>0; const aV = aVenirPour(liveStats && liveStats.aVenir, { plateforme: 'Vinted' }); const val = useEscrow ? walletEscrow.total : aV.valeur; return (
               <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.warn,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
-                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)}&nbsp;€</div>
-                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
+                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}} data-tresorerie-attente={val==null?'':Math.round(val*100)}>{val==null?'—':`${!useEscrow&&aV.partiel?'au moins ':''}${Math.round(val)}\u00a0€`}</div>
+                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.</> : <>L'argent que Vinted te doit encore : {aV.n} vente{aV.n>1?'s':''} conclue{aV.n>1?'s':''}, pas encore versée{aV.n>1?'s':''}{aV.partiel&&aV.manque.length?` (${aV.manque.join(', ')} pas lu)`:''}. <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
               </div>
               ); })()}
               {/* LITIGES EN COURS (paires qui reviennent : retour / remboursement / suspension) */}
