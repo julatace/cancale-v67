@@ -41598,8 +41598,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (5 nov., chantier E1, §5) « Rien à faire » ne se dit que sur ce qui a été LU : une case
               // pas lue (« — ») n'est pas une case à zéro. Sinon la ligne nomme ce qui manque.
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
+              // Les cases à zéro ET celles qu'il a cachées restent lisibles par les autres écrans et les bancs
+              // (mêmes compteurs), sans place à l'écran — aussi quand tout ce qui reste à faire est caché.
+              const compteursCaches = (<>
+                  <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
+                  {/* (11 nov., lot journee-perso) Les autres cartes qu'il a cachées : leur nombre reste lisible, sans place. */}
+                  {cacheesHorsCases.length ? <div hidden data-jp-cachees="">{cacheesHorsCases.map((id) => <span key={id} data-jp-cachee={id} data-n={String(nParCarteAF[id])}/>)}</div> : null}
+              </>);
               if (nGestes === 0 && nCacheesAF > 0) return { prochain: null, section: (
-                <p className="vrm-fu-vide" data-tout-a-jour="" data-jp-rien-affiche={nCacheesAF}>Rien à faire dans tes cartes affichées · {nCacheesAF} geste{nCacheesAF > 1 ? 's' : ''} dans les cartes cachées</p>
+                <section className="vrm-fu-afaire" aria-label="À faire" data-jp-rien-affiche={nCacheesAF}>
+                  <p className="vrm-fu-vide" data-tout-a-jour="">Rien à faire dans tes cartes affichées · {nCacheesAF} geste{nCacheesAF > 1 ? 's' : ''} dans les cartes cachées</p>
+                  {compteursCaches}
+                </section>
               ) };
               if (nGestes === 0) return { prochain: null, section: pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
@@ -41660,9 +41670,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </SheetShell>
                   ) : null}
                   {/* Les cases à zéro restent lisibles par les autres écrans et les bancs (mêmes compteurs), sans place à l'écran. */}
-                  <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
-                  {/* (11 nov., lot journee-perso) Les autres cartes qu'il a cachées : leur nombre reste lisible, sans place. */}
-                  {cacheesHorsCases.length ? <div hidden data-jp-cachees="">{cacheesHorsCases.map((id) => <span key={id} data-jp-cachee={id} data-n={String(nParCarteAF[id])}/>)}</div> : null}
+                  {compteursCaches}
                 </section>
               ) };
         })();
