@@ -51549,8 +51549,9 @@ function useQuoiDeNeuf() {
     vend: p.vend || vendActuel() || null, categories: p.categories !== undefined ? p.categories : lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
   const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
-  // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque ⇒ rien : jamais un compte faux qui change sous ses yeux.
-  const pret = p.uid === (AUTH.user?.id || '') && !!p.uid;
+  // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque, ou le nuage pas encore lu (« vu » sur un
+  // autre appareil, son statut) ⇒ rien : jamais un compte faux qui change sous ses yeux ni une carte qui clignote.
+  const pret = p.uid === (AUTH.user?.id || '') && !!p.uid && isCloudReady();
   return { aVoir: pret ? nouveautesAVoir(ctx, vues) : [], tout: pret ? nouveautesDuCompte(ctx) : [], vues: lireVuesNouveautes(vues), marquer };
 }
 function QuoiDeNeufJournee({ onNav }) {

@@ -129,6 +129,8 @@ async function scenario(nav, nom, W, theme) {
     const b = base({ affichage: 'complet' });
     const o = await ouvrir(nav, { W, sombre, base: b });
     const vu = await attendre(o.pg, async () => (await nCarte(o.pg)) > 0, 20000);
+    const suite = []; for (let i = 0; i < 20; i++) { suite.push(await nCarte(o.pg)); await o.pg.waitForTimeout(250); }
+    dit(suite.every((x) => x === suite[suite.length - 1]), `${T} le nombre ne change pas sous ses yeux`, suite.join(' '));
     const n = await nCarte(o.pg);
     dit(vu && n >= 12, `${T} la carte « Nouveau » est en haut de Ma journée (${n})`);
     dit(!(await o.pg.$('[role="dialog"]')), `${T} aucune fenêtre ouverte à l’arrivée`);
@@ -139,7 +141,7 @@ async function scenario(nav, nom, W, theme) {
     await o.pg.click('[data-quoi-de-neuf-carte]');
     await attendre(o.pg, async () => (await idsFeuille(o.pg)).length > 0);
     const ids = await idsFeuille(o.pg);
-    dit(ids.length === n, `${T} la feuille : une ligne par nouveauté (${ids.length})`);
+    dit(ids.length === n, `${T} la feuille : une ligne par nouveauté (${ids.length})`, ids.join(','));
     dit(ids.includes('facture-siret') && ids.includes('offres-auto-sures') && !ids.includes('ebay-sans-pointure'), `${T} Sneakers + micro + Complet : pro et Complet oui, « pas que des sneakers » non`, ids.join(','));
     dit(!ids.includes('centre-aide'), `${T} rien d’avant son inscription (centre d’aide du 8 nov.)`);
     const voirH = await o.pg.evaluate(() => Math.min(...[...document.querySelectorAll('[data-nouveaute-voir]')].map((a) => a.getBoundingClientRect().height)));
@@ -150,6 +152,7 @@ async function scenario(nav, nom, W, theme) {
     await o.pg.click('[data-quoi-de-neuf-feuille] [data-nouveaute="messages-tous"] [data-nouveaute-voir]').catch(() => {});
     const parti = await attendre(o.pg, async () => !(await o.pg.$('[data-quoi-de-neuf-feuille]')) && !(await o.pg.$('[data-quoi-de-neuf-carte]')));
     dit(cible === 'messages' && parti, `${T} « Voir » ferme la feuille et quitte Ma journée`);
+    dit(await attendre(o.pg, async () => !!((ligneMain(b).vrm_nouveautes_vues || {}).vues || {})['messages-tous'], 15000), `${T} « Voir » : cette ligne rangée dans main`);
     await capture(o.pg, pref + '-voir');
     await o.pg.evaluate(() => { history.pushState({}, '', '?tab=journee'); dispatchEvent(new PopStateEvent('popstate')); });
     await o.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });

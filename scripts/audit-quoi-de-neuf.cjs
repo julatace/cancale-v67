@@ -92,6 +92,7 @@ async function verifier(racine, { muet = false } = {}) {
   dit(!!fHook && /inscritLe:\s*AUTH\.user\?\.created_at/.test(fHook[1]), 'la date d’inscription vient du compte VRM (AUTH.user.created_at)');
   dit(!!fHook && /p\.mode === 'simple'/.test(fHook[1]) && /categories/.test(fHook[1]) && /regimeFiscal\(\)/.test(fHook[1]) && /save\(CLE_NOUVEAUTES_VUES/.test(fHook[1]), 'le contexte : Simple/Complet, ce qu’il vend, son statut ; « Vu » enregistré par save (synchronisé)');
   dit(!!fHook && /reg == null \? null/.test(fHook[1]), 'statut pas choisi ⇒ « pas su » (null), jamais « pas pro »');
+  dit(!!fHook && /aVoir: pret \? nouveautesAVoir\(ctx, vues\) : \[\]/.test(fHook[1]) && /const pret = p\.uid === \(AUTH\.user\?\.id \|\| ''\) && !!p\.uid && isCloudReady\(\);/.test(fHook[1]), 'profil pas posé ou nuage pas lu ⇒ aucune carte (pas un compte qui change sous ses yeux)');
   const jour = /<ScreenHead icon="soleilLevant" title="Ma journée"\/>([\s\S]*?)\{AF\.section\}/.exec(A);
   dit(!!jour && /<QuoiDeNeufJournee onNav=\{onNav\}\/>/.test(jour[1]), 'la carte est en haut de Ma journée (avant « À faire »)');
   const fJ = /function QuoiDeNeufJournee\(\{ onNav \}\) \{([\s\S]*?)\n\}/.exec(A);
@@ -130,6 +131,8 @@ async function verifier(racine, { muet = false } = {}) {
     ['src/App.jsx', 'clé hors SYNC_KEYS', '  CLE_NOUVEAUTES_VUES,\n', ''],
     ['src/App.jsx', 'carte retirée de Ma journée', '            {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}\n', ''],
     ['src/App.jsx', 'statut pas su ⇒ pas pro', "pro: reg == null ? null :", 'pro: reg == null ? false :'],
+    ['src/App.jsx', 'carte avant le nuage', ' && !!p.uid && isCloudReady();', ' && !!p.uid;'],
+    ['src/App.jsx', 'carte avant le profil', 'aVoir: pret ? nouveautesAVoir(ctx, vues) : []', 'aVoir: nouveautesAVoir(ctx, vues)'],
     ['src/App.jsx', 'feuille hors SheetShell', 'SheetShell={SheetShell} Bouton={Bouton}', 'SheetShell={(p) => <div>{p.children}</div>} Bouton={Bouton}'],
     ['src/QuoiDeNeuf.jsx', 'la carte devient une fenêtre', '<button type="button" className="vrm-qdn-carte"', '<button type="button" role="dialog" className="vrm-qdn-carte"'],
     ['src/ecrans/Reglages.jsx', 'Paramètres sans « Quoi de neuf »', "el:<QuoiDeNeufParametres onNav={setTab}/> },", 'el:null },'],
