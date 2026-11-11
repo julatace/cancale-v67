@@ -46638,7 +46638,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return est ? <span className="vrm-rp-sous" data-colis-limite="estimee" data-colis-limite-estimee={est.jour}>{`Vers le ${est.jour.slice(8, 10)}/${est.jour.slice(5, 7)} (estimé : ${nomTransporteur(carrierKey(t ? t.carrier : ev.carrier))} garde un colis ${est.garde} jours)`}</span>
                       : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>; })())}
               {/* (11 nov.) Le n° de suivi est sur la ligne (une fois, §7) : ici le compte seul. */}
-              {(plusieursComptesRet && cpt) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{`compte ${cpt}`}</span> : (su ? <span hidden data-rp-suivi={su}/> : null)}
+              {(plusieursComptesRet && cpt) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{`compte ${cpt}`}</span> : (su || cpt !== undefined ? <span hidden data-rp-suivi={su} data-colis-compte={cpt}/> : null)}
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
                   quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
               {x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">Transporteur pas encore connu : le suivi Vinted ne le nomme pas</span> : null}

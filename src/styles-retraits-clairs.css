@@ -23,7 +23,7 @@
 .vrm-rpf-suivi-ligne.is-sans { font-style: normal; opacity: .85; }
 :root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-sources { display: none !important; }
 .vrm-rpf-itineraire {
-  display: inline-flex; align-items: center; min-height: 32px; margin-top: 4px; font-size: 13px; font-weight: 600;
-  color: var(--p-encre, currentColor); text-decoration: underline; text-underline-offset: 2px;
+  position: relative; font-weight: 600; color: var(--p-encre, currentColor); text-decoration: underline; text-underline-offset: 2px;
 }
-@media (pointer: coarse) { .vrm-rpf-itineraire { min-height: 44px; } }
+/* 44 px au doigt sans grandir la ligne : la zone de toucher déborde autour du mot. */
+.vrm-rpf-itineraire::after { content: ''; position: absolute; inset: -12px -8px; }

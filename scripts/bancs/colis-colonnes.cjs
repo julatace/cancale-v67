@@ -190,7 +190,11 @@ const lire = (pg) => pg.evaluate((CODES) => {
   const compte = (s) => texte.split(s).length - 1;
   // (3 nov., nouvelle mise en page) Le code s'affiche au toucher (« Code ») : il est PORTÉ une fois par la ligne
   // de SON colis (`data-code-retrait`), et écrit en clair seulement dans le détail ouvert.
-  const codes = Object.fromEntries(CODES.map((c) => [c, main.querySelectorAll(`[data-code-retrait="${c}"]`).length + compte(c)]));
+  // (11 nov., Julien : « des infos dans tous les sens ») Le code est ÉCRIT sur la ligne de son colis (plus derrière
+  // « Code ») : une fois à l'écran = une fois dans le texte visible, plus un porteur `data-code-retrait` VISIBLE
+  // (le porteur caché de la ligne n'est pas une écriture). La règle est la même : jamais deux fois.
+  // Un code dans un repli fermé (« À vérifier ») n'est pas écrit : il est PORTÉ par sa ligne (une fois).
+  const codes = Object.fromEntries(CODES.map((c) => { const porteurs = main.querySelectorAll(`[data-code-retrait="${c}"]`).length; const ecrit = compte(c) + [...main.querySelectorAll(`[data-code-retrait="${c}"]`)].filter((x) => x.getClientRects().length && !(x.textContent || '').includes(c)).length; return [c, ecrit || Math.min(porteurs, porteurs > 1 ? porteurs : 1)]; }));
   const seg = [...document.querySelectorAll('[data-colis-onglet-choix]')].map((b) => ({ v: b.getAttribute('data-colis-onglet-choix'), n: b.getAttribute('data-colis-onglet-n'), urgent: b.getAttribute('data-urgent'), presse: b.getAttribute('aria-pressed'), txt: b.innerText.trim() }));
   const onglet = (document.querySelector('[data-colis-onglet]') || { getAttribute: () => null }).getAttribute('data-colis-onglet');
   // Texte écrasé : un bloc de texte réduit à une colonne étroite (une lettre par ligne).
@@ -286,7 +290,7 @@ async function main() {
         const premierPret = L.idents.find((x) => x.cle.startsWith('r:') && !x.verif);
         dit(!!mermoz && rowsMermoz.some((x) => x.echeanceAmbre && /dernier|demain/.test(x.echeance || '')) && premierPret && (premierPret.point === 'relaispressingmermoz|35000'), `${T} le point au dernier jour : en tête, « dernier jour » en ambre`, JSON.stringify([rowsMermoz.map((x) => [x.cle, x.echeance, x.section]), premierPret && premierPret.point]));
         // (3 nov.) Le code s'ouvre au toucher de « Code » : nommé (« Code de retrait 998877 »).
-        await pg.click('[data-cc-carte="r:v:9402"] [data-rp-code]').catch(() => {}); await pg.waitForTimeout(250);
+        await pg.click('[data-cc-carte="r:v:9402"] .vrm-rpf-ouvrir').catch(() => {}); await pg.waitForTimeout(250);   // (11 nov.) le détail s'ouvre en touchant la ligne
         const pumaTxt = await pg.evaluate(() => (document.querySelector('[data-cc-carte="r:v:9402"]') || {}).innerText || '');
         dit(/Puma Suede taille 42/.test(pumaTxt) && /Code de retrait\s*998877/.test(pumaTxt), `${T} une carte à retirer dit ce que c'est et SON code, nommé (« Code de retrait 998877 »)`, pumaTxt);
         await pg.click('[data-cc-carte="r:v:9402"] .vrm-rpf-ouvrir').catch(() => {}); await pg.waitForTimeout(200);

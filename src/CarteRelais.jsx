@@ -401,6 +401,9 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '',  // (lot AJ) l'arrivée lue qui range la ligne
     'data-rp-sources': marques.join(','), 'data-rp-verifie': Number.isFinite(x.verifieMs) ? String(x.verifieMs) : '', 'data-rp-code-sur': x.code && x.codeSur ? '1' : undefined, 'data-rp-codes-desaccord': desaccord ? desaccord.map((d) => d.source + ':' + d.code).join(',') : undefined };
   const basculer = () => setOuvert((o) => !o);
+  const suLigne = suiviDe ? String(suiviDe(x) || '') : '';
+  const titreLigne = (titreDe && titreDe(x)) || x.titre || '';
+  const titreSansArticle = !titreLigne || /^n°\s*…/.test(titreLigne);
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
   // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).
@@ -422,9 +425,9 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
           {!avecTransp && x.transp ? <BadgeTransporteur t={x.transp}/> : null}
         </span>
         <span className="vrm-rpf-quoi">
-          {/* (11 nov.) Un colis sans titre d'article s'appelait « n°…0010 » juste au-dessus de « n° 81000010 » :
-              le même n° deux fois. Il s'appelle « Colis » + son transporteur LU ; le n° est sur la ligne du code. */}
-          <span className="vrm-rpf-titre" title={x.titre} data-rp-titre="">{x.num ? `N°${x.num} · ` : ''}{(() => { const tt = (titreDe && titreDe(x)) || x.titre || ''; const nomT = x.transp && !x.trInconnu ? (x.transp.nom || '') : ''; return !tt || /^n°\s*…/.test(tt) ? (nomT ? `Colis ${nomT}` : 'Colis') : tt; })()}</span>
+          {/* (11 nov.) Un colis sans titre d'article s'appelait « n°…0010 » juste au-dessus de « n° 81000010 » : le même
+              n° deux fois. Son titre EST son n° de suivi complet (la clé), et la ligne du code ne le redit pas. */}
+          <span className="vrm-rpf-titre" title={x.titre} data-rp-titre="">{x.num ? `N°${x.num} · ` : ''}{titreSansArticle ? (suLigne ? `n° ${suLigne}` : 'Colis') : titreLigne}</span>
           {/* (11 nov., Julien : « des QR codes, des infos dans tous les sens, on ne comprend rien » ; « le n° de suivi
               est une clé ») CE QU'IL FAUT AU COMPTOIR, sans toucher : le code (gros), le n° de suivi, l'échéance.
               Plus de ligne de sources (« Vinted · e-mail · message · vérifié à… ») : elles restent en data-*. */}
@@ -434,7 +437,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
               : (!x.horsCompte ? <span className="vrm-rpf-code-venir" data-rp-code-a-venir="">Code à venir</span> : null))}
             {avecTransp && x.transp ? <span className="vrm-rpf-transp-ligne"><PastilleTransporteur t={x.transp} C={C} seul taille={16}/></span> : null}
-            {(() => { const su = suiviDe ? suiviDe(x) : ''; return su ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={su}>n° {su}</span> : <span className="vrm-rpf-suivi-ligne is-sans" data-rp-sans-suivi="">sans n° de suivi</span>; })()}
+            {titreSansArticle && suLigne ? <span hidden data-rp-suivi-ligne={suLigne}/> : suLigne ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={suLigne}>n° {suLigne}</span> : <span className="vrm-rpf-suivi-ligne is-sans" data-rp-sans-suivi="">sans n° de suivi</span>}
           </span>
           {(st || e) ? <span className="vrm-rpf-puces">
             {st ? <span className="vrm-rpf-puce is-ambre" data-rp-statut="">{st}</span> : null}
@@ -620,9 +623,9 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
         <header className="vrm-rpf-tete">
           <span className="vrm-rpf-ident">
             <b className="vrm-rpf-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
-            {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
-            {/* (11 nov.) Plus de carte (Julien : « ça sert à rien ») : l'itinéraire vers l'adresse LUE, d'un geste. */}
-            {(() => { const lieu = [p.nom, p.adresse || p.adresseCourte].filter(Boolean).join(', '); const href = lieu ? lienItineraire(lieu, appareilApple()) : ''; return href ? <a className="vrm-rpf-itineraire" href={href} target="_blank" rel="noreferrer" data-relais-itineraire="" aria-label={`Itinéraire vers ${p.nom || 'ce point'}`}>Itinéraire</a> : null; })()}
+            {/* (11 nov.) Plus de carte (Julien : « ça sert à rien ») : l'itinéraire vers l'adresse LUE, d'un geste, au bout de l'adresse. */}
+            {(() => { const adr = p.nom ? (p.adresse || p.adresseCourte || '') : ''; const lieu = [p.nom, p.adresse || p.adresseCourte].filter(Boolean).join(', '); const href = lieu ? lienItineraire(lieu, appareilApple()) : '';
+              return (adr || href) ? <span className="vrm-rpf-adr" data-relais-adresse="">{adr}{href ? <>{adr ? ' · ' : ''}<a className="vrm-rpf-itineraire" href={href} target="_blank" rel="noreferrer" data-relais-itineraire="" aria-label={`Itinéraire vers ${p.nom || 'ce point'}`}>Itinéraire</a></> : null}</span> : null; })()}
           </span>
           <span className="vrm-rpf-meta">
             {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
