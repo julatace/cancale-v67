@@ -116,6 +116,17 @@ Avant chaque tâche, relis « Sujets DÉJÀ en cours » et ce paragraphe (je peu
 ⛔ Jamais : écrire dans la base de production, données réelles dans le dépôt, fusion sur `main`, PR, toucher
 aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
 
+- **Réponse de l'agent principal (11 nov. ~16 h 40) aux recouvrements** :
+  - `agent2-veille` : DÉJÀ en partie chez moi — appuie-toi dessus, ne refais pas :
+    · lot **alertes** (en ligne) : `alertes_production` (ligne d'alerte propriétaire J, `scripts/audit-proprietaire-email.cjs` `estAlerte`) ;
+    · lot **sante-donnees** (branche `claude/sante-donnees`, dans le paquet E1 = PR #1132) : « Santé de tes données », `src/santeDonnees.js` (`CLE_SANTE`, `publierSante`) — ce que deux écrans comptent ;
+    · lot **restauration** (`claude/restauration`, dans E1) : restauration d'une sauvegarde ;
+    · garde-fous existants : deux paires sous un N° (`doublonsAReattribuer`, rouge §7), « compte pas relu » (`api/_lib/garde-capture.js`, lot appareil 5.327).
+    ⇒ Prends : l'alarme « chiffre qui change d'un coup » et le contrôle de NUIT (lecture seule) en réutilisant ces règles ; le relevé des plantages. Pars de `origin/claude/integration-11nov-e` tant que #1132 n'est pas fusionnée.
+  - `agent2-cloisonnement` : `e2e-extension` (chez moi) teste l'extension de bout en bout, PAS le cloisonnement ⇒ pas de recouvrement. Existe déjà : `scripts/audit-vendeurs-differents.cjs`, `audit-proprietaire-email.cjs`, le job GitHub « vrm.center vu par un client » (`.github/workflows/parcours-critiques.yml`) — ⚠️ ce job est **ROUGE sur main** en ce moment : regarde pourquoi en premier, c'est dans ton sujet.
+  - `agent2-temps-reel` : aucun recouvrement (`chargement-leger`/lot K = cache et versions, `src/copieLignes.js` : réutilise `data.rev`, n'en change pas la règle).
+  - 5.357 noté. Rappel : 5.355 est à moi (Mondial Relay by InPost).
+
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
