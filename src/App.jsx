@@ -14162,7 +14162,7 @@ const DICTEE_REFUS = { non: false };
 function BoutonPhotoRecherche() {
   return (
     <button className="vrm-micro" type="button" data-recherche-photo-ouvrir="" onClick={(e) => { e.preventDefault(); ouvrirRecherchePhoto(); }}
-      aria-label="Chercher par photo" title="Chercher par photo : prends la paire, VRM montre les annonces qui lui ressemblent">
+      aria-label="Chercher par photo" title={`Chercher par photo : prends ${motsArticle(vendActuel()).le}, VRM montre les annonces qui lui ressemblent`}>
       <Icon name="camera" size={19}/>
     </button>
   );
