@@ -48,6 +48,8 @@ const RAISONS = {
   'pas-ce-jour': 'liste pas lue le 31 décembre',
   partiel: 'une lecture d’annonces manque',
   'seuils-annee': 'seuils de cette année pas vérifiés',
+  'inventaire-publication': 'liste pas encore lue : ouvre Annonces',
+  'seuils-partiel': 'sur un chiffre d’affaires minimum',
 };
 const VERDICT = { atteint: 'seuil atteint', atteintSi: 'atteint si les ventes à dater y sont', sous: 'sous le seuil' };
 const ETAT_SEUIL = { ok: 'sous le seuil', proche: 'proche', base_depasse: 'dépassé', majore_depasse: 'seuil majoré dépassé', due_depuis_janvier: 'TVA due depuis janvier', depasse: 'dépassé', sortie: 'dépassé deux ans de suite' };
@@ -63,7 +65,7 @@ function sousTexte(e, K) {
     case 'inventaire': {
       const val = e.v && e.v.centimes != null ? `${e.v.nSans > 0 || e.partiel ? 'au moins ' : ''}${eur(e.v.centimes / 100)} sur ${nb(e.v.n)} paire${pl(e.v.n)}` : '';
       if (e.etat === 'attente') return `à faire le 31 décembre${val ? ' · aujourd’hui ' + val : ''}`;
-      if (e.etat === 'passu') return e.raison === 'pas-ce-jour' && e.lue ? `liste lue le ${e.lue.split('-').reverse().join('/')}, pas le 31/12 : VRM ne reconstitue pas un jour passé` : (RAISONS[e.raison] || 'pas su');
+      if (e.etat === 'passu') return e.raison === 'pas-ce-jour' && e.lue ? `liste lue le ${e.lue.split('-').reverse().join('/')}, pas le 31/12 : VRM ne reconstitue pas un jour passé` : (RAISONS['inventaire-' + e.raison] || RAISONS[e.raison] || 'pas su');
       if (e.etat === 'manque') return `${nb(e.n)} paire${pl(e.n)} sans prix · ${val}`;
       return val || 'liste lue le 31 décembre';
     }
@@ -82,7 +84,7 @@ function sousTexte(e, K) {
       if (e.tva) morceaux.push(`TVA : ${ETAT_SEUIL[e.tva] || e.tva}`);
       if (e.plafond) morceaux.push(`micro : ${ETAT_SEUIL[e.plafond] || e.plafond}`);
       for (const d of e.dac7 || []) morceaux.push(`DAC7 ${d.plateforme} : ${d.etat === 'passu' ? 'pas lu' : VERDICT[d.verdict] || 'pas su'}`);
-      if (e.etat === 'passu') morceaux.unshift(RAISONS[e.raison] || 'pas su');
+      if (e.etat === 'passu') morceaux.unshift(RAISONS['seuils-' + e.raison] || RAISONS[e.raison] || 'pas su');
       return morceaux.join(' · ') || 'aucune plateforme lue';
     }
     case 'export': return `période ${K.annee} · VRM ne sait pas s’il est parti`;
@@ -136,12 +138,12 @@ export default function ClotureAnnee({ portes = {}, maintenant: maintenantProp }
       data-cloture-faites={K.faites} data-cloture-sur={K.sur} aria-label={`Clôturer ${K.annee}`} style={{ scrollMarginTop: 72 }}>
       <div className="vrm-mb-tete">
         <h3 className="vrm-mb-titre">Clôturer {K.annee}</h3>
-        <span className="vrm-ca-compte" data-cloture-progression="">{K.faites}/{K.sur}</span>
+        {K.etat === 'cloturee' ? null : <span className="vrm-ca-compte" data-cloture-progression="">{K.faites}/{K.sur}</span>}
       </div>
       {K.etat === 'cloturee' ? (
         <div className="vrm-mb-etat is-pret" role="status">
           <b className="vrm-mb-titre-etat" data-cloture-faite="">{K.annee} clôturée le {dateFr(K.clotureeLe)}</b>
-          <button type="button" className="vrm-lien-action vrm-ca-rouvrir" data-cloture-rouvrir="" onClick={rouvrir}>Rouvrir la liste</button>
+          <button type="button" className="vrm-ca-rouvrir" data-cloture-rouvrir="" onClick={rouvrir}>Rouvrir la liste</button>
         </div>
       ) : (<>
         <p className="vrm-ca-phrase">Huit étapes, une par ligne. Touche une ligne pour ouvrir l’écran où la régler ; rien n’est fait à ta place.</p>

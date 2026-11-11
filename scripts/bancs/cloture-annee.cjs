@@ -205,7 +205,8 @@ const attendreCa = (pg) => pg.waitForFunction(() => { const e = document.querySe
           dit(ex && ex['export-periode'] === '2026', `${nom} : la porte « export » ouvre l’export sur 2026 (rien téléchargé)`, JSON.stringify(ex));
           await capture(pg, `cloture-export-${T.nom}`, '[data-export-comptable]');
           await pg.evaluate(() => document.querySelector('[data-cloture-annee]').scrollIntoView());
-          await pg.click('[data-cloture-porte="inventaire"]'); await pg.waitForTimeout(2500);
+          await pg.click('[data-cloture-porte="inventaire"]');
+          await pg.waitForSelector('[data-inventaire-annuel]', { timeout: 25000 }).catch(() => {});
           dit(!!(await pg.$('[data-inventaire-annuel]')), `${nom} : la porte « inventaire » ouvre l’inventaire de fin d’année du Stock`);
           await aller(pg, 'argent_declarer', '[data-cloture-annee]', 800); await attendreCa(pg);
           await pg.click('[data-cloture-fini]'); await pg.waitForTimeout(500);
@@ -217,6 +218,9 @@ const attendreCa = (pg) => pg.waitForFunction(() => { const e = document.querySe
           const ls = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_cloture_annee') || '{}'); } catch (_) { return {}; } });
           dit(ls['2026'] && ls['2026'].at > 0 && ls['2026'].etapes && ls['2026'].etapes.adater === 'manque', `${nom} : rangée avec l’état constaté de chaque étape`, JSON.stringify(ls));
           await capture(pg, `cloture-faite-${T.nom}`, '[data-cloture-annee]');
+          await pg.click('[data-cloture-rouvrir]'); await pg.waitForTimeout(800);
+          const A3 = await attrs(pg, '[data-cloture-annee]');
+          dit(A3 && A3['cloture-etat'] === 'afaire', `${nom} : « Rouvrir la liste » la remet à faire`, JSON.stringify(A3));
         }
       });
       dit(!errs.length, `${nom} : aucune erreur de page`, errs.slice(0, 3).join(' | '));

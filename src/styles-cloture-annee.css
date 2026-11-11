@@ -29,6 +29,7 @@
 }
 :root:root body .vrm-ca-cloture .vrm-ca-fini:disabled { opacity: .45 !important; cursor: default; }
 :root:root body .vrm-ca-cloture .vrm-ca-fini:focus-visible { outline: 3px solid var(--mb-accent) !important; outline-offset: 2px !important; }
-:root:root body .vrm-ca-cloture .vrm-ca-rouvrir { align-self: flex-start !important; min-height: 44px !important; }
+:root:root body .vrm-ca-cloture .vrm-ca-rouvrir { align-self: flex-start !important; min-height: 44px !important; margin: 2px 0 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; color: var(--mb-accent) !important; font: 600 15px/1 var(--mb-police) !important; cursor: pointer; }
+:root:root body .vrm-ca-cloture .vrm-mb-etat.is-pret { gap: 4px !important; }
 :root:root body .vrm-ca-cloture .vrm-mb-rond.is-attente, :root:root body .vrm-ca-cloture .vrm-mb-rond.is-geste, :root:root body .vrm-ca-cloture .vrm-mb-rond.is-na { font-size: 12px !important; }
 }
