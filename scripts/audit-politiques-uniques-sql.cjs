@@ -1,4 +1,4 @@
-// Migration 033 (une permissive par table) sur PostgreSQL JETABLE, jamais sur Supabase.
+// Migration 036 (ex-033 ; une permissive par table) sur PostgreSQL JETABLE, jamais sur Supabase.
 // Modèle : scripts/audit-confidentialite-sql.cjs.
 // On rebâtit l'état de production DÉCRIT par l'assistant Supabase (11 nov.) :
 // permissives en double + toutes les restrictives (006/027, 021), puis on joue une
@@ -30,7 +30,7 @@ const run=(sql,db=BASE)=>{const r=spawnSync(path.join(BIN,'psql'),['-h',DIR,'-p'
 const Q=(sql,db)=>{const r=run(sql,db);if(!r.ok)throw Error(r.err);return r.out;};
 const dit=(c,n)=>{c?ok++:ko++;console.log(`${c?'✅':'❌'} ${n}`);};
 const A='11111111-1111-4111-8111-111111111111',B='22222222-2222-4222-8222-222222222222',C='33333333-3333-4333-8333-333333333333';
-const M033=fs.readFileSync(path.join(RACINE,'supabase/migrations/033-politiques-uniques.sql'),'utf8');
+const M033=fs.readFileSync(path.join(RACINE,'supabase/migrations/036-politiques-uniques.sql'),'utf8');
 const M021=fs.readFileSync(path.join(RACINE,'supabase/migrations/021-confidentialite-boutiques.sql'),'utf8');
 let nBase=0;
 // Une base neuve, dans l'état de production décrit (variante d'abonnement, équipe ou non).

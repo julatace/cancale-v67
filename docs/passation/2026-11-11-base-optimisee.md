@@ -22,7 +22,7 @@ bornent `owner = auth.uid()`. Postgres combine les permissives en OU et les
 évalue toutes. (La 004 notait déjà : « tout_select / tout_insert / tout_update
 doublonnent “chacun ses lignes” ; les retirer demande une confirmation humaine ».)
 
-**Ce que fait `supabase/migrations/033-politiques-uniques.sql`** : garde
+**Ce que fait `supabase/migrations/036-politiques-uniques.sql`** : garde
 `vrm_proprietaire_permis` (021 : FOR ALL, TO authenticated,
 `owner = (select auth.uid())` en lecture et en écriture), retire les autres
 permissives **seulement si** leur condition est exactement la même (sous l'une

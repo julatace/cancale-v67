@@ -1,3 +1,4 @@
+-- (11 nov., intégration) renumérotée 033 → 036 : la 033 est celle des points de restauration.
 -- ════════════════════════════════════════════════════════════════════════════
 -- 033 — UNE SEULE POLITIQUE PERMISSIVE PAR TABLE (app_data, vinted_accounts)
 --       (11 novembre 2026) — PAS ENCORE APPLIQUÉE (geste de Julien,
