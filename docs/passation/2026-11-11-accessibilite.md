@@ -171,3 +171,30 @@ chaque morceau traduit porte son `lang`. (Note : §3 de CLAUDE.md dit « pas de 
   si une part de la CI dépasse 20 min, déplacer un banc vers la part la moins chargée.
 - Les données inventées sont petites : un état rare (bandeau d'erreur, liste longue) peut
   porter un contraste que le banc ne voit pas.
+
+## ÉTAT À LA REPRISE (arrêt demandé, 11 nov.)
+
+**Fait et poussé** (branche `claude/accessibilite`, aucune PR) : bancs `accessibilite` (17 écrans +
+5 feuilles) et `accessibilite-clavier` (zoom 200 %, clavier seul) sur le socle `_a11y.cjs`,
+branchés en CI (parts 2 et 3) et dans `LOT` de `lancer-bancs.cjs` ; corrections listées plus haut.
+
+**Prouvé (dernier passage, arbre fusionné avec `origin/main` du 11 nov. au soir)** :
+`accessibilite` **225 ✅ · 0 ❌** ; `accessibilite-clavier` **206 ✅ · 1 ❌** ; audits demandés verts ;
+rouge sur `origin/main` 2084be1b (84 ❌ et 1 ❌) ; mutations focus/largeur/coupe rouges.
+
+**Reste (le seul rouge)** : K2 sombre, Achats — la case `<input type="checkbox" aria-label="Sélectionner
+Achat Vinted banc">` garde un contour à 2,97:1. La règle ajoutée dans `src/selection-serie.css`
+(`.vrm-serie-case input:focus-visible`) **n'a pas pris** : soit cette case n'est pas une
+`CaseSerie` (chercher `Sélectionner ${` dans `src/App.jsx` l. ~14736 `vrm-sel-case` et ~47712),
+soit une règle plus forte l'écrase. Lancer :
+`BANC_ECRANS=achats BANC_SEUL=K BANC_DUMP=1 node scripts/bancs/accessibilite-clavier.cjs`.
+
+**Prochaines étapes** : 1) corriger cette case puis relancer les deux bancs ; 2) `git merge
+origin/main` (main bouge vite : chaque fusion a apporté de nouveaux rouges que le banc attrape) ;
+3) garder `CLAUDE.md` < 59 000 octets (déplacer telle quelle la plus ancienne ligne du §9 dans
+`historique-divers.md`) ; 4) faire trancher la langue de la page en anglais (section ⚠️ ci-dessus).
+
+**Pièges** : `lang="en"` si le navigateur est en anglais (le socle force `locale: 'fr-FR'`) ;
+`audit-coherence` exige l'historique complet (`git fetch --unshallow origin main`) ; ne jamais
+reconstruire `dist/` pendant qu'un banc le sert ; `tout-imprimer` et 4 bancs de navigation sont
+rouges à l'identique sur `main` (pas ce lot) ; durées ~10 et ~6 min sur machine chargée.
