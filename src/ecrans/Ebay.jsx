@@ -1412,7 +1412,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               <div style={{ marginTop: 12, display: 'flex', gap: 11, alignItems: 'flex-start', background: `${C.accent}0D`, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '12px 13px' }}>
                 <Icon name="box" size={20} style={{ color: C.accentTexte, flexShrink: 0, marginTop: 1 }} />
                 <div style={{ minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-                  <b>La livraison est gérée par eBay.</b> Le <b>transporteur</b> (Mondial Relay, Chronopost, Colissimo…) se choisit <b>dans eBay</b>, et c'est <b>eBay</b> qui fixe le montant, l'encaisse et te fournit le bordereau. <span className="vrm-aide" style={{ color: C.muted }}>Tu ne paies jamais le port.</span>
+                  <b>La livraison est gérée par eBay</b> : eBay fixe le montant et l'encaisse.
+                  <div className="vrm-aide" style={{ color: C.muted }}>Tu ne paies jamais le port.</div>
+                  <Pourquoi>Le transporteur (Mondial Relay, Chronopost, Colissimo…) se choisit dans eBay, et c'est eBay qui fixe le montant, l'encaisse et te fournit le bordereau.</Pourquoi>
                 </div>
               </div>
             </BlocEbay>
@@ -1847,7 +1849,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
       ) : (
         <>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55, marginBottom: 10 }}>
-            Tout est prêt côté clés. Autorise ton compte vendeur sur la page d'eBay — <b>aucun mot de passe ne passe par VRM</b>, tu te connectes chez eBay.
+            Autorise ton compte chez eBay : <b>aucun mot de passe ne passe par VRM</b>.
           </div>
           <button type="button" onClick={() => connecter(false)} disabled={busy}
             style={{ border: 'none', borderRadius: 12, background: C.accent, color:C.onAccent, padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
@@ -2387,10 +2389,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
             </label>
           )}
           {typeof achat === 'number' && (sousAchat
-            ? <div data-regle-achat="sous" data-regle-sous-achat={it.itemId} style={{ fontSize: 12, color: E.warn, marginTop: 6, lineHeight: 1.45 }}>C'est sous ton prix d'achat ({eurEbay(achat)}), avant frais eBay : une offre à ce montant te ferait vendre à perte.</div>
+            ? <div data-regle-achat="sous" data-regle-sous-achat={it.itemId} style={{ fontSize: 12, color: E.warn, marginTop: 6, lineHeight: 1.45 }}>Sous ton prix d'achat ({eurEbay(achat)}), avant frais eBay : vente à perte.</div>
             : <div data-regle-achat="connu" style={{ fontSize: 12, color: E.muted, marginTop: 6 }}>Prix d'achat : {eurEbay(achat)}.</div>)}
           {achat === null && <div data-regle-achat="pas-saisi" style={{ fontSize: 12, color: E.muted, marginTop: 6 }}>Prix d'achat pas saisi (Vinted → Annonces → Coût d'achat).</div>}
-          {et.offresFaites > 0 && <div data-regle-offres-faites={et.offresFaites} style={{ fontSize: 12, color: E.muted, marginTop: 6, lineHeight: 1.45 }}>eBay compte {et.offresFaites} offre{et.offresFaites > 1 ? 's' : ''} déjà faite{et.offresFaites > 1 ? 's' : ''} : si l'une atteint le montant, eBay peut l'accepter aussitôt.</div>}
+          {et.offresFaites > 0 && <div data-regle-offres-faites={et.offresFaites} style={{ fontSize: 12, color: E.muted, marginTop: 6, lineHeight: 1.45 }}>Déjà {et.offresFaites} offre{et.offresFaites > 1 ? 's' : ''} : si l'une atteint le montant, eBay peut l'accepter.</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
             <button type="button" data-regle-enregistrer={it.itemId} disabled={!peutEnregistrer} onClick={enregistrerRegle} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff', opacity: peutEnregistrer ? 1 : 0.45, cursor: peutEnregistrer ? 'pointer' : 'default' }}>{envoiRegle === 'pose' ? 'Envoi…' : 'Enregistrer la règle'}</button>
             <button className="vrm-b vrm-b-discret" type="button" data-regle-annuler={it.itemId} onClick={() => { setRegleOuverte(false); setRegleSignal(''); }} style={{ ...btnE, color: E.muted }}>Annuler</button>
@@ -2444,7 +2446,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {/* (9 octobre) Une règle d'offre connue : le nouveau prix la touche peut-être. */}
           {edit && et && et.etat === 'connue' && prixChange && (
             <div data-regle-rappel={it.itemId} style={{ fontSize: 12, color: E.muted, marginTop: 7, lineHeight: 1.45 }}>
-              Ta règle d'offre : eBay accepte dès {eurEbay(et.accepte)} — {Math.round(et.accepte / prixTape * 100)}&nbsp;% du nouveau prix. Changer le prix peut la faire tomber : VRM la relit après et te le dit.
+              Règle : eBay accepte dès {eurEbay(et.accepte)} ({Math.round(et.accepte / prixTape * 100)}&nbsp;% du nouveau prix). Elle peut tomber : VRM la relit.
             </div>
           )}
           {/* Couleur FIXÉE (9 octobre) : jamais le vert ni le rouge (§7). */}
@@ -2973,7 +2975,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
         {besoinCompris && pretes.length > 0 && (
           <label data-planif-risque="1" style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13, color: E.text, lineHeight: 1.5, background: `${E.warn}14`, border: `1px solid ${E.warn}`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, cursor: 'pointer' }}>
             <input type="checkbox" data-planif-compris="1" checked={compris} onChange={(e) => setCompris(e.target.checked)} style={{ width: 20, height: 20, flexShrink: 0, marginTop: 1, accentColor: E.accent }} />
-            <span><b>Annuler une programmation n'est pas garanti</b>, et un article <b>vendu ailleurs avant son heure</b> peut partir quand même. J'ai compris.</span>
+            <span><b>Annulation pas garantie</b> ; <b>vendu ailleurs avant l'heure</b>, il peut partir. J'ai compris.</span>
           </label>
         )}
         {envoi && !envoi.bilan && <div style={{ fontSize: 13, color: E.muted, marginBottom: 8 }}>Envoi à eBay : {envoi.en} sur {envoi.total}…</div>}
@@ -3412,7 +3414,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
         : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis`}{' '}<Pourquoi label="Liste pas relue" titre="Inactives pas relues">{anciennes.length === 1 ? 'Elle a pu changer sur eBay.' : 'Elles ont pu changer sur eBay.'} La remise en vente se fait sur eBay.</Pourquoi></div>}
       {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours.</div>}
       {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
-      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces articles sont vendus` : 'un de ces articles est vendu'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
+      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Pas encore vérifié si {attenteVerif > 1 ? `${attenteVerif} de ces articles sont vendus` : 'un de ces articles est vendu'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient ensuite.</div>}
       <div className="vrm-eb-ina-liste">{rendues}</div>
       {ficheIna && (
         <SheetShell onClose={() => setFicheIna(null)} titre={ficheIna.l.title || ficheIna.l.itemId} sousTitre={ficheIna.n ? `N°${ficheIna.n}` : 'pas reliée à un article'} data-inactive-fiche={ficheIna.l.itemId}>
@@ -3741,7 +3743,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
           )}
           {aRelire.length > 0 && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: E.muted, flex: '1 1 200px', minWidth: 0 }}>{aRelire.length} annonce{aRelire.length > 1 ? 's' : ''} dont la règle actuelle n'est pas lue : relis-{aRelire.length > 1 ? 'les' : 'la'} d'abord, rien n'est remplacé à l'aveugle.</span>
+              <span style={{ fontSize: 12, color: E.muted, flex: '1 1 200px', minWidth: 0 }}>{aRelire.length} annonce{aRelire.length > 1 ? 's' : ''} à la règle pas lue : relis-{aRelire.length > 1 ? 'les' : 'la'} d'abord (rien à l'aveugle).</span>
               <button type="button" data-regles-toutes-relire disabled={relit} onClick={() => onRelire && onRelire(aRelire)} style={{ ...lienE, opacity: relit ? 0.55 : 1 }}>{relit ? 'Lecture…' : `Relire ces ${aRelire.length} annonce${aRelire.length > 1 ? 's' : ''} chez eBay`}</button>
             </div>
           )}
@@ -4326,7 +4328,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         enLigne={enLigne} vendusVinted={vendusVinted} ventes={ventesConnues}
         comptesPub={comptesPub} compteDefaut={compteDefautPub} onCompte={choisirComptePub} />
     : connected === false
-      ? <div style={{ fontSize: 13, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre un article en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
+      ? <div style={{ fontSize: 13, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Relie d'abord ton compte eBay (onglet <b style={{ color: E.text }}>« Compte eBay »</b>).</div>
       : null; // en cours / pas su : on ne dit rien plutôt qu'une fausse invite
   // ── 3 bis. BROUILLONS · PLANIFICATEUR · PROGRAMMÉES (5 octobre) ────────────
   const brouillonsChoisis = planif && brouillons && typeof brouillons === 'object' ? planif.map((id) => brouillons[id]).filter(Boolean) : [];
@@ -4414,7 +4416,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const alertes = (<>
     {vueSeule && alertesAilleurs > 0 && (
       <div data-ebay-alertes-ailleurs={alertesAilleurs} style={{ ...bloc(E.warn), fontSize: 13, color: E.text, lineHeight: 1.5 }}>
-        ⚠️ {alertesAilleurs} article{alertesAilleurs > 1 ? 's' : ''} à régler sur tes autres comptes eBay (vendu{alertesAilleurs > 1 ? 's' : ''} ailleurs, encore en vente ou programmé{alertesAilleurs > 1 ? 's' : ''}) — choisis « Tous les comptes » en haut pour {alertesAilleurs > 1 ? 'les' : 'le'} voir.
+        ⚠️ {alertesAilleurs} article{alertesAilleurs > 1 ? 's' : ''} à régler sur tes autres comptes eBay : choisis « Tous les comptes ».{' '}
+        <Pourquoi>Vendu{alertesAilleurs > 1 ? 's' : ''} ailleurs, encore en vente ou programmé{alertesAilleurs > 1 ? 's' : ''} : choisis « Tous les comptes » en haut pour {alertesAilleurs > 1 ? 'les' : 'le'} voir.</Pourquoi>
       </div>
     )}
     {deuxComptesVue.length > 0 && (
@@ -4476,7 +4479,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
                 <div style={{ fontSize: 13, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.annonce.title || id}</div>
                 <div style={{ fontSize: 11, color: E.muted }}>Vinted : vendue · eBay : encore en vente{d.annonce.price ? ` à ${euroE(d.annonce.price)}` : ''}{surCompte(d.annonce)}{(() => { const k = regleEngage(etatDe(d.annonce)); return k ? <span data-ebay-doublon-regle={id} data-ebay-doublon-regle-k={k} style={{ color: E.warn, fontWeight: 700 }}>{k === 'oui' ? ' · elle a une règle d\'offre : eBay peut la vendre à tout moment' : ' · elle a peut-être une règle d\'offre chez eBay (pas relue) : eBay peut la vendre à tout moment'}</span> : null; })()}</div>
                 {raison && raison !== 'permis' && !commune && RAISON_RETRAIT_AUTO[raison] && <div data-ebay-auto-raison-texte={raison} style={{ fontSize: 11, color: E.muted, marginTop: 2 }}>Pas retirée toute seule : {RAISON_RETRAIT_AUTO[raison]}.</div>}
-                {inc && <div data-ebay-auto-incertain={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>Le retrait automatique du {new Date(inc.at).toLocaleDateString('fr-FR')} n'a pas eu de réponse claire d'eBay : regarde sur eBay avant de cliquer.</div>}
+                {inc && <div data-ebay-auto-incertain={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>Retrait auto du {new Date(inc.at).toLocaleDateString('fr-FR')} sans réponse claire : regarde sur eBay avant.</div>}
                 {etat && etat !== '…' && <div data-ebay-retrait-erreur={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>{etat}</div>}
               </div>
               <button type="button" data-retirer-ebay={id} disabled={etat === '…'} onClick={() => retirer(d)} style={{ ...lienE, opacity: etat === '…' ? 0.6 : 1 }}>{etat === '…' ? 'Retrait…' : 'Retirer d\'eBay'}</button>
@@ -4582,7 +4585,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   ].filter(Boolean);
   const ligneComptesIllisibles = illisiblesAnnonces.filter((c) => dansVue({ _compte: c.ref })).length > 0 && (
     <div data-ebay-annonces-illisibles={illisiblesAnnonces.length} style={{ ...bloc(E.warn), fontSize: 13, color: E.text, lineHeight: 1.5 }}>
-      ⚠️ Je n'ai pas pu lire les annonces {illisiblesAnnonces.length > 1 ? 'des comptes eBay' : 'du compte eBay'} {illisiblesAnnonces.map(nomCompteEbay).join(', ')} — rien n'est perdu, rouvre l'écran dans un moment. La liste ci-dessous ne {illisiblesAnnonces.length > 1 ? 'les' : 'le'} compte pas.
+      ⚠️ Annonces de {illisiblesAnnonces.map(nomCompteEbay).join(', ')} pas lues : rouvre l'écran dans un moment.{' '}
+      <Pourquoi>Je n'ai pas pu lire les annonces {illisiblesAnnonces.length > 1 ? 'des comptes eBay' : 'du compte eBay'} {illisiblesAnnonces.map(nomCompteEbay).join(', ')} — rien n'est perdu. La liste ci-dessous ne {illisiblesAnnonces.length > 1 ? 'les' : 'le'} compte pas.</Pourquoi>
     </div>
   );
   const lignePasSu = pasSu.length > 0 && (
@@ -4826,7 +4830,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         {connues.length > 0
           ? <>Règle d'offre active sur <b>{connues.length} annonce{connues.length > 1 ? 's' : ''}</b>{peutEtreRegle.length > 0 ? <>, et <b>peut-être sur {peutEtreRegle.length} autre{peutEtreRegle.length > 1 ? 's' : ''}</b> (VRM ne l'a pas relue — dit plus bas)</> : null} : eBay accepte, sans te demander, toute offre à partir du montant fixé</>
           : <>eBay tient <b>peut-être une règle d'offre sur {peutEtreRegle.length} annonce{peutEtreRegle.length > 1 ? 's' : ''}</b> (VRM ne l'a pas relue — dit plus bas) : si elle y est, eBay accepte, sans te demander, toute offre à partir de son montant</>}
-        {' '}— une offre acceptée est une vente, au prix de l'offre. En dessous, l'offre t'arrive sur eBay.{vieillesRegles > 0 ? ` Dont ${vieillesRegles} lue${vieillesRegles > 1 ? 's' : ''} il y a plus de 7 jours.` : ''}
+        {' '}— acceptée = vendue.{vieillesRegles > 0 ? ` Dont ${vieillesRegles} lue${vieillesRegles > 1 ? 's' : ''} il y a plus de 7 jours.` : ''}{' '}
+        <Pourquoi>Une offre acceptée est une vente, au prix de l'offre. En dessous du montant, l'offre t'arrive sur eBay.</Pourquoi>
       </div>
       <div data-regles-fenetre-ventes {...(ventesAge.etat === 'lu' ? { 'data-regles-ventes-age-h': String(ventesAge.h) } : {})} style={{ marginTop: 12, color: ventesVieilles ? E.warn : E.muted, fontSize: 13, lineHeight: 1.45 }}>
         eBay vend sans attendre VRM : VRM ne voit cette vente qu'en relisant tes ventes eBay — {ventesAge.etat === 'lu' ? `dernière lecture il y a ${ventesAge.h < 1 ? 'moins d\'une heure' : (ventesAge.h < 48 ? `${ventesAge.h} h` : `${Math.floor(ventesAge.h / 24)} jours`)}` : (ventesAge.etat === 'jamais' ? 'pas encore lues' : (ventesAge.etat === 'illisible' ? 'je n\'ai pas pu savoir quand' : 'lecture en cours'))}.
@@ -4834,7 +4839,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         <div style={{ marginTop: 8 }}><button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} className="vrm-b vrm-b-secondaire" style={{ opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button></div>
       </div>
       <div data-regles-fenetre style={{ marginTop: 12, color: E.muted, fontSize: 13, lineHeight: 1.45 }}>
-        Vendu sur Vinted ? Retiré d'eBay à ta prochaine ouverture de VRM{retraitAuto ? '' : ' (retrait auto éteint : par ton clic)'}. Entre-temps, eBay peut accepter une offre.
+        Vendu sur Vinted ? Retiré d'eBay quand tu rouvres VRM{retraitAuto ? '' : ' (retrait auto éteint : par ton clic)'}. D'ici là, une offre peut passer.
       </div>
       {!retraitAuto && <div style={{ marginTop: 6 }}><button type="button" data-regles-vers-retrait onClick={versRetraitAuto} style={{ ...lienE, padding: '5px 9px', fontSize: 12 }}>Voir le retrait automatique</button></div>}
       {!pasSuRegle.length && porteToutes && <div style={{ marginTop: 8 }}>{porteToutes}</div>}
@@ -5041,7 +5046,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       )}
       {lotInterrompu && (
         <div data-regles-lot-interrompu={lotInterrompu.n} style={{ ...bloc(E.warn), fontSize: 13, color: E.text, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          <span style={{ flex: 1, minWidth: 0 }}>Le dernier lot a été interrompu : {lotInterrompu.n} annonce{lotInterrompu.n > 1 ? 's' : ''} non envoyée{lotInterrompu.n > 1 ? 's' : ''}. Rouvre « Une règle pour toutes » pour {lotInterrompu.n > 1 ? 'les' : 'la'} reprendre.</span>
+          <span style={{ flex: 1, minWidth: 0 }}>Lot interrompu : {lotInterrompu.n} annonce{lotInterrompu.n > 1 ? 's' : ''} non envoyée{lotInterrompu.n > 1 ? 's' : ''}. Rouvre « Une règle pour toutes ».</span>
           <button className="vrm-icon-control" type="button" data-regles-lot-interrompu-fermer aria-label="Effacer ce message" onClick={() => { try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} setLotInterrompu(null); }} style={{ ...lienE, padding: '4px 9px' }}>✕</button>
         </div>
       )}

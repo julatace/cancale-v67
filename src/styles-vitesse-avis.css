@@ -20,6 +20,7 @@
 .vrm-av-moy { font-size: 24px; font-weight: 800; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
 .vrm-av-moy small { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); margin-left: 1px; }
 .vrm-av-sous { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--vrm-muted, #6E6E73); margin-top: 2px; }
+.vrm-av-histo { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
 .vrm-av-evol { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
 .vrm-av-liste { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .vrm-av-avis { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; color: var(--vrm-ink, #1D1D1F); min-width: 0; }

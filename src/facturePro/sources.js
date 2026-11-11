@@ -46,6 +46,8 @@
 // jamais ces factures par e-mail (aucune adresse prouvée) — PDF à joindre au
 // colis ou à partager.
 
+import { vcVenteAnnulee } from '../../api/_lib/vestiaire-regle.js';
+
 export const PLATEFORMES = {
   leboncoin: { l: 'Leboncoin', prefixe: 'lbc' },
   ebay: { l: 'eBay', prefixe: 'ebay' },
@@ -121,11 +123,25 @@ export function venteEbay(o) {
 }
 
 // ── VESTIAIRE ───────────────────────────────────────────────────────────────
-// Vestiaire ne relève que ce qu'il TE verse (`sellerEarning`), pas le prix payé
-// par l'acheteur ; et aucun acheteur. Une facture au montant versé serait fausse.
+// Vestiaire relève ce qu'il TE verse (`sellerEarning`) : une facture à ce montant
+// serait fausse. (11 nov., extension 5.340) L'extension range aussi le PRIX DE
+// VENTE de l'article (`prixVente` = { valeur, devise:'EUR', cle:'sellerPrice' }),
+// seulement s'il est écrit en euros au centime. Présent ⇒ la facture se fait à CE
+// prix ; absent ⇒ le refus d'avant, mot pour mot. Aucun acheteur : recopié.
+// L'identité : la clé de la vente dans `vc_ventes.ventes` (`id`), jamais le titre.
 export function venteVc(v) {
   if (!v || typeof v !== 'object') return non('vente', 'la vente n’est pas lue');
-  return non('prix', 'Vestiaire ne donne pas le prix payé par l’acheteur (seulement ce qu’il te verse)');
+  const pv = v.prixVente && typeof v.prixVente === 'object' ? v.prixVente : null;
+  const val = pv && pv.cle === 'sellerPrice' && pv.devise === 'EUR' ? Number(pv.valeur) : NaN;
+  const c = Math.round(val * 100);
+  if (!(Number.isFinite(val) && Number.isInteger(c) && c > 0 && Math.abs(c - val * 100) < 1e-6)) return non('prix', 'Vestiaire ne donne pas le prix payé par l’acheteur (seulement ce qu’il te verse)');
+  const ref = txt(v.id);
+  if (!refValide('vestiaire', ref)) return non('ref', 'la vente n’a pas de n° lu');
+  if (vcVenteAnnulee(v)) return non('annulee', 'la vente est annulée');
+  const t = date(v.date);
+  if (t == null) return non('date', 'la date de la vente n’est pas lue — ouvre « Mes ventes » sur Vestiaire');
+  return { ok: true, plateforme: 'vestiaire', ref, centimes: c, venteLe: new Date(t).toISOString(), designation: txt(v.titre), compte: txt(v.compte), acheteurPropose: null,
+    sansAcheteur: 'Vestiaire ne donne ni le nom ni l’adresse de l’acheteur' };
 }
 
 export function venteAutre(plateforme, brut) {

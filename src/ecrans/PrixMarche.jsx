@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { C, Card, LignePanne, ScreenHead } from '../App.jsx';
+import Pourquoi from '../composants/PourquoiReplie.jsx';
 
 
 // ⟦← App.jsx #1⟧
@@ -14,7 +15,7 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
       <ScreenHead icon="euro" title="Argent" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}
         desc="Ce que tes ventes disent du prix — par modèle et taille, pour tarifer et racheter juste." />
       {baseKO ? (
-        <LignePanne>Je n'ai pas pu lire tes ventes — un prix médian faux serait pire que pas de prix. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
+        <LignePanne>Ventes pas lues : pas de prix plutôt qu'un faux. Rien n'est perdu.</LignePanne>
       ) : groups == null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Lecture de tes ventes…</div>
       ) : (<>
@@ -32,12 +33,13 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
         {groups.length === 0 ? (
         <Card style={{ padding: 16 }}>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-            Pas encore assez de ventes pour dégager un prix fiable — il faut <b>au moins deux ventes</b> d'un même modèle dans une même taille. Ça se remplira tout seul au fil de tes ventes.
+            Pas encore assez de ventes : il faut <b>au moins deux ventes</b> d'un même modèle et taille.
           </div>
         </Card>
       ) : (<>
         <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-          Calculé sur tes <b>ventes finalisées</b>, regroupées par <b>modèle + taille</b> (au moins 2 ventes). Un modèle hors des grands connus n'apparaît pas — mieux vaut un blanc qu'un faux. Trié par ce qui se vend le plus.
+          Sur tes <b>ventes finalisées</b>, par <b>modèle + taille</b> (2 ventes au moins). Le plus vendu d'abord.{' '}
+          <Pourquoi>Un modèle hors des grands connus n'apparaît pas — mieux vaut un blanc qu'un faux.</Pourquoi>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {groups.map((gr, i) => (

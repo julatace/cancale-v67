@@ -197,6 +197,10 @@ const CSS = `
 .av-faq-texte{columns:2;column-gap:56px}
 .av-faq-texte p{break-inside:avoid;margin:0 0 24px;font-size:16px;line-height:1.55;color:var(--gris)}
 .av-faq-texte p b{color:var(--encre);font-weight:600}
+.av-faq-q{break-inside:avoid;margin:0 0 24px}
+.av-faq-q>b{display:block;font-size:16px;line-height:1.55;color:var(--encre);font-weight:600}
+.av-faq-texte .av-faq-q p{margin:0}
+.av-auto{margin:8px 0 0;padding-left:1.2em;font-size:17px;line-height:1.55;max-width:34em}
 .av-faq-texte a{color:var(--accent-texte);text-underline-offset:3px}
 
 /* La fin : une phrase, un geste. */
@@ -368,7 +372,7 @@ export default function Accueil({ onEntrer }) {
         <section className="av-hero" data-section="hero">
           <div className="av-in">
             <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">VRM, l’outil des revendeurs Vinted, Leboncoin et eBay, te dit chaque matin quoi faire — sans jamais te tromper de paire.</p>
+            <p className="av-sous">Vinted, Leboncoin, eBay : VRM te dit chaque matin quoi faire, sans erreur de paire.</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
@@ -397,7 +401,7 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <div className="av-journee-tete" data-reveil="">
               <h2 className="av-h2">Ta journée de revendeur, en quatre moments.</h2>
-              <p className="av-chapo">Le matin, au point relais, devant ton stock, à la fin du mois : VRM te montre ce qu’il y a à faire, et rien que ça.</p>
+              <p className="av-chapo">Le matin, au relais, au stock, en fin de mois : ce qu’il y a à faire, rien de plus.</p>
             </div>
             <div className="av-split">
               <div className="av-plateau" aria-hidden="true">
@@ -426,8 +430,14 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in av-deux">
             <div className="av-conf" data-confiance="" data-reveil="">
               <h2 className="av-h2">Tes comptes restent les tiens.</h2>
-              <p>VRM agit sur le compte ouvert dans ton navigateur, 50 actions par heure au plus. Jamais ton mot de passe Vinted.</p>
-              <p>Rien ne part sans toi. <span data-automatisme="">Retirer d’eBay une annonce vendue ailleurs</span>, <span data-automatisme="">accepter une offre au-dessus de ton prix mini</span> : éteints tant que tu ne les allumes pas. Messages aux favoris et republication : seulement si tu les lances. Aucune suppression sans ta confirmation.</p>
+              <p>VRM agit sur le compte ouvert, 50 actions/heure au plus. Jamais ton mot de passe Vinted.</p>
+              <p>Rien ne part sans toi. Éteints tant que tu ne les allumes pas :</p>
+              <ul className="av-auto">
+                <li data-automatisme="">retirer d’eBay une annonce vendue ailleurs ;</li>
+                <li data-automatisme="">accepter une offre au-dessus de ton prix mini.</li>
+              </ul>
+              <p>Messages aux favoris et republication : seulement si tu les lances.</p>
+              <p>Aucune suppression sans ta confirmation.</p>
               <p>Tes données servent ta boutique : VRM ne vend rien, aucune publicité.</p>
             </div>
             <div data-reveil="">
@@ -437,7 +447,8 @@ export default function Accueil({ onEntrer }) {
                 <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p>{`Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}${EXTENSION_SUR_LE_STORE ? ', depuis le Chrome Web Store. Puis connecte-la' : '. VRM te guide pas à pas, puis tu la connectes'} avec le même e-mail.`}</p></div></li>
                 <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes : ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
               </ol>
-              <p className="av-note" data-ordinateur-necessaire="">Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, navigateur ouvert.</p>
+              <p className="av-note" data-ordinateur-necessaire="">Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. </p>
+              <p className="av-note">Le téléphone consulte ; les actions passent par l’ordinateur allumé, navigateur ouvert.</p>
               {SERVIS.essai.length > 0 && <p className="av-note" data-navigateurs-essai={SERVIS.essai.join(',')}>{SERVIS.essai.join(', ')} (Mac, iPhone) : en essai, lecture de Vinted pas encore confirmée. {SERVIS.pasEncore.join(', ')} : pas encore.</p>}
             </div>
           </div>
@@ -471,12 +482,12 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in av-faq-grille">
             <h2 className="av-h2">Questions fréquentes</h2>
             <div className="av-faq-texte">
-              <p><b>Pourquoi une extension ?</b> Elle lit Vinted là où tu es connecté, au nom du compte ouvert. Aucun mot de passe demandé. <a href="/aide/extension">L’installer</a>.</p>
-              <p><b>Vinted peut-il bloquer mon compte à cause de VRM ?</b> Personne ne peut le garantir. VRM agit comme toi : une requête à la fois, 50 actions par heure au plus, pause si Vinted ralentit.</p>
-              <p><b>Mes données sont-elles en sécurité ?</b> Ta boutique est cloisonnée : aucun autre vendeur ne la voit. Double vérification possible. <a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p>
-              <p><b>Comment j’arrête ?</b> Tu résilies depuis l’app : fin à la période payée, rien à payer pendant l’essai. « Fermer mon compte » efface tes données.</p>
-              <p><b>Et sur mon téléphone ?</b> Tout se consulte, tes codes de retrait même sans réseau, une notification par vente. Les actions passent par ton ordinateur.</p>
-              <p><b>J’ai plusieurs comptes Vinted.</b> C’est fait pour, chiffres séparés. Avec Solo, un compte vend sur chaque plateforme, les autres achètent ; avec Pro, tous tes comptes vendent, sans limite.</p>
+              <div className="av-faq-q"><b>Pourquoi une extension ?</b><p>Elle lit Vinted là où tu es connecté. Aucun mot de passe demandé. <a href="/aide/extension">L’installer</a>.</p></div>
+              <div className="av-faq-q"><b>Vinted peut-il bloquer mon compte à cause de VRM ?</b><p>Personne ne peut le garantir. VRM agit comme toi : une requête à la fois.</p><p>50 actions par heure au plus, pause si Vinted ralentit.</p></div>
+              <div className="av-faq-q"><b>Mes données sont-elles en sécurité ?</b><p>Aucun autre vendeur ne voit ta boutique. Double vérification possible.</p><p><a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p></div>
+              <div className="av-faq-q"><b>Comment j’arrête ?</b><p>Tu résilies depuis l’app : fin à la période payée, rien à payer pendant l’essai.</p><p>« Fermer mon compte » efface tes données.</p></div>
+              <div className="av-faq-q"><b>Et sur mon téléphone ?</b><p>Tout se consulte, codes de retrait même sans réseau, une notification par vente.</p><p>Les actions passent par ton ordinateur.</p></div>
+              <div className="av-faq-q"><b>J’ai plusieurs comptes Vinted.</b><p>C’est fait pour, chiffres séparés.</p><p>Solo : un compte vend par plateforme, les autres achètent.</p><p>Et avec Pro, tous tes comptes vendent, sans limite.</p></div>
               <p><b>C’est seulement pour les baskets ?</b> Non : tout article (vêtements, sacs, livres…).</p>
               {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> En cours : ses ventes n’entrent encore dans aucun total.</p>}
               <p><b>Une autre question ?</b> <a href="/aide">L’aide</a> ; <a href="/statut">l’état du service</a>.</p>

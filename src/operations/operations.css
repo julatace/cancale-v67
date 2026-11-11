@@ -109,3 +109,4 @@
 .vrm-operations[data-ops-dark=true] :is(.atl-carte,.atl-pastille,.atl-num input,.atl-etapes input,.atl-choix select){background:#2C2C2E;color:#E5E5EA;border-color:#48484A}
 .vrm-operations[data-ops-dark=true] :is(.atl-ambre,.atl-ambre-texte){color:#EBC080!important}
 .vrm-operations[data-ops-dark=true] .atl-survol{box-shadow:inset 0 0 0 2px #0A84FF}
+.vrm-operations .ops-note .vrm-pourquoi.vrm-pourquoi-ecrit>summary{font-size:inherit}
