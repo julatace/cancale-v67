@@ -186,3 +186,28 @@ const r = await lancerTravail({
 
 - **Agent principal (11 nov. soir) — `claude/securite-vinted` (lot 6, sécurité des comptes Vinted ET Vestiaire, demande de Julien « comme Vintex, pour ne pas se faire bannir »)** : ext **5.366.0 réservée** (5.365 est prise par `import-historique-sites`). Module commun par plateforme (repos de nuit par compte, plafond/jour et par type DANS les 50/h, pas de rafale, délais variables, mode prudence, arrêt immédiat sur contrôle anti-robot, Retry-After, « n'agir que si tu es là », journée calme, « Tout arrêter »). S'appuie sur `agent2-vinted-forme` (5.357, prudence 24 h) sans le refaire. Mode d'emploi pour `vestiaire-plus` / `lbc-plus` : section « Sécurité des comptes — comment s'y brancher » ajoutée ici à la fin du lot.
 - **Agent principal (11 nov. soir) — `claude/annonce-vinted` (lot 7, « Créer sur Vinted » depuis une fiche VRM : brouillon préparé par l'extension, champs non reconnus DEMANDÉS avec les valeurs de Vinted, reliée par l'ID d'annonce rendu)** : ext **5.367.0 réservée**. Réutilise les briques de Republier (brouillon, photos, `reglerAvant`) et `lancerTravail`/SuiviTravail ; ne touche pas aux autres lots.
+
+## Sécurité des comptes — comment s'y brancher (11 nov., lot `securite-vinted`, ext. 5.366)
+Julien : « faire comme Vintex, pour ne pas se faire bannir », Vinted ET Vestiaire. Branche `claude/securite-vinted`
+(récit : `docs/passation/2026-11-11-securite-vinted.md`). Règle pure `src/securiteComptes.js`, bloc
+`<securite-comptes-regle>` RECOPIÉ dans `background.js` (`node scripts/audit-securite-comptes.cjs --recopie`, jamais
+à la main). **Tout geste qui écrit chez un site** (Vinted, Vestiaire, et Leboncoin pour `lbc-plus`) :
+```js
+// avant le plafond horaire (compterAction / gardeStricte), qui NE BOUGE PAS (50/h, réserve 5) :
+const s = await secuGeste('vestiaire', compte, 'baisse', 'serie');   // plateforme · compte · sorte · mode
+if (s) return { accepte: false, code: s.code, raison: s.error };       // refus dit (repos, prudence, Tout arrêter…)
+// … le geste … puis, sur la réponse :
+await secuObserver('vestiaire', compte, { status, defi, retryAfter }); // 'robot' ⇒ ce compte s'arrête net
+```
+- plateformes : `vinted` · `vestiaire` · `leboncoin` ; sortes : `offre favori republication mise_en_ligne baisse reponse
+  vacances bordereau publication autre` ; modes : `auto` (VRM seul) · `programme` (lancé par lui, part plus tard) ·
+  `serie` (lancé par lui, en série) · `suite` (fin d'un geste commencé) · `visite` · `clic`.
+- Vinted : passer `secu: { sorte, mode }` à `gardeStricte(uid, acc, { … })` suffit (le robot est déjà vérifié en tête).
+- Vestiaire : `vc-inject.js` rend déjà `defi` (DataDome/captcha vu) et `ra` (Retry-After) dans `vcenvoiresultat` /
+  `vcoffreresultat` ; faites pareil pour un nouveau geste de page (`defiDe(res, texte)`, `raDe(res)`).
+- Une lecture normale d'une page du site lève l'arrêt anti-robot : `secuLectureNormale(pf, compte)` (déjà branché sur
+  les captures Vinted et Vestiaire ; à brancher sur les captures Leboncoin).
+- « Tout arrêter » coupe TOUTES les plateformes : rien à faire de plus si le geste passe par `secuGeste`.
+- `lbc-plus` : la présence (« si tu es là ») n'est pas encore signalée par `lbc.js` — copier le bloc « 5.366 » de `vc.js`.
+- `agent2-vinted-forme` (5.357, prudence 24 h après un refus) : à l'intégration, UNE prudence par compte —
+  sa pose doit passer par `secuObserver` (ou l'inverse), jamais deux états.
