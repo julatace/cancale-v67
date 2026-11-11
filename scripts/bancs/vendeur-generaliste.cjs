@@ -236,7 +236,18 @@ async function scenario(nav, nom, W, theme) {
       const tx = await releveTexte(o.pg);
       const mauvais = phrasesAvec(tx, MOTS_CHAUSSURE);
       dit(mauvais.length === 0, `${T} ${t} : aucun mot de chaussure`, mauvais.slice(0, 6).join(' ¦ '));
+      // (11 nov., reprise) ni exemple de basket (marques), ni dessin de basket (états vides, Stock).
+      const marques = phrasesAvec(tx, /\b(nike|adidas|air ?max|spezial|salomon|gel-lyte|p-6000)\b/i);
+      const dessins = await o.pg.$$eval('[data-illustration="basket"], [data-sx-dessin="basket"]', (e) => e.length);
+      dit(marques.length === 0 && dessins === 0, `${T} ${t} : aucun exemple ni dessin de basket`, `${marques.slice(0, 4).join(' ¦ ')} · dessins ${dessins}`);
       if (t === 'journee' || t === 'annonces') await capture(o.pg, `${pref}-${t}`);
+      if (t === 'garage') {
+        // Le test n'est pas vide : l'explication est bien là, avec l'étiquette et « Article ».
+        const sx = await o.pg.$('[data-stock-explication]');
+        const etq = sx ? await o.pg.$eval('[data-stock-explication]', (e) => ({ d: (e.querySelector('[data-sx-dessin]') || {}).getAttribute?.('data-sx-dessin') || null, t: e.textContent })) : null;
+        dit(!!etq && etq.d === 'etiquette' && /Article/.test(etq.t) && /Vendu(?!e)/.test(etq.t), `${T} « Comment marche le Stock » : une étiquette, « Article », « Vendu »`, etq);
+        if (sx && SHOTS) { await sx.scrollIntoViewIfNeeded().catch(() => {}); await o.pg.waitForTimeout(300); await sx.screenshot({ path: path.join(SHOTS, `${pref}-stock-explication.png`) }).catch(() => {}); }
+      }
     }
     // La note d'un article : un exemple de lunettes (jamais « semelle »).
     await o.pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
