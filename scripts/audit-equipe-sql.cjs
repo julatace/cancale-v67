@@ -39,6 +39,7 @@ const SOCLE = ['005-abonnements.sql', '006-acces-abonnement.sql', '007-droits-mi
 // La 021 (confidentialité) : appliquée en production le 21 octobre, AVANT la
 // 016. Sa restrictive de lecture fermait la lecture du membre (22 octobre).
 const M021 = path.join(RACINE, 'supabase/migrations/021-confidentialite-boutiques.sql');
+const M027 = path.join(RACINE, 'supabase/migrations/027-abonnement-apercu-et-parrainage.sql');
 // Des identités INVENTÉES.
 const J = '11111111-1111-1111-1111-111111111111';   // le vendeur
 const V = '22222222-2222-2222-2222-222222222222';   // un autre vendeur
@@ -81,10 +82,14 @@ const MUTATIONS = {
   'ecriture-membre': { apres: `create policy equipe_ecrit on public.app_data for update to authenticated
   using (owner = (select public.vrm_equipe_vendeur())) with check (true);` },
   'verifier-droits': { outil: (s) => remplace(s, "    droits: `json_array_length(e.j -> 'droits') = 0`,\n", '', 'verifier-droits') },
-  'verifier-regles': { outil: (s) => remplace(s, "    regles: `(e.j -> 'regles')::jsonb = case when ${AVEC_021} then ${lit(JSON.stringify(REGLES_021))}::jsonb else ${lit(JSON.stringify(REGLES))}::jsonb end`,\n", '', 'verifier-regles') },
+  'verifier-regles': { outil: (s) => remplace(s, "    regles: `(e.j -> 'regles')::jsonb = case when ${AVEC_021} and ${AVEC_027} then ${lit(JSON.stringify(REGLES_021_027))}::jsonb when ${AVEC_021} then ${lit(JSON.stringify(REGLES_021))}::jsonb when ${AVEC_027} then ${lit(JSON.stringify(REGLES_027))}::jsonb else ${lit(JSON.stringify(REGLES))}::jsonb end`,\n", '', 'verifier-regles') },
   // 22 octobre : la 016 telle qu'elle était (sans retoucher la restrictive de la 021).
   'sans-lecture-021': { sql: (s) => remplace(s, "  if exists (select 1 from pg_catalog.pg_policies where schemaname = 'public' and tablename = 'app_data' and policyname = 'vrm_lecture_privee') then\n", "  if false then\n", 'sans-lecture-021') },
   'sans-garde-restrictive': { sql: (s) => remplace(s, "  if b is not null then\n    raise exception 'vrm_equipe_lecture_bloquee", "  if false then\n    raise exception 'vrm_equipe_lecture_bloquee", 'sans-garde-restrictive') },
+  // 11 nov. : la 016 qui réécrit `abonnement_requis` même après la 027 (referme l'aperçu sans abonnement).
+  'ecrase-027': { sql: (s) => remplace(s, "  if coalesce((select p.qual from pg_catalog.pg_policies p where p.schemaname = 'public' and p.tablename = 'app_data' and p.policyname = 'abonnement_requis'), '') <> 'true' then\n", '  if true then\n', 'ecrase-027') },
+  // 11 nov. : la garde du §11 ter qui prend la restrictive `true` de la 027 pour un verrou.
+  'garde-027-bloque': { sql: (s) => remplace(s, "     and coalesce(p.qual, '') <> 'true';", ';', 'garde-027-bloque') },
   'verifier-restrictives': { outil: (s) => remplace(s, "    restrictives_bloquantes: `(e.j ->> 'restrictives_bloquantes') is null`,\n", '', 'verifier-restrictives') },
 };
 
@@ -468,6 +473,46 @@ const lusDe = (u, owner, entete = owner) => lignes(en(u, `select id from public.
     parcoursMembre('016 puis 021');
     const t = run(SQL);
     dit(t.ok, '016 puis 021 : la 016 se rejoue encore', t.err);
+  });
+  // ── LA 027 (sans abonnement : lire oui, écrire non — 8 novembre) ──────
+  // Pas encore appliquée le 11 novembre, comme la 016 : les deux ordres sont
+  // possibles. Avant le 11 nov., la 016 passée APRÈS la 027 réécrivait
+  // `abonnement_requis` et refermait la lecture de qui ne paie plus.
+  const avec027 = (nom) => {
+    dit(Q("select qual from pg_policies where tablename = 'app_data' and policyname = 'abonnement_requis'") === 'true', nom + ' : `abonnement_requis` reste ouverte en lecture (la 027 tient)');
+    A("update public.vrm_reglages set valeur = '1' where cle = 'abonnement_obligatoire';");
+    const nb = Number(A(`select count(*) from public.app_data where owner = '${J}'`));
+    dit(lignes(en(J, `select id from public.app_data where owner = '${J}';`)).length === nb, nom + ' : sans abonnement, le vendeur LIT ses lignes (aperçu de la 027)');
+    const w = enRun(J, `insert into public.app_data (owner, id, data) values ('${J}', 'essai_027', '{}');`);
+    dit(!w.ok, nom + ' : sans abonnement, il n\'écrit rien', w.ok ? 'INSÉRÉ' : '');
+    dit(lusDe(M, J).length === 0, nom + ' : vendeur sans abonnement : son aide ne lit RIEN');
+    dit(en(M, `select coalesce(public.vrm_equipe_colis('${J}')::text, 'null');`) === 'null', nom + ' : ni la projection des colis');
+    A(`insert into public.abonnements (owner, statut) values ('${J}', 'active');`);
+    dit(JSON.stringify(lusDe(M, J)) === JSON.stringify(PERMIS_J), nom + ' : le vendeur paie : son aide relit EXACTEMENT les colis');
+    A("update public.vrm_reglages set valeur = '0' where cle = 'abonnement_obligatoire'; delete from public.abonnements;");
+  };
+  await essaie('021, 027 puis 016', () => {
+    fraiche('ordre027', 'socle');
+    Q(fs.readFileSync(M021, 'utf8'));
+    Q(fs.readFileSync(M027, 'utf8'));
+    const r = run(SQL);
+    dit(r.ok, '021, 027 puis 016 : la 016 passe', r.err.slice(0, 200));
+    if (!r.ok) return;
+    poserDonnees();
+    parcoursMembre('021, 027 puis 016');
+    avec027('021, 027 puis 016');
+  });
+  await essaie('021, 016 puis 027', () => {
+    fraiche('ordre016', 'socle');
+    Q(fs.readFileSync(M021, 'utf8'));
+    const r = run(SQL);
+    if (!r.ok) throw new Error(r.err);
+    Q(fs.readFileSync(M027, 'utf8'));
+    poserDonnees();
+    parcoursMembre('021, 016 puis 027');
+    avec027('021, 016 puis 027');
+    const t = run(SQL);
+    dit(t.ok && Q("select qual from pg_policies where tablename = 'app_data' and policyname = 'abonnement_requis'") === 'true', '021, 016 puis 027 : la 016 rejouée ne referme rien', t.err);
   });
   await essaie('une autre restrictive inconnue', () => {
     fraiche('bloquee', 'socle');
