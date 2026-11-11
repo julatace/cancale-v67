@@ -1340,6 +1340,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. (soir) · « Ton adresse VRM » en UN parcours** : en tête d'E-mails → Relier ma boîte (Paramètres → Mon adresse VRM : la même pièce en feuille) — barre 1·2·3·✓ avec reprise, adresse en grand, compte en puces, messagerie détectée par le domaine (une tuile, 3 pas, bouton vers la bonne page), relais Apple = liste des boîtes reliées, code Gmail affiché seul + « Confirmer dans Gmail » (son clic), essai « Reçu ✓ » ; plus de roue infinie ; adresses sans compte en une ligne (`src/AdresseReception.jsx`). `docs/passation/2026-11-10-adresse-vrm-simple.md`. Geste : aucun.
 
+
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ2)
 - **10 nov. · Mode vacances tous comptes (lot O, ext. 5.338)** : Paramètres → Mes comptes → « Mode vacances » : état LU par compte (`is_on_holiday` du profil, mesuré ; « — » pas su), « Tout mettre en vacances » / « Tout rouvrir » = UN compte par clic, celui de l'onglet ; le geste de Vinted jamais vu ⇒ appris sur SON geste (`noteVacances` → `vinted_vacances_recette`, `/users/{current|son n°}` seulement), relu après ; Leboncoin/eBay/Vestiaire « À faire sur le site ». `docs/passation/2026-11-10-mode-vacances.md`. Geste : installer 5.338.0, puis poser et retirer une fois le mode vacances à la main sur vinted.fr.
 
@@ -1392,3 +1393,23 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot audits-rouges)
 - **11 nov. · Partager une fiche (lot partage-fiche)** : Annonces « … » / Stock → « Partager » ⇒ `vrm.center/p/<jeton>` (3 gestes, partage du téléphone sinon copie) : photos, titre, taille, état, prix, liens des annonces en ligne (par le N°) ; jamais prix d'achat, N°, compte, adresse ; pseudo seulement voulu ; 1/7/30 j, « Arrêter » ; « Vendu » par la preuve de l'app, jamais par absence ; page datée, « À confirmer » après 72 h ; mode `partage` de /api/compte (aucune fonction neuve), jeton indexé par empreinte, même 404 partout. `docs/passation/2026-11-11-partage-fiche.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (ouverture-legere-2)
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot clics-directs)
+
+- **11 nov. · Clics directs** : Ma journée, toucher la pile (photo comprise) ⇒ Ventes, plus de zoom (`data-sans-visionneuse`) ; Ventes, la photo (ligne et détail) s'ouvre DIRECTEMENT dans LA visionneuse (`ouvrirVisionneuse`, toutes les photos de l'article par fichier, `article` ⇒ mode stream), plus de loupe ni de second panneau. Banc `clics-directs` (rouge sur `main`). `docs/passation/2026-11-11-clics-directs.md`. Geste : aucun.
+## Déplacé de CLAUDE.md §9 (11 nov., lot emails-ecran)
+
+- **11 nov. · Ouverture plus légère 2** : transactions et fraîcheur des comptes gardées sur l'appareil, revalidées par leur version de famille (nombre + lignes écrites depuis 6 h, `lireFamilleAvecCopie`) ; version illisible ⇒ lecture d'avant, jamais la copie ; instantané d'Annonces (Vinted, « Tous ») ; 2e ouverture Ma journée 927 → 458 Ko, Annonces 1 108 → 638 Ko ; e-mails de suivi et fiches de page refusés (aucune version sûre). `docs/passation/2026-11-11-ouverture-legere-2.md`. Geste : aucun.
+
+- **11 nov. · Centre d'aide intégré (lot centre-aide)** : le « ? » de chaque écran ouvre une animation SVG (une scène par geste, 3–5 s, pause, immobile si « réduire les animations ») puis 3 à 5 fiches « Comment faire » ; 69 fiches (`src/aideFiches.js`) avec « M'y emmener » (`?tab=`, `reglage=`) ; recherche tolérante dans la feuille et la loupe, sans IA ; mots selon « Tu vends quoi ? », fiches avancées tues en Simple (la recherche les trouve). `docs/passation/2026-11-11-centre-aide.md`. Geste : aucun.
+
+- **11 nov. · E-mails envoyés (lot emails-envoyes)** : gabarit 600 px sans image (en-tête « VRM » ou NOM DE LA BOUTIQUE), texte ≥ 14 px, AA clair/sombre ; facture/avoir : n° + montant du PDF, rien de VRM. Banc `emails-envoyes`. `2026-11-11-emails-envoyes.md`. Geste : aucun.
+## Déplacé de CLAUDE.md §9 (11 nov., lot quoi-de-neuf, taille du dossier)
+
+- **11 nov. · « Quoi de neuf » (lot quoi-de-neuf)** : `src/nouveautes.js` (date, titre ≤ 8 mots, phrase ≤ 12, `tab`, pour, mode) ⇒ carte discrète en haut de Ma journée → feuille (« Voir », « Tout vu ») + Paramètres → Aide ; « vu » dans SYNC_KEYS ; rien d'avant l'inscription ; selon ce qu'il vend, Simple/Complet, statut. ⚠️ **Chaque lot visible ajoute sa ligne en tête de `src/nouveautes.js`** (`audit-quoi-de-neuf`). `docs/passation/2026-11-11-quoi-de-neuf.md`. Geste : aucun.
+
+- **11 nov. · Glisser pour agir (lot gestes-glisser)** : UN `LigneGlissable` (règle pure `src/glisserRegle.js`) — glisser à gauche révèle 1–2 actions, glisser long = la principale ; les MÊMES fonctions que les boutons : Ventes « Déposé »/« Imprimer », À retirer « Retiré »/« Le code », Qui dorment « Baisser » (ouvre la feuille)/« Agir » ; bord gauche exclu, souris non, tiroir `inert` fermé, indice une fois ; remplace `GlisserVente` ; Messages : aucun « Lu » existant, rien ajouté. `audit-ligne-glissable`, banc `gestes-glisser`. `docs/passation/2026-11-11-gestes-glisser.md`. Geste : aucun.
+
+- **11 nov. · Page d’accueil publique (lot accueil-public)** : « pour qui » en tête, « Essayer gratuitement », 5 moments (+ Messages/offres), captures en catalogue mélangé, cartes Solo/Pro = `OFFRES` + CGV, FAQ en h3, SEO (OG `og-vrm.jpg`, JSON-LD sans avis). `docs/passation/2026-11-11-accueil-public.md`. Geste : aucun.
+
+- **11 nov. · Parcours d'arrivée (accompagnement nouveau vendeur)** : plein écran, une étape à la fois (compte · « Tu vends quoi ? » = Ma configuration · extension connectée à CE compte · e-mails « Reçu ✓ » · Vinted « N annonces lues » · première vente ⇒ « C'est prêt »), réussite CONSTATÉE (relu 10 s), reprise exacte sur tout appareil (`vrm_parcours` dans SYNC_KEYS, aucune migration) ; petite carte sur Ma journée. `docs/passation/2026-11-11-accompagnement-nouveau-vendeur.md`. Geste : aucun.

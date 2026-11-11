@@ -13,7 +13,7 @@ import { ANIMATIONS_ECRANS, LARGEUR, HAUTEUR, MS_SCENE, centreCible } from '../a
 const reduit = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; } };
 
 function Element({ e, actif, scene, apres, numero }) {
-  const cls = `vrm-aa-el vrm-aa-${e.t}` + (actif ? ` vrm-aa-actif vrm-aa-${scene.geste}` : '') + (e.rouge ? ' vrm-aa-rouge' : '') + (e.ambre ? ' vrm-aa-ambre' : '') + (e.plein ? ' vrm-aa-plein' : '');
+  const cls = `vrm-aa-el vrm-aa-${e.t}` + (actif ? ` vrm-aa-actif vrm-aa-${scene.geste}` : '') + (e.rouge ? ' vrm-aa-double' : '') + (e.ambre ? ' vrm-aa-ambre' : '') + (e.plein ? ' vrm-aa-plein' : '');
   const r = e.t === 'bouton' || e.t === 'badge' || e.t === 'champ' ? e.h / 2 : e.t === 'barre' ? e.h / 2 : 6;
   // Le texte tapé reste écrit après sa scène (jusqu'au tour suivant).
   const tape = e.t === 'champ' && apres && apres.texte;

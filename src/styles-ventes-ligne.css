@@ -38,12 +38,6 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-l
 
 /* ── « Déposé » ─────────────────────────────────────────────────────────── */
 .vrm-gestes-pile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-html body .vrm-app-shell .vrm-main .vrm-sale-row[data-glisse-depose] { position: relative; touch-action: pan-y; }
-html body .vrm-app-shell .vrm-main .vrm-sale-row[data-glisse-actif]::after {
-  content: 'Déposé'; position: absolute; top: 0; bottom: 0; left: 100%; width: 60vw; display: flex; align-items: center; padding-left: 20px;
-  background: var(--vrm-card2); color: var(--vrm-ink); font-size: 15px; font-weight: 700; pointer-events: none;
-}
-html body .vrm-app-shell .vrm-main .vrm-sale-row[data-glisse-pret]::after { background: var(--vrm-ink); color: var(--vrm-bg); }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-depose-attente] { opacity: .55; }
 .vrm-depose-barre {
   position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px;

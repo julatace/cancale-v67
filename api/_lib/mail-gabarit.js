@@ -27,21 +27,44 @@
 //    http(s) n'est jamais posée dans un lien (rendu : rien).
 // ⚠️ Aucune donnée inventée : le gabarit ne porte que ce qu'on lui donne.
 // ⚠️ Français seulement : VRM reste sur la France (§3, 28 oct.).
+// (11 nov., lot emails-envoyes — « les e-mails que VRM envoie au nom du vendeur
+// sont beaux et lisibles sur téléphone ») La forme est reprise ainsi :
+//   · largeur 600 au plus (une table « fantôme » fixe la largeur sous Outlook,
+//     qui ignore `max-width`) ; à 390 px la carte occupe tout l'écran ;
+//   · AUCUNE image distante : l'en-tête est un MOT (« VRM » en petit pour ses
+//     propres e-mails, le NOM DE LA BOUTIQUE pour une facture / un avoir) —
+//     plus de logo chargé depuis vrm.center (bloqué par défaut chez la plupart
+//     des boîtes, il laissait un carré vide) ; Julien (11 nov.) ne veut pas de
+//     « envoyée par VRM » dans la facture : `marque` n'écrit RIEN de VRM ;
+//   · texte ≥ 14 px partout (16 px le corps, 14 px les notes et le pied) ;
+//   · contrastes AA en clair ET en sombre : le bouton reste #0071e3 sous un mot
+//     blanc (4,7:1 — le #0a84ff du sombre ne donnait que 3,6:1) ; le gris doux
+//     est #636366 en clair (5,6:1 sur blanc), #aeaeb2 en sombre ;
+//   · sombre : `prefers-color-scheme` (Apple Mail, iOS, Outlook macOS) ET les
+//     attributs que pose Outlook.com (`[data-ogsc]`/`[data-ogsb]`) ; Gmail
+//     inverse lui-même — les couleurs choisies restent lisibles inversées ;
+//   · `lang` du document (fr ; « fr » aussi pour une facture bilingue, dont le
+//     français reste le texte de référence), `role="presentation"` sur chaque
+//     table de mise en page, un `<h1>` unique ;
+//   · seulement des liens https (une adresse http n'est jamais posée).
+// 
 
 export const SITE = 'https://vrm.center';
-export const LOGO = `${SITE}/vrm-logo-v5-192.png`;
 // Réglages → Notifications (là où vivent le bilan du mois et les e-mails de l'essai).
 export const LIEN_GERER = `${SITE}/?tab=settings&section=notifications`;
 
 export const echapperHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Une URL ne se pose dans un lien que si elle est http(s) (jamais `javascript:`).
-export const urlSure = (u) => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '');
+// (11 nov.) https SEULEMENT : un lien http part en clair et se fait réécrire en route.
+export const urlSure = (u) => (/^https:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '');
 // Un paragraphe : échappé, ses retours à la ligne gardés.
 const majuscule = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t);
 const para = (t) => echapperHtml(t).replace(/\r?\n/g, '<br>');
 
 const POLICE = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const ENCRE = '#1d1d1f', DOUX = '#6e6e73', FILET = '#e5e5ea', FOND = '#f5f5f7', CARTE = '#ffffff', BLEU = '#0071e3';
+const ENCRE = '#1d1d1f', DOUX = '#636366', FILET = '#e5e5ea', FOND = '#f5f5f7', CARTE = '#ffffff', BLEU = '#0071e3';
+// La largeur de la carte (600 au plus) : la même pour la table fantôme d'Outlook.
+export const LARGEUR = 600;
 
 // L'identité de l'éditeur pour le pied : lue dans `globalThis.VRM_EDITEUR`
 // (posé par public/legal/editeur.js, que `lireMentions()` charge côté serveur).
@@ -66,13 +89,16 @@ export function lignesEditeur(E = globalThis.VRM_EDITEUR) {
 // pied      : { texte, lien?, motLien? } — pourquoi ce message, « ne plus recevoir »
 // facultatif: true ⇒ « Gérer mes e-mails » (Réglages → Notifications) au pied
 // marque    : (facultatif) { nom } — l'e-mail est celui d'un VENDEUR (sa facture) :
-//             son nom en tête au lieu du logo VRM, et pas de mentions de VRM
+//             le NOM DE SA BOUTIQUE en tête au lieu du mot « VRM », et rien de VRM
+//             (ni mot, ni mentions de l'éditeur, ni « via VRM » : Julien, 11 nov.)
+// langue    : (facultatif) l'attribut `lang` du document (défaut « fr »)
 // editeur   : (facultatif) l'objet VRM_EDITEUR (défaut : globalThis)
-export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chiffres = [], suite = [], bouton = null, apres = '', pied = null, facultatif = false, marque = null, editeur } = {}) {
+export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chiffres = [], suite = [], bouton = null, apres = '', pied = null, facultatif = false, marque = null, editeur, langue = 'fr' } = {}) {
   const urlBouton = bouton ? urlSure(bouton.url) : '';
   const lienPied = pied ? urlSure(pied.lien) : '';
   const mentions = marque ? [] : lignesEditeur(editeur === undefined ? globalThis.VRM_EDITEUR : editeur);
   const apercu = String(preentete || paras[0] || titre || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+  const lang = /^[a-z]{2}$/.test(String(langue)) ? langue : 'fr';
 
   // ── Le texte brut : le même contenu, dans le même ordre ───────────────────
   const lignes = [titre, '', ...paras.flatMap((p) => [p, ''])];
@@ -90,12 +116,11 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
 
   // ── Le HTML ───────────────────────────────────────────────────────────────
   const p = (t, style = '') => `<p class="vrm-t" style="margin:0 0 16px;font-size:16px;line-height:1.55;color:${ENCRE};${style}">${para(t)}</p>`;
+  // L'en-tête : un MOT, jamais une image (aucune image distante obligatoire).
+  // Le nom d'une boutique peut être long : il se coupe (jamais de défilement de côté).
   const tete = marque
-    ? `<div class="vrm-t" style="font-size:15px;font-weight:600;color:${ENCRE};letter-spacing:-0.01em">${echapperHtml(marque.nom || '')}</div>`
-    : `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>`
-      + `<td style="vertical-align:middle"><img src="${LOGO}" width="32" height="32" alt="VRM" style="display:block;width:32px;height:32px;border:0;border-radius:8px;font:600 13px ${POLICE};color:${ENCRE}"></td>`
-      + `<td class="vrm-t" style="vertical-align:middle;padding-left:10px;font-size:15px;font-weight:600;color:${ENCRE};letter-spacing:-0.01em">VRM</td>`
-      + `</tr></table>`;
+    ? `<div class="vrm-t" style="font-size:17px;line-height:1.3;font-weight:600;color:${ENCRE};letter-spacing:-0.01em;word-break:break-word">${echapperHtml(marque.nom || '')}</div>`
+    : `<div class="vrm-doux" style="font-size:14px;line-height:1.3;font-weight:700;color:${DOUX};letter-spacing:0.06em">VRM</div>`;
   const tableChiffres = chiffres.length
     ? `<table role="presentation" class="vrm-chiffres" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:4px 0 20px;border-collapse:separate;background:${FOND};border-radius:14px">`
       + chiffres.map(([l, v, n], i) => {
@@ -106,17 +131,18 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
         return `<tr><td class="vrm-filet" style="padding:${haut};${filet}vertical-align:top">`
           + `<div class="vrm-t" style="font-size:15px;line-height:1.35;color:${ENCRE}">${echapperHtml(l)}</div>`
           + `</td><td class="vrm-filet vrm-t" align="right" style="padding:${haut};${filet}text-align:right;vertical-align:top;white-space:nowrap;font-size:17px;line-height:1.35;font-weight:600;color:${ENCRE};font-variant-numeric:tabular-nums;font-feature-settings:'tnum'">${echapperHtml(v)}</td></tr>`
-          + (n ? `<tr><td colspan="2" class="vrm-doux" style="padding:0 16px 13px;font-size:13px;line-height:1.4;color:${DOUX}">${echapperHtml(n)}</td></tr>` : '');
+          + (n ? `<tr><td colspan="2" class="vrm-doux" style="padding:0 16px 13px;font-size:14px;line-height:1.4;color:${DOUX}">${echapperHtml(n)}</td></tr>` : '');
       }).join('')
       + `</table>`
     : '';
   // Le bouton « à toute épreuve » : une cellule colorée (Outlook) + le lien en bloc.
+  // Le même bleu en clair et en sombre : un mot blanc y reste lisible (4,7:1).
   const btn = bouton && urlBouton
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px"><tr><td class="vrm-bouton" align="center" bgcolor="${BLEU}" style="border-radius:12px;background:${BLEU}">`
-      + `<a class="vrm-bouton" href="${echapperHtml(urlBouton)}" style="display:block;padding:0 24px;line-height:44px;min-height:44px;border-radius:12px;background:${BLEU};color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;white-space:nowrap">${echapperHtml(bouton.mot)}</a>`
+      + `<a class="vrm-bouton" href="${echapperHtml(urlBouton)}" style="display:block;padding:0 24px;line-height:44px;min-height:44px;border-radius:12px;background:${BLEU};color:#ffffff;font-size:16px;font-weight:600;text-decoration:none">${echapperHtml(bouton.mot)}</a>`
       + `</td></tr></table>`
     : '';
-  const petit = (t) => `<p class="vrm-doux" style="margin:0 0 8px;font-size:12px;line-height:1.5;color:${DOUX}">${t}</p>`;
+  const petit = (t) => `<p class="vrm-doux" style="margin:0 0 10px;font-size:14px;line-height:1.5;color:${DOUX}">${t}</p>`;
   const lienDoux = (url, mot) => `<a href="${echapperHtml(url)}" class="vrm-doux" style="color:${DOUX};text-decoration:underline">${echapperHtml(mot)}</a>`;
   const blocsPied = [];
   if (bouton && urlBouton) blocsPied.push(petit(`Le bouton ne marche pas ? Copie cette adresse dans ton navigateur :<br><span style="word-break:break-all">${echapperHtml(urlBouton)}</span>`));
@@ -124,27 +150,38 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
   if (facultatif) blocsPied.push(petit(lienDoux(LIEN_GERER, 'Gérer mes e-mails')));
   if (mentions.length) blocsPied.push(petit(mentions.map(echapperHtml).join('<br>')));
 
+  // Le sombre : la feuille `prefers-color-scheme` (Apple Mail, iOS, Outlook macOS),
+  // puis les MÊMES règles sous les attributs d'Outlook.com (`data-ogsc` : couleur
+  // du texte, `data-ogsb` : fond), qui ne lit pas la requête média.
+  const sombre = (pre) => {
+    const s = (sel) => sel.split(',').map((x) => `${pre}${x}`).join(',');
+    return `${s('.vrm-fond')}{background:#000000!important}${s('.vrm-carte')}{background:#1c1c1e!important}`
+      + `${s('.vrm-t')}{color:#f5f5f7!important}${s('.vrm-doux')}{color:#aeaeb2!important}`
+      + `${s('.vrm-filet')}{border-color:#38383a!important}${s('.vrm-chiffres')}{background:#2c2c2e!important}`
+      + `${s('hr.vrm-filet')}{border-top-color:#38383a!important}`;
+  };
   const style = `<style>`
     + `:root{color-scheme:light dark;supported-color-schemes:light dark}`
-    + `@media (prefers-color-scheme:dark){`
-    + `.vrm-fond{background:#000000!important}.vrm-carte{background:#1c1c1e!important}`
-    + `.vrm-t{color:#f5f5f7!important}.vrm-doux{color:#98989d!important}`
-    + `.vrm-filet{border-color:#38383a!important}.vrm-chiffres{background:#2c2c2e!important}`
-    + `.vrm-bouton{background:#0a84ff!important}hr.vrm-filet{border-top-color:#38383a!important}}`
-    + `@media (max-width:480px){.vrm-carte-td{padding:24px 20px!important}.vrm-h1{font-size:22px!important}}`
+    + `@media (prefers-color-scheme:dark){${sombre('')}}`
+    + sombre('[data-ogsc] ').replace(/\{background[^}]*\}/g, '{}').replace(/[^{}]+\{\}/g, '')
+    + sombre('[data-ogsb] ').replace(/\{(color|border-color|border-top-color)[^}]*\}/g, '{}').replace(/[^{}]+\{\}/g, '')
+    + `@media (max-width:480px){.vrm-carte-td{padding:24px 20px!important}.vrm-h1{font-size:22px!important}.vrm-ext{padding:16px 8px 28px!important}}`
     + `</style>`;
 
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
+  const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">`
+    + `<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">`
     + `<title>${echapperHtml(titre)}</title>${style}</head>`
     + `<body class="vrm-fond" style="margin:0;padding:0;background:${FOND};-webkit-text-size-adjust:100%;font-family:${POLICE}">`
     // Le préentête : caché, suivi de blancs pour que la boîte n'y colle pas le corps.
     + `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:${FOND}">${echapperHtml(apercu)}${'&#8199;&#65279;&#847; '.repeat(20)}</div>`
-    + `<table role="presentation" class="vrm-fond" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${FOND}" style="width:100%;background:${FOND}"><tr><td align="center" style="padding:28px 12px 36px">`
-    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:520px">`
-    + `<tr><td style="padding:0 8px 16px">${tete}</td></tr>`
+    + `<table role="presentation" class="vrm-fond" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${FOND}" style="width:100%;background:${FOND}"><tr><td class="vrm-ext" align="center" style="padding:28px 12px 36px">`
+    // Outlook (Windows) ignore `max-width` : une table fantôme fixe la largeur.
+    + `<!--[if mso]><table role="presentation" width="${LARGEUR}" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${LARGEUR}px">`
+    + `<tr><td style="padding:0 8px 14px;font-family:${POLICE}">${tete}</td></tr>`
     + `<tr><td class="vrm-carte vrm-carte-td" bgcolor="${CARTE}" style="background:${CARTE};border-radius:18px;padding:32px 28px;font-family:${POLICE}">`
-    + `<h1 class="vrm-t vrm-h1" style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.02em;color:${ENCRE}">${echapperHtml(titre)}</h1>`
+    + `<h1 class="vrm-t vrm-h1" style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.02em;color:${ENCRE};word-break:break-word">${echapperHtml(titre)}</h1>`
     + paras.map((t) => p(t)).join('')
     + (liste.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 16px">${liste.map((x) => `<tr><td class="vrm-t" valign="top" style="width:18px;padding:0 0 10px;font-size:16px;line-height:1.55;color:${BLEU}">•</td><td class="vrm-t" style="padding:0 0 10px;font-size:16px;line-height:1.55;color:${ENCRE}">${para(x)}</td></tr>`).join('')}</table>` : '')
     + tableChiffres
@@ -155,7 +192,9 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
     + (blocsPied.length
       ? `<tr><td style="padding:20px 8px 0;font-family:${POLICE}"><hr class="vrm-filet" style="border:0;border-top:1px solid ${FILET};margin:0 0 16px">${blocsPied.join('')}</td></tr>`
       : '')
-    + `</table></td></tr></table></body></html>`;
+    + `</table>`
+    + `<!--[if mso]></td></tr></table><![endif]-->`
+    + `</td></tr></table></body></html>`;
   return { texte, html };
 }
 

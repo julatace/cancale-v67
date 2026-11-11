@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+// (11 nov., lot DJ6) Le retour OAuth lit l'intention du clic (src/auth/compteNeuf.js) : la vraie règle, pas une copie.
+import { lireIntention as lireIntentionOAuth } from "../../src/auth/compteNeuf.js";
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source = fs.readFileSync(
@@ -162,6 +164,7 @@ function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
     AUTH: ancienne,
     RECOVERY_PENDING: false,
     lireLiaisonOAuth: () => null,
+    lireIntentionOAuth,
     cleanAuthUrl: () => {
       nettoyee = true;
     },
