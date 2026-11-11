@@ -5,6 +5,7 @@ import { bilanEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from '../enLi
 import { suivreReceptionLeboncoin } from '../rafraichissementLeboncoin.js';
 import { lbcFloute } from '../flouCompte.js';
 import React, { useState, useEffect, useRef } from 'react';
+import { suivi, suivreJob, lireAvanceeJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { montant } from '../format.js';
 import { ventesVcDe } from '../../api/_lib/vestiaire-regle.js';
 import { lbcColisAPoster } from '../../api/_lib/colis-sites.js';
@@ -89,6 +90,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
     let confirme = false;
     if (lbc && abandonne) { if (!(await demander())) return; confirme = true; }
     setRefus(null); setEnvoi(true);
+    const t0 = Date.now();
     const envoyer = (c) => vmrCmd(Object.assign({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, c ? { confirme: true } : {}), 30000);
     let r = await envoyer(confirme);
     if (r && !r.accepte && r.code === 'confirmer' && !confirme) {
@@ -103,6 +105,8 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
     if (!r.accepte) { setRefus(r.raison || "Refusé par l'extension."); return; }
     __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
     __vmrNotifier();
+    // (11 nov., lot suivi-travail) La feuille « VRM travaille » (eBay : VRM remplit, il met en vente lui-même).
+    if (!enCours) suivrePublicationSite({ sorte: lbc ? 'publier-lbc' : 'preparer-ebay', titre: lbc ? 'Publier sur Leboncoin' : 'Préparer sur eBay', etapes: lbc ? ETAPES_SUIVI_LBC : ETAPES_SUIVI_EBAY, id: String(id), jobId: r.jobId || jobId, depuis: t0, site: lbc ? 'Leboncoin' : 'eBay', preparer: !lbc });
   };
   const libelle = job && libelleRelais(job.etape) ? libelleRelais(job.etape) : envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
     : enCours ? (lbc ? 'Publication en cours…' : 'Formulaire eBay ouvert')
@@ -217,6 +221,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
       if (!ok) return;
     }
     setRefus(null); setAConfirmer(false); setEnvoi(true);
+    const t0 = Date.now();
     let r = await envoyer(!!confirme);
     setEnvoi(false);
     if (r && !r.accepte && r.code === 'confirmer') {
@@ -227,6 +232,8 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
     if (!r.accepte) { setRefus(r.raison ? (r.raison.charAt(0).toUpperCase() + r.raison.slice(1) + '.') : "Refusé par l'extension."); return; }
     __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() });
     __vmrNotifier();
+    // (11 nov., lot suivi-travail) VRM figé pendant le dépôt, avec son détail (pas pour un « remettre devant »).
+    if (!enCours) suivrePublicationSite({ sorte: 'publier-lbc', titre: 'Publier sur Leboncoin', etapes: ETAPES_SUIVI_LBC, id: String(q.id), num: q.numero, titreArticle: titre, jobId: r.jobId || jobId, depuis: t0, site: 'Leboncoin' });
   };
   const basculerPhoto = (u) => setPhotos((l) => (l.includes(u) ? l.filter((x) => x !== u) : (l.length >= LBC_PHOTOS_MAX ? l : [...l, u])));
   const categorie = categorieLbcDe(titre, desc, q.taille);
@@ -869,6 +876,27 @@ function QuotaLbc({ limit, plan, onFait }) {
 //   3. publier sa fiche, puis ATTENDRE la page de confirmation de Leboncoin
 //      avant la suivante (un dépôt à la fois, aucune attente artificielle).
 // Ce qui ne peut pas être recréé n'est jamais proposé (voir `repub` dans l'écran).
+// (11 nov., lot suivi-travail) Les étapes d'une annonce, telles que l'extension les dit (`progres.etape`).
+const ETAPES_SUIVI_LBC_REPUB = [['suppression', 'Suppression sur Leboncoin'], ['marque', 'Remise dans la file de VRM'], ['depot', 'Dépôt demandé à l’extension'], ['ouverture', 'Ouverture du dépôt'], ['remplissage', 'Remplissage du formulaire'], ['photos', 'Envoi des photos'], ['etapes', 'Étapes du dépôt'], ['publication', 'Publication'], ['accepte', 'Publiée sur Leboncoin ✓']];
+const ETAPES_SUIVI_LBC = ETAPES_SUIVI_LBC_REPUB.slice(2);
+const ETAPES_SUIVI_EBAY = [['depot', 'Demande envoyée à l’extension'], ['formulaire', 'Formulaire eBay ouvert et rempli']];
+// Une publication lancée sur SON clic (Leboncoin, eBay) : la feuille « VRM travaille » la suit
+// jusqu'à ce que l'extension dise « fait », un geste à faire dans l'onglet, l'abandon ou le délai.
+// `preparer` (eBay) : VRM remplit, c'est lui qui met en vente — l'annonce finit « à la main ».
+function suivrePublicationSite({ sorte, titre, etapes, id, num, titreArticle, jobId, depuis, site, preparer = false }) {
+  const t = suivi.demarrer({ sorte, titre, etapes, articles: [{ id, num: num || '', titre: titreArticle || '' }] });
+  if (!t) return;
+  t.etape(id, 'depot');
+  if (preparer) { t.etape(id, 'formulaire'); t.fin(id, { etat: 'main', raison: `formulaire ${site} ouvert et rempli par l’extension`, geste: `Relis et mets en vente sur ${site}` }); t.terminer(''); return; }
+  suivreJob(t, id, { jobId, lireJobs: () => __vmrJobs, depuis, delaiMs: 15 * 60000 }).then(({ fin, raison }) => {
+    if (fin === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
+    else if (fin === 'geste') t.fin(id, { etat: 'main', raison: `le dépôt attend ton geste dans l’onglet ${site}`, geste: `Termine-le dans l’onglet ${site}` });
+    else if (fin === 'abandonne') t.fin(id, { etat: 'main', raison: RAISON_ABANDON[raison] || 'VRM n’a pas vu la fin du dépôt', geste: `Si tu l’as publiée toi-même, clique « Déjà publiée » ; sinon relance` });
+    else if (fin === 'arret') t.fin(id, { etat: 'main', raison: `le dépôt continue dans l’onglet ${site}`, geste: `Regarde l’onglet ${site}` });
+    else t.fin(id, { etat: 'main', raison: 'VRM n’a pas vu la fin du dépôt en 15 min', geste: `Regarde l’onglet ${site} avant de relancer` });
+    t.terminer('');
+  });
+}
 const REPUB_LBC_MAX = 10;   // le plafond de suppressions par heure de l'extension
 const REPUB_LBC_ATTENTE_MS = 10 * 60000;
 const attendreRepubLbc = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -934,41 +962,59 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
     });
     if (!ok) return;
     stop.current = false; setMode('run');
+    // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL de tout ce que VRM fait et une BARRE »)
+    const t = suivi.demarrer({ sorte: 'republier-lbc', titre: 'Republier sur Leboncoin', etapes: ETAPES_SUIVI_LBC_REPUB,
+      articles: fiches.map(({ it }) => ({ id: it.lbc.id, num: it.numero || '', titre: (it.lbc && it.lbc.titre) || it.title || '' })) });
+    const poserS = (id, etat, texte, aLaMain) => {
+      poser(id, etat, texte);
+      if (!t) return;
+      if (aLaMain) t.fin(id, { etat: 'main', raison: texte, geste: aLaMain });
+      else if (etat === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
+      else if (etat === 'incertain') t.fin(id, { etat: 'main', raison: texte, geste: 'Regarde l’annonce sur Leboncoin avant de relancer' });
+      else if (etat === 'refuse' || etat === 'echec') t.fin(id, { etat: 'refus', raison: texte });
+    };
     for (const { it, f } of fiches) {
       const id = it.lbc.id;
+      if (t && !(await t.continuer())) stop.current = true;
       if (stop.current) { poser(id, 'attente', 'pas touchée — tu as arrêté'); continue; }
+      if (t) t.etape(id, 'suppression');
       // 1. Supprimer.
       poser(id, 'encours', 'Suppression sur Leboncoin…');
       let r = null; try { r = await vmrCmd({ cmd: 'lbcSupprime', id, confirme: true }, 70000); } catch (_) { r = null; }
-      if (!r) { poser(id, 'incertain', "je ne sais pas si elle est supprimée — l'extension n'a pas répondu. Regarde l'annonce sur Leboncoin. Arrêt."); break; }
-      if (r.accepte === false) { poser(id, 'refuse', `pas touchée — ${r.raison || 'refusé par l’extension'}. Arrêt.`); break; }
-      if (r.etape !== 'fait') { poser(id, r.etape === 'refuse' ? 'refuse' : 'incertain', r.etape === 'refuse' ? `pas touchée — Leboncoin a répondu ${r.statut}. Arrêt.` : `je ne sais pas si elle est supprimée — ${r.raison || 'pas de réponse de Leboncoin'}. Arrêt.`); break; }
-      if (r.note === false) { poser(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu le noter : elle n'est pas republiée (la file la croirait encore en ligne). Clique « ↻ Actualiser » puis publie-la depuis « À publier ». Arrêt."); break; }
+      if (!r) { poserS(id, 'incertain', "je ne sais pas si elle est supprimée — l'extension n'a pas répondu. Regarde l'annonce sur Leboncoin. Arrêt."); break; }
+      if (r.accepte === false) { poserS(id, 'refuse', `pas touchée — ${r.raison || 'refusé par l’extension'}. Arrêt.`); break; }
+      if (r.etape !== 'fait') { poserS(id, r.etape === 'refuse' ? 'refuse' : 'incertain', r.etape === 'refuse' ? `pas touchée — Leboncoin a répondu ${r.statut}. Arrêt.` : `je ne sais pas si elle est supprimée — ${r.raison || 'pas de réponse de Leboncoin'}. Arrêt.`); break; }
+      if (r.note === false) { poserS(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu le noter : elle n'est pas republiée (la file la croirait encore en ligne). Clique « ↻ Actualiser » puis publie-la depuis « À publier ». Arrêt."); break; }
       // 2. Retirer sa marque « publiée ».
+      if (t) t.etape(id, 'marque');
       let marque = true;
       for (const m of it.marques || []) { let x = null; try { x = await vmrCmd({ cmd: 'lbcMarque', id: String(m), etat: 'unposted' }, 30000); } catch (_) { x = null; } if (!x || !x.accepte) { marque = false; break; } }
-      if (!marque) { poser(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu la remettre dans la file : elle n'est pas republiée. Clique « ↻ Actualiser », « Ce n'est plus publié », puis publie-la. Arrêt."); break; }
+      if (!marque) { poserS(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu la remettre dans la file : elle n'est pas republiée. Clique « ↻ Actualiser », « Ce n'est plus publié », puis publie-la. Arrêt."); break; }
       // 3. Publier sa fiche, puis attendre la page de confirmation de Leboncoin.
       poser(id, 'encours', 'Supprimée · republication en cours…');
+      if (t) t.etape(id, 'depot');
       const jobId = 'lbc:' + it.id;
       const t0 = Date.now();
       let p = null; try { p = await vmrCmd(Object.assign({ cmd: 'lbcPublier', id: String(it.id) }, saitFiche ? { annonce: f.v.annonce } : {}), 30000); } catch (_) { p = null; }
-      if (!p || !p.accepte) { poser(id, 'echec', `supprimée de Leboncoin, pas encore republiée — ${p ? (p.raison || 'refusé par l’extension') : "l'extension n'a pas répondu"}. Elle est dans « À publier ». Arrêt.`); break; }
+      if (!p || !p.accepte) { poserS(id, 'echec', `supprimée de Leboncoin, pas encore republiée — ${p ? (p.raison || 'refusé par l’extension') : "l'extension n'a pas répondu"}. Elle est dans « À publier ». Arrêt.`); break; }
       __vmrJobs[jobId] = { etape: p.etape || 'depot', at: Date.now() }; __vmrNotifier();
       let fin = '';
       while (Date.now() - t0 < REPUB_LBC_ATTENTE_MS) {
         await attendreRepubLbc(1500);
         const j = __vmrJobs[jobId];
+        if (t) { const av = lireAvanceeJob(j, t0); if (av.etape && av.etape !== 'fait' && av.etape !== 'abandonne') t.etape(id, av.etape); }
         if (j && j.etape === 'fait' && Number(j.at || 0) >= t0) { fin = 'fait'; break; }
         if (j && j.etape === 'abandonne') { fin = 'abandonne'; break; }
         if (j && j.progres && /^(champ-manquant|publication-refusee)$/.test(j.progres.etape)) { fin = 'geste'; break; }
       }
-      if (fin === 'fait') { poser(id, 'fait', 'republiée ✓ — une annonce neuve est en ligne sur Leboncoin'); continue; }
-      poser(id, 'echec', fin === 'geste' ? "supprimée, et le dépôt attend ton geste dans l'onglet Leboncoin (un champ à choisir). Termine-le là-bas. Arrêt."
+      if (fin === 'fait') { poserS(id, 'fait', 'republiée ✓ — une annonce neuve est en ligne sur Leboncoin'); continue; }
+      poserS(id, 'echec', fin === 'geste' ? "supprimée, et le dépôt attend ton geste dans l'onglet Leboncoin (un champ à choisir). Termine-le là-bas. Arrêt."
         : fin === 'abandonne' ? "supprimée, mais le dépôt n'a pas abouti. Elle est dans « À publier » : relance-la de là. Arrêt."
-        : "supprimée ; je n'ai pas vu la fin du dépôt en 10 min — regarde l'onglet Leboncoin avant de relancer. Arrêt.");
+        : "supprimée ; je n'ai pas vu la fin du dépôt en 10 min — regarde l'onglet Leboncoin avant de relancer. Arrêt.",
+        fin === 'geste' ? 'Termine le dépôt dans l’onglet Leboncoin' : fin === 'abandonne' ? 'Relance-la depuis « À publier »' : 'Regarde l’onglet Leboncoin avant de relancer');
       break;
     }
+    if (t) t.terminer(stop.current ? 'arrêté par toi' : '');
     setMode('fini'); stop.current = false;
     if (onFini) onFini();
   };

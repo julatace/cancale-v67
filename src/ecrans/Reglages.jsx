@@ -15,6 +15,7 @@ import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { HistoriqueModifications } from '../OutilsParcours.jsx';
+import { TravauxPasses } from '../composants/SuiviTravail.jsx';   // (11 nov., lot suivi-travail) les travaux suivis (Republier, publier, baisse…)
 import { dateImportValide } from '../brouillonsReglages.js';
 import { preparerLiaisonOAuth } from '../auth/liaisonOAuth.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -2603,7 +2604,7 @@ function JournalVrm() {
   const nomCompte = (uid) => labels[uid] || (comptesV.find((a) => String(a && a.vinted_user_id) === String(uid)) || {}).login || null;
   const numeroDeItem = (id) => (fiches[id] && fiches[id].numero) || null;
   if (etat === undefined) return <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>;
-  if (etat.erreur) return <div className="vrm-sec-liste" data-journal="pas-su"><div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>Je n'ai pas pu lire le journal — réessaie dans un instant.</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div>;
+  if (etat.erreur) return <><TravauxPasses/><div className="vrm-sec-liste" data-journal="pas-su"><div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>Je n'ai pas pu lire le journal — réessaie dans un instant.</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div></>;
   const comptesJ = comptesDuJournal(etat.evenements);
   const vus = filtrerJournal(etat.evenements, { compte, type });
   const jours = [];
@@ -2617,6 +2618,8 @@ function JournalVrm() {
       {/* (10 nov., lot G) La jauge des 50 actions/h de chaque compte Vinted, en tête (src/JaugeActions.jsx). */}
       <JaugesComptes uids={comptesV.map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={nomCompte}/>
       <HistoriqueModifications owner={AUTH.user?.id||''}/>
+      {/* (11 nov., lot suivi-travail) Les travaux longs suivis par la feuille « VRM travaille », gardés sur cet appareil. */}
+      <TravauxPasses/>
       <div className="vrm-sec-filtres vrm-compte-puces" role="radiogroup" aria-label="Type">
         {FILTRES_TYPE.map(([id, lib]) => <button key={id} type="button" role="radio" aria-checked={type === id} data-journal-type={id} className={'vrm-compte-puce' + (type === id ? ' is-actif' : '')} onClick={() => setType(id)}>{lib}</button>)}
       </div>
