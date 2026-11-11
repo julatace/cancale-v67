@@ -161,6 +161,13 @@ const XML_REFUS = XML_ECHEC(ERR('1047', 'Error', 'Cette annonce est déjà termi
 const fee = (n, v) => `<Fee><Name>${n}</Name><Fee currencyID="EUR">${v}</Fee></Fee>`;
 const ELIGIBLE = '110000000002';
 let mode = {};
+// (11 nov.) 450 commandes inventées sur 600 jours, avec un acheteur et une adresse (qui ne doivent PAS être gardés).
+const HISTO = Array.from({ length: 450 }, (_, i) => ({ orderId: 'H-' + String(i).padStart(4, '0'), creationDate: new Date(Date.now() - 3600000 - i * (600 / 450) * 86400000).toISOString(),
+  orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'FULFILLED', buyer: { username: 'acheteur_' + i, buyerRegistrationAddress: { fullName: 'Nom Inventé' } },
+  paymentSummary: { totalDueSeller: { value: '50.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' },
+  fulfillmentStartInstructions: [{ shippingStep: { shipTo: { fullName: 'Nom Inventé', contactAddress: { addressLine1: '1 rue Inventée' } }, shippingCarrierCode: 'X' } }],
+  lineItems: [{ lineItemId: 'L' + i, sku: 'VRM-' + (i + 1), legacyItemId: String(110000100000 + i), title: 'Paire ' + i }] }));
+const HISTO_JOURNAL = [];
 const uuidsVus = new Map();       // UUID déjà utilisé → ItemID (comme eBay : 488)
 // La règle d'offre d'une annonce, avant la dernière révision (« ancien-puis-nouveau »).
 const avantRevision = new Map();
@@ -382,6 +389,20 @@ global.fetch = async (url, opts = {}) => {
       if (mode.envoi === 'refus') return rep({ errors: [{ errorId: 150020, longMessage: 'Offre refusée par eBay. Bearer at-J v^1.1#SECRET-QUI-FUIRAIT' }] }, 400);
       return rep({ offers: [{ offerId: 'o1', offerStatus: 'PENDING' }, { offerId: 'o2', offerStatus: 'PENDING' }] });
     }
+    // (11 nov., import-historique-sites) L'HISTORIQUE : une fenêtre `creationdate:[de..a]`,
+    // servie depuis `HISTO` (inventé) ; plus ancienne que 2 ans ⇒ eBay refuse (400).
+    if (u.includes('/sell/fulfillment/v1/order') && /filter=creationdate/.test(u)) {
+      const q = new URL(u).searchParams, m = /creationdate:\[([^.]+\.\d+Z)\.\.([^\]]+)\]/.exec(q.get('filter') || '');
+      HISTO_JOURNAL.push(u);
+      if (!m) return rep({ errors: [{ errorId: 30700, message: 'Invalid filter' }] }, 400);
+      const de = Date.parse(m[1]), a = Date.parse(m[2]);
+      if (mode.histo === 'ko') return rep({ errors: [{ errorId: 2003 }] }, 500);
+      if (mode.histo === 'forme') return rep({ commandes: [] });
+      if (de < Date.now() - 730 * JOUR) return rep({ errors: [{ errorId: 30850, message: 'The creationdate filter range is too old.' }] }, 400);
+      const dans = HISTO.filter((o) => { const t = Date.parse(o.creationDate); return t >= de && t <= a; });
+      const off = Number(q.get('offset')), lim = Number(q.get('limit'));
+      return rep({ orders: dans.slice(off, off + lim), total: dans.length, offset: off, limit: lim });
+    }
     if (u.includes('/sell/fulfillment/v1/order')) return mode.commandes === 'ko' ? rep({ errors: [] }, 500) : rep({ orders: [{ orderId: '01-0001', lineItems: [{ sku: 'VRM-24' }] }], total: 1 });
     return rep({ orders: [], inventoryItems: [], total: 0 });
   }
@@ -444,6 +465,7 @@ global.fetch = async (url, opts = {}) => {
     if (id === 'main' && mode.mainKo) return rep({ message: 'boom' }, 500);
     if (id === 'ebay_retraits_auto' && mode.journalKo) return rep({ message: 'boom' }, 500);
     if (id === 'ebay_listings' && mode.listingsKo) return rep({ message: 'boom' }, 500);
+    if (id === 'ebay_orders' && mode.ordersKo) return rep({ message: 'boom' }, 500);   // (11 nov.) l'historique ne peut pas fusionner
     if (id === 'ebay_comptes' && mode.comptesKo) return rep({ message: 'boom' }, 500);
     if (/^ebay_offres/.test(String(id || '')) && mode.offresKo) return rep({ message: 'boom' }, 500);
     const out = lignes.filter((r) => (!id || r.id === id) && (!owner || r.owner === owner));
@@ -560,7 +582,7 @@ const RA = {};
   }
 
   // ── 1. Session obligatoire ─────────────────────────────────────────────────
-  const TOUTES = ['commandessuite','message','offredetail','sync', 'finances', 'publish', 'revise', 'sku', 'offreinfo', 'offre', 'retirer', 'programmer', 'programmees', 'deprogrammer', 'reprogrammer', 'limites', 'regleoffre', 'regleoffrelire','commande','transporteurs','expedier','messageacheteur','messages','repondre','offresrecues','repondreoffre','modifierannonce','terminerannonce'];
+  const TOUTES = ['historique','commandessuite','message','offredetail','sync', 'finances', 'publish', 'revise', 'sku', 'offreinfo', 'offre', 'retirer', 'programmer', 'programmees', 'deprogrammer', 'reprogrammer', 'limites', 'regleoffre', 'regleoffrelire','commande','transporteurs','expedier','messageacheteur','messages','repondre','offresrecues','repondreoffre','modifierannonce','terminerannonce'];
   for (const action of TOUTES) {
     await essaie('sans session : ' + action, async () => {
       const o = await app('', { action, item: { title: 'x' }, itemId: '110000000001', listingId: ELIGIBLE, numero: '22', remise: 10, confirme: true, price: '10' });
@@ -574,7 +596,7 @@ const RA = {};
     dit(o.code === 401 && chezEbay(o.journal).length === 0, 'un jeton que le service d\'identité ne reconnaît pas est refusé', `HTTP ${o.code}`);
   });
   await essaie('abonnement coupé', async () => {
-    for (const action of ['commandessuite','status', 'sync', 'programmer', 'authurl']) {
+    for (const action of ['historique','commandessuite','status', 'sync', 'programmer', 'authurl']) {
       const o = await app(JWT_C, { action, confirme: true });
       dit(o.code === 402 && chezEbay(o.journal).length === 0,
         `un vendeur dont l'abonnement est coupé ne pilote pas « ${action} » (402, zéro appel eBay)`, `HTTP ${o.code}`);
@@ -596,7 +618,7 @@ const RA = {};
     const s = await app(JWT_B, { action: 'status' });
     dit(s.code === 200 && s.corps && s.corps.connected === false,
       "un autre vendeur connecté voit SON état : pas de compte eBay relié (jamais celui de Julien)", `HTTP ${s.code} ${JSON.stringify(s.corps)}`);
-    for (const action of ['commandessuite','sync', 'sku', 'offreinfo', 'offre', 'retirer', 'programmees', 'limites']) {
+    for (const action of ['historique','commandessuite','sync', 'sku', 'offreinfo', 'offre', 'retirer', 'programmees', 'limites']) {
       const o = await app(JWT_B, { action, itemId: '110000000001', listingId: ELIGIBLE, numero: '22', remise: 10, confirme: true });
       const jetonJ = chezEbay(o.journal).some((x) => /rt-de-J/.test(x.corps) || x.jeton === 'at-J');
       dit(o.code === 401 && o.corps && o.corps.reason === 'not-connected' && auCompte(o.journal).length === 0 && !jetonJ,
@@ -1339,6 +1361,61 @@ const RA = {};
     const o = await app(JWT_J, { action: 'sync' });
     dit(ecrit(o.journal, 'ebay_orders') === null && ecrit(o.journal, 'ebay_listings') !== null,
       'eBay ne rend pas les commandes ⇒ elles gardent leur dernière capture, les annonces lues sont rangées quand même');
+  });
+
+  // ── HISTORIQUE eBAY (11 nov., lot import-historique-sites) ────────────────
+  await essaie('historique eBay', async () => {
+    remettre(); HISTO_JOURNAL.length = 0;
+    lignes = lignes.filter((x) => !(x.owner === J && (x.id === 'ebay_orders' || x.id === 'import_ebay')));
+    const deja = { ...HISTO[3], buyer: { username: 'garde_moi' }, _deSync: true };
+    lignes.push({ owner: J, id: 'ebay_orders', data: { rev: 2, orders: [deja], pagination: { generation: 'g', nextOffset: null, complete: true, lues: 1, total: 1, ids: ['H-0003'] } } });
+    const o1 = await app(JWT_J, { action: 'historique' });
+    const n1 = HISTO_JOURNAL.length;
+    dit(o1.code === 200 && o1.corps.ok === true && n1 === 3, 'un appel = une étape bornée (3 pages chez eBay au plus)', `HTTP ${o1.code} · ${n1} page(s)`);
+    dit(HISTO_JOURNAL.every((u) => /limit=200/.test(u) && /creationdate/.test(decodeURIComponent(u))), 'fenêtres `creationdate:[de..a]`, 200 par page');
+    const fen = HISTO_JOURNAL.map((u) => /creationdate:\[([^.]+)/.exec(decodeURIComponent(u))[1]);
+    dit(Date.parse(fen[0]) > Date.parse(fen[1]) && Date.parse(fen[1]) > Date.parse(fen[2]), 'de la plus récente à la plus ancienne', fen.join(' '));
+    let tours = 0;
+    while (tours++ < 15) { const o = await app(JWT_J, { action: 'historique' }); if (!o.corps || !o.corps.etat || o.corps.etat.etat === 'fini') break; }
+    const d = lignes.find((x) => x.owner === J && x.id === 'ebay_orders').data;
+    const ids = d.orders.map((x) => x.orderId);
+    dit(HISTO.every((x) => ids.includes(x.orderId)) && new Set(ids).size === ids.length, 'les 450 commandes rangées dans `ebay_orders`, chacune une fois', `${ids.length} / ${new Set(ids).size}`);
+    const h3 = d.orders.find((x) => x.orderId === 'H-0003');
+    dit(h3 && h3._deSync === true && h3.buyer && h3.buyer.username === 'garde_moi', 'une commande déjà rangée n’est jamais remplacée');
+    const neuve = d.orders.find((x) => x.orderId === 'H-0100');
+    dit(neuve && !neuve.buyer && !JSON.stringify(neuve).includes('Inventée') && neuve.paymentSummary.totalDueSeller.value === '50.00' && neuve.lineItems[0].sku === 'VRM-101' && neuve._historique === true,
+      'une commande de l’historique entre SANS acheteur ni adresse, avec montant, frais et SKU', JSON.stringify(neuve).slice(0, 160));
+    const st = lignes.find((x) => x.owner === J && x.id === 'import_ebay').data;
+    dit(st.etat === 'fini' && st.raisonFin === 'ebay' && st.ventes.lus === 450 && st.ventes.total === 450 && st.achats.limiteJours === 60, '« fini » quand eBay refuse la fenêtre trop ancienne (sa limite) ; 450 lues ; achats : 60 jours dits', JSON.stringify({ e: st.etat, r: st.raisonFin, v: st.ventes }));
+    const avant = HISTO_JOURNAL.length;
+    const o2 = await app(JWT_J, { action: 'historique' });
+    dit(o2.code === 200 && o2.corps.deja === true && HISTO_JOURNAL.length === avant && auCompte(o2.journal).length === 0, 'fini : aucun appel à eBay', `${HISTO_JOURNAL.length - avant} page(s)`);
+    const o3 = await app(JWT_J, { action: 'historique', depuisDebut: true });
+    dit(o3.code === 200 && HISTO_JOURNAL.length === avant + 3 && Date.parse(/creationdate:\[[^.]+\.\d+Z\.\.([^\]]+)/.exec(decodeURIComponent(HISTO_JOURNAL[avant]))[1]) > Date.now() - 60000, '« Tout récupérer » : repart de maintenant');
+  });
+  await essaie('historique eBay refus', async () => {
+    remettre(); HISTO_JOURNAL.length = 0;
+    lignes = lignes.filter((x) => !(x.owner === J && (x.id === 'ebay_orders' || x.id === 'import_ebay')));
+    mode.histo = 'ko';
+    const o = await app(JWT_J, { action: 'historique' });
+    const st = (lignes.find((x) => x.owner === J && x.id === 'import_ebay') || {}).data;
+    dit(o.code === 200 && st && st.etat === 'pause' && st.ventes.lus === 0 && st.curseur.offset === 0 && HISTO_JOURNAL.length === 1 && !lignes.some((x) => x.owner === J && x.id === 'ebay_orders'), 'eBay en panne : la série s’arrête, rien n’avance, rien n’est écrit', JSON.stringify(st && { e: st.etat, c: st.cause }));
+    mode.histo = 'forme';
+    await app(JWT_J, { action: 'historique' });
+    const st2 = (lignes.find((x) => x.owner === J && x.id === 'import_ebay') || {}).data;
+    dit(st2 && st2.cause === 'forme' && st2.ventes.pages === 0 && !lignes.some((x) => x.owner === J && x.id === 'ebay_orders'), 'une réponse d’une forme inconnue n’écrit rien et n’avance pas');
+    mode.histo = 'ok'; mode.ordersKo = true;
+    await app(JWT_J, { action: 'historique' });
+    const st3 = (lignes.find((x) => x.owner === J && x.id === 'import_ebay') || {}).data;
+    dit(st3 && st3.cause === 'base' && st3.ventes.pages === 0 && st3.ventes.lus === 0, 'notre base ne prend pas la page : rien n’avance (relue à l’appel suivant)', JSON.stringify(st3 && st3.ventes));
+    mode.ordersKo = false;
+    const base = lignes.find((x) => x.owner === J && x.id === 'import_ebay');
+    const lec0 = lignes.slice();
+    lignes = lignes.filter((x) => x !== base);
+    lignes.push({ owner: J, id: 'import_ebay', data: { v: 1, ventes: { lus: 0, pages: 0, fini: false }, curseur: { fin: new Date().toISOString(), offset: 0, fenetres: 0 }, debut: 1, rev: 3 } });
+    dit(lec0.length > 0, 'reprise posée');
+    const B0 = await app(JWT_B, { action: 'historique' });
+    dit(B0.code === 401 && !lignes.some((x) => x.owner === B && x.id === 'import_ebay'), 'un autre vendeur sans eBay : rien lu, rien écrit chez lui ni chez Julien', `HTTP ${B0.code}`);
   });
 
   // ── 9. ANNULER · DÉPLACER ──────────────────────────────────────────────────
