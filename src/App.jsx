@@ -51691,7 +51691,8 @@ function useQuoiDeNeuf() {
   React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || k === CLE_NOUVEAUTES_VUES) setVues(load(CLE_NOUVEAUTES_VUES, null)); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const reg = regimeFiscal();
   const ctx = { inscritLe: AUTH.user?.created_at || '', mode: p.mode === 'simple' ? 'simple' : 'complet',
-    vend: p.vend || vendActuel() || null, categories: p.categories !== undefined ? p.categories : lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
+    // Ce qu'il vend : lu du réglage lui-même (le profil peut avoir été posé avant la lecture du nuage).
+    vend: jeVendsEffectif(load(CLE_JE_VENDS, null), { proprietaire: proprioTri() }).vend, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
   const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
   // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque, ou le nuage pas encore lu (« vu » sur un

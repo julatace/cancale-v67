@@ -118,6 +118,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth >
 const attendre = async (pg, f, ms = 9000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await f()) return true; await pg.waitForTimeout(200); } return false; };
 const nCarte = (pg) => pg.evaluate(() => { const c = document.querySelector('[data-quoi-de-neuf-carte]'); return c ? Number(c.getAttribute('data-n')) : 0; });
 const idsFeuille = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-quoi-de-neuf-feuille] [data-nouveaute]')].map((x) => x.getAttribute('data-nouveaute')));
+// La feuille « compte relié à VRM » (src/CompteRelie.jsx, une fois par compte) : fermée comme il le ferait.
+const fermerAccueil = async (pg) => { for (let i = 0; i < 3 && await pg.$('[data-compte-relie-feuille]'); i++) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(600); } };
 const COMPLET = ['offres-auto-sures', 'republier-main', 'chercher-photo'];
 const PRO = ['facture-siret', 'dates-versement', 'pour-mon-comptable'];
 
@@ -133,7 +135,8 @@ async function scenario(nav, nom, W, theme) {
     dit(suite.every((x) => x === suite[suite.length - 1]), `${T} le nombre ne change pas sous ses yeux`, suite.join(' '));
     const n = await nCarte(o.pg);
     dit(vu && n >= 12, `${T} la carte « Nouveau » est en haut de Ma journée (${n})`);
-    dit(!(await o.pg.$('[role="dialog"]')), `${T} aucune fenêtre ouverte à l’arrivée`);
+    dit(!(await o.pg.$('[data-quoi-de-neuf-feuille]')), `${T} la feuille ne s’ouvre pas toute seule`);
+    await fermerAccueil(o.pg);
     const h = await o.pg.evaluate(() => { const c = document.querySelector('[data-quoi-de-neuf-carte]'); return c ? c.getBoundingClientRect().height : 0; });
     dit(h >= 44 && h <= 72, `${T} une ligne discrète (${Math.round(h)} px)`);
     await capture(o.pg, pref + '-carte');
@@ -157,6 +160,7 @@ async function scenario(nav, nom, W, theme) {
     await o.pg.evaluate(() => { history.pushState({}, '', '?tab=journee'); dispatchEvent(new PopStateEvent('popstate')); });
     await o.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
     await attendre(o.pg, async () => (await nCarte(o.pg)) > 0, 20000);
+    await fermerAccueil(o.pg);
     dit((await nCarte(o.pg)) === n - 1, `${T} la carte dit une de moins (${await nCarte(o.pg)})`);
     await o.pg.click('[data-quoi-de-neuf-carte]');
     await o.pg.waitForSelector('[data-quoi-de-neuf-vu]', { timeout: 8000 }).catch(() => {});
@@ -197,6 +201,7 @@ async function scenario(nav, nom, W, theme) {
     const vu = await attendre(o.pg, async () => (await nCarte(o.pg)) > 0, 20000);
     dit(vu, `${T} la carte est là`);
     if (vu) {
+      await fermerAccueil(o.pg);
       await o.pg.click('[data-quoi-de-neuf-carte]');
       await attendre(o.pg, async () => (await idsFeuille(o.pg)).length > 0);
       const ids = await idsFeuille(o.pg);
