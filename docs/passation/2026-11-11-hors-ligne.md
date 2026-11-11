@@ -90,6 +90,34 @@ file d'envoi faisait gagner l'appareil, sans un mot).
 - La file d'envoi d'avant reste pour tout ce qui n'est pas un geste (réglages, chiffres
   publiés par les écrans) : elle repart après le rejeu.
 
-## 5. ÉTAT À LA REPRISE
+## 5. ÉTAT À LA REPRISE (11 nov., soir)
 
-(rempli en fin de session, voir plus bas)
+Tête poussée : voir `git log -1 origin/claude/hors-ligne`. Build vert (avec la liste des morceaux).
+
+**Fait et vérifié** : registre des gestes + rejeu (audit 16/16 mutations), intégration App.jsx,
+audits verts (variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
+quoi-de-neuf, traduction, gestes-hors-ligne §1–15, file-envoi, et ceux qui lisent `sw.js` :
+app-installable, csp, journee-hors-ligne, inventaire-hors-ligne, notifs-belles, signalement,
+vapid, verifier-production, diagnostic, aide-signalement, import-partage-aide).
+
+**Trouvé par le banc (1er passage)** et corrigé :
+1. Un écran à la demande jamais ouvert en ligne n'était PAS dans le cache du service worker :
+   hors ligne, « La page n'a pas pu se charger ». ⇒ `vite.config.js` publie
+   `/hors-ligne-assets.json` (≈ 100 morceaux, sans carte/3D/film), `public/sw.js`
+   (`rechaufferMorceaux`) les range un par un après la coquille ; la purge d'un déploiement les
+   garde (`nomsGardesHorsLigne`). Rangement à la 2e ouverture en ligne (la 1re n'est pas encore
+   servie par le service worker).
+2. La saisie en série ne s'ouvre plus par « Outils → Compléter les prix d'achat » : le banc passe
+   par le prochain geste d'Annonces (`data-ann-prochain-geste="prix"`).
+3. `hors-reseau.cjs` était rouge avant le lot (porte froide sans abonnement servi) : corrigé.
+
+**PAS ENCORE MESURÉ** : le banc `gestes-hors-ligne.cjs` n'a pas pu repasser après ces
+corrections — la file des créneaux lourds (`lourd.sh`, 40 à 50 commandes en attente) ne l'a pas
+servi en 2 h (tâche arrêtée à la limite). À faire en premier à la reprise :
+`BANC_TAILLES=390 BANC_PORT=… lourd.sh node scripts/bancs/gestes-hors-ligne.cjs`, regarder
+`en-ligne-390.png`, `A-settings-hors-ligne-390.png`, `A-attente-390.png`, `B-trancher-390.png` ;
+puis 1512 ; puis la preuve « rouge avant » : `BANC_DIST=/home/user/wt/main-ref/dist` (build de
+`main` sans le registre) doit rougir A–E ; puis `hors-reseau.cjs` et `file-envoi.cjs`
+(`NODE_OPTIONS=--require …/_porte-banc.cjs`) pour vérifier qu'ils restent verts.
+Si le banc rougit sur la pastille ou le registre, regarder d'abord la capture (porte fermée ?
+écran de secours ?) avant de toucher au code.
