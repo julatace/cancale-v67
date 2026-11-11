@@ -35,7 +35,7 @@ let ko = 0, ok = 0;
 const dit = (bon, quoi, det) => { if (bon) ok++; else ko++; console.log(`${bon ? 'OK  ' : 'KO  '}${quoi}${!bon && det ? ' — ' + String(det).slice(0, 500) : ''}`); };
 const capture = async (pg, nom, plein = false) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: plein }).catch(() => {}); };
 
-const charger = async (l) => (await import('file://' + path.join(__dirname, '..', '..', 'src', 'i18n', 'langues', `${l}.js`))).default;
+const charger = async (l) => { const imp = async (n) => (await import('file://' + path.join(__dirname, '..', '..', 'src', 'i18n', 'langues', n))).default; return { ...(await imp(`${l}-accueil.js`)), ...(await imp(`${l}.js`)) }; };
 
 // La forme commune d'une page : langue, débordement, clés brutes.
 const sondeLangue = (pg, cles) => pg.evaluate((cles) => {

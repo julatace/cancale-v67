@@ -14,8 +14,9 @@ par pays est un lot d'étude séparé, `fiscalite-pays`). L'argent reste en euro
 |---|---|
 | `src/i18n/index.js` | `t()` / `tr()`, pluriels (`Intl.PluralRules`), formats (`nombre`, `monnaie` — euro par défaut, `null` ⇒ « — » —, `date`, `heure`, `dateRelative`, `listeDansLaLangue`), la langue courante, son chargement, `<html lang>` |
 | `src/i18n/react.js` | `useLangue()` (`useSyncExternalStore`) : redessine au changement |
-| `src/i18n/langues/fr.js` | **la source** (dans le JS initial) |
-| `src/i18n/langues/{en,es,it,de}.js` | chargées **à la demande** (`import()`, un morceau Vite chacune) |
+| `src/i18n/langues/fr-accueil.js` | **la source, partie publique** : ce qu'une page SANS l'app affiche (accueil, erreur du démarrage, documents légaux, sélecteur) — dans le fichier d'entrée |
+| `src/i18n/langues/fr.js` | **la source, partie app** : tout le reste, importée par `App.jsx` (`ajouterSourceApp`) |
+| `src/i18n/langues/{en,es,it,de}{-accueil,}.js` | chargées **à la demande** (`import()`, les deux parties ensemble) |
 | `src/i18n/ChoixLangue.jsx` | le petit sélecteur des pages sans compte (accueil, connexion) |
 
 - **La langue** : le choix du vendeur (Paramètres → Affichage → **Langue**, rangé dans
@@ -118,8 +119,9 @@ par pays est un lot d'étude séparé, `fiscalite-pays`). L'argent reste en euro
 
 ### Comment ajouter un texte (le geste de chaque futur lot)
 
-1. Écrire la clé et le texte français dans `src/i18n/langues/fr.js` (dans sa section).
-2. Écrire la MÊME clé dans `en.js`, `es.js`, `it.js`, `de.js` (tutoiement : « you »,
+1. Écrire la clé et le texte français dans `src/i18n/langues/fr.js` (dans sa section) —
+   ou `fr-accueil.js` seulement si une page SANS l'app l'affiche.
+2. Écrire la MÊME clé dans `en.js`, `es.js`, `it.js`, `de.js` (le même fichier, `-accueil` ou non) (tutoiement : « you »,
    « tú », « tu », « du » ; vocabulaire : bordereau = shipping label / etiqueta de envío /
    etichetta di spedizione / Versandetikett, point relais = pickup point / punto de
    recogida / punto di ritiro / Paketshop, annonce = listing / anuncio / annuncio /
@@ -147,23 +149,39 @@ on traduit, puis on **ajoute le fichier (ou la fonction) à `MIGRES`** dans
 dans le SOURCE (ce lot en a adapté six pour l'accueil : ils lisent aussi
 `src/i18n/langues/fr.js`). Juger la règle, pas l'orthographe (§6.4).
 
+### Le poids du fichier d'entrée
+
+Le banc `accueil` borne le fichier d'entrée à 26 Ko compressés ; **`main` le dépassait
+déjà** (29,9 Ko mesurés par le banc, rouge avant ce lot). Avec un seul `fr.js` dans
+l'entrée, ce lot l'emmenait à 39,2 Ko : d'où les deux parties. Après : **32,9 Ko** (+3 Ko :
+le moteur `src/i18n/index.js`, le sélecteur, les noms des clés de l'accueil). Une clé lue
+par l'accueil, `main.jsx` ou le sélecteur DOIT être dans `fr-accueil.js` (audit D0, sinon
+la clé brute s'afficherait avant l'app) ; rien d'autre n'y va.
+
 ## Les preuves
 
 - `npm run build` vert ; les quatre langues sortent en morceaux séparés (`dist/assets/en-*.js`…).
 - `node scripts/audit-traduction.cjs` : dictionnaires (clés, formes, pluriels, variables,
   longueurs, barre du bas ≤ 12 caractères, phrase des offres = serveur), clés appelées,
   aucun texte en dur dans les fichiers de `MIGRES`, la règle exécutée (repli, pluriels,
-  formats, langue du navigateur). `--prouve` : 11 mutations, toutes rouges.
+  formats, langue du navigateur), et les deux parties (une clé dans un seul fichier, les
+  clés de l'accueil dans la partie publique). `--prouve` : 12 mutations, toutes rouges.
 - Les audits touchés par le déplacement des textes de l'accueil (`audit-accueil-navigateurs`
   — ses 9 mutations visent maintenant fr.js et restent rouges —, `audit-plans-solo-pro`,
   `audit-vendeur-generaliste`, `audit-chrome-en-dur`, `audit-profil-oauth`) : verts.
-- La batterie complète des audits (`scripts/audit-*.cjs`) passée sur `main` et sur la
-  branche : voir le rapport de fin de session.
+- La batterie complète des 470 audits (`scripts/audit-*.cjs`) passée sur `main` puis sur
+  la branche (avant la découpe du dictionnaire) : tous verts des deux côtés ; après la
+  découpe, les audits touchés repassés un par un : verts.
+- Bancs existants : `accueil` (placé en `fr-FR`, la page suit maintenant la langue du
+  navigateur) a les MÊMES 4 rouges que `main` (prix « aucun autre », Vestiaire, poids de
+  l'entrée, film) ; `coque-parametres` a les MÊMES 6 rouges que `main`. Rien de neuf.
 - Banc `scripts/bancs/traduction.cjs` (données inventées, harnais de `nouveau-vendeur`) :
   accueil, connexion, inscription, coque, « Plus », Paramètres, panneau Langue, dans les
   cinq langues à 390 px tactile et 1512 px ; `<html lang>`, texte = dictionnaire, aucune
   clé brute, aucun débordement / titre coupé / bouton court sur deux lignes / cible < 44 px,
-  changement de langue SANS rechargement avec `vrm_langue` rangé. Captures regardées.
+  changement de langue SANS rechargement avec `vrm_langue` rangé : **260 OK, 0 KO**.
+  Captures regardées (le français qui reste sur Ma journée / dans Paramètres vient des
+  écrans et composants pas encore migrés : phrase d'écran, carte « À terminer », `L.*`).
 
 ## Gestes de Julien
 

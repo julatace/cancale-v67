@@ -53,7 +53,7 @@ function Capture({ nom, alt, taille = TEL, paresseuse = true, prioritaire = fals
 }
 
 // ── Les quatre moments de la journée ────────────────────────────────────────
-// (11 nov., lot traduction) Les textes des moments vivent dans src/i18n/langues/*.js
+// (11 nov., lot traduction) Les textes des moments vivent dans les dictionnaires (src/i18n/langues/)
 // (`accueil.moment.<id>.titre|texte|alt|point1|point2`) : ici, l'ordre et les captures.
 const MOMENTS = [
   { id: 'matin', capture: 'journee' },

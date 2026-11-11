@@ -622,7 +622,10 @@ import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n } from "./i18n/index.js";
+import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+// La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
+import frApp from "./i18n/langues/fr.js";
+ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 

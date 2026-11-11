@@ -30,7 +30,7 @@ const R = path.join(__dirname, '..');
 if (process.argv.includes('--prouve')) {
   const NAV = path.join(R, 'src', 'navigateursServis.js');   // la règle (ré-exportée par navigateurExtension.js)
   const ACC = path.join(R, 'src', 'Accueil.jsx');   // eslint-disable-line no-unused-vars
-  const FR = path.join(R, 'src', 'i18n', 'langues', 'fr.js');
+  const FR = path.join(R, 'src', 'i18n', 'langues', 'fr-accueil.js');
   const MUTS = [
     ['Orion promis comme Chrome', NAV, "ordinateur: [...NAVIGATEURS_CHROMIUM, ...(firefox ? ['Firefox'] : [])],", "ordinateur: [...NAVIGATEURS_CHROMIUM, 'Orion', ...(firefox ? ['Firefox'] : [])],"],
     ['Firefox promis sans fiche', NAV, "...(firefox ? ['Firefox'] : [])],", "'Firefox'],"],

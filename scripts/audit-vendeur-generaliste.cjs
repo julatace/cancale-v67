@@ -35,7 +35,7 @@ const PERMIS = [
   ['src/App.jsx', /^'Chaussures( enfants)?'$/, 'catégorie Leboncoin (le nom du site), choisie seulement pour un article chaussure'],
   ['src/Accueil.jsx', /seulement pour les baskets \?/, 'la question de l’accueil, dont la réponse est « Non : tout article »'],
   // (11 nov., lot traduction) La même question, déplacée dans les dictionnaires (clé `accueil.faq.baskets.q`).
-  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}.js`, /^"accueil\.faq\.baskets\.q"/, 'la question de l’accueil (traduite), dont la réponse est « tout article »', 'ligne']),
+  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}-accueil.js`, /^"accueil\.faq\.baskets\.q"/, 'la question de l’accueil (traduite), dont la réponse est « tout article »', 'ligne']),
   ['src/ebayRecherche.jsx', /^(>Pointure<|"Pointure")$/, 'critère de recherche eBay (veille) : la donnée elle-même s’appelle pointure (2 chiffres)'],
   ['src/operations/Operations.jsx', /Pointure/, 'le même critère de veille eBay (Organisation, retirée du menu)'],
   ['src/operations/metier.js', /Pointure attendue/, 'la validation du critère de veille eBay'],

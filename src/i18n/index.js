@@ -17,7 +17,13 @@
 //   (titres d'annonces, pseudos, messages) ne se traduisent jamais.
 // Méthode pour migrer un écran : docs/passation/2026-11-11-traduction.md.
 // ══════════════════════════════════════════════════════════════════════════
-import fr from './langues/fr.js';
+// ⚠️ Le français se range en DEUX parties : `fr-accueil.js` (ce qu'une page SANS l'app
+// affiche : accueil, erreur du démarrage, documents légaux) est dans le fichier d'entrée ;
+// `fr.js` (tout le reste) arrive AVEC l'app (`ajouterSourceApp`, appelé par App.jsx) — le
+// fichier d'entrée a un budget de poids (banc accueil). Les autres langues : leurs deux
+// parties chargées à la demande, ensemble.
+import frAccueil from './langues/fr-accueil.js';
+const fr = { ...frAccueil };
 
 export const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // Le nom de chaque langue DANS sa langue (un sélecteur se lit par celui qui ne
@@ -27,11 +33,12 @@ export const NOMS_LANGUES = { fr: 'Français', en: 'English', es: 'Español', it
 export const LOCALES = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES', it: 'it-IT', de: 'de-DE' };
 export const CLE_LANGUE = 'vrm_langue';
 
+const deux = (a, b) => Promise.all([a, b]).then(([x, y]) => ({ default: { ...(x && x.default), ...(y && y.default) } }));
 const CHARGEURS = {
-  en: () => import('./langues/en.js'),
-  es: () => import('./langues/es.js'),
-  it: () => import('./langues/it.js'),
-  de: () => import('./langues/de.js'),
+  en: () => deux(import('./langues/en-accueil.js'), import('./langues/en.js')),
+  es: () => deux(import('./langues/es-accueil.js'), import('./langues/es.js')),
+  it: () => deux(import('./langues/it-accueil.js'), import('./langues/it.js')),
+  de: () => deux(import('./langues/de-accueil.js'), import('./langues/de.js')),
 };
 
 let langue = 'fr';
@@ -40,6 +47,8 @@ const charges = { fr };
 const abonnes = new Set();
 
 export const estLangue = (l) => LANGUES.includes(l);
+// La partie « app » du français (src/i18n/langues/fr.js), posée par App.jsx à son chargement.
+export function ajouterSourceApp(d) { if (d && typeof d === 'object') { Object.assign(fr, d); if (langue === 'fr') emettre(); } }
 export const langueCourante = () => langue;
 export const localeCourante = () => LOCALES[langue] || 'fr-FR';
 

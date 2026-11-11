@@ -80,7 +80,10 @@ const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at:
 const ORDI = { largeur: 1512, hauteur: 900 }, TEL = { largeur: 390, hauteur: 844, mobile: true };
 
 async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, session = false, url = '/', reduit = false, sombre = false } = {}) {
-  const ctx = await nav.newContext({ viewport: { width: largeur, height: hauteur }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 2 : 1, colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
+  const ctx = await nav.newContext({ viewport: { width: largeur, height: hauteur }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 2 : 1, colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference', serviceWorkers: 'block',
+    // (11 nov., lot traduction) La page suit la langue du navigateur : ce banc juge la page FRANÇAISE
+    // (les autres langues : scripts/bancs/traduction.cjs).
+    locale: 'fr-FR' });
   const lectures = [];
   await ctx.route(/supabase\.co|\/api\//, (rt) => { lectures.push(rt.request().url()); rt.fulfill({ status: 200, contentType: 'application/json', body: '[]' }); });
   await ctx.route(/^https?:\/\/(?!localhost)/, (rt) => rt.abort());

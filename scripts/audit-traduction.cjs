@@ -57,9 +57,22 @@ async function principal() {
   console.log('── D. les dictionnaires (src/i18n/langues/)');
   const D = {};
   for (const l of LANGUES) {
-    try { D[l] = (await import(pathToFileURL(path.join(R, 'src', 'i18n', 'langues', `${l}.js`)).href + '?v=' + Math.random())).default; }
-    catch (e) { D[l] = null; dit(false, `D1 ${l}.js se charge`, e.message); }
+    // Deux parties par langue : `<l>-accueil.js` (dans le fichier d'entrée) et `<l>.js` (avec l'app).
+    try {
+      const imp = async (n) => (await import(pathToFileURL(path.join(R, 'src', 'i18n', 'langues', n)).href + '?v=' + Math.random())).default;
+      const a = await imp(`${l}-accueil.js`), b = await imp(`${l}.js`);
+      const deuxFois = Object.keys(a).filter((k) => k in b);
+      if (deuxFois.length) dit(false, `D0 ${l} : une clé vit dans un seul des deux fichiers`, deuxFois);
+      D[l] = { ...a, ...b };
+    } catch (e) { D[l] = null; dit(false, `D1 ${l}.js et ${l}-accueil.js se chargent`, e.message); }
   }
+  // Les clés publiques (lues par la page d'accueil AVANT l'app) sont dans la partie publique.
+  try {
+    const acc = lire('src/Accueil.jsx') + lire('src/main.jsx') + lire('src/i18n/ChoixLangue.jsx');
+    const pub = (await import(pathToFileURL(path.join(R, 'src', 'i18n', 'langues', 'fr-accueil.js')).href + '?v=' + Math.random())).default;
+    const hors = [...new Set([...acc.matchAll(/\btr\(\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)].map((m) => m[1]))].filter((k) => !(k in pub));
+    dit(!hors.length, 'D0 chaque clé de l’accueil, du démarrage et du sélecteur est dans fr-accueil.js (sinon : la clé brute avant l’app)', hors);
+  } catch (e) { dit(false, 'D0 fr-accueil.js se lit', e.message); }
   const fr = D.fr || {};
   const cles = Object.keys(fr);
   dit(cles.length > 100 && LANGUES.every((l) => D[l] && typeof D[l] === 'object'), `D1 les cinq dictionnaires se chargent (${cles.length} clés en français)`);
@@ -166,6 +179,8 @@ async function principal() {
     const store = {};
     global.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
     const I = await import(pathToFileURL(path.join(R, 'src', 'i18n', 'index.js')).href + '?v=' + Math.random());
+    // Comme App.jsx à son chargement : la partie « app » du français rejoint la source.
+    I.ajouterSourceApp((await import(pathToFileURL(path.join(R, 'src', 'i18n', 'langues', 'fr.js')).href)).default);
     dit(I.t('nav.ventes') === fr['nav.ventes'] && I.t('cle.qui.nexiste.pas') === 'cle.qui.nexiste.pas', 'R1 français par défaut ; une clé inconnue rend la clé (jamais un blanc)');
     dit(I.langueDuNavigateur({ languages: ['de-AT', 'en'] }) === 'de' && I.langueDuNavigateur({ languages: ['pt-BR'], language: 'pt-BR' }) === 'fr' && I.langueDuNavigateur({ languages: ['nl', 'it-CH'] }) === 'it', 'R2 langue du navigateur parmi les cinq (de-AT ⇒ de), sinon fr');
     store.vrm_langue = '"es"';
@@ -195,9 +210,10 @@ async function principal() {
 if (process.argv.includes('--prouve')) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'trad-'));
   const copier = (rel) => { const d = path.join(tmp, rel); fs.mkdirSync(path.dirname(d), { recursive: true }); fs.copyFileSync(path.join(R, rel), d); };
-  const FICHIERS = ['src/i18n/index.js', 'src/i18n/react.js', 'src/i18n/ChoixLangue.jsx', 'src/Accueil.jsx', 'src/profil/MenuProfil.jsx', 'src/composants/GardeEcran.jsx', 'src/main.jsx', 'src/App.jsx', 'src/ecrans/Reglages.jsx', 'api/_lib/plan-regle.js', ...LANGUES.map((l) => `src/i18n/langues/${l}.js`)];
+  const FICHIERS = ['src/i18n/index.js', 'src/i18n/react.js', 'src/i18n/ChoixLangue.jsx', 'src/Accueil.jsx', 'src/profil/MenuProfil.jsx', 'src/composants/GardeEcran.jsx', 'src/main.jsx', 'src/App.jsx', 'src/ecrans/Reglages.jsx', 'api/_lib/plan-regle.js', ...LANGUES.map((l) => `src/i18n/langues/${l}.js`), ...LANGUES.map((l) => `src/i18n/langues/${l}-accueil.js`)];
   const MUTS = [
     ['une clé manque en allemand', 'src/i18n/langues/de.js', /\n\s*"nav\.ventes": [^\n]*/, ''],
+    ['une clé de l’accueil rangée avec l’app', 'src/i18n/langues/fr-accueil.js', /\n\s*"accueil\.hero\.titre": [^\n]*/, ''],
     ['une variable renommée en italien', 'src/i18n/langues/it.js', /("auth\.fournisseur\.continuer": "[^"]*)\{nom\}/, '$1{name}'],
     ['un pluriel sans `one` en espagnol', 'src/i18n/langues/es.js', /("reglages\.recherche\.trouves": \{ )one: "[^"]*", /, '$1'],
     ['un texte anglais trois fois trop long', 'src/i18n/langues/en.js', /("nav\.annonces": ")([^"]*)"/, '$1$2 $2 $2 $2 $2 and more words to overflow"'],
@@ -205,7 +221,7 @@ if (process.argv.includes('--prouve')) {
     ['un placeholder en dur à la connexion', 'src/App.jsx', "placeholder={tr('auth.champ.prenomPlaceholder')}", 'placeholder="Ton prénom (facultatif)"'],
     ['une ligne de Paramètres en dur', 'src/ecrans/Reglages.jsx', "lib:tr('reglages.corbeille.lib')", "lib:'Corbeille'"],
     ['une clé appelée mais absente du français', 'src/ecrans/Reglages.jsx', "tr('reglages.recherche.effacer')", "tr('reglages.recherche.effacerTout')"],
-    ['la phrase Solo recopiée de travers', 'src/i18n/langues/fr.js', /("accueil\.offre\.solo\.phrase": "Un compte)/, '$1 et demi'],
+    ['la phrase Solo recopiée de travers', 'src/i18n/langues/fr-accueil.js', /("accueil\.offre\.solo\.phrase": "Un compte)/, '$1 et demi'],
     ['le repli sur le français retiré', 'src/i18n/index.js', 'if (e == null) e = fr[cle];', ''],
     ['la langue du navigateur ignorée', 'src/i18n/index.js', "if (estLangue(l)) return l;", ''],
   ];
