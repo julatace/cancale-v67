@@ -126,6 +126,9 @@ async function passe(b, tel) {
     dit(d1 && d1.prix === '10000' && d1.benef === '4650' && d1.nbenef === '4' && d1.figs.some((f) => /sur 4 des 5/.test(f)), `${T} toucher ⇒ prix médian 100 €, bénéfice médian 46,50 € « sur 4 des 5 »`, JSON.stringify(d1 && d1.figs));
     dit(d1 && d1.ventes.join() === 'tx1,tx2,tx3,tx4,tx5', `${T} les 5 ventes, la plus récente d’abord (ni Air Force 1, ni Samba)`, d1 && d1.ventes.join());
     dit(d1 && !CONSEIL.test(d1.t), `${T} aucune phrase ne dit à quel prix vendre`);
+    // (11 nov., décision C6) Le prix médian s'écrit UNE fois : déplié, la phrase se tait sur le prix.
+    const fois = (t) => (String(t || '').replace(/\u00a0/g, ' ').match(/en médiane/g) || []).length;
+    dit(d1 && !/€/.test(d1.phrase) && fois(d1.t) === 0 && d1.figs.filter((f) => /100\s?€/.test(f.replace(/\u00a0/g, ' '))).length === 1, `${T} (C6) déplié : le prix médian une seule fois (la case), la phrase sans prix`, JSON.stringify(d1 && { phrase: d1.phrase, figs: d1.figs }));
     await r.pg.locator('[data-achat-hors-form] [data-revente-modele]').scrollIntoViewIfNeeded();
     await r.pg.screenshot({ path: path.join(CAP, `revente-modele-${tel ? 390 : 1512}-saisie.png`) });
     dit(await r.pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${T} aucun débordement horizontal (saisie)`);
@@ -151,6 +154,7 @@ async function passe(b, tel) {
     const f = await lireBloc(r.pg, '[data-revente-feuille]');
     dit(f && f.etat === 'ok' && f.n === '5' && f.prix === '10000' && f.benef === '4650' && f.ventes.length === 5 && f.figs.length === 3, `${T} la feuille, dépliée : mêmes chiffres, 3 cases, 5 ventes`, JSON.stringify(f && { n: f.n, figs: f.figs }));
     await r.pg.screenshot({ path: path.join(CAP, `revente-modele-${tel ? 390 : 1512}-feuille.png`) });
+    dit(f && !/€/.test(f.phrase), `${T} (C6) la feuille : la phrase dépliée ne répète pas le prix médian`, f && f.phrase);
     dit(r.ecrits.length === nEcrits, `${T} aucune écriture vers la base`, JSON.stringify(r.ecrits.slice(nEcrits)).slice(0, 200));
     dit(await r.pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${T} aucun débordement horizontal`);
     dit(r.errs.length === 0, `${T} aucune erreur`, r.errs.join(' | '));

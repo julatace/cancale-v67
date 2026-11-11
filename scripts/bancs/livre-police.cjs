@@ -155,6 +155,10 @@ const an = String(maintenant.getFullYear());
         dit(/^Livre-de-police-.*\.pdf$/.test(pdf.nom) && pdf.octets.slice(0, 5).toString() === '%PDF-', 'PDF créé dans le navigateur');
         const texte = await pg.evaluate(() => document.querySelector('[data-livre-police]').innerText);
         dit(!/conform/i.test(texte + csv.octets.toString('utf8')), 'jamais « conforme »');
+        // (11 nov., décision C7) L'identité des vendeurs : jamais saisie dans VRM, remplie sur l'export (dit).
+        const c7 = await pg.evaluate(() => { const c = document.querySelector('[data-livre-police]'); const p = c.querySelector('[data-livre-identite-export]'); return { champs: c.querySelectorAll('input, textarea').length, phrase: p && p.offsetParent ? p.innerText : '' }; });
+        dit(c7.champs === 0 && /export/.test(c7.phrase) && /pas dans VRM/.test(c7.phrase), '(C7) aucun champ d’identité ; l’écran dit : sur l’export, pas dans VRM', JSON.stringify(c7));
+        dit(/Identité du vendeur/.test(csv.octets.toString('utf8')), '(C7) le tableur porte la colonne « Identité du vendeur » à remplir');
         const cibles = await pg.evaluate(() => [...document.querySelectorAll('[data-livre-police] button, [data-livre-police] select')].filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
         dit(cibles.length > 0 && cibles.every((h) => h >= 44), 'cibles ≥ 44 px', cibles.join(','));
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

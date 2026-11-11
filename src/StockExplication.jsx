@@ -15,8 +15,10 @@ const reduit = () => { try { return window.matchMedia('(prefers-reduced-motion: 
 
 // La silhouette d'une basket (inventée, neutre), dans un repère 0..100 × 0..60.
 const BASKET = 'M6 40 C6 30 14 28 22 27 L40 16 C46 13 52 16 54 22 L58 30 C70 31 86 33 92 40 C96 44 94 50 88 50 L12 50 C8 50 6 46 6 40 Z';
+// (11 nov., lot DJ2) Hors Sneakers : une étiquette de prix (un article), jamais une basket.
+const ETIQUETTE = 'M30 14 H62 L88 34 L62 54 H30 C26 54 24 52 24 48 V20 C24 16 26 14 30 14 Z M36 30 a4 4 0 1 0 0.1 0 Z';
 
-export default function StockExplication({ onFermer = null }) {
+export default function StockExplication({ onFermer = null, sneakers = true }) {
   const [anime] = React.useState(() => !reduit());
   // Étagère : 3 colonnes × 2 rangées, une planche au milieu. La case visée :
   // rangée 1, colonne 2 (x 205, y 44, 40 × 42).
@@ -52,7 +54,7 @@ export default function StockExplication({ onFermer = null }) {
           <rect x="202" y="41" width="46" height="48" rx="6" className={'vrm-sx-halo' + (anime ? '' : ' is-fixe')} />
           <g className={'vrm-sx-tag' + (anime ? '' : ' is-fixe')}>
             <rect x="199" y="12" width="52" height="18" rx="9" className="vrm-sx-tag-fond" />
-            <text x="225" y="25" textAnchor="middle" className="vrm-sx-tag-txt">Vendue</text>
+            <text x="225" y="25" textAnchor="middle" className="vrm-sx-tag-txt">{sneakers ? 'Vendue' : 'Vendu'}</text>
           </g>
           <g className={'vrm-sx-libre' + (anime ? '' : ' is-cache')}>
             <path d="M218 65 l5 5 l9 -10" className="vrm-sx-coche" />
@@ -62,10 +64,10 @@ export default function StockExplication({ onFermer = null }) {
         <g className="vrm-sx-carte" transform={anime ? undefined : 'translate(199.2 32.3) scale(0.3636)'}>
           <rect x="16" y="50" width="110" height="80" rx="12" className="vrm-sx-carte-fond" />
           <rect x="22" y="56" width="98" height="46" rx="6" className="vrm-sx-photo" />
-          <path d={BASKET} transform="translate(29 59) scale(0.84 0.84)" className="vrm-sx-basket" />
+          <path d={sneakers ? BASKET : ETIQUETTE} fillRule="evenodd" transform="translate(29 59) scale(0.84 0.84)" className="vrm-sx-basket" data-sx-dessin={sneakers ? 'basket' : 'etiquette'} />
           <rect x="22" y="108" width="36" height="16" rx="8" className="vrm-sx-chip" />
           <text x="40" y="120" textAnchor="middle" className="vrm-sx-chip-txt">N°12</text>
-          <text x="64" y="120" className="vrm-sx-legende">Air Max 90</text>
+          <text x="64" y="120" className="vrm-sx-legende">{sneakers ? 'Air Max 90' : 'Article'}</text>
         </g>
         {/* Le colis qui part. */}
         <g className={'vrm-sx-colis' + (anime ? '' : ' is-cache')}>
