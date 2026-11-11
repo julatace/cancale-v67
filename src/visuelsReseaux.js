@@ -201,10 +201,10 @@ export function planVisuel(opts, mesurer = mesureApprochee) {
   if (modele === 'carte') {
     ops.push({ t: 'fond', couleur: FOND_GRIS });
     const story = format === 'story';
-    const cx = story ? 72 : 96, cy = story ? 250 : 72, cw = w - 2 * cx, ch = story ? 1480 : 896;
+    const cx = story ? 72 : 96, cy = story ? (boutique ? 250 : 160) : 72, cw = w - 2 * cx, ch = story ? (boutique ? 1480 : 1600) : 896;
     if (boutique) T(boutique, w / 2, story ? 140 : h - 60, story ? 40 : 30, 600, story ? ENCRE : GRIS, 'center', w - 2 * M);
     ops.push({ t: 'rect', x: cx, y: cy, w: cw, h: ch, r: 48, couleur: BLANC, ombre: true });
-    const pin = story ? 28 : 24, phH = story ? 1060 : 590;
+    const pin = story ? 28 : 24, phH = story ? ch - 360 : 680;
     ops.push({ t: 'photo', a: 0, p: a.lues[0], x: cx + pin, y: cy + pin, w: cw - 2 * pin, h: phH, r: 32 });
     if (prix) {
       const pPx = story ? 60 : 48; const pw = mesurer(prix, pPx, 700) + 56; const ph = pPx + 30;
@@ -231,7 +231,7 @@ export function planVisuel(opts, mesurer = mesureApprochee) {
     if (boutique) { ops.push({ t: 'point', x: w / 2 - mesurer(boutique, 40, 600) / 2 - 26, y: 142, r: 9, couleur: accent }); T(boutique, w / 2 + 0, 120, 40, 600, ENCRE, 'center', w - 2 * M - 60); }
     y = boutique ? 210 : 120;
   }
-  const phH = story ? (extras.length ? 1000 : 1240) : 640;
+  const phH = story ? (extras.length ? (boutique ? 1040 : 1130) : (boutique ? 1280 : 1380)) : (boutique ? 640 : 720);
   ops.push({ t: 'photo', a: 0, p: a.lues[0], x: M, y, w: w - 2 * M, h: phH, r: story ? 48 : 40 });
   y += phH;
   if (extras.length) {
