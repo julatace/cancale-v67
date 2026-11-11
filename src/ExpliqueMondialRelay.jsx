@@ -83,8 +83,8 @@ export default function ExpliqueMondialRelay({ anime = true }) {
         </div>
       </div>
       <ol className="mrx-etapes">
-        <li><b>1. Dans l’app Mondial Relay</b>ouvre le colis et fais une capture d’écran de son QR. Le site et les e-mails ne le montrent pas.</li>
-        <li><b>2. Dans VRM, sur ce colis</b>« Ajouter le QR » puis choisis la capture. Le QR est lu dans ton téléphone : rien n’est envoyé.</li>
+        <li><b>1. Dans l’app Mondial Relay</b>ouvre le colis et fais une capture d’écran de son QR.</li>
+        <li><b>2. Dans VRM, sur ce colis</b>« Ajouter le QR », choisis la capture. Lu sur ton téléphone.</li>
         <li><b>3. Au relais</b>« En grand » : le code et le QR. Sans QR, le code suffit au comptoir.</li>
       </ol>
       <span className="mrx-faux">Exemple inventé : n°, code et QR de cette animation sont faux.</span>
