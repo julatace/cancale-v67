@@ -46,7 +46,7 @@ export const POLICE = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Hel
 const ENCRE = '#1D1D1F', GRIS = '#6E6E73', FOND_GRIS = '#F2F2F7', BLANC = '#FFFFFF';
 
 const propre = (v, max) => {
-  const s = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f​-‏ -‮⁦-⁩]/g, ' ').replace(/\s+/g, ' ').trim();
+  const s = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
   return max && s.length > max ? s.slice(0, max).trimEnd() : s;
 };
 
