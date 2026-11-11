@@ -29299,6 +29299,9 @@ if (typeof window !== 'undefined') window.addEventListener('online', () => {
     // Les commandes gardées ne se revalident qu'au préchargement (une fois par ouverture) : on le relance,
     // par la MÊME règle (`lireAvecCopie`) — réussi, la mention « pas relu » part ; raté, elle reste.
     _prechargeComptes = null; _prechargeLancePour = ''; prechargerDemarrage();
+    // Les familles gardées (transactions, dates de capture — `lireFamilleCopiee`) : relues par la même
+    // règle ; la mémoire de 60 s des transactions est oubliée d'abord. Lectures seules.
+    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail().catch(() => {});
   } catch (_) {}
 });
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
