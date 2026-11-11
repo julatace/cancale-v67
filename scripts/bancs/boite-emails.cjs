@@ -175,13 +175,18 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
             const m = x.querySelector('.vrm-boite-marque'), q = x.querySelector('[data-boite-quoi]');
             if (!m || !q) return { id: x.dataset.boiteEmail, ok: false };
             const rm = m.getBoundingClientRect(), rq = q.getBoundingClientRect(), cs = getComputedStyle(m), lg = m.querySelector('[data-logo-site]');
-            return { id: x.dataset.boiteEmail, k: m.dataset.marque, logo: lg ? lg.dataset.logoSite : '', mono: m.innerText.trim(), cache: m.getAttribute('aria-hidden') === 'true', gauche: rm.right <= rq.left, taille: Math.round(rm.width), fond: cs.backgroundColor, ok: true };
+            const lt = m.querySelector('[data-transporteur-logo]');
+            return { id: x.dataset.boiteEmail, k: m.dataset.marque, logo: lg ? lg.dataset.logoSite : '', tr: m.dataset.transporteur || '', logoTr: lt ? lt.dataset.marque : '', mono: m.innerText.trim(), cache: m.getAttribute('aria-hidden') === 'true', gauche: rm.right <= rq.left, taille: Math.round(rm.width), fond: cs.backgroundColor, ok: true };
           }));
           const mq = Object.fromEntries(marques.map((x) => [x.id, x]));
           const chrono = E.find((e) => /Chronopost/.test(e.from) && parId[e.id]);
           const colore = (c) => { const n = (String(c).match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number); return n.length === 3 && Math.max(...n) - Math.min(...n) > 12; };
           const fondsColores = marques.filter((x) => x.ok && colore(x.fond));
-          dit(marques.every((x) => x.ok && x.cache && x.gauche && x.taille >= 32) && mq[id(2)].logo === 'vinted' && mq[id(27)].logo === 'vestiaire' && ['monogramme', 'transporteur'].includes(mq[id(1)].k) && mq[id(1)].mono === 'MR' && !!chrono && mq[chrono.id].mono === 'C' && fondsColores.length === 0, `${nom} : la marque de l'expéditeur à GAUCHE de chaque ligne (≥ 32 px) — logo du site, monogramme neutre (« MR », « C ») pour un transporteur, aucun fond de couleur`, JSON.stringify([mq[id(1)], mq[id(2)], fondsColores.slice(0, 1)]));
+          // (11 nov.) Depuis le 10 nov. (« transporteurs parfaits », src/transporteursVisuels.js) la marque d'un
+          // transporteur est SON logo dessiné (`LogoTransporteur`, par sa clé) ; le monogramme neutre reste le repli
+          // d'une clé sans logo. L'identité jugée : la clé du transporteur, pas un mot.
+          const marqueTr = (x, cle, mono) => !!x && x.ok && ((x.k === 'transporteur' && x.tr === cle && x.logoTr === cle) || (['monogramme', 'transporteur'].includes(x.k) && x.mono === mono && !x.logoTr));
+          dit(marques.every((x) => x.ok && x.cache && x.gauche && x.taille >= 32) && mq[id(2)].logo === 'vinted' && mq[id(27)].logo === 'vestiaire' && marqueTr(mq[id(1)], 'mondialrelay', 'MR') && !!chrono && marqueTr(mq[chrono.id], 'chronopost', 'C') && fondsColores.length === 0, `${nom} : la marque de l'expéditeur à GAUCHE de chaque ligne (≥ 32 px) — logo du site, logo du transporteur (ou son monogramme neutre « MR », « C »), aucun fond de couleur derrière`, JSON.stringify([mq[id(1)], mq[id(2)], fondsColores.slice(0, 1)]));
           // L'heure alignée à droite, sur la ligne de la nature ; le transporteur et le compte en dessous.
           const heures = await lignes.evaluateAll((l) => l.map((x) => { const t = x.querySelector('time'), q = x.querySelector('[data-boite-quoi]'), tx = x.querySelector('.vrm-boite-ligne-txt'); if (!t || !q || !tx) return null; const rt = t.getBoundingClientRect(), rq = q.getBoundingClientRect(), rx = tx.getBoundingClientRect(); return { droite: Math.abs(rt.right - rx.right) <= 1, ligne: rt.top < rq.bottom && rt.bottom > rq.top }; }));
           const heureLue = /\b15:58\b/.test(parId[id(1)].texte) && /compte-un/.test(parId[id(1)].texte) && /Mondial Relay/.test(parId[id(1)].texte);
