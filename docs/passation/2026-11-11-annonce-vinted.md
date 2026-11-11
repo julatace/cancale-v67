@@ -72,9 +72,23 @@ Aucune PR, aucune fusion sur `main`.
   exactes, N° lié, 1 action, questions sans aucun geste, gardes sans requête, refus/flou/photo refusée.
 - `--prouve` : sur `origin/main` la fonction n'existe pas (rouge) ; **5/5 mutations** de la règle de
   l'app rouges.
-- Banc `scripts/bancs/annonce-vinted.cjs` (390 tactile / 1512, clair / sombre) : voir « État ».
+- `--prouve` aussi : **4/4 mutations de l'extension** rouges (deux catégories ⇒ la première prise ;
+  réponse hors liste acceptée ; N° plus lié ; plus de verrou de la fiche).
+- Banc `scripts/bancs/annonce-vinted.cjs` (390 tactile / 1512, clair / sombre) : **48 ✅ · 0 ❌** —
+  compte de l'onglet, manques, confirmation sans envoi, VRM figé + question au-dessus et cliquable,
+  recherche, commande (liste blanche, 2 photos, « N°41 » en bas), réponse renvoyée une fois, fin avec
+  lien et « à choisir sur Vinted », sans compte ⇒ bouton éteint. Captures regardées : deux défauts vus
+  et corrigés (thème sombre : la feuille restait blanche — `--vrm-card` n'existe pas, `--vrm-surface` ;
+  la question arrivait avant le gel — `seuilMs: 0`).
+- `npm run build` vert.
 - Audits communs : coherence, traduction (44), textes-courts, variables, tdz, icones, quoi-de-neuf,
   identite, secrets, fonctions-api — verts ; `audit-extension-zip` vert ; zips régénérés.
 
 ## État à la reprise
-Voir la fin de ce fichier (mis à jour à la fin du lot).
+Livré, poussé, `origin/main` fusionné (rien de neuf à la fin). Rien de rouge connu dans ce lot.
+Pas vérifié en vrai : la forme d'un brouillon INCOMPLET acceptée par Vinted (taille du colis vide) et
+la feuille dans l'app complète (le banc monte la feuille seule ; « À publier » vit dans Annonces).
+Intégration : la version 5.367.0 suppose les 5.345–5.366 des autres lots ; à l'intégration, garder la
+plus haute version et la capacité `creervinted: '5.367.0'`.
+Geste de Julien : installer 5.367.0 ; ouvrir une fois la page « Vendre » de vinted.fr (l'extension
+apprend le catalogue des catégories, sinon VRM propose seulement ses catégories déjà utilisées).
