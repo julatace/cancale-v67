@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import {
   chaineArticle,
-  bilanAnnonce,
   comparerComptes,
   diagnosticConnexion,
 } from "../../src/outilsArticlesVinted.js";
+// (11 nov., décision C10) L'ancien bilan d'Outils est FONDU dans src/annoncesACompleter.js (`manquesAnnonce`) :
+// les mêmes règles (un manque LU est dit, un champ jamais lu est « pas su », jamais un manque) y sont jugées.
+import { manquesAnnonce } from "../../src/annoncesACompleter.js";
+const cles = (l) => l.map((m) => m.cle);
 let n = 0;
 const eg = (a, b) => {
   assert.deepEqual(a, b);
@@ -41,39 +44,17 @@ eg(
 );
 eg(chaineArticle("invalid").conflit, true);
 eg(
-  bilanAnnonce({
-    id: "1",
-    title: "Ordi",
-    price: 120,
-    photoCount: 0,
-    descLen: 0,
-  }).manque,
-  ["Photos", "Description"],
+  cles(manquesAnnonce({ titre: "Ordi", prix: 120, nPhotos: 0, descLen: 0, prixAchat: 40 }).manques),
+  ["description", "photos"],
 );
-eg(bilanAnnonce({ id: "1", title: "Ordi", price: 120 }).inconnu, [
-  "Photos",
-  "Description",
-  "Caractéristiques",
-]);
+// Lu sans photos ni description : « pas su », jamais un manque inventé.
+eg(manquesAnnonce({ titre: "Ordi", prix: 120, prixAchat: 40 }).manques, []);
+eg(manquesAnnonce({ titre: "Ordi", prix: 120, prixAchat: 40 }).pasSu, ["photos", "marque", "taille", "etat"]);
+// Titre et prix lus vides : manques nommés.
+eg(cles(manquesAnnonce({ titre: "", prix: null, nPhotos: 6, desc: "Description", prixAchat: 40 }).manques), ["titre", "prix"]);
+// Tout est là : rien à compléter.
 eg(
-  bilanAnnonce(
-    { id: "1", title: "Ordi", price: 120 },
-    { id: "2", title: "Autre", price: 1, photos: ["url"], desc: "Autre" },
-  ).prepare,
-  false,
-);
-eg(
-  bilanAnnonce(
-    { id: "1", title: "", price: null },
-    {
-      id: "1",
-      title: "Ordi",
-      price: 100,
-      photos: ["url"],
-      desc: "Description",
-      caracteristiques: "32 Go RAM",
-    },
-  ).manque,
+  manquesAnnonce({ titre: "Ordi", prix: 100, nPhotos: 6, desc: "Description", marque: "X", taille: "42", etat: "Bon", champsLus: { marque: true, taille: true, etat: true }, prixAchat: 40 }).manques,
   [],
 );
 const acc = (uid) => ({ _acc: { vinted_user_id: uid } });
@@ -152,11 +133,5 @@ eg(
   diagnosticConnexion({ uid: "1", owner: "a", extension: null }).titre,
   "Extension non joignable",
 );
-eg(
-  bilanAnnonce(
-    { id: "1", title: "Ordi", price: 20 },
-    { id: "1", price: null, priceInput: "1e2" },
-  ).manque.includes("Prix"),
-  true,
-);
+eg(cles(manquesAnnonce({ titre: "Ordi", prix: "abc", nPhotos: 6, desc: "x", prixAchat: 40 }).manques).includes("prix"), true);
 console.log(n + " contrôles articles et comparaison réussis");

@@ -4576,7 +4576,6 @@ function EmailsSetting({onComptes}) {
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
-  const proprioEmails = useEstProprietaire();
   const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
   const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
   // (2 nov.) L'Aperçu ouvre le journal sur un état OU un type (« 2 bordereaux ajoutés à Colis » → les bordereaux).
