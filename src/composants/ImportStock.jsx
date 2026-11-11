@@ -12,6 +12,7 @@ import React from 'react';
 import { lireFichierAchats } from '../importAchats.js';
 import { NOMS, champsDe, OBLIGATOIRES, reconnaitreColonnes, colonnesManquantes, changerColonne, apercuParTranches, resume, ecritures, propositionAnnonce } from '../importStock.js';
 import './import-stock.css';
+import { motsVendeur } from '../profilVendeur.js';   // (11 nov., intégration 5.355) « paire » / « article »
 
 const LIGNES_AFFICHEES = 150;
 const prixTexte = (p) => (p ? `${p} €` : '—');
