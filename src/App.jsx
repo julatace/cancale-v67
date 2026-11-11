@@ -2170,7 +2170,8 @@ const authSignOut = () => {
   // les données du vendeur parti : le suivant, connecté dans le MÊME onglet, les
   // voyait. Un rechargement les remet tous à zéro (le délai laisse partir le
   // message à l'extension, comme Réglages le faisait déjà).
-  try { setTimeout(() => { try { location.reload(); } catch (_) {} }, 300); } catch (_) {}
+  // Droit sur l'écran de connexion (`?connexion`), pas la page d'accueil publique.
+  try { setTimeout(() => { try { location.replace('/?connexion'); } catch (_) {} }, 300); } catch (_) {}
 };
 // « Se déconnecter » (le GESTE) : rien ne part sans le dire (src/deconnexionSure.js).
 // Une saisie pas encore envoyée ⇒ « Envoyer d'abord » / « Me déconnecter quand
@@ -4209,7 +4210,12 @@ const fetchVintedAccounts = async () => {
       // (29 oct.) Gardé sur l'appareil pour le Stock (`comptesStockEcartes`) :
       // un compte supprimé pour de bon n'y revient jamais. Seulement sur une
       // lecture RÉUSSIE (« pas su » n'efface pas la dernière liste connue).
-      if (blk.ok && Array.isArray(b)) { try { localStorage.setItem(CLE_SUPPRIMES, JSON.stringify([...blocked])); } catch (_) {} } } catch (_) {}
+      if (blk.ok && Array.isArray(b)) { try { localStorage.setItem(CLE_SUPPRIMES, JSON.stringify([...blocked])); } catch (_) {} }
+      else throw new Error('pas lu'); } catch (_) {
+      // (11 nov., robustesse des données, point 24) Liste illisible : la DERNIÈRE
+      // connue sert (un compte supprimé pour de bon ne revient pas sur un hoquet).
+      try { const g = JSON.parse(localStorage.getItem(CLE_SUPPRIMES) || '[]'); if (Array.isArray(g)) g.forEach((u) => blocked.add(String(u))); } catch (_) {}
+    }
     if (blocked.size) {
       const reappeared = list.filter(a => blocked.has(String(a.vinted_user_id)));
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
@@ -5819,7 +5825,10 @@ const lireVentesEmail = () => {
   _ventesEmailLu.vol = (async () => {
     let rows = null;
     try { const r = await lireTout(requeteVentesEmail(Date.now()), { strict: true }); rows = Array.isArray(r) ? r : null; } catch (_) { rows = null; }
-    _ventesEmailLu.rows = rows; _ventesEmailLu.at = Date.now(); _ventesEmailLu.vol = null;
+    // (11 nov., robustesse des données, point 77) Un échec ne se garde PAS 60 s
+    // comme une réponse : la lecture suivante réessaie (la règle de `cachedRow`).
+    if (rows !== null) { _ventesEmailLu.rows = rows; _ventesEmailLu.at = Date.now(); }
+    _ventesEmailLu.vol = null;
     return rows;
   })();
   return _ventesEmailLu.vol;
@@ -7156,13 +7165,17 @@ const fetchResumesConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
     const base=uid==null?RESUME_CONV_BASE:RESUME_CONV_BASE.replace('id=like.harvest_%25_conv_%25',`id=like.harvest_${uid}_conv_%25`);
-    let rows = null;
+    let rows = null, auteurRate = false;
     if (!_resumeConvSansAuteur) {
       rows = await lireTout(base + RESUME_CONV_AUTEUR, { strict: true });
-      if (rows === null) _resumeConvSansAuteur = true;
+      if (rows === null) auteurRate = true;
     }
     if (rows === null) rows = await lireTout(base, { strict: true });
     if (rows === null) return null;
+    // (11 nov., robustesse des données, point 30) « Sans auteur » pour la session
+    // seulement si la lecture SANS l'auteur a marché là où l'autre a échoué (la
+    // grammaire refusée) — plus sur une simple coupure réseau.
+    if (auteurRate) _resumeConvSansAuteur = true;
     const mr = messagesRetires();
     const out = new Map();
     for (const r of rows) {
@@ -54136,12 +54149,15 @@ function AppCoeur() {
           data.online = prec;
           if (prec != null && j[0].oa) data.onlineAt = j[0].oa;
         }
-        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        const rw = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
           method: 'POST',
           headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
           body: JSON.stringify([withOwner({ id: 'widget_stats', data: { ...data, updatedAt: new Date().toISOString() } })]),
         });
-      } catch (_) {}
+        // (11 nov., robustesse des données, point 41) Écriture refusée ⇒ l'empreinte
+        // tombe : le prochain passage réessaie (le widget ne garde plus un CA périmé).
+        if (!rw || !rw.ok) widgetEcrit.current = '';
+      } catch (_) { widgetEcrit.current = ''; }
     })();
   }, [widgetBase, liveStatsVus]);
 
