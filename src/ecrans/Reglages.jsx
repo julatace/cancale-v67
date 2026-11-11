@@ -2577,7 +2577,7 @@ function JournalVrm() {
       ))}
       {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
       <div className="vrm-sec-trous" data-journal-trous="">
-        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone', extension: 'gestes de l’extension' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone', extension: 'gestes de l’extension', moderation: 'ce que Vinted a masqué ou limité' }[x] || x)).join(', ')}.</p> : null}
         {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
       </div>
     </div>
