@@ -78,3 +78,12 @@ visible ». Partie de `origin/claude/revue-colis` (pas de `main`), comme demand�
 - **Banc thermique** : cas « blanc collé au QR » (`fabriquerBordereau(…, { blancQr: 30 })`) — un blanc assez grand pour le tampon seulement sans la garde de 5 mm autour des codes : c'est lui qui fait rougir `sansBloques` (sans lui, la mutation restait verte : sur les autres formes le blanc cherché évite déjà les codes).
 - **Banc imprimante** : la section (N° seul par défaut, Dymo 4XL écrit, aperçu dessiné au format 104 × 159, tampon thermique réglé à part de l'A4, A4 sans papier thermique), 390 et 1512 px.
 - Quoi de neuf : `impression-thermique`.
+- **Audits corrigés par ce lot** : `audit-secrets` (l'adresse inventée « 12 rue Imaginaire » ⇒ « 12 allée Imaginaire »), `audit-variables` (`globalThis.createImageBitmap`), `audit-vendeur-generaliste` (titre d'exemple « Veste en jean bleue », taille M), `audit-selection-bordereaux` (juge `deja` partagé, accepte le paramètre `thermique`).
+- **Banc imprimante** : rouge AVANT ce lot (le Chromium du banc parle anglais ⇒ l'app en anglais depuis la traduction, « Imprimante et bordereaux » introuvable) — le banc pose `vrm_langue = fr` et ouvre `?reglage=imprimante`. Tampon en LISTE (4 pastilles coupées à 390 px, vu sur la capture).
+
+### Preuves (11 nov., soir)
+- `thermique.cjs` 403 verts / 0 ; mutations : sansDecoupe 9 rouges, deforme 34, rogne 13, gris 23, titre 17, sansBloques 1 (le cas « blanc collé au QR »), sansRecadrage 3.
+- `tampon-bordereau.cjs` 199 / 0 ; `colis-a-leur-place.cjs` 184 / 0 ; `imprimante.cjs` 52 / 0 (390 et 1512 px, captures regardées).
+- `audit-impression` 36 verts, `--prouve` 7 rouges ; `audit-traduction` 44 / 0, `--prouve` 12/12.
+- Passe complète (`lancer-audits`, 2 en parallèle) : 498 audits, 27 rouges dont 4 corrigés ici ; les 23 autres sont rouges aussi sur `origin/main` ou `origin/claude/revue-colis` (ex. `audit-signalement` « colis », `audit-vente-verification` V4, `audit-benefice` `MeilleuresSources` déclaré deux fois, `audit-safari` `navigator.share` ligne 3384, `audit-chrome-en-dur` App.jsx:42054) — pas de ce lot.
+- Planches des PDF rendus (10×15, Dymo, Brother 62 continu, 10×10, Autre, 4 par page, N° + titre / + taille / rien, encre telle quelle, fiche de préparation) : regardées.
