@@ -209,6 +209,27 @@ async function partieT(fichier) {
     const f = monter({ src: avant }); const r = await creer(f, { reponses: { catalog_id: '1242' } });
     const rougeAvant = r.absent === true;
     console.log(rougeAvant ? '✅ §6.1 — sur origin/main : `creerVintedFiche` n’existe pas (E1 rouge)' : '❌ §6.1 — la fonction existait déjà sur origin/main ?');
+    // Mutations de l'EXTENSION : chacune doit rendre E rouge.
+    const BG = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+    const MUT_E = [
+      ['deux catégories de Vinted ⇒ la première prise', ["return ids.length === 1 ? ids[0] : '';", "return ids.length >= 1 ? ids[0] : '';"]],
+      ['une réponse hors liste acceptée', ["if (r && options && options.some(([id]) => id === r)) { poser(champ, r, options); continue; }", "if (r) { poser(champ, r, options || []); continue; }"]],
+      ['le N° n’est plus lié à l’identifiant rendu', ["const lien = await lierNumeroFiche(draftId, numero, uid, ficheId);", "const lien = { ok: true };"]],
+      ['plus de verrou de la fiche', ["if (v0) return { accepte: false, code: 'incertaine'", "if (false) return { accepte: false, code: 'incertaine'"]],
+    ];
+    let mortesE = 0;
+    for (const [nom, [de, vers]] of MUT_E) {
+      if (!BG.includes(de)) { console.log(`❌ mutation extension « ${nom} » : motif introuvable`); continue; }
+      const tmp = path.join(os.tmpdir(), `bg-mut-cv-${Date.now()}-${Math.random().toString(36).slice(2)}.js`);
+      fs.writeFileSync(tmp, BG.replace(de, vers));
+      const ko0 = ko; ok = 0; ko = 0;
+      const log = console.log; console.log = () => {};
+      try { await partieE(tmp); } catch (_) { ko++; }
+      console.log = log;
+      const rouge = ko > 0; ko = ko0;
+      if (rouge) mortesE++;
+      console.log(`${rouge ? '✅' : '❌'} mutation extension « ${nom} » ⇒ ${rouge ? 'ROUGE' : 'reste vert'}`);
+    }
     // Mutations de la règle de l'app : chacune doit rendre T rouge.
     const SRC = fs.readFileSync(fichierApp, 'utf8');
     const MUT = [
@@ -231,8 +252,8 @@ async function partieT(fichier) {
       if (rouge) mortes++;
       console.log(`${rouge ? '✅' : '❌'} mutation « ${nom} » ⇒ ${rouge ? 'ROUGE' : 'reste vert'}`);
     }
-    const tout = rougeAvant && mortes === MUT.length;
-    console.log(tout ? `\n✅ preuve : rouge sur le code d’avant, ${mortes}/${MUT.length} mutations rouges` : `\n❌ preuve incomplète (${mortes}/${MUT.length})`);
+    const tout = rougeAvant && mortes === MUT.length && mortesE === MUT_E.length;
+    console.log(tout ? `\n✅ preuve : rouge sur le code d’avant, ${mortesE}/${MUT_E.length} mutations de l’extension et ${mortes}/${MUT.length} de l’app rouges` : `\n❌ preuve incomplète (${mortes}/${MUT.length})`);
     process.exit(tout ? 0 : 1);
   }
   await partieE(process.env.BG_SRC || undefined);
