@@ -28,6 +28,7 @@ import { texteBilan } from './bilan-semaine.js';
 import { notificationDoubleVente } from './double-vente.js';
 import { texteComptesARelire } from './comptes-a-relire.js';
 import { texteCompteRelie } from '../../src/compteRelie.js';
+import { texteNotifModeration } from '../../src/moderationVinted.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -184,6 +185,14 @@ export const APERCUS_NOTIF = {
     quoi: 'Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois.',
     exemples: [
       { ...texteCompteRelie([{ plateforme: 'vinted', id: '123', nom: EX.compte }]), mene: 'Paramètres · Comptes liés' },
+    ],
+  },
+  // (11 nov., ext. 5.350) Vinted a masqué / fait disparaître / limite (src/moderationVinted.js, le vrai texte).
+  moderation: {
+    quoi: 'Vinted a masqué une de tes annonces, en a fait disparaître une, limite ou ferme un de tes comptes — vu par l’extension en relisant ce qu’elle lit déjà. Une fois par événement, regroupé.',
+    exemples: [
+      { ...texteNotifModeration([{ s: 'masquee', compte: '1', t: 2, cle: 'a', a: '1000001' }, { s: 'disparue', compte: '1', t: 1, cle: 'b', a: '1000002' }], { nomCompte: () => EX.compte }), mene: 'Ma journée (en tête)' },
+      { ...texteNotifModeration([{ s: 'restreint', compte: '1', t: 1, cle: 'c' }], { nomCompte: () => EX.compte }), mene: 'Ma journée (en tête)' },
     ],
   },
 };

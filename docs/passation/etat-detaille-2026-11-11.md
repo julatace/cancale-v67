@@ -1,0 +1,6 @@
+# État détaillé — lignes du 11 novembre retirées de CLAUDE.md §9
+
+Déplacées **telles quelles** (CLAUDE.md doit rester sous 59 000 octets ; règle d'en-tête : « déplacer tel quel le détail le plus ancien de §9 »), le 11 nov. par la session `claude/alerte-moderation`.
+
+- **11 nov. · Extension 5.341 : les dates de versement arrivent vite** : `capterDatesVersement` lit 10 détails par passage (5), 15/h au plus DANS les 20 lectures, un passage de fond toutes les 20 min onglet vinted.fr ouvert ; au-delà de 5 jamais la place des codes, preuves, relevés (« pas su » ⇒ réservée) ; pause aléatoire 2–5 s, une requête à la fois, 429 ⇒ arrêt et pause ; la plus récente d'abord ; la carte dit « N restantes · environ X jours ». 1 751 ventes ⇒ ≈ 6 jours onglet ouvert. `docs/passation/2026-11-11-extension-5341.md`. Geste : installer 5.341.0, laisser vinted.fr ouvert sur le grand compte.
+- **11 nov. · Ventes sans date de versement (lot DJ7)** : mesuré, 1 751 sur UN compte, détail de transaction jamais relu ; relevé : 0 vente datable. « Déclarer » : « N datées ✓ · M sans date », une raison par ligne + geste (« Ouvrir Vinted » par compte, Leboncoin à la main) ; jamais devinée (`src/versementRaisons.js`). `docs/passation/2026-11-11-dates-versement.md`. Geste : ouvrir vinted.fr sur ce compte.
