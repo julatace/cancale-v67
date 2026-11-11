@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { baisseTapee, lignesBaisse, comptesAOuvrir, issueBaisse, bilanBaisse, eurosBaisse as eur } from './baissePrix.js';
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
+import { suivi } from './suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la série
 import JaugeActions from './JaugeActions.jsx';   // (10 nov., lot G) les 50 actions/h du compte de l'onglet
 
 const ETAT = { envoi: 'Envoi…', fait: 'Fait', ecart: 'Autre prix', incertain: 'Pas relu', echec: 'Refusé', refus: 'Pas envoyée', 'pas-envoye': 'Pas envoyée' };
@@ -50,21 +51,38 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
     arret.current = false; setArretDemande(false);
     setPhase('envoi'); setEtats({}); setProgres({ i: 0, n: file.length });
     const res = {};
+    // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL et une BARRE ») La feuille « VRM travaille ».
+    const t = suivi.demarrer({ sorte: 'baisse-prix', titre: `Baisser le prix (${baisse.mode === 'pct' ? `−${baisse.valeur} %` : `−${baisse.valeur} €`})`,
+      etapes: [['envoi', 'Envoi du nouveau prix à Vinted'], ['relu', 'Prix relu sur Vinted']], uid: compteOnglet || '',
+      articles: file.map((l) => ({ id: l.id, num: l.numero || '', titre: l.titre || '' })) });
     const poser = (id, e) => { res[id] = e; setEtats((x) => ({ ...x, [id]: e })); };
+    let stopVinted = '';
     for (let i = 0; i < file.length; i++) {
       const l = file[i];
+      if (t && !(await t.continuer())) arret.current = true;
       if (arret.current) { for (const m of file.slice(i)) poser(m.id, { etat: 'pas-envoye', raison: 'Arrêtée par toi' }); break; }
       setProgres({ i: i + 1, n: file.length });
       poser(l.id, { etat: 'envoi' });
+      if (t) t.etape(l.id, 'envoi', l.prix != null && l.nouveau != null ? `${eur(l.prix)} → ${eur(l.nouveau)}` : '');
       let r = null; try { r = await onBaisser(l); } catch (_) { r = null; }
       const iss = issueBaisse(r);
       poser(l.id, iss);
-      if (iss.arret) { for (const m of file.slice(i + 1)) poser(m.id, { etat: 'pas-envoye', raison: iss.raison }); break; }
+      if (t) {
+        if (iss.etat === 'fait' || iss.etat === 'ecart') t.etape(l.id, 'relu', iss.prixVu != null ? eur(iss.prixVu) : '');
+        t.fin(l.id, iss.etat === 'fait' ? { etat: 'ok' }
+          : iss.etat === 'ecart' || iss.etat === 'incertain' ? { etat: 'main', raison: iss.raison || (iss.etat === 'ecart' ? 'Vinted montre un autre prix' : 'pas relu'), geste: 'Regarde l’annonce sur Vinted' }
+          : { etat: 'refus', raison: iss.raison, geste: iss.arret ? 'Attends la fin de la pause de Vinted, puis relance' : '' });
+      }
+      if (iss.arret) { stopVinted = iss.raison || 'refus'; for (const m of file.slice(i + 1)) { poser(m.id, { etat: 'pas-envoye', raison: iss.raison }); if (t) t.fin(m.id, { etat: 'saute', raison: iss.raison }); } break; }
       if (i < file.length - 1) {
-        const fin = Date.now() + pauseEntre();
-        while (Date.now() < fin && !arret.current) await new Promise((ok) => setTimeout(ok, Math.min(250, Math.max(0, fin - Date.now()))));
+        const ms = pauseEntre();
+        const fin = Date.now() + ms;
+        if (t && ms >= 1000) t.pause({ ms, raison: 'Pause entre deux annonces' });
+        while (Date.now() < fin && !arret.current && !(t && t.doitSArreter())) await new Promise((ok) => setTimeout(ok, Math.min(250, Math.max(0, fin - Date.now()))));
+        if (t) t.finPause();
       }
     }
+    if (t) t.terminer(arret.current ? 'arrêté par toi' : stopVinted, stopVinted ? 'arrete' : undefined);
     setPhase('fini');
     if (onFini) onFini(file.map((l) => ({ ligne: l, issue: res[l.id] || null })));
   };

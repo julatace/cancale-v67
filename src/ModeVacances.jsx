@@ -14,6 +14,7 @@
 import React from 'react';
 import { GroupeIos } from './composants/Ios.jsx';
 import JaugeActions from './JaugeActions.jsx';
+import { suivi } from './suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant le geste
 import {
   LIGNE_ETAT_VACANCES, LIGNE_RECETTE_VACANCES, SELECT_PROFIL_VACANCES, SELECT_ETAT_VACANCES, SELECT_RECETTE_VACANCES,
   AUTRES_SITES_VACANCES, lignesVacances, recetteSait, planVacances, actionVacances, issueVacances, ageLu,
@@ -97,10 +98,23 @@ export default function ModeVacances({ comptes = [] }) {
     if (!ok) return;
     setOccupe(true);
     setIssues((x) => ({ ...x, [l.uid]: { etat: 'envoi' } }));
+    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : jamais le pseudo (rien de personnel au journal).
+    const t = suivi.demarrer({ sorte: 'vacances', titre: sens ? 'Mode vacances : poser' : 'Mode vacances : retirer', uid: l.uid,
+      etapes: [['envoi', 'Envoi à Vinted'], ['relu', 'État relu sur Vinted']],
+      articles: [{ id: l.uid, titre: 'Le compte ouvert sur vinted.fr' }] });
+    if (t) t.etape(l.uid, 'envoi');
     let r = null;
     if (!vmrExtPresent()) r = { accepte: false, raison: 'L’extension ne répond pas ici : rien n’est parti' };
     else { try { r = await vmrCmd({ cmd: 'vacancesVinted', uid: l.uid, vacances: sens, confirme: true }, 90000); } catch (_) { r = null; } if (!r) r = { sansReponse: true }; }
     const iss = issueVacances(r, sens);
+    if (t) {
+      if (typeof iss.vacances === 'boolean') t.etape(l.uid, 'relu', iss.vacances ? 'en vacances' : 'ouvert');
+      t.fin(l.uid, iss.etat === 'fait' || iss.etat === 'deja' ? { etat: 'ok' }
+        : iss.etat === 'apprendre' ? { etat: 'main', raison: iss.raison, geste: sens ? 'Mets ce compte en vacances une fois à la main sur vinted.fr : VRM apprend' : 'Rouvre ce compte une fois à la main sur vinted.fr : VRM apprend' }
+        : iss.etat === 'ecart' || iss.etat === 'incertain' ? { etat: 'main', raison: iss.raison, geste: 'Regarde ton profil Vinted' }
+        : { etat: 'refus', raison: iss.raison });
+      t.terminer('');
+    }
     setIssues((x) => ({ ...x, [l.uid]: iss }));
     if (typeof iss.vacances === 'boolean') setRelus((x) => ({ ...x, [l.uid]: { vacances: iss.vacances, at: new Date().toISOString(), via: 'relu' } }));
     setOccupe(false);

@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { ordreRecent, quandEbay } from '../ordreRecent.js';
+import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la publication
 import BilanSynchronisation from '../BilanSynchronisation.jsx';
 import { problemesAnnonce } from '../verifAnnonce.js';
 import FiabiliteVentes from '../FiabiliteVentes.jsx';
@@ -1138,6 +1139,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       if (!ok) return;
     }
     setBusy(true); setRes(null); setCheck(null);
+    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : envoi, puis la réponse d'eBay telle quelle.
+    const t = suivi.demarrer({ sorte: 'publier-ebay', titre: 'Publier sur eBay', etapes: [['envoi', 'Envoi de l’annonce à eBay'], ['accepte', 'Mise en vente acceptée par eBay ✓']],
+      articles: [{ id: 'ebay', num: (b.item && b.item.numero) || '', titre: titre || '' }] });
+    if (t) t.etape('ebay', 'envoi');
     // `appelEbay` ne lève jamais : une coupure (code 0) ou une réponse illisible
     // n'est PAS « impossible » — la requête a pu arriver, l'annonce exister.
     const { code, j } = await appelEbay({ action: 'publish', item: b.item, confirme: true, ...corpsCompteEbay(comptePub) });   // posé après SON clic (P12)
@@ -1153,6 +1158,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     }
     else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRes({ err: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est partie. Rafraîchis depuis eBay (Paramètres → Comptes eBay) avant de recommencer.' });
     else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
+    if (t) {
+      if (j && j.ok) { t.etape('ebay', 'accepte'); t.fin('ebay', { etat: 'ok', lien: j.url || '' }); }
+      else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) t.fin('ebay', { etat: 'main', raison: 'eBay n’a pas répondu : l’annonce est peut-être partie', geste: 'Rafraîchis depuis eBay (Paramètres → Comptes eBay) avant de recommencer' });
+      else t.fin('ebay', { etat: 'refus', raison: (j && j.error) || 'eBay a refusé la publication' });
+      t.terminer('');
+    }
     setBusy(false);
   };
   const lab = { fontSize: 13, color: C.muted, display: 'block', marginBottom: 6, fontWeight: 500 };
