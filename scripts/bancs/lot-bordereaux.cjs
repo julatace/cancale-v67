@@ -112,18 +112,22 @@ const projette = (row, sel) => {
     // (3 nov., choix de Julien n° 2) L'aperçu suit l'ordre des GROUPES de l'écran (le plus pressé d'abord, par
     // transporteur) — avant, la date de vente (la plus récente en haut). Jugé contre les cartes rendues.
     const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].map((e) => e.getAttribute('data-tx-colis')).filter((x, i, a) => a.indexOf(x) === i));
-    dit(ap.length && JSON.stringify(ap.map((x) => x.cle)) === JSON.stringify(ecran.filter((c) => ap.some((x) => x.cle === c))), 'l’aperçu suit l’ordre des colis de l’écran', JSON.stringify({ apercu: ap.map((x) => x.cle), ecran }));
+    // (11 nov., lot DJ3) « Tout imprimer » en trois temps : « Ce qui part » d'abord, « À vérifier » à part (décochés) — l'ordre
+    // de chaque groupe reste celui de l'écran.
+    const ordre = (L) => JSON.stringify(L.map((x) => x.cle)) === JSON.stringify(ecran.filter((c) => L.some((x) => x.cle === c)));
+    dit(ap.length && ordre(ap.filter((x) => x.coche)) && ordre(ap.filter((x) => !x.coche)), 'l’aperçu suit l’ordre des colis de l’écran', JSON.stringify({ apercu: ap.map((x) => x.cle), ecran }));
     const v4 = ap.find((x) => x.cle === '9004');
     dit(v4 && !v4.coche && v4.ancienne, 'la vente d’il y a un mois est DÉCOCHÉE et dit pourquoi (pas d’impression silencieuse d’archives)', JSON.stringify(v4));
     dit(ap.filter((x) => x.coche).length === 3, 'les trois ventes récentes sont cochées', JSON.stringify(ap));
     const bouton = await pg.$('[data-lot] button[data-lot-imprimer]');   // (5 nov., chantier D) la feuille est un portail : le premier « data-imprime » de la page est une carte
     dit(!!bouton && (await bouton.getAttribute('data-lot-imprimer')) === '3', 'le bouton imprime EXACTEMENT les cochés (3)', bouton ? await bouton.getAttribute('data-lot-imprimer') : 'absent');
     if (bouton) {
-      await pg.locator('[data-lot-ligne="9001"] input').nth(1).check();
-      dit(await pg.getByText('2 · 1/3 article(s) contrôlé(s)',{exact:true}).isVisible(),'le contrôle physique est distinct de la sélection');
+      // (11 nov., lot DJ3) Le contrôle se fait sur l'APERÇU A4 (une page par colis coché, tampon N° + titre) ; plus de case
+      // « Contrôlé » ni de question « Préparer quand même » (un geste de moins) — jugé : 3 pages, aucune question.
+      dit(await pg.locator('[data-lot] [data-lot-apercu]').count() === 3, 'l’aperçu A4 montre une page par colis coché (3) — le contrôle avant le PDF');
       await bouton.click();
-      const continuer=pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true});
-      await continuer.waitFor();dit(true,'les articles non contrôlés sont signalés avant le PDF');await continuer.click();
+      await pg.waitForTimeout(800);
+      dit(!(await pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true}).count()), 'aucune question « contrôlé » entre « Imprimer » et le PDF');
       // (4 nov.) Le type de ces bordereaux n'a pas de place gardée : la feuille du tampon s'ouvre UNE fois, « Imprimer ».
       const feuille = await pg.waitForSelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"])', { timeout: 20000 }).then(() => true).catch(() => false);
       const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-placeur-tampon]').length);
