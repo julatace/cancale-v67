@@ -40,6 +40,8 @@ const MUTS = {
   'cout-passu-zero': ['L.total = L.passu ? null : somme;', 'L.total = somme;', 'coutPlateformes.js'],
   'cout-detail-faux': ['if (det && det[0] + det[1] + det[2] + det[3] === tot)', 'if (det)', 'coutPlateformes.js'],
   'cout-abo-ressemblance': ['Vinted: /^vinted\\b/i', 'Vinted: /vinted/i', 'coutPlateformes.js'],
+  'cout-montant-tu': ["if (!S.complet && !S.couverture && plat !== 'Vestiaire')", 'if (false)', 'coutPlateformes.js'],
+  'cout-montant-toujours': ["if (!S.complet && !S.couverture && plat !== 'Vestiaire')", "if (plat !== 'Vestiaire' && plat !== 'eBay')", 'coutPlateformes.js'],
   'cout-ebay-couverture-tue': ['if (S.couverture && S.couverture.lus < S.couverture.n)', 'if (false)', 'coutPlateformes.js'],
   'ecran-prevision-absente': ['<PrevisionMoisCarte liveStats', '<div data-retire liveStats', 'ecrans/Stats.jsx'],
   'ecran-deux-vues': ["if (vue === 'periode') return <div className=\"vrm-ap-cout\" data-cout-vue=\"periode\">{bascule}{parPeriode}</div>;", '', 'ArgentPlus.jsx'],
@@ -143,7 +145,7 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   const S = (ym, p) => M.find((m) => m.ym === ym).sites.find((s) => s.plat === p);
   const v = S('2026-11', 'Vinted');
   dit(v.cat.boost === 300 && v.cat.etiquettes === 250 && v.cat.autres === 120 && v.cat.abonnements === 1000, 'C1 Vinted novembre : boost 3 €, étiquette 2,50 € (fiche), 1,20 € sans détail = « autres », Vinted Pro 10 €', JSON.stringify(v.cat));
-  dit(v.total === 300 + 250 + 120 + 1000 && v.verif.frais === v.verif.detail, 'C2 le total = « Frais par site » du mois (même règle) + l’abonnement rattaché', JSON.stringify({ total: v.total, verif: v.verif }));
+  dit(v.total === 300 + 250 + 120 + 1000 && v.verif.frais === v.verif.detail && !v.partiel && !v.manques.length, 'C2 le total = « Frais par site » du mois (même règle) + l’abonnement rattaché', JSON.stringify({ total: v.total, verif: v.verif }));
   dit(!JSON.stringify(M).includes('"abonnements":1700') && S('2026-11', 'Vinted').cat.abonnements === 1000, 'C3 « Mon Vinted coach », « Canva » : pas rattachés à Vinted (seul le début du nom compte)');
   const o = S('2026-10', 'Vinted');
   dit(o.cat.boost === 900 + 230 && o.cat.abonnements === 1000, 'C4 octobre à part : boost de la fiche + pack Vinted noté (2,30 €)', JSON.stringify(o.cat));
@@ -157,6 +159,12 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   const Mn = C.coutParPlateforme({ releve: null, ebay: null, compta, mois: ['2026-11'], R: RR, chargeAbo });
   dit(Mn[0].sites.filter((s) => s.plat !== 'Leboncoin').every((s) => s.total == null && s.passu), 'C9 relevé et eBay pas lus : « — », jamais 0', JSON.stringify(Mn[0].sites.map((s) => [s.plat, s.total])));
   dit(JSON.stringify(C.detailFraisFiche({ fees: '3', transportVendeur: '2,50', commission: '', emballage: '0,40' })) === '[300,250,0,40]' && C.detailFraisFiche({}) === null, 'C10 le détail de la fiche : [boost, port payé par lui, commission, reste] — rien noté ⇒ rien rangé');
+  const Mx = C.coutParPlateforme({ releve: [...releve, ['Vinted', 'a', '9', t(8), null, 30, 0, 'x']], ebay, compta, mois: ['2026-11'], R: RR, chargeAbo });
+  const vx = Mx[0].sites.find((s) => s.plat === 'Vinted');
+  dit(vx.partiel && vx.manques.includes('un montant Vinted pas lu') && vx.total === v.total, 'C12 une vente Vinted au montant pas lu : nommée, le total ne bouge pas', JSON.stringify(vx.manques));
+  const My = C.coutParPlateforme({ releve: [['Vinted', 'a', '7', t(9), 70, 30, 1.5, 'x', '', '', null, [900, 0, 0, 0]]], ebay: [], compta: {}, mois: ['2026-11'], R: RR, chargeAbo });
+  const vy = My[0].sites.find((s) => s.plat === 'Vinted');
+  dit(vy.total === 150 && vy.cat.autres === 150 && vy.cat.boost === 0, 'C13 un détail qui ne somme pas au total : rien de réparti, « autres frais notés » (le total fait foi)', JSON.stringify(vy.cat));
   dit(C.moisAvant(t(10), 4).join(',') === '2026-11,2026-10,2026-09,2026-08', 'C11 quatre mois, le plus récent d’abord');
 
   console.log('\n── E. Les écrans');

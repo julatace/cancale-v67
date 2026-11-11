@@ -97,7 +97,7 @@ export function coutParPlateforme({ releve, ebay, compta, mois = [], excluAutre,
         }
         cat.boost += c(S.options);                                         // packs et options notés dans Dépenses
         if (plat === 'Vestiaire' && S.commissionPasLue) { L.manques.push('commission Vestiaire pas lue'); L.partiel = true; }
-        if (!S.baseLue) { L.manques.push(`un montant ${plat} pas lu`); L.partiel = true; }
+        if (!S.complet && !S.couverture && plat !== 'Vestiaire') { L.manques.push(`un montant ${plat} pas lu`); L.partiel = true; }
         L.verif = { frais: S.frais == null ? null : c(S.frais), detail: plat === 'eBay' ? c(S.commission) + c(S.options) : noteFiches + c(S.options) };
       }
       // Les abonnements rattachés à ce site (échéances du mois).
@@ -125,5 +125,6 @@ export const sitesMontresCout = (M) => SITES_COUT.filter((p) => (M || []).some((
 
 export const nomMois = (ym, court = false) => {
   const { de } = bornesMois(ym);
-  return new Date(de).toLocaleDateString('fr-FR', { month: court ? 'short' : 'long' }).replace('.', '');
+  const m = new Date(de).toLocaleDateString('fr-FR', { month: court ? 'short' : 'long' }).replace('.', '');
+  return court ? m.charAt(0).toUpperCase() + m.slice(1) : m;
 };

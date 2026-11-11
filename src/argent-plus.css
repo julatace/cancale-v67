@@ -30,7 +30,7 @@ html body button.vrm-ap-ligne:disabled { cursor: default; opacity: 1; }
 .vrm-ap-table { display: flex; flex-direction: column; margin-top: 4px; }
 .vrm-ap-tr { display: grid; grid-template-columns: minmax(64px, 1.1fr) repeat(var(--n, 4), minmax(0, 1fr)); align-items: center; column-gap: 4px; border-top: 1px solid var(--vrm-line, #E5E5EA); }
 .vrm-ap-th { border-top: 0; font-size: 12px; color: var(--vrm-muted, #6E6E73); font-weight: 600; min-height: 28px; }
-.vrm-ap-mois { text-align: right; padding-right: 6px; white-space: nowrap; text-transform: capitalize; }
+.vrm-ap-mois { text-align: right; padding-right: 6px; white-space: nowrap; }
 .vrm-ap-site { font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html body .vrm-ap-carte button.vrm-ap-td { min-height: 44px; min-width: 0; padding: 0 6px; border: 0; border-radius: 8px; background: transparent; font: 500 14px/1.2 var(--vrm-police, inherit); color: var(--vrm-ink, #1D1D1F); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
 html body .vrm-ap-carte button.vrm-ap-td[aria-expanded="true"] { background: var(--vrm-card2, #F2F2F7); }
