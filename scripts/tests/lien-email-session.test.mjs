@@ -103,3 +103,14 @@ test('déconnexion : le cache des ventes de l’onglet (sessionStorage) et sa co
   assert.equal(Object.keys(cache).length, 0, 'la copie en mémoire reste');
   assert.equal(ls.getItem('vrm_x'), null);
 });
+
+test('lien de récupération : accepté sans marque (autre appareil), jamais par-dessus un autre compte', async () => {
+  const R = '#access_token=a.b.c&refresh_token=r&expires_in=3600&type=recovery';
+  const b = banc({ hash: R, jetonDe: 'moi' });
+  const r = await b.run();
+  assert.equal(r && r.ok, true);
+  assert.equal(r.recovery, true);
+  const c = banc({ hash: R, avant: { access_token: 'v', user: { id: 'victime' } }, jetonDe: 'tiers' });
+  await c.run();
+  assert.equal(c.ecrite, undefined, 'un lien de récupération d’un tiers a remplacé la session');
+});

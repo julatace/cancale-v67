@@ -2085,7 +2085,9 @@ const consumeAuthRedirect = async () => {
     // remplace rien : il faut que CE navigateur ait demandé l'e-mail, et
     // jamais par-dessus le compte d'un autre (src/lienEmail.js).
     const avant=readSession();
-    const verdict=adopterJetonsDuLien({demandeIci:lienDemandeIci(localStorage),sessionId:avant&&avant.user&&avant.user.id,jetonId:me.id});
+    // Un lien de RÉCUPÉRATION s'ouvre souvent sur un autre appareil : il n'exige pas
+    // la marque (il mène au choix d'un mot de passe, geste visible), mais jamais par-dessus un autre compte.
+    const verdict=adopterJetonsDuLien({demandeIci:type==='recovery'||lienDemandeIci(localStorage),sessionId:avant&&avant.user&&avant.user.id,jetonId:me.id});
     if(verdict==='autre_session')return{error:MSG_LIEN_AUTRE_COMPTE};
     if(verdict!=='oui')return{error:MSG_LIEN_PAS_DEMANDE};
     oublierLienDemande(localStorage);
