@@ -115,7 +115,16 @@ function chargerRegle(texte) {
     K.poserEssai([onglet, appareil], 'essaiun', V('a'), maint - 5000);
     K.poserEssai([appareil], 'essaideux', V('b'), maint - 1000);
     const essais = K.prendreEssais([mem(), appareil], maint);
-    dit(!!essais.essaiun && !!essais.essaideux && appareil.getItem(K.CLE_ESSAIS) === null, 'K1 les tentatives sont lues puis effacées (une fois)', JSON.stringify(Object.keys(essais)));
+    // (relecture du 11 nov.) Lues sans effacer : une AUTRE tentative en cours (autre onglet)
+    // doit survivre au retour de la première ; ce qui a servi part par `oterEssai`.
+    dit(!!essais.essaiun && !!essais.essaideux, 'K1 les tentatives gardées sont lues', JSON.stringify(Object.keys(essais)));
+    if (typeof K.oterEssai === 'function') {
+      K.oterEssai([onglet, appareil], V('a'), 'essaiun', maint);
+      const apres = K.prendreEssais([onglet, appareil], maint);
+      dit(!apres.essaiun && !!apres.essaideux, 'K1 après l’échange : CETTE tentative effacée, celle d’un autre onglet gardée', JSON.stringify(Object.keys(apres)));
+      K.oterEssai([onglet, appareil], V('b'), '', maint);
+      dit(appareil.getItem(K.CLE_ESSAIS) === null && onglet.getItem(K.CLE_ESSAIS) === null, 'K1 plus aucune tentative ⇒ plus aucune clé');
+    } else dit(false, 'K1 `oterEssai` existe (effacer ce qui a servi, seulement)');
     const c1 = K.candidatsVerificateur({ idRetour: 'essaiun', essais, onglet: V('z'), appareil: V('b') });
     dit(c1[0].v === V('a'), 'K1 le retour présente d’abord le vérificateur de SA tentative (pas celui de l’onglet)', JSON.stringify(c1.map((x) => x.v[0])));
     const c2 = K.candidatsVerificateur({ idRetour: '', essais, onglet: V('z'), appareil: V('b') });
