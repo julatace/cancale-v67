@@ -108,7 +108,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
       const w = ecritures(mode, lignes, { nouvelId: () => nouvelId(mode === 'ventes' ? 'vi_' : 'si_'), importId, nom: fichier.nom, coutExiste: outils.coutExiste });
       const r = await outils.ecrire(mode, w);
       if (r && r.ok) {
-        outils.toast(`${pl(w.items.length, mode === 'ventes' ? 'vente importée' : 'paire importée', mode === 'ventes' ? 'ventes importées' : 'paires importées')}`);
+        outils.toast(`${pl(w.items.length, mode === 'ventes' ? 'vente importée' : `${motsVendeur().nom} importé${motsVendeur().e}`, mode === 'ventes' ? 'ventes importées' : `${motsVendeur().noms} importé${motsVendeur().es}`)}`);
         setFichier(null); setLignes(null); setEtat(outils.lireEtat());
       } else { setErreur((r && r.raison) || 'Rien n’a été écrit : réessaie.'); setRelire((x) => x + 1); }
     } finally { setEcriture(false); }
@@ -145,7 +145,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
         options={[{ v: 'stock', l: 'Mon stock', data: { 'data-imps-mode-choix': 'stock' } }, { v: 'ventes', l: 'Mes ventes passées', data: { 'data-imps-mode-choix': 'ventes' } }]}/>
       {!fichier && (
         <>
-          <p className="vrm-imps-phrase">{mode === 'ventes' ? 'Une ligne par vente. VRM lit ces colonnes :' : 'Une ligne par paire. VRM lit ces colonnes :'}</p>
+          <p className="vrm-imps-phrase">{mode === 'ventes' ? 'Une ligne par vente. VRM lit ces colonnes :' : `Une ligne par ${motsVendeur().nom}. VRM lit ces colonnes :`}</p>
           <ul className="vrm-imps-puces" aria-label="Colonnes lues">
             {champsDe(mode).map((c) => <li key={c} data-imps-attendue={c}>{noms[c]}{OBLIGATOIRES[mode].includes(c) ? '' : ' · facultatif'}</li>)}
           </ul>
@@ -224,7 +224,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
             {imports.map((imp) => (
               <li key={imp.id} className="vrm-imps-ligne" data-imps-import={imp.id} data-imps-import-type={imp.type} data-imps-import-n={imp.n}>
                 <span className="vrm-imps-corps">
-                  <span className="vrm-imps-titre">{imp.type === 'ventes' ? pl(imp.n, 'vente passée', 'ventes passées') : pl(imp.n, 'paire en stock', 'paires en stock')}</span>
+                  <span className="vrm-imps-titre">{imp.type === 'ventes' ? pl(imp.n, 'vente passée', 'ventes passées') : pl(imp.n, `${motsVendeur().nom} en stock`, `${motsVendeur().noms} en stock`)}</span>
                   <span className="vrm-imps-meta">{[dateTexte(String(imp.at).slice(0, 10)), imp.nom].filter(Boolean).join(' · ')}</span>
                 </span>
                 {aAnnuler === imp.id
@@ -239,14 +239,14 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
 
       {mode === 'stock' && (etat.stock || []).length > 0 && (
         <section className="vrm-imps-bloc" data-imps-propositions={propositions ? propositions.length : 'pas-su'}>
-          <h4 className="vrm-imps-h">Relier tes paires à leurs annonces</h4>
+          <h4 className="vrm-imps-h">Relier {motsVendeur().tes} à leurs annonces</h4>
           {propositions === null
-            ? <p className="vrm-imps-note">Ouvre Annonces une fois : VRM pourra te proposer l’annonce Vinted de chaque paire importée.</p>
+            ? <p className="vrm-imps-note">Ouvre Annonces une fois : VRM pourra te proposer l’annonce Vinted de chaque {motsVendeur().nom} importé{motsVendeur().e}.</p>
             : !propositions.length
-              ? <p className="vrm-imps-note">Aucune annonce sans N° ne ressemble à une paire importée.</p>
+              ? <p className="vrm-imps-note">Aucune annonce sans N° ne ressemble à {motsVendeur().un} importé{motsVendeur().e}.</p>
               : (
                 <>
-                  <p className="vrm-imps-note">Une proposition, par ressemblance : vérifie avant de relier. L’annonce prend alors le N° de la paire.</p>
+                  <p className="vrm-imps-note">Une proposition, par ressemblance : vérifie avant de relier. L’annonce prend alors le N° {motsVendeur().de}.</p>
                   <ul className="vrm-imps-lignes">
                     {propositions.map(({ it, a }) => (
                       <li key={it.id} className="vrm-imps-ligne" data-imps-proposition={it.numero} data-imps-proposition-annonce={a.id}>

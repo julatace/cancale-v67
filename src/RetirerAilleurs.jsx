@@ -12,6 +12,7 @@ import { BoutonBase } from './composants/Bouton.jsx';
 import { PhotoVide } from './composants/PhotoVide.jsx';
 import { phraseArticle, texteResultat } from './retirerAilleurs.js';
 import './retirer-ailleurs.css';
+import { motsVendeur } from './profilVendeur.js';
 
 const LIEN_SITE = { Vinted: 'https://www.vinted.fr/', Vestiaire: 'https://fr.vestiairecollective.com/', Leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', eBay: 'https://www.ebay.fr/sh/lst/active' };
 const ETAT = { auto: 'VRM le retire', main: 'à faire sur le site', verifier: 'vérifier' };
@@ -61,7 +62,7 @@ export function RetirerAilleursBloc({ plan, resultats = null, enVol = false, onR
           </div>
         </article>
       ))}
-      {plan.ambigus > 0 ? <p className="vrm-ra-note" data-ra-ambigus={String(plan.ambigus)}>{plan.ambigus} N° porté{plan.ambigus > 1 ? 's' : ''} par deux paires : aucun retrait proposé (vérifie le N° sur le carton).</p> : null}
+      {plan.ambigus > 0 ? <p className="vrm-ra-note" data-ra-ambigus={String(plan.ambigus)}>{plan.ambigus} N° porté{plan.ambigus > 1 ? 's' : ''} par deux {motsVendeur().noms} : aucun retrait proposé (vérifie le N° sur le carton).</p> : null}
       {plan.manques.length && !compact ? <p className="vrm-ra-note" data-ra-manques="">Pas tout relu : {plan.manques.join(', ')}. Ce qui n’est pas lu n’est ni affirmé ni retiré.</p> : null}
     </section>
   );
