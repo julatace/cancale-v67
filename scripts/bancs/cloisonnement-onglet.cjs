@@ -188,7 +188,8 @@ async function scenario(nav, W, sombre) {
   await pg.waitForTimeout(2500);
   // Un vendeur neuf : « Ma configuration » et le parcours s'ouvrent — « Plus tard » / ✕ pour voir les écrans.
   for (let i = 0; i < 4; i++) {
-    const plusTard = pg.locator('[data-configuration] button:has-text("Plus tard"), [data-parcours-fermer], button:has-text("Plus tard")').first();
+    const plusTard = pg.locator('[data-configuration-plus-tard], [data-parcours-fermer]').first();
+    await plusTard.waitFor({ timeout: i ? 2500 : 8000 }).catch(() => {});
     if (!(await plusTard.isVisible().catch(() => false))) break;
     await plusTard.click().catch(() => {}); await pg.waitForTimeout(700);
   }

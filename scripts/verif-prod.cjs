@@ -102,7 +102,8 @@ async function passage(nav, { quoi, W, BRUIT, estMorceauPerime }) {
   await pg.waitForTimeout(2500);
   // Les feuilles d'accueil d'un compte neuf (Ma configuration, parcours) : « Plus tard ».
   for (let i = 0; i < 4; i++) {
-    const p = pg.locator('[data-configuration] button:has-text("Plus tard"), [data-parcours-fermer]').first();
+    const p = pg.locator('[data-configuration-plus-tard], [data-parcours-fermer]').first();
+    await p.waitFor({ timeout: i ? 2500 : 8000 }).catch(() => {});
     if (!(await p.isVisible().catch(() => false))) break;
     await p.click().catch(() => {}); await pg.waitForTimeout(600);
   }

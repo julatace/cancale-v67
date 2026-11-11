@@ -143,7 +143,8 @@ export function jouerScenario(sc, { maintenant = Date.now() } = {}) {
   const instantanes = [];
   const photo = (cle) => {
     const etat = etatParcours(preuves, { maintenant });
-    instantanes.push({ cle, etat, montree: etapeAMontrer(etat, cle) || cle });
+    // La miniature montre l'écran de CETTE étape, juste après son geste (✓ ou ce qui bloque).
+    instantanes.push({ cle, etat, montree: cle });
   };
   // 1. Inscription : un identifiant FICTIF, aucune requête.
   const uid = uidFictif();
