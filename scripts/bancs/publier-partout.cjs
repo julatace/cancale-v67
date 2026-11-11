@@ -214,6 +214,7 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         await pg.waitForFunction(() => { const e = document.querySelector('[data-pp-case="9012:ebay"] [data-pp-prix]'); return e && e.getAttribute('data-pp-prix') === '85'; }, null, { timeout: 5000 }).catch(() => {});
         const c2 = await cases(pg);
         dit(c2.find((x) => x.site === 'ebay').prix === '85' && c2.find((x) => x.site === 'leboncoin').prix === '80', `${nomVp} · D · « +5 € » sur eBay ⇒ 85 € sur eBay, 80 € ailleurs`, JSON.stringify(c2.map((x) => [x.site, x.prix])));
+        await pg.waitForFunction(() => !!localStorage.getItem('vrm_partout_prix'), null, { timeout: 8000 }).catch(() => {});   // save() est différé
         const garde = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_partout_prix') || 'null'); } catch (_) { return null; } });
         dit(garde && garde.ebay && garde.ebay.mode === 'eur' && garde.ebay.valeur === 5, `${nomVp} · D · le réglage est gardé (vrm_partout_prix)`, JSON.stringify(garde));
         await capture(pg, `partout-prix-${nomVp}`);
@@ -225,6 +226,7 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         await pg.waitForSelector('[data-pp-case="9012:vestiaire"] [data-pp-finir]', { timeout: 5000 }).catch(() => {});
         const fin = await pg.evaluate(() => { const e = document.querySelector('[data-pp-case="9012:vestiaire"] [data-pp-finir]'); return e ? e.innerText : ''; });
         dit(/Mati[eè]re « Cuir »/.test(fin), `${nomVp} · H · défaut Vestiaire « matière Cuir » ⇒ « à finir sur Vestiaire » nommé`, fin);
+        await pg.waitForFunction(() => /Cuir/.test(localStorage.getItem('vrm_partout_params') || ''), null, { timeout: 8000 }).catch(() => {});
         const gp = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_partout_params') || 'null'); } catch (_) { return null; } });
         dit(gp && gp.vestiaire && gp.vestiaire.matiere === 'Cuir', `${nomVp} · H · le défaut est gardé (vrm_partout_params)`, JSON.stringify(gp));
         const liv = '[data-pp-case="9012:leboncoin"] [data-pp-champ="leboncoin:livraison"][data-pp-champ-quoi="annonce"]';
@@ -265,7 +267,11 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         dit(br && !/livraison|shipping/i.test(JSON.stringify(br)), `${nomVp} · F · aucun port dans le brouillon (§2.8)`);
         dit(!ACTIONS_EBAY.includes('publish') && !ACTIONS_EBAY.includes('pubverify'), `${nomVp} · F · aucune publication eBay d’ici`, ACTIONS_EBAY.join());
         dit(!POSTS.some((p) => /lbcPublier|vcPreparer/.test(p.body)), `${nomVp} · B · rien n’est parti vers Leboncoin ni Vestiaire sans extension`);
+        // VRM FIGÉ pendant l'envoi : le suivi commun (SuiviTravail) a couvert l'écran, avec son récapitulatif.
+        const suivi = await pg.evaluate(() => { const f = document.querySelector('[data-suivi-fermer]'); const t = document.querySelector('[data-suivi-travail]'); return { fermer: !!f, sorte: t ? t.getAttribute('data-suivi-travail') : '' }; });
+        dit(suivi.fermer && suivi.sorte === 'publier-partout', `${nomVp} · H · VRM figé : le suivi commun (détail, barre, récapitulatif) a couvert l’envoi`, JSON.stringify(suivi));
         await capture(pg, `partout-bilan-${nomVp}`);
+        if (suivi.fermer) await pg.click('[data-suivi-fermer]');
         await sain(pg, `${nomVp} · série`);
         await pg.click('[data-pp-fermer]');
       });

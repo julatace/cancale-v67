@@ -15,7 +15,7 @@
 // garde son propre état par case) ; scripts/audit-publier-partout.cjs l'exécute.
 import { NOM_PARTOUT } from './publierPartout.js';
 
-export const ETAPES_PARTOUT = Object.freeze([['envoi', 'Envoi à l’extension'], ['depot', 'Dépôt sur le site']]);
+export const ETAPES_PARTOUT = Object.freeze([['envoi', 'Envoi'], ['depot', 'Dépôt sur le site']]);
 const FIN = { publie: 'ok', 'a-finir': 'main', refuse: 'refus', 'pas-envoye': 'saute' };
 
 // plan : sortie `planPartout`. Rend { surEtat, doitSArreter, terminer, pilote } ou
