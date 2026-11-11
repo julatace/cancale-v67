@@ -58,6 +58,14 @@ doitRefuser('la branche réaffecte une variable de tête sans la lire', `const [
   if (R4.vues.length && R4.vues[0].compagnons) { ko++; console.log('❌ un compagnon qui réaffecte une variable de tête devait rester'); } else console.log('✅ un compagnon qui réaffecte une variable de tête reste dans le composant'); }
 doitRefuser('lit this', `const [tab] = useState('t');
   return (<div>{tab==='t' && (<b>{this}</b>)}</div>);`, /this/);
+// ── deux modules préchargés : l'aide `prechargerAuRepos` est déclarée AVANT tout appel (zone morte au démarrage, 11 nov.)
+{
+  let src = `import React, { lazy, Suspense } from 'react';\nfunction aLaDemande(c){return c;}\n// ⟦démarrage léger⟧ racines paresseuses\nconst FavorisVinted = aLaDemande(() => 1);\nfunction Un() { return <i/>; }\nfunction Deux() { return <b/>; }\nexport default function App() { return (<div><Un/><Deux/></div>); }\n`;
+  const appF = path.join(__dirname, '..', 'src', 'App.jsx');
+  for (const [f, r] of [['coeur/Un.jsx', 'Un'], ['coeur/Deux.jsx', 'Deux']]) { const o = T.decouper(src, { fichier: f, sorte: 'ecran', racines: [r], precharger: true }, appF); src = o.src; }
+  const decl = src.indexOf('const prechargerAuRepos = '), appel = src.search(/^prechargerAuRepos\(/m);
+  if (decl < 0 || appel < 0 || decl > appel) { ko++; console.log(`❌ deux modules préchargés : prechargerAuRepos appelé (${appel}) avant d'être déclaré (${decl})`); } else console.log('✅ deux modules préchargés : l’aide est déclarée avant le premier appel');
+}
 // ── imports différés (sur des fichiers de synthèse dans un dossier temporaire)
 {
   const fs = require('fs'), os = require('os');
