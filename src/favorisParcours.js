@@ -35,15 +35,22 @@ export const RYTHME_VINTEX = { min: 6, max: 10 };   // secondes (delaiFavori, in
 // avec le NOMBRE de personnes et celles à qui on peut écrire — sans pseudo.
 //   bloque(id) : la ligne de favori ne peut plus recevoir de message (vendue,
 //   déjà dans la file, envoyée, en conversation…) — la règle de FavorisVinted.
-export function annoncesQui(cartes = [], bloque = () => false) {
+//   depuis : (ajout validé par Julien, 11 nov.) seuls les NOUVEAUX favoris —
+//   arrivés APRÈS ce moment (le dernier envoi) — sont proposés par défaut ;
+//   les plus anciens sont comptés à part (`anciens`), jamais perdus. Un favori
+//   sans date lisible n'est jamais « nouveau ». null ⇒ tous.
+export function annoncesQui(cartes = [], bloque = () => false, { depuis = null } = {}) {
   const liste = [];
+  const nouveau = (p) => depuis == null || (Number.isFinite(Number(p.date)) && Number(p.date) > depuis);
   for (const c of Array.isArray(cartes) ? cartes : []) {
     const personnes = Array.isArray(c.personnes) ? c.personnes : [];
-    const aEcrire = personnes.filter((p) => p && p.etat === 'a_envoyer' && !bloque(p.id)).map((p) => String(p.id));
+    const libres = personnes.filter((p) => p && p.etat === 'a_envoyer' && !bloque(p.id));
+    const aEcrire = libres.filter(nouveau).map((p) => String(p.id));
+    const anciens = libres.length - aEcrire.length;
     liste.push({
       cle: c.cle, itemId: c.itemId || null, titre: c.titre || '', numero: c.numero || '', photo: c.photo || null,
       prix: Number.isFinite(Number(c.prix)) && Number(c.prix) > 0 ? Number(c.prix) : null,
-      personnes: personnes.length, aEcrire, vendu: !!c.vendu, choisissable: !c.vendu && aEcrire.length > 0,
+      personnes: personnes.length, aEcrire, anciens, vendu: !!c.vendu, choisissable: !c.vendu && aEcrire.length > 0,
       aVerifier: personnes.filter((p) => p && p.etat === 'a_verifier').length,
       aOuvrir: personnes.filter((p) => p && p.ouvrir).map((p) => String(p.id)),
       envoyes: personnes.filter((p) => p && p.etat === 'envoye').length,
@@ -199,4 +206,87 @@ export function ventesPourHistorique({ ventes = [], txnItem = {}, conversations 
     out.push({ tx, itemId: String(itemId), acheteur: v.conversation_id != null ? (autre.get(String(v.conversation_id)) || null) : null, at: Number.isFinite(at) ? at : null });
   }
   return out;
+}
+
+// Le dernier envoi confirmé de ce compte (le repère des « nouveaux favoris »).
+export function dernierEnvoi(jobs = []) {
+  let t = null;
+  for (const j of Array.isArray(jobs) ? jobs : []) {
+    if (!j || j.etat !== 'envoye') continue;
+    const v = Number(j.envoyeLe || j.traiteLe);
+    if (Number.isFinite(v) && (t == null || v > t)) t = v;
+  }
+  return t;
+}
+
+// ── LE GARDE-FOU DE MARGE (ajout validé par Julien, 11 nov.) ───────────────
+// Avant l'envoi, ce qui RESTE après la remise et les frais, avec SON prix
+// d'achat relié par identité (la fiche `vinted_annonce_numeros[item_id]`).
+//   apres   : le prix de l'offre, en euros (null ⇒ pas d'offre calculable) ;
+//   plancher: plancherVente(fiche) (src/plancherOffre.js : achat + frais connus,
+//             la MÊME règle que le bénéfice) ;
+//   mini    : le prix mini posé à côté du N° (euros), ou null.
+// → { reste: centimes|null, etat: 'ok'|'partiel'|'achat'|'illisible'|'sans',
+//     bloque: null|'mini'|'perte' }
+// Une offre sous le prix mini, ou à perte, est BLOQUÉE : elle ne part que sur
+// sa confirmation explicite. Prix d'achat inconnu ⇒ « — », jamais bloquée en
+// silence ni dite « sans perte ».
+const cts = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+export function gardeMarge({ apres = null, plancher = null, mini = null } = {}) {
+  const o = cts(apres);
+  if (o == null) return { reste: null, etat: 'sans', bloque: null };
+  const m = cts(mini);
+  let bloque = m != null && o < m ? 'mini' : null;
+  if (!plancher || plancher.plancher == null || (plancher.etat !== 'ok' && plancher.etat !== 'partiel')) return { reste: null, etat: plancher && plancher.etat === 'illisible' ? 'illisible' : 'achat', bloque };
+  const reste = o - plancher.plancher;
+  if (reste < 0) bloque = bloque || 'perte';
+  return { reste, etat: plancher.etat, bloque };
+}
+
+// ── « CE QUI MARCHE » (ajout validé par Julien, 11 nov.) ────────────────────
+// Pour chaque envoi (un lot de la file), combien ont ACHETÉ ensuite — relié
+// par la transaction de l'annonce ET la personne (achatsApresMessage), jamais
+// par ressemblance — et avec quelle remise (celle que la file a portée).
+export function ceQuiMarche(jobs = [], ventes = []) {
+  const parLot = new Map();
+  for (const j of Array.isArray(jobs) ? jobs : []) {
+    if (!j || j.etat !== 'envoye' || !j.lot) continue;
+    if (!parLot.has(j.lot)) parLot.set(j.lot, []);
+    parLot.get(j.lot).push(j);
+  }
+  const out = [];
+  for (const [lot, js] of parLot) {
+    const h = achatsApresMessage(js, ventes);
+    const o = js.find((x) => x.offre && x.offre.mode)?.offre || null;
+    const at = Math.max(...js.map((x) => Number(x.envoyeLe || x.traiteLe) || 0));
+    out.push({ lot: String(lot), at: at || null, envoyes: js.length, achats: h.achats, offre: o ? { mode: o.mode, valeur: Number(o.valeur) } : null, auto: js.every((x) => x.auto === true) });
+  }
+  return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+
+// ── L'OFFRE GROUPÉE (ajout validé par Julien, 11 nov.) ──────────────────────
+// Une personne qui a mis PLUSIEURS de ses annonces en favori : seule l'identité
+// que le SERVEUR a prouvée (`id` = « <annonce>:<personne> » de la file) les
+// relie — jamais un pseudo qui se ressemble. VRM ne connaît pas (encore) de
+// recette d'offre « lot » chez Vinted : la proposition se fait sur Vinted ; ici
+// on dit combien de personnes, quelles annonces, et le prix du lot à SA remise.
+// → [{ items:[itemId…] }] (aucune identité de personne n'en sort).
+export function offresGroupees(jobs = []) {
+  const parPersonne = new Map();
+  for (const j of Array.isArray(jobs) ? jobs : []) {
+    if (!j || ['annule', 'refuse'].includes(j.etat)) continue;
+    const m = /^([1-9]\d{0,19}):([1-9]\d{0,19})$/.exec(String(j.id || ''));
+    if (!m) continue;
+    if (!parPersonne.has(m[2])) parPersonne.set(m[2], new Set());
+    parPersonne.get(m[2]).add(m[1]);
+  }
+  return [...parPersonne.values()].filter((s) => s.size >= 2).map((s) => ({ items: [...s].sort() }));
+}
+// Le prix d'un lot à une remise en % (sur la somme des prix connus) ; un prix
+// manquant ⇒ null (jamais un total partiel présenté comme complet).
+export function prixLot(prix = [], pct = 0) {
+  if (!Array.isArray(prix) || !prix.length || prix.some((p) => !(Number(p) > 0))) return null;
+  const total = Math.round(prix.reduce((t, p) => t + Number(p) * 100, 0));
+  const k = Math.max(0, Math.min(99, Math.floor(Number(pct) || 0)));
+  return { total: total / 100, apres: Math.round(total * (100 - k) / 100) / 100 };
 }
