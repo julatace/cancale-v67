@@ -86,8 +86,8 @@ achats, du plus récent, avec date, prix (ou « prix pas saisi »), N°, « reve
   « au plus » tu, « pas saisie » classée, source sans mesure classée, N° ambigu relié,
   vente sans achat tue, second calcul dans la carte, rouge, carte retirée d'Achats).
 - Banc `scripts/bancs/meilleures-sources.cjs` (données inventées, 390 tactile et
-  1512, clair et sombre, Achats ET Argent) : 108 verts. Sur le build d'origin/main :
-  voir la fin de ce récit. Captures regardées (390 clair/sombre, 1512 sombre,
+  1512, clair et sombre, Achats ET Argent) : 108 verts. Sur le build d'origin/main
+  (76445c0) : **8 rouges** (la carte n'existe ni dans Achats ni dans Argent, aux 4 combinaisons). Captures regardées (390 clair/sombre, 1512 sombre,
   feuille 390 sombre) : défaut vu et corrigé (accent trop sombre en mode sombre,
   retrait parasite des lignes).
 
