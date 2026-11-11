@@ -598,6 +598,7 @@ import Visionneuse from "./Visionneuse.jsx";
 import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
 import { cleFacture } from "./factureAchat.js";
 import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille de vignettes, par compte — même couche, après la DA6
+import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
 import { enregistrerGaleries } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -42038,7 +42039,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     )}
                     {aRelie ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                       <Bouton variante="secondaire" icone="doc" data-recu-relie={String(aRelie.transaction_id||'')} disabled={recuOuverture===String(aRelie.transaction_id||'')} onClick={()=>ouvrirRecuRelie(aRelie, num)} title="Ouvrir le reçu d'achat" aria-label="Reçu d'achat">Reçu d’achat</Bouton>
-                      <Bouton variante="discret" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente">Changer l’achat relié</Bouton>
+                      <Bouton variante="discret" data-recap-changer-achat="" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente, ou le délier">Changer l’achat relié</Bouton>
                     </div> : null}
                   </details>
                 </section>
@@ -43591,7 +43592,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
-          prochainNumero={nextNumero} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
+          prochainNumero={nextNumero} onReserverNumero={recordUsed} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
           chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
           onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS

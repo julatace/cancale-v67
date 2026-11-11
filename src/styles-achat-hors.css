@@ -1,0 +1,43 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — « NOUVEL ACHAT » HORS PLATEFORME, DEBOUT À LA BROCANTE (11 nov., lot DJ5)
+   docs/passation/2026-11-11-achats-relier.md
+
+   Julien : « Achat hors brocante doit être amélioré ». La saisie en UNE colonne :
+   la photo d'abord (une grande tuile qu'on touche), le prix en grand, ses
+   derniers lieux en pastilles de 44 px, gros bouton « Ajouter l'achat ».
+   Même couche que la DA6 (`@layer vrm-premium`). Rien de métier ici.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+  .vrm-ahp-photo {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 168px;
+    padding: 0;
+    border: 1.5px dashed var(--vrm-border, rgba(127, 127, 127, .35));
+    border-radius: 18px;
+    background: var(--vrm-card2, rgba(127, 127, 127, .06));
+    color: inherit;
+    cursor: pointer;
+    overflow: hidden;
+    font-family: inherit;
+  }
+  .vrm-ahp-photo[data-achat-hors-photo-pleine="1"] { border-style: solid; }
+  .vrm-ahp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vrm-ahp-photo-vide {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    height: 100%; font-size: 15px; font-weight: 600; opacity: .72;
+  }
+  .vrm-ahp-photo-changer {
+    position: absolute; right: 10px; bottom: 10px;
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(0, 0, 0, .55); color: #fff;
+    font-size: 13px; font-weight: 600;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .vrm-ahp-lieux { scrollbar-width: none; }
+  .vrm-ahp-lieux::-webkit-scrollbar { display: none; }
+  @media (min-width: 700px) {
+    .vrm-ahp-photo { height: 200px; max-width: 360px; }
+  }
+} /* fin @layer vrm-premium */

@@ -310,7 +310,12 @@ const lirePhotosAchatsHors = async () => {
 };
 // ⟦← App.jsx #5⟧
 
-function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null, importer = null }) {
+// (11 nov., lot DJ5 — Julien : « Achat hors brocante doit être amélioré ») LA SAISIE REFAITE, DEBOUT À LA
+// BROCANTE : la PHOTO d'abord (une grande tuile, un toucher), le nom, le PRIX en grand, OÙ (ses derniers
+// lieux d'abord, puis la liste courte), la date, le N° de rangement — le prochain N° libre PROPOSÉ en
+// pastille, posé seulement par SON toucher, et réservé dans le pool à l'enregistrement (`onReserverNumero`,
+// append-only : jamais redonné à une annonce). Une colonne, gros boutons. Rien n'est deviné (§2.5).
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null, importer = null, onReserverNumero = null }) {
   // (10 nov., lot J) « Importer un tableur » (src/importAchats.js) : `importer` = { existants, numeroDe, etatNumero, onImporter }.
   const [importOuvert, setImportOuvert] = useState(false);
   // (10 nov., lot AN) `facture` (src/FactureAchat.jsx) : joindre une facture d'achat (PDF ou photo) à l'achat saisi.
@@ -395,6 +400,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     // La facture jointe part dans SA ligne, par l'identité de l'achat (jamais son titre).
     if (form.facture && facture) await facture.joindre(cleFacture('hors', id), form.facture);
     if (rec.numero && rec.price && onPrixParNumero) onPrixParNumero(rec.numero, rec.price);
+    // Le N° PROPOSÉ (le prochain libre) qu'il a pris : réservé dans le pool, jamais redonné.
+    if (rec.numero && prochainNumero != null && rec.numero === String(prochainNumero) && onReserverNumero) onReserverNumero(rec.numero);
     setEnvoi(false);
     if (!ouvert) onBasculer(true);
     if (photoRatee) toast("Achat enregistré — mais la photo n'a pas pu être envoyée (la base n'a pas répondu). Modifie l'achat pour la remettre.");
@@ -417,6 +424,14 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     ? `${liste.length} achat${liste.length > 1 ? 's' : ''} · ${total.toFixed(2).replace('.', ',')}\u00a0€ payés`
     : 'Brocante, fournisseur, main propre…';
   const photoForm = form ? (form.photo || (form.photoAvant && photos ? photos[idPhotoAchatHors(editId)] : null)) : null;
+  // Ses derniers lieux d'abord (les achats saisis, du plus récent), puis la liste courte.
+  const lieux = useMemo(() => {
+    const vus = new Set(), recents = [];
+    const tri = [...liste].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    for (const b of tri) { const l = String(libelleSourceAchat(b && b.source) || '').trim(); const k = l.toLowerCase(); if (!l || vus.has(k)) continue; vus.add(k); recents.push(l); if (recents.length >= 4) break; }
+    return [...recents.map((l) => ({ l, recent: true })), ...SOURCES_ACHAT_HORS.filter((x) => !vus.has(x.toLowerCase())).map((l) => ({ l, recent: false }))];
+  }, [liste]);
+  const numPropose = !editId && prochainNumero != null && String(prochainNumero).trim() ? String(prochainNumero) : '';
   return (
     <div data-achats-hors style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, marginBottom: 12, boxShadow: C.shadow || 'none', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 14px', minHeight: 58 }}>
@@ -437,34 +452,40 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
             {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>Importer un tableur</Bouton> : null}
           </div>
+          {/* 1. La photo d'abord : une grande tuile, un toucher (appareil photo ou galerie). */}
+          <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? 'Changer la photo' : 'Ajouter une photo'} style={{ borderColor: C.border, background: C.card, color: C.text }}>
+            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" /> : <span className="vrm-ahp-photo-vide"><Icon name="camera" size={28} /><span>Photo</span></span>}
+            {photoForm ? <span className="vrm-ahp-photo-changer">Changer</span> : null}
+          </button>
+          {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>Retirer la photo</Bouton>}
+          <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
+          {/* 2. Ce que c'est. */}
           {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
           {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
           {/* (10 nov., lot AV) Ce que tu as revendu ce modèle : le passé, jamais un conseil (src/reventeModele.js). */}
           {titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-            {champ('Prix payé', <div style={{ position: 'relative' }}><input data-champ="prix" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" placeholder="0,00" autoComplete="off" style={{ ...inp, paddingRight: 30 }} /><span aria-hidden="true" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span></div>)}
-            {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
-          </div>
+          {/* 3. Le prix payé, en grand : c'est LUI qui le tape (§2.5). */}
+          {champ('Prix payé', <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums' }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
+          {/* 4. Où : ses derniers lieux d'abord, puis la liste courte ; un champ libre. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {champ('Où (facultatif)', <input data-champ="lieu" value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, fournisseur…" autoComplete="off" style={inp} />)}
-            <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-              {SOURCES_ACHAT_HORS.map(s => {
+            {champ('Où', <input data-champ="lieu" value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, magasin…" autoComplete="off" style={inp} />)}
+            <div className="vrm-rangee vrm-ahp-lieux" data-achat-hors-lieux={lieux.filter((x) => x.recent).length} style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              {lieux.map(({ l: s, recent }) => {
                 const actif = form.source.trim().toLowerCase() === s.toLowerCase();
-                return <button key={s} type="button" data-source={s} onClick={() => setForm(d => ({ ...d, source: s }))} aria-pressed={actif}
-                  style={{ flexShrink: 0, height: 36, padding: '0 13px', borderRadius: 999, border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{s}</button>;
+                return <button key={s} type="button" className="vrm-ahp-puce" data-source={s} data-source-recent={recent ? '1' : undefined} onClick={() => setForm(d => ({ ...d, source: s }))} aria-pressed={actif}
+                  style={{ flexShrink: 0, minHeight: 44, padding: '0 15px', borderRadius: 999, border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>{recent ? <Icon name="clock" size={14} /> : null}{s}</button>;
               })}
             </div>
           </div>
+          {/* 5. La date (aujourd'hui par défaut). */}
+          {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
+          {/* 6. Le N° de rangement : le prochain libre PROPOSÉ, posé par SON toucher seulement. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {champ('N° de rangement (facultatif)', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder="—" style={inp} />)}
+            {numPropose && form.numero !== numPropose ? <Bouton variante="secondaire" data-achat-hors-num-propose={numPropose} onClick={() => setForm(d => ({ ...d, numero: numPropose }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{`Prendre le N°${numPropose}`}</Bouton> : null}
+          </div>
           {/* (10 nov., lot BH) La référence de l'achat : c'est ELLE (jamais le nom ni le prix) qui dit qu'un achat est saisi deux fois. */}
           {champ('N° de commande ou de facture (facultatif)', <input data-champ="ref" value={form.ref || ''} onChange={e => setForm(d => ({ ...d, ref: e.target.value }))} placeholder="ex : n° de transaction Vinted" autoComplete="off" spellCheck={false} maxLength={40} style={inp} />)}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}
-            <Bouton variante="secondaire" icone="camera" data-achat-hors-photo onClick={() => fichierRef.current && fichierRef.current.click()} style={{ minHeight: 44 }}>
-              {form.photo || form.photoAvant ? 'Changer la photo' : 'Photo (facultatif)'}
-            </Bouton>
-            {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))}>Retirer la photo</Bouton>}
-            <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
-          </div>
           {facture ? (() => {
             const cf = editId ? cleFacture('hors', editId) : '';
             const deja = cf && facture.factures ? facture.factures[cf] : null;
@@ -481,23 +502,22 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
               </div>
             );
           })() : null}
-          <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} open={!!(editId && form.numero) || undefined}>
-            <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 13 }}>Relier à un article (facultatif)</summary>
+          <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} >
+            <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 13 }}>Relier à une annonce (facultatif)</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
               {Array.isArray(paires) && paires.length > 0 && champ('Une de tes annonces en ligne',
                 <select value="" onChange={e => { const p = paires.find(x => String(x.id) === e.target.value); if (!p) return; setForm(d => ({ ...d, numero: p.num, title: d.title.trim() ? d.title : (p.title || '') })); }} style={inp}>
                   <option value="">— choisir —</option>
                   {paires.map(p => <option key={p.id} value={String(p.id)}>N°{p.num} · {(p.title || '').slice(0, 40)}</option>)}
                 </select>)}
-              {champ('N° de l\'article', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
               <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de l'article dans son bénéfice.</div>
             </div>
           </details>
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 13, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="vrm-ahp-gestes" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Bouton variante="primaire" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
-              style={{ flex: 1, minWidth: 0, minHeight: 48, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</Bouton>
-            <Bouton variante="discret" onClick={fermer} style={{ flexShrink: 0, padding: '0 12px' }}>Annuler</Bouton>
+              style={{ width: '100%', minHeight: 54, fontSize: 17, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</Bouton>
+            <Bouton variante="discret" data-achat-hors-annuler onClick={fermer} style={{ width: '100%', minHeight: 44 }}>Annuler</Bouton>
           </div>
           {editId && <Bouton variante="discret" icone="trash" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start' }}>Supprimer cet achat</Bouton>}
         </div></div>
