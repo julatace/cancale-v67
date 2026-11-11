@@ -52,7 +52,7 @@ tout arrive par e-mail). Aucune écriture en base.
 - `scripts/audit-retours-litiges.cjs` (EXÉCUTE la route sur des e-mails INVENTÉS à la forme mesurée + règles
   de l’app + tampon sur un vrai PDF + compta) : **38/38** ; sur l'arbre d'avant (1c8e0a07, git archive) :
   **15 rouges** (le bordereau de retour sortait « ignoré », le remboursement « connu-sans-action ») ;
-  `--prouve` : voir ci-dessous.
+  `--prouve` : **11/11** mutations rouges (branche absente, n° du corps seul, sans PDF rangé, e-mail jeté, carte rangée, relié par titre, remboursement inventé, partiel sorti des coûts, « Paire revenue » sans N°, source tue, tampon sans N°).
 - Banc `scripts/bancs/retours-litiges.cjs` (390 tactile clair/sombre, 1512 clair) : voir ci-dessous.
 - Touchés et verts : audit-litiges-ecran, litiges, retours-stock, lbc-suppression, variables, tdz,
   coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction (C2 était

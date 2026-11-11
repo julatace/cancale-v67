@@ -44613,7 +44613,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             chercher : sur « Achats », en tête de chaque étape (Tous compris : c'est
             désormais l'écran par défaut), jamais sur « Colis à retirer ». */}
         {!modeRetraits && (aFilter!=='all' || modeListeAchats) && (()=>{
-          const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
+          // (11 nov., lot retours-litiges) Un achat dont le bordereau de retour est DÉJÀ arrivé par e-mail (même n°) est
+          // dans « Retours » juste dessous, avec « Imprimer » : pas deux fois (§7).
+          const avecBordRetour = new Set(retoursAchatRes && retoursAchatRes.etat === 'lu' ? [...retoursAchatRes.cartes, ...retoursAchatRes.anciennes].map((c) => c.tx) : []);
+          const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')) && !avecBordRetour.has(String(o.transaction_id)));
           if (!l.length) return null;
           const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
           const unSeul = comptes.length===1;

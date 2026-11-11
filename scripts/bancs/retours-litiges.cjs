@@ -80,7 +80,7 @@ const projette = (row, sel) => {
 const reDe = (motif) => new RegExp('^' + motif.replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$');
 
 async function preparer(b, vp, ROWS, { sombre = false } = {}) {
-  const ctx = await b.newContext({ viewport: vp, colorScheme: sombre ? 'dark' : 'light', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ locale: 'fr-FR', viewport: vp, colorScheme: sombre ? 'dark' : 'light', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = [], versVinted = [], lusPdf = [], selectData = [];
   pg.on('pageerror', (e) => errs.push(e.message));
@@ -149,6 +149,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(a.presse === '1' && /À déposer avant le/.test(a.limite) && !/rgb\(110, 110, 115\)/.test(a.ambre), `${nom} : 9501 à déposer dans moins de 48 h ⇒ la date en ambre`, JSON.stringify([a.limite, a.ambre]));
         dit(a.remb === 'non' && /Pas encore remboursé/.test(a.phraseRemb), `${nom} : 9501 « Pas encore remboursé » (rien de prouvé)`, a.phraseRemb);
         dit(s.remb === 'oui' && s.montant === '45.9' && /Remboursé/.test(s.phraseRemb) && /45,90/.test(s.phraseRemb), `${nom} : 9502 « Remboursé 45,90 € » (e-mail du même n°)`, s.phraseRemb);
+        dit((await pg.$('[data-a-renvoyer] [data-retour-tx="9501"]')) === null, `${nom} : 9501 n’est pas redit dans « à renvoyer » (son bordereau est déjà là, une fois)`);
         dit(a.bouton >= 44, `${nom} : « Imprimer le bordereau » fait 44 px et plus`, String(a.bouton));
         dit((await rougeIci(pg, '[data-retours-achat]')) === false, `${nom} : aucun rouge sur « Retours »`);
         await pg.locator('[data-retours-achat]').first().scrollIntoViewIfNeeded().catch(() => {});
@@ -166,7 +167,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit((await deborde(pg)) <= 1, `${nom} : Achats, rien ne déborde`);
       });
       if (!sombre) await essaie('Tout imprimer → Retours', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+        await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 25000 }).catch(() => {});
         await pg.waitForTimeout(1200);
         const bt = await pg.$('button[data-lot-ouvrir="1"]');
