@@ -33,7 +33,7 @@ p.vrm-ia-sous { margin-top: 6px; font-size: 13px; }
 .vrm-ia-ecart h4 { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: 15px; font-weight: 700; }
 .vrm-ia-ecart h4 b { font-size: 15px; font-variant-numeric: tabular-nums; }
 .vrm-ia-ecart h4 b[data-ia-ton="geste"] { color: var(--vrm-warn, #B25000); }
-.vrm-ia-ecart h4 b[data-ia-ton="doublon"] { color: var(--vrm-doublon, #D70015); }
+.vrm-ia-ecart h4 b.is-double { color: var(--vrm-doublon); }
 .vrm-ia ul { list-style: none; margin: 6px 0 0; padding: 0; }
 .vrm-ia-l { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; border-top: 1px solid var(--vrm-line, rgba(0,0,0,.06)); }
 .vrm-ia-l:first-child { border-top: 0; }

@@ -169,28 +169,33 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       await capture(pg, `A-ventes-tous-${T.nom}`, '[data-a-venir]');
     });
     await essaie(`B ${T.nom}`, async () => {
-      await aller(pg, 'journee', '[data-journal-semaine]', 3500);
+      // (11 nov.) Depuis Ma journée v2 (9 nov., 60febc6f, docs/passation/2026-11-09-journee-v2.md) la carte
+      // « Semaine du … » est FUSIONNÉE dans la frise de la tête sombre : « Semaine du … » se touche et montre
+      // la semaine passée (même règle `journalSemaine`, même période que le bilan du lundi). Les règles
+      // jugées restent : la bonne semaine, en tête, ses nombres exacts (le geste hors semaine n'y est pas),
+      // « — » jamais 0. La carte repliable n'existe plus (choix de Julien) : le repli est remplacé par
+      // l'aller-retour jours ⇄ semaine.
+      await aller(pg, 'journee', '[data-jv2-semaine]', 3500);
+      await pg.click('[data-jv2-semaine]', { timeout: 10000 });
+      await pg.waitForSelector('[data-journal-semaine]', { timeout: 8000 }).catch(() => {});
       const J = await attrs(pg, '[data-journal-semaine]');
       dit(J && J['journal-semaine'] === ymL(lundiPasse), `B : le journal de la semaine du ${ymL(lundiPasse)} est en tête de Ma journée`, JSON.stringify(J));
-      const ordre = await pg.evaluate(() => { const j = document.querySelector('[data-journal-semaine]'); const t = document.querySelector('.vrm-fu-tete'); return !!(j && t && (t.compareDocumentPosition(j) & Node.DOCUMENT_POSITION_FOLLOWING)) && j.getBoundingClientRect().top < 900; });
-      dit(ordre, 'B : juste sous la tête sombre');
-      const cases = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-journal-case]')].map((e) => [e.getAttribute('data-journal-case'), e.getAttribute('data-valeur')])));
+      const ordre = await pg.evaluate(() => { const j = document.querySelector('[data-journal-semaine]'); const t = document.querySelector('.vrm-fu-tete'); return !!(j && t && t.contains(j)) && j.getBoundingClientRect().top + window.scrollY < 900; });
+      dit(ordre, 'B : dans la tête sombre, en haut');
+      const cases = await pg.evaluate(() => { const p = document.querySelector('[data-journal-semaine]'); if (!p) return {}; const o = Object.fromEntries([...p.querySelectorAll('[data-journal-case]')].map((e) => [e.getAttribute('data-journal-case'), e.getAttribute('data-valeur')])); const v = p.querySelector('[data-jv2-vendu]'); o.vendu = v ? v.getAttribute('data-jv2-vendu') : null; o.texte = p.innerText.replace(/\s+/g, ' '); return o; });
       const dansSem = (d) => d >= lundiPasse && d < lundiCourant;
       const vSem = VENTES.filter((v) => v[3] && dansSem(v[4]));
       const vcDate = new Date(rows.find((r) => r.id === 'vc_ventes').data.ventes[72900001].date);
       const nAtt = vSem.length + (dansSem(vcDate) ? 1 : 0), eAtt = Math.round((vSem.reduce((t, v) => t + v[2], 0) + (dansSem(vcDate) ? VC_MONTANT : 0)) * 100);
       dit(cases.ventes === String(nAtt) && cases.vendu === String(eAtt) && cases.colis === '2', `B : ${nAtt} ventes, ${eAtt / 100} €, 2 colis envoyés (le geste hors semaine n’y est pas)`, JSON.stringify(cases));
-      dit(cases.brut === '', 'B : bénéfice brut « — » (aucun prix d’achat saisi), jamais 0', JSON.stringify(cases.brut));
-      const petits = await cibles(pg, '[data-journal-bascule]');
-      dit(!petits.length, 'B : la bascule fait 44 px', JSON.stringify(petits));
-      await capture(pg, `B-journee-${T.nom}`, '[data-journal-semaine]');
-      await pg.click('[data-journal-bascule]');
+      dit(!/b[ée]n[ée]fice[^·]*\b0\s*€|\b0\s*€[^·]*b[ée]n[ée]fice/i.test(cases.texte || ''), 'B : aucun bénéfice à 0 inventé (aucun prix d’achat saisi)', cases.texte);
+      const petits = await cibles(pg, '[data-jv2-semaine], [data-jv2-toucher]');
+      dit(!petits.length, 'B : « Semaine du … » et les jours font 44 px', JSON.stringify(petits));
+      await capture(pg, `B-journee-${T.nom}`, '.vrm-fu-tete');
+      await pg.click('[data-jv2-semaine]');
       await pg.waitForTimeout(300);
-      await pg.reload({ waitUntil: 'domcontentloaded' });
-      await pg.waitForSelector('[data-journal-semaine]', { timeout: 20000 }).catch(() => {});
-      const R = await attrs(pg, '[data-journal-semaine]');
-      dit(R && R['journal-replie'] === '1' && !(await pg.$('[data-journal-case]')), 'B : replié, il le reste au rechargement (cette semaine)');
-      await pg.click('[data-journal-bascule]'); await pg.waitForTimeout(200);
+      const retour = await pg.evaluate(() => ({ sem: !!document.querySelector('[data-journal-semaine]'), periode: (document.querySelector('[data-jv2-argent]') || { getAttribute: () => null }).getAttribute('data-jv2-periode') }));
+      dit(!retour.sem && /^\d{4}-\d{2}-\d{2}$/.test(retour.periode || ''), 'B : « Revenir aux jours » rend un jour', JSON.stringify(retour));
       dit(T.vp.width > 500 || (await deborde(pg)) <= 1, 'B : aucun débordement à 390 px');
     });
     await essaie(`C ${T.nom}`, async () => {

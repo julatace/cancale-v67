@@ -30,7 +30,9 @@ const RACINE = path.join(__dirname, '..');
 const SRC = path.join(RACINE, 'src');
 
 // Les couleurs de MARQUE : celles des logos (Mondial Relay, Relais Colis, DPD, DHL, Google).
-const MARQUES = ['#e2001a', '#e30613', '#dc0032', '#d40511', '#ea4335'];
+const MARQUES = ['#e2001a', '#e30613', '#dc0032', '#d40511', '#ea4335',
+  '#c8102e',   // (11 nov.) Mondial Relay : la tuile de sa marque (src/transporteursVisuels.js, `TRANSPORTEURS.mondialrelay.marque`), pas la palette
+];
 // La DETTE : les rouges écrits en dur qui restent HORS de la zone du chantier A (fichier : plafond).
 // Le plafond ne monte jamais ; un fichier qui n'est pas ici n'a droit à aucun rouge.
 const DETTE = {

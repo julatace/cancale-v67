@@ -139,9 +139,16 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
             await pg.click('[data-appareil-fermer]');
             await FEUILLE(pg).getByRole('button', { name: 'Déconnecter', exact: true }).waitFor({ timeout: 5000 }).catch(() => {});
             await capture(pg, `C-${tag}-confirmer`);
+            // (11 nov.) Depuis le lot H, l'ouverture envoie {action:'verifier'} une fois
+            // (alerte « nouvel appareil », src/appareilNouveau.js) : la règle se juge sur
+            // ce que le CLIC envoie, et la demande d'ouverture ne doit rien porter d'autre.
+            const avantClic = posts.length;
+            const ouverture = posts.slice(0, avantClic);
+            dit(ouverture.every((p) => JSON.stringify(JSON.parse(p || '{}')) === '{"action":"verifier"}'), `C ${tag} : avant le clic, seule la vérification d'ouverture est partie`, JSON.stringify(ouverture));
             await FEUILLE(pg).getByRole('button', { name: 'Déconnecter', exact: true }).click({ timeout: 5000 }).catch(() => {});
             await attendre(700);
-            dit(posts.length === 1 && JSON.parse(posts[0] || '{}').session === 'b2c3d4e5-0000-4000-8000-000000000002' && Object.keys(JSON.parse(posts[0] || '{}')).length === 1, `C ${tag} : « Déconnecter » n'envoie QUE l'identifiant de cet appareil`, JSON.stringify(posts));
+            const clic = posts.slice(avantClic);
+            dit(clic.length === 1 && JSON.parse(clic[0] || '{}').session === 'b2c3d4e5-0000-4000-8000-000000000002' && Object.keys(JSON.parse(clic[0] || '{}')).length === 1, `C ${tag} : « Déconnecter » n'envoie QUE l'identifiant de cet appareil`, JSON.stringify(clic));
           }
           if (PARTIES.includes('D')) {
             await pg.click('[data-deconnexion-partout]', { timeout: 8000 }).catch((e) => dit(false, `D ${tag} : « Se déconnecter partout » se touche`, String(e.message).split('\n')[0]));
