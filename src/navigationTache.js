@@ -91,7 +91,10 @@ const SITE_D_ONGLET = { plat_vinted: 'vinted', plat_leboncoin: 'leboncoin', plat
 const SECTIONS_TACHE = ['ventes', 'annonces', 'messages', 'achats'];
 // Les sections propres d'un site → leur place d'aujourd'hui : [onglet, sub].
 const PLACE_SECTION = {
-  leboncoin: { colis: ['cat_bord', 'leboncoin'] },
+  // (11 nov., revue colis) Colis n'est plus un onglet (lot DJ3) : « Colis » de Leboncoin vit dans Ventes · Leboncoin
+  // (section « À expédier », `LeboncoinColis`). L'ancienne cible `cat_bord` ici n'était pas redirigée (`setTab`
+  // applique `placeDesColis` AVANT cette table) : `?tab=plat_leboncoin&section=colis` ouvrait un écran BLANC.
+  leboncoin: { colis: ['ventes', 'leboncoin'] },
   ebay: { agent: ['ventes', 'ebay.agent'], offres: ['ventes', 'ebay.offres'], promo: ['annonces', 'ebay.promo'], compte: ['settings', 'ebay'] },
 };
 // Sans section (ou une section inconnue), l'espace d'un site ouvrait sur ses
