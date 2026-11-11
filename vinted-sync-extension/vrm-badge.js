@@ -418,6 +418,9 @@
       } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val" data-flux-ok>Tes données sont à jour · ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
       flux += ligneSecours(f);
+      // 5.341 : les dates de versement encore à lire sur CE compte (pas su ⇒ rien).
+      const dt = e.plateforme === 'vinted' && e.site && e.site.dates;
+      if (dt && Number(dt.reste) > 0) flux += `<div class="val gris" data-dates-versement="${Number(dt.reste)}">Dates de versement en cours de lecture · ${Number(dt.reste).toLocaleString('fr-FR')} restantes · environ ${Number(dt.jours)} jour${Number(dt.jours) > 1 ? 's' : ''}, Vinted ouvert</div>`;
     }
 
     // 5.243 : sur Vestiaire, ce qui est capté, famille par famille.

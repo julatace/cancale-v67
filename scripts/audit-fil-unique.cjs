@@ -107,7 +107,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m +
 
   // 8 — l'app
   dit(N.TACHES_SITE.messages && N.TACHES_SITE.messages.toutes === true, '8 · Messages a « Tous »');
-  dit(N.siteDeTache('messages', null) === 'vinted' && N.siteDeTache('messages', 'toutes') === 'toutes' && N.siteDeTache('ventes', null) === 'toutes' && N.siteDeTache('annonces', 'toutes') === 'vinted', '8 · défaut de Messages : Vinted ; Ventes inchangé ; Annonces sans « Tous »');
+  dit(N.siteDeTache('messages', null) === 'toutes' && N.siteDeTache('messages', 'vinted') === 'vinted' && N.siteDeTache('messages', 'toutes') === 'toutes' && N.siteDeTache('ventes', null) === 'toutes' && N.siteDeTache('annonces', 'toutes') === 'vinted', '8 · défaut de Messages : « Tous » (décision C9 du 11 nov.) ; un choix Vinted gardé ; Ventes inchangé ; Annonces sans « Tous »');
   dit(/'vrm_fils_relies',/.test((/const SYNC_KEYS = \[[\s\S]*?\];/.exec(app) || [''])[0]), '8 · `vrm_fils_relies` est synchronisé');
   const ecran = fs.readFileSync(path.join(__dirname, '..', 'src', 'ecrans', 'FilsTous.jsx'), 'utf8').replace(/\/\/.*$/gm, '');
   const ecritures = [...ecran.matchAll(/\becrire\(\s*([\w.]+)/g)].map((m) => m[1]);

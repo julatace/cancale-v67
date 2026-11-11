@@ -13,6 +13,7 @@ import { phraseMoitie } from './ceQuiRapporte.js';
 //                seulement quand la ligne est dépliée ;
 //   dateEnLigne(it, dates) → ms | null ; ouvert : déplié d'emblée (feuille d'un achat).
 const J_FMT = { day: 'numeric', month: 'short' };
+export const PHRASE_DEPLIEE = 'Tes ventes de ce modèle';
 export function ReventeModele({ cible, lireReleve, lireExtras = null, dateEnLigne = null, ouvert = false, C }) {
   const lire = () => { try { return typeof lireReleve === 'function' ? lireReleve() : null; } catch (_) { return null; } };
   const [releve, setReleve] = React.useState(lire);
@@ -62,7 +63,9 @@ export function ReventeModele({ cible, lireReleve, lireExtras = null, dateEnLign
     data-revente-benef={res.benefMedian == null ? '' : Math.round(res.benefMedian * 100)} data-revente-nbenef={res.nBenef}
     data-revente-delai={res.delaiMedian == null ? '' : res.delaiMedian} style={base}>
     <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span data-revente-phrase="">{phrase}</span>
+      {/* (11 nov., décision C6 — Julien : « tranche ») Le prix médian s'écrit UNE fois (§7) :
+          replié, la phrase le dit ; déplié, la case « Prix de vente » le dit et la phrase se tait. */}
+      <span data-revente-phrase="">{deplie ? PHRASE_DEPLIEE : phrase}</span>
     </summary>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
       <div style={{ fontSize: 12, color: C.muted }}>{res.modele.nom} · tes ventes finalisées</div>

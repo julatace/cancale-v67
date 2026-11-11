@@ -103,10 +103,13 @@ async function verifier(racine, { muet = false } = {}) {
   // ── A : l'affichage ──
   const et = G.ETAPES_CONFIGURATION.find((e) => e.cle === 'affichage');
   const simple = G.CHOIX_AFFICHAGE.find((c) => c.v === 'simple');
-  dit(!/Simple ou complet/.test(et.titre) && simple.puces.join(' ').match(/Stock/) && /Republier/.test(simple.puces.join(' ')) && /plateformes/.test(simple.puces.join(' ')) && /Prix à baisser/.test(simple.puces.join(' ')), 'A1 l’étape dit ce que Simple cache, concrètement (Stock, Republier, plateformes non reliées, « Prix à baisser »)', simple.puces);
+  // (11 nov., lot DJ2) Les puces sont des objets { ic, t } (une icône par puce).
+  const pucesS = simple.puces.map((p) => (typeof p === 'string' ? p : p.t)).join(' ');
+  dit(!/Simple ou complet/.test(et.titre) && /Stock/.test(pucesS) && /Republier/.test(pucesS) && /plateformes/.test(pucesS) && /Prix à baisser/.test(pucesS), 'A1 l’étape dit ce que Simple cache, concrètement (Stock, Republier, plateformes non reliées, « Prix à baisser »)', simple.puces);
   dit(G.affichageRecommande({ proprietaire: false, nComptesVinted: 1, nVentes30j: 12 }) === 'simple' && G.affichageRecommande({ proprietaire: false, nComptesVinted: 1, nVentes30j: 30 }) === 'complet' && G.affichageRecommande({ proprietaire: false, nComptesVinted: 2, nVentes30j: 3 }) === 'complet' && G.affichageRecommande({ proprietaire: false, nComptesVinted: 1, nVentes30j: null }) === null, 'A2 « recommandé pour toi » = la règle existante (1 compte et < 30 ventes / 30 j ⇒ Simple) ; pas su ⇒ aucune recommandation');
   const reg = fs.readFileSync(path.join(racine, 'src', 'ecrans', 'Reglages.jsx'), 'utf8');
-  dit(G.CHEMIN_REGLAGE_AFFICHAGE === 'Réglages → Affichage → Affichage' && /\{ id:'affichage', titre:'Affichage'/.test(reg) && /id:'affichage-mode'[^\n]*lib:'Affichage'/.test(reg), 'A3 le chemin dit existe (groupe « Affichage », réglage « Affichage »)');
+  // (11 nov., lot DJ2) « Tu pourras changer dans Paramètres » : l'écran s'appelle Paramètres (barre du bas).
+  dit(G.CHEMIN_REGLAGE_AFFICHAGE === 'Paramètres → Affichage' && /\{ id:'affichage', titre:'Affichage'/.test(reg) && /id:'affichage-mode'[^\n]*lib:'Affichage'/.test(reg), 'A3 le chemin dit existe (Paramètres, groupe « Affichage »)');
 
   // ── T : les textes ──
   const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*\/\//.test(l)).map((l) => l.replace(/\s\/\/\s.*$/, '')).join('\n');
@@ -130,7 +133,9 @@ async function verifier(racine, { muet = false } = {}) {
   dit(/<CarteVerifEntreprise /.test(fp) && /<CarteVerifEntreprise /.test(cd) && /useRechercheEntreprise\(deps\.chercherEntreprise/.test(fp) && /useRechercheEntreprise\(entreprise\.chercherEntreprise/.test(cd), 'B1 la MÊME recherche et la MÊME carte dans « Ma facture » et « Ma configuration »');
   dit(!/chercherEntreprise\([^)]*\)\.then/.test(fp), 'B2 « Ma facture » ne remplit plus rien en silence à la réponse du registre');
   dit(/if \(frais === null \|\| frais === undefined\) return false;/.test(cd), 'B3 la configuration relit la fiche avant d’écrire ; lecture ratée ⇒ rien écrit');
-  dit(/Recherche de l’entreprise…/.test(re) && /rep === 'encours'/.test(re) && !/setTimeout/.test(re), 'B4 l’animation « Recherche de l’entreprise… » ne dure que la requête (aucun délai fabriqué)');
+  // (11 nov., lot DJ1) L'animation ne dure que la requête, ARRÊTÉE à 8 s (le seul minuteur pose « lent ») —
+  // jamais un délai fabriqué avant de montrer la réponse (audit-facture-siret l'exécute).
+  dit(/Recherche de ton entreprise…/.test(re) && /rep === 'encours'/.test(re) && (re.match(/setTimeout\(/g) || []).length === 1 && /setTimeout\(\(\) => \{ if \(!mort\) \{ mort = true; setRep\(\{ etat: 'lent' \}\); \} \}, DELAI_RECHERCHE_MS\)/.test(re), 'B4 l’animation ne dure que la requête, arrêtée à 8 s (aucun délai fabriqué)');
   return ko;
 }
 

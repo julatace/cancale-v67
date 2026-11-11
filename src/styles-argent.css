@@ -80,3 +80,13 @@
 :root:root body .vrm-argent #compta-benefice .vrm-compta-q-tete { justify-content: flex-start; }
 
 } /* @layer vrm-premium */
+
+/* (11 nov., décision C4) Factures au téléphone : le geste principal + « … » (feuille en portail).
+   Sur ordinateur, les cinq boutons restent sur la ligne du titre. */
+.vrm-fac-actions-tel { display: none; }
+@media (max-width: 767px) {
+  :root:root body .vrm-fac-actions { display: none !important; }
+  :root:root body .vrm-fac-actions-tel { display: flex; align-items: center; gap: 8px; }
+  :root:root body .vrm-fac-actions-tel > button { min-height: 44px !important; }
+  :root:root body .vrm-fac-plus { width: 44px; height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; padding: 0; }
+}

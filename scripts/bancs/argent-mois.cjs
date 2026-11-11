@@ -204,7 +204,7 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       const nA = semDansMoisA.length + 1, nB = avantVentes.length + VENTES.filter((v) => false).length;
       dit(meme && meme['comparer-meme-point'] === '1', 'C : ce mois en cours se compare au même point', JSON.stringify(meme));
       dit(C.ventes && Number(C.ventes.a) === nA && Number(C.ventes.b) === nB, `C : ventes ${nA} face à ${nB}`, JSON.stringify(C.ventes));
-      dit(C.vendu && C.vendu.ecart !== '' && C.recu && C.benefice && C.achats, 'C : cinq lignes (achats compris), l’écart du vendu écrit', JSON.stringify(C));
+      dit(C.vendu && C.vendu.ecart !== '' && C.recu && C.benefice && C.paires, 'C : cinq lignes (paires achetées comprises), l’écart du vendu écrit', JSON.stringify(C));
       // (10 nov., lot BL) Deux sélecteurs : le mois d'en face se CHOISIT (le même mois l'an dernier).
       await pg.selectOption('[data-comparer-mois="b"]', `${MAINT.getFullYear() - 1}-${String(MAINT.getMonth() + 1).padStart(2, '0')}`); await pg.waitForTimeout(400);
       const an = await attrs(pg, '[data-comparer]');

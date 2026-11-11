@@ -192,6 +192,9 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           // ── E : « à la main » sur les deux paires ────────────────────────────
           if (!(await pg.locator('[data-actions-possibles]').count())) { await cocher(pg, '9102'); await cocher(pg, '9103'); }
           await actions(pg, 2);
+          // (11 nov., lot DJ8) « Republier à la main » est AU-DESSUS des tuiles (conseillé), « Republier » (par VRM) dessous.
+          const mainDabord = await pg.evaluate(() => { const m = document.querySelector('[data-action-sel="main"]'), t = document.querySelector('.vrm-act-tuiles'); return !!(m && t && (m.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING)); });
+          dit(mainDabord, `E ${T} feuille Actions : « Republier à la main » d’abord, les tuiles (Par VRM) ensuite`);
           await clic(pg, '[data-action-sel="main"] button');
           await pg.waitForSelector('[data-repub-main="9102"]', { timeout: 6000 });
           const pose = await feuillePosee(pg);

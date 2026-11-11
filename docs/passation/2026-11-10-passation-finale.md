@@ -10,7 +10,7 @@ Remplace, pour l'état, `2026-11-10-passation-generale.md` et `2026-11-09-passat
 
 ## A. Ce que tu as aujourd'hui (en ligne sur vrm.center)
 
-Mis en ligne le 10 nov. (PR #1088 → #1124, toutes vérifiées avant mise en ligne) :
+Mis en ligne le 10 nov. (PR #1088 → #1125, toutes vérifiées avant mise en ligne) :
 
 | domaine | ce qui marche |
 |---|---|
@@ -80,6 +80,14 @@ Mis en ligne après la rédaction (10 nov., 22 h–23 h) : annonces à compléte
 
 ## D. Pour la prochaine session Claude : ce qui reste à finir
 
+### D0. Demandes de Julien du 11 nov. (en cours)
+
+Voir `docs/passation/2026-11-11-demandes-julien.md`. En ligne : DJ5 Achats et DJ7 ventes sans date
+(#1125). En cours (branches `claude/…`) : DJ1 `facture-siret`, DJ2 `vendeur-generaliste`, DJ3
+`colis-a-leur-place`, DJ4 `stock-juste`, DJ6 `profil-photo`, DJ8 `offres-sures`, extension 5.341
+`extension-5341` (dates de versement plus vite), bancs `rouges-a`, `rouges-b`, `audits-rouges`.
+Si la session tombe : reprendre chaque branche (son récit `docs/passation/2026-11-11-<lot>.md`).
+
 ### D1. Chantiers commencés, travail POUSSÉ mais PAS vérifié (reprendre la branche)
 
 | lot | branche | état | reste |
@@ -97,7 +105,7 @@ communes à recopier dans chaque brief sont résumées en F.
 | lot | contenu | note |
 |---|---|---|
 | suite de K | appliquer les copies revalidées aux autres lectures du démarrage : `harvest_%_txn_%` (~246 Ko), `harvest_*` (~244 Ko), `email_track_*` (~130 Ko), `vinted_item_details` (~108 Ko) ; un instantané pour Annonces | mesurer d'abord (`_mesure-demarrage`) ; voir `2026-11-10-ouverture-legere.md` |
-| textes courts, 5e série | ≈ 135 textes > 90 caractères restants : Réglages, eBay, Leboncoin, Accueil, `ConfigurerTransfert`, `RelierBoite`, `CarteRelais` ; « ⓘ Pourquoi ? » en 11 px dans `operations.css` | chercher chaque libellé dans `scripts/` avant de le changer |
+| textes courts, 6e série | 42 textes (dont CGU/rétractation/essai/DAC7 exprès) ; voir `2026-11-11-textes-courts-5.md`. Avant : ≈ 135 textes > 90 caractères restants : Réglages, eBay, Leboncoin, Accueil, `ConfigurerTransfert`, `RelierBoite`, `CarteRelais` ; « ⓘ Pourquoi ? » en 11 px dans `operations.css` | chercher chaque libellé dans `scripts/` avant de le changer |
 | extension 5.339 sur le vrai Vinted | repères de la page d'annonce (titre, prix, marque, vendeur) non mesurés sur le vrai site | si l'encart n'apparaît pas, mesurer la page réelle |
 | VoiceOver | relecture à la main sur iPhone/Safari ; écrans Litiges, E-mails, Communauté, Organisation | |
 | logos exacts | Chronopost, Colissimo, InPost, Relais Colis, Shop2Shop, GLS, Colis Privé (aujourd'hui « mot-symbole ») | attendre les captures de Julien ; `DESSINS_TRANSPORTEURS` dans `src/transporteursVisuels.js` |
