@@ -3453,6 +3453,12 @@ async function commandeParcours(msg,sender){return parcoursSerie(async()=>{
 });}
 
 // --- Messages venant de content.js ----------------------------------------
+const PAGE_SORTES_PREUVE = new Set(['label', 'receipt', 'suppression', 'vacances', 'writereq', 'fiche', 'publication', 'brouillon', 'brouillonPublie']);
+function canalPageDouteux(msg) {
+  if (msg && msg.canal === 'douteux') return true;
+  let orion = false; try { orion = !!globalThis.__vrmOrionCompat; } catch (_) {}
+  return orion && !(msg && msg.canal === 'sur');
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if(msg?.from==='vrm-parcours'){commandeParcours(msg,sender).then(sendResponse,()=>sendResponse({ok:false,message:'Le rapport local n’a pas pu être confirmé.'}));return true;}
@@ -3461,6 +3467,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!CAP.alarms) rattraperMinuteries();
   // Navigateur sans API `cookies` : la page Vinted donne les siens (voir
   // `recevoirCookiesPage`). Sur Chrome, `veux` répond non et rien d'autre ne part.
+  // 5.361 : content.js demande le numéro de SON onglet (la boîte aux lettres du
+  // relais est adressée : seul l'onglet visé y répond).
+  if (msg && msg.from === 'vrm-onglet' && msg.action === 'quiSuisJe') {
+    sendResponse({ ok: true, tab: sender && sender.tab && sender.tab.id != null && !(sender.frameId > 0) ? sender.tab.id : null });
+    return true;
+  }
   if (msg && msg.from === 'vrm-cookies') {
     if (msg.action === 'veux') { sendResponse({ ok: true, veux: !CAP.cookies }); return true; }
     recevoirCookiesPage(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
@@ -3727,7 +3739,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           // Seulement le CDN d'images de Vinted : ce pont ne doit pas devenir un
           // téléchargeur d'URL arbitraire pour n'importe quelle page.
-          if (!/^https:\/\/[\w.-]*vinted\.net\//i.test(String(msg.url || ''))) { sendResponse({ ok: false, error: 'url non autorisée' }); return; }
+          // 5.361 (haute 25) : un SOUS-DOMAINE de vinted.net, jamais « …vinted.net » (`evilvinted.net`).
+          if (!urlPhotoPermise(msg.url, /^(?:[a-z0-9-]+\.)*vinted\.net$/i)) { sendResponse({ ok: false, error: 'url non autorisée' }); return; }
           const r = await photoBytes(msg.url);
           sendResponse(r);
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -4297,6 +4310,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       domain = h;
     }
   }
+  // ⚠️ 5.361 (canal privé sur Orion) — un canal « douteux » (inject.js posé par
+  //    une balise `<script src>`, après d'éventuels scripts de la page : un faux
+  //    canal a pu être proposé le premier) ne donne AUCUNE preuve ni AUCUN état :
+  //    ni bordereau (= preuve de vente, §5), ni reçu, ni suppression, ni recette
+  //    apprise, ni fiche, ni publication, ni brouillon. `canal` est posé par
+  //    content.js (la page ne peut pas le dicter) ; un fond Orion sans cette
+  //    marque tient le canal pour douteux.
+  if (PAGE_SORTES_PREUVE.has(String(msg.kind || '')) && canalPageDouteux(msg)) { noterDiag('page_canal_douteux_' + String(msg.kind).slice(0, 20)); return; }
   if (msg.kind === 'csrf' && msg.csrf) {
     lastCsrfByDomain[domain] = msg.csrf;
     // On rattache le csrf au compte actif (mise a jour legere).
@@ -7049,8 +7070,20 @@ const reponsePage = (o) => (o && typeof o === 'object')
   ? { status: Number(o.status) || 0, ok: !!o.ok, origine: String(o.origine || ''),
       json: async () => { if (o.json === undefined || o.json === null) throw new Error('vide'); return o.json; } }
   : { status: 0, ok: false, origine: '', json: async () => { throw new Error('rien'); } };
+// ⚠️ 5.361 (revue de robustesse, hautes 23-24) — LA BOÎTE AUX LETTRES EST ADRESSÉE.
+//    Avant : la demande posée dans `chrome.storage.local` était prise par
+//    N'IMPORTE QUEL onglet Vinted visible (un autre domaine, un autre compte que
+//    celui vérifié), et deux fenêtres visibles répondaient toutes deux (requête
+//    doublée). Désormais la demande porte l'onglet visé (`tab`) : seul content.js
+//    de CET onglet répond (il connaît son numéro, demandé au fond au chargement,
+//    `vrm-onglet`), et la réponse n'est crue que si elle dit le même onglet.
+//    Et un relais qui a REÇU la demande puis dépassé son délai répond
+//    `{ delai: true }` : « délai dépassé » n'est plus pris pour « pas de relais »
+//    — la MÊME requête n'est jamais renvoyée par la boîte (elle a pu partir).
+//    La boîte ne sert que si `tabs.sendMessage` n'a trouvé AUCUN destinataire.
 function demandeParStockage(req, fin) {
   let ecoute = null;
+  if (req.tab == null) { fin(null); return; }
   try {
     ecoute = (ch, zone) => {
       try {
@@ -7059,7 +7092,8 @@ function demandeParStockage(req, fin) {
         if (!v || v.id !== req.id) return;
         try { chrome.storage.onChanged.removeListener(ecoute); } catch (_) {}
         try { chrome.storage.local.remove(PAGE_REP_STORE); } catch (_) {}
-        fin(v);
+        if (v.tab !== req.tab) { noterDiag('relais_boite_autre_onglet'); fin(null); return; }
+        fin(v.delai ? null : v);
       } catch (_) {}
     };
     chrome.storage.onChanged.addListener(ecoute);
@@ -7068,7 +7102,7 @@ function demandeParStockage(req, fin) {
 }
 function fetchParLaPage(tabId, p, headers) {
   const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  const req = { vrm: 'fetchPage', id, p: String(p || ''), h: (headers && typeof headers === 'object') ? headers : {} };
+  const req = { vrm: 'fetchPage', id, tab: tabId == null ? null : tabId, p: String(p || ''), h: (headers && typeof headers === 'object') ? headers : {} };
   return new Promise((res) => {
     let fini = false, t = null;
     const fin = (o) => { if (fini) return; fini = true; clearTimeout(t); res(reponsePage(o)); };
@@ -7076,8 +7110,11 @@ function fetchParLaPage(tabId, p, headers) {
     if (CAP.tabsMsg && tabId != null) {
       try {
         chrome.tabs.sendMessage(tabId, req, (o) => {
-          void (chrome.runtime && chrome.runtime.lastError);
-          if (o && typeof o === 'object' && o.id === id) fin(o); else demandeParStockage(req, fin);
+          const err = chrome.runtime && chrome.runtime.lastError;
+          if (o && typeof o === 'object' && o.id === id) { fin(o.delai ? null : o); return; }
+          // Un relais a répondu (même `null` : hors Vinted, canal absent) : rien
+          // n'est rejoué. Seul « aucun destinataire » passe par la boîte.
+          if (err) demandeParStockage(req, fin); else fin(null);
         });
         return;
       } catch (_) {}
@@ -10231,6 +10268,10 @@ async function offresEnAttente(uid) {
   } catch (_) { /* forme inattendue ⇒ aucune offre plutôt qu'une fausse */ }
   return out;
 }
+// Le corps d'une réponse dans une conversation Vinted : la forme RELEVÉE sur ses
+// vraies requêtes (`{ reply: { body, … } }`, docs/automatisation-vinted.md §3).
+// Une seule fabrique pour tous les envois (5.361, haute 21).
+function corpsReponseVinted(texte) { return { reply: { body: String(texte == null ? '' : texte), photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } }; }
 async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   if (!uid || !tx || !oid) return { ok: false, error: 'offre incomplète' };
   const accts = await getStoredAccounts();
@@ -10259,10 +10300,18 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   if (quoi === 'reject' && r && r.ok && conv && msg) {
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
+    // ⚠️ 5.361 (revue de robustesse, haute 21) : le corps est la forme RELEVÉE sur
+    //    ses vraies requêtes (`docs/automatisation-vinted.md` §3, la même que
+    //    `executerMessageFavori` et l'app) — `corpsReponseVinted`. Avant : `{ message }`,
+    //    une forme jamais vue chez Vinted (refusée), et l'action restait consommée.
+    //    Refus (ou rien parti) ⇒ la place est RENDUE et c'est dit.
+    let parti = false;
     try {
-      const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, { message: String(msg) }, { timeoutMs: 12000 });
-      noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
+      const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, corpsReponseVinted(msg), { timeoutMs: 12000 });
+      parti = !!(rm && rm.ok);
+      noterDiag(parti ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
     } catch (_) {}
+    if (!parti) { if (c2.at) await rendreActions(String(uid), c2.at, 1); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
   }
   return { ok: !!r.ok, status: r.status, code: r.code, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
@@ -13976,7 +14025,7 @@ async function executerMessageFavori(uid,acc,body){
   await pauseFavori('reponse', uid);
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
-  const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:texteFinal,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
+  const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,corpsReponseVinted(texteFinal),{timeoutMs:12000});
   if(partie(r))ecrits++;
   // (29 oct., revue) Pas d'onglet, onglet hors de Vinted, ou pause : le message n'est PAS
   // parti (vérifié dans la page avant l'envoi) — un refus certain, pas « à vérifier »
@@ -15507,12 +15556,16 @@ async function photoBytes(url) {
     // 31 oct. : le STATUT part avec le refus (relayé par le pont) — l'app ne
     // redemande plus un lien MORT (404/410) comme un refus passager (429/5xx).
     if (!res.ok) return { ok: false, error: `image ${res.status}`, statut: res.status };
+    // 5.361 (revue, 100) : la taille annoncée AVANT de télécharger, et une image seulement.
+    const annonce = Number(res.headers.get('content-length'));
+    if (isFinite(annonce) && annonce > 12000000) return { ok: false, error: 'image trop lourde' };
+    if (!typeImage(res.headers.get('content-type') || 'image/jpeg')) return { ok: false, error: 'pas une image' };
     const buf = await res.arrayBuffer();
     if (!buf.byteLength || buf.byteLength > 12000000) return { ok: false, error: 'image trop lourde' };
     const bytes = new Uint8Array(buf);
     let bin = '';
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    const mime = res.headers.get('content-type') || 'image/jpeg';
+    const mime = typeImage(res.headers.get('content-type') || 'image/jpeg');
     return { ok: true, dataUrl: `data:${mime};base64,${btoa(bin)}` };
   } catch (e) { return { ok: false, error: String(e).slice(0, 60), statut: 0 }; }  // 0 = réseau (passager)
 }
@@ -21377,18 +21430,47 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
 //    l'ancien réglage `vrm_detourage` (il n'est plus lu). Le détourage ne part
 //    donc que par `photosPourVestiaire` (aucune publication Vestiaire n'existe
 //    encore : rien n'est dépensé aujourd'hui).
+// ⚠️ 5.361 (revue de robustesse, hautes 25-26) — LE FOND N'EST PAS UN
+//    TÉLÉCHARGEUR. Avant : `photosEnOctets` prenait N'IMPORTE QUELLE adresse
+//    (aucune liste d'hôtes), autant qu'en disait le message (`max` dicté), sans
+//    plafond de taille (tout en mémoire du worker) ; et la liste blanche du pont
+//    (`[\w.-]*vinted\.net`) laissait passer `https://evilvinted.net/`.
+//    Désormais : https seulement, hôte EXACTEMENT un CDN des sites (sous-domaine
+//    de vinted.net, leboncoin.fr ou vestiairecollective.com — jamais un nom qui
+//    finit pareil), sans identifiant dans l'adresse ; 15 photos au plus (la
+//    limite Leboncoin), 12 Mo chacune (lu dans `content-length` AVANT de
+//    télécharger, puis revérifié), 60 Mo pour toute la série ; une réponse qui
+//    n'est pas une image est refusée.
+const PHOTOS_MAX = 15, PHOTO_MAX_OCTETS = 12000000, PHOTOS_MAX_OCTETS = 60000000;
+const HOTES_PHOTOS = /^(?:[a-z0-9-]+\.)*(?:vinted\.net|leboncoin\.fr|vestiairecollective\.com)$/i;
+function urlPhotoPermise(u, hotes) {
+  try {
+    const x = new URL(String(u || ''));
+    return x.protocol === 'https:' && !x.username && !x.password && !x.port && (hotes || HOTES_PHOTOS).test(x.hostname);
+  } catch (_) { return false; }
+}
+const typeImage = (t) => { const m = String(t || '').split(';')[0].trim().toLowerCase(); return /^image\/(jpeg|jpg|png|webp|gif|avif|heic)$/.test(m) ? m : null; };
 async function photosEnOctets(urls, max) {
   const out = [];
-  for (const u of (urls || []).slice(0, max || 12)) {
+  const n = Math.max(0, Math.min(PHOTOS_MAX, Math.floor(Number(max)) || 12));
+  let total = 0;
+  for (const u of (Array.isArray(urls) ? urls : []).slice(0, n)) {
+    if (!urlPhotoPermise(u)) { out.push({ url: String(u).slice(0, 200), erreur: 'adresse non autorisée' }); continue; }
     try {
-      const r = await fetch(String(u));
+      const r = await fetch(String(u), { credentials: 'omit', signal: signalDelai(30000) });
       if (!r.ok) { out.push({ url: u, erreur: 'http ' + r.status }); continue; }
+      const annonce = Number(r.headers.get('content-length'));
+      if (isFinite(annonce) && annonce > PHOTO_MAX_OCTETS) { out.push({ url: u, erreur: 'trop lourde' }); continue; }
+      if (isFinite(annonce) && annonce > 0 && total + annonce > PHOTOS_MAX_OCTETS) { out.push({ url: u, erreur: 'trop lourde' }); continue; }
+      const type = typeImage(r.headers.get('content-type') || 'image/jpeg');
+      if (!type) { out.push({ url: u, erreur: 'pas une image' }); continue; }
       const buf = new Uint8Array(await r.arrayBuffer());
       if (!buf.length) { out.push({ url: u, erreur: 'vide' }); continue; }
+      if (buf.length > PHOTO_MAX_OCTETS || total + buf.length > PHOTOS_MAX_OCTETS) { out.push({ url: u, erreur: 'trop lourde' }); continue; }
+      total += buf.length;
       let bin = '';
       for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-      const type = r.headers.get('content-type') || 'image/jpeg';
-      out.push({ url: u, b64: btoa(bin), type: type.split(';')[0].trim(), taille: buf.length });
+      out.push({ url: u, b64: btoa(bin), type, taille: buf.length });
     } catch (e) { out.push({ url: u, erreur: String((e && e.message) || e).slice(0, 60) }); }
   }
   return out;

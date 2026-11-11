@@ -26,6 +26,7 @@
       canal.onmessage = (e) => { const m = e && e.data; if (!m || typeof m !== 'object') return; for (const f of recus) { try { f(m); } catch (_) {} } };
     } catch (_) {}
   }, false);
+  const canalSur = () => { try { return !globalThis.__vrmOrionCompat || globalThis.__vrmCanalInline === true; } catch (_) { return false; } };
   const versPage = (m) => { if (!canal) return false; try { canal.postMessage(m); return true; } catch (_) { return false; } };
 
   // Injecte inject.js dans le MAIN world (via un <script> pointant sur la
@@ -55,11 +56,17 @@
     try {
       const m = {};
       for (const k of Object.keys(d)) {
-        if (k === '__tag' || k === 'from' || k === 'domain') continue;
+        if (k === '__tag' || k === 'from' || k === 'domain' || k === 'canal') continue;
         m[k] = d[k];
       }
       m.from = 'cancale-content';
       m.domain = location.host;
+      // 5.361 : le canal est-il SÛR ? Oui quand inject.js a été posé avant toute
+      // page (manifeste, monde MAIN — Chrome, Edge, Firefox ; ou en ligne à
+      // document_start sur Orion, constaté par orion-main.js). Sur Orion par la
+      // balise `<script src>` : « douteux » — le fond n'en tire alors aucune
+      // preuve ni aucun état (voir `PAGE_SORTES_PREUVE`). Posé ICI, jamais par la page.
+      m.canal = canalSur() ? 'sur' : 'douteux';
       chrome.runtime.sendMessage(m);
     } catch (_) { /* le service worker peut etre endormi, on ignore */ }
   });
@@ -124,11 +131,16 @@
     const f = enAttente.get(String(d.id || ''));
     if (f) { enAttente.delete(String(d.id)); f(d); }
   });
+  // 5.361 (hautes 23-24) : le numéro de CET onglet (demandé au fond) — la boîte
+  // aux lettres ne répond qu'aux demandes adressées à lui. Délai dépassé ⇒
+  // `{ delai: true }` (le fond ne rejoue jamais une requête peut-être partie).
+  let monOnglet = null;
+  try { chrome.runtime.sendMessage({ from: 'vrm-onglet', action: 'quiSuisJe' }, (r) => { void (chrome.runtime && chrome.runtime.lastError); if (r && r.ok && r.tab != null) monOnglet = r.tab; }); } catch (_) {}
   const demanderPage = (req) => new Promise((res) => {
     const id = String((req && req.id) || '');
     if (!id || !/(^|\.)vinted\.[a-z.]+$/i.test(location.hostname)) { res(null); return; }
-    const t = setTimeout(() => { enAttente.delete(id); res(null); }, 20000);
-    enAttente.set(id, (d) => { clearTimeout(t); res({ id, status: d.status, ok: d.ok, json: d.json, origine: d.origine }); });
+    const t = setTimeout(() => { enAttente.delete(id); res({ id, tab: monOnglet, delai: true }); }, 20000);
+    enAttente.set(id, (d) => { clearTimeout(t); res({ id, tab: monOnglet, status: d.status, ok: d.ok, json: d.json, origine: d.origine }); });
     if (!versPage({ __tag: 'CANCALE_VINTED_REQ', id, p: req.p, h: req.h })) { enAttente.delete(id); clearTimeout(t); res(null); }
   });
   try {
@@ -179,7 +191,9 @@
         if (zone !== 'local' || !ch || !ch.vrmPageReq) return;
         const req = ch.vrmPageReq.newValue;
         if (!req || req.vrm !== 'fetchPage' || Date.now() - Number(req.at || 0) > 20000) return;
-        if (document.visibilityState === 'hidden') return;   // l'onglet visible répond
+        // 5.361 : seul l'onglet VISÉ répond (numéro connu et égal) — jamais « un
+        // onglet Vinted visible quelconque » (autre domaine, autre compte, doublon).
+        if (monOnglet == null || req.tab !== monOnglet) return;
         demanderPage(req).then((o) => { if (o) chrome.storage.local.set({ vrmPageRep: o }); });
       } catch (_) {}
     });
