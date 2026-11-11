@@ -5,6 +5,12 @@
   "functions": {
     "api/compte.js": {
       "maxDuration": 60
+    },
+    "api/ship-reminders.js": {
+      "maxDuration": 300
+    },
+    "api/ebay.js": {
+      "maxDuration": 60
     }
   },
   "git": {
