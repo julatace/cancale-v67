@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
+import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
 import { periodeADater } from '../aDaterAnnee.js';
 import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
@@ -3678,7 +3679,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
     : B.raison === 'cotisations' ? <>En attente de ton chiffre d'affaires déclaré : ouvre l'écran Ventes une fois.</>
     : B.raison === 'rien' ? <>Aucune vente finalisée ni dépense sur la période : rien à calculer.</>
     : B.n === 0 ? <>Aucune vente finalisée sur la période{B.depenses === 'jamais' ? '' : ' : seules tes dépenses comptent'}.</>
-    : <>Ce qu'il te reste{B.depenses === 'jamais' ? ' avant tes dépenses' : ''} : tes ventes finalisées, moins le prix d'achat des paires{B.fraisCouverts > 0 ? ', les frais de vente' : ''}{B.depenses === 'jamais' ? '' : ', tes dépenses'}{B.sansCotis ? '' : " et l'URSSAF"}.</>;
+    : <>Ce qu'il te reste{B.depenses === 'jamais' ? ' avant tes dépenses' : ''} : tes ventes finalisées, moins le prix d'achat des {motsVendeur().noms}{B.fraisCouverts > 0 ? ', les frais de vente' : ''}{B.depenses === 'jamais' ? '' : ', tes dépenses'}{B.sansCotis ? '' : " et l'URSSAF"}.</>;
   // La couverture n'est redite que si la phrase ne la dit pas déjà (raison « achats »).
   const couverture = !B || B.n === 0 || B.raison === 'achats' ? null
     : B.nCout === B.n ? <>Prix d'achat {B.n === 1 ? 'connu pour 1 vente' : `connus pour les ${B.n} ventes`}.</>

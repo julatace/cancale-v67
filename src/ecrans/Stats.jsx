@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { motsVendeur } from '../profilVendeur.js';
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
 import { annulationsParCompte } from '../annulationsCompte.js';
 import { modeleSur, classementRapporte } from '../ceQuiRapporte.js';
@@ -166,7 +167,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
       </div>
       <div style={{maxHeight:260,overflowY:'auto'}}>
         {ventes.map((v,i)=>{
-          const nom=catName[v.productId]||(v.productId?('Paire '+v.productId):'—');
+          const nom=catName[v.productId]||(v.productId?(motsVendeur().Nom+' '+v.productId):'—');
           const dateAff=(type==='encaisse'?v.receiveDate:v.saleDate)||'';
           const benef=(+v.sellPrice||0)-(+v.buyPrice||0);
           return (
@@ -988,7 +989,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (31 oct.) Rythme, marges par groupe, temps de vente, jours et heures,
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
       </RepliStats>
-      <RepliStats id="vente" titre="Ce qui se vend, ton rythme, le stock qui dort" phrase="Marges par marque, temps de vente, jours et heures où tu vends, paires en ligne depuis longtemps, boost.">
+      <RepliStats id="vente" titre="Ce qui se vend, ton rythme, le stock qui dort" phrase={`Marges par marque, temps de vente, jours et heures où tu vends, ${motsVendeur().noms} en ligne depuis longtemps, boost.`}>
       <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
@@ -1492,7 +1493,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
       : `${BP.n === 0 ? 'aucune vente finalisée · ' : ''}après prix d’achat, frais${BP.depenses === 'jamais' ? '' : ', dépenses'}${BP.sansCotis ? '' : ' et URSSAF'}${BP.depenses === 'jamais' ? ' · avant tes dépenses' : ''}`;
     return tuile('benefice', NOM_BENEFICE, CB.valeur == null ? '—' : fmt(CB.valeur), sous,
       { 'data-sv-etat': BP ? 'lu' : etatBP, 'data-sv-n': BP ? BP.n : undefined, 'data-sv-ncout': BP ? BP.nCout : undefined, 'data-sv-brut': BP && BP.nCout > 0 ? cents(BP.brut) : '', ...CB.attrs },
-      'Bénéfice : tes ventes finalisées moins le prix d’achat des paires, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.');
+      `Bénéfice : tes ventes finalisées moins le prix d’achat des ${motsVendeur().noms}, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.');
   })();
   const tDelai = !releve
     ? tuile('delai', 'Temps pour vendre', '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })

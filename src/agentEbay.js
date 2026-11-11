@@ -20,6 +20,7 @@
 //  se propose pas.
 // ════════════════════════════════════════════════════════════════════════════
 
+import { motsVendeur } from './profilVendeur.js';
 export const AGENT_MAX_PAR_JOUR = 20;
 export const AGENT_RESUME_MAX_AGE_MS = 48 * 3600000;   // au-delà, le résumé n'est plus une mesure
 
@@ -174,7 +175,7 @@ export function propositionAgent(o) {
   if (r.actif === false) return { etat: 'eteint' };
   const pasSu = [];
   if (x.paires === undefined || x.enLigne === undefined || x.ventes === undefined || x.dejaSurEbay === undefined) return { etat: 'en-cours' };
-  if (!Array.isArray(x.paires)) pasSu.push('tes paires numérotées');
+  if (!Array.isArray(x.paires)) pasSu.push(`${motsVendeur().tes} numéroté${motsVendeur().e}s`);
   if (!estSet(x.enLigne)) pasSu.push('tes annonces Vinted en ligne');
   if (x.ventes && x.ventes.enCours) return { etat: 'en-cours' };
   if (!x.ventes || !estMap(x.ventes.vendus)) pasSu.push('tes ventes (Vinted, eBay, Leboncoin)');

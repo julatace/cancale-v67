@@ -14,6 +14,7 @@
 //  Le clavier reste toujours là (saisir le n°) ; sans caméra, il prend la main.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { motsVendeur } from './profilVendeur.js';
 import { createPortal } from 'react-dom';
 import { filtreRepetition } from './scanColis.js';
 import { venteDuColis } from './photoCarton.js';
@@ -126,7 +127,7 @@ export const creerBip = () => {
 const MOTS = {
   envoi: {
     titre: 'Scanner un bordereau', saisie: 'N° de suivi du bordereau', tete: 'Dans ce colis',
-    geste: 'C’est la bonne paire · Colis fait', fait: 'Colis fait', deja: 'Déjà noté colis fait',
+    get geste() { return `C’est ${motsVendeur().bonne} · Colis fait`; }, fait: 'Colis fait', deja: 'Déjà noté colis fait',
     inconnu: 'Ce n° n’est relié à aucune vente', ambigu: (n) => `${n} ventes portent ce n° : vérifie`,
     sansVente: 'Ce bordereau n’est relié à aucune vente', personne: 'acheteur',
     sansCamera: 'Pas de caméra ici : tape le n° imprimé sur le bordereau.',

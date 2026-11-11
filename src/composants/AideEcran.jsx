@@ -15,6 +15,7 @@ import { SheetShell as SheetShellBase } from './SheetShell.jsx';
 import { BoutonBase } from './Bouton.jsx';
 import { AIDE_ECRANS, ARTICLES_AIDE } from '../aideEcrans.js';
 import { ETAPES_ECRANS } from '../aideEtapes.js';
+import { phraseVendeur } from '../profilVendeur.js';
 import './aide-ecran.css';
 
 export const NOMS_ECRANS_AIDE = {
@@ -45,15 +46,15 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
       {/* (10 nov., lot J) EN TÊTE : les 3 à 5 gestes de cet écran (sans vidéo), texte de scripts/aide-contenu.cjs. */}
       {etapes.length ? (
         <ol className="vrm-aide-etapes" data-aide-etapes={etapes.length}>
-          {etapes.map((e, i) => <li key={i} data-aide-etape={i + 1}><span className="vrm-aide-etape-n" aria-hidden="true">{i + 1}</span><span>{e}</span></li>)}
+          {etapes.map((e, i) => <li key={i} data-aide-etape={i + 1}><span className="vrm-aide-etape-n" aria-hidden="true">{i + 1}</span><span>{phraseVendeur(e)}</span></li>)}
         </ol>
       ) : null}
       <ul className="vrm-aide-groupe" data-aide-questions={a.questions.length}>
         {a.questions.map(([q, r], i) => (
           <li key={i}>
             <details className="vrm-aide-q" data-aide-question={i} open={i === 0 ? true : undefined}>
-              <summary><span>{q}</span><Chevron/></summary>
-              <p>{r}</p>
+              <summary><span>{phraseVendeur(q)}</span><Chevron/></summary>
+              <p>{phraseVendeur(r)}</p>
             </details>
           </li>
         ))}

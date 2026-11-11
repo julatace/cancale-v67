@@ -30,6 +30,7 @@
 // `entree` : la fiche telle qu'elle est AVANT le geste ; `patch` : les champs posés.
 // Un champ absent avant vaut `undefined` (l'annulation le RETIRE, elle ne pose pas
 // `null` à sa place) — c'est ce qui rend l'état d'avant EXACT.
+import { motsVendeur } from './profilVendeur.js';
 export function champsAvant(entree, patch) {
   const e = entree && typeof entree === 'object' ? entree : {};
   const out = {};
@@ -86,7 +87,7 @@ export const ACTIONS_RECHERCHE = [
   { id: 'calculette', libelle: 'Calculette d’achat', sous: 'Combien je gagne si je l’achète X € ?', icone: 'euro', mots: ['calculette', 'calculer', 'calcul', 'combien', 'gagner', 'gagne', 'benefice', 'marge', 'rentable', 'acheter'] },
   { id: 'achats', libelle: 'Mes achats', sous: 'Achats', icone: 'bag', mots: ['achats', 'achat', 'acheter'] },
   { id: 'reglages', libelle: 'Réglages', sous: 'Paramètres de VRM', icone: 'gear', mots: ['reglages', 'parametres', 'preferences', 'settings', 'options'] },
-  { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, sous: 'La fiche de la paire', icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire'] },
+  { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, get sous() { return `La fiche ${motsVendeur().de}`; }, icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire', 'article'] },
   { id: 'baisser-prix', num: true, libelle: (n) => `Baisser le prix de N°${n}`, sous: 'La feuille du prix — rien n’est envoyé avant « Appliquer »', icone: 'euro', mots: ['baisser', 'prix', 'changer', 'modifier', 'promo', 'reduire', 'diminuer'] },
   { id: 'stock-num', num: true, libelle: (n) => `Voir N°${n} au Stock`, sous: 'Où il est rangé', icone: 'grid', mots: ['stock', 'ranger', 'rangement', 'garage', 'case', 'ou'] },
 ];
