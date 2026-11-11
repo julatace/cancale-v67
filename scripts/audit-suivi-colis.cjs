@@ -388,7 +388,7 @@ function chargeApp(noms, injecte) {
     dit(JSON.stringify(tags) === JSON.stringify(['retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
       'cron : « dernier jour » (dont le n° lu dans le sujet) — « à vérifier » ne sonne plus (3 nov. : un délai passé n\'est pas un fait) — jamais le colis retiré ailleurs, coché, ni fini pour l\'app', `HTTP ${r1.code} · ${tags.join(' · ')}`);
     const d = p1.find((p) => p.tag === 'retrait-dernier-30000021') || {};
-    dit(/^Dernier jour · /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=cat_bord&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour · <lieu> », le n° dans le texte, ouvre Colis → « À retirer », SA carte (31 oct.)', `${d.title} | ${d.body}`);
+    dit(/^Dernier jour · /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=achats&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour · <lieu> », le n° dans le texte, ouvre Achats → « À retirer », SA carte (31 oct. ; Achats depuis le 11 nov.)', `${d.title} | ${d.body}`);
     const v = p1.find((p) => p.tag === 'retrait-a_verifier-09440000000022') || {};
     // (29 oct.) « sans doute reparti » ne s'écrit plus : un délai dépassé ne prouve
     // rien (mesuré le 29 : 5 « sans doute repartis » sur 5 avaient été RETIRÉS) —

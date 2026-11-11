@@ -91,3 +91,16 @@ button.vrm-cn-ligne:active { background: var(--fu-remplir); }
 .vrm-np-relance { font: 400 13px/1.45 var(--vrm-police); color: var(--fu-gris2); }
 .vrm-np-relance code { font: 500 12px/1.4 var(--vrm-police-mono); color: var(--fu-encre); overflow-wrap: anywhere; }
 .vrm-np-relance b { color: var(--fu-encre); font-weight: 600; }
+/* (11 nov., lot `notifs-groupees`) Regrouper et l'heure du soir : le libellé, puis le choix sur toute la largeur. */
+.vrm-np-ligne.vrm-np-ligne-col { flex-direction: column; align-items: stretch; gap: 8px; }
+.vrm-np-ligne.vrm-np-ligne-col > .vrm-np-lib { flex: 0 0 auto; }
+.vrm-np-ligne.vrm-np-ligne-col > .vrm-seg { width: 100%; }
+/* (11 nov.) Jours calmes : sept pastilles, 44 px au doigt ; la cochée en encre (pas d'accent : un réglage, pas une alerte). */
+.vrm-np-jours { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; max-width: 420px; width: 100%; }
+.vrm-np-jour { min-height: 44px; border-radius: 12px; border: 1px solid var(--fu-filet); background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); font: 600 15px/1 var(--vrm-police); cursor: pointer; }
+.vrm-np-jour[aria-pressed="true"] { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); border-color: var(--fu-encre, #1d1d1f); }
+.vrm-np-jour:disabled { opacity: .5; cursor: default; }
+.vrm-np-heures input[type="date"] {
+  min-height: 44px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--fu-filet); box-sizing: border-box;
+  background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); font: 500 15px/1 var(--vrm-police);
+}

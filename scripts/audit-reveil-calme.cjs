@@ -57,6 +57,8 @@ const hhmm = (t) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris',
   process.env.CRON_SECRET = 'secret-banc'; process.env.SUPABASE_SERVICE_KEY = 'service-banc';
   delete process.env.VAPID_PRIVATE_KEY;
   const maintenant = Date.now();
+  // (11 nov.) La route lit l'horloge des notifications : ce banc juge les heures calmes, il pose l'heure lui-même.
+  process.env.VRM_NOTIF_HORLOGE = new Date(maintenant).toISOString();
   const prefsRoute = { calme: { actif: true, debut: hhmm(maintenant - 10 * H), fin: hhmm(maintenant - 20 * 60e3) } };
   const journalRoute = { n: 2, entrees: [{ seq: 1, famille: 'ventes', cat: 'vente', at: new Date(maintenant - 2 * H).toISOString(), etat: 'calme', titre: 'Vendu', texte: '', url: '/' }, { seq: 2, famille: 'offres', cat: 'offre', at: new Date(maintenant - H).toISOString(), etat: 'calme', titre: 'Offre', texte: '', url: '/' }] };
   let memo = null, ecritures = 0, lecturesSubs = 0, panneMemo = false, envois = 0;
