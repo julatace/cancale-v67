@@ -94,8 +94,7 @@ coupure disait « réessaie » et perdait la saisie si la fiche se fermait ; une
 
 ## 6. Chiffres
 
-- `reseau-instable` : **72/72** (390 tactile + 1512) avant le merge ; rejoué après le vrai `git merge origin/main` (voir
-  le rapport de session).
+- `reseau-instable` : **72/72** (390 tactile + 1512), avant ET après le vrai `git merge origin/main` (rebâti).
 - `audit-reseau-instable --prouve` : 39 verts, 8/8 mutations rouges (après merge).
 - Après merge : `npm run build` ; audits `variables`, `tdz`, `coherence` (⚠️ exige l'historique complet :
   `git fetch --unshallow origin main` dans un clone superficiel, sinon « historique illisible »), `identite`, `icones`,
