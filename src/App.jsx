@@ -160,7 +160,8 @@ import QuiDorment from "./design/QuiDorment.jsx";
 import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
 // ⟦→ ecrans/Vestiaire.jsx #2⟧
 // ⟦→ ecrans/Compta.jsx #2⟧
-import { versementsDuReleve, completerVersementsParReleve } from "./versementReleve.js";
+import { versementsDuReleve, completerVersementsParReleve, versementsParReleve } from "./versementReleve.js";
+import { raisonsADater, venteDatees } from "./versementRaisons.js";   // (11 nov., lot DJ7) pourquoi sans date, et le geste
 import { aDaterParAnnee, anneeSureDeVente, tsVenteADater, periodeADater } from './aDaterAnnee.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
@@ -32049,6 +32050,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // le CA de l'année y lit la part PROUVÉE (vendue et lue finalisée la même année), Compta
       // dit « vendues de … à … ». Aucun mois n'en change (§5).
       { const R = aDaterParAnnee(aDater); ad.annees = R.annees; if (R.de != null) { ad.de = R.de; ad.a = R.a; } }
+      // (11 nov., lot DJ7) POURQUOI elles n'ont pas de date (src/versementRaisons.js) : détail de
+      // la transaction jamais relu (par compte), pas encore finalisée chez Vinted, Leboncoin…
+      // et combien sont DATÉES, dont par le relevé du porte-monnaie (par n° de transaction).
+      ad.raisons = raisonsADater(aDater, { etat: (tx) => etatTxn(tx), compteDe: (o) => (o && o._acc && o._acc.vinted_user_id != null ? { uid: String(o._acc.vinted_user_id), nom: accNameOf(o._acc) } : null) });
+      ad.datees = venteDatees(lignes, versementsParReleve(versements));
       // (1er nov., audit A2) Vestiaire est LU (ses ventes au montant sûr sont dans
       // les mois) ou pas su ; ce qui n'est compté nulle part (`nonComptees`) est
       // publié avec le reste : le widget, la carte URSSAF et le rappel du 1er
