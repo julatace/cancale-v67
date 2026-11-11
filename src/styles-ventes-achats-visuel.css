@@ -200,3 +200,10 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] svg { width: 16px !important; height: 16px !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord > :not(.vrm-puce-transp) { width: auto !important; }
 }
+
+/* (11 nov., Julien : « il MANQUE les logos de transporteur ») À l'ordinateur, le logo du transporteur connu ouvre la
+   ligne « compte · date » de la colonne Article, sur CHAQUE vente qui en a un ; au téléphone il est dans la ligne
+   « N° · Vinted · logo · compte » (l'autre est caché : un seul logo visible par ligne). */
+.vrm-ledger-sale-transp { display: inline-flex; align-items: center; vertical-align: middle; margin-right: 6px; }
+@media (max-width: 1023px) { :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-transp { display: none !important; } }
+@media (min-width: 1024px) { :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 .vrm-fu-vente-transp { display: none !important; } }
