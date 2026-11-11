@@ -16,7 +16,7 @@ import Frise from '../design/Frise.jsx';
 import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { champsFacultatifs } from '../profilVendeur.js';
-import { AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner, vendActuel, exemplesActuels } from '../App.jsx';
+import { AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, dejaEnLigneEbay, optsNumeroVerif, vmrCmd, vmrExtPresent, withOwner, vendActuel, exemplesActuels } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { PHOTOS_AJOUT_MAX, PHOTOS_EBAY_MAX, estPhotoAjoutee, placesPhotos, deplacerPhoto, avecPhotosAjoutees, photoEnJpegBase64 } from '../photosEbayAjout.js';
@@ -1037,7 +1037,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   //      frais), puis la publication — les gardes de `gardePublier` d'abord.
   // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) : ce qui partira
   // (titre, prix, photos, caractéristiques, catégorie) contre SON prix d'achat connu.
-  const verifEbay = (item) => {
+  const verifEbay = (item, deja = null) => {
     const aspects = (item && item.aspects) || asp || {};
     const cle = (re) => Object.keys(aspects).find((k) => re.test(k));
     const kMarque = cle(/^(marque|brand)$/i), kTaille = cle(/pointure|taille|size/i);
@@ -1046,7 +1046,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     let achat = null;
     try { if (pairSel) achat = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[pairSel.id], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
     const nPh = String(photos || '').split(/\s+/).filter((u) => /^https?:\/\//.test(u.trim())).length;
-    return problemesAnnonce({ titre, taille: String(taille || ''), famille: familleArticle({ titre, taille: String(taille || ''), marque: String(marque || '') }).famille, marque: String(marque || ''), categorie: (cat && cat.categoryId) || '', nPhotos: nPh, prix: item ? item.price : prix, achat, facultatifs: champsFacultatifs(vendActuel()) }, 'ebay');
+    // (11 nov., lot verif-publication) Le N° : le SKU « VRM-{n°} » (référence native) ou la
+    // fin de la description qui partira ; « déjà en ligne sur eBay » est posé par l'appelant.
+    const num = (pairSel && pairSel.num) || '';
+    const desc = item && typeof item.description === 'string' ? item.description.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<[^>]+>/g, '') : undefined;
+    return problemesAnnonce({ titre, taille: String(taille || ''), famille: familleArticle({ titre, taille: String(taille || ''), marque: String(marque || '') }).famille, marque: String(marque || ''), categorie: (cat && cat.categoryId) || '', nPhotos: nPh, prix: item ? item.price : prix, achat, facultatifs: champsFacultatifs(vendActuel()),
+      numero: num, ...(desc !== undefined ? { description: desc } : {}), ref: (item && item.sku) || '', ...optsNumeroVerif(), ...(deja === true ? { dejaEnLigne: true, dejaEnLigneOu: 'sur eBay' } : {}) }, 'ebay');
   };
   const [autoPub, setAutoPub] = React.useState(null);   // null · { id, etape: 'analyse' | 'verif' }
   const publierEnUnClic = (p) => { setRes(null); setCheck(null); setAutoPub({ id: p.id, etape: 'analyse' }); choisirPaire(p); };
@@ -1066,7 +1071,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       if (b.err) { setAutoPub(null); setRes({ err: b.err }); return; }
       const g = gardePublier();
       if (g) { setAutoPub(null); setRes({ err: g.t }); return; }
-      if (!(await verifierAvantPublication(verifEbay(b.item), { site: 'ebay' }))) { setAutoPub(null); return; }
+      if (!(await verifierAvantPublication(verifEbay(b.item, (pairSel && pairSel.num) ? await dejaEnLigneEbay(pairSel.num) : null), { site: 'ebay' }))) { setAutoPub(null); return; }
       setVerif(true);
       const { j } = await appelEbay({ action: 'pubverify', item: b.item, ...corpsCompteEbay(comptePub) });
       setVerif(false);
@@ -1092,7 +1097,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const publier = async (opts = {}) => {
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
     const g = gardePublier(); if (g) { setRes({ err: g.t }); return; }
-    if (!(opts && opts.verifie) && !(await verifierAvantPublication(verifEbay(b.item), { site: 'ebay' }))) return;
+    if (!(opts && opts.verifie) && !(await verifierAvantPublication(verifEbay(b.item, (pairSel && pairSel.num) ? await dejaEnLigneEbay(pairSel.num) : null), { site: 'ebay' }))) return;
     // (9 octobre) Une RÈGLE D'OFFRE part avec l'annonce : eBay vendra la paire
     // sans lui demander. TOUJOURS une confirmation qui le dit (même avec un
     // seul compte) — le compte y est nommé s'il y en a plusieurs.

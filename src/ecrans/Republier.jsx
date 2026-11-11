@@ -1,6 +1,8 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { problemesLot } from '../verifAnnonce.js';
+const CLES_VERIF_NEUVES = ['numeroLu', 'numeroEcrit', 'ou', 'dejaEnLigne', 'dejaEnLigneOu'];
+const pickVerif = (v) => { const o = {}; if (v && typeof v === 'object') for (const k of CLES_VERIF_NEUVES) if (v[k] !== undefined) o[k] = v[k]; return o; };
 import { centimes } from '../beneficePaire.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -1451,7 +1453,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // prix qui PARTIRONT (l'aperçu), les photos, la taille et la marque lues.
   const lancerFile = async () => {
     const lot = aFaireCalc.map((a) => { const x = action === 'enLigne' ? {} : apercu(a); return { numero: a.numero, titre: x.titre || a.titre, prix: x.prix != null ? x.prix : a.prix, achat: a.floor,
-      ...(a.nPhotos != null ? { nPhotos: a.nPhotos } : {}), ...(a.taille !== undefined ? { taille: a.taille, famille: a.famille || '' } : {}), ...(a.marque !== undefined ? { marque: a.marque } : {}) }; });
+      ...(a.nPhotos != null ? { nPhotos: a.nPhotos } : {}), ...(a.taille !== undefined ? { taille: a.taille, famille: a.famille || '' } : {}), ...(a.marque !== undefined ? { marque: a.marque } : {}),
+      // (11 nov., lot verif-publication) Le N° écrit (la lecture de la description qui
+      // repart, la lettre du bas sautée) et « déjà en ligne sur ce compte » (une AUTRE
+      // annonce, même N°), tels que l'écran Annonces les a lus ; absents ⇒ rien jugé.
+      ...pickVerif(a.verif) }; });
     if (!(await verifierAvantPublication(problemesLot(lot, 'vinted'), { site: 'vinted' }))) return;
     setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run');
   };
