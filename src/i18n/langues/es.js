@@ -398,5 +398,7 @@ export default {
   "horsligne.quoi.photo": "Foto de compra",
   "horsligne.achat.numeroAuRetour": "N.º al volver la conexión",
   "horsligne.achat.note": "Compra guardada sin conexión · foto y N.º al volver la conexión",
+  "horsligne.froid.titre": "Sin conexión.",
+  "horsligne.froid.texte": "Ves lo que hay en este dispositivo (comprobado el {heure}). Tus gestos se envían cuando vuelva la red.",
   "horsligne.reessai": "El servidor está ocupado: las acciones se reintentan en un momento.",
 };

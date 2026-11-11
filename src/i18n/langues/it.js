@@ -398,5 +398,7 @@ export default {
   "horsligne.quoi.photo": "Foto d’acquisto",
   "horsligne.achat.numeroAuRetour": "N. al ritorno della rete",
   "horsligne.achat.note": "Acquisto salvato offline · foto e N. al ritorno della rete",
+  "horsligne.froid.titre": "Offline.",
+  "horsligne.froid.texte": "Vedi ciò che c’è su questo dispositivo (verificato il {heure}). Le tue azioni partono al ritorno della rete.",
   "horsligne.reessai": "Il server è occupato: le azioni ripartono tra poco.",
 };

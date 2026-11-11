@@ -398,5 +398,7 @@ export default {
   "horsligne.quoi.photo": "Purchase photo",
   "horsligne.achat.numeroAuRetour": "No. once back online",
   "horsligne.achat.note": "Purchase saved offline · photo and No. once back online",
+  "horsligne.froid.titre": "Offline.",
+  "horsligne.froid.texte": "You see what is on this device (checked on {heure}). Your actions are sent when the network is back.",
   "horsligne.reessai": "The server is busy: actions will be retried shortly.",
 };

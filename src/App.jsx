@@ -3559,11 +3559,19 @@ const stockGestes = () => {
 const _gestesHL = { owner: null, charge: false, attente: 0, atrancher: 0, enCours: false, envoyesAt: 0, envoyesN: 0, arret: null, liste: [] };
 let _pushApresGestes = false, _rejeuT = null, _rejeuEssai = 0;
 const signalerGestesHL = () => { try { window.dispatchEvent(new Event('vrm:gestes-hl')); } catch (_) {} };
+// Les gestes regroupés par ce qu'ils touchent (une fiche, un colis, un prix) : UNE ligne, UN choix.
+const groupeCleHL = (g) => (g.ligne ? 'ligne|' + g.ligne + '|' + g.chemin[0] : g.k + '|' + JSON.stringify((g.chemin || []).slice(0, 1)));
+const groupesGestesHL = (liste, etat) => {
+  const m = new Map();
+  for (const g of liste || []) { if (!g || g.etat !== etat) continue; const c = groupeCleHL(g); if (!m.has(c)) m.set(c, []); m.get(c).push(g); }
+  return [...m.values()].map((l) => l.sort((a, b) => a.seq - b.seq));
+};
 const rafraichirGestesHL = async () => {
   const owner = AUTH.user?.id; if (!owner) return null;
   const l = await lireGestes(stockGestes(), owner);
   if (AUTH.user?.id !== owner) return null;
-  if (l) { const n = compterGestes(l); Object.assign(_gestesHL, { owner, charge: true, attente: n.attente, atrancher: n.atrancher, liste: l }); }
+  // Un geste = ce que la personne a fait : les champs d'une même fiche (prix + sa date…) comptent pour UN.
+  if (l) { const n = compterGestes(l); Object.assign(_gestesHL, { owner, charge: true, attente: groupesGestesHL(l, 'attente').length, atrancher: groupesGestesHL(l, 'atrancher').length, liste: l }); void n; }
   else Object.assign(_gestesHL, { owner, charge: true });
   signalerGestesHL();
   return l;
@@ -3663,12 +3671,15 @@ const rejouerGestes = async () => {
   _pushApresGestes = false; cloudPush();
 };
 const fileNonVideHL = () => { const f = lireFile(localStorage, AUTH.user?.id); return !!(f && f.cles && Object.keys(f.cles).length); };
-const trancherGesteHL = async (id, choix) => {
+const trancherGesteHL = async (ids, choix) => {
   const owner = AUTH.user?.id; if (!owner) return;
-  const g = await trancherRegistre(stockGestes(), owner, id, choix);
-  if (g && choix === 'mien') poserLocalHL(g.k, g.chemin, g.apres);
+  let mien = false;
+  for (const id of [].concat(ids)) {
+    const g = await trancherRegistre(stockGestes(), owner, id, choix);
+    if (g && choix === 'mien') { poserLocalHL(g.k, g.chemin, g.apres); mien = true; }
+  }
   await rafraichirGestesHL();
-  if (g && choix === 'mien') rejouerGestesBientot(0);
+  if (mien) rejouerGestesBientot(0);
 };
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => rejouerGestesBientot(1500));
@@ -4953,10 +4964,24 @@ const sondeLectureSansCompte = async () => {
   } catch (_) { return null; }
 };
 
+// (11 nov., lot hors-ligne) La dernière liste LUE des comptes, gardée sur l'appareil SANS rien de
+// secret (jetons, cookies retirés) : hors ligne, chaque écran retrouve ses comptes (sinon « Je n'ai
+// pas pu lire tes comptes Vinted » partout). Seulement hors ligne MESURÉ, seulement pour CE vendeur ;
+// en ligne, la base fait foi comme avant (« pas su » ⇒ null).
+const CLE_COMPTES_COPIE = 'vrm_comptes_copie';
+const SECRET_COMPTE = /token|cookie|secret|session|password|csrf|anon_id|jwt/i;
+const garderComptesCopie = (owner, list) => {
+  try { localStorage.setItem(CLE_COMPTES_COPIE, JSON.stringify({ qui: owner, at: Date.now(), list: list.map((a) => Object.fromEntries(Object.entries(a || {}).filter(([k]) => !SECRET_COMPTE.test(k)))) })); } catch (_) {}
+};
+const comptesCopieHorsLigne = (owner) => {
+  if (!horsLigneMaintenant()) return null;
+  try { const o = JSON.parse(localStorage.getItem(CLE_COMPTES_COPIE) || 'null'); return o && o.qui === owner && Array.isArray(o.list) && o.list.every((a) => a && a.owner === owner) ? o.list : null; } catch (_) { return null; }
+};
 const fetchVintedAccounts = async () => {
   const owner = AUTH.user?.id;
   if (!owner || !AUTH.session?.access_token) return null;
   const filtre = `&owner=eq.${encodeURIComponent(owner)}`;
+  if (horsLigneMaintenant()) return comptesCopieHorsLigne(owner);
   try {
     const [res, blk] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, { headers: sbAuth() }),
@@ -4982,8 +5007,9 @@ const fetchVintedAccounts = async () => {
       reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}${filtre}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
     }
     memoriserComptesLies(owner, list);   // (6 nov.) ce que le préchargement lira à la prochaine ouverture
+    garderComptesCopie(owner, list);
     return list;
-  } catch (_) { return null; }                 // réseau coupé, DNS, CORS : on ne sait pas
+  } catch (_) { return comptesCopieHorsLigne(owner); }   // réseau coupé, DNS, CORS : on ne sait pas (hors ligne mesuré : la copie)
 };
 
 // Retire un compte de l'app : supprime sa ligne dans Supabase "vinted_accounts".
@@ -18584,37 +18610,47 @@ const sujetHL = (g) => {
   if (g.k === 'vinted_annonce_numeros' && g.chemin[1] === 'numero') return `N° · ${quoi}`;
   return quoi;
 };
+// Le geste qui parle pour son groupe : le prix ou le N° d'une fiche (pas sa date), sinon le premier.
+const principalHL = (gr) => gr.find((g) => g.k === 'vinted_annonce_numeros' && ['buyPrice', 'numero'].includes(g.chemin && g.chemin[1])) || gr[0];
+const sujetGroupeHL = (g) => {
+  if (g.k === 'vinted_annonce_numeros' && g.chemin && g.chemin[1] === 'buyPrice') {
+    let n = ''; try { n = String(((load('vinted_annonce_numeros', {}) || {})[g.chemin[0]] || {}).numero || ''); } catch (_) { n = ''; }
+    return tr('horsligne.quoi.prix') + (n ? ` · N°${n}` : '');
+  }
+  return sujetHL(g);
+};
+const valeurGroupeHL = (g, v) => (g.k === 'vinted_annonce_numeros' && g.chemin && g.chemin[1] === 'buyPrice' && v != null && v !== '' ? `${String(v).replace('.', ',')} €` : texteValeurHL(g, v));
 function FeuilleGestesHL({ onFermer }) {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { const f = () => maj(); window.addEventListener('vrm:gestes-hl', f); rafraichirGestesHL(); return () => window.removeEventListener('vrm:gestes-hl', f); }, []);
   const liste = (_gestesHL.owner === AUTH.user?.id ? _gestesHL.liste : []) || [];
-  const atr = liste.filter((g) => g.etat === 'atrancher'), att = liste.filter((g) => g.etat === 'attente').sort((a, b) => a.seq - b.seq);
+  const atr = groupesGestesHL(liste, 'atrancher'), att = groupesGestesHL(liste, 'attente').sort((a, b) => a[0].seq - b[0].seq);
   return (
     <SheetShell onClose={onFermer} z={Z_CONFIRMATION}>
       <div data-gestes-hl-feuille="" style={{ padding: '6px 4px 18px' }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: '0 0 12px' }}>{tr('horsligne.feuille.titre')}</h2>
         {!atr.length && !att.length ? <p style={{ color: C.muted, fontSize: 14 }}>{tr('horsligne.feuille.vide')}</p> : null}
         {atr.length ? <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: '6px 0 8px' }}>{tr('horsligne.feuille.atrancher')}</h3> : null}
-        {atr.map((g) => (
+        {atr.map((gr) => { const g = principalHL(gr), ids = gr.map((x) => x.id); return (
           <div key={g.id} data-geste-atrancher={g.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 10, background: C.card }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>{sujetHL(g)}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>{sujetGroupeHL(g)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 14, lineHeight: 1.4 }}>
-              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ici')}</span><span data-geste-mien="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{texteValeurHL(g, g.apres)}</span>
-              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ailleurs')}</span><span data-geste-autre="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{texteValeurHL(g, g.nuage)}</span>
+              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ici')}</span><span data-geste-mien="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{valeurGroupeHL(g, g.apres)}</span>
+              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ailleurs')}</span><span data-geste-autre="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{valeurGroupeHL(g, g.nuage)}</span>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <Bouton variante="secondaire" data-geste-garder="mien" onClick={() => trancherGesteHL(g.id, 'mien')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderMienne')}</Bouton>
-              <Bouton variante="secondaire" data-geste-garder="autre" onClick={() => trancherGesteHL(g.id, 'autre')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderAutre')}</Bouton>
+              <Bouton variante="secondaire" data-geste-garder="mien" onClick={() => trancherGesteHL(ids, 'mien')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderMienne')}</Bouton>
+              <Bouton variante="secondaire" data-geste-garder="autre" onClick={() => trancherGesteHL(ids, 'autre')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderAutre')}</Bouton>
             </div>
           </div>
-        ))}
+        ); })}
         {att.length ? <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: '12px 0 8px' }}>{tr('horsligne.feuille.attente')}</h3> : null}
-        {att.map((g) => (
+        {att.map((gr) => { const g = principalHL(gr); return (
           <div key={g.id} data-geste-attente={g.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, borderBottom: `1px solid ${C.border}`, padding: '10px 2px', fontSize: 14 }}>
-            <span style={{ color: C.text }}>{sujetHL(g)}</span>
-            <span style={{ color: C.muted, textAlign: 'right', overflowWrap: 'anywhere' }}>{g.ligne ? '✓' : texteValeurHL(g, g.apres)}</span>
+            <span style={{ color: C.text }}>{sujetGroupeHL(g)}</span>
+            <span style={{ color: C.muted, textAlign: 'right', overflowWrap: 'anywhere' }}>{g.ligne ? '✓' : valeurGroupeHL(g, g.apres)}</span>
           </div>
-        ))}
+        ); })}
       </div>
     </SheetShell>
   );

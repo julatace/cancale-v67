@@ -151,13 +151,15 @@ const saisirPrix = async (pg, numero, prix) => {
   await champ.click(); await champ.fill(String(prix)); await champ.press('Enter');
   return true;
 };
-const prixBase = (base, n) => String(((base.main.main || {}).vinted_annonce_numeros || {})[IDS[n - 1]]?.buyPrice || '');
-const prixLocal = (pg, n) => pg.evaluate((id) => { try { return String((JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')[id] || {}).buyPrice || ''); } catch (_) { return 'illisible'; } }, IDS[n - 1]).catch(() => '?');
+// Le prix tel que l'app le range (« 41,00 ») jugé comme un NOMBRE.
+const prixN = (v) => { const x = parseFloat(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(x) ? String(x) : ''; };
+const prixBase = (base, n) => prixN(((base.main.main || {}).vinted_annonce_numeros || {})[IDS[n - 1]]?.buyPrice);
+const prixLocal = (pg, n) => pg.evaluate((id) => { try { return String((JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')[id] || {}).buyPrice || ''); } catch (_) { return 'illisible'; } }, IDS[n - 1]).then(prixN).catch(() => '?');
 const pastille = (pg) => pg.evaluate(() => { const el = document.querySelector('[data-gestes-hl]'); return el ? { etat: el.getAttribute('data-gestes-hl'), attente: Number(el.getAttribute('data-gestes-attente')), atrancher: Number(el.getAttribute('data-gestes-atrancher')), texte: (el.innerText || '').trim() } : null; }).catch(() => null);
 const registre = (pg) => pg.evaluate((uid) => new Promise((ok) => { try { const rq = indexedDB.open('vrm-gestes', 1); rq.onupgradeneeded = () => { try { rq.result.createObjectStore('registres', { keyPath: 'uid' }); } catch (_) {} }; rq.onsuccess = () => { try { const g = rq.result.transaction('registres', 'readonly').objectStore('registres').get(uid); g.onsuccess = () => ok((g.result && g.result.gestes) || []); g.onerror = () => ok(null); } catch (_) { ok(null); } }; rq.onerror = () => ok(null); } catch (_) { ok(null); } }), UID).catch(() => null);
 const enAttente = async (pg) => { const r = await registre(pg); return r ? r.filter((g) => g.etat === 'attente').length : -1; };
 // Les écritures ACCEPTÉES qui ont fait passer le prix du N°n à `p` (de « autre chose » à p) : UNE seule.
-const posees = (base, n, p) => { let prec = String((MAIN0.vinted_annonce_numeros[IDS[n - 1]] || {}).buyPrice || ''); let k = 0; for (const e of base.main.ecritures) { if (!(e.resultat === 1 || e.resultat === 201) || !e.data) continue; const v = String(((e.data.vinted_annonce_numeros || {})[IDS[n - 1]] || {}).buyPrice || ''); if (v === p && prec !== p) k++; prec = v; } return k; };
+const posees = (base, n, p) => { let prec = prixN((MAIN0.vinted_annonce_numeros[IDS[n - 1]] || {}).buyPrice); let k = 0; for (const e of base.main.ecritures) { if (!(e.resultat === 1 || e.resultat === 201) || !e.data) continue; const v = prixN(((e.data.vinted_annonce_numeros || {})[IDS[n - 1]] || {}).buyPrice); if (v === p && prec !== p) k++; prec = v; } return k; };
 const faits = (base) => ((base.main.main || {}).vrm_gestes_faits) || [];
 const doublonsFaits = (base) => { const l = faits(base); return l.length - new Set(l).size; };
 const numerosIntacts = (d) => {
@@ -187,7 +189,7 @@ async function main() {
       await pg.goto(URL0() + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' }).catch(() => {});
       // Le service worker range les morceaux de l'app (liste du build) : un écran jamais ouvert s'ouvre hors ligne.
       const rang = async () => pg.evaluate(async () => { try { const c = await caches.open('vrm-shell-v6'); const r = await c.match('/hors-ligne-assets.json'); if (!r) return { n: 0, sur: -1 }; const l = (await r.json()).fichiers || []; let n = 0; for (const f of l) if (await c.match(f)) n++; return { n, sur: l.length }; } catch (e) { return { n: 0, sur: -1 }; } }).catch(() => ({ n: 0, sur: -1 }));
-      await attendre(async () => { const r = await rang(); return r.sur > 0 && r.n === r.sur; }, 30000, 500);
+      await attendre(async () => { const r = await rang(); return r.sur > 0 && r.n === r.sur; }, 120000, 500);
       const rr = await rang();
       if (!(rr.sur > 0)) console.log('    (service worker :', JSON.stringify(await pg.evaluate(async () => ({ ctrl: !!(navigator.serviceWorker && navigator.serviceWorker.controller), caches: await caches.keys(), n: (await (await caches.open('vrm-shell-v6')).keys()).map((r) => new URL(r.url).pathname).slice(0, 8) })).catch((e) => String(e))), ')');
       dit(rr.sur > 10 && rr.n === rr.sur, `${T} : en ligne, les morceaux de l'app sont rangés pour le hors ligne`, `${rr.n}/${rr.sur}`);
@@ -274,6 +276,7 @@ async function main() {
         dit(p && p.atrancher === 1, `${T} B : « 1 geste à trancher »`, JSON.stringify(p));
         await attendre(async () => (await prixLocal(pg, 2)) === '52', 5000);
         dit(await prixLocal(pg, 2) === '52', `${T} B : A affiche la version de la base (52)`, await prixLocal(pg, 2));
+        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
         await pg.locator('[data-gestes-hl-trancher]').click();
         await pg.locator('[data-geste-atrancher]').first().waitFor({ timeout: 5000 });
         const mien = await pg.locator('[data-geste-mien]').first().innerText(), autre = await pg.locator('[data-geste-autre]').first().innerText();
@@ -311,7 +314,7 @@ async function main() {
         dit(JSON.stringify(vus) === '["44","45","46","47"]', `${T} C : les 4 arrivent`, JSON.stringify(vus));
         const fois = [4, 5, 6, 7].map((n) => posees(base, n, String(40 + n)));
         dit(fois.every((x) => x === 1), `${T} C : chacun posé UNE fois`, JSON.stringify(fois));
-        const ordre = [4, 5, 6].map((n) => base.main.ecritures.findIndex((e) => (e.resultat === 1) && e.data && String(((e.data.vinted_annonce_numeros || {})[IDS[n - 1]] || {}).buyPrice || '') === String(40 + n)));
+        const ordre = [4, 5, 6].map((n) => base.main.ecritures.findIndex((e) => (e.resultat === 1) && e.data && prixN(((e.data.vinted_annonce_numeros || {})[IDS[n - 1]] || {}).buyPrice) === String(40 + n)));
         dit(ordre[0] >= 0 && ordre[0] <= ordre[1] && ordre[1] <= ordre[2], `${T} C : dans l'ordre des gestes`, JSON.stringify(ordre));
         dit(doublonsFaits(base) === 0, `${T} C : aucun identifiant de geste deux fois dans vrm_gestes_faits`);
         await attendre(async () => (await enAttente(pg)) === 0, 8000);

@@ -403,5 +403,7 @@ export default {
   "horsligne.quoi.photo": "Photo d’achat",
   "horsligne.achat.numeroAuRetour": "N° au retour du réseau",
   "horsligne.achat.note": "Achat noté hors ligne · photo et N° au retour du réseau",
+  "horsligne.froid.titre": "Hors ligne.",
+  "horsligne.froid.texte": "Tu vois ce qui est sur cet appareil (vérifié le {heure}). Tes gestes partent au retour du réseau.",
   "horsligne.reessai": "Le serveur est occupé : les gestes repartent dans un instant.",
 };

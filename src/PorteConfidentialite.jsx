@@ -1,5 +1,6 @@
 import React,{useState,useEffect,useRef} from 'react';
 import { rythme } from './rythmeLectures.js';
+import { tr } from './i18n/index.js';
 import { laissezPasserHorsLigne, noterVerification, effacerLaissezPasser, poserHorsLigne } from './porteHorsLigne.js';
 const stockage=()=>{try{return window.localStorage;}catch(_){return null;}};
 const horsReseau=()=>{try{return typeof navigator!=='undefined'&&navigator.onLine===false;}catch(_){return false;}};
@@ -76,7 +77,7 @@ export default function PorteConfidentialite({session,onVerifier,onDeconnexion,o
  if(etat==='ok'||etat==='hors-ligne')return <React.Fragment key={montage}>
   {etat==='hors-ligne'&&<div role="status" className="vrm-bandeau-abo" data-hors-ligne-froid="" data-hors-ligne-depuis={controle.at||undefined} style={{position:'fixed',top:'max(8px, env(safe-area-inset-top))',left:0,right:0,maxWidth:560,margin:'0 auto',width:'calc(100% - 32px)',zIndex:70}}>
    <span className="vrm-bandeau-abo-point" aria-hidden="true"/>
-   <span className="vrm-bandeau-abo-texte"><b>Hors ligne · lecture seule.</b> Tu vois ce qui est déjà sur cet appareil (vérifié le {heureCourte(controle.at)}). Rien n’est envoyé ni enregistré sur VRM avant le retour du réseau.</span>
+   <span className="vrm-bandeau-abo-texte"><b>{tr('horsligne.froid.titre')}</b> {tr('horsligne.froid.texte',{heure:heureCourte(controle.at)})}</span>
    <button type="button" className="vrm-bandeau-abo-geste" onClick={()=>setTour(t=>t+1)}>Réessayer</button>
   </div>}
   {children}</React.Fragment>;
