@@ -7,7 +7,7 @@
 // visibilité, urgences) est src/journeePerso.js : ce fichier ne fait que la montrer.
 import React from 'react';
 import { BoutonBase } from './composants/Bouton.jsx';
-import { CARTES_JOURNEE, ZONES_JOURNEE, ordreJournee, visibiliteCarte, basculerCarte, deplacerCarte, revenirOrigine, estOrigine, carteJournee } from './journeePerso.js';
+import { CARTES_JOURNEE, ZONES_JOURNEE, ordreJournee, ordreMobile, visibiliteCarte, basculerCarte, deplacerCarte, revenirOrigine, estOrigine, carteJournee } from './journeePerso.js';
 
 const Poignee = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" fill="currentColor">
@@ -30,16 +30,16 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
     const el = racine.current.querySelector(`[data-jp-poignee="${id}"]`);
     if (el && document.activeElement !== el) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } }
   });
-  const dire = (id, zone, i) => { const c = carteJournee(id); setAnnonce(`${c ? c.nom : id} : ${i + 1}ᵉ sur ${ordreJournee(zone, r).length}`); };
+  const dire = (id, zone, i) => { const c = carteJournee(id); setAnnonce(`${c ? c.nom : id} : ${i + 1}ᵉ sur ${ordreMobile(zone, r).length}`); };
   const deplacer = (id, zone, vers, clavier) => {
     const n = deplacerCarte(r, id, vers);
     if (n === r) return;
     if (clavier) focusApres.current = id;
     poser(n);
-    dire(id, zone, ordreJournee(zone, n).indexOf(id));
+    dire(id, zone, ordreMobile(zone, n).indexOf(id));
   };
   const auClavier = (e, id, zone) => {
-    const liste = ordreJournee(zone, r), i = liste.indexOf(id);
+    const liste = ordreMobile(zone, r), i = liste.indexOf(id);
     const vers = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : e.key === 'Home' ? 0 : e.key === 'End' ? liste.length - 1 : null;
     if (vers == null) return;
     e.preventDefault();
@@ -56,7 +56,7 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
     setGlisse(id);
     let courant = r;
     const bouge = (ev) => {
-      const lignes = [...ul.querySelectorAll('[data-jp-ligne]')].filter((l) => l.getAttribute('data-jp-ligne') !== id);
+      const lignes = [...ul.querySelectorAll('[data-jp-ligne]:not([data-jp-fixe])')].filter((l) => l.getAttribute('data-jp-ligne') !== id);
       let vers = 0;
       for (const l of lignes) { const b = l.getBoundingClientRect(); if (ev.clientY > b.top + b.height / 2) vers += 1; }
       const n = deplacerCarte(courant, id, vers);
@@ -64,7 +64,7 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
     };
     const fin = () => {
       window.removeEventListener('pointermove', bouge); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', fin);
-      setGlisse(null); dire(id, zone, ordreJournee(zone, courant).indexOf(id));
+      setGlisse(null); dire(id, zone, ordreMobile(zone, courant).indexOf(id));
     };
     window.addEventListener('pointermove', bouge); window.addEventListener('pointerup', fin); window.addEventListener('pointercancel', fin);
   };
@@ -73,7 +73,7 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
     <div className="vrm-jp" ref={racine} data-jp-editeur="" data-jp-origine={origine ? '1' : '0'}>
       <p className="vrm-jp-aide">Glisse la poignée pour ranger une carte, touche l’interrupteur pour la cacher. Les alertes urgentes restent toujours affichées.</p>
       {ZONES_JOURNEE.map((z) => {
-        const ids = ordreJournee(z.id, r);
+        const ids = ordreJournee(z.id, r), nMob = ordreMobile(z.id, r).length;
         return (
           <section key={z.id} className="vrm-jp-zone" aria-labelledby={`vrm-jp-z-${z.id}`}>
             <h3 className="vrm-jp-zone-titre" id={`vrm-jp-z-${z.id}`}>{z.nom}</h3>
@@ -81,14 +81,15 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
               {ids.map((id, i) => {
                 const c = carteJournee(id); const v = visibiliteCarte(id, { reglage: r, mode });
                 return (
-                  <li key={id} className={'vrm-jp-ligne' + (v.choisie ? '' : ' is-cachee') + (glisse === id ? ' is-glisse' : '')} data-jp-ligne={id} data-jp-rang={i} data-jp-montree={v.choisie ? '1' : '0'}>
+                  <li key={id} className={'vrm-jp-ligne' + (v.choisie ? '' : ' is-cachee') + (glisse === id ? ' is-glisse' : '')} data-jp-ligne={id} data-jp-rang={i} data-jp-fixe={c.fixe ? '' : undefined} data-jp-montree={v.choisie ? '1' : '0'}>
                     {/* `touch-action: none` EN LIGNE : une règle globale hors couche (« manipulation ») l'emporterait sur
                         la feuille de style, et le doigt ferait défiler la page au lieu de déplacer la carte. */}
+                    {c.fixe ? <span className="vrm-jp-poignee is-fixe" aria-hidden="true"/> : (
                     <button type="button" className="vrm-jp-poignee" data-jp-poignee={id} style={{ touchAction: 'none' }}
-                      aria-label={`Déplacer ${c.nom} (${i + 1}ᵉ sur ${ids.length})`} aria-describedby="vrm-jp-consigne" aria-roledescription="poignée"
+                      aria-label={`Déplacer ${c.nom} (${ordreMobile(z.id, r).indexOf(id) + 1}ᵉ sur ${nMob})`} aria-describedby="vrm-jp-consigne" aria-roledescription="poignée"
                       onKeyDown={(e) => auClavier(e, id, z.id)} onPointerDown={(e) => glisser(e, id, z.id)}>
                       <Poignee/>
-                    </button>
+                    </button>)}
                     <span className="vrm-jp-textes">
                       <span className="vrm-jp-nom">{c.nom}</span>
                       <span className="vrm-jp-desc">{c.desc}</span>

@@ -41,6 +41,7 @@
   color: var(--p-gris, #6E6E73) !important; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+.vrm-jp-poignee.is-fixe { cursor: default; }
 .vrm-jp-ligne.is-glisse .vrm-jp-poignee { cursor: grabbing; color: var(--p-encre, inherit) !important; }
 .vrm-jp-poignee:focus-visible { outline: 2px solid #0071E3; outline-offset: -2px; }
 .vrm-jp-textes { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }

@@ -79,6 +79,10 @@ async function controles(T, ok) {
     const rD2 = P.deplacerCarte(rD, 'messages', 999);
     ok(P.ordreJournee('afaire', rD2).slice(-1)[0] === 'messages' && P.deplacerCarte(null, 'inconnue', 0).ordre.length === 0, 'R5 déplacement borné ; une carte inconnue ne change rien');
     ok(P.deplacerCarte(null, 'frise', 0).ordre.length > 0 && P.ordreJournee('tete', P.deplacerCarte(null, 'frise', 0))[0] === 'frise', 'R5 la tête se range aussi');
+    // Les chiffres du mois sont posés SOUS la carte sombre par la grille : une carte fixe (pas de poignée qui ne ferait rien).
+    const fixes = cat.filter((c) => c.fixe).map((c) => c.id);
+    const rP = P.deplacerCarte(null, 'phrase', 99);
+    ok(fixes.join() === 'chiffres' && P.estOrigine(P.deplacerCarte(null, 'chiffres', 0)) && P.ordreJournee('tete', rP).join() === 'prochain,frise,phrase,chiffres' && !P.ordreMobile('tete', null).includes('chiffres'), 'R5 une carte fixe (les chiffres du mois) ne se déplace pas et garde sa place', P.ordreJournee('tete', rP).join());
     // R6
     ok(P.estOrigine(P.revenirOrigine(rD)) && P.estOrigine(P.revenirOrigine(rPrix)) && P.estOrigine(null) && !P.estOrigine(rD) && !P.estOrigine(rPrix), 'R6 « Revenir au réglage d’origine » efface ordre et choix');
     const abime = P.lireJourneePerso({ ordre: 'x', choix: { prix: 'oui', envoyer: false } });
@@ -143,6 +147,7 @@ const MUTATIONS = {
   frise_demontee: ['app', (s) => s.replace("return id === 'phrase' ? null : <div key={id} hidden data-jp-cachee={id}>{blocsTete[id]}</div>;", 'return null;')],
   clavier_muet: ['editeur', (s) => s.replace('onKeyDown={(e) => auClavier(e, id, z.id)} ', '')],
   defilement_vole: ['editeur', (s) => s.replace(" style={{ touchAction: 'none' }}", '')],
+  fixe_deplacable: ['regle', (s) => s.replace("const cat = CARTES_JOURNEE.filter((c) => c.zone === zone && !c.fixe).map((c) => c.id);", "const cat = CARTES_JOURNEE.filter((c) => c.zone === zone).map((c) => c.id);")],
   doigt_muet: ['editeur', (s) => s.replace(' onPointerDown={(e) => glisser(e, id, z.id)}', '')],
   sans_parametres: ['reglages', (s) => s.replace(", el:<JourneePersoSetting/> },", ", el:null },")],
 };

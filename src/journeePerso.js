@@ -33,7 +33,9 @@ export const CARTES_JOURNEE = [
   { id: 'phrase', zone: 'tete', nom: 'La phrase du jour', desc: 'Tes colis du jour, en une phrase.' },
   { id: 'prochain', zone: 'tete', nom: 'La prochaine chose à faire', desc: 'Le geste le plus pressé, tout en haut.' },
   { id: 'frise', zone: 'tete', nom: 'Les 7 derniers jours', desc: 'Ce que tu as vendu, jour par jour.' },
-  { id: 'chiffres', zone: 'tete', nom: 'Les chiffres du mois', desc: 'Bénéfice, vendu, reçu.' },
+  // `fixe` : sa place ne dépend pas de l'ordre (les cases du mois sont toujours posées SOUS la carte
+  // sombre, par la grille des widgets) — un interrupteur, pas de poignée qui ne ferait rien.
+  { id: 'chiffres', zone: 'tete', nom: 'Les chiffres du mois', desc: 'Bénéfice, vendu, reçu, sous la carte du haut.', fixe: true },
   { id: 'ailleurs', zone: 'afaire', nom: 'Vendus ailleurs', desc: 'Annonces à retirer des autres sites.' },
   { id: 'deux-fois', zone: 'afaire', nom: 'En ligne deux fois', desc: 'La même annonce publiée deux fois.' },
   { id: 'envoyer', zone: 'afaire', nom: 'Colis à envoyer', desc: 'Revient seule si un colis est pressé.', urgent: true },
@@ -69,8 +71,15 @@ export const estOrigine = (r) => { const x = lireJourneePerso(r); return x.ordre
 // puis chaque carte qu'il n'a jamais rangée (livrée après son réglage) à SA place
 // d'origine : juste après la carte qui la précède dans le catalogue (ou en tête).
 export function ordreJournee(zone, reglage) {
+  const mobiles = ordreMobile(zone, reglage);
+  // Une carte fixe reprend sa place d'origine dans la zone.
+  CARTES_JOURNEE.filter((c) => c.zone === zone).forEach((c, i) => { if (c.fixe) mobiles.splice(Math.min(i, mobiles.length), 0, c.id); });
+  return mobiles;
+}
+// L'ordre des seules cartes qui se déplacent (celles qui ont une poignée).
+export function ordreMobile(zone, reglage) {
   const r = lireJourneePerso(reglage);
-  const cat = CARTES_JOURNEE.filter((c) => c.zone === zone).map((c) => c.id);
+  const cat = CARTES_JOURNEE.filter((c) => c.zone === zone && !c.fixe).map((c) => c.id);
   const out = r.ordre.filter((id) => cat.includes(id));
   cat.forEach((id, i) => {
     if (out.includes(id)) return;
@@ -111,7 +120,7 @@ export function urgencesJournee({ tuiles = {}, alertes = [] } = {}) {
 // ── LES GESTES DE L'ÉDITEUR (rendent un NOUVEAU réglage, à enregistrer) ──────
 const estampille = (r) => ({ ...r, at: new Date().toISOString() });
 // L'ordre complet (toutes zones), pour qu'un déplacement fige la zone entière.
-const ordreComplet = (r) => ZONES_JOURNEE.flatMap((z) => ordreJournee(z.id, r));
+const ordreComplet = (r) => ZONES_JOURNEE.flatMap((z) => ordreMobile(z.id, r));
 
 export function basculerCarte(reglage, id, on) {
   const r = lireJourneePerso(reglage);
@@ -119,11 +128,12 @@ export function basculerCarte(reglage, id, on) {
   return estampille({ ...r, choix: { ...r.choix, [id]: !!on } });
 }
 
-// Déplace `id` à la position `vers` (index dans SA zone, borné).
+// Déplace `id` à la position `vers` (index parmi les cartes MOBILES de sa zone, borné).
+// Une carte fixe ne se déplace pas.
 export function deplacerCarte(reglage, id, vers) {
   const r = lireJourneePerso(reglage);
-  const c = PAR_ID.get(id); if (!c) return r;
-  const zone = ordreJournee(c.zone, r);
+  const c = PAR_ID.get(id); if (!c || c.fixe) return r;
+  const zone = ordreMobile(c.zone, r);
   const de = zone.indexOf(id);
   const a = Math.max(0, Math.min(zone.length - 1, Math.round(Number(vers))));
   if (de < 0 || !Number.isFinite(a) || a === de) return r;

@@ -149,6 +149,9 @@ const editeur = (pg, sel = '[data-feuille-journee-perso]') => pg.evaluate((sel) 
 const lirePerso = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_journee_perso')); } catch (_) { return null; } });
 // Glisser une poignée : au DOIGT (événements tactiles CDP ⇒ pointeurs « touch ») ou à la souris.
 async function glisser(pg, tactile, id, versId) {
+  // La ligne doit être À L'ÉCRAN : un doigt posé hors de la vue touche <html>, pas la poignée.
+  await pg.locator(`[data-jp-poignee="${id}"]`).evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await pg.waitForTimeout(250);
   const a = await pg.locator(`[data-jp-poignee="${id}"]`).boundingBox();
   const b = await pg.locator(`[data-jp-ligne="${versId}"]`).boundingBox();
   const x = a.x + a.width / 2, y0 = a.y + a.height / 2, y1 = b.y + b.height * 0.8;
@@ -193,18 +196,20 @@ async function main() {
         await pg.locator('[data-jp-interrupteur="envoyer"]').click(); await pg.waitForTimeout(300);
         ed = await editeur(pg);
         dit(ed.montrees.envoyer === '0' && ed.origine === '0', `E ${T} l'interrupteur cache « Colis à envoyer »`, JSON.stringify({ m: ed.montrees.envoyer, o: ed.origine }));
-        // K — au clavier : « Les chiffres du mois » remonte d'un cran (flèche haut), le focus reste sur sa poignée, c'est annoncé.
-        await pg.locator('[data-jp-poignee="chiffres"]').focus();
+        // K — au clavier : « Les 7 derniers jours » remonte d'un cran (flèche haut), le focus reste sur sa poignée, c'est annoncé.
+        // « Les chiffres du mois » est FIXE (toujours sous la carte sombre) : aucune poignée.
+        dit(await pg.locator('[data-feuille-journee-perso] [data-jp-poignee="chiffres"]').count() === 0, `K ${T} « Les chiffres du mois » (posés sous la carte) n'ont pas de poignée qui ne ferait rien`);
+        await pg.locator('[data-jp-poignee="frise"]').focus();
         await pg.keyboard.press('ArrowUp'); await pg.waitForTimeout(250);
         ed = await editeur(pg);
-        dit(ed.zones.tete.join() === 'phrase,prochain,chiffres,frise' && ed.focus === 'chiffres' && /3/.test(ed.annonce), `K ${T} flèche haut : « chiffres » avant « frise », le focus reste sur la poignée, annoncé`, JSON.stringify({ tete: ed.zones.tete, focus: ed.focus, annonce: ed.annonce }));
+        dit(ed.zones.tete.join() === 'phrase,frise,prochain,chiffres' && ed.focus === 'frise' && /2/.test(ed.annonce), `K ${T} flèche haut : la frise avant la prochaine chose, le focus reste sur la poignée, annoncé`, JSON.stringify({ tete: ed.zones.tete, focus: ed.focus, annonce: ed.annonce }));
         await pg.keyboard.press('Home'); await pg.waitForTimeout(250);
         ed = await editeur(pg);
-        dit(ed.zones.tete[0] === 'chiffres' && ed.focus === 'chiffres', `K ${T} Début : en tête de sa zone`, JSON.stringify(ed.zones.tete));
+        dit(ed.zones.tete[0] === 'frise' && ed.focus === 'frise', `K ${T} Début : en tête de sa zone`, JSON.stringify(ed.zones.tete));
         await pg.keyboard.press('End'); await pg.waitForTimeout(250);
         await pg.keyboard.press('ArrowUp'); await pg.waitForTimeout(250);
         ed = await editeur(pg);
-        dit(ed.zones.tete.join() === 'phrase,prochain,chiffres,frise', `K ${T} Fin puis haut : avant-dernière`, JSON.stringify(ed.zones.tete));
+        dit(ed.zones.tete.join() === 'phrase,frise,prochain,chiffres', `K ${T} Fin puis haut : avant-dernière des cartes mobiles`, JSON.stringify(ed.zones.tete));
         // G — au doigt (390) / à la souris (1512) : « Messages » glissé sous « Prix à baisser ».
         const avantG = ed.zones.afaire.slice();
         await glisser(pg, tactile, 'messages', 'prix');
@@ -218,11 +223,11 @@ async function main() {
         await shot(pg, `jp-modifiee-${vp.width}-${theme}`);
         dit(!e1.cartes.includes('envoyer') && e1.cachees.envoyer === '3' && e1.nCachees === 1, `D ${T} « à envoyer » cachée : plus à l'écran, son compteur reste publié (bloc caché, 3)`, JSON.stringify({ cartes: e1.cartes, cachees: e1.cachees, nc: e1.nCachees }));
         dit(e0.gestes != null && e1.gestes === e0.gestes - 1, `D ${T} « N gestes » ne compte plus la carte cachée (${e0.gestes} ⇒ ${e0.gestes - 1})`, String(e1.gestes));
-        dit(e1.ordreTete.join() === 'phrase,chiffres,frise' || e1.ordreTete.join() === 'phrase,prochain,chiffres,frise', `D ${T} la tête suit SON ordre (chiffres avant la frise)`, e1.ordreTete.join());
+        dit(e1.ordreTete.join() === 'phrase,frise,chiffres' || e1.ordreTete.join() === 'phrase,frise,prochain,chiffres', `D ${T} la tête suit SON ordre (la frise avant la prochaine chose)`, e1.ordreTete.join());
         // O — enregistré, synchronisé, et toujours là au rechargement.
         await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_journee_perso')); return p && p.choix && p.choix.envoyer === false; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
         const p = await lirePerso(pg);
-        dit(p && p.choix && p.choix.envoyer === false && Array.isArray(p.ordre) && p.ordre.indexOf('chiffres') < p.ordre.indexOf('frise'), `O ${T} le réglage est enregistré (vrm_journee_perso)`, JSON.stringify(p));
+        dit(p && p.choix && p.choix.envoyer === false && Array.isArray(p.ordre) && p.ordre.indexOf('frise') < p.ordre.indexOf('prochain'), `O ${T} le réglage est enregistré (vrm_journee_perso)`, JSON.stringify(p));
         // Cette base est « non cloisonnée » (la sonde `owner` répond 400, comme au banc journee-v2) : l'app n'y
         // écrit jamais la ligne `main`. La preuve de la synchro est donc la FILE D'ENVOI vers le nuage (où
         // n'entrent que les clés de SYNC_KEYS, jusqu'à ce que le nuage les accepte) ; le sens nuage → appareil
