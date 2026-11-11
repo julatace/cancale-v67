@@ -20,7 +20,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const PREFIXE_ACTIONS = 'actions_compte_';
-export const SELECT_ACTIONS = 'id,ts:data->ts,max:data->>max,reserve:data->>reserve';
+export const SELECT_ACTIONS = 'id,ts:data->ts,max:data->>max,reserve:data->>reserve,prudence:data->>prudence,maxp:data->>maxPrudence';
+// (11 nov., ext. 5.357) LA PRUDENCE : après un refus de Vinted, le compte passe 24 h à
+// `PLAFOND_PRUDENCE` actions/heure (le plafond normal ne bouge pas). Chaque Chrome publie
+// l'heure de fin (`prudence`) ; la plus lointaine encore à venir fait foi, échue = levée.
+export const PLAFOND_PRUDENCE = 20;
+const PRUDENCE_MAX_MS = 24 * 3600000 + 60000;
 export const PLAFOND_HEURE = 50;      // CLAUDE.md §3 (sa décision du 29 oct.)
 export const RESERVE_GESTES = 5;      // les 5 dernières restent à SES clics ⇒ 45 pour l'app
 const HEURE = 3600000;
@@ -35,7 +40,7 @@ export function jaugeDuCompte(rows, uid, maintenant = Date.now()) {
   const miennes = rows.filter((r) => r && ligneDe(PREFIXE_ACTIONS, u, r.id));
   if (!miennes.length) return null;
   const heures = [];
-  let max = null, reserve = null;
+  let max = null, reserve = null, prudence = null, maxp = null;
   for (const r of miennes) {
     for (const x of (Array.isArray(r.ts) ? r.ts : [])) {
       const v = Number(x);
@@ -44,16 +49,20 @@ export function jaugeDuCompte(rows, uid, maintenant = Date.now()) {
     const m = Number(r.max), z = Number(r.reserve);
     if (r.max != null && Number.isFinite(m) && m > 0 && max == null) max = m;
     if (r.reserve != null && Number.isFinite(z) && z >= 0 && reserve == null) reserve = z;
+    const pr = Number(r.prudence), mp = Number(r.maxp);
+    if (r.prudence != null && Number.isFinite(pr) && pr > maintenant && pr <= maintenant + PRUDENCE_MAX_MS && (prudence == null || pr > prudence)) { prudence = pr; maxp = Number.isFinite(mp) && mp > 0 ? mp : PLAFOND_PRUDENCE; }
   }
   heures.sort((a, b) => a - b);
-  const plafond = max == null ? PLAFOND_HEURE : max;
-  const res = reserve == null ? RESERVE_GESTES : reserve;
+  // En prudence, le plafond de la prudence vaut pour tout (l'extension ne garde pas de réserve).
+  const plafond = prudence != null ? Math.min(maxp, max == null ? PLAFOND_HEURE : max) : (max == null ? PLAFOND_HEURE : max);
+  const res = prudence != null ? 0 : (reserve == null ? RESERVE_GESTES : reserve);
   const n = heures.length;
   return {
     n,
     max: plafond,
     pourApp: Math.max(0, plafond - res),
     plein: n >= plafond - res,
+    prudence,
     // La plus ancienne action de l'heure sort du compte à cette heure-là : une place se libère.
     repartA: n ? heures[0] + HEURE : null,
   };
@@ -74,6 +83,8 @@ export function heureFr(ms) {
 export function texteJauge(j) {
   if (!j) return { valeur: '—', suite: 'pas encore dit par l’extension', ton: 'passu' };
   const valeur = `${j.n}/${j.max} cette heure`;
+  // (5.357) Prudence : un geste de Vinted à respecter ⇒ ambre, l'heure de fin dite.
+  if (j.prudence) return { valeur, suite: `Prudence jusqu’à ${heureFr(j.prudence)}`, ton: 'geste', prudence: true };
   if (!j.n) return { valeur, suite: '', ton: '' };
   if (j.plein) return { valeur, suite: `VRM attend · repart à ${heureFr(j.repartA)}`, ton: 'geste' };
   return { valeur, suite: `repart à ${heureFr(j.repartA)}`, ton: '' };

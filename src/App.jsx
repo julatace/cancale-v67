@@ -242,6 +242,8 @@ const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ 
 // (9 nov., lot AG) La ligne ambre « compte qui n'arrive plus » est FONDUE dans la ligne de fraîcheur unique
 // (src/LigneFraicheur.jsx, règle src/fraicheur.js) : une voix en haut de l'app, plus deux.
 const LigneFraicheurParesseuse = lazy(() => import('./LigneFraicheur.jsx'));
+// (11 nov., ext. 5.357) « Vinted a changé sa page des ventes : VRM ne la lit plus, on corrige » — une fois, sur Ma journée.
+const AlerteFormeVinted = lazy(() => import('./AlerteFormeVinted.jsx'));
 // (8 nov.) « shop_x est relié à VRM » : la feuille d'accueil d'un compte relié pour la première fois (src/CompteRelie.jsx).
 const AccueilComptesReliesParesseux = lazy(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
 const FactureVenteLigneParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
@@ -56476,6 +56478,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
+        {tab==='journee'&&<GardeEcran nom="journee:forme"><Suspense fallback={null}><AlerteFormeVinted/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onAllerTrancher={allerTrancher} onTrancherAT={trancherAT} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à

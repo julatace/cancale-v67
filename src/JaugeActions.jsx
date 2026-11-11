@@ -53,7 +53,7 @@ export default function JaugeActions({ uid, nom = '' }) {
   const j = rows === undefined ? undefined : jaugeDuCompte(rows, u, maintenant);
   const t = j === undefined ? { valeur: '…', suite: '', ton: 'passu' } : texteJauge(j);
   return (
-    <div className="vrm-jauge" data-jauge-actions={u} data-jauge-n={j ? j.n : (j === null ? 'pas-su' : 'lecture')} data-jauge-max={j ? j.max : ''} data-ton={t.ton || undefined}
+    <div className="vrm-jauge" data-jauge-actions={u} data-jauge-n={j ? j.n : (j === null ? 'pas-su' : 'lecture')} data-jauge-max={j ? j.max : ''} data-jauge-prudence={j && j.prudence ? String(j.prudence) : undefined} data-ton={t.ton || undefined}
       role="status" aria-label={`Actions de l’heure${nom ? ' sur ' + nom : ''} : ${t.valeur}${t.suite ? ', ' + t.suite : ''}`}>
       <BarreJauge j={j || null} />
       <span className="vrm-jauge-texte">
@@ -77,7 +77,7 @@ export function JaugesComptes({ uids = [], nomCompte = () => null }) {
         const j = rows === undefined ? undefined : jaugeDuCompte(rows, u, maintenant);
         const t = j === undefined ? { valeur: '…', suite: '', ton: 'passu' } : texteJauge(j);
         return (
-          <div key={u} className="vrm-jauge vrm-jauge-rangee" data-jauge-actions={u} data-jauge-n={j ? j.n : (j === null ? 'pas-su' : 'lecture')} data-ton={t.ton || undefined}>
+          <div key={u} className="vrm-jauge vrm-jauge-rangee" data-jauge-actions={u} data-jauge-n={j ? j.n : (j === null ? 'pas-su' : 'lecture')} data-jauge-prudence={j && j.prudence ? String(j.prudence) : undefined} data-ton={t.ton || undefined}>
             <span className="vrm-jauge-nom">{nomCompte(u) || `compte ${u}`}</span>
             <BarreJauge j={j || null} />
             <span className="vrm-jauge-texte"><b className="vrm-jauge-valeur">{t.valeur}</b>{t.suite ? <span className="vrm-jauge-suite">{t.suite}</span> : null}</span>

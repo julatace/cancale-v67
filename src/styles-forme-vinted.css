@@ -1,0 +1,13 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « Vinted a changé sa page des ventes » (11 nov., ext. 5.357) : src/AlerteFormeVinted.jsx.
+   Ambre (un geste de notre côté à attendre, rien de grave à rattraper chez lui). Aucun rouge (§7).
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-forme-vinted {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+  margin: 0 0 12px; padding: 10px 16px; border-radius: var(--w-r, 24px);
+  background: var(--w-carte, #fff); box-shadow: var(--w-ombre, none);
+  font-size: 14px; line-height: 1.4; color: var(--w-encre, #1D1D1F);
+}
+.vrm-forme-ligne { display: flex; align-items: flex-start; gap: 8px; margin: 0; flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.vrm-forme-point { flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--vrm-warn, #B25000); }
+.vrm-forme-compris { min-height: 44px; min-width: 44px; margin-left: auto; }
