@@ -102,9 +102,15 @@ etatSimpleImport(etats && etats[uid]);                  // { etat, n, N }
   (`--mutations`).
 - `audit-budget-lectures` et `audit-ventes-fusion` : verts (rouges tant que l'import tournait DANS la
   visite — d'où le passage de fond).
-- Les 128 audits qui lisent `background.js` : comparés à origin/main (voir « Rouges restants »).
-- Banc **`scripts/bancs/import-depart.cjs`** (390 tactile et 1512, clair et sombre) : voir le résultat
-  ci-dessous ; captures regardées.
+- Les **130 audits** qui lisent `background.js`, lancés sur l'arbre fusionné ET sur origin/main : **aucun
+  ne passe du vert au rouge**. Rouges sur les deux (sans lien avec ce lot) : `audit-preuve-vente`,
+  `audit-prix-mini`. (Un rouge vu en route, `audit-lbc-plus-vue-pause` : deux `ImportDepart` dans le
+  collage App + écrans — l'import de Réglages s'appelle `HistoriqueVinted`, vert.)
+- Banc **`scripts/bancs/import-depart.cjs`** (390 tactile et 1512, clair et sombre) : **80 verts**. Il a
+  trouvé deux défauts, corrigés : un total absent lu comme 0 côté app (« 0 sur 0 »), et la carte blanche
+  en mode sombre (jetons `--d-*` désormais). Captures regardées (Paramètres, Ma journée, pause).
+- Banc **`scripts/bancs/badge.cjs`** : **138 verts** (6 neufs : « 400 sur 1 250 », barre au tiers, pas de
+  bouton pendant la lecture, « Tout est récupéré ✓ » + « Tout récupérer », jamais lu ⇒ rien).
 
 ## Reste / limites
 
