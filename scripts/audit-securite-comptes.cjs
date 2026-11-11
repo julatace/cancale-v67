@@ -49,7 +49,7 @@ const MUTATIONS = {
   defi: ['src/securiteComptes.js', "if (e['x-datadome'] || e['x-dd-b'] || /challenge/i.test(String(e['cf-mitigated'] || ''))) return 'robot';", ''],
   retry: ['vinted-sync-extension/background.js', 'const minutes = Math.max(PAUSE_PALIERS_MIN[niveau - 1], Math.ceil((Number(retryMs) || 0) / 60000));', 'const minutes = PAUSE_PALIERS_MIN[niveau - 1];'],
   moteur: ['vinted-sync-extension/background.js', "if (await secuGeste('vinted', uid, 'offre', 'auto')) break;", ''],
-  clicRobot: ['vinted-sync-extension/background.js', "  { const rb = await secuRobotDit('vinted', uid); if (rb) return rb; }\n  // Vinted a demandé de ralentir", '  // Vinted a demandé de ralentir'],
+  observer: ['vinted-sync-extension/background.js', "        c.robot = { depuis: t };", ''],
   vc: ['vinted-sync-extension/background.js', "{ const rbVc = await secuRobotDit('vestiaire', o.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }\n    const secuVc = await secuGeste('vestiaire', o.compte, 'reponse', 'clic');", 'const secuVc = null;'],
   lecture: ['vinted-sync-extension/background.js', "secuLectureNormale('vinted', String(uid)).catch(() => {});", ''],
 };
