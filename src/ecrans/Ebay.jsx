@@ -1787,7 +1787,8 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 de Vinted. */}
             {(() => {
               const ords = data.orders || [];
-              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
+              // (11 nov., revue robustesse) `null` = pas su ⇒ « — », jamais « 0,00 € ».
+              const eur = (n) => n == null || !Number.isFinite(Number(n)) ? '—' : (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
               const val = (o) => Number((o && o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || 0) || 0;
               const paye = (o) => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID';
               const livre = (o) => String((o && o.orderFulfillmentStatus) || '').toUpperCase() === 'FULFILLED';

@@ -38252,9 +38252,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (manque || !declarables) { setDeclForm(f => f ? { ...f, refus: manque || { enCours: [], rates: ['les dates de versement Vinted'] } } : f); return; }
     const ids = regle === 'vente' && ancienneRegle ? ancienneRegle.ids : report.saleLines.map(l => l.id).filter(Boolean);
     const ca = regle === 'vente' && ancienneRegle ? ancienneRegle.ca : Math.round(report.ca * 100) / 100;
-    const m = parseFloat(String(montantTxt || '').replace(/\s/g, '').replace(',', '.'));
+    const m = lireMontantSaisi(montantTxt);   // (11 nov.) la même règle que « payé » : « 1.234,56 » n'est plus lu 1,23 €
     const p = lireMontantSaisi(payeTxt);
-    const rec = { ids, n: ids.length, ca, montant: isFinite(m) && m >= 0 ? Math.round(m * 100) / 100 : null, paye: p == null ? null : p, regle: regle === 'vente' ? 'vente' : 'versement', at: Date.now() };
+    const rec = { ids, n: ids.length, ca, montant: m == null ? null : m, paye: p == null ? null : p, regle: regle === 'vente' ? 'vente' : 'versement', at: Date.now() };
     setDeclUrssaf(prev => { const u = { ...(prev || {}), [reportMonth]: rec }; save('vrm_urssaf_declare', u); return u; });
     setDeclForm(null);
     allerMoisSuivantSerie(reportMonth);

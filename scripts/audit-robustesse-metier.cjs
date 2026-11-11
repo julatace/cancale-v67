@@ -23,6 +23,7 @@
 //       d'une paire qui dort ne descend jamais sous le prix d'achat.
 //    K  Aucun bénéfice / marge négatif en rouge (§7 : rouge = deux paires sous un N°).
 //    L  N° comparés par `cleNum` (bordereau, inventaire).
+//    M  « pas su » ≠ 0 : Argent eBay « — » ; montant déclaré lu par `lireMontantSaisi`.
 //  `--prouve` : chaque mutation (réaffaiblir la règle) doit faire rougir un contrôle.
 //  Sur origin/main (git archive), A, B, D, E, F, G, H, I, J, K sont rouges.
 //  Aucune donnée réelle : tout est inventé (dépôt public).
@@ -52,6 +53,7 @@ const MUTATIONS = {
   'offre vendue ailleurs acceptée': [['src/offresGarde.js', "if (r === 'vendue-ailleurs') return { bloque: true,", "if (r === 'vendue-ailleurs') return { bloque: false,"]],
   'baisse flottante': [['src/baissePrix.js', "!/^\\d+(?:[.,]\\d{1,2})?$/.test(brut.replace(/\\s/g, ''))", 'Math.round(v * 100) !== v * 100']],
   'bénéfice rouge': [['src/ecrans/Compta.jsx', "style={{padding:'2px 10px',color:b==null?C.muted:C.text,", "style={{padding:'2px 10px',color:b==null?C.muted:(b>=0?C.text:C.danger),"]],
+  'eBay pas su = 0': [['src/ecrans/Ebay.jsx', "const eur = (n) => n == null || !Number.isFinite(Number(n)) ? '—' : (Math.round", "const eur = (n) => (Math.round"]],
   'bordereau sans cleNum': [['src/App.jsx', 'bb.numero && cleNum(bb.numero) === cleNum(numero)', 'bb.numero && String(bb.numero) === String(numero)']],
 };
 
@@ -199,6 +201,17 @@ const MUTATIONS = {
     dit(/cleNum\(bb\.numero\) === cleNum\(numero\)/.test(g), 'L1 bordereau ⇄ fiche par `cleNum` (« 07 » = « 7 »)');
     const j = STOCK.indexOf('const numeroExists ='), h = j < 0 ? '' : STOCK.slice(j, j + 300);
     dit(/cleNum\(/.test(h) && !/toLowerCase\(\)/.test(h), 'L2 inventaire : un N° déjà pris se reconnaît par `cleNum`');
+  }
+
+  // ── M. « Pas su » ≠ 0 (moy. 23, 33) ─────────────────────────────────────
+  {
+    const EB = sansCommentaires(lire('src/ecrans/Ebay.jsx'));
+    const i = EB.indexOf('const ords = data.orders || [];'), g = i < 0 ? '' : EB.slice(i, i + 600);
+    const m = g.match(/const eur = (\([^\n]*);/);
+    let r = null; try { r = m ? new Function('return ' + m[1])()(null) : null; } catch (_) { r = null; }
+    dit(r === '—', 'M1 Argent eBay : un total « pas su » s\'écrit « — », jamais « 0,00 € »', String(r));
+    const j = APP.indexOf('const declarerMois = '), h = j < 0 ? '' : APP.slice(j, APP.indexOf('\n  };', j));
+    dit(/const m = lireMontantSaisi\(montantTxt\)/.test(h) && !/parseFloat\(String\(montantTxt/.test(h), 'M2 montant déclaré lu par `lireMontantSaisi` (« 1.234,56 » n\'est plus 1,23 €)');
   }
 
   console.log(rouges ? `\n❌ ${rouges} contrôle(s) rouge(s)` : '\n✅ robustesse métier : toutes les règles tiennent');
