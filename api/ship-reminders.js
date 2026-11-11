@@ -40,6 +40,7 @@ import { aExpedier } from './widget.js';
 import { bordsParTransaction, compterEcheances, heureCourte } from './_lib/limite-envoi.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
+import { MAIN_MOTS, motsServeur } from './_lib/mots-vendeur.js';
 import { sbCle } from './_lib/cle.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
@@ -228,7 +229,7 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = ['vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus'];
+const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -386,7 +387,7 @@ async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
   if (!bilanAEnvoyer(b)) return 'données illisibles — réessai demain';
   // Le mémo AVANT l'envoi, et CONFIRMÉ : un bilan par semaine, jamais deux.
   if (!(await ecrireDedup('bilan_semaine_dedup', { semaine: sem.lundi, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
-  const t = texteBilan(b, sem);
+  const t = texteBilan(b, sem, motsServeur(d.main && d.main[MAIN_MOTS], proprietaireCourant()));   // (11 nov.) « paire » / « article »
   const envoi = await sendPushToAll({ cat: 'bilan', title: t.titre, body: t.corps, tag: 'bilan-' + sem.lundi, url: DESTINATIONS.semaine({ lundi: sem.lundi }) });   // (10 nov., lot BC) l'écran « Ma semaine », sur CETTE semaine
   // Le bilan rendu ne porte AUCUN montant (la réponse d'un cron se lit dans un
   // tableau de bord) : seulement les états, et le nombre de colis.

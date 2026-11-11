@@ -10,6 +10,7 @@
 import React, { useMemo } from 'react';
 import { margeParPlateforme, texteMarge, sitesMontres, sitesLusDeLignes } from './margePlateforme.js';
 import './styles-marge-plateforme.css';
+import { motsVendeur } from './profilVendeur.js';
 
 const NOM = { Vinted: 'Vinted', Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire: 'Vestiaire Co' };
 
@@ -34,7 +35,7 @@ export default function MargePlateforme({ liveStats, releve = null, de, a, onSai
   const sansAchat = R.plateformes.reduce((s, p) => s + (p.etat === 'lu' ? p.nSansAchat : 0), 0);
   return (
     <section className="vrm-sv-carte vrm-mp-carte" data-stats-carte="marge-plateforme" data-mp-etat={R.etat} data-mp-releve={R.releveLu ? '1' : '0'} data-mp-caches={R.plateformes.filter((p) => !montres.has(p.plat)).map((p) => p.plat).join(',')}>
-      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">Marge par plateforme</h2><span className="vrm-sv-note">bénéfice par paire</span></div>
+      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">Marge par plateforme</h2><span className="vrm-sv-note">bénéfice par {motsVendeur().nom}</span></div>
       <ol className="vrm-mp-liste">
         {lignes.map((p) => {
           const t = texteMarge(p);

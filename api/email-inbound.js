@@ -38,6 +38,8 @@ import { stampBordereau } from './_lib/stamp.js';
 import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
+import { motsServeur } from './_lib/mots-vendeur.js';
+import { motsArticle } from '../src/profilVendeur.js';
 // (9 nov.) Solo : la vente d'un compte hors offre ne sonne pas (api/_lib/plan-regle.js).
 import { venteHorsPlanServeur } from './_lib/plan-vendeur.js';
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres as fusionnerRegistresLib, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
@@ -1035,12 +1037,14 @@ export function jugerPrixParTitre(title, map) {
 async function prixAchatParTitre(title) {
   if (!title) return { etat: 'aucune' };
   try {
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros,jv:data->vrm_je_vends`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
     const rows = await res.json();
-    return jugerPrixParTitre(title, (rows[0] && rows[0].vinted_annonce_numeros) || {});
+    const j = jugerPrixParTitre(title, (rows[0] && rows[0].vinted_annonce_numeros) || {});
+    // (11 nov., lot vocabulaire-article) « paire » / « article » selon ce qu'il vend.
+    return j && typeof j === 'object' ? { ...j, mots: motsServeur(rows[0] && rows[0].jv, proprietaireCourant()) } : j;
   } catch (_) { return null; }
 }
 // La phrase du conseil, dans la notification. Sans identité, AUCUN « Accepte :
@@ -1048,9 +1052,10 @@ async function prixAchatParTitre(title) {
 // elle ». Pure, exécutée par `audit-flux-divers.cjs`.
 export function phraseConseilOffre(juge, offre) {
   const o = Number(offre);
+  const m = (juge && juge.mots) || motsArticle('sneakers');
   if (!juge || !juge.etat) return ' — expire en 24h.';
-  if (juge.etat === 'ambigu') return ` — ${juge.n || 'plusieurs'} paires portent ce titre dans VRM : ouvre la conversation pour savoir laquelle avant de répondre.`;
-  if (juge.etat === 'unique' && Number.isFinite(o)) return ` — une paire à ce titre a coûté ${Math.round(juge.prix)} € dans VRM (reconnue au titre seulement) : vérifie que c'est elle avant de répondre.`;
+  if (juge.etat === 'ambigu') return ` — ${juge.n || 'plusieurs'} ${m.noms} portent ce titre dans VRM : ouvre la conversation pour savoir ${m.laquelle} avant de répondre.`;
+  if (juge.etat === 'unique' && Number.isFinite(o)) return ` — ${m.un} à ce titre a coûté ${Math.round(juge.prix)} € dans VRM (reconnu${m.e} au titre seulement) : vérifie que c'est ${m.lui} avant de répondre.`;
   return ' — expire en 24h.';
 }
 

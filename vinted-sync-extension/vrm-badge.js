@@ -481,7 +481,7 @@
       const ici = String(location.pathname || '');
       const lignes = e.aRetirer.liste.slice(0, 6).map((r) => {
         const cette = r.lbcId && ici.includes(String(r.lbcId));
-        const nom = (r.numero ? 'N°' + r.numero + ' · ' : '') + (r.titre || 'une paire');
+        const nom = (r.numero ? 'N°' + r.numero + ' · ' : '') + (r.titre || (globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).un || 'une paire');
         return `<div class="val alerte" data-a-retirer="${esc(r.lbcId || r.numero || '')}">${cette ? '<b>C’est cette annonce</b> — ' : ''}${esc(nom)} — vendue sur Vinted, encore en ligne ici${r.lu ? ' (vu ' + esc(depuis(r.lu)) + ')' : ''}${r.url && !cette ? ` · <a href="${esc(r.url)}" target="_top">voir l’annonce</a>` : ''}</div>`;
       }).join('');
       const plus = e.aRetirer.liste.length > 6 ? `<div class="val gris">et ${e.aRetirer.liste.length - 6} autre(s) — la liste complète est dans VRM → Leboncoin → Annonces</div>` : '';

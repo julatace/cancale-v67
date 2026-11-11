@@ -253,8 +253,8 @@
       if (!(R.extractBrand(a.marque) || a.marque) && !R.extractBrand(a.titre)) { hote.setAttribute('data-vrm-stock', 'marque'); stock.appendChild(el('p', 'petit', 'Marque pas lue : je ne compare pas.')); return; }
       const p = R.pairesDuModele({ cible, stock: r.stock, marqueDe: R.extractBrand, modeleDe: R.extractModel, couleursDe: R.extractColors });
       hote.setAttribute('data-vrm-stock', String(p.n));
-      if (!p.n) { stock.appendChild(el('p', 'petit', r.aConfirmer ? 'Aucune paire proche en ligne. Des comptes sont à relire.' : 'Aucune paire proche en ligne chez toi.')); return; }
-      stock.appendChild(el('p', '', `Peut-être ${p.n} paire${p.n > 1 ? 's' : ''} proche${p.n > 1 ? 's' : ''} en ligne chez toi`));
+      if (!p.n) { stock.appendChild(el('p', 'petit', r.aConfirmer ? `${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).Aucune || 'Aucune paire'} proche en ligne. Des comptes sont à relire.` : `${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).Aucune || 'Aucune paire'} proche en ligne chez toi.`)); return; }
+      stock.appendChild(el('p', '', `Peut-être ${p.n} ${p.n > 1 ? ((globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).noms || 'paires') : ((globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).nom || 'paire')} proche${p.n > 1 ? 's' : ''} en ligne chez toi`));
       const ul = el('ul');
       for (const x of p.paires.slice(0, 3)) ul.appendChild(el('li', '', x.titre + (x.taille ? ' · ' + x.taille : '')));
       stock.appendChild(ul);

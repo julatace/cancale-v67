@@ -39,6 +39,7 @@
 //      · des ventes Leboncoin sans date captées pendant la semaine ;
 //      · pour le reçu : des ventes finalisées sans date de versement (elles
 //        peuvent avoir été payées cette semaine — le dire, pas les deviner).
+import { motsArticle } from '../../src/profilVendeur.js';
 import { ventesFaites, ventesDeclarables, compteEcarte } from './ventes-regle.js';
 import { excluAutreDe } from './comptes-exclus.js';
 
@@ -229,7 +230,9 @@ const euros = (x) => `${Number(x).toLocaleString('fr-FR', { minimumFractionDigit
 const jourMois = (ymd) => new Date(minuitParis(ymd) + 12 * 3600000).toLocaleDateString('fr-FR', { timeZone: PARIS, day: 'numeric', month: 'short' });
 const liste = (xs, max = 2) => xs.length <= max ? xs.join(', ') : `${xs.slice(0, max).join(', ')} et ${xs.length - max} autre${xs.length - max > 1 ? 's' : ''}`;
 
-export function texteBilan(b, sem) {
+// (11 nov., lot vocabulaire-article) `mots` : « paire » / « article » du vendeur (api/_lib/mots-vendeur.js) ;
+// absent ⇒ les mots de Sneakers, le texte d'avant mot pour mot.
+export function texteBilan(b, sem, mots = motsArticle('sneakers')) {
   const titre = `📊 Ta semaine du ${jourMois(sem.lundi)} au ${jourMois(sem.dimanche)}`;
   const l = [];
   const v = b.vendu;
@@ -248,8 +251,8 @@ export function texteBilan(b, sem) {
   else l.push("À expédier : à voir dans l'app.");
   if (b.dorment.etat === 'su' && (b.dorment.n > 0 || !b.dorment.auMoins)) {
     l.push(b.dorment.n
-      ? `${b.dorment.auMoins ? 'Au moins ' : ''}${b.dorment.n} paire${b.dorment.n > 1 ? 's' : ''} en ligne depuis plus de 30 jours.`
-      : 'Aucune paire ne dort.');
+      ? `${b.dorment.auMoins ? 'Au moins ' : ''}${b.dorment.n} ${b.dorment.n > 1 ? mots.noms : mots.nom} en ligne depuis plus de 30 jours.`
+      : `${mots.Aucune} ne dort.`);
   }
   return { titre, corps: l.join('\n') };
 }

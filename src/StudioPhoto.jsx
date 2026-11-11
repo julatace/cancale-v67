@@ -27,6 +27,7 @@
 // photo du téléphone (champ fichier), recadré au même format, et on le DIT.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RATIO_CADRE, PHOTOS_MAX_PAR_PAIRE, recadrer, recadrerFichier, lireStudio, modifierStudio, detourerLocal } from './studioPhoto.js';
+import { motsVendeur } from './profilVendeur.js';
 import { lirePhotoroom, cleUtilisable, raisonSansPhotoroom, detourerAvecPhotoroom } from './photoroomCle.js';
 
 const damier = 'repeating-conic-gradient(#d9dde3 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
@@ -42,7 +43,7 @@ function Cadre({ C }) {
       <line x1="30" y1="296" x2="270" y2="296" stroke={trait} strokeWidth="2" strokeDasharray="7 6" />
       <line x1="150" y1="40" x2="150" y2="360" stroke={doux} strokeWidth="1" strokeDasharray="3 7" />
       <path d="M58 296 C 70 250, 110 236, 150 240 C 190 236, 232 246, 246 296" fill="none" stroke={doux} strokeWidth="1.5" />
-      <text x="150" y="322" textAnchor="middle" fill={trait} fontSize="12" fontFamily="inherit">la paire sur cette ligne, de profil</text>
+      <text x="150" y="322" textAnchor="middle" fill={trait} fontSize="12" fontFamily="inherit">{motsVendeur().le} sur cette ligne, de profil</text>
     </svg>
   );
 }
@@ -76,7 +77,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
   // Ce qu'une opération rapporte, pour la paire `p` où elle a commencé.
   const appliquer = (p, photos, texte) => {
     if (toujoursLa(p)) { if (photos) setPhotos(photos); setMsg(texte); return; }
-    setMsg(`Photo de la N°${p.num} — ${texte} (Tu regardes maintenant une autre paire : rien n’a été rangé sous celle-ci.)`);
+    setMsg(`Photo de ${motsVendeur().la} N°${p.num} — ${texte} (Tu regardes maintenant ${motsVendeur().autre} : rien n’a été rangé sous ${motsVendeur().celle}-ci.)`);
   };
 
   const liste = useMemo(() => {
@@ -117,8 +118,8 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
     const r = await modifierStudio(base, p.cle, p.num, (l) => (l.length >= PHOTOS_MAX_PAR_PAIRE ? false : [...l, ph]));
     setOccupe('');
     if (!r.ok) { setMsg(r.raison === 'lecture' ? 'La base n’a pas répondu : je n’ai rien rangé (pour ne pas effacer les photos déjà là). Réessaie.' : 'La photo n’a pas pu être enregistrée — réessaie.'); return; }
-    if (r.rien) { setMsg(`Cette paire a déjà ${PHOTOS_MAX_PAR_PAIRE} photos : retire-en une pour en ranger une autre.`); return; }
-    appliquer(p, r.photos, `Photo rangée pour la paire N°${p.num}.`);
+    if (r.rien) { setMsg(`${motsVendeur().Ce} a déjà ${PHOTOS_MAX_PAR_PAIRE} photos : retire-en une pour en ranger une autre.`); return; }
+    appliquer(p, r.photos, `Photo rangée pour ${motsVendeur().le} N°${p.num}.`);
   };
 
   const declencher = () => {
@@ -179,19 +180,19 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.bg, borderRadius: '18px 18px 0 0', width: '100%', maxWidth: 620, maxHeight: '92vh', overflowY: 'auto', padding: '16px 14px calc(20px + env(safe-area-inset-bottom))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: C.text }}>Studio photo{sel ? ` · N°${sel.num}` : ''}</span>
-          {sel && <button type="button" className={B.d} onClick={() => { couper(); setSel(null); setMode('choix'); setMsg(''); }}>Changer de paire</button>}
+          {sel && <button type="button" className={B.d} onClick={() => { couper(); setSel(null); setMode('choix'); setMsg(''); }}>Changer {motsVendeur().deNom}</button>}
           <button type="button" aria-label="Fermer le studio photo" onClick={fermer} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
-          Même cadre pour toutes tes paires. Enregistre, puis ajoute-la sur Vinted.
+          Même cadre pour {motsVendeur().toutes} {motsVendeur().tes}. Enregistre, puis ajoute-la sur Vinted.
         </div>
 
         {!sel && (
           <div data-studio-choix>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre de la paire" aria-label="Chercher une paire"
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`N° ou titre ${motsVendeur().de}`} aria-label={`Chercher ${motsVendeur().un}`}
               style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 15, background: C.card, color: C.text, marginBottom: 8, fontFamily: 'inherit' }} />
             {!(paires || []).length ? (
-              <div style={{ fontSize: 13, color: C.muted }}>Aucune paire numérotée : les photos se rangent sous le N°.</div>
+              <div style={{ fontSize: 13, color: C.muted }}>{motsVendeur().Aucune} numéroté{motsVendeur().e} : les photos se rangent sous le N°.</div>
             ) : liste.map((p) => (
               <button key={p.cle} type="button" data-studio-paire={p.cle} onClick={() => { setSel(p); setMode('choix'); setMsg(''); }}
                 style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', textAlign: 'left', border: 'none', borderBottom: `1px solid ${C.border}`, background: 'transparent', padding: '10px 4px', cursor: 'pointer', fontFamily: 'inherit', color: C.text }}>
@@ -226,16 +227,16 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
           </div>
           {msg && <div data-studio-msg style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 10 }}>{msg}</div>}
 
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: '6px 0' }}>Photos de la paire N°{sel.num}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: '6px 0' }}>Photos {motsVendeur().de} N°{sel.num}</div>
           {photos === undefined ? <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>
             : photos === null ? <div data-studio-passu style={{ fontSize: 13, color: C.muted }}>La base n’a pas répondu : photos rangées pas sues. Rien ne sera écrasé.</div>
-            : !photos.length ? <div style={{ fontSize: 13, color: C.muted }}>Aucune photo rangée pour cette paire.</div>
+            : !photos.length ? <div style={{ fontSize: 13, color: C.muted }}>Aucune photo rangée pour {motsVendeur().ce}.</div>
             : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
                 {photos.map((ph, i) => (
                   <div key={ph.id} data-studio-photo={ph.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, background: C.card }}>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <img src={ph.img} alt={`Photo ${i + 1} de la paire N°${sel.num}`} style={{ width: ph.detoure ? '50%' : '100%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />
+                      <img src={ph.img} alt={`Photo ${i + 1} ${motsVendeur().de} N°${sel.num}`} style={{ width: ph.detoure ? '50%' : '100%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />
                       {ph.detoure && <img src={ph.detoure} data-studio-detoure alt="Détourée" style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'contain', borderRadius: 6, background: damier }} />}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>

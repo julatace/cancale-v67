@@ -14,6 +14,7 @@
 //  (src/preparerRelais.js, mémoire sur l'appareil).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { motsVendeur } from './profilVendeur.js';
 import { createPortal } from 'react-dom';
 import { ordreDeSeance, indexDeReprise, progression, lireSeancePreparer, ecrireSeancePreparer, oublierSeancePreparer } from './preparerRelais.js';
 
@@ -131,7 +132,7 @@ export default function PreparerColis({ colis, uid = '', attente = '', onFait, o
         <div className="vrm-prep-photo">
           {sure
             ? ((c.photo && Photo && Photo(c.photo)) || <span className="vrm-prep-photo-vide" data-preparer-sans-photo="">Photo pas encore lue</span>)
-            : <span className="vrm-prep-verif" data-preparer-verif="" role="note"><b>Paire à vérifier</b><span>{c.raisonPaire || 'Ce colis n’est relié à aucune vente par son n° : VRM ne montre pas de photo devinée. Regarde le bordereau et le carton.'}</span></span>}
+            : <span className="vrm-prep-verif" data-preparer-verif="" role="note"><b>{motsVendeur().Nom} à vérifier</b><span>{c.raisonPaire || 'Ce colis n’est relié à aucune vente par son n° : VRM ne montre pas de photo devinée. Regarde le bordereau et le carton.'}</span></span>}
           {c.num ? <span className={'vrm-prep-num is-' + (c.etatNum || 'ok')} data-preparer-grand-num={c.num}>N°{c.num}</span> : <span className="vrm-prep-num is-sans" data-preparer-grand-num="">Sans N°</span>}
         </div>
         {PHRASE_NUM[c.etatNum] ? <p className={'vrm-emb-alerte is-' + c.etatNum} role={c.etatNum === 'double' ? 'alert' : undefined} data-preparer-alerte={c.etatNum}>{PHRASE_NUM[c.etatNum](c.num, c)}</p> : null}

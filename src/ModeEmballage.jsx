@@ -10,9 +10,10 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { CASES_EMBALLAGE, ordreSeance, complet, aMarquerPostes, lireSeance, ecrireSeance, oublierSeance } from './emballage.js';
 import './styles-emballage.css';
+import { motsVendeur } from './profilVendeur.js';
 
 const PHRASE_NUM = {
-  double: (n) => `Deux paires portent le N°${n} : vérifie là où elles sont rangées avant d'emballer.`,
+  double: (n) => `Deux ${motsVendeur().noms} portent le N°${n} : vérifie là où ${motsVendeur().elle}s sont rangé${motsVendeur().e}s avant d'emballer.`,
   'a-verifier': (n) => `Le N°${n} est à vérifier là où l'article est rangé : regarde l'étiquette avant d'emballer.`,
   sans: () => 'Aucun N° relié à cette vente : fie-toi à la photo et au titre.',
 };
@@ -124,7 +125,7 @@ export default function ModeEmballage({ colis, lecture = null, onFermer, onMarqu
           </span>
         </div>
         <div className="vrm-emb-ou" data-emb-emplacement={c.emplacement.etat}>
-          <span className="vrm-emb-ou-lib">Où est la paire</span>
+          <span className="vrm-emb-ou-lib">Où est {motsVendeur().le}</span>
           <span className="vrm-emb-ou-txt">{c.emplacement.texte}</span>
           {c.emplacement.detail ? <span className="vrm-emb-ou-detail">{c.emplacement.detail}</span> : null}
         </div>
