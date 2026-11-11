@@ -36,13 +36,28 @@ Aucune fonction `api/` de plus (12/12), aucune migration, rien dans l'extension.
 ⚠️ Sans le secret `CRON_SECRET` dans GitHub, le passage de 15 min ne tourne pas : le résumé
 part alors au prochain envoi du vendeur (le réveil a la même dépendance depuis le 5 nov.).
 
+## 2 bis. Les JOURS calmes (ajout de Julien, relayé par la session principale)
+
+« En plus des heures calmes, des jours calmes au choix (week-end, jours off cochés, ou une
+période congés du … au …). Pendant un jour calme, seul l'URGENT passe ; le reste attend et part
+groupé au premier moment non calme. »
+
+| règle | où | décision |
+|---|---|---|
+| Réglage | `push_prefs.calme.jours` (`['sam','dim']`…), `push_prefs.calme.conges` `{ du, au }` (jours de Paris, inclus) | indépendants de l'interrupteur des heures calmes ; Paramètres → Notifications : « Week-end calme » (= samedi + dimanche), sept pastilles L…D, « Congés » Du / au + Effacer. La ligne `calme` est réécrite ENTIÈRE (un réglage n'efface pas l'autre). |
+| Une seule règle | `api/_lib/notif-textes.js` : `reglageJours`, `jourCalme`, `calmePourLeJour`, appelée par `dansHeuresCalmes` | le serveur (porte d'envoi, donc TOUS les rappels et e-mails) et l'écran (Paramètres : « Aujourd'hui est calme ») importent la même. |
+| L'urgent qui passe | `calmePourLeJour` | échéance (date limite d'envoi ou de retrait) dans moins de 24 h ; `urgent: true` posé par le rappel du matin quand des colis sont dus aujourd'hui ou en retard ; double vente ; panne (`capture` : un compte qui n'arrive plus ; `signalement`). « Deux articles sous le même N° » : aucune notification n'existe pour ça aujourd'hui (les doublons de N° se règlent seuls, §5) — rien à laisser passer. |
+| Le reste | `push.js` | rangé « heures calmes » dans la cloche ; une fenêtre de regroupement qui finit un jour calme passe aussi « heures calmes ». |
+| Le premier moment non calme | `api/_lib/reveil-calme.js` | le récapitulatif du réveil ne part pas un jour calme ; le premier matin non calme, il compte TOUT ce qui a été gardé depuis le dernier récapitulatif (mémo `push_reveil.seq`, sinon sa date, sinon 30 jours si des jours calmes sont posés), non lu seulement : « Pendant ta pause : 3 notifications ». |
+
 ## 3. Preuves
 
 | preuve | résultat |
 |---|---|
-| `scripts/audit-notifs-groupees.cjs` — EXÉCUTE `sendPushToAll` et la VRAIE route `api/ship-reminders.js` (`?moment=groupe`) sur une fausse base (filtres `data->>`, `Range`, comparer-et-échanger), push simulé, horloge de Paris simulée | **29/29** ; sur `origin/main` (`--sur`) **27 rouges** (avant retrait des 3 contrôles du soir) |
+| `scripts/audit-notifs-groupees.cjs` — avec J1–J10 (jours calmes : week-end, urgent qui passe, réveil EXÉCUTÉ samedi/dimanche/lundi, jours cochés, congés, fenêtre un jour calme) — EXÉCUTE `sendPushToAll` et la VRAIE route `api/ship-reminders.js` (`?moment=groupe`) sur une fausse base (filtres `data->>`, `Range`, comparer-et-échanger), push simulé, horloge de Paris simulée | **39/39** ; sur `origin/main` (`--sur`) **27 rouges** (avant retrait des 3 contrôles du soir) |
+| Mutations jours calmes (6/6 rouges) | jours ignorés (10), urgent bloqué (6), congés ignorés (1), réveil un jour calme (4), réveil limité à 24 h (1), `urgent` du rappel ignoré (6) |
 | Mutations (7/7 rouges, refaites après la fusion) | fenêtre jamais occupée, idempotence retirée, urgent ignoré, résumé à la fenêtre libre ignoré, clé sans jour, Colis rétabli, heures calmes ignorées au passage |
-| banc `centre-notifs` (390 tactile / 1512, clair / sombre) : F5 à F5c neufs (Regrouper Non · 15 · 30 · 60, ligne écrite entière) | 114/114 ; captures regardées (un vide de 160 px sous le libellé vu à la capture et corrigé) |
+| banc `centre-notifs` (390 tactile / 1512, clair / sombre) : F5 à F5c (Regrouper) et F10 à F14 (week-end, jour coché, congés, Effacer ; ligne `calme` gardée entière) — 144/144 ; captures regardées (la 7e pastille débordait à 390 px : corrigé) | 114/114 ; captures regardées (un vide de 160 px sous le libellé vu à la capture et corrigé) |
 | audits voisins remis à la règle (adresses Ventes/Achats) | `audit-notifications`, `audit-notifs-belles`, `audit-colis-heure`, `audit-suivi-vinted`, `audit-suivi-colis` ; bancs `colis-relais-push`, `retrait-conv-push`, `rappel-soir` |
 
 **Rouges restants (dits, pas cachés)** : bancs de rendu `notifs-destination` (15 rouges ; 9 déjà sur
@@ -60,3 +75,5 @@ l'idempotence reste active partout. `audit-notifs-groupees` ne le charge pas.
 
 Aucun (le secret `CRON_SECRET` est déjà dans GitHub si le réveil fonctionne). Les réglages
 sont dans Paramètres → Notifications.
+
+`audit-reveil-calme` pose désormais lui-même l'heure de la route (la route lit l'horloge des notifications, comme l'envoi) : 13/13.

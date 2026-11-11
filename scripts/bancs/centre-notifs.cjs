@@ -256,6 +256,30 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await pg.waitForTimeout(500);
           const gnon = ecrits.filter((l) => l.id === 'push_prefs').pop();
           dit(!!gnon && gnon.data.regrouper === false && await pg.locator('[data-np-regrouper="off"]').count() === 1, `${T} · F5c « Non » ⇒ regrouper:false (chaque notification seule)`, JSON.stringify(gnon && gnon.data));
+          // (11 nov.) Jours calmes : week-end, jours cochés, congés — la ligne `calme` gardée entière.
+          ecrits.length = 0;
+          dit(await pg.locator('[data-np-weekend="off"]').count() === 1 && await pg.locator('[data-np-jour]').count() === 7, `${T} · F10 « Week-end calme » éteint par défaut, sept jours à cocher`);
+          await pg.locator('[data-np-weekend] [role="switch"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const we = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!we && we.data.calme && JSON.stringify(we.data.calme.jours) === '["sam","dim"]' && we.data.calme.actif === false && we.data.familles && we.data.familles.messages === false
+            && await pg.locator('[data-np-jour="sam"][aria-pressed="true"]').count() === 1, `${T} · F11 week-end calme ⇒ calme.jours [sam, dim], heures calmes et types GARDÉS`, JSON.stringify(we && we.data));
+          await pg.locator('[data-np-jour="mer"]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const me = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!me && JSON.stringify(me.data.calme.jours) === '["sam","dim","mer"]', `${T} · F12 cocher mercredi l’ajoute`, JSON.stringify(me && me.data.calme));
+          await pg.locator('[data-np-conges-du]').fill('2026-12-20').catch(() => {});
+          await pg.waitForTimeout(400);
+          await pg.locator('[data-np-conges-au]').fill('2026-12-27').catch(() => {});
+          await pg.waitForTimeout(500);
+          const cg = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!cg && cg.data.calme.conges && cg.data.calme.conges.du === '2026-12-20' && cg.data.calme.conges.au === '2026-12-27' && await pg.locator('[data-np-conges="2026-12-20_2026-12-27"]').count() === 1,
+            `${T} · F13 congés du 20 au 27 déc. écrits`, JSON.stringify(cg && cg.data.calme));
+          if (SHOTS) await pg.locator('[data-np-reglages]').screenshot({ path: path.join(SHOTS, `centre-${vp.width}-${sombre ? 'sombre' : 'clair'}-jours.png`) }).catch(() => {});
+          await pg.locator('[data-np-conges-effacer]').click().catch(() => {});
+          await pg.waitForTimeout(500);
+          const ef = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          dit(!!ef && ef.data.calme.conges === null && JSON.stringify(ef.data.calme.jours) === '["sam","dim","mer"]', `${T} · F14 « Effacer » retire les congés, les jours restent`, JSON.stringify(ef && ef.data.calme));
           await pg.locator('[data-np-fenetre-choix="15"]').click().catch(() => {});
           await pg.waitForTimeout(400);
           const rel = await pg.evaluate(() => { const e = document.querySelector('[data-relances-essai]'); return e ? { etat: e.getAttribute('data-relances-essai'), codes: e.querySelectorAll('code').length } : null; });
