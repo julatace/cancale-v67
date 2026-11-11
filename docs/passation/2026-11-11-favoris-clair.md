@@ -98,10 +98,31 @@ d'`audit-traduction`. Le journal du suivi reste en français (trace copiable, r�
 - Banc `scripts/bancs/favoris-clair.cjs` (remplace `favoris-ecran.cjs`, qui jugeait l'écran retiré) : vrai
   `FavorisVinted` + vraie feuille `SuiviTravailHote`, fausse file serveur À ÉTAT, extension bouchonnée
   (« envoyé », puis « offre refusée » au 3e), 390 tactile / 1512, clair / sombre ; mutations `FC_MUTANT`.
-  Résultats : voir « ÉTAT » ci-dessous.
+  **122 ✅** (base, clair + sombre, 390 + 1512 ; après correction du repère de couleur : le bleu
+  d'accent du mode sombre #409CFF était hors de la plage permise du banc), `FC_JEU=vide` 12 ✅,
+  `absente` 12 ✅. Mutations toutes rouges : `max` 12 ❌, `nouveaux` interrompu (rouge), `marge` 2 ❌,
+  `histo` 4 ❌, `suivi` 8 ❌, `envoi` (lancer sans clic) interrompu (rouge).
+  Captures REGARDÉES : 390 clair (qui, quoi, quand, historique, récap, suivi, fin), 1512 clair.
+  Défauts vus et corrigés : « Il te reste au plus −4,50 € » ⇒ « Tu perds au moins 4,50 € » ;
+  « Maintenant, comme… » coupé à 390 ⇒ « Comme Vintex » ; « 1 achat(s) sur 1 » ⇒ « 1 sur 1 ont acheté ».
+- `npm run build` vert.
 - Audits communs, `audit-favoris-ecran` (42), `audit-favoris-auto` (54), tests `favoris-*.test.mjs`,
   `audit-journee-perso`, `audit-traduction`.
 
 ## ÉTAT À LA REPRISE
 
-(rempli à la fin)
+Livré, poussé, `origin/main` fusionné (rien de neuf au dernier `git fetch`), `origin/claude/suivi-travail`
+(856e49dca, `lancerTravail`) fusionné. L'envoi des messages garde l'API BAS NIVEAU de SuiviTravail
+(`suivi.demarrer` + `surGeste`) : la boucle est pilotée par la file serveur et un minuteur (comme
+Republier), pas par un `for` ; le mode auto (allumer, régler, arrêter) passe par `lancerTravail`
+(une action, ne fige rien si < 1 s). Rien d'envoyé en vrai, aucune écriture en base, aucune extension touchée.
+Restes / à regarder :
+- La carte Ma journée « nouveaux favoris » n'est pas montée dans un banc (règle et rangement prouvés par
+  `audit-favoris-clair` et `audit-journee-perso`) ; elle lit les favoris du compte de Messages
+  (`favorisUid` : compte choisi, sinon celui de l'onglet Vinted) — un vendeur multi-comptes sans compte
+  choisi ne voit que celui-là.
+- L'offre groupée ne voit que les personnes DÉJÀ contactées (seule identité prouvée côté client) ; aucune
+  recette d'offre lot ⇒ « à faire sur Vinted ».
+- « Plus d'outils » (…) ouvre encore l'ancienne feuille (récupérer toutes les pages, vérifier un favori,
+  diagnostic, « J'ai vérifié sur Vinted ») : elle montre des pseudos, comme avant ; à refaire plus tard.
+- Banc rouge sur l'avant : lancé sur `git archive origin/main` (voir ci-dessous, ligne ajoutée si fini).
