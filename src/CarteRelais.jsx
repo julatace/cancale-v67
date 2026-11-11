@@ -432,7 +432,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
               est une clé ») CE QU'IL FAUT AU COMPTOIR, sans toucher : le code (gros), le n° de suivi, l'échéance.
               Plus de ligne de sources (« Vinted · e-mail · message · vérifié à… ») : elles restent en data-*. */}
           <span className="vrm-rpf-comptoir" data-rp-comptoir="">
-            {desaccord ? <span className="vrm-rpf-code-gros is-ambre" data-rp-code-visible="desaccord">2 codes</span>
+            {desaccord ? <span className="vrm-rpf-code-gros is-ambre" data-rp-code-visible="desaccord" data-rp-code-desaccord="">2 codes</span>
               : x.code ? <span className="vrm-rpf-code-gros" data-rp-code-visible={x.code}>{x.code}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
               : (!x.horsCompte ? <span className="vrm-rpf-code-venir" data-rp-code-a-venir="">Code à venir</span> : null))}
@@ -458,6 +458,9 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
           {desaccord.map((d) => <span key={d.source + d.code} className="vrm-rpf-desaccord-v" data-rp-desaccord-valeur={d.code} data-rp-desaccord-source={d.source}><b>{d.code}</b> · {NOMS_SOURCES[d.source] || d.source}</span>)}
         </div> : null}
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
+        {/* (11 nov.) D'où vient ce que la ligne dit (les sources qui ont vu CE colis, l'heure de la dernière vérification) :
+            dans le détail ouvert, plus sur la ligne (Julien : « des infos dans tous les sens »). */}
+        {marques.length || verifie ? <span className="vrm-rpf-sources is-detail" data-rp-sources-ligne="">{marques.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className="vrm-rpf-verifie" data-rp-verifie-texte="">{verifie}</span> : null}</span> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
       </div> : null}
       {tiroirG}
