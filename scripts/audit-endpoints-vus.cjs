@@ -135,8 +135,10 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
       sendMessage: (m) => { window.__recu.push(m); },
     } };
   });
-  await pg.addScriptTag({ content: SRC });
+  // 5.356 : l'ordre du manifeste — content.js D'ABORD, puis inject.js (qui lui remet
+  // le port de son canal PRIVÉ au chargement ; content.js n'écoute plus `window`).
   await pg.addScriptTag({ content: RELAIS });
+  await pg.addScriptTag({ content: SRC });
 
   await essaie('le clic sur le bouton', async () => {
     // Ce que fait le bouton : une requête d'export, plus un appel banal à côté.
@@ -159,7 +161,7 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
       'et cet envoi immédiat porte déjà la requête d’export',
       JSON.stringify(tot.map((m) => Object.keys(m.reponses || {}))));
     await pg.waitForTimeout(6000);
-    const vus = await pg.evaluate(() => window.__vus || []);
+    const vus = (await pg.evaluate(() => window.__recu || [])).filter((m) => m && m.kind === 'seen_urls');   // 5.356 : le canal est privé, la page ne voit plus rien — on lit ce qui ARRIVE au fond
     dit(vus.length > 0, 'le mouchard envoie son relevé', `${vus.length} envoi(s)`);
     // Ce que le RELAIS a réellement transmis au service worker.
     const recu = (await pg.evaluate(() => window.__recu || [])).filter((m) => m && m.kind === 'seen_urls');
@@ -235,8 +237,8 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
     }
     await pc.goto('https://www.vinted.fr/inbox/12345678', { waitUntil: 'domcontentloaded' });
     await pc.evaluate(() => { window.__recu = []; window.chrome = { runtime: { getURL: (f) => 'about:blank#' + f, sendMessage: (m) => { window.__recu.push(m); } } }; });
+    await pc.addScriptTag({ content: RELAIS });   // 5.356 : ordre du manifeste (content.js reçoit le canal privé d'inject.js)
     await pc.addScriptTag({ content: SRC });
-    await pc.addScriptTag({ content: RELAIS });
     await pc.evaluate(async (u) => {
       const ok = async (f) => { try { await f(); } catch (_) {} };
       await ok(() => fetch(`/api/v2/conversations/${u.conv}`).then((r) => r.text()));

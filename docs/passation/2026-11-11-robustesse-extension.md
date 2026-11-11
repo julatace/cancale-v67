@@ -34,7 +34,14 @@ rouge (`--prouve`).
 Audits existants remis à la nouvelle règle (rien d'autre) : `audit-extension-navigateurs`
 (le banc du relais transporte le port du canal), `audit-frein-vinted` §7 (la page ne
 moissonne plus), `audit-offres-auto` (le corps du moteur est dans
-`autoAccepterOffresUnPassage`), `audit-numero-vinted` (une réservation ancienne reste prise).
+`autoAccepterOffresUnPassage`), `audit-numero-vinted` (une réservation ancienne reste prise),
+`audit-supprimees` / `audit-suivi-vinted` / `audit-endpoints-vus` (le banc remet le port du canal,
+content.js chargé avant inject.js comme dans le manifeste), `audit-wreq-sensible` (le texte d'une
+réponse n'est plus gardé, sa forme oui), `tests/favoris-chrome-csp`, `tests/orion-injection`
+(capture par le port), `tests/favoris-cloche-accessible` (cloche « disponible », zéro clic).
+Vérifié : `audit-extension-zip`, `coherence`, `variables`, `tdz`, `identite`, `icones`,
+`regles-achat-extension`, `npm run build` verts ; les ~140 audits qui lisent l'extension verts
+(`tests/favoris-disponibilite` est rouge aussi sur origin/main, non touché).
 `scripts/_fond-vm.cjs` sert maintenant le vrai PATCH conditionnel et le POST
 `ignore-duplicates` de PostgREST (comparer-et-échanger).
 

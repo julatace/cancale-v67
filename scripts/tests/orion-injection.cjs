@@ -15,7 +15,7 @@ const os=require('node:os');
   if(u.pathname==='/api/v2/inbox'){api++;return r.fulfill({contentType:'application/json',body:'{"conversations":[],"code":0}'});}
   return r.fulfill({contentType:'text/html; charset=utf-8',headers:bloque?{'Content-Security-Policy':"default-src 'self'; script-src 'self'"}:{},body:'<!doctype html><html><head></head><body>Fixture de page Vinted</body></html>'});
  });
- await p.addInitScript({content:`window.captures=[];window.chrome=window.chrome||{};Object.defineProperty(window.chrome,'runtime',{value:{getURL:p=>'https://vrm-fixture.invalid/'+p},configurable:true});window.addEventListener('message',e=>{if(e.source===window&&e.data?.__tag==='CANCALE_VINTED')window.captures.push(e.data);});\n${boot}`});await p.goto('https://www.vinted.fr/');
+ await p.addInitScript({content:`window.captures=[];window.chrome=window.chrome||{};Object.defineProperty(window.chrome,'runtime',{value:{getURL:p=>'https://vrm-fixture.invalid/'+p},configurable:true});window.addEventListener('message',e=>{if(e.source===window&&e.data?.__tag==='CANCALE_VINTED_CANAL'&&e.ports?.[0])e.ports[0].onmessage=m=>{if(m.data?.__tag==='CANCALE_VINTED')window.captures.push(m.data);};});\n${boot}`});await p.goto('https://www.vinted.fr/');
  if(!bloque){
   await p.waitForFunction(()=>window.captures.some(x=>x.kind==='injectReady'),null,{timeout:8000}).catch(e=>{throw Error(e.message+' '+JSON.stringify({messages,assets}));});
   await p.evaluate(()=>fetch('/api/v2/inbox').then(r=>r.json()));await p.waitForFunction(()=>window.captures.some(x=>x.kind==='harvest'&&x.type==='inbox'));

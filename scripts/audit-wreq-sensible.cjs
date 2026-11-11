@@ -54,9 +54,10 @@ const cas = async (url, body) => { ecrits.length = 0; try { await ctx.storeWrite
   dit(r4 && !JSON.stringify(r4).includes('SECRET123'), 'ni un paiement');
   const r5 = await cas('https://sdk.fra-01.braze.eu/api/v3/data/', '{"api_key":"x"}');
   dit(r5 === null, 'une requête vers un autre site n’est pas rangée du tout', JSON.stringify(r5).slice(0, 80));
-  // L'autre sens : ce qui sert à reproduire une action garde son contenu.
+  // 5.356 (revue de robustesse, haute 17) : le TEXTE envoyé à un acheteur n'est plus rangé — seule sa
+  // FORME (noms de clés, types) : VRM écrit ses réponses dans la forme mesurée, il n'a pas besoin du texte.
   const r6 = await cas('/api/v2/conversations/9/replies', '{"reply":{"body":"merci"}}');
-  dit(r6 && JSON.stringify(r6).includes('merci'), 'une réponse garde son contenu (elle sert à reproduire l’action)');
+  dit(r6 && !JSON.stringify(r6).includes('merci') && /reply\.body:string/.test(JSON.stringify(r6)), 'une réponse à un acheteur : sa forme est rangée, jamais son texte');
   const r7 = await cas('/api/v2/item_upload/items', '{"item":{"title":"nike"}}');
   dit(r7 && JSON.stringify(r7).includes('nike'), 'une création d’annonce aussi');
   console.log(`\n${ko ? '❌' : '✅'} ${ok} contrôle(s) au vert, ${ko} au rouge.`);
