@@ -6,6 +6,7 @@ import { RappelsSetting } from '../App.jsx';
 import { useObjectifMois } from '../App.jsx';
 import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrière après une mauvaise manipulation
+import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -1941,6 +1942,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
+      // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
+      { id:'importer', type:'panneau', nu:true, ic:'box', lib:'Importer', desc:'Ton stock et tes ventes passées, depuis un tableur ou un autre logiciel.', data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
       { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       // (11 nov.) Revenir en arrière : des points posés tout seuls (avant une action en série, un
       // import, chaque jour) ou une sauvegarde complète ⇒ aperçu précis ⇒ choisir quoi ⇒ confirmer (src/restauration.js).

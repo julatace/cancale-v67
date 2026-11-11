@@ -558,6 +558,8 @@ import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichi
 import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJournee } from "./operations/atelier.js";
 // ⟦→ ecrans/Compta.jsx #8⟧
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
+import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, refVente } from "./importStock.js";
+import { ImportStockReglage } from "./composants/ImportStock.jsx";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
@@ -2698,6 +2700,9 @@ const SYNC_KEYS = [
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
   // lu par la fiche d'une paire (« L'histoire du N° »). Ne change jamais un N°.
   'vrm_numeros_journal',
+  // (11 nov.) Paramètres → Importer (src/importStock.js) : le stock et les ventes passées
+  // importés d'un autre outil, et le journal des imports (« Annuler » retire ce qu'un import a créé).
+  'vrm_stock_importe','vrm_ventes_importees','vrm_imports',
   'vrm_stock_sortis','vrm_stock_garder','vrm_stock_garde_hors_ligne','vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
@@ -4427,6 +4432,136 @@ function RevenirEnArriere() {
     </div>);
 }
 export { RevenirEnArriere, pointAvant };
+// ── (11 nov.) PARAMÈTRES → IMPORTER : son stock et ses ventes passées d'un autre outil ──
+// La règle : src/importStock.js ; l'écran : src/composants/ImportStock.jsx ;
+// docs/passation/2026-11-11-import-autre-outil.md. Ici : ce que l'écran LIT (les N°
+// déjà servis, les ventes déjà lues) et ce qu'il ÉCRIT, sur son clic seulement.
+//  · Un N° importé ne prend JAMAIS la place d'un N° servi (pool, fiches, ventes, Leboncoin,
+//    Vestiaire, réservés, déjà importé) : CONFLIT. Rien n'est lu ⇒ `null` ⇒ aucun aperçu.
+//  · Les N° importés entrent dans le pool (append-only) : `prochainLibre` ne les redonne
+//    pas. Un coût n'est posé (`vinted_buyprice_by_num`) que sur un N° qui n'en a aucun.
+//  · Annuler retire ce que l'import a créé, rien d'autre ; le pool ne rétrécit jamais.
+const lireListeCle = (k) => { const v = load(k, []); return Array.isArray(v) ? v : []; };
+const lireVentesImportees = () => lireListeCle(CLE_VENTES_IMPORTEES);
+const lireStockImporte = () => lireListeCle(CLE_STOCK_IMPORTE);
+const numeroDImport = (v, ms) => {
+  const k = cleNum(v); if (!k || !NUM_OK.test(k)) return '';
+  if (archiveNumeros() && /^\d+$/.test(k) && !(ms != null && isFinite(ms))) return null;
+  return numeroExterne(k, null, null, ms);
+};
+// Les N° déjà servis : cleNum ⇒ la raison dite sur la ligne en conflit. `null` = pas su.
+async function numerosServisImport() {
+  if (!isCloudReady()) return null;
+  const jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`);
+  if (!Array.isArray(jr)) return null;
+  const pris = new Map();
+  const add = (v, raison) => { const c = cleNum(v); if (c && !pris.has(c)) pris.set(c, raison); };
+  Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero, 'est déjà sur une annonce'));
+  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero, 'est déjà sur une vente'));
+  Object.values(load('vrm_lbc_liens', {}) || {}).forEach((v) => add(v, 'est déjà relié sur Leboncoin'));
+  try { Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros'))).forEach((v) => add(v, 'est déjà sur Vestiaire')); } catch (_) {}
+  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach((v) => add(v, 'est réservé pour une annonce en cours'));
+  lireStockImporte().forEach((x) => add(x && x.numero, 'est déjà importé'));
+  (load('vinted_used_numeros', []) || []).forEach((v) => add(v, 'a déjà servi dans VRM (il ne se redonne jamais)'));
+  return pris;
+}
+// Les ventes déjà lues par VRM, par identité (`plateforme:n°`), sur cet appareil. Le vrai
+// garde-fou est dans `ventesDeclarables`/`ventesFaites` : une vente importée dont le n°
+// est lu n'y compte pas (une lecture arrivée APRÈS l'import ne compte pas deux fois).
+const ventesLuesImport = () => {
+  const s = new Set();
+  try { for (const o of ((_acctCache.sold && _acctCache.sold.items) || [])) if (o && o.transaction_id != null) s.add('vinted:' + o.transaction_id); } catch (_) {}
+  return s;
+};
+const ecoutesImport = new Set();
+const signalerImport = (cles) => { emettreClesRelues(cles); for (const f of ecoutesImport) { try { f(); } catch (_) {} } };
+const outilsImport = {
+  toast: (t) => toast(t),
+  marqueDe: (t) => extractBrand(t) || '',
+  lireEtat: () => ({ stock: lireStockImporte(), ventes: lireVentesImportees(), imports: lireListeCle(CLE_IMPORTS) }),
+  ecouter: (f) => {
+    ecoutesImport.add(f);
+    const s = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, 'vinted_annonce_numeros'].includes(k)) f(); };
+    window.addEventListener('vrm:save', s);
+    const off = onCloudReady(f);
+    return () => { ecoutesImport.delete(f); window.removeEventListener('vrm:save', s); if (typeof off === 'function') off(); };
+  },
+  coutExiste: (n) => { const m = load('vinted_buyprice_by_num', {}) || {}; return m[String(n)] != null && String(m[String(n)]).trim() !== ''; },
+  contexte: async (mode) => {
+    if (mode === 'ventes') {
+      if (!isCloudReady()) return null;
+      const refsImportees = new Set(lireVentesImportees().filter((x) => x && x.ref).map((x) => (x.plateforme || '') + '|' + refVente(x.ref)));
+      return { refsLues: ventesLuesImport(), refsImportees };
+    }
+    const pris = await numerosServisImport();
+    if (!pris) return null;
+    return { numeroDe: numeroDImport, numeroPris: (n) => pris.get(cleNum(n)) || '', archive: archiveNumeros() };
+  },
+  ecrire: async (mode, w) => {
+    if (!isCloudReady()) return { ok: false, raison: 'Tes données ne sont pas encore chargées : réessaie dans un instant.' };
+    if (mode !== 'ventes') {
+      if (!numerotationPermise()) return { ok: false, raison: 'La numérotation se vérifie : réessaie dans quelques secondes.' };
+      if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) return { ok: false, raison: 'Une écriture de N° est en cours : réessaie dans un instant.' };
+      // Relu au moment d'écrire : un N° servi entre l'aperçu et le clic ⇒ rien n'est écrit.
+      const pris = await numerosServisImport();
+      if (!pris) return { ok: false, raison: 'Je n’ai pas pu relire tes N° déjà servis : rien n’a été écrit.' };
+      const pris2 = w.items.filter((x) => pris.has(cleNum(x.numero)));
+      if (pris2.length) return { ok: false, raison: `N°${pris2[0].numero} vient d’être servi ailleurs : rien n’a été écrit, relis l’aperçu.` };
+      const pool = (load('vinted_used_numeros', []) || []).slice();
+      const dejaK = new Set(pool.map(cleNum));
+      for (const n of w.numeros) { const ep = entreePool(n); if (ep != null && !dejaK.has(cleNum(ep))) { pool.push(ep); dejaK.add(cleNum(ep)); } }
+      save('vinted_used_numeros', pool.sort(triPool));
+      save(CLE_STOCK_IMPORTE, [...w.items, ...lireStockImporte()]);
+      const couts = { ...(load('vinted_buyprice_by_num', {}) || {}) }, poses = {};
+      for (const [n, p] of Object.entries(w.couts || {})) if (couts[n] == null || String(couts[n]).trim() === '') { couts[n] = p; poses[n] = p; }
+      if (Object.keys(poses).length) save('vinted_buyprice_by_num', couts);
+      save(CLE_IMPORTS, [...lireListeCle(CLE_IMPORTS), { ...w.journal, couts: poses }]);
+      signalerImport(['vinted_used_numeros', 'vinted_buyprice_by_num', CLE_STOCK_IMPORTE, CLE_IMPORTS]);
+      return { ok: true };
+    }
+    save(CLE_VENTES_IMPORTEES, [...w.items, ...lireVentesImportees()]);
+    save(CLE_IMPORTS, [...lireListeCle(CLE_IMPORTS), w.journal]);
+    signalerImport([CLE_VENTES_IMPORTEES, CLE_IMPORTS]);
+    return { ok: true };
+  },
+  annuler: async (imp) => {
+    if (!isCloudReady()) return { ok: false, raison: 'Tes données ne sont pas encore chargées : réessaie dans un instant.' };
+    const r = annulerImport(imp, { stock: lireStockImporte(), ventes: lireVentesImportees(), couts: load('vinted_buyprice_by_num', {}) || {}, imports: lireListeCle(CLE_IMPORTS) });
+    if (!r) return { ok: false };
+    if (imp.type === 'ventes') save(CLE_VENTES_IMPORTEES, r.ventes); else save(CLE_STOCK_IMPORTE, r.stock);
+    if (r.coutsRetires) save('vinted_buyprice_by_num', r.couts);
+    save(CLE_IMPORTS, r.imports);
+    signalerImport([CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, 'vinted_buyprice_by_num']);
+    return { ok: true, retires: r.retires };
+  },
+  // Les annonces Vinted lues dans CET onglet (le cache des comptes) ; `null` = pas lues.
+  annonces: () => {
+    const c = _acctCache.listings;
+    if (!c || !Array.isArray(c.items)) return null;
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    return c.items.filter((x) => x && x.id != null).map((x) => ({ id: String(x.id), titre: String(x.title || ''), numero: (fiches[String(x.id)] && fiches[String(x.id)].numero) || '' }));
+  },
+  // SON clic relie : l'annonce (sans N°) prend le N° de la paire importée. Rien d'autre.
+  relier: async (it, a) => {
+    if (!numerotationPermise()) return { ok: false, raison: 'La numérotation se vérifie : réessaie dans quelques secondes.' };
+    if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) return { ok: false, raison: 'Une écriture de N° est en cours : réessaie dans un instant.' };
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const f = fiches[a.id];
+    if (f && String(f.numero || '').trim()) return { ok: false, raison: `Cette annonce porte déjà le N°${f.numero} : rien n’est changé.` };
+    const k = cleNum(it.numero);
+    if (Object.values(fiches).some((e) => e && cleNum(e.numero) === k)) return { ok: false, raison: `Le N°${it.numero} est déjà sur une autre annonce : rien n’est changé.` };
+    const apres = { ...fiches, [a.id]: { ...(f || {}), numero: String(it.numero), manuelAt: new Date().toISOString(), importId: it.importId } };
+    noterJournalNumeros(fiches, apres);
+    save('vinted_annonce_numeros', apres);
+    save(CLE_STOCK_IMPORTE, lireStockImporte().map((x) => (x && x.id === it.id ? { ...x, annonce: a.id } : x)));
+    signalerImport(['vinted_annonce_numeros', CLE_STOCK_IMPORTE]);
+    return { ok: true };
+  },
+};
+function ImporterSetting() {
+  return <ImportStockReglage outils={outilsImport} Bouton={Bouton} Segmente={Segmente}/>;
+}
+export { ImporterSetting, lireVentesImportees, lireStockImporte };
 
 // ── (10 nov., lot BD) LA NOTE PRIVÉE D'UNE PAIRE (src/notePaire.js, src/NotePaire.jsx) ──
 // UN état pour tous les endroits où la paire apparaît (Annonces, fiche paire, Ventes,
@@ -8337,7 +8472,7 @@ const avecDatesLbc = (ventes, dates) => {
   return change ? out : ventes;
 };
 const lireDeclarations = () => { const v = load('vrm_urssaf_declare', {}); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; };
-const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare } = {}) => {
+const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare, importees } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
@@ -8444,6 +8579,33 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     const l = { id, plateforme: 'Vestiaire', ts: t, ym: ymDeTs(t), eur: recu.eur, titre: '', masquee: false };
     if (garde(l)) lignes.push(place(l));
   }
+  // (11 nov.) LES VENTES IMPORTÉES (Paramètres → Importer, src/importStock.js), marquées
+  // `source: 'importe'`. Une vente importée dont le n° de commande est celui d'une vente
+  // LUE par VRM (même identité `plateforme:n°`, lue avant ou après l'import) ne compte
+  // pas : elle y est déjà. Jamais par le titre ni le montant (§5).
+  const prefImp = { Vinted: 'vinted:', Leboncoin: 'lbc:', eBay: 'ebay:', Vestiaire: 'vestiaire:' };
+  const lusImp = new Set();
+  if ((importees || []).length) {
+    for (const o of (vinted || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) lusImp.add('vinted:' + tx); }
+    for (const v of (lbc || [])) if (v && v.txId) lusImp.add('lbc:' + v.txId);
+    for (const e of (ebay || [])) if (e && e.orderId) lusImp.add('ebay:' + e.orderId);
+    for (const v of (vestiaire || [])) if (v && v.id) lusImp.add('vestiaire:' + v.id);
+  }
+  const eurImp = (p) => { const x = String(p == null ? '' : p).trim(); if (!x) return null; const n = Number(x.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null; };
+  const dejaLueImp = (v) => { const pr = prefImp[v.plateforme]; const r = String(v.ref == null ? '' : v.ref).trim(); return !!(pr && r && lusImp.has(pr + r)); };
+  // Le CA DÉCLARÉ : daté au VERSEMENT écrit dans son fichier ; sans versement ⇒ « à
+  // dater », dans aucun mois ; montant vide ⇒ mise à part et NOMMÉE (« au moins »).
+  for (const v of (importees || [])) {
+    if (!v || !v.id || dejaLueImp(v)) continue;
+    const id = 'importe:' + v.id, pl = v.plateforme || 'Autre';
+    if (vus.has(id)) continue;
+    const eur = eurImp(v.prix);
+    if (eur == null) { vus.add(id); ecartees.push({ id, plateforme: pl, raison: 'montant vide dans ton fichier', titre: v.titre || '', manque: true, importee: true }); continue; }
+    const t = /^\d{4}-\d{2}-\d{2}$/.test(String(v.versement || '')) ? Date.parse(v.versement + 'T12:00:00') : 0;
+    if (!t) { vus.add(id); aDaterOuDeclaree({ id, plateforme: pl, eur, titre: v.titre || '', masquee: false, importee: true }); continue; }
+    const l = { id, plateforme: pl, ts: t, ym: ymDeTs(t), eur, titre: v.titre || '', masquee: false, importee: true };
+    if (garde(l)) lignes.push(place(l));
+  }
   return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
 };
 // ⚠️⚠️ « J'AI DÉCLARÉ CE MOIS » NE S'ENREGISTRE QUE SUR UNE LECTURE COMPLÈTE
@@ -8485,7 +8647,7 @@ const lectureIncomplete = ({ registre, ventes, ventesErreur, comptesEchec, verse
 //    serait une date fausse), elle est comptée dans `sansDate`. eBay : commande
 //    payée, en euros, datée de sa création (même lecture que le CA déclaré).
 //    Identité `plateforme:id`, jamais un titre (§5).
-const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {}) => {
+const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, importees } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
   // (1er nov., audits A2 et A10) Les ventes FAITES dont l'argent ne se lit pas
@@ -8542,6 +8704,30 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {})
     if (recu.eur == null) { nonComptees.push({ plateforme: 'Vestiaire', raison: recu.raison, ts: t || null }); continue; }
     if (!t) { nonComptees.push({ plateforme: 'Vestiaire', raison: 'vente pas datée', ts: null }); continue; }
     lignes.push({ plateforme: 'Vestiaire', ts: t, eur: recu.eur, compte: String(v.compte || ''), tx: String(v.id) });
+  }
+  // (11 nov.) LES VENTES IMPORTÉES (Paramètres → Importer, src/importStock.js), marquées
+  // `source: 'importe'`. Une vente importée dont le n° de commande est celui d'une vente
+  // LUE par VRM (même identité `plateforme:n°`, lue avant ou après l'import) ne compte
+  // pas : elle y est déjà. Jamais par le titre ni le montant (§5).
+  const prefImp = { Vinted: 'vinted:', Leboncoin: 'lbc:', eBay: 'ebay:', Vestiaire: 'vestiaire:' };
+  const lusImp = new Set();
+  if ((importees || []).length) {
+    for (const o of (vinted || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) lusImp.add('vinted:' + tx); }
+    for (const v of (lbc || [])) if (v && v.txId) lusImp.add('lbc:' + v.txId);
+    for (const e of (ebay || [])) if (e && e.orderId) lusImp.add('ebay:' + e.orderId);
+    for (const v of (vestiaire || [])) if (v && v.id) lusImp.add('vestiaire:' + v.id);
+  }
+  const eurImp = (p) => { const x = String(p == null ? '' : p).trim(); if (!x) return null; const n = Number(x.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null; };
+  const dejaLueImp = (v) => { const pr = prefImp[v.plateforme]; const r = String(v.ref == null ? '' : v.ref).trim(); return !!(pr && r && lusImp.has(pr + r)); };
+  // VENDU : au jour de la VENTE écrit dans son fichier (sans heure : `heureLue: false`).
+  for (const v of (importees || [])) {
+    if (!v || !v.id || dejaLueImp(v) || !garde('importe:' + v.id)) continue;
+    const pl = v.plateforme || 'Autre';
+    const t = /^\d{4}-\d{2}-\d{2}$/.test(String(v.date || '')) ? Date.parse(v.date + 'T12:00:00') : 0;
+    const eur = eurImp(v.prix);
+    if (eur == null) { nonComptees.push({ plateforme: pl, raison: 'montant vide dans ton fichier', ts: t || null }); continue; }
+    if (!t) { sansDate += 1; continue; }
+    lignes.push({ plateforme: pl, ts: t, eur, compte: '', heureLue: false, importee: true });
   }
   return { lignes, sansDate, ecartees, nonComptees };
 };
@@ -11333,6 +11519,8 @@ const ajouterNumerosHorsEcran = (taken, takenK) => {
   const add = (v) => { const c = cleNum(v); if (!c) return; if (takenK) takenK.add(c); if (/^\d+$/.test(c)) taken.add(Number(c)); };
   try { Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros'))).forEach(add); } catch (_) {}
   try { (load('vinted_used_numeros', []) || []).forEach(add); } catch (_) {}
+  // (11 nov.) Le stock importé (Paramètres → Importer) : ses N° sont écrits sur des cartons.
+  try { lireStockImporte().forEach((x) => add(x && x.numero)); } catch (_) {}
 };
 const CLES_ECRITURE_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_vc_numeros'];
 let _numVcEnVol = null, _numVcRelance = null;
@@ -20001,6 +20189,7 @@ function CarteParcoursApp({ comptes, plein = false }) {
       attrsCarte={c === 'configuration' && mode === 'etape' ? { 'data-reprendre-configuration': conf ? 'plustard' : 'jamais' } : {}}
       onOk={() => ecrireParcoursIci({ fini: new Date().toISOString(), ouvert: false })}
       onExemple={sansCompte && plein ? () => entrerModeExemple() : null}
+      onImporter={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} }}
       onMasquer={!plein && mode !== 'pret' ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
   );
 }
@@ -29634,6 +29823,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne pas ranger une case VIDE dans la grille quand il est éteint.
   const [benefJourneeOn] = useBeneficeJournee();
   const [numeros, setNumeros] = useStateCle('vinted_annonce_numeros', () => load('vinted_annonce_numeros', {}));
+  // (11 nov.) Les ventes passées importées (Paramètres → Importer) : dans le vendu et le CA déclaré.
+  const [ventesImp] = useStateCle(CLE_VENTES_IMPORTEES, lireVentesImportees);
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
   // source fiable de l'ancienneté d'une annonce — voir listedAgeDays.
@@ -33127,10 +33318,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbcLu === undefined || ebayCmd === undefined || versements === undefined || ventesVc === undefined) return undefined;
     if (versements === null) return null;
     try {
-      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: venteOffOf, excluAutre, versements, declare: declUrssaf });
+      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: venteOffOf, excluAutre, versements, declare: declUrssaf, importees: ventesImp });
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, ventesVc, excluAutre, declUrssaf]);
+  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, ventesVc, excluAutre, ventesImp, declUrssaf]);
   // Ce qui n'est compté dans AUCUN « reçu » parce que son argent ne se lit pas
   // (Vinted au prix pas lu, Leboncoin au prix inconnu, Vestiaire au montant pas
   // sûr) — et Vestiaire pas lu du tout. Chaque total « reçu » le dit (« au moins »).
@@ -33150,16 +33341,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (declarables) return { lignes: declarables.lignes, aDater: declarables.aDater, vinted: 'lu' };
     if (lbcLu === undefined || ebayCmd === undefined) return { lignes: [], aDater: [], vinted: 'encours' };
     try {
-      const r = ventesDeclarables({ lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], excluAutre, declare: declUrssaf });
+      const r = ventesDeclarables({ lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], excluAutre, declare: declUrssaf, importees: ventesImp });
       return { lignes: r.lignes, aDater: r.aDater, vinted: 'passu' };
     } catch (_) { return { lignes: [], aDater: [], vinted: 'passu' }; }
-  }, [declarables, lbcLu, lbcVentes, ebayCmd, datesLbc, declUrssaf, ventesVc, excluAutre]);
+  }, [declarables, lbcLu, lbcVentes, ebayCmd, datesLbc, declUrssaf, ventesVc, excluAutre, ventesImp]);
   // Les ventes FAITES, toutes plateformes (`ventesFaites`) : « Vendu aujourd'hui »,
   // « Vendu ce mois » et la colonne VENDU du graphique.
   // (6 nov.) Avec les ventes vues par e-mail pas encore relues (`ventesListe`) : vendues, datées.
-  const vendus = useMemo(() => ventesFaites({ vinted: ventesListe || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], cachee: isHidden, excluAutre }),
+  const vendus = useMemo(() => ventesFaites({ vinted: ventesListe || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], cachee: isHidden, excluAutre, importees: ventesImp }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ventesListe, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc, ventesVc, excluAutre]);
+    [ventesListe, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc, ventesVc, excluAutre, ventesImp]);
   // VENDU sur une période (aujourd'hui, ce mois) — sur `vendus`, la même liste
   // que le graphique : la carte et la colonne du jour ne peuvent pas diverger.
   const bilanVentes = React.useCallback((depuisTs, jusquaTs) => bilanLignes(vendus.lignes, depuisTs, jusquaTs), [vendus]);
@@ -39132,7 +39323,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], exclu: venteOffOf, excluAutre, versements: versements || {}, declare: declUrssaf }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], exclu: venteOffOf, excluAutre, versements: versements || {}, declare: declUrssaf, importees: ventesImp }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
@@ -53322,6 +53513,7 @@ function AppCoeur() {
       if(t==='semaine'){ const l=p.get('lundi'); DEMANDE_SEMAINE.lundi=l&&/^\d{4}-\d{2}-\d{2}$/.test(l)?l:null; try{ window.dispatchEvent(new Event('vrm:semaine')); }catch(_){} }
       // (10 nov., lot H) « Nouvel appareil » : Appareils connectés, CETTE session en évidence.
       if(t==='settings'&&section==='appareils'){ DEMANDE_APPAREIL.session=sessionValide(p.get('session')); DEMANDE_REGLAGE_SOUS.id='appareils'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
+      if(t==='settings'&&section==='importer'){ DEMANDE_REGLAGE_SOUS.id='importer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (11 nov., lot centre-aide) « M'y emmener » d'une fiche d'aide : le panneau de Réglages nommé (liste fermée, src/aideFiches.js).
       { const rg=p.get('reglage'); if(t==='settings'&&rg&&REGLAGES_AIDE.includes(rg)){ DEMANDE_REGLAGE_SOUS.id=rg; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
@@ -54993,7 +55185,7 @@ function AppCoeur() {
       const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
       const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
       const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
-      const v = ventesFaites({ vinted: ventesCoqueEmail, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcCoque || [], cachee, excluAutre: excluAutreCoque });
+      const v = ventesFaites({ vinted: ventesCoqueEmail, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcCoque || [], cachee, excluAutre: excluAutreCoque, importees: lireVentesImportees() });
       const r = resumeVendu(v.lignes);
       const loginDe = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
       const venduManque = [
