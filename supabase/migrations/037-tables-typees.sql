@@ -341,36 +341,36 @@ end $$;
 -- ── 7. Ventes / achats : une liste `my_orders` ⇒ une ligne par n° de transaction ──
 create or replace function public.vrm_t_commandes(p_table text, p_owner uuid, p_compte text, liste jsonb, out n integer, out sans integer)
 language plpgsql security definer set search_path = '' as $$
-declare v_ids text[];
 begin
-  select coalesce(array_agg(distinct tx) filter (where tx is not null), '{}'), count(*) filter (where tx is null)
-    into v_ids, sans
+  -- Une passe : l'identité et l'empreinte de chaque commande. Seules les commandes
+  -- NEUVES ou CHANGÉES sont relues champ par champ (une ligne de 2 000 ventes dont
+  -- une seule change ne recalcule qu'une ligne).
+  select count(distinct tx), count(*) filter (where tx is null) into n, sans
     from (select public.vrm_t_texte(o -> 'transaction_id') tx from jsonb_array_elements(liste) e(o)) z;
-  n := coalesce(array_length(v_ids, 1), 0);
-  execute format('delete from public.%I where owner = $1 and plateforme = ''vinted'' and compte = $2 and transaction_id <> all ($3)', p_table)
-    using p_owner, p_compte, v_ids;
+  execute format('delete from public.%I c where c.owner = $1 and c.plateforme = ''vinted'' and c.compte = $2
+                   and not exists (select 1 from jsonb_array_elements($3) e(o)
+                                   where public.vrm_t_texte(o -> ''transaction_id'') = c.transaction_id)', p_table)
+    using p_owner, p_compte, liste;
   execute format($f$
     insert into public.%1$I as c (owner, plateforme, compte, transaction_id, item_id, titre, prix, devise, statut,
                                   statut_utilisateur, date_commande, date_texte, conversation_id, photo, empreinte)
-    select distinct on (tx) $1, 'vinted', $2, tx,
+    select $1, 'vinted', $2, tx,
            coalesce(public.vrm_t_texte(o -> 'item_id'), public.vrm_t_texte(o -> 'item' -> 'id')),
            public.vrm_t_texte(o -> 'title'), public.vrm_t_montant(o -> 'price'), public.vrm_t_devise(o -> 'price'),
            public.vrm_t_texte(o -> 'status'), public.vrm_t_texte(o -> 'transaction_user_status'),
            public.vrm_t_date(o -> 'date'), left(public.vrm_t_texte(o -> 'date'), 80),
            public.vrm_t_texte(o -> 'conversation_id'),
            coalesce(public.vrm_t_texte(o -> 'photo' -> 'url'), public.vrm_t_texte(o -> 'photo')),
-           md5(o::text)
-      from (select public.vrm_t_texte(o -> 'transaction_id') tx, o, i
-              from jsonb_array_elements($3) with ordinality e(o, i)) z
-     where tx is not null
-     order by tx, i
+           emp
+      from (select distinct on (l.tx) l.tx, l.o, l.emp from (select public.vrm_t_texte(o -> 'transaction_id') tx, o, md5(o::text) emp, i from jsonb_array_elements($3) with ordinality e(o, i)) l where l.tx is not null order by l.tx, l.i) z
+     where not exists (select 1 from public.%1$I x where x.owner = $1 and x.plateforme = 'vinted' and x.compte = $2
+                          and x.transaction_id = z.tx and x.empreinte = z.emp)
     on conflict (owner, plateforme, compte, transaction_id) do update set
       item_id = excluded.item_id, titre = excluded.titre, prix = excluded.prix, devise = excluded.devise,
       statut = excluded.statut, statut_utilisateur = excluded.statut_utilisateur,
       date_commande = excluded.date_commande, date_texte = excluded.date_texte,
       conversation_id = excluded.conversation_id, photo = excluded.photo,
       empreinte = excluded.empreinte, projete_le = now()
-     where c.empreinte is distinct from excluded.empreinte
   $f$, p_table) using p_owner, p_compte, liste;
 end $$;
 
@@ -383,7 +383,6 @@ declare
   v_compte text := substring(p_id from '^harvest_([0-9]+)_');
   v_cle text;
   liste jsonb;
-  v_ids text[];
   v_sans integer;
   v_n integer;
   v_lu timestamptz;
@@ -441,14 +440,14 @@ begin
       perform public.vrm_t_lue(p_owner, p_id, fam, v_lu, null, null);
       return 'ok';
     end if;
-    select coalesce(array_agg(distinct aid) filter (where aid is not null), '{}'), count(*) filter (where aid is null)
-      into v_ids, v_sans
+    select count(distinct aid), count(*) filter (where aid is null) into v_n, v_sans
       from (select public.vrm_t_texte(it -> 'id') aid from jsonb_array_elements(liste) e(it)) z;
-    delete from public.annonces where owner = p_owner and plateforme = 'vinted' and compte = v_compte and annonce_id <> all (v_ids);
+    delete from public.annonces a where a.owner = p_owner and a.plateforme = 'vinted' and a.compte = v_compte
+       and not exists (select 1 from jsonb_array_elements(liste) e(it) where public.vrm_t_texte(it -> 'id') = a.annonce_id);
     insert into public.annonces as a (owner, plateforme, compte, annonce_id, titre, prix, devise, marque, taille, etat,
                                       url, photo, n_photos, vues, favoris, masquee, fermee, brouillon, reservee,
                                       cree_le, num_ecrit, empreinte)
-    select distinct on (aid) p_owner, 'vinted', v_compte, aid,
+    select p_owner, 'vinted', v_compte, aid,
            public.vrm_t_texte(it -> 'title'), public.vrm_t_montant(it -> 'price'), public.vrm_t_devise(it -> 'price'),
            coalesce(public.vrm_t_texte(it -> 'brand_title'), public.vrm_t_texte(it -> 'brand')),
            coalesce(public.vrm_t_texte(it -> 'size_title'), public.vrm_t_texte(it -> 'size')),
@@ -460,19 +459,18 @@ begin
            public.vrm_t_bool(it -> 'is_draft'), public.vrm_t_bool(it -> 'is_reserved'),
            public.vrm_t_date(it -> 'created_at_ts'),
            case when jsonb_typeof(it -> 'numEcrit') in ('object', 'string', 'number') then it -> 'numEcrit' end,
-           md5(it::text)
-      from (select public.vrm_t_texte(it -> 'id') aid, it, i from jsonb_array_elements(liste) with ordinality e(it, i)) z
-     where aid is not null
-     order by aid, i
+           emp
+      from (select distinct on (l.aid) l.aid, l.it, l.emp from (select public.vrm_t_texte(it -> 'id') aid, it, md5(it::text) emp, i from jsonb_array_elements(liste) with ordinality e(it, i)) l where l.aid is not null order by l.aid, l.i) z
+     where not exists (select 1 from public.annonces x where x.owner = p_owner and x.plateforme = 'vinted'
+                          and x.compte = v_compte and x.annonce_id = z.aid and x.empreinte = z.emp)
     on conflict (owner, plateforme, compte, annonce_id) do update set
       titre = excluded.titre, prix = excluded.prix, devise = excluded.devise, marque = excluded.marque,
       taille = excluded.taille, etat = excluded.etat, url = excluded.url, photo = excluded.photo,
       n_photos = excluded.n_photos, vues = excluded.vues, favoris = excluded.favoris,
       masquee = excluded.masquee, fermee = excluded.fermee, brouillon = excluded.brouillon,
       reservee = excluded.reservee, cree_le = excluded.cree_le, num_ecrit = excluded.num_ecrit,
-      empreinte = excluded.empreinte, projete_le = now()
-     where a.empreinte is distinct from excluded.empreinte;
-    perform public.vrm_t_lue(p_owner, p_id, fam, v_lu, coalesce(array_length(v_ids, 1), 0), v_sans);
+      empreinte = excluded.empreinte, projete_le = now();
+    perform public.vrm_t_lue(p_owner, p_id, fam, v_lu, v_n, v_sans);
     return 'ok';
   end if;
 
