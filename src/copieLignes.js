@@ -285,10 +285,24 @@ const parIdTri = (m) => [...m.values()].sort((a, b) => (String(a.id) < String(b.
 
 // `lireCompte()` → nombre ou null · `lireDepuis(X)` → lignes ou null · `lireComplet()` → lignes ou null.
 // Rend `{ ok:true, rows, mode:'copie'|'entiere', recues }` ou `{ ok:false }` (pas su).
+// Les familles rangées sur l'appareil, par compte (`vrm_` : effacée avec les données locales).
+// Sans elle, la 1re ouverture attendait l'ouverture d'IndexedDB avant sa lecture entière
+// (mesuré au banc `chargement`, 1512 px : « Qui dorment » arrivait après l'écran).
+const CLE_FAMILLES = 'vrm_copies_familles';
+const famillesRangees = (local, uid) => { try { const o = JSON.parse(local.getItem(CLE_FAMILLES) || 'null'); return o && o.uid === uid && Array.isArray(o.f) ? o.f : []; } catch (_) { return null; } };
+const noterFamille = (local, uid, famille, oui) => {
+  try {
+    const f = (famillesRangees(local, uid) || []).filter((x) => x !== famille);
+    if (oui) f.push(famille);
+    local.setItem(CLE_FAMILLES, JSON.stringify({ uid, f }));
+  } catch (_) {}
+};
 export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepuis, lireComplet, stockage, local = null, maintenant = Date.now, fenetreMs = FENETRE_FAMILLE_MS, relectureMs = RELECTURE_ENTIERE_MS }) {
   const cle = `famille:${famille}`;
   let copie = null;
-  if (uid && stockage) {
+  // Rien de rangé pour ce compte (marque lue sans attendre) : pas d'attente d'IndexedDB.
+  const rangees = local && uid ? famillesRangees(local, uid) : null;
+  if (uid && stockage && !(Array.isArray(rangees) && !rangees.includes(famille))) {
     try {
       const e = ((await stockage.lire(uid, famille, [CLE_FAMILLE])) || new Map()).get(CLE_FAMILLE);
       const v = e && typeof e.v === 'string' ? JSON.parse(e.v) : null;
@@ -297,10 +311,10 @@ export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepui
   }
   const ranger = async (rows, lu, entiere) => {
     if (!uid || !stockage) return;
-    if (!rows.every(ligneVersionnable)) { try { await stockage.retirer(uid, famille, [CLE_FAMILLE]); } catch (_) {} return; }
+    if (!rows.every(ligneVersionnable)) { try { await stockage.retirer(uid, famille, [CLE_FAMILLE]); } catch (_) {} if (local) noterFamille(local, uid, famille, false); return; }
     const row = { rows };
     if (!gardable(row)) return;
-    try { await stockage.ecrire(uid, famille, [{ id: CLE_FAMILLE, v: JSON.stringify({ n: rows.length, max: plusRecente(rows), lu, entiere }), row }]); } catch (_) {}
+    try { await stockage.ecrire(uid, famille, [{ id: CLE_FAMILLE, v: JSON.stringify({ n: rows.length, max: plusRecente(rows), lu, entiere }), row }]); if (local) noterFamille(local, uid, famille, true); } catch (_) {}
   };
   const entiere = async () => {
     const t0 = maintenant();
@@ -309,7 +323,7 @@ export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepui
       if (copie) noterPasRelu([cle], local ? lireVu(local, uid) : null);
       return { ok: false };
     }
-    await ranger(r, t0, t0);
+    ranger(r, t0, t0).catch(() => {});   // rangée sans faire attendre l’écran
     noterRelu([cle]);
     if (local && uid) noterVu(local, uid, maintenant());
     return { ok: true, rows: r, mode: 'entiere', recues: r.length };
@@ -327,7 +341,7 @@ export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepui
   // date plus vieille que X) — on ne devine pas laquelle, la famille est relue.
   if (m.size !== n) return entiere();
   const rows = parIdTri(m);
-  await ranger(rows, t0, copie.entiere);
+  ranger(rows, t0, copie.entiere).catch(() => {});
   noterRelu([cle]);
   if (local && uid) noterVu(local, uid, maintenant());
   return { ok: true, rows, mode: 'copie', recues: rec.length };
