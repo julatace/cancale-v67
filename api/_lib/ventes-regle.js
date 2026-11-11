@@ -122,7 +122,7 @@ export const indexDeclarations = (reg) => {
 
 export const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
 
-export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare } = {}) => {
+export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare, importees } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
@@ -227,10 +227,37 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     const l = { id, plateforme: 'Vestiaire', ts: t, ym: ymDeTs(t), eur: recu.eur, titre: '', masquee: false };
     if (garde(l)) lignes.push(place(l));
   }
+  // (11 nov.) LES VENTES IMPORTÉES (Paramètres → Importer, src/importStock.js), marquées
+  // `source: 'importe'`. Une vente importée dont le n° de commande est celui d'une vente
+  // LUE par VRM (même identité `plateforme:n°`, lue avant ou après l'import) ne compte
+  // pas : elle y est déjà. Jamais par le titre ni le montant (§5).
+  const prefImp = { Vinted: 'vinted:', Leboncoin: 'lbc:', eBay: 'ebay:', Vestiaire: 'vestiaire:' };
+  const lusImp = new Set();
+  if ((importees || []).length) {
+    for (const o of (vinted || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) lusImp.add('vinted:' + tx); }
+    for (const v of (lbc || [])) if (v && v.txId) lusImp.add('lbc:' + v.txId);
+    for (const e of (ebay || [])) if (e && e.orderId) lusImp.add('ebay:' + e.orderId);
+    for (const v of (vestiaire || [])) if (v && v.id) lusImp.add('vestiaire:' + v.id);
+  }
+  const eurImp = (p) => { const x = String(p == null ? '' : p).trim(); if (!x) return null; const n = Number(x.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null; };
+  const dejaLueImp = (v) => { const pr = prefImp[v.plateforme]; const r = String(v.ref == null ? '' : v.ref).trim(); return !!(pr && r && lusImp.has(pr + r)); };
+  // Le CA DÉCLARÉ : daté au VERSEMENT écrit dans son fichier ; sans versement ⇒ « à
+  // dater », dans aucun mois ; montant vide ⇒ mise à part et NOMMÉE (« au moins »).
+  for (const v of (importees || [])) {
+    if (!v || !v.id || dejaLueImp(v)) continue;
+    const id = 'importe:' + v.id, pl = v.plateforme || 'Autre';
+    if (vus.has(id)) continue;
+    const eur = eurImp(v.prix);
+    if (eur == null) { vus.add(id); ecartees.push({ id, plateforme: pl, raison: 'montant vide dans ton fichier', titre: v.titre || '', manque: true, importee: true }); continue; }
+    const t = /^\d{4}-\d{2}-\d{2}$/.test(String(v.versement || '')) ? Date.parse(v.versement + 'T12:00:00') : 0;
+    if (!t) { vus.add(id); aDaterOuDeclaree({ id, plateforme: pl, eur, titre: v.titre || '', masquee: false, importee: true }); continue; }
+    const l = { id, plateforme: pl, ts: t, ym: ymDeTs(t), eur, titre: v.titre || '', masquee: false, importee: true };
+    if (garde(l)) lignes.push(place(l));
+  }
   return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
 };
 
-export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {}) => {
+export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, importees } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
   // (1er nov., audits A2 et A10) Les ventes FAITES dont l'argent ne se lit pas
@@ -287,6 +314,30 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre 
     if (recu.eur == null) { nonComptees.push({ plateforme: 'Vestiaire', raison: recu.raison, ts: t || null }); continue; }
     if (!t) { nonComptees.push({ plateforme: 'Vestiaire', raison: 'vente pas datée', ts: null }); continue; }
     lignes.push({ plateforme: 'Vestiaire', ts: t, eur: recu.eur, compte: String(v.compte || '') });
+  }
+  // (11 nov.) LES VENTES IMPORTÉES (Paramètres → Importer, src/importStock.js), marquées
+  // `source: 'importe'`. Une vente importée dont le n° de commande est celui d'une vente
+  // LUE par VRM (même identité `plateforme:n°`, lue avant ou après l'import) ne compte
+  // pas : elle y est déjà. Jamais par le titre ni le montant (§5).
+  const prefImp = { Vinted: 'vinted:', Leboncoin: 'lbc:', eBay: 'ebay:', Vestiaire: 'vestiaire:' };
+  const lusImp = new Set();
+  if ((importees || []).length) {
+    for (const o of (vinted || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) lusImp.add('vinted:' + tx); }
+    for (const v of (lbc || [])) if (v && v.txId) lusImp.add('lbc:' + v.txId);
+    for (const e of (ebay || [])) if (e && e.orderId) lusImp.add('ebay:' + e.orderId);
+    for (const v of (vestiaire || [])) if (v && v.id) lusImp.add('vestiaire:' + v.id);
+  }
+  const eurImp = (p) => { const x = String(p == null ? '' : p).trim(); if (!x) return null; const n = Number(x.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null; };
+  const dejaLueImp = (v) => { const pr = prefImp[v.plateforme]; const r = String(v.ref == null ? '' : v.ref).trim(); return !!(pr && r && lusImp.has(pr + r)); };
+  // VENDU : au jour de la VENTE écrit dans son fichier (sans heure : `heureLue: false`).
+  for (const v of (importees || [])) {
+    if (!v || !v.id || dejaLueImp(v) || !garde('importe:' + v.id)) continue;
+    const pl = v.plateforme || 'Autre';
+    const t = /^\d{4}-\d{2}-\d{2}$/.test(String(v.date || '')) ? Date.parse(v.date + 'T12:00:00') : 0;
+    const eur = eurImp(v.prix);
+    if (eur == null) { nonComptees.push({ plateforme: pl, raison: 'montant vide dans ton fichier', ts: t || null }); continue; }
+    if (!t) { sansDate += 1; continue; }
+    lignes.push({ plateforme: pl, ts: t, eur, compte: '', heureLue: false, importee: true });
   }
   return { lignes, sansDate, ecartees, nonComptees };
 };

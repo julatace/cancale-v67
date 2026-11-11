@@ -29,7 +29,7 @@ import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
-import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
+import { gesteCorbeille, lireVentesImportees, DEMANDE_REGLAGE_SOUS } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
@@ -1548,8 +1548,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vestiaire = ventesVc || [];
-    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre });
-    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
+    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre, importees: lireVentesImportees() });
+    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees: lireVentesImportees() });
     let finSansDate = 0;
     const finalise = [];
     for (const l of [...decl.lignes, ...decl.aDater]) {
@@ -1794,7 +1794,7 @@ const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS
 const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u) }) => {
   const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
   const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
+  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees: lireVentesImportees() });
   // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
   // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
   const ncER = phraseNonComptees((decl.ecartees || []).filter((x) => x && x.manque));
@@ -3471,6 +3471,11 @@ function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
       <li key="lbc" data-adater-raison="leboncoin" data-n={r.n}>
         <span><b>{nbAd(r.n)}</b> Leboncoin : date à recopier.</span>
         <Bouton variante="discret" data-urssaf-dater="" data-adater-geste="main" onClick={onDater}>Dater à la main</Bouton>
+      </li>);
+    else if (r.cle === 'importee') lignes.push(
+      <li key="imp" data-adater-raison="importee" data-n={r.n}>
+        <span><b>{nbAd(r.n)}</b> importée{plAd(r.n)} sans date de versement : ajoute-la dans ton fichier, puis réimporte.</span>
+        <Bouton variante="discret" data-adater-geste="importer" onClick={() => { DEMANDE_REGLAGE_SOUS.id = 'importer'; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} try { const st = { vrmTab: 'settings', vrmSub: 'ventes' }; window.history.pushState(st, ''); window.dispatchEvent(new window.PopStateEvent('popstate', { state: st })); } catch (_) {} }}>Importer</Bouton>
       </li>);
     else if (r.cle === 'vestiaire') lignes.push(
       <li key="vc" data-adater-raison="vestiaire" data-n={r.n}>

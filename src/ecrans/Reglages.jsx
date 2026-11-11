@@ -1,7 +1,8 @@
 import { PlateformesSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
-import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
+import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';
+import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)   // (10 nov., lot Y) la corbeille 30 jours
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -1929,6 +1930,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
+      // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
+      { id:'importer', type:'panneau', nu:true, ic:'box', lib:'Importer', desc:'Ton stock et tes ventes passées, depuis un tableur ou un autre logiciel.', data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
       { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       // (10 nov., lot Y) Ce qu'il a supprimé DANS VRM, restaurable 30 jours (src/corbeille.js).
       { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:'Corbeille', desc:'Ce que tu as supprimé, à restaurer pendant 30 jours.', val:String(lireListeCorbeille().length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
