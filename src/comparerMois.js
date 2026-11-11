@@ -40,7 +40,7 @@ const LIGNES = [
   { cle: 'ventes', nom: 'Ventes', type: 'n' },
   // (11 nov., décision C5 — Julien : « tranche ») Les PAIRES achetées (pièces), pas les achats :
   // un lot de 3 compte 3. Le nombre d'achats s'écrit en petit à côté (`achats`).
-  { cle: 'paires', nom: 'Paires achetées', type: 'n' },
+  { cle: 'paires', nom: 'Paires', type: 'n' },
 ];
 
 const pasSu = (raison) => ({ valeur: null, partiel: false, manque: [], raison });

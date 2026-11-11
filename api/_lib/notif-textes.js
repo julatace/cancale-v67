@@ -152,16 +152,16 @@ export function echeancePressante(echeance, t = Date.now()) {
 }
 
 // ── L'HEURE DU RÉSUMÉ DU SOIR (11 nov., décision C8 — Julien : « tranche ») ─────
-// Rangée dans `push_prefs` : `soir: { heure: 18..22 }` (heure de PARIS). Absente ⇒ le
+// Rangée dans `push_prefs` : `soirHeure: 18..22` (heure de PARIS ; ⚠️ pas `soir`, qui est
+// l'ancienne catégorie on/off encore lue). Absente ⇒ le
 // défaut d'avant, INCHANGÉ : le cron de Vercel de 18:00 UTC (19 h l'hiver, 20 h l'été).
 // Le serveur part quand l'heure de Paris a atteint SON heure (une fois par soir : le mémo
 // `soir_reminder_dedup`) ; une heure choisie est servie par le passage horaire
 // (`?moment=soir&passage=heure`, .github/workflows/resume-soir-heure.yml).
 export const HEURES_SOIR = Object.freeze([18, 19, 20, 21, 22]);
 export function reglageSoir(prefs) {
-  const s = prefs && prefs.soir && typeof prefs.soir === 'object' ? prefs.soir : {};
-  const h = Number(s.heure);
-  return { heure: HEURES_SOIR.includes(h) && Number.isInteger(s.heure) ? h : null };
+  const h = prefs ? prefs.soirHeure : null;
+  return { heure: Number.isInteger(h) && HEURES_SOIR.includes(h) ? h : null };
 }
 // L'heure (Paris) du défaut, ce jour-là : celle de 18:00 UTC (19 ou 20).
 export function heureSoirDefaut(t = Date.now()) {

@@ -1450,11 +1450,11 @@ function PushPrefsSetting({ comptes, onMuets }) {
       )}
       {/* (11 nov., décision C8 — Julien : « tranche ») L'heure du résumé du soir : le défaut
           INCHANGÉ (19 h l'hiver, 20 h l'été), ou son heure, de 18 h à 22 h (heure de Paris).
-          Rangée dans `push_prefs.soir` ; le serveur la lit (api/_lib/notif-textes.js, `soirALHeure`). */}
+          Rangée dans `push_prefs.soirHeure` ; le serveur la lit (api/_lib/notif-textes.js, `soirALHeure`). */}
       <div className="vrm-np-ligne" data-np-soir={soir.heure == null ? 'defaut' : String(soir.heure)}>
         <span className="vrm-np-lib">Résumé du soir<small>Ce qu’il y a à faire demain.</small></span>
         <select className="vrm-np-soir" aria-label="Heure du résumé du soir" data-np-soir-choix="" value={soir.heure == null ? '' : String(soir.heure)} disabled={!prefs||busy}
-          onChange={(e)=>{ const v = e.target.value; const suite = { ...(prefs || {}) }; if (v === '') delete suite.soir; else suite.soir = { heure: Number(v) }; ecrirePrefs(suite, 'L’heure du résumé'); }}>
+          onChange={(e)=>{ const v = e.target.value; const suite = { ...(prefs || {}) }; if (v === '') delete suite.soirHeure; else suite.soirHeure = Number(v); ecrirePrefs(suite, 'L’heure du résumé'); }}>
           <option value="">19 h (hiver) · 20 h (été)</option>
           {HEURES_SOIR.map((h)=><option key={h} value={String(h)}>{h} h</option>)}
         </select>
