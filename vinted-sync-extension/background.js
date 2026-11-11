@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.342.0';
+const CODE_VERSION = '5.351.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -200,6 +200,8 @@ function plateformeDe(url) {
 // `lier-extension=<identifiant de CETTE extension>` — l'app, connectée, lui
 // adresse sa propre session (voir `demanderLiaison`). Plus de mot de passe VRM
 // tapé dans l'extension quand l'app peut la connecter.
+// 5.351 : les écrans que la carte du logo peut ouvrir (liste blanche, adresse de l'app).
+const ECRANS_CARTE = Object.freeze({ colis: 'tab=cat_bord', messages: 'tab=messages', offres: 'tab=messages&vue=favoris', journee: 'tab=journee' });
 function ouvrirVRMDepuis(urlActive, opts) {
   const p = plateformeDe(urlActive);
   let idExt = ''; try { idExt = String(chrome.runtime.id || ''); } catch (_) {}
@@ -207,13 +209,15 @@ function ouvrirVRMDepuis(urlActive, opts) {
   // 5.325 : « Continuer avec Google / Discord » — un nom de la liste, jamais
   // un texte reçu tel quel ; seulement avec une liaison.
   const connexion = lier && FOURNISSEURS_CONNEXION.includes(String((opts && opts.connexion) || '')) ? String(opts.connexion) : '';
-  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
+  // 5.351 : « Colis · Messages · Offres · Ma journée » depuis la carte du logo.
+  const ecran = !lier && opts && Object.prototype.hasOwnProperty.call(ECRANS_CARTE, String(opts.ecran || '')) ? ECRANS_CARTE[String(opts.ecran)] : '';
+  const cible = ecran ? APP_URL_VRM + '/?' + ecran : APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
   try {
     chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
       const t = (ouverts || [])[0];
       // Déjà sur VRM : on ne recharge pas la page (on garde l'écran où l'on est)
       // — sauf pour une liaison, que l'app lit dans l'adresse.
-      if (t && !lier && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
+      if (t && !lier && !ecran && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
       if (t) { chrome.tabs.update(t.id, { url: cible, active: true }); try { chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} }
       else chrome.tabs.create({ url: cible });
     });
@@ -3432,7 +3436,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'ouvrirVRM') {
       // La carte de connexion vit dans un iframe de l'onglet : sender.tab est
       // l'onglet du site, c'est lui qui décide l'onglet de VRM.
-      ouvrirVRMDepuis((sender && sender.tab && sender.tab.url) || '');
+      // 5.351 (lot extension-visuel) : la carte ouvre VRM sur un ÉCRAN de la liste
+      // (`ECRANS_CARTE`) — un nom connu, jamais une adresse reçue telle quelle.
+      ouvrirVRMDepuis((sender && sender.tab && sender.tab.url) || '', { ecran: msg.ecran });
       sendResponse({ ok: true });
       return true;
     }
@@ -13828,6 +13834,11 @@ async function etatSite(url,tabId) {
     site = uid ? { id: String(uid), nom: (await loginDe(String(uid))) || (await loginVu(String(uid))), choix: await choixCompte(String(uid)) } : { id: null, nom: '' };
     // 5.341 : les dates de versement encore à lire sur CE compte (pas su ⇒ null).
     if (uid) site.dates = await datesPourCarte(String(uid));
+    // 5.351 : « en pause car Vinted freine » — lu dans CE Chrome (stockage local,
+    // aucune requête) : la pause 429/403 et le frein des mises en ligne du compte.
+    if (uid) { const fr = await lireFreinRepub(String(uid)).catch(() => null); site.frein = fr ? { jusqua: Number(fr.jusqua) || 0, restreint: !!fr.restreint } : null; }
+    const pz = await pauseVinted().catch(() => null);
+    site.pause = pz ? { jusqua: Number(pz.jusqua) || 0 } : null;
   } else if (plateforme === 'leboncoin') {
     const vu=local.vrmLbcTransport?.[tabId];
     const connu=local.vrmLbcCompte;
