@@ -19,7 +19,7 @@ export const ORDRE_PAR_TABLE = {
   app_data: 'owner.asc,id.asc',
   vinted_accounts: 'owner.asc,vinted_user_id.asc',
   abonnements: 'owner.asc',
-  essais_gratuits: 'cle.asc',     // clé primaire `cle` (022) — pas de colonne id
+  essais_gratuits: 'cle.asc',   // (11 nov.) clé primaire `cle` (migration 022), lue par api/_lib/pilotage.js
 };
 
 // `chemin` : « table?filtres… » ou l'URL complète « …/rest/v1/table?filtres… ».

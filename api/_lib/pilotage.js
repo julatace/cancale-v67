@@ -34,7 +34,7 @@
 //     une lecture ratée n'écrit RIEN ; une valeur pas sue reste `null`.
 // ═══════════════════════════════════════════════════════════════════════════
 import { sbCle } from './cle.js';
-import { ordreStable } from './ordre-stable.js';
+import { ordreStable } from './ordre-stable.js';   // (11 nov.) chaque page Range porte un tri total
 import { proprietaireInstallation } from './signalement.js';
 import { listerPlantagesTerrain } from './alertes-plantages.js';
 import { stripeApi as stripeApiReel, stripePret, stripeModeTest } from './stripe.js';

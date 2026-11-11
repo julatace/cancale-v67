@@ -166,7 +166,7 @@ select meta->>'id' from public.app_data
 sauter ou être lue deux fois d'une page à l'autre). Corrigé par `ordreStable(…)` ;
 `essais_gratuits` ajoutée à `ORDRE_PAR_TABLE` avec sa clé `cle` (l'ordre par défaut
 `owner,id` aurait fait échouer cette lecture : pas de colonne `id`).
-`scripts/tests/pilotage.test.mjs` 7/7, audit 12/12 vert.
+`scripts/tests/pilotage.test.mjs` 7/7, audit 12/12 vert. (Au merge : `main` avait corrigé la même chose en même temps, lot « audits rouges » — c'est sa version qui est gardée.)
 
 ## Preuves de la session
 
