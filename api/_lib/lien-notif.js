@@ -18,7 +18,8 @@ import { normaliserSuivi } from './etat-colis-email.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // (10 nov., lot BC) `lundi` : la semaine (AAAA-MM-JJ, un lundi) de l'écran « Ma semaine ».
-const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi', 'session'];
+const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi', 'session', 'rappel'];
+// (11 nov., rappels perso) `rappel` : l'identifiant d'un rappel posé par le vendeur (api/_lib/rappels-perso.js).
 
 export function lienNotif(tab, o = {}) {
   const p = { tab, ...o };

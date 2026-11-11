@@ -78,6 +78,8 @@ export const GENRES = [
   { id: 'argent', re: /^final-/, titre: (k) => `${k} versements reçus`, url: lienNotif('ventes', { site: 'vinted' }), action: null },
   { id: 'arrivee', re: /^(relais|retrait-code)-/, titre: (k) => `${k} colis t'attendent`, url: DESTINATIONS.retrait({}), action: { action: 'voir', title: 'Voir le code' } },
   { id: 'offre', re: /^offer-/, titre: (k) => `${k} offres à trancher`, url: DESTINATIONS.offres(), action: { action: 'voir', title: 'Répondre' } },
+  // (11 nov.) Les rappels posés par le vendeur (« Me le rappeler ») : plusieurs ⇒ « 3 rappels », Ma journée.
+  { id: 'rappel', re: /^rappel-/, titre: (k) => `${k} rappels`, url: lienNotif('journee'), action: { action: 'voir', title: 'Ouvrir' } },
   { id: 'message', re: /^msg-/, titre: (k) => `${k} nouveaux messages`, url: lienNotif('messages', { site: 'vinted' }), action: { action: 'voir', title: 'Répondre' } },
 ];
 // Le genre d'une notification (par son étiquette), ou `null` (elle ne se regroupe pas :

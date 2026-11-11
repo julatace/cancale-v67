@@ -606,6 +606,10 @@ import "./styles-popups.css";       // (9 nov., lot AI) l'avatar du compte Vinte
 import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {LignePlancher} from "./LignePlancher.jsx";
 import { CLE_NOTES_PAIRES, NOTE_MAX, noteDe, opsNote, notesPropres, numerosAmbigus } from './notePaire.js';
+// (11 nov.) « Me le rappeler » : la règle (api/_lib/rappels-perso.js, la même que le serveur) et la forme (src/Rappels.jsx).
+import { CLE_RAPPELS, lireRappels, nouveauRappel, reporterRappel, marquerFait, supprimerRappel, purgerRappels, rappelsDuJour, rappelsAVenir, rappelsFaits, rappelDeCible, etatCible, lienRappel, cibleRappel, quandEnMots as quandRappel } from '../api/_lib/rappels-perso.js';
+import { lienNotif as lienNotifRappel } from '../api/_lib/lien-notif.js';
+import { FeuilleRappel, CarteRappelsJour, ListeRappels, BandeauRappel, BoutonRappelVue } from './Rappels.jsx';
 import { NotePaireVue } from './NotePaire.jsx';
 import { CLE_HORS_MASQUES, achatsEnDouble, opsGarder, horsVisibles } from './achatsDoubles.js';
 import { AchatsEnDouble } from './AchatsEnDouble.jsx';
@@ -2648,6 +2652,9 @@ const SYNC_KEYS = [
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
   'vrm_notes_paires', 'vrm_achats_hors_masques',
+  // (11 nov.) Les RAPPELS qu'il a posés (« Me le rappeler », api/_lib/rappels-perso.js) :
+  // { [id]: { sorte, num|item|tx, jour, note, etat… } } — lus PROJETÉS par le cron (9 h) et l'agenda.
+  'vrm_rappels',
   // (10 nov., lot Y) La CORBEILLE 30 jours ({ [id]: entrée }, src/corbeille.js) : ce qu'il a supprimé DANS VRM.
   'vrm_corbeille',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
@@ -4467,6 +4474,127 @@ function NotePaireCoque({ numero = '', itemId = '', recreeDe = '', variante = 'l
     onEditer={n && n.cachee ? null : () => editerNotePaire(paire, n && n.texte)}/>;
   return rangee ? <span className="vrm-note-rangee">{vue}</span> : vue;
 }
+
+// ── (11 nov.) « ME LE RAPPELER » (api/_lib/rappels-perso.js, src/Rappels.jsx) ──
+// Les rappels qu'IL pose lui-même sur un article (N°), une vente ou un achat — jamais
+// proposés par VRM (refus du 11 oct., §3). UN état (`vrm_rappels`, clé synchronisée,
+// fusionnée par id entre ses appareils), relu à chaque sauvegarde ou fusion du nuage.
+// Chaque geste (poser, fait, reporter, supprimer) est un geste annulable 5 s
+// (`gesteVrm`) qui n'écrit QUE le rappel touché. Le serveur (api/ship-reminders.js)
+// fait sonner la notification à 9 h le jour dit.
+let _rappelsVue = null, _rappelsEcoute = false;
+const _rappelsAbonnes = new Set();
+const notifierRappels = () => { [..._rappelsAbonnes].forEach((f) => { try { f(); } catch (_) {} }); };
+const lireCarteRappels = () => { if (_rappelsVue == null) { const v = load(CLE_RAPPELS, {}); _rappelsVue = v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } return _rappelsVue; };
+const abonnerRappels = (fn) => {
+  if (!_rappelsEcoute) {
+    _rappelsEcoute = true;
+    const relire = () => { _rappelsVue = null; notifierRappels(); };
+    window.addEventListener('vrm:save', (e) => { if (e && e.detail && e.detail.k === CLE_RAPPELS) relire(); });
+    onCloudReady(relire); onCleRelue(CLE_RAPPELS, relire);
+  }
+  _rappelsAbonnes.add(fn);
+  return () => { _rappelsAbonnes.delete(fn); };
+};
+const poserRappelsVue = (f) => { _rappelsVue = typeof f === 'function' ? f(lireCarteRappels()) : (f || {}); notifierRappels(); };
+const useRappels = () => React.useSyncExternalStore(abonnerRappels, lireCarteRappels);
+// Un geste : le rappel `apres` (ou `undefined` = retiré) à la place de `avant`, plus la purge
+// des pierres tombales de plus de 30 jours (une sous-valeur chacune).
+const gesteRappel = (texte, id, apres) => {
+  const carte = lireCarteRappels();
+  const ops = [{ k: CLE_RAPPELS, type: 'cle', id, apres, avant: carte[id] }];
+  const purgee = purgerRappels(carte);
+  for (const k of Object.keys(carte)) if (k !== id && !(k in purgee)) ops.push({ k: CLE_RAPPELS, type: 'cle', id: k, apres: undefined, avant: carte[k] });
+  gesteVrm(texte, ops, { [CLE_RAPPELS]: poserRappelsVue });
+};
+// L'état de la cible AU MOMENT de l'ouvrir (« vendu entre-temps » au lieu d'un écran vide).
+const etatCibleRappel = (r) => {
+  let vendus = null; try { vendus = new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) {}
+  let presents = null; try { presents = numsPresents(); } catch (_) {}
+  return etatCible(r, { vendus, presents, annulee: (tx) => { try { return txnAnnuleeAvantEnvoi(tx); } catch (_) { return false; } } });
+};
+// Ouvrir l'élément : la MÊME adresse que la notification (api/_lib/lien-notif.js), par identité.
+const ouvrirRappel = (r) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: lienRappel(r, lienNotifRappel).replace(/^\//, '') })); } catch (_) {} };
+const DEMANDE_RAPPEL = { id: null };
+const demanderFeuilleRappel = (detail) => { try { window.dispatchEvent(new CustomEvent('vrm:rappel-feuille', { detail })); } catch (_) {} };
+// Les gestes communs (carte du jour, Paramètres, bandeau).
+const GESTES_RAPPEL = {
+  onOuvrir: (r) => ouvrirRappel(r),
+  onFait: (r) => { const c = marquerFait(lireCarteRappels(), r.id); if (c) gesteRappel('Rappel fait', r.id, c[r.id]); },
+  onReporter: (r) => demanderFeuilleRappel({ mode: 'reporter', id: r.id, cible: cibleRappel(r) }),
+  onSupprimer: (r) => { const c = supprimerRappel(lireCarteRappels(), r.id); if (c) gesteRappel('Rappel supprimé', r.id, c[r.id]); },
+};
+// « Me le rappeler » : posé sur la fiche d'un article, la fiche d'une vente, la ligne d'un achat.
+// Sans identité (ni N°, ni annonce, ni transaction), le bouton ne s'affiche pas (§5).
+// `variante` : 'bloc' (fiche d'un article) · 'grille' (fiche d'une vente, `Bouton`) · 'geste' (« … » d'une annonce) · 'menu' (⋯ d'un achat).
+function BoutonRappel({ cible, libelle = '', variante = 'bloc', style = undefined, avant = null }) {
+  const carte = useRappels();
+  const c = cibleRappel(cible);
+  if (!c) return null;
+  const actif = rappelDeCible(lireRappels(carte), c);
+  const ouvrir = () => { if (typeof avant === 'function') { try { avant(); } catch (_) {} } demanderFeuilleRappel({ mode: 'creer', cible: c, libelle, id: actif ? actif.id : null }); };
+  const lib = actif ? `Rappel ${quandRappel(actif.jour)}` : 'Me le rappeler';
+  if (variante === 'grille') return <Bouton variante="secondaire" icone="clock" data-rappel-bouton={actif ? 'actif' : 'neuf'} onClick={ouvrir}>{lib}</Bouton>;
+  if (variante === 'menu') return <button type="button" role="menuitem" data-rappel-bouton={actif ? 'actif' : 'neuf'} onClick={ouvrir} style={style}><Icon name="clock" size={15} style={{ color: C.muted }}/>{lib}</button>;
+  if (variante === 'geste') return <button type="button" className="vrm-fiche-geste" data-rappel-bouton={actif ? 'actif' : 'neuf'} onClick={ouvrir} style={style}>{lib}</button>;
+  return <BoutonRappelVue actif={actif} variante={variante} onClick={ouvrir}/>;
+}
+// L'hôte, monté une fois : la feuille (poser, reporter) et le bandeau ouvert par la notification.
+function HoteRappels() {
+  const carte = useRappels();
+  const [feuille, setFeuille] = React.useState(null);
+  const [bandeau, setBandeau] = React.useState(null);
+  React.useEffect(() => {
+    const ouvrirFeuille = (e) => { const d = e && e.detail; if (d && d.cible) setFeuille(d); };
+    const ouvrirBandeau = () => { const id = DEMANDE_RAPPEL.id; DEMANDE_RAPPEL.id = null; if (id) setBandeau({ id, ouvert: false }); };
+    window.addEventListener('vrm:rappel-feuille', ouvrirFeuille); window.addEventListener('vrm:rappel-ouvrir', ouvrirBandeau);
+    ouvrirBandeau();
+    return () => { window.removeEventListener('vrm:rappel-feuille', ouvrirFeuille); window.removeEventListener('vrm:rappel-ouvrir', ouvrirBandeau); };
+  }, []);
+  const rB = bandeau ? lireRappels(carte).find((x) => x.id === bandeau.id) || null : null;
+  const etatB = rB ? etatCibleRappel(rB) : null;
+  // Un article encore là : sa fiche s'ouvre (« Tout sur le N° ») — une fois, quand le rappel est lu.
+  React.useEffect(() => {
+    if (!bandeau || bandeau.ouvert || !rB) return;
+    setBandeau((b) => (b ? { ...b, ouvert: true } : b));
+    if (rB.sorte === 'article' && rB.num && etatB && (etatB.etat === 'present' || etatB.etat === 'pas-su')) setTimeout(() => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(rB.num) })); } catch (_) {} }, 0);
+  }, [bandeau, rB, etatB]);
+  const carteL = lireRappels(carte);
+  const rF = feuille && feuille.id ? carteL.find((x) => x.id === feuille.id) || null : null;
+  const enregistrer = ({ choix, note }) => {
+    const f = feuille; setFeuille(null);
+    if (f.mode === 'reporter') {
+      const c = reporterRappel(lireCarteRappels(), f.id, choix); if (!c) { toast('Pas reporté : ce rappel n’existe plus'); return; }
+      gesteRappel(`Rappel reporté · ${quandRappel(c[f.id].jour)}`, f.id, c[f.id]);
+      return;
+    }
+    const r = nouveauRappel({ cible: f.cible, choix, note }, Date.now(), ...(rF ? [rF.id] : []));
+    if (!r) { toast('Pas enregistré : choisis une date à venir'); return; }
+    gesteRappel(`Rappel posé · ${quandRappel(r.jour)} à 9 h`, r.id, r);
+  };
+  return <>
+    {feuille ? <FeuilleRappel Feuille={SheetShell} cible={feuille.cible} libelle={feuille.libelle || ''} mode={feuille.mode} existant={rF} onEnregistrer={enregistrer} onFermer={() => setFeuille(null)}/> : null}
+    {bandeau && rB && !feuille ? createPortal(<div className="vrm-app-shell"><BandeauRappel r={rB} etat={etatB}
+      onFait={(r) => { GESTES_RAPPEL.onFait(r); setBandeau(null); }} onReporter={(r) => { GESTES_RAPPEL.onReporter(r); setBandeau(null); }}
+      onHistoire={(r, e) => { setBandeau(null); if (e && e.tx) ouvrirRappel({ ...r, sorte: 'vente', tx: e.tx }); else if (r.num) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(r.num) })); } catch (_) {} } }}
+      onFermer={() => setBandeau(null)}/></div>, document.body) : null}
+  </>;
+}
+// Ma journée : la carte « Rappels du jour » (rien s'il n'y en a pas).
+function RappelsJourCoque() {
+  const carte = useRappels();
+  const lignes = rappelsDuJour(lireRappels(carte)).map((r) => ({ r, etat: etatCibleRappel(r) }));
+  return <CarteRappelsJour lignes={lignes} {...GESTES_RAPPEL}/>;
+}
+// Paramètres → Rappels.
+function RappelsSetting() {
+  const carte = useRappels();
+  const tous = lireRappels(carte);
+  const avecEtat = (l) => l.map((r) => ({ r, etat: r.etat === 'actif' ? etatCibleRappel(r) : null }));
+  return <ListeRappels duJour={avecEtat(rappelsDuJour(tous))} avenir={avecEtat(rappelsAVenir(tous))} faits={avecEtat(rappelsFaits(tous))} {...GESTES_RAPPEL}/>;
+}
+const nRappelsActifs = () => lireRappels(lireCarteRappels()).filter((r) => r.etat === 'actif').length;
+export { BoutonRappel, RappelsSetting, nRappelsActifs, useRappels };
 
 // localStorage est partagé entre les onglets : le changement de vendeur
 // doit fermer l'ancien écran avant toute autre sauvegarde différée.
@@ -11309,7 +11437,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_cloture_annee', 'vrm_cloture_vue', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_rappels', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_cloture_annee', 'vrm_cloture_vue', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -42776,6 +42904,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
             {AF.section}
 
+            {/* (11 nov.) « Rappels du jour » : ceux qu'il a posés lui-même (« Me le rappeler »), sous « À faire ». */}
+            <RappelsJourCoque/>
+
             {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières
                 ventes, stock, tendances) n'est plus rendue sur Ma journée : la maquette n'a que la
                 tête et « À faire ». Les chiffres vivent dans Ventes, Statistiques et Comptabilité.
@@ -43268,6 +43399,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('cat_msg', null, ONGLETS_DEPLACES).tab); onNav('cat_msg'); }}>Conversation</Bouton> : null}
                     {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche de la paire</Bouton> : null}
+                    {/* (11 nov.) « Me le rappeler » : par le n° de transaction (§5), jamais le titre. */}
+                    {o.transaction_id != null ? <BoutonRappel variante="grille" cible={{ sorte: 'vente', tx: String(o.transaction_id), num: num || '', plat: 'vinted' }} libelle={num ? `N°${num} · ${nom}` : nom}/> : null}
                     {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
                     {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
                     {/* (11 nov., lot ventes-lot) Les articles d'un lot PROUVÉ sont dans le récapitulatif (section
@@ -45034,6 +45167,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>Suivre le colis</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(`Prix payé copié : ${prixPaye}\u00a0€ — colle-le au numérotage`); } catch(_) { toast('Copie impossible','error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>Copier le prix payé (pour le numérotage)</button>}
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
+                    {/* (11 nov.) « Me le rappeler » : par le n° de transaction de l'achat (§5). */}
+                    <BoutonRappel variante="menu" style={item} avant={close} cible={{ sorte: 'achat', tx: String(o.transaction_id || ''), num: numA || '', plat: 'vinted' }} libelle={numA ? `N°${numA} · ${o.title || ''}` : (o.title || '')}/>
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?NOM_RECU_ACHAT:'Attestation d\'achat'}</button>
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
                     {(()=>{ const cf = cleFacture('tx', o.transaction_id); if (!cf) return null; const a = !!(facturesAchat.factures && facturesAchat.factures[cf]);
@@ -45746,6 +45881,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
                     {/* (3 nov.) L'histoire de CE N° et sa copie (N° neuf). */}
                     {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>Histoire · Dupliquer</button>}
+                    {/* (11 nov.) « Me le rappeler » : par le N° et l'identifiant de l'annonce (§5). */}
+                    <BoutonRappel variante="geste" style={geste} cible={{ sorte: 'article', num: num || '', item: String(it.id || '') }} libelle={num ? `N°${num}` : (it.title || '')}/>
                     <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={()=>{ gesteVendues([it.id], true); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
                   </div>
                   </SheetShell>
@@ -53172,6 +53309,11 @@ function AppCoeur() {
       // (5 nov.) Une notification touchée porte `notif=<n°>` (public/sw.js) : son entrée du centre est marquée lue.
       { const nn=Number(p.get('notif')); if(Number.isSafeInteger(nn)&&nn>0){ marquerNotifLue(nn); if(!t) window.history.replaceState(window.history.state,'',window.location.pathname); } } if(p.get('print')==='bord') _pendingBordPrint=true;
       // (5 nov.) `cloche=1` (le récapitulatif du réveil) : ouvrir la cloche — tout de suite si elle est montée, sinon à son montage.
+      // (11 nov.) Un rappel posé par lui (« Me le rappeler ») : `rappel=<id>` ⇒ le bandeau dit l'état de la cible
+      // (vendu entre-temps…) et propose « Fait » / « Reporter » ; l'écran de l'élément s'ouvre par sa cible.
+      { const rp=p.get('rappel'); if(rp&&/^[A-Za-z0-9_-]{6,40}$/.test(rp)){ DEMANDE_RAPPEL.id=rp; try{ window.dispatchEvent(new Event('vrm:rappel-ouvrir')); }catch(_){} } }
+      if(t==='journee'&&p.get('section')==='rappels') setTimeout(()=>{ try{ const el=document.getElementById('vrm-rappels-jour'); if(el) el.scrollIntoView({block:'start',behavior:'smooth'}); }catch(_){} },400);
+      if(t==='settings'&&p.get('section')==='rappels'){ DEMANDE_REGLAGE_SOUS.id='rappels'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(p.get('cloche')==='1'){ try{ sessionStorage.setItem('vrm_ouvrir_cloche','1'); }catch(_){} try{ window.dispatchEvent(new Event('vrm:centre-notifs')); }catch(_){} }
       if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
@@ -56199,6 +56341,8 @@ function AppCoeur() {
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
+      {/* (11 nov.) « Me le rappeler » : la feuille et le bandeau ouvert par la notification (api/_lib/rappels-perso.js). */}
+      <HoteRappels/>
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
       <RaccourcisClavier Feuille={SheetShell}/>
       {/* (11 nov., lot DJ6) Le menu du profil (photo de la colonne / de l'en-tête). */}
@@ -56368,7 +56512,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = () => setFicheNum(null);
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}<NotePaireCoque numero={p.num} variante="bloc" ajout/></> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}<NotePaireCoque numero={p.num} variante="bloc" ajout/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
