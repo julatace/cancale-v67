@@ -66,10 +66,15 @@ inventé (barème public cité, « à vérifier ») ; (3) argent reçu et CA dé
 | … sur `origin/main` (git archive) | **rouge** : D0 (le CA comptait 81,73 € au lieu de 40,00 €) + module absent |
 | `audit-bilan-semaine` (miroir identique) | 54 verts |
 | audits variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets, traduction, urssaf, facture-siret, facture-pro, etat-compte, quoi-de-neuf | verts |
-| `scripts/bancs/vinted-pro.cjs` (390 clair/sombre, 1512) | voir « ÉTAT À LA REPRISE » |
+| `scripts/bancs/vinted-pro.cjs` (390 clair/sombre, 1512 ; Pro profil, particulier, pas su, Pro par e-mail ; l'argent 69,00 € / 4,85 € / 2,00 € / 38,00 €) | **29 verts** ; captures regardées (langue du navigateur du banc : anglais) |
+| `bancs/comptes-lies` | vert |
+| `npm run build` | vert |
 
 ## ÉTAT À LA REPRISE
-Voir la fin de ce fichier (mise à jour à chaque étape).
+Fini et poussé. Rien de rouge connu. Non fait : le banc n'a pas été rejoué sur un build d'origin/main (la preuve
+« rouge avant » est celle de l'audit, D0 sur l'arbre d'origin/main) ; le bilan de la semaine côté serveur lit les
+ventes SANS `_prixPro` (le miroir n'a rien à lire) ⇒ il garde le prix de la liste pour un compte Pro ; ventesFaites
+(« Vendu ») garde le prix de la liste (pas un chiffre déclaré). Aucune extension touchée.
 
 ## Geste de Julien
 Sur chaque compte Vinted Pro : ouvrir le **porte-monnaie** Vinted (l'extension range le relevé) — c'est lui qui
