@@ -668,6 +668,7 @@ import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from 
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
 import { jourParis } from "./dateParis.js";   // (11 nov.) jour/mois métier à l'heure de Paris
 import { sommeConnue, texteSomme, medianeSue } from "./sommeConnue.js";   // (11 nov.) « pas su » ≠ 0
+import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 nov.) stockage protégé (Safari privé, quota)
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -54803,7 +54804,9 @@ function AppCoeur() {
   useEffect(()=>{
     if(!synced) return;
     const norm=v=>String(v||'').trim();
-    const seenRaw=localStorage.getItem('vinted_sv_seen_catalog');
+    // (11 nov.) stockage illisible (Safari privé…) : on ne fait RIEN (jamais une « première fois » inventée).
+    if(!stockageDispo()) return;
+    const seenRaw=lireLocal('vinted_sv_seen_catalog');
     const currentIds=catalog.map(p=>norm(p.id)).filter(Boolean);
 
     if(seenRaw===null){
@@ -54811,8 +54814,7 @@ function AppCoeur() {
       save('vinted_sv_seen_catalog',currentIds);
       return;
     }
-    let seen=[];
-    try{ seen=JSON.parse(seenRaw)||[]; }catch(_){ seen=[]; }
+    const seen=lireJSON(seenRaw,[])||[];
     const seenSet=new Set(seen.map(norm));
     const factureNums=new Set(invoices.flatMap(i=>norm(i.productId).split('+').map(norm)).filter(Boolean));
 
@@ -54843,8 +54845,9 @@ function AppCoeur() {
   // on envoie une notification navigateur + on affiche un bandeau dans l'app.
   useEffect(()=>{
     if(!synced) return;
-    const prevV=parseInt(localStorage.getItem('vinted_notif_last_sales')||'-1',10);
-    const prevF=parseInt(localStorage.getItem('vinted_notif_last_invoices')||'-1',10);
+    if(!stockageDispo()) return;   // (11 nov.) sans stockage, aucun compteur : aucune notification inventée
+    const prevV=parseInt(lireLocal('vinted_notif_last_sales','-1'),10);
+    const prevF=parseInt(lireLocal('vinted_notif_last_invoices','-1'),10);
     const curV=sales.length;
     const curF=invoices.length;
 
@@ -55558,7 +55561,7 @@ function AppCoeur() {
       // updated_at a changé = nouveau message reçu). Au tout premier lancement de
       // cette logique, on initialise en silence (on ne re-nag pas sur l'existant).
       const seenConvs = load('vinted_notif_seen_convs', {});
-      const firstMsgRun = localStorage.getItem('vinted_notif_seen_convs')===null;
+      const firstMsgRun = lireLocal('vinted_notif_seen_convs')===null;   // (11 nov.) illisible ⇒ « première fois » : silence, jamais une rafale
       // ⚠️ 3 octobre : on FUSIONNE, on ne reconstruit plus. Reconstruit à partir
       // de ce qu'on vient de lire, le mémo PERDAIT les conversations d'un compte
       // dont la lecture avait échoué — et au passage suivant elles re-sonnaient

@@ -46,6 +46,7 @@ import '../stats-plus.css';
 import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categoriesLecture.js';   // (11 nov., lot rapport-mois) lectures partagées
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
+import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 
 // ⟦← App.jsx #6⟧
 // « Annonces en ligne » : UNE règle d'écriture pour chaque écran qui la montre
@@ -186,7 +187,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
           const dateAff=(type==='encaisse'?v.receiveDate:v.saleDate)||'';
           const benef=beneficeVenteManuelle(v);
           return (
-            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+            <div key={v.id||i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{color:C.text,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
                 <div style={{color:C.muted,fontSize:11}}>{dateAff}{v.productId?` · n°${v.productId}`:''}</div>
@@ -1088,7 +1089,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct}\u00a0%)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
               ); })()}
             </div>
-            <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
+            <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{ecrireLocal('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -1107,7 +1108,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
             </div>
-            <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
+            <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{ecrireLocal('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>

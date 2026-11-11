@@ -31,7 +31,7 @@ function prouver(script, MUT, R) {
 }
 
 // Le texte d'un fichier sans ses commentaires (on juge la règle, pas un commentaire).
-const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, '')).replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 
 // Tous les fichiers .js/.jsx d'un dossier, récursivement.
 function fichiers(dossier, ext = /\.(jsx?|mjs)$/) {
