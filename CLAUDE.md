@@ -531,6 +531,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **11 nov. · Équipe prête à activer** : la 016 ne referme plus la lecture sans abonnement si la 027 passe avant (les deux ordres marchent) ; « Envoyer l'invitation » à partager (aucun lien secret) ; l'aide sans la 016 lit « le vendeur doit l'activer » ; SQL à coller dans `scripts/equipe-sql/`. `docs/passation/2026-11-11-equipe-pret.md`. Geste : confirmation d'e-mail, puis les 3 SQL (pas à pas §4).
 - **11 nov. · Facture Pro (lot DJ1)** : SIRET cherché à la VALIDATION (squelette, arrêt 8 s) ⇒ « C'est bien toi ? » (Oui écrit, Non rien ; RCS = ville du greffe recopiée du Kbis, jamais inventée ; EI « pas de RCS ») ; le statut choisi montre ses mentions ; factures Leboncoin/eBay/Vestiaire seulement sur un compte dit pro (`comptesFacture`, serveur 409) ; « Bon de retour » sur chaque vente Pro ; plus de pied VRM (Reply-To) ; e-mails Pro relus app ouverte (bouton manquant). `docs/passation/2026-11-11-facture-siret.md`. Geste : aucun.
 - **11 nov. · Extension 5.341 : les dates de versement arrivent vite** : `capterDatesVersement` lit 10 détails par passage (5), 15/h au plus DANS les 20 lectures, un passage de fond toutes les 20 min onglet vinted.fr ouvert ; au-delà de 5 jamais la place des codes, preuves, relevés (« pas su » ⇒ réservée) ; pause aléatoire 2–5 s, une requête à la fois, 429 ⇒ arrêt et pause ; la plus récente d'abord ; la carte dit « N restantes · environ X jours ». 1 751 ventes ⇒ ≈ 6 jours onglet ouvert. `docs/passation/2026-11-11-extension-5341.md`. Geste : installer 5.341.0, laisser vinted.fr ouvert sur le grand compte.
 - **11 nov. · Ventes sans date de versement (lot DJ7)** : mesuré, 1 751 sur UN compte, détail de transaction jamais relu ; relevé : 0 vente datable. « Déclarer » : « N datées ✓ · M sans date », une raison par ligne + geste (« Ouvrir Vinted » par compte, Leboncoin à la main) ; jamais devinée (`src/versementRaisons.js`). `docs/passation/2026-11-11-dates-versement.md`. Geste : ouvrir vinted.fr sur ce compte.
@@ -539,7 +540,6 @@ sans la fonction.
 - **11 nov. · Textes courts, 5e série** : Réglages, eBay, Leboncoin, Accueil (FAQ question/réponse), réception des e-mails, carte des relais, Stock, Vestiaire, Compta… : une phrase, le détail sous « Pourquoi ? » ; « Tu ne paies jamais le port » et l'attribution de la carte restent à l'écran ; 133 → 42 textes longs ; audit `textes-courts` étendu à 24 fichiers. `docs/passation/2026-11-11-textes-courts-5.md`. Geste : aucun.
 - **11 nov. · Ouverture plus légère (lot K)** : ventes/achats, dressings, boîtes de réception gardés sur l'appareil (IndexedDB, par compte VRM, effacés à la déconnexion), revalidés par leur VERSION scalaire (`data.rev`, capture, écriture) : rien changé ⇒ rien téléchargé (2e ouverture 2,5 Mo → 0,9 Mo), changé ⇒ cette ligne seule ; versions ratées ⇒ lecture d'avant ou « pas su », jamais la copie, « Vu à hh:mm · pas relu » (`src/copieLignes.js`). `docs/passation/2026-11-10-ouverture-legere.md`. Geste : aucun.
 - **11 nov. · Infos sur vinted.fr (lot AA, ext. 5.339)** : sous SES annonces « N°124 · acheté 60 € · en ligne depuis 23 j » (identifiant d'annonce, compte de l'onglet, pas su ⇒ rien) ; sur l'annonce d'un autre vendeur, encart « VRM » replié : calculette (règle de l'app) + « peut-être N paires proches » (lot F) ; lecture seule, aucune requête Vinted. `docs/passation/2026-11-10-extension-infos.md`. Geste : installer 5.339.0.
-- **10 nov. · Mode vacances tous comptes (lot O, ext. 5.338)** : Paramètres → Mes comptes → « Mode vacances » : état LU par compte (`is_on_holiday` du profil, mesuré ; « — » pas su), « Tout mettre en vacances » / « Tout rouvrir » = UN compte par clic, celui de l'onglet ; le geste de Vinted jamais vu ⇒ appris sur SON geste (`noteVacances` → `vinted_vacances_recette`, `/users/{current|son n°}` seulement), relu après ; Leboncoin/eBay/Vestiaire « À faire sur le site ». `docs/passation/2026-11-10-mode-vacances.md`. Geste : installer 5.338.0, puis poser et retirer une fois le mode vacances à la main sur vinted.fr.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
@@ -560,8 +560,7 @@ vérifier par `curl https://vrm.center/api/sante`.
   poser `STRIPE_SECRET_KEY`, régler l'adresse des CGV ; passer en mode réel.
 - Supabase : Site URL `https://vrm.center` et Redirect URLs, SMTP personnalisé,
   confirmation d'email obligatoire ; (pour Discord) activer le fournisseur Discord.
-- Migration **016** (mode équipe) : essai annulé, appliquer VRM peu sollicité, puis
-  `node scripts/equipe-sql/essai-annule.cjs --verifier`.
+- Migration **016** (mode équipe) : pas à pas sans terminal dans `2026-11-11-equipe-pret.md` §4.
 - Captcha Turnstile : prêt et éteint ; l'ordre des gestes est dans l'historique sécurité
   (d'abord l'extension, puis la clé de site, puis Supabase).
 - Repasser sur Vinted connecté sur les comptes dont la lecture est ancienne (la ligne de
