@@ -47,6 +47,7 @@
 // « encaissé » (§5).
 // ─────────────────────────────────────────────────────────────────────────────
 import { montantPropose } from './prixAchatPropose.js';
+import { jourParis, moisParis } from './dateParis.js';
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 // (9 nov.) + le TRIMESTRE (« AAAA-T1 » … « AAAA-T4 ») pour « Exporter pour mon
@@ -73,8 +74,8 @@ export const moisDePeriode = (periode) => {
   return out;
 };
 export const dansPeriode = (ym, periode) => !!ym && !!periode && moisDePeriode(periode).includes(String(ym));
-const ymLocal = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-export const jourFr = (t) => { const d = new Date(t); return t == null || isNaN(d) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
+const ymLocal = (t) => moisParis(t);   // (11 nov.) mois de PARIS (même règle que le CA déclaré)
+export const jourFr = (t) => { const j = t == null ? '' : jourParis(t); return j ? `${j.slice(8, 10)}/${j.slice(5, 7)}/${j.slice(0, 4)}` : ''; };
 const cts = (x) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 100));
 const centimesTexte = (v) => {
   if (v == null) return null;

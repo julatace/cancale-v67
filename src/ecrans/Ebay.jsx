@@ -202,7 +202,7 @@ function parisVersUtc(date, heure) {
 }
 // Le jour suivant, dans le calendrier (pas « + 24 h » : après le 25 octobre
 // une journée dure 25 h, et « 18:00 tous les jours » deviendrait 17:00).
-const jourSuivant = (date) => { const [y, mo, d] = date.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1, d + 1)); return t.toISOString().slice(0, 10); };
+const jourSuivant = (date) => { const [y, mo, d] = date.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1, d + 1)); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`; };   // calendrier pur (aucun instant)
 const minutesDe = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '')); return m ? (+m[1]) * 60 + (+m[2]) : NaN; };
 const JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const JOURS_LETTRE = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];

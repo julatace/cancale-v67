@@ -6,6 +6,7 @@ import './operations.css';
 import { DESCRIPTION_ORGANISATION } from './description.js';
 import Atelier from './Atelier.jsx';
 import Pourquoi from '../composants/PourquoiReplie.jsx';
+import { jourParis } from '../dateParis.js';
 const EUR=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
 const euros=n=>EUR.format(n/100);
 const date=n=>n?new Date(n).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):'Sans échéance';
@@ -70,7 +71,7 @@ export default function Operations({headers,vendeur,initialSection,contexteEbay=
  const ouvrirAction=(titre,champs,type,cible,transform=f=>f)=>setAction({titre,champs,onSubmit:f=>envoyer(type,{cible,...transform(f)})});
  const etatMission=(x,etat)=>{if(etat==='bloquee')ouvrirAction('Pourquoi la mission est-elle bloquée ?',[{nom:'note',label:'Cause et prochaine action',type:'textarea',maxLength:1500}], 'mission.etat',x.id,f=>({...f,etat}));else if(etat==='annulee')ouvrirAction('Annuler cette mission',[{nom:'note',label:'Motif',type:'textarea',maxLength:1500}],'mission.etat',x.id,f=>({...f,etat}));else envoyer('mission.etat',{cible:x.id,etat,note:x.compteRendu||''});};
  const exporterLot=x=>{const cellule=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';const lignes=[['type','reference','article','devise','depense_source_eur','ventilation_eur'],['source',x.id,x.titre,'EUR',(x.total/100).toFixed(2),''],...x.articles.map(a=>['allocation',a.id,a.titre,'EUR','',(a.cout/100).toFixed(2)])];const blob=new Blob(['\uFEFF'+lignes.map(l=>l.map(cellule).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='VRM-ventilation-'+x.id+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
- const exporter=()=>{const blob=new Blob([JSON.stringify({exporte:new Date().toISOString(),donnees},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='VRM-organisation-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ const exporter=()=>{const blob=new Blob([JSON.stringify({exporte:new Date().toISOString(),donnees},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='VRM-organisation-'+jourParis()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  const aEcheance=['missions','reservations','dossiers'].includes(section);
  const idsPassation=section==='missions'&&modeMission?new Set(passationMissions(donnees?.missions||[],maintenant)[modeMission].map(x=>x.id)):null;
  const recherches=(Array.isArray(donnees?.[section])?donnees[section]:[]).filter(x=>{const etat=section==='reservations'?etatReservation(x,maintenant):x.etat;const e=echeanceActive(section,x,maintenant);return (!idsPassation||idsPassation.has(x.id))&&(archives||idsPassation||!['annulee','expiree','convertie','validee','archivee','controlee','clos'].includes(etat))&&(!aEcheance||!proches||e&&['retard','proche'].includes(e.etat))&&[x.titre,x.reference,x.acheteur].filter(Boolean).join(' ').toLocaleLowerCase('fr').includes(filtre.toLocaleLowerCase('fr'));});

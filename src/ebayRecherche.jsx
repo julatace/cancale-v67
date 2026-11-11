@@ -26,7 +26,7 @@ import {veillesDuFil,MAX_VEILLES_ACTIVES} from './operations/metier.js';
 
 export const RELIRE_MS = 15 * 60 * 1000;
 // Le jour de Paris (le plafond du serveur repart à minuit, heure de Paris).
-export const jourParis = (t = Date.now()) => { try { return (globalThis.__vrmFmtJourEbay || (globalThis.__vrmFmtJourEbay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)); } catch (_) { return new Date(t).toISOString().slice(0, 10); } };
+export const jourParis = (t = Date.now()) => { try { return (globalThis.__vrmFmtJourEbay || (globalThis.__vrmFmtJourEbay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)); } catch (_) { return jourParisRegle(t); } };
 export const MAX_FIL = MAX_VEILLES_ACTIVES;
 const ENDPOINT_OPS = '/api/compte?mode=operations';
 
@@ -81,6 +81,7 @@ export function raisonEchec(res) {
 // (6 nov., vitesse 2) `repereAdmis` vit dans repereEbay.js (l'app s'en sert sans
 // charger cet écran) ; ré-exporté ici, ses lecteurs ne changent pas.
 import { repereAdmis } from './repereEbay.js';
+import { jourParis as jourParisRegle } from './dateParis.js';
 export { repereAdmis };
 export const criteresDeVeille = (v) => ({
   mots: v.mots, exclus: v.exclus || '', pointure: v.pointure || '', minimum: v.minimum ?? null, maximum: v.maximum ?? null,

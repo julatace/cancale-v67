@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  « VRM T'AIDE-T-IL ? » — LA NOTE DE SATISFACTION (9 nov. 2026)
 // ════════════════════════════════════════════════════════════════════════════
@@ -110,7 +111,7 @@ export function agregerNotes(lignes) {
     n += 1; somme += note; rep[note - 1] += 1;
     const mot = motSansIdentite(l.mot);
     const t = ms(l.at);
-    if (mot) coms.push({ note, mot, jour: t != null ? new Date(t).toISOString().slice(0, 10) : null, t: t || 0 });
+    if (mot) coms.push({ note, mot, jour: t != null ? (jourParis(t) || null) : null, t: t || 0 });
   }
   coms.sort((a, b) => b.t - a.t);
   return {

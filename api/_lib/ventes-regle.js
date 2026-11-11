@@ -105,7 +105,7 @@ export const montantRecuEbay = (o) => {
   return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
 };
 
-export const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+export const ymDeTs = (t) => { try { return (ymDeTs._f || (ymDeTs._f = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)).slice(0, 7); } catch (_) { return ''; } };
 
 export const indexDeclarations = (reg) => {
   if (!reg || typeof reg !== 'object' || Array.isArray(reg)) return null;

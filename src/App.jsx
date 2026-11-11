@@ -665,6 +665,7 @@ import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
+import { jourParis } from "./dateParis.js";   // (11 nov.) jour/mois métier à l'heure de Paris
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -8390,8 +8391,8 @@ const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
 };
 const moisDeVente = (o) => {
   const t = tsCommande(o); if (!t) return null;
-  const d = new Date(t);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  // (11 nov.) mois de PARIS (règle de src/dateParis.js), jamais celui de l'appareil.
+  try { return (moisDeVente._f || (moisDeVente._f = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)).slice(0, 7); } catch (_) { return null; }
 };
 const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'completed';
 // Répartition par mois du CA déclarable. `masquee(o)` sert UNIQUEMENT à compter
@@ -8422,7 +8423,9 @@ const caUrssafParMois = (ventes, masquee, versements) => caDeclarableParMois(ven
 //    prix FINAL du détail (en centimes). eBay : commande PAYÉE, en euros, datée
 //    de sa création. Une autre devise est écartée et COMPTÉE à part, jamais
 //    convertie au hasard.
-const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+// (11 nov.) Mois de PARIS (src/dateParis.js `moisParis`, recopiée ici car des audits l'exécutent seule ;
+//    scripts/audit-dates-paris.cjs vérifie qu'elle rend la même chose).
+const ymDeTs = (t) => { try { return (ymDeTs._f || (ymDeTs._f = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)).slice(0, 7); } catch (_) { return ''; } };
 // ⚠️ LES COMPTES SÉLECTIONNÉS (Julien, 3 octobre : « tu prends tous les comptes
 //    qu'on a sélectionnés »). `exclu(o)` = la vente vient d'un compte qu'il a
 //    exclu de l'app : elle n'entre dans AUCUN total — ni un mois, ni « à dater ».
@@ -13582,7 +13585,8 @@ const dateJourFr = (d) => {
 // (2 nov., audit des données ; limites n°14) Une date de vente illisible ne
 // s'affiche jamais « Invalid Date » : « date inconnue » (la règle de `fmtD`, Colis).
 const dateFr = (d, opts) => { const t = d == null || d === '' ? NaN : (typeof d === 'number' ? d : Date.parse(d)); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', opts) : 'date inconnue'; };
-const dateLocaleISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+// (11 nov.) Le jour de PARIS (règle de src/dateParis.js, autonome : des audits l'exécutent seule).
+const dateLocaleISO = () => { try { return (dateLocaleISO._f || (dateLocaleISO._f = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date()); } catch (_) { return ''; } };
 // ⟦→ ecrans/Achats.jsx #4⟧
 // Le prix tapé, relu en centimes (« 12,5 » → « 12,50 ») : `prixAchatSaisi`,
 // importé de src/prixAuNumerotage.js — la même lecture pour toutes les saisies.
@@ -18005,7 +18009,9 @@ function BandeauConfirmationAdresse({ onVoir }) {
 // journée). Sans abonnement, c'est la carte de l'aperçu qui parle
 // (`ApercuSansAbonnement`) — jamais un blocage sans explication.
 // Porte aussi, une fois, le code de parrainage gardé depuis le lien.
-const cleRappelEssai = (uid, seuil) => `vrm_rappel_essai_${uid}_${seuil}_${new Date().toISOString().slice(0, 10)}`;
+// (11 nov.) UNE clé par seuil, qui garde le JOUR de Paris où il l'a fermée (avant : une clé par jour UTC,
+//    jamais nettoyée, et le bandeau revenait à 0 h 30).
+const cleRappelEssai = (uid, seuil) => `vrm_rappel_essai_${uid}_${seuil}`;
 function voirAbonnement(setTab) {
   try { localStorage.setItem('vrm_reglages_vue', 'abonnement'); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:voir-abonnement')); } catch (_) {}
@@ -18034,13 +18040,13 @@ function BandeauAbonnement({ setTab }) {
   if (e.lectureSeule) return null;
   const r = rappelEssai(e);
   if (!r) return null;
-  let vu = false; try { vu = !!localStorage.getItem(cleRappelEssai(uid, r.seuil)); } catch (_) {}
+  let vu = false; try { vu = localStorage.getItem(cleRappelEssai(uid, r.seuil)) === jourParis(); } catch (_) {}
   if (vu || ferme) return null;
   return (
     <div data-bandeau-abonnement="essai" data-essai-jours={r.jours} data-seuil={r.seuil} role="status" className="vrm-bandeau-abo">
       <span className="vrm-bandeau-abo-texte">{r.texte}</span>
       <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={() => voirAbonnement(setTab)}>Gérer</button>
-      <button type="button" className="vrm-bandeau-abo-fermer" aria-label="Masquer pour aujourd'hui" onClick={() => { try { localStorage.setItem(cleRappelEssai(uid, r.seuil), '1'); } catch (_) {} setFerme(1); }}>
+      <button type="button" className="vrm-bandeau-abo-fermer" aria-label="Masquer pour aujourd'hui" onClick={() => { try { localStorage.setItem(cleRappelEssai(uid, r.seuil), jourParis()); } catch (_) {} setFerme(1); }}>
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m2.5 2.5 7 7m0-7-7 7"/></svg>
       </button>
     </div>
@@ -20685,7 +20691,7 @@ function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
   // (`lignesAVenir`, src/ventesEcran.js) ; plusieurs groupes ⇒ une ligne chacun.
   const { lignes, resume } = lignesAVenir(groupes);
   const quand = (g) => `${g.n} vente${g.n > 1 ? 's' : ''}${g.prevu != null ? ` · ${texteDatePrevue(g.prevu)}` : ''}`;
-  const attrsGroupe = (g) => ({ 'data-a-venir-ligne': g.plateforme, 'data-a-venir-compte': g.compte, 'data-a-venir-eur': String(Math.round(g.eur * 100)), 'data-a-venir-prevu': g.prevu != null ? new Date(g.prevu).toISOString().slice(0, 10) : '' });
+  const attrsGroupe = (g) => ({ 'data-a-venir-ligne': g.plateforme, 'data-a-venir-compte': g.compte, 'data-a-venir-eur': String(Math.round(g.eur * 100)), 'data-a-venir-prevu': g.prevu != null ? jourParis(g.prevu) : '' });
   return (
     <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(T.n)} data-a-venir-site={plateforme || 'toutes'} data-a-venir-partiel={T.partiel ? '1' : undefined} data-a-venir-groupes={String(groupes.length)}
       style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '12px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
@@ -26682,7 +26688,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;
-    a.download=`vrm-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.download=`vrm-backup-${jourParis()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -55488,7 +55494,7 @@ function AppCoeur() {
     // seulement complet ; sinon la valeur d'avant reste (jamais un minimum présenté complet).
     const aV = aVenirPour(liveStatsVus.aVenir);
     if (aV.valeur != null && !aV.partiel) base0.enAttente = Math.round(aV.valeur);
-    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: new Date().toISOString().slice(0, 10) }) };
+    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: jourParis() }) };
     const cle = JSON.stringify(data);
     if (cle === widgetEcrit.current) return;
     widgetEcrit.current = cle;
@@ -57100,7 +57106,7 @@ function AppCoeur() {
               omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton e-mail)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted et eBay, clé du widget, clé Photoroom, clés de tes téléphones (jamais dans un fichier)'] };
             const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
             const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;
-            a.download=`vrm-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
+            a.download=`vrm-sauvegarde-${jourParis()}.json`;
             // Révoquer plus tard : un fichier de 12 Mo révoqué aussitôt peut ne
             // jamais se télécharger (Safari).
             document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 4000);

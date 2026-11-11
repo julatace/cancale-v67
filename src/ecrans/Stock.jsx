@@ -25,6 +25,7 @@ import { InventaireStock } from "../InventaireStock.jsx";
 import { InventaireAnnuel } from "../InventaireAnnuel.jsx";   // (10 nov., lot W) l'inventaire de fin d'année
 import { DEMANDE_INVENTAIRE_ANNUEL } from "../inventaireAnnuel.js";   // (11 nov.) ouverte depuis « Clôturer l'année »
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
+import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 
 // ⟦← App.jsx #3⟧
 
@@ -783,7 +784,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const L = lignes(cles);
         const csv = csvDe(['N°', 'Article', 'État', 'Meuble', 'Rangée', 'Colonne'], L.map((f) => { const ou = ouEst(f); return [f.numero, f.title || '', rangeeEtat(f) === 'vendue' ? 'vendue à sortir' : 'plus en ligne', ou ? ou.meuble.name : '', ou ? ou.rangee : '', ou ? ou.colonne : '']; }));
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a');
-        a.href = url; a.download = `stock-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+        a.href = url; a.download = `stock-${jourParis()}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
         return resumeSerie({ faits: L, pasFaits: [] }, { un: 'paire exportée', plusieurs: 'paires exportées' });
       } },
     ];

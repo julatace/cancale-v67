@@ -68,6 +68,7 @@ const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
 import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'année »
 import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
+import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -382,7 +383,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           const url=URL.createObjectURL(blob);
           const a=document.createElement('a');
           a.href=url;
-          a.download=`catalogue-${new Date().toISOString().slice(0,10)}.csv`;
+          a.download=`catalogue-${jourParis()}.csv`;
           document.body.appendChild(a);a.click();document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }} color={C.blue} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>}/>
@@ -646,7 +647,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             const url=URL.createObjectURL(blob);
             const a=document.createElement('a');
             a.href=url;
-            a.download=`ventes-${new Date().toISOString().slice(0,10)}.csv`;
+            a.download=`ventes-${jourParis()}.csv`;
             document.body.appendChild(a);a.click();document.body.removeChild(a);
             URL.revokeObjectURL(url);
           }} color={C.blue}>📤 Exporter Excel</Btn>
@@ -984,7 +985,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;
-    a.download=`factures-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download=`factures-${jourParis()}.csv`;
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
@@ -2909,7 +2910,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
   const lignes = ouvert ? suivi.lignes : suivi.lignes.slice(0, 4);
   const a = suivi.annee;
-  const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+  const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${jourParis()}.csv`, 'text/csv;charset=utf-8');
   const ouvrirEdit = (ym) => { const d = (regLu || {})[ym] || {}; setEdit({ ym, montant: d.montant != null ? String(d.montant).replace('.', ',') : '', paye: d.paye != null ? String(d.paye).replace('.', ',') : '' }); };
   const enregistrer = () => {
     const m = lireMontantSaisi(edit.montant), p = lireMontantSaisi(edit.paye);
@@ -3270,7 +3271,7 @@ function RecapComptableMensuel() {
       const rows = [['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'CA apres URSSAF']];
       moisRecap.forEach((m) => rows.push([m.label, m.count, m.ca.toFixed(2), m.profit == null ? '' : m.profit.toFixed(2), m.urssaf.toFixed(2), m.net.toFixed(2)]));
       const csv = rows.map((r) => r.join(';')).join('\n');
-      telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+      telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${jourParis()}.csv`, 'text/csv;charset=utf-8');
     } catch (err) { toast('Erreur export : ' + err.message); }
   };
   // ── (3 nov.) « RÉCAP DE [MOIS] » : un PDF et un tableur (src/recapMois.js) ──
