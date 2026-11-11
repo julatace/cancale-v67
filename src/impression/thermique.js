@@ -141,24 +141,20 @@ export function carteEncre(pixels, w, h, { seuil = 235, k = 3 } = {}) {
 // ne compte pas comme du contenu : rogner sur lui garderait la feuille entière.
 function estFiletLigne(c, y, x0, x1) { let n = 0; for (let x = x0; x < x1; x++) n += c.m[y * c.cw + x]; return n >= (x1 - x0) * 0.6; }
 function estFiletColonne(c, x, y0, y1) { let n = 0; for (let y = y0; y < y1; y++) n += c.m[y * c.cw + x]; return n >= (y1 - y0) * 0.6; }
-// Masque des filets : les rangées/colonnes « filet » isolées (voisines blanches).
-function sansFilets(c, R) {
+// Masque des filets de DÉCOUPE : un filet (rangée ou colonne) près d'un BORD de la
+// zone (≤ `bord` cellules) est retiré — sauf s'il a son pendant au bord opposé :
+// c'est alors le CADRE de l'étiquette, qui est gardé. Un filet au milieu de la
+// zone est du contenu (un trait de l'étiquette), toujours gardé.
+function sansFilets(c, R, bord) {
   const m = c.m.slice(), { x0, y0, x1, y1 } = R;
-  const ligneVide = (y) => { if (y < y0 || y >= y1) return true; for (let x = x0; x < x1; x++) if (c.m[y * c.cw + x]) return false; return true; };
-  const colVide = (x) => { if (x < x0 || x >= x1) return true; for (let y = y0; y < y1; y++) if (c.m[y * c.cw + x]) return false; return true; };
-  const presqueVide = (y, sauf) => { let n = 0; for (let x = x0; x < x1; x++) n += c.m[y * c.cw + x] && !sauf(x) ? 1 : 0; return n <= (x1 - x0) * 0.05; };
-  for (let y = y0; y < y1; y++) {
-    if (!estFiletLigne(c, y, x0, x1)) continue;
-    // fin : au plus deux cellules d'épaisseur, la rangée d'avant ou d'après est vide (ou presque)
-    const fin = (ligneVide(y - 1) || presqueVide(y - 1, () => false) || estFiletLigne(c, y - 1, x0, x1)) && (ligneVide(y + 1) || presqueVide(y + 1, () => false) || estFiletLigne(c, y + 1, x0, x1)) && !(estFiletLigne(c, y - 1, x0, x1) && estFiletLigne(c, y + 1, x0, x1));
-    if (fin) for (let x = x0; x < x1; x++) m[y * c.cw + x] = 0;
-  }
-  for (let x = x0; x < x1; x++) {
-    if (!estFiletColonne(c, x, y0, y1)) continue;
-    const pv = (xx) => { if (xx < x0 || xx >= x1) return true; let n = 0; for (let y = y0; y < y1; y++) n += c.m[y * c.cw + xx]; return n <= (y1 - y0) * 0.05; };
-    const fin = (colVide(x - 1) || pv(x - 1) || estFiletColonne(c, x - 1, y0, y1)) && (colVide(x + 1) || pv(x + 1) || estFiletColonne(c, x + 1, y0, y1)) && !(estFiletColonne(c, x - 1, y0, y1) && estFiletColonne(c, x + 1, y0, y1));
-    if (fin) for (let y = y0; y < y1; y++) m[y * c.cw + x] = 0;
-  }
+  const lignes = [], cols = [];
+  for (let y = y0; y < y1; y++) if (estFiletLigne(c, y, x0, x1)) lignes.push(y);
+  for (let x = x0; x < x1; x++) if (estFiletColonne(c, x, y0, y1)) cols.push(x);
+  const b = bord == null ? Math.max(2, Math.round((Math.min(x1 - x0, y1 - y0)) * 0.06)) : bord;
+  const haut = lignes.filter((y) => y - y0 < b), bas = lignes.filter((y) => y1 - 1 - y < b);
+  const gauche = cols.filter((x) => x - x0 < b), droite = cols.filter((x) => x1 - 1 - x < b);
+  if (!(haut.length && bas.length)) for (const y of [...haut, ...bas]) for (let x = x0; x < x1; x++) m[y * c.cw + x] = 0;
+  if (!(gauche.length && droite.length)) for (const x of [...gauche, ...droite]) for (let y = y0; y < y1; y++) m[y * c.cw + x] = 0;
   return m;
 }
 // La boîte de l'encre UTILE dans `rect` (pixels), filets écartés, élargie de
@@ -182,10 +178,15 @@ export function boiteEncre(carte, rect, pad = 0) {
 // mesurer au moins `minCote` px de côté. Sinon : null (la feuille n'est pas
 // découpée, la règle d'avant s'applique). `codes` : boîtes en pixels.
 function coupeMilieu(carte, R, axe, gouttiere) {
-  const { k } = carte, m = sansFilets(carte, R);
+  const { k } = carte, m = carte.m;
   const a0 = axe === 'x' ? R.x0 : R.y0, a1 = axe === 'x' ? R.x1 : R.y1, b0 = axe === 'x' ? R.y0 : R.x0, b1 = axe === 'x' ? R.y1 : R.x1;
   const L = a1 - a0, lo = a0 + Math.floor(L * 0.35), hi = a0 + Math.ceil(L * 0.65), g = Math.max(1, Math.ceil(gouttiere / k));
-  const vide = (a) => { for (let b = b0; b < b1; b++) if (m[axe === 'x' ? b * carte.cw + a : a * carte.cw + b]) return false; return true; };
+  // Vide : rien d'encré en travers, sauf un filet de découpe (pointillés ou trait fin) qui
+  // court LE LONG de la coupe — une colonne (ou rangée) dont l'encre couvre ≥ 60 % du
+  // côté sans épaisseur (ses voisines à 2 cellules sont vides) en fait partie.
+  const brut = (a) => { let n = 0; for (let b = b0; b < b1; b++) n += m[axe === 'x' ? b * carte.cw + a : a * carte.cw + b]; return n; };
+  const vide = (a) => { const n = brut(a); if (n === 0) return true; const L2 = b1 - b0; if (n < L2 * 0.25) return false;
+    const voisinVide = (o) => a + o < a0 || a + o >= a1 || brut(a + o) === 0; return (voisinVide(-2) || voisinVide(-3)) && (voisinVide(2) || voisinVide(3)); };
   let best = null, i = lo;
   while (i < hi) {
     if (!vide(i)) { i++; continue; }
