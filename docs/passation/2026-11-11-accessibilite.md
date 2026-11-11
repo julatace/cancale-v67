@@ -123,6 +123,7 @@ serveur de `dist/`, ouverture d'un écran avec largeur/thème/zoom/lien, axe, ci
 | `role-img-alt` | fiche d'une vente : barre de coût `role="img"` au nom vide (aucun segment) | sans segment, la barre est décorative (`aria-hidden`) |
 | `color-contrast` | « Ajouter une note » sur le remplissage gris (3,96:1) | en clair #5E5E63 (5,0:1) |
 | idem | « Vendus ailleurs » → « Voir le détail » à opacité 0,7 (2,8:1) | le gris secondaire du thème au lieu de l'opacité |
+| `label-content-name-mismatch` | Ma journée : la carte « Au moins N choses à trancher » (arrivée par `main` pendant ce lot ; le banc l'a vue à la fusion) — « Trancher »/« Fermer » absent du nom | comme les autres cartes : texte entier lu (`vrm-sr-seul`), ligne affichée cachée au lecteur, le mot du geste reste dans le nom ; `data-plein` |
 | Z2 (texte coupé, toutes tailles) | Stock : « N°12 » coupé en « N°1… » dans les vignettes de 44 px | pastille resserrée en vignette mini (3 chiffres tiennent), N° entier en `title`, `aria-hidden` (la ligne l'écrit en clair) |
 
 Rien d'autre au zoom 200 % ni au clavier : aucune page ne défile en largeur, chaque écran est
