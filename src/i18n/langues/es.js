@@ -7,7 +7,9 @@ import ecran_annonces from './es/annonces.js';
 import ecran_stock from './es/stock.js';
 import ecran_messages from './es/messages.js';
 import ecran_emails from './es/emails.js';
+import ecran_stats from './es/stats.js';
 export default {
+  ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
   ...ecran_stock,
