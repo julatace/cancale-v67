@@ -148,7 +148,7 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   dit(!/vmrCmd|vmrExec|executerCommande|offer_requests|\/api\//.test(ecr), 'S6 rien ne part chez Vinted ni au serveur d’ici');
   const iJ = app.indexOf("id: 'prix-mini-manquants'"), blocJ = iJ > 0 ? app.slice(Math.max(0, iJ - 900), iJ + 700) : '';
   dit(/const lPM = offresAuto === true && Array\.isArray\(listings\.items\) && !listings\.error \?/.test(blocJ) && /carteJourneePrixMini\(\{ actif: offresAuto === true, lignes: lPM \}\)/.test(blocJ), 'S7 Ma journée : la carte seulement allumée, annonces lues, par la même règle');
-  dit(/tab: 'messages'/.test(blocJ) && /demanderVue\('offresauto'\)/.test(blocJ), 'S8 « Saisir » ouvre Messages → Offres auto');
+  dit(/tab: 'cat_msg'/.test(blocJ) && /demanderVue\('offresauto'\)/.test(blocJ), 'S8 « Saisir » ouvre Messages · Vinted → Offres auto (pas le fil « Tous »)');
   dit(/value=\{saisies\[l\.id\] \|\| ''\}/.test(ecr) && /placeholder=\{tr\('prixMini\.placeholder'\)\}/.test(ecr) && !/setSaisies\(\{\s*\.\.\.[^}]*prix/.test(ecr), 'S9 le champ est vide tant qu’il ne tape rien (aucun prix proposé)');
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);

@@ -94,7 +94,7 @@ const attr = (pg, sel, a) => pg.getAttribute(sel, a).catch(() => null);
         dit(ids[0] === '51013' && ids.indexOf('51005') < ids.indexOf('51004'), `L ${tag} : la plus chère d’abord`, ids.slice(0, 4));
         const l5 = L.find((x) => x.id === '51004') || {};
         dit(l5.achat === '30' && /N°5/.test(l5.txt) && /65 €/.test(l5.txt) && /acheté 30 €/.test(l5.txt), `L ${tag} : N°5 · 65 € · acheté 30 € (sa fiche)`, l5);
-        dit(L.every((x) => x.v === ''), `L ${tag} : aucun champ prérempli (jamais un prix proposé)`, L.map((x) => x.v));
+        dit(L.length > 0 && L.every((x) => x.v === ''), `L ${tag} : aucun champ prérempli (jamais un prix proposé)`, L.map((x) => x.v));
         dit((L.find((x) => x.id === '51006') || {}).achat === '' && /achat pas saisi/.test((L.find((x) => x.id === '51006') || {}).txt || ''), `L ${tag} : achat inconnu ⇒ « achat pas saisi », jamais un chiffre`);
         // ── S : la saisie en série ──
         const c6 = pg.locator('[data-pmm-ligne="51005"] input');

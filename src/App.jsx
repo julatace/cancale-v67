@@ -42220,12 +42220,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (11 nov., lot prix-mini) « N annonces sans prix mini » : SEULEMENT quand l'acceptation
         // automatique est ALLUMÉE et que les annonces en ligne ont été LUES (pas su ⇒ rien). La
         // même règle que l'écran (src/prixMiniManquants.js) ; « Saisir » ouvre Offres auto, où
-        // la saisie en série est juste sous l'interrupteur. Neutre : rien n'est perdu, une offre
+        // la saisie en série est juste sous l'interrupteur (`cat_msg` : Messages filtré sur Vinted,
+        // là où vit Offres auto — « Tous » montre le fil unique). Neutre : rien n'est perdu, une offre
         // sans prix mini attend sa réponse. Jamais un prix proposé.
         { const lPM = offresAuto === true && Array.isArray(listings.items) && !listings.error ? lignesPrixMiniManquants({ annonces: annSelectionnables.filter(a=>a.etat==='en-ligne'), numeros, virgule: extSait('offrespage')==='ok' }) : null;
           const cPM = carteJourneePrixMini({ actif: offresAuto === true, lignes: lPM });
           if (cPM) { const court = tr('prixMini.journee', { n: cPM.n });
-            jobs.push({ id: 'prix-mini-manquants', n: cPM.n, icon: 'tag', color: C.text, court, detail: tr('prixMini.journeeDetail'), title: court, photos: cPM.photos.length ? cPM.photos : null, tab: 'messages', prio: 3.3, action: tr('prixMini.journeeAction'),
+            jobs.push({ id: 'prix-mini-manquants', n: cPM.n, icon: 'tag', color: C.text, court, detail: tr('prixMini.journeeDetail'), title: court, photos: cPM.photos.length ? cPM.photos : null, tab: 'cat_msg', prio: 3.3, action: tr('prixMini.journeeAction'),
               avant: () => { demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} } }); } }
         // (9 nov., lot AC) « À TRANCHER » : UNE ligne, seulement s'il y a quelque chose
         // (la somme SUE des sources, src/aTrancher.js — « au moins » s'il en manque une).
@@ -45698,7 +45699,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
             {/* (11 nov., lot DJ8) L'écran complet : seuils par paire, aperçu, historique (Messages → Favoris & offres → Offres auto). */}
-            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>Régler par paire, voir l’historique ›</button>
+            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('cat_msg'); }}>Régler par paire, voir l’historique ›</button>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
                 <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
