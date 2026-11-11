@@ -16267,16 +16267,19 @@ const BrandMark = ({ id }) => id === 'google' ? (
 
 // Les documents légaux (public/legal/*.html) : liens discrets, sur l'écran de
 // connexion (accessibles SANS compte, comme la loi l'exige) et dans Réglages.
+// (11 nov., lot traduction) Le nom se lit dans la langue au rendu (accesseur `[1]`) ; les
+// documents eux-mêmes restent en français (droit français, à faire relire avant toute traduction).
+const docLegal = (h, cle) => { const d = [h]; Object.defineProperty(d, 1, { get: () => tr(cle), enumerable: true }); return d; };
 const DOCS_LEGAUX = [
-  ['/legal/mentions-legales.html', 'Mentions légales'],
-  ['/legal/cgu.html', 'CGU'],
-  ['/legal/cgv.html', 'CGV'],
-  ['/legal/confidentialite.html', 'Confidentialité'],
-  ['/legal/cookies.html', 'Cookies'],
+  docLegal('/legal/mentions-legales.html', 'legal.mentions'),
+  docLegal('/legal/cgu.html', 'legal.cgu'),
+  docLegal('/legal/cgv.html', 'legal.cgv'),
+  docLegal('/legal/confidentialite.html', 'legal.confidentialite'),
+  docLegal('/legal/cookies.html', 'legal.cookies'),
 ];
 function LiensLegaux() {
   return (
-    <nav aria-label="Documents légaux" style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 14px',marginTop:16,fontSize:12}}>
+    <nav aria-label={tr('legal.documents')} style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 14px',marginTop:16,fontSize:12}}>
       {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.muted,textDecoration:'none'}}>{t}</a>)}
     </nav>
   );
@@ -16479,13 +16482,13 @@ function CaptchaConnexion({ etat }) {
   return (
     <div data-captcha={etat.statut} style={{marginBottom:10}}>
       <div ref={ref} data-captcha-widget="" style={{minHeight:etat.statut==='erreur'?0:65}}/>
-      {etat.statut === 'charge' && <div data-captcha-attente="" style={{fontSize:12,color:C.muted,lineHeight:1.45}}>Vérification anti-robot en cours…</div>}
-      {etat.statut === 'interactif' && <div data-captcha-attente="" style={{fontSize:12,color:C.text,lineHeight:1.45}}>Coche la case de vérification ci-dessus pour continuer.</div>}
+      {etat.statut === 'charge' && <div data-captcha-attente="" style={{fontSize:12,color:C.muted,lineHeight:1.45}}>{tr('auth.captcha.charge')}</div>}
+      {etat.statut === 'interactif' && <div data-captcha-attente="" style={{fontSize:12,color:C.text,lineHeight:1.45}}>{tr('auth.captcha.interactif')}</div>}
       {etat.statut === 'erreur' && (
         <div data-captcha-erreur="" style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',lineHeight:1.45}}>
           {MSG_CAPTCHA_ERREUR}
           <div><button type="button" data-captcha-reessayer="" onClick={() => setEssai((n) => n + 1)}
-            style={{marginTop:8,minHeight:46,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button></div>
+            style={{marginTop:8,minHeight:46,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{tr('commun.reessayer')}</button></div>
         </div>
       )}
     </div>
@@ -16564,7 +16567,7 @@ function AuthScreen() {
     try {
       const r=await oauthStart(p, intention||(mode==='up'?'inscription':'connexion'));
       if (!r.ok) {demandeEnCours.current=false;setErr(r.error);setBusy(false);setFournisseurEnCours('');}
-    } catch (_) {demandeEnCours.current=false;setErr('Impossible d’ouvrir cette connexion. Réessaie.');setBusy(false);setFournisseurEnCours('');}
+    } catch (_) {demandeEnCours.current=false;setErr(tr('auth.err.ouverture'));setBusy(false);setFournisseurEnCours('');}
     // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
     // le libère si l’utilisateur revient en arrière avec le cache du navigateur.
   };
@@ -16582,8 +16585,8 @@ function AuthScreen() {
     if (moyensConnexion.statut === 'pret') {
       __lierConnexion = null;
       if (providerEnabled(lierFournisseur)) { setLierFournisseurMot(''); oauth(lierFournisseur); }
-      else setLierFournisseurMot(`La connexion avec ${nom} n’est pas encore ouverte sur VRM. Connecte-toi ici avec ton e-mail et ton mot de passe VRM : l’extension sera connectée en même temps.`);
-    } else if (moyensConnexion.statut === 'erreur') setLierFournisseurMot(`Je n’ai pas pu vérifier la connexion avec ${nom}. Réessaie les moyens de connexion ci-dessous, ou connecte-toi avec ton e-mail : l’extension sera connectée en même temps.`);
+      else setLierFournisseurMot(tr('auth.lier.pasOuverte', { nom }));
+    } else if (moyensConnexion.statut === 'erreur') setLierFournisseurMot(tr('auth.lier.pasVerifie', { nom }));
     else if (moyensConnexion.statut === 'initial') loadAuthSettings();
   }, [moyensConnexion.statut]);
 
@@ -16595,11 +16598,11 @@ function AuthScreen() {
       if(!r.ok){if(r.recovery){setMode('reset');setNeedConfirm(false);setConfirmLink('');}if(!attendreEmail(r))setErr(r.error);return;}
       if(action==='confirmer'){
         setNeedConfirm(false);setConfirmLink('');
-        setInfo(r.connected?'Compte confirmé. Connexion en cours…':'Adresse confirmée. Tu peux maintenant te connecter avec ton mot de passe.');
+        setInfo(r.connected?tr('auth.info.compteConfirme'):tr('auth.info.adresseConfirmee'));
         if(r.connected)setTimeout(()=>location.reload(),800);
-      } else if(action==='renvoyer')setInfo('Nouvel e-mail envoyé — utilise le plus récent.');
-      else setInfo('Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? ».');
-    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+      } else if(action==='renvoyer')setInfo(tr('auth.info.nouvelEmail'));
+      else setInfo(tr('auth.info.lienEnvoye'));
+    } catch (_) {setErr(tr('auth.err.demande'));}
     finally {demandeEnCours.current=false;setBusy(false);}
   };
 
@@ -16608,29 +16611,29 @@ function AuthScreen() {
     if(busy||demandeEnCours.current)return;
     if (enAttenteEmail && (mode === 'up' || mode === 'reset')) return;
     setErr(''); setInfo('');
-    if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
-    if (mode !== 'reset' && !pw) {setErr('Indique ton mot de passe.');return;}
-    if ((mode === 'up' || mode === 'newpw') && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
+    if (mode !== 'newpw' && !email.trim()) { setErr(tr('auth.err.email')); return; }
+    if (mode !== 'reset' && !pw) {setErr(tr('auth.err.motDePasse'));return;}
+    if ((mode === 'up' || mode === 'newpw') && pw.length < 8) { setErr(tr('auth.err.court')); return; }
     // Un mot de passe qui protège une comptabilité mérite mieux que « 12345678 ».
-    if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr('Mélange lettres et chiffres — ce mot de passe protège ta compta.'); return; }
+    if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr(tr('auth.err.melange')); return; }
     demandeEnCours.current=true;setBusy(true);
     try {
       if (mode === 'newpw') {
         const r = await authSetPassword(pw);
         if (!r.ok) setErr(r.error);
-        else { setInfo('Mot de passe enregistré. Tu es connecté.'); setTimeout(()=>location.reload(), 900); }
+        else { setInfo(tr('auth.info.mdpEnregistre')); setTimeout(()=>location.reload(), 900); }
       } else if (mode === 'reset') {
         const rr = await authReset(email);
         if (rr && rr.captcha) { setErr(rr.error); return; }
         if (rr && !rr.ok && attendreEmail({ attente: delaiDemandeEmail(rr.error) })) return;
-        if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un e-mail, utilise le lien le plus récent.');return;}
+        if(!rr?.ok){setErr(tr('auth.err.envoiLien'));return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
         // (8 nov.) La phrase dit le geste ; « Renvoyer » attend l'intervalle de
         // Supabase (60 s) sur le bouton lui-même.
         const adresse=String(email).trim().toLowerCase();
         setResetEnvoye(adresse);setFinAttente(Date.now()+60*1000);
-        setInfo(`On t’a envoyé un e-mail à ${adresse}. Ouvre-le sur cet appareil.`);
+        setInfo(tr('auth.info.emailEnvoye', { adresse }));
       } else if (mode === 'up') {
         // On l'écrit AVANT de partir : `save` range dans le navigateur et le
         // nuage suivra à la première synchro. Écrit seulement s'il l'a donné —
@@ -16638,7 +16641,7 @@ function AuthScreen() {
         try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
         const r = await authSignUp(email, pw);
         if (!r.ok) { if(attendreEmail(r)){} else if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
-        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo('Ton compte est créé. Confirme ton e-mail, puis connecte-toi ici : inutile de quitter cette page.'); }
+        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo(tr('auth.info.compteCree')); }
         else location.reload();
       } else {
         const r = await authSignIn(email, pw);
@@ -16648,7 +16651,7 @@ function AuthScreen() {
         // pourrait garder en mémoire les données du vendeur précédent.
         else location.reload();
       }
-    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+    } catch (_) {setErr(tr('auth.err.demande'));}
     finally { demandeEnCours.current=false;setBusy(false); }
   };
 
@@ -16746,28 +16749,28 @@ function AuthScreen() {
 `}</style>
       <aside className="vrm-cx-marque">
         <div className="vrm-cx-aurore" aria-hidden="true" data-cx-aurore=""><i/><i/><i/></div>
-        <div className="vrm-cx-etiquettes" aria-hidden="true"><span>Colis prêt</span><span>Bordereau imprimé</span><span>Vendu sur Vinted</span><span>Retirée de Leboncoin</span></div>
+        <div className="vrm-cx-etiquettes" aria-hidden="true"><span>{tr('auth.deco.colis')}</span><span>{tr('auth.deco.bordereau')}</span><span>{tr('auth.deco.vendu')}</span><span>{tr('auth.deco.retiree')}</span></div>
         <div className="vrm-cx-haut">
-          <a href="/" className="vrm-cx-logo" aria-label="VRM — page d'accueil">
+          <a href="/" className="vrm-cx-logo" aria-label={tr('auth.logoAccueil')}>
             <img src="/vrm-logo-v5-192.png" alt="" width="36" height="36"/><b>VRM</b>
           </a>
           {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
               pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
-          <a href="/" data-retour-accueil="" className="vrm-cx-retour">← Découvrir VRM</a>
+          <a href="/" data-retour-accueil="" className="vrm-cx-retour">← {tr('auth.decouvrir')}</a>
         </div>
-        <h1 className="vrm-cx-titre">{mode==='up' ? <>Bienvenue sur VRM.<span>Ton espace de revendeur.</span></> : <>Content de te revoir.<span>Ta boutique t'attend.</span></>}</h1>
+        <h1 className="vrm-cx-titre">{mode==='up' ? <>{tr('auth.marque.bienvenue')}<span>{tr('auth.marque.espace')}</span></> : <>{tr('auth.marque.revoir')}<span>{tr('auth.marque.attend')}</span></>}</h1>
         <ul className="vrm-cx-points">
-          <li><i>1</i><span><b>Tes colis du jour</b>, dans le bon ordre, avec leur bordereau.</span></li>
-          <li><i>2</i><span><b>Vendu ici, à retirer ailleurs</b> : Vinted, Leboncoin et eBay au même endroit.</span></li>
-          <li><i>3</i><span><b>Tes chiffres</b>, prêts pour l'URSSAF, mois par mois.</span></li>
+          <li><i>1</i><span><b>{tr('auth.point1.titre')}</b>{tr('auth.point1.texte')}</span></li>
+          <li><i>2</i><span><b>{tr('auth.point2.titre')}</b>{tr('auth.point2.texte')}</span></li>
+          <li><i>3</i><span><b>{tr('auth.point3.titre')}</b>{tr('auth.point3.texte')}</span></li>
         </ul>
-        <div className="vrm-cx-pied vrm-cx-points">Aucun mot de passe Vinted demandé.</div>
+        <div className="vrm-cx-pied vrm-cx-points">{tr('auth.pied')}</div>
       </aside>
       <main className="vrm-cx-main">
       <div className="vrm-cx-boite">
         <form onSubmit={submit} className="vrm-cx-form" aria-busy={busy} aria-labelledby="vrm-cx-titre-formulaire">
           <h2 id="vrm-cx-titre-formulaire" style={{fontSize:20,fontWeight:700,color:C.text,letterSpacing:-0.4,margin:'0 0 4px'}}>
-            {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
+            {mode==='up' ? tr('auth.titre.up') : mode==='reset' ? tr('auth.titre.reset') : mode==='newpw' ? tr('auth.titre.newpw') : tr('auth.titre.in')}
           </h2>
           <div style={{fontSize:15,color:C.muted,marginBottom:mode==='in'?14:18,lineHeight:1.5}}>
             {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
@@ -16778,32 +16781,32 @@ function AuthScreen() {
                 personne qui s'inscrit que ses données seront partagées — seul un
                 « colonne absente » MESURÉ (400) le dit ; sinon, rien. */}
             {mode==='up' ? (CLOISONNE
-              ? 'Tes données (annonces, stock, compta) ne seront visibles que par toi.'
-              : SCHEMA_MESURE ? 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.' : null)
-             : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
-             : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
+              ? tr('auth.sous.cloisonne')
+              : SCHEMA_MESURE ? tr('auth.sous.pasCloisonne') : null)
+             : mode==='reset' ? tr('auth.sous.reset')
+             : mode==='newpw' ? tr('auth.sous.newpw')
              : null /* « Ta boutique t'attend » est déjà dit au-dessus (§7) */}
           </div>
           {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
               UNE connexion pour les deux : l'app connecte l'extension juste après. */}
           {__lier && (mode==='in' || mode==='up') && (
             <div data-lier-connexion="" style={{fontSize:13,color:C.text,background:`${C.accent}12`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>
-              Connecte-toi ici : l'extension {NAV.de} se connecte aussi, rien à taper.
+              {tr('auth.lier.extension', { navigateur: NAV.de })}
             </div>
           )}
           {/* (11 nov., lot DJ6) « Continuer avec Discord » sans compte VRM : rien n'a été créé (annulé par le serveur). */}
           {AUTH_REDIRECT?.sansCompteFournisseur && mode==='in' && (()=>{ const p=AUTH_REDIRECT.sansCompteFournisseur, nom=p==='google'?'Google':'Discord'; return <div role="alert" data-sans-compte={p} style={{fontSize:14,color:C.text,border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'10px 12px',marginBottom:14,lineHeight:1.45}}>
-            <div style={{fontWeight:600}}>Aucun compte VRM relié à ce {nom}.</div>
-            <div style={{color:C.muted,marginTop:2}}>Connecte-toi d’abord, puis relie {nom} dans ton profil.</div>
-            {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Créer un nouveau compte avec {nom}</button>}
+            <div style={{fontWeight:600}}>{tr('auth.sansCompte.titre', { nom })}</div>
+            <div style={{color:C.muted,marginTop:2}}>{tr('auth.sansCompte.texte', { nom })}</div>
+            {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.sansCompte.creer', { nom })}</button>}
           </div>; })()}
           {lierFournisseurMot && (mode==='in' || mode==='up') && <div role="status" data-lier-fournisseur-mot={lierFournisseur} style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>{lierFournisseurMot}</div>}
-          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>Plus de 10 minutes : l’extension n’est pas connectée.</div><div>Connecte-toi, puis reclique « Continuer avec Google » (ou Discord) dans l’extension.</div></div>}
+          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>{tr('auth.perime.1')}</div><div>{tr('auth.perime.2')}</div></div>}
 
-          {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
+          {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>{tr('auth.moyens.chargement')}</div>}
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12}}>
-            Les autres moyens de connexion n’ont pas pu être chargés. L’e-mail reste disponible.
-            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Réessayer les moyens de connexion</button>
+            {tr('auth.moyens.erreur')}
+            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.moyens.reessayer')}</button>
           </div>}
 
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
@@ -16821,12 +16824,12 @@ function AuthScreen() {
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
                     border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
                     fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? `Ouverture de ${p.label}…` : mode==='up' ? `Créer mon compte avec ${p.label}` : `Continuer avec ${p.label}`}
+                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? tr('auth.fournisseur.ouverture', { nom: p.label }) : mode==='up' ? tr('auth.fournisseur.creer', { nom: p.label }) : tr('auth.fournisseur.continuer', { nom: p.label })}
                 </button>
               ))}
               <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
                 <span style={{flex:1,height:1,background:C.border}}/>
-                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>ou par e-mail</span>
+                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{tr('auth.ouEmail')}</span>
                 <span style={{flex:1,height:1,background:C.border}}/>
               </div>
             </>);
@@ -16836,7 +16839,7 @@ function AuthScreen() {
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
           {mode==='up' && confirmRequired() && (
             <div style={{fontSize:12,color:C.text,background:`${C.accent}08`,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px',marginBottom:14,lineHeight:1.5}}>
-              Après l’inscription, <b>confirme ton adresse</b> avec le lien reçu par email.
+              {tr('auth.confirmer.avant')}<b>{tr('auth.confirmer.gras')}</b>{tr('auth.confirmer.apres')}
             </div>
           )}
 
@@ -16847,76 +16850,76 @@ function AuthScreen() {
               du monde. Facultatif : un champ obligatoire de plus pour un
               bonjour serait un péage. */}
           {mode==='up' && (
-            <label className="vrm-cx-champ"><span>Prénom <span style={{fontWeight:400,color:C.muted}}>(facultatif)</span></span>
-              <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
+            <label className="vrm-cx-champ"><span>{tr('auth.champ.prenom')} <span style={{fontWeight:400,color:C.muted}}>{tr('auth.champ.facultatif')}</span></span>
+              <input type="text" autoComplete="given-name" placeholder={tr('auth.champ.prenomPlaceholder')}
                 disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={field}/>
             </label>
           )}
           {mode!=='newpw' && (
-            <label className="vrm-cx-champ"><span>Adresse e-mail</span>
-              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" required
+            <label className="vrm-cx-champ"><span>{tr('auth.champ.email')}</span>
+              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={tr('auth.champ.emailPlaceholder')} required
                 disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);setResetEnvoye('');}} style={field}/>
             </label>
           )}
           {mode!=='reset' && (
             <div className="vrm-cx-champ"><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
-                <label htmlFor="vrm-cx-password">{mode==='newpw'?'Nouveau mot de passe':'Mot de passe'}</label>
-                {mode==='in' && <button type="button" disabled={busy} onClick={()=>changerMode('reset')} className="vrm-cx-oublie">Mot de passe oublié ?</button>}
+                <label htmlFor="vrm-cx-password">{mode==='newpw'?tr('auth.titre.newpw'):tr('auth.champ.mdp')}</label>
+                {mode==='in' && <button type="button" disabled={busy} onClick={()=>changerMode('reset')} className="vrm-cx-oublie">{tr('auth.oublie')}</button>}
               </div>
               <span className="vrm-cx-secret">
                 <input id="vrm-cx-password" type={motDePasseVisible?'text':'password'} autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'} required
                   aria-describedby={(mode==='up'||mode==='newpw')?'vrm-cx-regles':undefined}
-                  placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
+                  placeholder={mode==='newpw'?tr('auth.champ.nouveauMdpPlaceholder'):tr('auth.champ.mdp')}
                   disabled={busy} value={pw} onChange={e=>{setPw(e.target.value);setErr('');}} style={{...field,paddingRight:88}}/>
-                <button type="button" disabled={busy} aria-label={motDePasseVisible?'Masquer le mot de passe':'Afficher le mot de passe'} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?'Masquer':'Afficher'}</button>
+                <button type="button" disabled={busy} aria-label={motDePasseVisible?tr('auth.mdp.masquerLabel'):tr('auth.mdp.afficherLabel')} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?tr('commun.masquer'):tr('commun.afficher')}</button>
               </span>
             </div>
           )}
-          {(mode==='up'||mode==='newpw') && <ul id="vrm-cx-regles" className="vrm-cx-regles" aria-label="Conditions du mot de passe">
-            <li data-valide={pw.length>=8}>8 caractères minimum</li>
-            <li data-valide={pw.length>0&&!/^(\d+|[a-z]+)$/i.test(pw)}>Mélange de caractères</li>
+          {(mode==='up'||mode==='newpw') && <ul id="vrm-cx-regles" className="vrm-cx-regles" aria-label={tr('auth.regles.label')}>
+            <li data-valide={pw.length>=8}>{tr('auth.regles.huit')}</li>
+            <li data-valide={pw.length>0&&!/^(\d+|[a-z]+)$/i.test(pw)}>{tr('auth.regles.melange')}</li>
           </ul>}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
           {err  && <div role="alert" style={{fontSize:13,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {/* Le décompte vit sur le bouton qui envoie (inscription, mot de passe
               oublié, « Renvoyer » d'un compte pas confirmé) ; sinon dans la phrase. */}
-          {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? TEXTE_DELAI_EMAIL_BOUTON : texteDelaiEmail(resteAttente)}</div>}
+          {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? tr('auth.delai.bouton') : tr('auth.delai.secondes', { n: resteAttente })}</div>}
           {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
-              Ton compte <b>{email}</b> attend sa confirmation.
+              {tr('auth.attente.avant')}<b>{email}</b>{tr('auth.attente.apres')}
               <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
                 <button type="button" data-auth-renvoyer="" disabled={busy||enAttenteEmail}
                   onClick={()=>actionConfirmation('renvoyer')}
                   style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
                     borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
-                  {enAttenteEmail ? `Renvoyer dans ${resteAttente} s` : "Renvoyer l'email"}
+                  {enAttenteEmail ? tr('auth.renvoyerDans', { s: resteAttente }) : tr('auth.renvoyerEmail')}
                 </button>
                 <button type="button" data-auth-lien-connexion="" disabled={busy||enAttenteEmail}
                   onClick={()=>actionConfirmation('lien')}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
                     borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
-                  Recevoir un lien de connexion
+                  {tr('auth.lienConnexion')}
                 </button>
               </div>
               <details className="vrm-cx-aide-confirmation">
-                <summary>Le lien de confirmation ne s’ouvre pas ?</summary>
+                <summary>{tr('auth.lienAide.q')}</summary>
               <div style={{marginTop:8,fontSize:12,color:C.muted,lineHeight:1.5}}>
                 {/* « il renvoie vers une adresse de test » : vrai le 5 octobre (Site URL
                     resté sur localhost:3000, mesuré dans les journaux), faux dès que
                     Julien règle Supabase. La phrase ne dit plus que ce qui reste vrai
                     dans les deux cas. */}
-                Si le lien du mail affiche « <i>impossible d'accéder au site</i> »,
-                <b style={{color:C.text}}> copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
+                {tr('auth.lienAide.1')}<i>{tr('auth.lienAide.2')}</i>{tr('auth.lienAide.3')}
+                <b style={{color:C.text}}>{tr('auth.lienAide.4')}</b>{tr('auth.lienAide.5')}
               </div>
-              <input aria-label="Lien de confirmation reçu par e-mail" value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
+              <input aria-label={tr('auth.lienAide.label')} value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder={tr('auth.lienAide.placeholder')}
                 style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:12,
                   padding:'10px 11px',fontSize:17,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
                 <button type="button" disabled={busy||!confirmLink.trim()}
                   onClick={()=>actionConfirmation('confirmer')}
                   style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'9px 13px',
                     fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
-                  Confirmer avec ce lien
+                  {tr('auth.lienAide.confirmer')}
                 </button>
               </details>
             </div>
@@ -16931,15 +16934,15 @@ function AuthScreen() {
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && mode==='reset' && resetEnvoye) ? `Renvoyer dans ${resteAttente} s` : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? (resetEnvoye ? 'Renvoyer l’e-mail' : 'Envoyer le lien') : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (fournisseurEnCours?tr('auth.bouton.ouverture'):mode==='up'?tr('auth.bouton.creation'):mode==='reset'?tr('auth.bouton.envoiLien'):mode==='newpw'?tr('auth.bouton.enregistrement'):tr('auth.bouton.connexion')) : (enAttenteEmail && mode==='reset' && resetEnvoye) ? tr('auth.renvoyerDans', { s: resteAttente }) : (enAttenteEmail && (mode==='up'||mode==='reset')) ? tr('auth.reessaieDans', { s: resteAttente }) : attendCaptcha ? (captcha.statut==='erreur' ? tr('auth.captcha.indisponible') : captcha.statut==='interactif' ? tr('auth.captcha.coche') : tr('auth.captcha.enCours')) : mode==='up' ? tr('auth.bouton.creer') : mode==='reset' ? (resetEnvoye ? tr('auth.bouton.renvoyer') : tr('auth.bouton.envoyerLien')) : mode==='newpw' ? tr('commun.enregistrer') : tr('auth.titre.in')}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
               collecte). */}
           {mode==='up' && (
             <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginTop:10,textAlign:'center'}}>
-              En créant ton compte, tu acceptes les <a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>conditions d’utilisation</a> et
-              tu as pris connaissance de la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
+              {tr('auth.cgu.1')}<a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('auth.cgu.2')}</a>{tr('auth.cgu.3')}
+              <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('auth.cgu.4')}</a>.
             </div>
           )}
 
@@ -16951,15 +16954,15 @@ function AuthScreen() {
             {mode!=='reset' && ((CLOISONNE || mode==='up') ? (
               <button type="button" disabled={busy} onClick={()=>changerMode(mode==='up'?'in':'up')}
                 style={{border:'none',background:'transparent',color:C.accentTexte,fontSize:15,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-                {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
+                {mode==='up' ? tr('auth.dejaCompte') : tr('auth.creerCompte')}
               </button>
             ) : (
-              <span style={{fontSize:15,color:C.muted,fontWeight:500}}>Inscriptions bientôt ouvertes</span>
+              <span style={{fontSize:15,color:C.muted,fontWeight:500}}>{tr('auth.inscriptionsBientot')}</span>
             ))}
             {mode==='reset' && (
               <button type="button" disabled={busy} onClick={()=>changerMode('in')}
                 style={{border:'none',background:'transparent',color:C.muted,fontSize:15,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-                Retour
+                {tr('commun.retour')}
               </button>
             )}
           </div>
@@ -16979,11 +16982,11 @@ function AuthScreen() {
             ne dit rien tant qu'on ne sait pas : « pas su » ne vaut pas « oui ». */}
         <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:16,lineHeight:1.5,minHeight:32}}>
           {!CLOISONNE
-            ? <><b style={{color:C.warn}}>Séparation des comptes pas encore activée.</b><br/>Connecte-toi pour retrouver tes données — mais n'invite personne tant que la migration n'est pas passée.</>
+            ? <><b style={{color:C.warn}}>{tr('auth.isolation.inactive.titre')}</b><br/>{tr('auth.isolation.inactive.texte')}</>
             : ouverte === true
-            ? <><b style={{color:C.warn}}>Séparation des comptes pas encore verrouillée.</b><br/>La clé publique de cette page lit encore les données. Connecte-toi pour retrouver les tiennes — mais n'invite personne tant que le verrou (RLS) n'est pas posé.</>
+            ? <><b style={{color:C.warn}}>{tr('auth.isolation.ouverte.titre')}</b><br/>{tr('auth.isolation.ouverte.texte')}</>
             : ouverte === false
-            ? <>Chaque vendeur ne voit que ses propres données.<br/>L'isolation est appliquée par la base, pas par l'application.</>
+            ? <>{tr('auth.isolation.fermee.1')}<br/>{tr('auth.isolation.fermee.2')}</>
             : null /* en cours, ou pas su : on n'affirme rien */}
         </div>
       </div>
