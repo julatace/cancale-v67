@@ -428,7 +428,7 @@ export default {
   "vcPhotos.source.guide": "sellers’ guide",
   "vcPhotos.source.smart": "your Vestiaire form",
   "vcPhotos.choisirEtiquette": "Choose the label",
-  "vcPhotos.note": "VRM can't see what a photo shows: “check it yourself” is up to you. The background is cut out with your Photoroom key, above.",
+  "vcPhotos.note": "VRM can't see what a photo shows: “check it yourself” is up to you. The background is cut out with your Photoroom key (“Your Photoroom key” card).",
   "vcPhotos.confirme.titre": {"one": "{n} photo Vestiaire asks for is missing", "other": "{n} photos Vestiaire asks for are missing"},
   "vcPhotos.confirme.ok": "Prepare anyway",
   "vcPhotos.confirme.annuler": "Complete first",

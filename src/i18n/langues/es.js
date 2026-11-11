@@ -428,7 +428,7 @@ export default {
   "vcPhotos.source.guide": "guía de vendedores",
   "vcPhotos.source.smart": "tu formulario de Vestiaire",
   "vcPhotos.choisirEtiquette": "Elegir la etiqueta",
-  "vcPhotos.note": "VRM no ve lo que muestra una foto: «revísalo tú» te toca a ti. El fondo se recorta con tu clave Photoroom, arriba.",
+  "vcPhotos.note": "VRM no ve lo que muestra una foto: «revísalo tú» te toca a ti. El fondo se recorta con tu clave Photoroom (tarjeta «Tu clave Photoroom»).",
   "vcPhotos.confirme.titre": {"one": "Falta {n} foto que pide Vestiaire", "other": "Faltan {n} fotos que pide Vestiaire"},
   "vcPhotos.confirme.ok": "Preparar igualmente",
   "vcPhotos.confirme.annuler": "Completar primero",

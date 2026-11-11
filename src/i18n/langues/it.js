@@ -428,7 +428,7 @@ export default {
   "vcPhotos.source.guide": "guida dei venditori",
   "vcPhotos.source.smart": "il tuo modulo Vestiaire",
   "vcPhotos.choisirEtiquette": "Scegli l'etichetta",
-  "vcPhotos.note": "VRM non vede cosa mostra una foto: «verificalo tu» spetta a te. Lo sfondo si scontorna con la tua chiave Photoroom, sopra.",
+  "vcPhotos.note": "VRM non vede cosa mostra una foto: «verificalo tu» spetta a te. Lo sfondo si scontorna con la tua chiave Photoroom (scheda «La tua chiave Photoroom»).",
   "vcPhotos.confirme.titre": {"one": "Manca {n} foto richiesta da Vestiaire", "other": "Mancano {n} foto richieste da Vestiaire"},
   "vcPhotos.confirme.ok": "Prepara comunque",
   "vcPhotos.confirme.annuler": "Completa prima",

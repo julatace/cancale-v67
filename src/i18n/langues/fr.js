@@ -433,7 +433,7 @@ export default {
   "vcPhotos.source.guide": "guide de vendeurs",
   "vcPhotos.source.smart": "ton formulaire Vestiaire",
   "vcPhotos.choisirEtiquette": "Choisir l'étiquette",
-  "vcPhotos.note": "VRM ne voit pas ce que montre une photo : « à vérifier » reste à toi. Le fond se détoure avec ta clé Photoroom, plus haut.",
+  "vcPhotos.note": "VRM ne voit pas ce que montre une photo : « à vérifier » reste à toi. Le fond se détoure avec ta clé Photoroom (carte « Ta clé Photoroom »).",
   "vcPhotos.confirme.titre": {"one": "{n} photo demandée par Vestiaire manque", "other": "{n} photos demandées par Vestiaire manquent"},
   "vcPhotos.confirme.ok": "Préparer quand même",
   "vcPhotos.confirme.annuler": "Compléter d’abord",

@@ -428,7 +428,7 @@ export default {
   "vcPhotos.source.guide": "Verkäuferratgeber",
   "vcPhotos.source.smart": "dein Vestiaire-Formular",
   "vcPhotos.choisirEtiquette": "Etikett wählen",
-  "vcPhotos.note": "VRM sieht nicht, was ein Foto zeigt: „selbst prüfen“ liegt bei dir. Der Hintergrund wird mit deinem Photoroom-Schlüssel freigestellt, oben.",
+  "vcPhotos.note": "VRM sieht nicht, was ein Foto zeigt: „selbst prüfen“ liegt bei dir. Der Hintergrund wird mit deinem Photoroom-Schlüssel freigestellt (Karte „Dein Photoroom-Schlüssel“).",
   "vcPhotos.confirme.titre": {"one": "{n} von Vestiaire verlangtes Foto fehlt", "other": "{n} von Vestiaire verlangte Fotos fehlen"},
   "vcPhotos.confirme.ok": "Trotzdem vorbereiten",
   "vcPhotos.confirme.annuler": "Zuerst ergänzen",
