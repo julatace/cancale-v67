@@ -62,7 +62,10 @@ const deuxAuPlus = (l, f) => { const v = l.slice(0, 2).map(f); return v.join(' �
 // Une ligne ne se coupe qu'APRÈS un « · » ou un « : » — jamais au milieu d'un nom
 // (« Mondial / Relay », « Kusmi / Tea ») : chaque morceau reste d'un seul tenant.
 // Un morceau long (une phrase) garde ses coupures normales entre les mots.
-const morceaux = (l) => String(l).split(/(?<= [·:]) /u).map((m, k, t) => <React.Fragment key={k}><span className={m.length <= 28 ? 'vrm-tr-seg' : undefined}>{m}</span>{k < t.length - 1 ? ' ' : ''}</React.Fragment>);
+// (11 nov.) Coupé à la main, sans « lookbehind » (Safari < 16.4 refuse de lire le fichier) :
+// une espace précédée de « · » ou « : », eux-mêmes précédés d'une espace.
+const couperApresSeparateur = (t) => { const out = []; let d = 0; for (let i = 2; i < t.length; i++) if (t[i] === ' ' && (t[i - 1] === '·' || t[i - 1] === ':') && t[i - 2] === ' ') { out.push(t.slice(d, i)); d = i + 1; } out.push(t.slice(d)); return out; };
+const morceaux = (l) => couperApresSeparateur(String(l)).map((m, k, t) => <React.Fragment key={k}><span className={m.length <= 28 ? 'vrm-tr-seg' : undefined}>{m}</span>{k < t.length - 1 ? ' ' : ''}</React.Fragment>);
 function texteEtape(e) {
   const L = texteEtapeLong(e);
   if (e.etat === 'passu') return { t: L.t.replace(/ les bordereaux$/, ''), s: [e.id === 'imprimer' && e.auMoins ? 'Colis les lit' : 'Lecture en cours'] };

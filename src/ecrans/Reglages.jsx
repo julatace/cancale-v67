@@ -1,9 +1,12 @@
 import { PlateformesSetting } from '../App.jsx';
+import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
+import { RappelsSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
 import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrière après une mauvaise manipulation
+import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -126,7 +129,7 @@ const nomAppareilPris = (nom, verifies) => {
 // ⟦← App.jsx #18⟧
 
 const lireConnexionsOAuth = async()=>{
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
 };
 // (11 nov., lot DJ6) « Délier » Google/Discord : sur son clic, confirmé ; jamais la dernière façon de se connecter.
 const oauthDelier = async (provider, id, nbIdentites) => {
@@ -134,7 +137,7 @@ const oauthDelier = async (provider, id, nbIdentites) => {
  if(nbIdentites<2)return{ok:false,error:`${nom} est ta seule façon de te connecter : ajoute d’abord un mot de passe (Changer mon mot de passe).`};
  if(!id)return{ok:false,error:'Je n’ai pas pu lire cette liaison. Recharge la page.'};
  if(!(await askConfirm({title:`Délier ${nom} ?`,desc:`Tu ne pourras plus te connecter avec ${nom}. Ton compte VRM ne change pas.`,ok:'Délier',cancel:'Annuler'})))return{ok:false};
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});
   if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:/single.identity|last.identity|at least/i.test(String(j?.msg||j?.message||j?.error_code||''))?`${nom} est ta seule façon de te connecter.`:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
   try{relireFiche(AUTH.user?.id);}catch(_){}return{ok:true};
  }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
@@ -1866,6 +1869,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
+      // (11 nov.) « Me le rappeler » : les rappels qu'il a posés sur un article, une vente, un achat (api/_lib/rappels-perso.js).
+      { id:'rappels', type:'panneau', ic:'clock', lib:'Rappels', desc:'Ceux que tu as posés avec « Me le rappeler » : à 9 h le jour choisi.', data:{ 'data-reglage-rappels':'' }, el:<RappelsSetting/> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
@@ -1937,6 +1942,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
+      // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
+      { id:'importer', type:'panneau', nu:true, ic:'box', lib:'Importer', desc:'Ton stock et tes ventes passées, depuis un tableur ou un autre logiciel.', data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
       { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       // (11 nov.) Revenir en arrière : des points posés tout seuls (avant une action en série, un
       // import, chaque jour) ou une sauvegarde complète ⇒ aperçu précis ⇒ choisir quoi ⇒ confirmer (src/restauration.js).
@@ -2461,7 +2468,7 @@ function DoubleVerification({ onEtat } = {}) {
 // « Se déconnecter partout », « Appareils connectés », « Ce que VRM a fait ».
 const appelSecurite = async (mode, init) => {
   try {
-    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(20000) });
+    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: signalDelai(20000) });
     const j = await r.json().catch(() => null);
     return { status: r.status, j };
   } catch (_) { return { status: 0, j: null }; }
