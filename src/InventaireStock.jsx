@@ -32,7 +32,7 @@ import { SegmenteBase } from './composants/Bouton.jsx';
 import { Numero } from './composants/Numero.jsx';
 import Pourquoi from './composants/PourquoiReplie.jsx';
 import './styles-inventaire.css';
-import { useLectureCamera, creerBip } from './ScannerColis.jsx';   // (10 nov., lot W) la caméra du lot V
+import { useLectureCamera, phraseSansCamera, creerBip } from './ScannerColis.jsx';   // (10 nov., lot W) la caméra du lot V
 import { numeroDuScan } from './inventaireAnnuel.js';
 import './styles-inventaire-annuel.css';
 
@@ -96,7 +96,7 @@ function ScanNumeros({ onLu }) {
   return (
     <div className="vrm-inv-scan" data-inv-scan={camera}>
       <video ref={video} playsInline muted autoPlay aria-hidden="true"/>
-      {camera === 'sans' ? <p className="vrm-inv-scan-sans" data-inv-scan-sans="">Pas de caméra ici : tape le N°.</p> : <span className="vrm-inv-scan-viseur" aria-hidden="true"/>}
+      {camera === 'sans' ? <p className="vrm-inv-scan-sans" data-inv-scan-sans="">{phraseSansCamera('Pas de caméra ici : tape le N°.')}</p> : <span className="vrm-inv-scan-viseur" aria-hidden="true"/>}
     </div>
   );
 }

@@ -60,7 +60,7 @@ jobs:
           echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
       - name: Vérifier les écrans sur données fictives
         env:
-          NODE_OPTIONS: --require=./scripts/bancs/_porte-banc.cjs
+          NODE_OPTIONS: --require=./scripts/bancs/_porte-banc.cjs --require=./scripts/bancs/_garde-reseau.cjs
         run: |
           node scripts/bancs/${{ matrix.banc }}.cjs
           if [ "${{ matrix.banc }}" = "parcours-quotidien" ]; then

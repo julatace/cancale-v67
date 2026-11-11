@@ -32,6 +32,15 @@ import { previsionUrssaf } from '../previsionUrssaf.js';
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
+// (11 nov., lot rapport-mois) « Rapport du mois » : le PDF (src/rapportMois.js), les lectures de catégories partagées.
+import { AUTH, lireExtrasRepartition } from '../App.jsx';
+import { moisRapportParDefaut, moisRapportChoix, donneesRapportMois, pdfRapportMois, nomFichierRapport, bornesMois, libelleMoisRapport } from '../rapportMois.js';
+import { margeParPlateforme } from '../margePlateforme.js';
+import { statsParCategorie, afficherCategories, cleVente as cleVenteCat, CLE_CATEGORIES_MAIN } from '../statsCategories.js';
+import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categoriesLecture.js';
+import { lireValeurStock } from '../coutVente.js';
+import { bornesPeriode as bornesPeriodeExport, raisonUrssaf } from '../exportComptable.js';
+import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
@@ -57,6 +66,8 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
+import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'année »
+import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -1955,6 +1966,13 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
 // Rien n'est lu tant qu'il n'a pas ouvert la carte (« Préparer »).
 function ExportComptableCarte(props) {
   const [ouvert, setOuvert] = React.useState(false);
+  // (11 nov.) « Clôturer l'année » → « Export pour ton comptable » : la carte s'ouvre sur l'année
+  // demandée (rien n'est lu ni téléchargé avant son clic sur Tableur / PDF).
+  const [periodeVoulue, setPeriodeVoulue] = React.useState('');
+  React.useEffect(() => {
+    const f = () => { const p = DEMANDE_COMMANDE.exportPeriode; if (p && /^\d{4}$/.test(p)) { DEMANDE_COMMANDE.exportPeriode = ''; setPeriodeVoulue(p); setOuvert(true); } };
+    f(); window.addEventListener('vrm:export-comptable', f); return () => window.removeEventListener('vrm:export-comptable', f);
+  }, []);
   return (
     <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -1964,19 +1982,21 @@ function ExportComptableCarte(props) {
         </div>
         {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
       </div>
-      {ouvert && <ExportComptableCorps {...props} />}
+      {ouvert && <ExportComptableCorps key={periodeVoulue || 'x'} {...props} anneeVoulue={periodeVoulue} />}
     </div></Card>
   );
 }
-function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, anneeVoulue = '' }) {
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   const ventesVcER = useVentesVestiaire();
   const ligne = useLigneUrssaf();
   const regime = useRegimeFiscal();
   // (11 nov.) Défaut : le dernier mois BOUCLÉ ; changer de type choisit la dernière période bouclée.
-  const [type, setTypeBrut] = React.useState('mois');
+  // (11 nov.) « Clôturer l'année » → l'export s'ouvre sur l'année demandée (`anneeVoulue`).
+  const anneeOk = anneeVoulue && periodesExport('annee').includes(anneeVoulue) ? anneeVoulue : '';
+  const [type, setTypeBrut] = React.useState(anneeOk ? 'annee' : 'mois');
   const choix = React.useMemo(() => periodesExport(type), [type]);
-  const [periode, setPeriode] = React.useState(() => periodeBouclee('mois'));
+  const [periode, setPeriode] = React.useState(() => anneeOk || periodeBouclee('mois'));
   const setType = (t) => { setTypeBrut(t); setPeriode(periodeBouclee(t)); };
   React.useEffect(() => { if (!choix.includes(periode)) setPeriode(periodeBouclee(type)); }, [choix, periode, type]);
   const [achats, setAchats] = React.useState(undefined);
@@ -3846,18 +3866,12 @@ function PorteMonnaieCompta({ accounts, panelOff }) {
 // Meilleur compte, pour ce mois ou le mois d'avant ; « Télécharger en PDF ».
 // Chaque valeur vient de SA règle (src/bilanMois.js le dit) : rien n'est
 // recalculé ici. « — » = pas su ; « au moins » = un minimum, le manque nommé.
-function BilanMoisCarte({ liveStats, compta }) {
-  const [quel, setQuel] = React.useState('courant');
-  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
-  const ligneUrssaf = useLigneUrssaf();
-  const regime = useRegimeFiscal();
-  const [envoi, setEnvoi] = React.useState(false);
-  const maintenant = Date.now();
-  const ymA = ymCourant(maintenant);
-  const ym = quel === 'courant' ? ymA : (() => { const [y, m] = ymA.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+// (11 nov., lot rapport-mois) L'ASSEMBLAGE DU BILAN D'UN MOIS, sorti de la carte telle quelle :
+// la carte « Bilan du mois » et le « Rapport du mois » le partagent (les mêmes chiffres, §11).
+// Chaque valeur vient de SA règle (src/bilanMois.js le dit) : rien n'est recalculé ici.
+const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant = Date.now() }) => {
   const [y, m] = ym.split('-').map(Number);
   const de = new Date(y, m - 1, 1).getTime(), finMois = new Date(y, m, 1).getTime();
-  const enCours = quel === 'courant';
   const a = enCours ? maintenant : finMois;
   const V = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes) ? liveStats.venduLignes : null;
   const vendu = (() => {
@@ -3874,6 +3888,19 @@ function BilanMoisCarte({ liveStats, compta }) {
   const nomGroupe = (l) => (l.plateforme === 'Vinted' ? (l.compte || 'Vinted') : (l.compte ? `${l.compte} (${l.plateforme})` : l.plateforme));
   const meilleur = V ? meilleurCompte(V.filter((l) => l.ts >= de && l.ts < a), nomGroupe) : null;
   const D = bilanDuMois({ ym, vendu, recu, depense: charges, benefice: CB, B: Bm, meilleur, maintenant, enCours });
+  return { D, vendu, recu, Bm, CB, V, de, a, nomGroupe };
+};
+function BilanMoisCarte({ liveStats, compta }) {
+  const [quel, setQuel] = React.useState('courant');
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const [envoi, setEnvoi] = React.useState(false);
+  const maintenant = Date.now();
+  const ymA = ymCourant(maintenant);
+  const ym = quel === 'courant' ? ymA : (() => { const [y, m] = ymA.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const enCours = quel === 'courant';
+  const { D, vendu } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant });
   const telecharger = async () => {
     if (envoi) return;
     setEnvoi(true);
@@ -3900,6 +3927,105 @@ function BilanMoisCarte({ liveStats, compta }) {
       <div className="vrm-bilan-pied">
         <Bouton variante="secondaire" icone="save" occupe={envoi} data-bilan-pdf="" onClick={telecharger}>Télécharger en PDF</Bouton>
       </div>
+    </div>
+  );
+}
+// ── (11 nov., lot rapport-mois) « RAPPORT DU MOIS » EN PDF, EN UN CLIC ─────────
+// Un mois (défaut : le dernier BOUCLÉ) ⇒ un PDF de 2 à 4 pages (src/rapportMois.js),
+// partagé par la feuille native, sinon téléchargé. AUCUNE règle ici : le bilan est
+// `assembleBilanMois` (la carte « Bilan du mois »), les plateformes `margeParPlateforme`,
+// les catégories `statsParCategorie` (lectures de src/categoriesLecture.js), le stock
+// `lireValeurStock`, les achats `registreAchatsDe`, l'URSSAF `montantPeriodeUrssaf` pour
+// le régime CHOISI. Rien n'est lu avant SON clic (le relevé et les achats sont lourds).
+const relevePourRapport = () => {
+  const r = lireReleveVentes();
+  return r ? r.l.filter(Array.isArray).map(([plateforme, compte, id, ts, eur, achat, frais, titre, num]) => ({ plateforme, compte, id, ts, eur, achat, frais, titre, num })) : null;
+};
+function RapportMoisCarte({ liveStats, compta, panelOff, accounts }) {
+  const choix = React.useMemo(() => moisRapportChoix(), []);
+  const [ym, setYm] = React.useState(() => moisRapportParDefaut());
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const [occupe, setOccupe] = React.useState(false);
+  const [retour, setRetour] = React.useState(null);
+  React.useEffect(() => { setRetour(null); }, [ym]);
+  const partageable = React.useMemo(() => { try { return typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && typeof File === 'function' && navigator.canShare({ files: [new File([new Uint8Array(1)], 'x.pdf', { type: 'application/pdf' })] }); } catch (_) { return false; } }, []);
+  const pret = regime !== undefined && liveStats !== undefined;
+  const creer = async () => {
+    if (occupe || !pret) return;
+    setOccupe(true); setRetour(null);
+    try {
+      const maintenant = Date.now();
+      const enCours = ym === ymCourant(maintenant);
+      const { D: bilan, Bm, CB, V, de, a } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant });
+      const manque = [...(liveStats && liveStats.venduManque || []), ...(liveStats && liveStats.venduEnAttente ? ['lecture en cours'] : [])];
+      const nonComptees = (liveStats && liveStats.venduNonComptees) || [];
+      const releve = relevePourRapport();
+      const b = bornesMois(ym, maintenant);
+      const dansMois = (l) => l && Number.isFinite(Number(l.ts)) && l.ts >= b.de && l.ts < b.a;
+      const lignesMois = V ? V.filter(dansMois) : null;
+      const releveMois = releve ? releve.filter(dansMois) : null;
+      const plateformes = V ? margeParPlateforme({ vendu: V, manque, nonComptees, releve: releveMois, de, a }) : null;
+      // Les lectures du clic : l'annonce de chaque vente, les catégories, les achats, la fiche de facturation.
+      const [extras, table, achatsLus, recusLus, ent] = await Promise.all([
+        lireExtrasRepartition().catch(() => ({ txn: null, items: null, dates: null })),
+        lireTableFamilles().catch(() => null),
+        lireAchatsRegistre().catch(() => null),
+        fetchEmailAchats().then(recusAchatDe).catch(() => null),
+        lireReglage('vrm_pro_facture').catch(() => null),
+      ]);
+      // Titre et N° : le relevé de Ventes PAR IDENTITÉ, sinon le titre de SON annonce Vinted (reliée par SA transaction).
+      const titres = {};
+      for (const l of (releve || [])) { const k = cleVenteCat(l.plateforme, l.id); if (k && (l.titre || l.num)) titres[k] = { titre: l.titre || '', num: l.num || '' }; }
+      for (const l of (lignesMois || [])) {
+        if (l.plateforme !== 'Vinted') continue;
+        const k = cleVenteCat('Vinted', l.tx); const t = extras && extras.txn ? extras.txn[String(l.tx)] : null; const it = t && t.item && extras.items ? extras.items[t.item] : null;
+        if (k && !(titres[k] && titres[k].titre) && it && it.title) titres[k] = { titre: it.title, num: (titres[k] && titres[k].num) || '' };
+      }
+      let categories;
+      if (lignesMois) {
+        const manquent = [];
+        for (const l of lignesMois) if (l.plateforme === 'Vinted') { const t = extras && extras.txn ? extras.txn[String(l.tx)] : null; const it = t && t.item ? String(t.item) : ''; if (it && !(extras.items && extras.items[it] && extras.items[it].cat)) manquent.push(it); }
+        const fiches = await lireCategoriesFiches(manquent).catch(() => null);
+        let main = {}; try { const v = load(CLE_CATEGORIES_MAIN, {}); main = v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { main = {}; }
+        const S = statsParCategorie({ vendu: lignesMois, releve: releveMois, famDe: fabriqueFamDe({ extras, fiches, table, main }), stock: null });
+        let jeVends = 'auto'; try { jeVends = lireReglageJeVends(load(CLE_JE_VENDS, null)).choix; } catch (_) { jeVends = 'auto'; }
+        categories = afficherCategories(S, jeVends) ? S : (table === null && fiches === null ? null : undefined);
+      }
+      const achats = achatsLus === null ? null : registreAchatsDe({ achats: achatsLus, recus: recusLus, periode: ym, panelOff });
+      const taux = tauxUrssaf();
+      const urssaf = regime == null ? null : { regime, regimeTexte: libelleRegime(regime), taux, raison: raisonUrssaf(regime),
+        ...(regime === 'micro' ? montantPeriodeUrssaf(bornesPeriodeExport(ym), ligneUrssaf, taux) : {}) };
+      // L'en-tête : SA fiche de facturation, sinon ses comptes vendeurs (jamais un acheteur).
+      // Un compte écarté par SON choix n'est nommé nulle part (§5 : « ne plus lui parler des comptes retirés »).
+      const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+      const comptes = [...new Set((accounts || []).filter((x) => x && !compteEcarteChoix(x.vinted_user_id, hAcc, panelOff || {})).map((x) => x.login || '').filter(Boolean))];
+      const boutique = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), sous: String(ent.siret || '').trim() ? `SIRET ${String(ent.siret).trim()}` : '' }
+        : comptes.length ? { nom: comptes.slice(0, 3).join(' · ') + (comptes.length > 3 ? ` +${comptes.length - 3}` : ''), sous: 'Comptes vendeurs' } : null;
+      const d = donneesRapportMois({ ym, maintenant, boutique, bilan, vendu: V ? { lignes: V, manque, nonComptees } : null, B: Bm, benefice: CB, brut: Bm ? chiffreBrut(Bm) : null,
+        recuJours: ligneUrssaf && ligneUrssaf.recuJours, plateformes, categories, titres, stock: lireValeurStock(AUTH.user && AUTH.user.id), achats, urssaf });
+      if (!d) throw new Error('mois invalide');
+      const octets = await pdfRapportMois(d);
+      const fin = await partagerOuTelecharger(octets, nomFichierRapport(ym), { telecharger: telechargerFichier, type: 'application/pdf' });
+      setRetour({ fin, manques: d.manques.length });
+    } catch (err) { setRetour({ fin: 'ko', raison: (err && err.message) || String(err) }); }
+    setOccupe(false);
+  };
+  return (
+    <div className="vrm-rapport-mois" data-rapport-mois={ym} data-rapport-voie={partageable ? 'partage' : 'telechargement'}>
+      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Ventes, argent, stock, achats — et ce qui manque.</p>
+      <select aria-label="Mois du rapport" data-rapport-choix="" value={ym} onChange={(e) => setYm(e.target.value)} style={{ width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
+        {choix.map((p) => <option key={p} value={p}>{libelleMoisRapport(p)}{p === ymCourant() ? ' (en cours)' : ''}</option>)}
+      </select>
+      <Bouton variante="primaire" icone="doc" data-rapport-creer="" disabled={!pret || occupe} occupe={occupe} onClick={creer} style={{ marginTop: 10, width: '100%' }}>
+        {occupe ? 'Je prépare le rapport…' : partageable ? 'Partager le rapport (PDF)' : 'Télécharger le rapport (PDF)'}
+      </Bouton>
+      {retour && <p role="status" data-rapport-fin={retour.fin} data-rapport-manques={retour.manques != null ? retour.manques : ''} style={{ margin: '8px 0 0', fontSize: 13, color: retour.fin === 'ko' ? C.warn : C.muted, lineHeight: 1.5 }}>
+        {retour.fin === 'ko' ? `Rapport pas créé : ${retour.raison}`
+          : retour.fin === 'annule' ? 'Partage annulé. Rien n’est parti.'
+          : `${retour.fin === 'partage' ? 'Rapport partagé' : 'Rapport téléchargé'}${retour.manques ? ` · ${retour.manques} point${retour.manques > 1 ? 's' : ''} à compléter, listé${retour.manques > 1 ? 's' : ''} à la fin` : ' · rien ne manque'}.`}
+      </p>}
     </div>
   );
 }
@@ -3931,6 +4057,26 @@ function DelaiPaiementCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, ac
     </div>
   );
 }
+// (11 nov.) Les portes de « Clôturer l'année » : chacune OUVRE l'écran existant qui règle
+// l'étape (rien n'est fait à sa place). Un écran d'un autre segment : on y va d'abord.
+const viserCompta = (sel, ouvrirDetails = true, essai = 0) => {
+  try {
+    const d = document.querySelector(sel);
+    if (!d) { if (essai < 20) setTimeout(() => viserCompta(sel, ouvrirDetails, essai + 1), 80); return; }
+    if (ouvrirDetails && d.tagName === 'DETAILS' && !d.open) d.open = true;
+    d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (_) {}
+};
+const portesCloture = ({ onNav }) => ({
+  adater: () => ouvrirRepliCompta('compta-ca'),
+  prix: () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); },
+  inventaire: () => { DEMANDE_INVENTAIRE_ANNUEL.at = Date.now(); if (onNav) onNav('garage'); },
+  ca: () => ouvrirRepliCompta('compta-ca'),
+  urssaf: () => viserCompta('#compta-urssaf', false),
+  revenus: () => viserCompta('[data-micro-repli]'),
+  seuils: () => viserCompta('[data-micro-repli]'),
+  export: (annee) => { DEMANDE_COMMANDE.export = Date.now(); DEMANDE_COMMANDE.exportPeriode = String(annee); try { window.dispatchEvent(new Event('vrm:export-comptable')); } catch (_) {} },
+});
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false, vue = 'resume', allerVue = null, argentNav = null }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -4240,6 +4386,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <ComptaRepli id="compta-bilan" titre="Bilan du mois" resume="Vendu, reçu, dépensé, bénéfice, meilleur compte — en PDF">
             <BilanMoisCarte liveStats={liveStats} compta={data} />
           </ComptaRepli>
+          {/* (11 nov., lot rapport-mois) Le rapport du mois en PDF, à partager. */}
+          <ComptaRepli id="compta-rapport" titre="Rapport du mois" resume="Un PDF de 2 à 4 pages, à partager">
+            <RapportMoisCarte liveStats={liveStats} compta={data} panelOff={panelOff} accounts={accounts} />
+          </ComptaRepli>
           <ComptaRepli id="compta-delai" titre="Délai de paiement" resume="Combien de jours entre la vente et le versement, site par site">
             <DelaiPaiementCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
@@ -4423,6 +4573,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <div className="vrm-compta-q-tete">
           <h2 className="vrm-compta-question" data-compta-question="declarer">Combien je dois déclarer ?</h2>
         </div>
+        {/* (11 nov.) « Clôturer l'année » : de décembre à mai, la liste guidée (src/clotureAnnee.js, lecture et liens). */}
+        <ClotureAnnee portes={portesCloture({ onNav })} />
         <PrevisionUrssafCarte onNav={onNav} />
         {/* (10 nov., lot BK) « Mois bouclé » : ce qui manque avant de déclarer le mois choisi (src/moisBoucle.js). */}
         <MoisBoucle portes={portesMoisBoucle({ onNav, ouvrirRepli: ouvrirRepliCompta })} />

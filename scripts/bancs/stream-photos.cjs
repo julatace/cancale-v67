@@ -189,7 +189,9 @@ const attendreNuage = async (b, test) => { for (let i = 0; i < 30; i++) { const 
         await attendre(700);
         const ouvert = await pg.evaluate(([cachee, f]) => { const est = new Function('return ' + f)(); for (const btn of document.querySelectorAll('.vrm-photo-open')) { if (est(btn.querySelector('img'), cachee)) { btn.click(); return true; } } return false; }, [CACHEE, est.toString()]);
         await attendre(600);
-        const v = await pg.evaluate(() => { const i = document.querySelector('.vrm-photo-panel img'); if (!i) return null; const f = getComputedStyle(i).filter; return { attr: i.hasAttribute('data-stream-photo'), px: Number((/blur\(([\d.]+)px\)/.exec(f) || [])[1] || 0), alt: i.getAttribute('alt'), titre: (document.querySelector('.vrm-photo-panel') || {}).innerText || '' }; });
+        // (11 nov., clics-directs) La photo d'une vente s'ouvre dans LA visionneuse de l'app (l'ancien panneau .vrm-photo-panel est retiré).
+        await pg.waitForFunction(() => { const i = document.querySelector('[data-visionneuse="ouverte"] [data-visionneuse-img]'); return i && i.complete; }, null, { timeout: 5000 }).catch(() => {});
+        const v = await pg.evaluate(() => { const i = document.querySelector('[data-visionneuse="ouverte"] [data-visionneuse-img]'); if (!i) return null; const f = getComputedStyle(i).filter; return { attr: i.hasAttribute('data-stream-photo'), px: Number((/blur\(([\d.]+)px\)/.exec(f) || [])[1] || 0), alt: i.getAttribute('alt'), titre: (document.querySelector('[data-visionneuse="ouverte"]') || {}).innerText || '' }; });
         dit(ouvert && v && v.attr && v.px >= 40, `C ${tag} : la visionneuse « Agrandir » d'une vente ${CACHEE} est floutée (flou doublé en grand)`, JSON.stringify({ ouvert, v }));
         dit(v && !/adidas/i.test(v.alt + ' ' + v.titre), `C ${tag} : la visionneuse ne dit pas la marque (titre, alt)`, JSON.stringify(v));
         await capture(pg, `C-${tag}-visionneuse`);

@@ -67,22 +67,25 @@ async function controles(T, ok) {
     ok(vEm.montree && !vEm.force, 'R3 montrée et urgente : pas de mention « forcée »');
     // R4 — un réglage ancien qui ne connaît pas une carte (simulée : on retire « deux-fois » de son ordre).
     const az = zone('afaire');
-    const ancien = { v: 1, ordre: az.filter((id) => id !== 'deux-fois').reverse(), choix: {} };
+    // Son ordre : la neuve absente, et sa voisine d'origine (« Vendus ailleurs ») rangée EN TÊTE (pas en dernier : la
+    // neuve posée en bas tomberait par hasard juste après elle).
+    const ancien = { v: 1, ordre: ['ailleurs', ...az.filter((id) => id !== 'deux-fois' && id !== 'ailleurs').reverse()], choix: {} };
     const o4 = P.ordreJournee('afaire', ancien);
     const ii = az.indexOf('deux-fois'), voisin = az[ii - 1];
     ok(o4.length === az.length && o4.indexOf('deux-fois') === o4.indexOf(voisin) + 1, 'R4 une carte livrée après son réglage apparaît à sa place (après sa voisine d’origine)', o4.join(','));
-    const o4b = P.ordreJournee('afaire', { ordre: az.slice(1) });
-    ok(o4b[0] === az[0], 'R4 une carte neuve sans voisine avant elle vient en tête', o4b.join(','));
+    const am = P.ordreMobile('afaire', null);
+    const o4b = P.ordreMobile('afaire', { ordre: am.slice(1).reverse() });
+    ok(o4b[0] === am[0], 'R4 une carte neuve sans voisine avant elle vient en tête', o4b.join(','));
     // R5
     const rD = P.deplacerCarte(null, 'messages', 0);
-    ok(P.ordreJournee('afaire', rD)[0] === 'messages' && JSON.stringify(P.ordreJournee('tete', rD)) === JSON.stringify(zone('tete')) && JSON.stringify(P.ordreJournee('bas', rD)) === JSON.stringify(zone('bas')), 'R5 déplacer en tête : sa zone seule bouge');
+    ok(P.ordreMobile('afaire', rD)[0] === 'messages' && P.ordreJournee('afaire', rD)[0] === 'trancher' && JSON.stringify(P.ordreJournee('tete', rD)) === JSON.stringify(zone('tete')) && JSON.stringify(P.ordreJournee('bas', rD)) === JSON.stringify(zone('bas')), 'R5 déplacer en tête : sa zone seule bouge (« À trancher », fixe, reste devant)');
     const rD2 = P.deplacerCarte(rD, 'messages', 999);
     ok(P.ordreJournee('afaire', rD2).slice(-1)[0] === 'messages' && P.deplacerCarte(null, 'inconnue', 0).ordre.length === 0, 'R5 déplacement borné ; une carte inconnue ne change rien');
     ok(P.deplacerCarte(null, 'frise', 0).ordre.length > 0 && P.ordreJournee('tete', P.deplacerCarte(null, 'frise', 0))[0] === 'frise', 'R5 la tête se range aussi');
     // Les chiffres du mois sont posés SOUS la carte sombre par la grille : une carte fixe (pas de poignée qui ne ferait rien).
     const fixes = cat.filter((c) => c.fixe).map((c) => c.id);
     const rP = P.deplacerCarte(null, 'phrase', 99);
-    ok(fixes.join() === 'chiffres' && P.estOrigine(P.deplacerCarte(null, 'chiffres', 0)) && P.ordreJournee('tete', rP).join() === 'prochain,frise,phrase,chiffres' && !P.ordreMobile('tete', null).includes('chiffres'), 'R5 une carte fixe (les chiffres du mois) ne se déplace pas et garde sa place', P.ordreJournee('tete', rP).join());
+    ok(fixes.join() === 'chiffres,trancher' && P.estOrigine(P.deplacerCarte(null, 'chiffres', 0)) && P.ordreJournee('tete', rP).join() === 'prochain,frise,phrase,chiffres' && !P.ordreMobile('tete', null).includes('chiffres'), 'R5 une carte fixe (les chiffres du mois, « À trancher ») ne se déplace pas et garde sa place', P.ordreJournee('tete', rP).join());
     // R6
     ok(P.estOrigine(P.revenirOrigine(rD)) && P.estOrigine(P.revenirOrigine(rPrix)) && P.estOrigine(null) && !P.estOrigine(rD) && !P.estOrigine(rPrix), 'R6 « Revenir au réglage d’origine » efface ordre et choix');
     const abime = P.lireJourneePerso({ ordre: 'x', choix: { prix: 'oui', envoyer: false } });
@@ -106,7 +109,10 @@ async function controles(T, ok) {
   const blocs = (app.split('const blocsAF = {')[1] || '').split('\n              };')[0];
   const clesBlocs = [...blocs.matchAll(/^\s*(?:'([\w-]+)'|(\w+)):/gm)].map((m) => m[1] || m[2]);
   if (/\['envoyer', 'retirer', 'messages', 'prix'\]\.map/.test(blocs)) clesBlocs.push('envoyer', 'retirer', 'messages', 'prix');
-  const catAF = P ? P.CARTES_JOURNEE.filter((c) => c.zone === 'afaire').map((c) => c.id) : [];
+  const catAF = P ? P.CARTES_JOURNEE.filter((c) => c.zone === 'afaire' && !c.fixe).map((c) => c.id) : [];
+  // Une carte FIXE de « À faire » (« À trancher », toujours en tête) n'est pas rangée : elle passe par la règle là où elle est rendue.
+  const fixesAF = P ? P.CARTES_JOURNEE.filter((c) => c.zone === 'afaire' && c.fixe).map((c) => c.id) : [];
+  ok(fixesAF.every((id) => new RegExp(`visJ\\('${id}'\\)\\.montree \\? carte`).test(app)), 'S4 une carte fixe de « À faire » passe aussi par la règle (cachable)', fixesAF.join(','));
   ok(catAF.length && catAF.every((id) => clesBlocs.includes(id)) && clesBlocs.every((id) => catAF.includes(id)), 'S4 chaque carte « À faire » du catalogue a son bloc, et chaque bloc est au catalogue', `blocs: ${clesBlocs.join(',')} · catalogue: ${catAF.join(',')}`);
   const nPar = (app.split('const nParCarteAF = {')[1] || '').split('};')[0];
   const clesN = [...nPar.matchAll(/(?:'([\w-]+)'|(\w+)):/g)].map((m) => m[1] || m[2]);
@@ -147,6 +153,7 @@ const MUTATIONS = {
   frise_demontee: ['app', (s) => s.replace("return id === 'phrase' ? null : <div key={id} hidden data-jp-cachee={id}>{blocsTete[id]}</div>;", 'return null;')],
   clavier_muet: ['editeur', (s) => s.replace('onKeyDown={(e) => auClavier(e, id, z.id)} ', '')],
   defilement_vole: ['editeur', (s) => s.replace(" style={{ touchAction: 'none' }}", '')],
+  trancher_intouchable: ['app', (s) => s.replace("{jobTrancher && visJ('trancher').montree ? carteTrancher(jobTrancher) : null}", '{jobTrancher ? carteTrancher(jobTrancher) : null}')],
   fixe_deplacable: ['regle', (s) => s.replace("const cat = CARTES_JOURNEE.filter((c) => c.zone === zone && !c.fixe).map((c) => c.id);", "const cat = CARTES_JOURNEE.filter((c) => c.zone === zone).map((c) => c.id);")],
   doigt_muet: ['editeur', (s) => s.replace(' onPointerDown={(e) => glisser(e, id, z.id)}', '')],
   sans_parametres: ['reglages', (s) => s.replace(", el:<JourneePersoSetting/> },", ", el:null },")],

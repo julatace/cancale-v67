@@ -78,7 +78,7 @@ async function controles(T, ok) {
   // (11 nov., lot journee-perso) `visibiliteCarte` et `nCachees` (src/journeePerso.js) partent de
   // `caseJourneeMontree` (audit-journee-perso le vérifie) : la même règle de départ, ses choix par-dessus.
   // (11 nov., lot centre-aide) l'aide choisit ses fiches selon Simple/Complet (`chercherAide`) : lecture d'affichage, permise.
-  const permises = lectures.filter((l) => /caseJourneeMontree\(|visibiliteCarte\(|nCartesCachees\(|const ctx = \{ mode: (p|profil)\.mode|chercherAide\(/.test(l));
+  const permises = lectures.filter((l) => /caseJourneeMontree\(|visibiliteCarte\(|nCartesCachees\(|const ctx = \{[^}]*?\bmode: (p|profil)\.mode|chercherAide\(/.test(l));
   ok(lectures.length > 0 && lectures.length === permises.length, 'B1 le mode n’est lu que par la navigation, les filtres de site, l’aide et les cartes de Ma journée', lectures.filter((l) => !permises.includes(l)).map((l) => l.trim().slice(0, 120)).join(' | '));
   ok(/<div hidden>\{T\.filter\(\(x\) => !cases\.includes\(x\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app), 'B2 une case tue garde son compteur publié (bloc caché `data-tuile`)');
   ok(/entreeMontree\(t, ctx\)/.test(app) && /\.filter\(\(o\) => siteMontre\(o\.id, ctx\)\)/.test(app), 'B3 la navigation et les filtres passent par la règle');

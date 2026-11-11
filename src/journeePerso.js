@@ -36,6 +36,8 @@ export const CARTES_JOURNEE = [
   // `fixe` : sa place ne dépend pas de l'ordre (les cases du mois sont toujours posées SOUS la carte
   // sombre, par la grille des widgets) — un interrupteur, pas de poignée qui ne ferait rien.
   { id: 'chiffres', zone: 'tete', nom: 'Les chiffres du mois', desc: 'Bénéfice, vendu, reçu, sous la carte du haut.', fixe: true },
+  // (11 nov.) « À trancher » (lot DJ4) : toujours en tête de « À faire », ouverte en place — FIXE.
+  { id: 'trancher', zone: 'afaire', nom: 'À trancher', desc: 'Tes doutes à régler, toujours en tête.', fixe: true },
   { id: 'ailleurs', zone: 'afaire', nom: 'Vendus ailleurs', desc: 'Annonces à retirer des autres sites.' },
   { id: 'deux-fois', zone: 'afaire', nom: 'En ligne deux fois', desc: 'La même annonce publiée deux fois.' },
   { id: 'envoyer', zone: 'afaire', nom: 'Colis à envoyer', desc: 'Revient seule si un colis est pressé.', urgent: true },
@@ -44,7 +46,7 @@ export const CARTES_JOURNEE = [
   { id: 'prix', zone: 'afaire', nom: 'Prix à baisser', desc: 'Un conseil, rien ne part seul.' },
   { id: 'a-relier', zone: 'afaire', nom: 'E-mails à relier', desc: 'Les comptes dont rien n’arrive.' },
   { id: 'stock-sortie', zone: 'afaire', nom: 'Vendus encore rangés', desc: 'À sortir de tes meubles.' },
-  { id: 'cycles', zone: 'afaire', nom: 'Supprimés de Vinted', desc: 'Que deviennent-ils ?' },
+  // (11 nov.) « Supprimés de Vinted » n'est plus une carte : ces articles vivent dans « À trancher » (lot DJ4).
   { id: 'autres', zone: 'afaire', nom: 'Les autres rappels', desc: 'Litiges, achats à relier, inventaire…' },
   { id: 'urssaf', zone: 'afaire', nom: 'Déclaration URSSAF', desc: 'L’échéance qui approche.' },
   { id: 'notifs', zone: 'bas', nom: 'Notifications coupées', desc: 'Quand ce téléphone ne te prévient plus.' },

@@ -8,6 +8,11 @@
 //   · Leboncoin : N°2 (la même paire que Vinted) et N°31 (seulement là) ;
 //   · N°7 rangée PUIS vendue ; N°8 rangée, plus en ligne nulle part ;
 //   · N°3 : une vieille fiche numérotée, plus en ligne, jamais rangée.
+// ⚠️ (11 nov., lot DJ4 — Julien : « Stock = seulement les paires en ligne ») Les nombres
+// ci-dessous sont ceux d'avant : « à confirmer » (N°21) et « masquée » (N°5) sont désormais
+// À PART (replis `data-stock-repli`), hors du compte et de la liste « En ligne » ; les
+// attentes du code (5 en ligne, À ranger 2,31,41,9…) font foi. Leboncoin porte une
+// lecture complète fraîche (règle du 6 nov.) ; V2 : VRM donne un N° à l'annonce Vestiaire.
 // Aux deux tailles (390 tactile, 1512 souris), en clair et en sombre, il exige :
 //   A  en tête : 6 annonces actuelles (N°2 comptée UNE fois), dont 1 à confirmer
 //      NOMMÉE (compte_beta), dont 1 masquée — pas « au moins » (tout est lu) ;
@@ -84,9 +89,11 @@ const LIGNES = {
   ], pagination: { total_entries: 5 } } } },
   'harvest_222_listings': { id: 'harvest_222_listings', data: { capturedAt: new Date(AUJ - 3 * 86400000).toISOString(), payload: { items: [ann(2001, 'Paire inventée vingt et un 42')], pagination: { total_entries: 1 } } } },
   'lbc_listings': { id: 'lbc_listings', data: { items: {
-    L1: { id: 'L1', customRef: 'VRM-2', subject: 'Paire inventée deux 40 (Leboncoin)', status: 'active' },
-    L2: { id: 'L2', customRef: 'VRM-31', subject: 'Paire inventée trente et un', status: 'active' },
-  }, lectures: {} } },
+    L1: { id: 'L1', account: 'lbc1', customRef: 'VRM-2', subject: 'Paire inventée deux 40 (Leboncoin)', status: 'active' },
+    L2: { id: 'L2', account: 'lbc1', customRef: 'VRM-31', subject: 'Paire inventée trente et un', status: 'active' },
+  // (11 nov., DJ4) Une lecture COMPLÈTE fraîche de « Mes annonces » (la règle du 6 nov.,
+  // src/enLigneLbc.js) : sans elle, les deux annonces seraient « à confirmer ».
+  }, lectures: { lbc1: { at: new Date(AUJ - 3600000).toISOString(), total: 2, n: 2 } } } },
   'lbc_ventes': { id: 'lbc_ventes', data: { ventes: {} } },
 };
 
@@ -201,21 +208,22 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
         dit(theme === (sombre ? 'dark' : 'light'), `${t} : le thème demandé est rendu`, theme);
         // A — les chiffres en tête.
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (!el) return null; return { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), ac: el.getAttribute('data-stock-a-confirmer'), ma: el.getAttribute('data-stock-masquees'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') }; });
-        dit(!!tete && tete.n === '7' && tete.am === '0', `${t} : A/V1 — 7 annonces actuelles (N°2 sur deux sites, N°9 Vinted+Vestiaire : une fois chacune ; N°41 Vestiaire seul), pas « au moins »`, JSON.stringify(tete));
-        dit(!!tete && tete.ac === '1' && /compte_beta/.test(tete.txt) && /à confirmer/.test(tete.txt), `${t} : A — dont 1 « à confirmer », le compte NOMMÉ`, tete && tete.txt);
-        dit(!!tete && tete.ma === '1' && /masquée/.test(tete.txt), `${t} : A — dont 1 masquée par Vinted, comptée parmi les présentes`, tete && tete.txt);
+        dit(!!tete && tete.n === '5' && tete.am === '0', `${t} : A/V1 — (DJ4) 5 paires EN LIGNE (N°2 sur deux sites, N°9 Vinted+Vestiaire : une fois chacune ; N°41 Vestiaire seul ; ni N°21 à confirmer ni N°5 masquée), pas « au moins »`, JSON.stringify(tete));
+        dit(!!tete && tete.ac === '1' && /compte_beta/.test(tete.txt) && /à confirmer/.test(tete.txt), `${t} : A — à part : 1 « à confirmer », le compte NOMMÉ`, tete && tete.txt);
+        dit(!!tete && tete.ma === '1' && /masquée/.test(tete.txt), `${t} : A — à part : 1 masquée par Vinted (toujours chez toi)`, tete && tete.txt);
         // B — la liste.
         const liste = await pg.evaluate(() => [...document.querySelectorAll('[data-stock-annonce]')].map((el) => ({ k: el.getAttribute('data-stock-annonce'), e: el.getAttribute('data-stock-annonce-etat'), p: el.getAttribute('data-stock-annonce-plats'), o: el.getAttribute('data-stock-annonce-place') })));
         const cles = liste.map((x) => x.k).sort();
-        dit(JSON.stringify(cles) === JSON.stringify(['1', '2', '21', '31', '41', '5', '9']), `${t} : B — la liste : chaque annonce actuelle une fois, jamais N°3 ni N°7 ni N°8 ni N°43 (vendue sur Vestiaire)`, JSON.stringify(cles));
+        dit(JSON.stringify(cles) === JSON.stringify(['1', '2', '31', '41', '9']), `${t} : B — (DJ4) la liste « En ligne » : chaque paire en ligne une fois, jamais N°21 (à confirmer), N°5 (masquée), N°3, N°7, N°8 ni N°43 (vendue sur Vestiaire)`, JSON.stringify(cles));
         const l9 = liste.find((x) => x.k === '9') || {}, l41 = liste.find((x) => x.k === '41') || {};
         dit(l9.p === 'vinted,vestiaire' && l41.p === 'vestiaire' && l41.e === 'enligne', `${t} : V1 — N°9 RELIÉE par son clic : Vinted ET Vestiaire, une fois ; N°41 seulement sur Vestiaire`, JSON.stringify([l9, l41]));
-        const l2 = liste.find((x) => x.k === '2') || {}, l1 = liste.find((x) => x.k === '1') || {}, l21 = liste.find((x) => x.k === '21') || {}, l5 = liste.find((x) => x.k === '5') || {};
+        const l2 = liste.find((x) => x.k === '2') || {}, l1 = liste.find((x) => x.k === '1') || {};
+        const aPart = await pg.evaluate(() => ({ ac: [...document.querySelectorAll('[data-stock-repli="aconfirmer"] [data-stock-a-part]')].map((el) => el.getAttribute('data-stock-a-part')), ma: [...document.querySelectorAll('[data-stock-repli="masquees"] [data-stock-a-part]')].map((el) => el.getAttribute('data-stock-a-part')) }));
         dit(l2.p === 'vinted,leboncoin' && l2.o === 'non-range', `${t} : B — N°2 : Vinted ET Leboncoin, « pas encore rangée »`, JSON.stringify(l2));
-        dit(l1.o === 'Étagère banc|1|1' && l21.e === 'aconfirmer' && l5.e === 'masquee', `${t} : B — N°1 dit sa case ; N°21 « à confirmer » ; N°5 « masquée »`, JSON.stringify([l1, l21, l5]));
+        dit(l1.o === 'Étagère banc|1|1' && aPart.ac.join(',') === '21' && aPart.ma.join(',') === '5', `${t} : B — N°1 dit sa case ; À PART : N°21 dans « À confirmer », N°5 dans « Masquées par Vinted »`, JSON.stringify([l1, aPart]));
         // C — À ranger.
         const ar = await pg.evaluate(() => [...document.querySelectorAll('[data-a-ranger]')].map((el) => el.getAttribute('data-a-ranger')).sort().join(','));
-        dit(ar === '2,31,41,5,9', `${t} : C/V1 — « À ranger » = les annonces actuelles sans case, Vestiaire compris (jamais la vieille fiche N°3)`, ar);
+        dit(ar === '2,31,41,9', `${t} : C/V1 — « À ranger » = les paires en ligne sans case, Vestiaire compris (jamais la vieille fiche N°3)`, ar);
         // D — vendue.
         dit(await attr(pg, '[data-case-num="7"]', 'data-case-etat') === 'vendue' && !!(await pg.$('[data-stock-vendues-sortir] [data-stock-rangee="7"]')), `${t} : D — N°7 (rangée puis vendue) : case allumée, dans « Vendues à sortir »`, await attr(pg, '[data-case-num="7"]', 'data-case-etat'));
         // E — plus en ligne.
@@ -255,7 +263,7 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
       await essaie(t + ' partiel', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'partiel' });
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
-        dit(!!tete && tete.n === '6' && tete.am === '1' && /au moins/.test(tete.txt) && /compte_beta/.test(tete.txt), `${t} : G — compte_beta pas lu : « au moins 6 », le compte nommé`, JSON.stringify(tete));
+        dit(!!tete && tete.n === '5' && tete.am === '1' && /au moins/.test(tete.txt) && /compte_beta/.test(tete.txt), `${t} : G — compte_beta pas lu : « au moins 5 », le compte nommé`, JSON.stringify(tete));
         const e21 = await attr(pg, '[data-case-num="21"]', 'data-case-etat');
         dit(e21 !== 'plusenligne' && !(await pg.$('[data-stock-plus-en-ligne] [data-stock-rangee="21"]')) && !!(await pg.$('[data-stock-rangees-passu]')), `${t} : G — N°21 (de compte_beta) n'est PAS dite « plus en ligne » : « pas vérifiée »`, String(e21));
         dit(await attr(pg, '[data-case-num="8"]', 'data-case-etat') === 'plusenligne', `${t} : G — N°8 (de compte_alpha, bien lu) reste « plus en ligne »`);
@@ -266,8 +274,11 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
       await essaie(t + ' vc-sans-num', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'vc-sans-num' });
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' '), sn: ((pop || el).querySelector('[data-stock-vc-sans-numero]') || {}).textContent || '' } : null; });
-        dit(!!tete && tete.n === '7' && tete.am === '1' && /au moins/.test(tete.txt), `${t} : V2 — annonce Vestiaire sans N° : pas comptée (7), total « au moins »`, JSON.stringify(tete && { n: tete.n, am: tete.am }));
-        dit(!!tete && /Vestiaire sans N°/.test(tete.sn) && /Paire inventée une 42/.test(tete.sn), `${t} : V2 — elle est NOMMÉE (son titre)`, tete && tete.sn);
+        // (11 nov., DJ4) Depuis la numérotation Vestiaire (`vrm_vc_numeros`, App.jsx), VRM DONNE un N°
+        // neuf à l'annonce sans référence : une paire de plus, jamais réunie à N°1 par le titre.
+        const vcs = await pg.evaluate(() => [...document.querySelectorAll('[data-stock-annonce]')].filter((el) => el.getAttribute('data-stock-annonce-plats') === 'vestiaire').map((el) => el.getAttribute('data-stock-annonce')).sort());
+        dit(!!tete && tete.n === '6' && tete.am === '0', `${t} : V2 — annonce Vestiaire sans référence : son N° donné par VRM, comptée une fois (6)`, JSON.stringify(tete && { n: tete.n, am: tete.am }));
+        dit(vcs.length === 2 && vcs.includes('41') && !vcs.includes('1'), `${t} : V2 — elle a SON N° (jamais N°1)`, JSON.stringify(vcs));
         const l1 = await attr(pg, '[data-stock-annonce="1"]', 'data-stock-annonce-plats');
         dit(l1 === 'vinted', `${t} : V2 — même titre que la Vinted N°1 : N°1 reste « vinted » seule (jamais rapprochée par le titre)`, String(l1));
         await shot(pg, nomShot + '-vc-sans-num');
@@ -277,9 +288,9 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
       await essaie(t + ' vc-vieille', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'vc-vieille' });
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), ac: el.getAttribute('data-stock-a-confirmer'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
-        dit(!!tete && tete.n === '7' && tete.ac === '2' && /Vestiaire, lu il y a 3 j/.test(tete.txt) && /Mes articles/.test(tete.txt), `${t} : V3 — lecture Vestiaire de 3 jours : N°41 « à confirmer », Vestiaire NOMMÉ avec le geste`, tete && tete.txt);
-        const l41 = await attr(pg, '[data-stock-annonce="41"]', 'data-stock-annonce-etat'), l9 = await attr(pg, '[data-stock-annonce="9"]', 'data-stock-annonce-etat');
-        dit(l41 === 'aconfirmer' && l9 === 'enligne', `${t} : V3 — N°41 « à confirmer » ; N°9 reste « en ligne » (lue fraîche sur Vinted)`, JSON.stringify([l41, l9]));
+        dit(!!tete && tete.n === '4' && tete.ac === '2' && /Vestiaire, lu il y a 3 j/.test(tete.txt) && /Mes articles/.test(tete.txt), `${t} : V3 — lecture Vestiaire de 3 jours : N°41 « à confirmer », Vestiaire NOMMÉ avec le geste`, tete && tete.txt);
+        const l41 = await pg.$('[data-stock-repli="aconfirmer"] [data-stock-a-part="41"]') && !(await pg.$('[data-stock-annonce="41"]')), l9 = await attr(pg, '[data-stock-annonce="9"]', 'data-stock-annonce-etat');
+        dit(!!l41 && l9 === 'enligne', `${t} : V3 — N°41 À PART « à confirmer » (hors de la liste en ligne) ; N°9 reste « en ligne » (lue fraîche sur Vinted)`, JSON.stringify([!!l41, l9]));
         await shot(pg, nomShot + '-vc-vieille');
         await finPage(pg, errs, t, 'vc-vieille');
         await ctx.close();
@@ -287,7 +298,7 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
       await essaie(t + ' vc-absent', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'vc-absent' });
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
-        dit(!!tete && tete.n === '6' && tete.am === '1' && /au moins/.test(tete.txt) && /Vestiaire \(jamais lu/.test(tete.txt), `${t} : V4 — Vestiaire jamais lu : « au moins 6 », NOMMÉ avec le geste`, tete && tete.txt);
+        dit(!!tete && tete.n === '4' && tete.am === '1' && /au moins/.test(tete.txt) && /Vestiaire \(jamais lu/.test(tete.txt), `${t} : V4 — Vestiaire jamais lu : « au moins 4 », NOMMÉ avec le geste`, tete && tete.txt);
         const e8 = await attr(pg, '[data-case-num="8"]', 'data-case-etat');
         dit(e8 !== 'plusenligne' && !(await pg.$('[data-stock-plus-en-ligne]')) && !!(await pg.$('[data-stock-rangees-passu]')), `${t} : V4 — N°8 rangée n'est PAS dite « plus en ligne » (Vestiaire pourrait la porter) : « pas vérifiée »`, String(e8));
         await shot(pg, nomShot + '-vc-absent');
@@ -297,7 +308,7 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
       await essaie(t + ' rien', async () => {
         const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'rien' });
         const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); return el ? { n: el.getAttribute('data-stock-actuelles'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') } : null; });
-        dit(!!tete && tete.n === 'passu' && /—/.test(tete.txt) && /pas pu lire/.test(tete.txt) && !/Aucune annonce/i.test(tete.txt), `${t} : H — rien lu : « — » et la raison, jamais « aucune annonce »`, JSON.stringify(tete));
+        dit(!!tete && tete.n === 'passu' && /—/.test(tete.txt) && /pas pu lire|pas lues/.test(tete.txt) && !/Aucune annonce/i.test(tete.txt), `${t} : H — rien lu : « — » et la raison, jamais « aucune annonce »`, JSON.stringify(tete));
         const pl = await pg.evaluate(() => [...document.querySelectorAll('[data-case-etat="plusenligne"]')].length);
         dit(pl === 0 && !(await pg.$('[data-stock-plus-en-ligne]')) && await attr(pg, '[data-case-num="7"]', 'data-case-etat') === 'vendue', `${t} : H — aucune case dite « plus en ligne » ; la vendue reste allumée`, String(pl));
         dit(!!(await pg.$('[data-case-num="1"]')) && !!(await pg.$('[data-case-num="8"]')), `${t} : H — les paires rangées restent dans leurs cases (rien ne disparaît)`);

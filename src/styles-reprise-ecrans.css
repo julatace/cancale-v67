@@ -1,0 +1,18 @@
+/* ── UN FILTRE RETENU EST TOUJOURS DIT (11 nov., lot reprise-ecrans) ─────────
+   Une ligne neutre sous la barre du haut : ce que l'écran garde (filtre, tri,
+   recherche), chacun avec « Effacer » (44 px au doigt). Aucune couleur d'accent
+   (§7 : rien à rattraper, seulement à savoir). Clair et sombre par les jetons. */
+.vrm-reprise-retenue {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  margin: 6px 16px 4px; padding: 4px 4px 4px 14px; border-radius: 14px;
+  background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); font-size: 13px; line-height: 1.3;
+}
+.vrm-reprise-titre { color: var(--fu-gris, #6e6e73); font-weight: 600; }
+.vrm-reprise-puce { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.vrm-reprise-quoi { overflow-wrap: anywhere; }
+.vrm-reprise-quoi b { font-weight: 700; }
+.vrm-reprise-effacer {
+  min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--fu-encre, #1d1d1f); text-decoration: underline; text-underline-offset: 3px;
+}
+.vrm-reprise-effacer:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: -2px; border-radius: 12px; }

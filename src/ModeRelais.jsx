@@ -48,7 +48,8 @@ export function useEcranAllume() {
 
 // (10 nov., lot AY) `vueA` : hors ligne, l'instant où ces codes ont été lus pour la dernière fois (« codes vus à 14:02 ») —
 // jamais présentés comme frais.
-export default function ModeRelais({ colis, onRetire, onAnnuler, onFermer, Retour, Icon, horsLigne = false, note = '', vueA = null, zIndex }) {
+// `Photo` : <PhotoVinted> de l'app (référent coupé, secours, sonde) — une photo d'achat est une photo Vinted (audit-photos-vinted).
+export default function ModeRelais({ colis, onRetire, onAnnuler, onFermer, Retour, Icon, Photo = null, horsLigne = false, note = '', vueA = null, zIndex }) {
   const vivants = React.useMemo(() => ordreRelais(Array.isArray(colis) ? colis : []), [colis]);
   // Un colis « Retiré » sort de « à retirer » tout de suite (le geste est optimiste) :
   // la séance le garde à sa place, montré retiré, avec « Annuler » 5 s.
@@ -147,7 +148,7 @@ export default function ModeRelais({ colis, onRetire, onAnnuler, onFermer, Retou
             </div>
             {c.suivi ? <p className="vrm-relais-suivi">n° {c.suivi}</p> : null}
             <div className="vrm-relais-achat">
-              {c.photo ? <img className="vrm-relais-photo" data-vrm-vignette="" src={c.photo} alt="" referrerPolicy="no-referrer" decoding="async"/> : null}
+              {c.photo && Photo ? <Photo className="vrm-relais-photo" data-vrm-vignette="" src={c.photo} alt="" decoding="async"/> : null}
               <span className="vrm-relais-achat-titre" data-relais-titre="">{c.titre}</span>
             </div>
             <div className="vrm-relais-geste">

@@ -20,7 +20,10 @@ const CAS = [
   ['B 125', 'B125', true], ['b125', 'B125', true], ['bé 125', 'B125', true], ['B cent vingt-cinq', 'B125', true], ['numéro B 125', 'B125', true],
   ['Nike Dunk noire', 'Nike Dunk noire', false], ['nike 42', 'nike 42', false], ['air max 90', 'air max 90', false],
   ['la samba', 'la samba', false], ['taille 42', 'taille 42', false], ['et', 'et', false], ['', '', false], ['  ', '', false],
-  ['New Balance 550 !', 'New Balance 550', false], ['deux nike', 'deux nike', false], ['douze paires noires', 'douze paires noires', false],
+  ['New Balance 550 !', 'New Balance 550', false],
+  // (11 nov., parler à la loupe) une TAILLE dite en lettres : après « taille », ou un 16–50 qui finit la phrase.
+  ['Nike rouge quarante-deux', 'Nike rouge 42', false], ['nike taille quarante deux', 'nike taille 42', false], ['pointure trente-neuf adidas', 'pointure 39 adidas', false],
+  ['air max quatre-vingt-dix', 'air max quatre-vingt-dix', false], ['quarante-deux', '42', true], ['Jordan quatre noire', 'Jordan quatre noire', false], ['deux nike', 'deux nike', false], ['douze paires noires', 'douze paires noires', false],
 ];
 
 const MUTATIONS = {
@@ -29,7 +32,9 @@ const MUTATIONS = {
   mot_inconnu_ignore: (s) => s.replace("    return null;\n  }\n  return vu ? total + courant : null;", "    continue;\n  }\n  return vu ? total + courant : null;"),
   sans_lettre: (s) => s.replace("if (lireNombre(reste) != null) { lettre = l.toUpperCase(); t = reste; }", ''),
   sans_appel: (s) => s.replace("  do { avant = t; t = t.replace(APPEL, ''); } while (t !== avant);\n", ''),
-  texte_devine: (s) => s.replace("if (n == null) return { requete: brut, numero: false };", "if (n == null) { const d = /\\d+/.exec(t); return d ? { requete: d[0], numero: true } : { requete: brut, numero: false }; }"),
+  sans_taille: (s) => s.replace("if (n == null) return { requete: taillesEnChiffres(brut), numero: false };", "if (n == null) return { requete: brut, numero: false };"),
+  taille_partout: (s) => s.replace("const finit = j === mots.length && i > 0 && n != null && n >= 16 && n <= 50;", "const finit = n != null;"),
+  texte_devine: (s) => s.replace("if (n == null) return { requete: taillesEnChiffres(brut), numero: false };", "if (n == null) { const d = /\\d+/.exec(t); return d ? { requete: d[0], numero: true } : { requete: brut, numero: false }; }"),
 };
 
 async function charger(src) {
@@ -67,11 +72,12 @@ async function audit(src, bavard) {
   // Branchement (commentaires retirés).
   const code = APP.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
   const dit = (c, m) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m); };
-  dit(/const dicterRecherche = \(t\) => \{ const r = requeteDeLaVoix\(t\);[^}]*setGsQ\(r\.requete\)/.test(code), 'la barre de recherche pose la requête lue par `requeteDeLaVoix`');
-  dit((code.match(/<MicDictee nu titre="Chercher à la voix" onText=\{dicterRecherche\}\/>/g) || []).length === 2, 'le micro est dans la barre, sur ordinateur ET au téléphone');
+  const MOTEUR = fs.readFileSync(path.join(R, 'src', 'dicteeNavigateur.js'), 'utf8');
+  dit(/const dicterRecherche = \(t\) => \{ const r = requeteDeLaVoix\(t\);[\s\S]{0,700}?setGsQ\(r\.requete\)/.test(code), 'la barre de recherche pose la requête lue par `requeteDeLaVoix`');
+  dit(/const micLoupe = <MicDictee nu canal="loupe"[^>]*onText=\{dicterRecherche\}/.test(code) && (code.match(/\{micLoupe\}/g) || []).length === 2, 'le micro est dans la barre, sur ordinateur ET au téléphone');
   dit(/if \(!DICTEE_OK \|\| refus\) return null;/.test(code) && /typeof \(window\.SpeechRecognition \|\| window\.webkitSpeechRecognition\) === 'function'/.test(code), 'sans l’API, ou micro refusé : pas de bouton');
-  dit(/rec\.lang = 'fr-FR'/.test(code), 'reconnaissance en fr-FR');
-  dit(!/fetch\([^)]*(speech|whisper|transcri|audio)/i.test(code) && !/MediaRecorder/.test(code), 'aucun son enregistré ni envoyé à un service (ni MediaRecorder, ni appel de transcription)');
+  dit(/rec\.lang = 'fr-FR'/.test(MOTEUR), 'reconnaissance en fr-FR (le moteur commun)');
+  dit(![code, MOTEUR].some((c) => /fetch\([^)]*(speech|whisper|transcri|audio)/i.test(c) || /MediaRecorder|getUserMedia/.test(c)), 'aucun son enregistré ni envoyé à un service (ni MediaRecorder, ni appel de transcription)');
   console.log(ko ? `\n❌ audit-recherche-vocale : ${ko} rouge(s)` : '\n✅ audit-recherche-vocale : tout vert');
   process.exit(ko ? 1 : 0);
 })();

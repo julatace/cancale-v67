@@ -215,3 +215,11 @@
 .vrm-s2d-plat { position: absolute; left: 4px; top: 4px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 6px; border-radius: 6px; }
 .vrm-s2d-aussi { position: absolute; right: 4px; bottom: 22px; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 5px; border-radius: 6px; }
 @media (min-width: 760px) { .vrm-s2d-gestes .vrm-b { flex: 0 1 220px; } }
+
+/* (11 nov., lot DJ4) Une paire en ligne sur plusieurs sites = UNE ligne, une pastille par site.
+   Neutres (aucune couleur d'accent : §7). Le « à part » (à confirmer, masquées, gardées) : replis. */
+.vrm-s2d-sites { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0 1px; }
+.vrm-s2d-site { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; font-weight: 650; line-height: 1; background: rgba(120, 120, 128, .14); color: var(--w-gris, #6E6E73); }
+.vrm-s2d-a-part { padding: 2px 0; }
+.vrm-s2d-a-part + .vrm-s2d-a-part { border-top: 1px solid rgba(120, 120, 128, .2); }
+.vrm-s2d-a-part > summary { min-height: 44px; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; cursor: pointer; list-style: none; }

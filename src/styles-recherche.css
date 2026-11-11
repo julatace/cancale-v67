@@ -45,7 +45,7 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
   flex: none; min-height: 44px; min-width: 44px; padding: 0 6px; border: 0; background: transparent;
   font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
 }
-@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
   .vrm-recherche-panneau {
     position: fixed; left: 0; right: 0; width: auto; top: 56px; z-index: 75;
     max-height: min(70dvh, calc(100dvh - 140px)); border-radius: 0 0 16px 16px; border-width: 0 0 1px;
@@ -86,7 +86,7 @@ html body [data-cible-eclaire][data-cible-eclaire]:not(#_):not(#_) {
 /* Sur ordinateur, la barre du haut RESTE en haut quand la page défile : la
    recherche (et « / ») est joignable de partout, et son panneau tombe toujours
    dans la fenêtre — jamais hors de vue au-dessus du défilement. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-main > .vrm-barre-haut { position: sticky; top: 0; z-index: 45; background-color: var(--vrm-bg, #FFFFFF); }
   /* (1er nov.) Collée, la barre gardait sa marge du haut (8 px) : le contenu qui
      défile passait dans cette bande, au-dessus d'elle. La marge devient un

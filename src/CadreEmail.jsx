@@ -11,6 +11,8 @@
 //     page (vercel.json, héritée par un `srcdoc`) ;
 //   · à la LARGEUR de l'écran : un e-mail plus large que le cadre (600 px fixes) est
 //     réduit à l'échelle, jamais coupé ni défilant de côté ; la hauteur suit le contenu ;
+//     (11 nov.) sur ordinateur la colonne de lecture lui laisse sa taille NATURELLE
+//     (échelle 1) ; la marge du cadre tombe avant qu'une échelle ne soit posée ;
 //   · les images distantes ne partent que sur « Afficher les images » (une fois par
 //     ouverture, jamais retenu) ; les pixels de suivi ont été retirés au serveur.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,9 +34,16 @@ export default function CadreEmail({ html, images = 0, sombreEmail = false, appS
       // L'échelle se pose sur l'enveloppe, jamais sur `body` : le fond de l'e-mail
       // (posé sur body) remplit alors tout le cadre, même réduit.
       const b = d.querySelector('.vrm-cadre-corps') || d.body;
-      b.style.transform = ''; b.style.width = '';
+      b.style.transform = ''; b.style.width = ''; b.style.paddingLeft = ''; b.style.paddingRight = '';
       const large = f.clientWidth || 0;
-      const contenu = Math.max(d.documentElement.scrollWidth, b.scrollWidth);
+      let contenu = Math.max(d.documentElement.scrollWidth, b.scrollWidth);
+      // (11 nov.) Taille naturelle d'abord : si la marge intérieure du cadre suffit à
+      // faire déborder l'e-mail (600 px fixes dans 610), on la retire avant toute échelle.
+      if (large > 0 && contenu > large + 1) {
+        b.style.paddingLeft = '0px'; b.style.paddingRight = '0px';
+        contenu = Math.max(d.documentElement.scrollWidth, b.scrollWidth);
+        if (contenu > large + 1) { b.style.paddingLeft = ''; b.style.paddingRight = ''; contenu = Math.max(d.documentElement.scrollWidth, b.scrollWidth); }
+      }
       const r = large > 0 && contenu > large + 1 ? large / contenu : 1;
       if (r < 1) { b.style.transformOrigin = '0 0'; b.style.width = contenu + 'px'; b.style.transform = `scale(${r})`; }
       const h = Math.ceil(Math.max(b.scrollHeight, b.offsetHeight) * r);
