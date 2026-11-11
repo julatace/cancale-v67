@@ -130,3 +130,34 @@ export function texteMarge(p) {
   if (p.nSansFrais) sur += ` · frais pas lus pour ${p.nSansFrais}`;
   return { ventes, vendu, mediane: eurosMarge(p.mediane), total: eurosMarge(p.total), sur, manques };
 }
+
+// ── (11 nov., décision C11 — Julien : « tranche ») UN SITE QU'IL N'UTILISE PAS EST CACHÉ ──
+// Caché seulement quand c'est SU : aucune vente de ce site (toutes dates, la règle de « Vendu »),
+// aucune vente au montant pas lu, et aucune annonce ni vente rangée par l'extension pour lui
+// (`lus` : { Leboncoin: true|false, … } — une ligne lue NON VIDE). Pas su ⇒ montré (« pas su »
+// ne vaut pas « absent ») : ventes en lecture ou pas lues, site manquant, lignes pas lues.
+// Vinted, le site principal, est toujours montré (la règle de la rangée des sites).
+// → Set des plateformes montrées.
+export const LIGNES_SITE = Object.freeze({ Leboncoin: ['lbc_listings', 'lbc_ventes'], eBay: ['ebay_orders', 'ebay_listings'], Vestiaire: ['vc_listings', 'vc_ventes'] });
+export function sitesMontres({ vendu, manque = [], nonComptees = [], lus } = {}) {
+  const out = new Set(PLATEFORMES_MARGE);
+  if (!Array.isArray(vendu) || !lus || typeof lus !== 'object') return out;
+  const man = Array.isArray(manque) ? manque.map(String) : [];
+  for (const plat of PLATEFORMES_MARGE) {
+    if (plat === 'Vinted' || man.includes(plat) || lus[plat] !== false) continue;
+    const vente = vendu.some((l) => l && l.plateforme === plat) || (Array.isArray(nonComptees) ? nonComptees : []).some((x) => x && x.plateforme === plat);
+    if (!vente) out.delete(plat);
+  }
+  return out;
+}
+// Les lignes lues (réponse de `select=id,a:data->items->0,v:data->ventes->0,o:data->orders->0`) → { plat: bool }.
+// Une ligne présente au premier élément non nul = des annonces ou des ventes lues.
+export function sitesLusDeLignes(rows) {
+  if (!Array.isArray(rows)) return null;
+  const plein = (r) => r && (r.a != null || r.v != null || r.o != null);
+  const res = {};
+  for (const [plat, prefixes] of Object.entries(LIGNES_SITE)) {
+    res[plat] = rows.some((r) => r && prefixes.some((p) => String(r.id || '') === p || String(r.id || '').startsWith(p + '_')) && plein(r));
+  }
+  return res;
+}

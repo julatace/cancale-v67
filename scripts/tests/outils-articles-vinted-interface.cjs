@@ -10,9 +10,9 @@ const { build } = require("esbuild"),
       resolveDir: root,
       loader: "jsx",
       contents: `
-import React from'react';import{createRoot}from'react-dom/client';import{AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle}from'./src/OutilsArticlesVinted.jsx';
+import React from'react';import{createRoot}from'react-dom/client';import{ComparaisonComptesVinted,HistoriqueArticle}from'./src/OutilsArticlesVinted.jsx';
 window.owner='a';window.compte='123';window.item='3';window.mode='ok';window.edite='';window.reads=[];const root=createRoot(document.getElementById('root'));
-window.afficher=()=>root.render(<><AnnoncesACompleter items={[{id:'3',title:'Ordinateur',price:100,photoCount:0,descLen:0,_acc:{login:'Alice'}},{id:'4',title:'Écran',price:20}]} numeros={{'3':{numero:'7'}}} drafts={{}} ouvrir={id=>window.edite=id} charger={()=>{}}/><ComparaisonComptesVinted rows={[{uid:'123',nom:'Alice',ventes:3,ca:100,benefice:null,couvertes:0,prixManquants:1,stock:2,taches:1}]} periode="Octobre 2026" disponible={false} stockDisponible={false} charger={()=>{}}/><HistoriqueArticle item={window.item} uid={window.compte} owner={window.owner} ownerActuel={()=>window.owner} numeros={{'3':{numero:'7'},'2':{numero:'7'}}} prix={[]} lire={async q=>{window.reads.push(q);const owner=window.owner;if(window.mode==='lent')await new Promise(r=>window.fin=r);if(window.mode==='erreur')throw Error('Lecture indisponible');return q.includes('coffre')?[{id:'coffre_'+window.compte+'_3',owner,item:'3',ancienData:'2',price:'100'},{id:'coffre_'+window.compte+'_2',owner,item:'2',price:'110'}]:[{id:'harvest_'+window.compte+'_conv_9',owner,item:'2'}];}}/></>);window.afficher();`,
+window.afficher=()=>root.render(<><ComparaisonComptesVinted rows={[{uid:'123',nom:'Alice',ventes:3,ca:100,benefice:null,couvertes:0,prixManquants:1,stock:2,taches:1}]} periode="Octobre 2026" disponible={false} stockDisponible={false} charger={()=>{}}/><HistoriqueArticle item={window.item} uid={window.compte} owner={window.owner} ownerActuel={()=>window.owner} numeros={{'3':{numero:'7'},'2':{numero:'7'}}} prix={[]} lire={async q=>{window.reads.push(q);const owner=window.owner;if(window.mode==='lent')await new Promise(r=>window.fin=r);if(window.mode==='erreur')throw Error('Lecture indisponible');return q.includes('coffre')?[{id:'coffre_'+window.compte+'_3',owner,item:'3',ancienData:'2',price:'100'},{id:'coffre_'+window.compte+'_2',owner,item:'2',price:'110'}]:[{id:'harvest_'+window.compte+'_conv_9',owner,item:'2'}];}}/></>);window.afficher();`,
     },
     bundle: true,
     write: false,
@@ -62,21 +62,8 @@ window.afficher=()=>root.render(<><AnnoncesACompleter items={[{id:'3',title:'Ord
         ),
         "owner-scoped scalar metadata reads",
       );
-      await p.locator("[data-annonces-completer] summary").click();
-      await p.getByRole("button", { name: "Compléter", exact: true }).click();
-      check(
-        (await p.evaluate(() => window.edite)) === "3",
-        "opens precise article",
-      );
-      await p
-        .getByRole("button", { name: "Données non récupérées", exact: true })
-        .click();
-      check(
-        (await p.locator(".vrm-outils-liste").innerText()).includes(
-          "Non récupéré",
-        ),
-        "unknown distinct from absent",
-      );
+      // (11 nov., C10) L'ancien bloc « Annonces à compléter » est fondu dans la vue d'Annonces
+      // (scripts/audit-annonces-a-completer.cjs juge la règle unique).
       await p.locator("[data-comparer-comptes] summary").click();
       check(
         (await p.locator("table").innerText()).includes("Non calculable"),

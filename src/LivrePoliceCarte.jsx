@@ -145,6 +145,10 @@ export default function LivrePoliceCarte({ lireAchats, registreDe, panelOff }) {
           {lu === 'encours' ? 'Je lis tes achats…' : lu === 'passu' ? '— achats pas lus' : `${L.n} achat${L.n > 1 ? 's' : ''} sur la période`}
           {L && L.pasLu.length ? <span data-livre-pas-lu-txt=""> · pas lu : {L.pasLu.join(', ')}</span> : null}
         </div>
+        {/* (11 nov., décision C7 — Julien : « tranche ») L'identité civile des vendeurs (données de
+            tiers) n'est JAMAIS saisie ni rangée dans VRM : elle se remplit sur l'export (colonne
+            « Identité du vendeur »). Dit en une phrase, à côté des boutons d'export. */}
+        <div data-livre-identite-export="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>L’identité des vendeurs se remplit sur l’export, pas dans VRM.</div>
         {ac.length ? <div data-livre-a-completer="" style={{ marginTop: 10 }}>
           <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>À compléter</span>
           {ac.map(([k, n]) => <div key={k} data-livre-manque={k} style={{ display: 'flex', gap: 8, justifyContent: 'space-between', fontSize: 13, color: C.text, padding: '4px 0' }}><span style={{ minWidth: 0 }}>{k}</span><b className="vrm-display" style={{ color: C.warn, fontVariantNumeric: 'tabular-nums' }}>{n}</b></div>)}
@@ -152,7 +156,7 @@ export default function LivrePoliceCarte({ lireAchats, registreDe, panelOff }) {
         <div style={{ marginTop: 10 }}>
           <Pourquoi label="Pourquoi ?">
             Un revendeur professionnel d’objets d’occasion tient ce registre (code pénal, art. 321-7 et R321-1 et suivants) et se déclare en préfecture (cerfa 11733).
-            Chaque achat reçoit un n° d’ordre qui ne change jamais. Aucune plateforme ne donne l’identité civile des vendeurs : complète-la.
+            Chaque achat reçoit un n° d’ordre qui ne change jamais. Aucune plateforme ne donne l’identité civile des vendeurs.
             Sources : <a href="https://entreprendre.service-public.gouv.fr/vosdroits/F39552" target="_blank" rel="noopener noreferrer">service-public.gouv.fr</a> · <a href="https://www.legifrance.gouv.fr/codes/section_lc/LEGITEXT000006070719/LEGISCTA000006117615/" target="_blank" rel="noopener noreferrer">Légifrance</a>.
           </Pourquoi>
         </div>
