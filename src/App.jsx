@@ -46099,6 +46099,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
                         {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
                         {batchBusy&&progressionLot&&<div className="vrm-tip-progression" role="status">{progressionLot.etape==='lecture'?`PDF ${progressionLot.fait}/${progressionLot.total}`:'Préparation…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
+                        <div className="vrm-tip-outils vrm-lot-outils">
+                          <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
+                          <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
+                        </div>
                         <section className="vrm-tip-groupe" data-lot-section="partent">
                           <h3>Ce qui part <span>{partent.length}</span></h3>
                           {partent.length ? partent.map(ligne) : <p className="vrm-tip-vide">Rien de neuf à imprimer.</p>}
@@ -46109,7 +46113,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </section>}
                         {ebayL.length > 0 && <section className="vrm-tip-groupe is-ebay" data-lot-section="ebay">
                           <h3>Étiquette dans eBay <span>{ebayL.length}</span></h3>
-                          {ebayL.map((l) => <div key={l.cle} className="vrm-tip-ligne is-off" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-cochable="0"><span data-lot-ebay="1" className="vrm-tip-case-off"/><PhotoVente src={l.photo||null} size={44} portrait/><span className="vrm-tip-corps"><span className="vrm-titre-entier vrm-tip-titre">{l.titre}</span></span></div>)}
+                          {ebayL.map((l) => <div key={l.cle} className="vrm-tip-ligne is-off" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-cochable="0" data-coche="0"><input type="checkbox" className="vrm-tip-case" disabled checked={false} readOnly aria-label={`${l.titre||'Commande'} : eBay`}/><PhotoVente src={l.photo||null} size={44} portrait/><span className="vrm-tip-corps"><span className="vrm-titre-entier vrm-tip-titre">{l.titre}</span><span className="vrm-tip-sous"><span data-lot-ebay="1">eBay</span></span></span></div>)}
                         </section>}
                         {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
                         {choisis.length > 0 && <section className="vrm-tip-groupe" data-lot-section="apercu" aria-label="Aperçu">

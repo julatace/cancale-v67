@@ -1387,3 +1387,5 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-progression { display: flex; align-items: center; gap: 10px; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); }
 .vrm-tip-progression progress { flex: 1; height: 4px; }
 .vrm-tip-pdf { display: flex; align-items: center; justify-content: center; margin: 0 auto; text-decoration: none; }
+.vrm-tip-outils { display: flex; gap: 16px; margin-top: -4px; }
+.vrm-tip-outils .vrm-tip-lien { margin-right: 0; font-size: 13px; }
