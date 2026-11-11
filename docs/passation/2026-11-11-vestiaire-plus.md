@@ -107,7 +107,12 @@ Contre-offre si appris, sinon « Répondre sur Vestiaire ↗ »).
 | Cloche : « N **paires** vendues …, encore en ligne sur Vestiaire » | texte d'avant le 2 nov. (« ce n'est pas toujours une paire ») | « N articles vendus … » | lecture du code |
 | Offres Vestiaire en français seulement | écran pas migré | `OffresVestiaire.jsx` passe par `tr()` (16 clés, 5 langues), ajouté à MIGRES | `audit-traduction` |
 | Le prix de vente Vestiaire (`sellerPrice`, 5.340) n'arrivait JAMAIS dans `vc_ventes` ⇒ facture Pro Vestiaire refusée | `vc.js` (le relais) ne recopiait pas `prixVente` (lu par vc-inject, rangé par le fond, perdu entre les deux) | `vc.js` relaie `prixVente` ; le fond le rebâtit (`prixVenteVc`) | `audit-vc-prix` P10 (VRAI vc-inject → vc.js → background) : rouge sur le vc.js d'avant, vert après ; mutation `relaisPrixVente` rouge |
-| (voir la suite ci-dessous, bancs Vestiaire) | | | |
+| Le récapitulatif d'une vente en contrôle disait « Vestiaire : « IN_PROGRESS ». » | la phrase recopiait le mot brut quand `etapeMotVc` ne le range pas | la phrase dit l'étape EN COURS lue dans `etapesVc` (« Authentification. ») ; le mot brut reste dans les détails | banc `vestiaire-plus` B |
+| La date de paiement estimée écrite deux fois (L'argent + parcours) | — (nouveau) | une seule ligne « Versement » dans L'argent : versé ⇒ mois du CA, estimé ⇒ pas dans le CA, rien ⇒ dit | banc `vestiaire-plus` B (« écrite UNE fois ») |
+| « Photos Vestiaire » : « ta clé Photoroom, plus haut » alors que la carte est plus bas | texte | la carte est nommée | capture 390 regardée |
+| Banc `lien-vc-frise` E comptait aussi la frise du parcours | le banc prenait TOUS les `data-fu-etape` du récapitulatif | il compare la frise du haut, hors `[data-vc-parcours]` (une frise à part, voulue) | `lien-vc-frise` 63/63 |
+| Préparer sur Vestiaire laisse la feuille « VRM travaille » (lot suivi-travail) ; la baisse Vestiaire n'y était pas | — | `BaissePrixVestiaire` passe par `suivi.demarrer` (VRM figé, étapes envoi → relu, pause entre deux, journal) | banc `vestiaire-plus` D (« la feuille commune suit la baisse ») |
+
 
 Audits Vestiaire relancés, tous verts : `audit-numeros-vestiaire` 26, `audit-vc-conversations` 36,
 `audit-vc-messages` 40, `audit-vc-offres` 45, `audit-vc-publier` 111, `audit-vc-recon` 11,
@@ -122,6 +127,14 @@ imprimer ») n'est PAS touché (écrans en cours d'intégration ailleurs) — «
 déjà les bordereaux Vestiaire rangés (`lignesLotTous`).
 
 ## Preuves
+- Bancs relancés (build de la branche) — verts : `vestiaire-plus` **55/55**, `lien-vc-frise` 63/63, `vestiaire-colis` 57/57,
+  `bordereau-vestiaire-ouverture` 2/2. Rouges **IDENTIQUES sur `origin/main`** (f04d4a580, construit et passé à
+  part, ligne à ligne) — pas de ce lot, à reprendre par l'intégration : `vestiaire` (15), `vestiaire-fiches` (8),
+  `vestiaire-messages` (3), `vestiaire-parite` (5 : « À expédier » devenu « À envoyer », pastille), `vestiaire-bout-en-bout` (32),
+  `vc-publier` (5). Piste : ces bancs ne fixent pas la langue (Chromium sans `locale` ⇒ l'app en anglais depuis le
+  lot traduction) et des libellés ont changé ; `vestiaire-plus` fixe `locale: 'fr-FR'` + `vrm_langue`.
+- Captures regardées (390 clair, 1512 sombre) : Ma journée, Répondre ⇒ Messages, parcours, photos, baisse (pas appris,
+  appris, fini avec la feuille commune). Vu dans la feuille commune : « 1 sur 1 » avec une barre à moitié — à signaler au lot suivi-travail.
 
 - `scripts/audit-vc-prix.cjs` : VRAI vc-inject.js + vc.js + background.js (`_fond-vm.cjs`),
   35 contrôles ; `--prouve` 16/16 mutations rouges. Sur `origin/main` : la fonction n'existe pas
