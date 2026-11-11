@@ -5,6 +5,7 @@ import { ordreRecent, quandVestiaire } from '../ordreRecent.js';
 import { STYLE_FLOU, vcFloute } from '../flouCompte.js';
 import { lienDe, vcReliable } from '../lienVestiaire.js';
 import React, { useState, useEffect } from 'react';
+import { suivi, suivreJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
 import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut } from '../../api/_lib/vestiaire-regle.js';
@@ -488,11 +489,24 @@ function PublierVestiaire({ comptes }) {
       if (rp.manque.length && !(await askConfirm({ title: tr('vcPhotos.confirme.titre', { n: rp.manque.length }), desc: textePhotosManquantes(rp), ok: tr('vcPhotos.confirme.ok'), cancel: tr('vcPhotos.confirme.annuler') }))) return; }
     if (!(await verifierAvantPublication(problemesAnnonce({ titre: p.title || '', taille: p.taille || '', famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, marque: p.marque || '', nPhotos: (p.photos || []).length, prix: p.prix, achat: achatV , facultatifs: champsFacultatifs(vendActuel()) }, 'vestiaire'), { site: 'vestiaire' }))) return;
     setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
+    const t0 = Date.now();
     const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id), publier: auto }, 30000);
     setEnvoi('');
     if (!r) { setMsg((m) => ({ ...m, [p.id]: "L'extension n'a pas répondu — recharge cette page et réessaie." })); return; }
     if (!r.accepte) { setMsg((m) => ({ ...m, [p.id]: r.raison || "Refusé par l'extension." })); return; }
     __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier();
+    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : « publiée » seulement si l'extension le dit.
+    const id = String(p.id);
+    const t = suivi.demarrer({ sorte: auto ? 'publier-vc' : 'preparer-vc', titre: auto ? 'Publier sur Vestiaire' : 'Préparer sur Vestiaire', articles: [{ id, num: p.num || '', titre: p.title || '' }],
+      etapes: auto ? [['depot', 'Formulaire Vestiaire ouvert'], ['accepte', 'Publiée sur Vestiaire ✓']] : [['depot', 'Formulaire Vestiaire ouvert et rempli']] });
+    if (!t) return;
+    t.etape(id, 'depot');
+    if (!auto) { t.fin(id, { etat: 'main', raison: 'formulaire ouvert et rempli par l’extension', geste: 'Relis et publie sur Vestiaire' }); t.terminer(''); return; }
+    suivreJob(t, id, { jobId: r.jobId || 'vc:' + id, lireJobs: () => __vmrJobs, depuis: t0, delaiMs: 15 * 60000 }).then(({ fin }) => {
+      if (fin === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
+      else t.fin(id, { etat: 'main', raison: fin === 'abandonne' ? 'VRM n’a pas vu la fin de la publication' : fin === 'arret' ? 'la publication continue dans l’onglet Vestiaire' : 'VRM n’a pas vu la fin en 15 min', geste: 'Regarde l’onglet Vestiaire ; si elle est en ligne, clique « Déjà publiée »' });
+      t.terminer('');
+    });
   };
   const marquer = async (p) => {
     if (envoi) return;

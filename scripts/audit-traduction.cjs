@@ -46,6 +46,7 @@ const MIGRES = [
   ['src/PhotosVestiaire.jsx', ['*']],
   ['src/BaissePrixVestiaire.jsx', ['*']],
   ['src/OffresVestiaire.jsx', ['*']],
+  ['src/composants/SuiviTravail.jsx', ['*']],   // (11 nov., lot suivi-travail)
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;

@@ -6,7 +6,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
-import JaugeActions from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h du compte
+import JaugeActions from '../JaugeActions.jsx';
+import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la file   // (10 nov., lot G) la jauge des 50 actions/h du compte
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
@@ -742,6 +743,21 @@ function etatDeFinRepub(fin) {
   const etat = f.accepte && ['fait', 'double', 'incertain'].includes(f.etape) ? f.etape : (f.accepte && f.refaire) ? 'a-refaire' : 'echec';
   return { etat, raison: f.raison || (etat === 'echec' ? "la mise en ligne planifiée n'a pas abouti" : ''), nouveau: f.nouveau };
 }
+// (11 nov., lot suivi-travail) Le résultat d'une paire (rendu par l'extension) dit dans la feuille,
+// avec le geste à faire. « Double » et « incertain » ne sont jamais « réussie » : à regarder.
+function issueSuivi(s0) {
+  const r = s0 && s0.raison ? String(s0.raison) : '';
+  switch (s0 && s0.etat) {
+    case 'fait': return { etat: 'ok' };
+    case 'double': return { etat: 'main', raison: r || 'peut-être en double sur Vinted', geste: 'Regarde ton dressing Vinted et supprime le doublon s’il y en a un' };
+    case 'incertain': return { etat: 'main', raison: r || 'Vinted n’a pas répondu clairement', geste: 'Regarde ton dressing Vinted avant de relancer' };
+    case 'a-refaire': return { etat: 'refus', raison: r || 'brouillon pas créé', geste: 'Refais le brouillon depuis sa ligne dans Republier' };
+    default:
+      if (s0 && s0.code === 'plus-dans-la-liste') return { etat: 'saute', raison: r };
+      if (s0 && s0.question) return { etat: 'refus', raison: r || 'il manque une information', geste: 'Réponds à la question sur sa ligne dans Republier' };
+      return { etat: 'refus', raison: r || 'pas faite', geste: s0 && (s0.code === 'vinted-pause' || s0.code === 'frein-refus') ? 'Attends la fin de la pause de Vinted, puis relance' : s0 && s0.code === 'plafond' ? 'Attends que la jauge des 50 actions/heure redescende' : '' };
+  }
+}
 function majProgRepub(p, d) {
   const id = String(d.id); const cur = p[id] || {};
   if (d.pause) return { ...p, [id]: { ...cur, pause: { quoi: String(d.pause), jusqua: Number(d.jusqua) || 0, ms: Number(d.ms) || 0 } } };
@@ -1446,6 +1462,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // seule une paire pas commencée qui a quitté la liste vivante (vendue, retirée)
   // est sautée, et c'est dit sur sa ligne.
   const [figee, setFigee] = useState(null);
+  // (11 nov., lot suivi-travail) Le pilote de la feuille « VRM travaille » (src/suiviTravail.js).
+  const suiviRef = React.useRef(null);
+  const arretJusquaRef = React.useRef(0);
+  arretJusquaRef.current = arretJusqua;
   const aFaire = mode !== 'idle' && figee ? figee : aFaireCalc;
   // (3 nov.) Vérifier avant de republier (`src/verifAnnonce.js`) : le titre et le
   // prix qui PARTIRONT (l'aperçu), les photos, la taille et la marque lues.
@@ -1454,6 +1474,21 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       ...(a.nPhotos != null ? { nPhotos: a.nPhotos } : {}), ...(a.taille !== undefined ? { taille: a.taille, famille: a.famille || '' } : {}), ...(a.marque !== undefined ? { marque: a.marque } : {}) }; });
     if (!(await verifierAvantPublication(problemesLot(lot, 'vinted'), { site: 'vinted' }))) return;
     setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run');
+    // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL de tout ce que VRM fait et une BARRE ») La
+    // feuille « VRM travaille » suit la file : ses deux gestes reviennent ici (pause, arrêt, reprise).
+    // La dernière étape n'est cochée que sur le « fait » rendu par l'extension (Vinted a accepté) — jamais supposée.
+    const etapesSuivi = [...listeEtapesSuivi(), ['accepte', 'Acceptée par Vinted ✓']];
+    suiviRef.current = suivi.demarrer({ sorte: `republier-${action}`, titre: A.titre, etapes: etapesSuivi, uid: compteUid,
+      articles: aFaireCalc.map((a) => ({ id: a.id, num: a.numero || '', titre: a.titre || '' })),
+      surGeste: (quoi) => {
+        if (quoi === 'pause') setMode((m) => (m === 'run' ? 'pause' : m));
+        else if (quoi === 'arret') setMode('fini');
+        else if (quoi === 'reprendre') {
+          const t = suiviRef.current; const reste = arretJusquaRef.current - Date.now();
+          if (reste > 0) { if (t) { t.noter(`Vinted demande d’attendre : reprise possible dans ${Math.ceil(reste / 60000)} min`, null, 'pause'); t.pause({ jusqua: arretJusquaRef.current, raison: 'Vinted demande d’attendre' }); t.terminer('', 'pause'); } return; }
+          setMode('run');
+        }
+      } });
   };
   // La paire suivante, dont le bloc d'avancée dit le temps : sa ligne ne le redit pas (§7).
   const idAnnoncee = mode === 'run' ? ((aFaire.find((a) => !st[a.id]) || {}).id || null) : null;
@@ -1515,6 +1550,32 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     }, delai * 1000);
     return () => { annule = true; clearTimeout(t); setProchaine(null); };
   }, [mode, st, esp, espMode, espMin, espMax, plan]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // (11 nov., lot suivi-travail) La feuille suit ce que l'ÉCRAN sait (st : résultat rendu par
+  // l'extension ; prog : ses étapes annoncées ; prochaine : l'attente tirée avant de lancer).
+  // Rien n'y est déduit : une annonce n'est « réussie » que si l'extension l'a dit.
+  React.useEffect(() => {
+    const t = suiviRef.current; if (!t || !t.etat()) return;
+    for (const a of (figee || [])) {
+      const s0 = st[a.id]; if (!s0) continue;
+      const p0 = prog[String(a.id)] || {};
+      if (s0.etat === 'encours') {
+        t.debut(a.id);
+        if (p0.etape) t.etape(a.id, p0.etape, p0.etape === 'photos' && p0.total > 0 ? `photo ${Math.min(p0.fait + 1, p0.total)} sur ${p0.total}` : '');
+        if (p0.pause && p0.pause.jusqua > Date.now()) t.pause({ jusqua: p0.pause.jusqua, raison: `Pause au hasard ${PAUSE_NOM[p0.pause.quoi] || ''}`.trim() });
+      } else if (s0.etat === 'planifiee') {
+        t.debut(a.id);
+        t.etape(a.id, 'attente', s0.jusqua ? `mise en ligne programmée vers ${new Date(s0.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'mise en ligne programmée');
+      } else {
+        if (s0.etat === 'fait') t.etape(a.id, 'accepte');
+        t.fin(a.id, issueSuivi(s0));
+      }
+    }
+    if (prochaine && prochaine.at > Date.now()) t.pause({ jusqua: prochaine.at, raison: 'Pause entre deux annonces' });
+    if (arretJusqua > Date.now()) t.pause({ jusqua: arretJusqua, raison: 'Vinted demande d’attendre' });
+    // La boucle s'est arrêtée (pause, arrêt, fin) et plus rien n'est en route chez l'extension.
+    const enRoute = Object.values(st).some((x) => x.etat === 'encours');
+    if (mode !== 'run' && mode !== 'idle' && !enRoute && t.etat().statut === 'cours') t.terminer(arret || '', mode === 'pause' ? 'pause' : undefined);
+  }, [st, prog, prochaine, mode, arret, arretJusqua]);   // eslint-disable-line react-hooks/exhaustive-deps
   const nFait = Object.values(st).filter((s) => s.etat === 'fait').length;
   const nEchec = Object.values(st).filter((s) => s.etat === 'echec').length;
   const nDouble = Object.values(st).filter((s) => s.etat === 'double' || s.etat === 'incertain').length;
@@ -1567,6 +1628,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
   const summ = { display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: C.text };
   const pageOk = extSait('republierpage') === 'ok';
+  // (11 nov., lot suivi-travail) Les étapes d'UNE annonce, celles que l'extension annonce pour ce geste.
+  function listeEtapesSuivi() { return action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : action === 'enLigne' ? ETAPES_REPUB.publier : action === 'modifier' ? ETAPES_MODIF : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); }
   const ETAPES = A.etapes;
   const iEtape = Math.max(0, ETAPES.findIndex((x) => x[0] === etape));
   const s2 = (n, mot, pl) => `${n} ${n > 1 ? (pl || mot + 's') : mot}`;
