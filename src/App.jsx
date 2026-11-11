@@ -50416,7 +50416,7 @@ function EquipeSansAcces({ nonInstalle, onPropre }) {
       <div style={boiteEquipe()}>
         <TeteEquipe titre="Colis de l'équipe" onPropre={onPropre}/>
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px', fontSize: 15, color: C.text, lineHeight: 1.55 }}>
-          {nonInstalle ? EQUIPE_NON_INSTALLE_TXT : "Plus d'accès aux colis de cette équipe (invitation retirée ou quittée)."}
+          {nonInstalle ? <>{EQUIPE_NON_INSTALLE_TXT}<div data-equipe-geste="aide" style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{EQUIPE_NON_INSTALLE_GESTE_AIDE}</div></> : "Plus d'accès aux colis de cette équipe. Invitation retirée ou quittée."}
         </div>
       </div>
     </div>
@@ -50452,7 +50452,10 @@ function InvitationsEquipe({ invitations, uid, onPropre, onFait }) {
 }
 // Ce qu'un membre voit et ne voit pas — UNE phrase, pour l'invitation et pour
 // le panneau du vendeur (§11). Elle dit la règle de la base (016), rien de plus.
-const CE_QUE_VOIT_UN_MEMBRE = "Un membre voit les colis à expédier et peut imprimer leurs bordereaux, et il voit les codes de retrait des achats. Il ne voit aucun montant (ni prix, ni ventes, ni argent), ni les réglages, ni les comptes Vinted, ni les messages des acheteurs. Il peut réaliser les missions qui lui sont attribuées, cocher leurs étapes et signaler un blocage. Le responsable conserve la validation finale ; une mission terminée ne modifie pas les ventes ou le stock.";
+// (11 nov.) Phrases courtes (≤ 12 mots), même règle qu'avant.
+const CE_QUE_VOIT_UN_MEMBRE = "Ton aide voit les colis à envoyer et imprime les bordereaux. Il voit les colis à retirer et leurs codes. Il ne voit aucun montant, ni réglage, ni message. Ni tes comptes Vinted. Il fait les missions que tu lui confies. Tu gardes la validation finale.";
+// Ce que l'aide lit quand la 016 manque : le fait, puis le geste — qui n'est pas le sien.
+const EQUIPE_NON_INSTALLE_GESTE_AIDE = "Le vendeur doit l'activer. Rien à faire de ton côté.";
 
 // ── L'ÉCRAN DU MEMBRE : les colis du vendeur, et rien d'autre ─────────────
 // Chaque lecture porte l'en-tête `x-vrm-equipe` (la base ne montre les lignes
@@ -50523,8 +50526,8 @@ function ColisEquipe({ vendeur, de, onPropre }) {
   let corps;
   if (d === undefined) corps = <div data-equipe-etat="chargement" style={{ fontSize: 15, color: C.muted }}>Lecture des colis…</div>;
   else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
-  else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 15, color: C.text }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
-  else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Plus d'accès aux colis de cette équipe (invitation retirée ou abonnement fini).</div>;
+  else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 15, color: C.text }}>{EQUIPE_NON_INSTALLE_TXT}<div data-equipe-geste="aide" style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{EQUIPE_NON_INSTALLE_GESTE_AIDE}</div></div>;
+  else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Plus d'accès aux colis de cette équipe. Invitation retirée, ou abonnement du vendeur fini.</div>;
   else {
     const ventes = d.ventes.filter((o) => aExpedier(o) && !d.postes.has(String(o.transaction_id)));
     // (5 nov.) `needs_action` sur un ACHAT veut dire « une action » : « Commande livrée ! »
