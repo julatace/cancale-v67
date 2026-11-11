@@ -100,6 +100,8 @@ export function livreDesRecettes({ decl, periode, numDe = () => '', compteDe = (
   if (!decl || !Array.isArray(decl.lignes) || !PERIODE_OK.test(String(periode || ''))) return null;
   const ligne = (l, montant, raison) => ({
     id: String(l.id), ts: l.ts == null ? null : l.ts, date: jourFr(l.ts), montant, plateforme: l.plateforme,
+    // (11 nov.) Les frais de la plateforme quand ils sont LUS (eBay) ; sinon null (« pas su », jamais 0).
+    frais: Number.isFinite(l.frais) ? l.frais : null,
     reglement: `Versement ${l.plateforme}`, reference: referenceDe(l.id), num: String(numDe(String(l.id)) || ''),
     compte: String(compteDe(String(l.id)) || ''), titre: String(l.titre || ''), raison: raison || '',
     // (9 nov.) Ce que la date de la ligne EST, selon la règle de `ventesDeclarables` :

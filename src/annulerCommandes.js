@@ -80,7 +80,7 @@ export const ACTIONS_RECHERCHE = [
   { id: 'imprimer-jour', libelle: 'Imprimer les bordereaux du jour', sous: 'Colis → « Tout imprimer » : tu choisis, puis tu imprimes', icone: 'printer', mots: ['imprimer', 'impression', 'bordereaux', 'bordereau', 'etiquettes', 'jour', 'tout imprimer'] },
   { id: 'colis-envoyer', libelle: 'Colis à envoyer', sous: 'Colis → À envoyer', icone: 'box', mots: ['colis', 'envoyer', 'expedier', 'poster', 'deposer', 'a envoyer'] },
   { id: 'colis-retirer', libelle: 'Colis à retirer', sous: 'Colis → À retirer', icone: 'truck', mots: ['colis', 'retirer', 'retrait', 'recuperer', 'relais', 'a retirer'] },
-  { id: 'export-comptable', libelle: 'Exporter pour mon comptable', sous: 'Compta → tableur et PDF d’une période', icone: 'doc', mots: ['exporter', 'export', 'comptable', 'comptabilite', 'compta', 'csv', 'excel', 'tableur', 'pdf'] },
+  { id: 'export-comptable', libelle: 'Exporter pour mon comptable', sous: 'Argent → un zip : tableur, récap, factures', icone: 'doc', mots: ['exporter', 'export', 'comptable', 'comptabilite', 'compta', 'csv', 'excel', 'tableur', 'pdf', 'zip', 'xlsx', 'justificatifs'] },
   { id: 'ma-configuration', libelle: 'Ma configuration', sous: 'Plateformes, statut, numéro, affichage, notifications', icone: 'gear', mots: ['configuration', 'configurer', 'config', 'statut', 'plateformes', 'demarrage'] },
   { id: 'ma-journee', libelle: 'Ma journée', sous: 'Ce qu’il y a à faire aujourd’hui', icone: 'home', mots: ['journee', 'aujourd', 'accueil', 'ma journee'] },
   // (10 nov., lot L) La calculette d'achat : elle OUVRE une feuille qui n'écrit rien.

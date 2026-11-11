@@ -347,7 +347,13 @@ const lignesSignalements = () => rows.filter((r) => /^signalement_/.test(r.id));
     dit(s1.code === 200 && oui.every((k) => typeof c[k] === 'boolean'), 'ses oui/non sont intacts', c);
     dit(c.etat && c.etat.base === 'ok' && c.etat.emails === 'ok' && c.etat.notifications === 'panne' && c.etat.verifieA === new Date(Date.now()).toISOString(), 'etat : base ok, e-mails ok (collecteur passé il y a 2 min), notifications en panne (clé VAPID absente)', c.etat);
     dit(/s-maxage=30/.test(s1.entetes['Cache-Control'] || ''), 'Cache-Control : s-maxage=30', s1.entetes);
-    const lu = journal.filter((j) => /\/rest\/v1\//.test(j.url));
+    // (11 nov.) Depuis le 9 nov. (fda8cdb1, /statut) /api/sante lit AUSSI la ligne bornée des sondes
+    // (`statut_sondes`, neutre, limit=1 : 60 incidents et 31 jours au plus, api/_lib/statut-sondes.js).
+    // La règle reste : le collecteur en UNE lecture courte, scalaire, chez le neutre ; rien d'autre n'est lu.
+    const lu0 = journal.filter((j) => /\/rest\/v1\//.test(j.url));
+    const sondes = lu0.filter((j) => /[?&]id=eq\.statut_sondes(&|$)/.test(j.url));
+    const lu = lu0.filter((j) => !sondes.includes(j));
+    dit(sondes.length <= 1 && sondes.every((j) => j.url.includes(`owner=eq.${NEUTRE}`) && /[?&]limit=1(&|$)/.test(j.url)), 'la ligne des sondes : une fois au plus, chez le neutre, une ligne', sondes.map((x) => x.url));
     dit(lu.length === 1 && lu[0].url.includes(`owner=eq.${NEUTRE}`) && /select=id,at:data->>at,etat:data->>etat/.test(lu[0].url) && !/select=data(&|$)/.test(lu[0].url), 'UNE lecture courte : deux scalaires du collecteur, chez le neutre (jamais `select=data`)', lu.map((x) => x.url));
     const fuite = Object.entries(SECRETS).filter(([, v]) => JSON.stringify(c).includes(v));
     dit(!fuite.length && !JSON.stringify(c).includes(A), 'aucune donnée d’un vendeur dans la réponse', fuite);

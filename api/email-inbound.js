@@ -25,6 +25,8 @@ import { ligneHtml, idHtml } from "./_lib/email-html.js";
 
 import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { suiteProduction, SIGNAUX as SIGNAUX_PROD, SERIE_503, FENETRE_503_MS } from './_lib/alertes-production.js';
+import { proprietaireInstallation } from './_lib/signalement.js';
 import { texteArrivee } from './_lib/notif-textes.js';
 import { colisPerdu } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
@@ -162,6 +164,21 @@ const marquerEcritureRatee = () => { const st = contexteVendeur.getStore(); if (
 const ecritureRatee = () => !!(contexteVendeur.getStore() || {}).ecritureRatee;
 // Répondre « reçu » n'est vrai que si l'email est RANGÉ. Sinon : 503, et le
 // service de réception réessaiera — il le garde pendant des heures.
+// (11 nov., alertes de production) Un 503 de plus dans la série : 3 en une heure
+// ⇒ UNE alerte au PROPRIÉTAIRE (api/_lib/alertes-production.js). Au mieux : la base
+// tombée n'écrit pas la série non plus — la sonde « base » de /statut le dit.
+// Borné à 3 s : la réponse au collecteur ne doit pas attendre.
+async function noter503() {
+  try {
+    const proprio = await proprietaireInstallation();
+    if (!proprio) return;
+    await Promise.race([
+      suiteProduction({ proprio, suite: { cle: 'emails:503', echec: true, seuil: SERIE_503, fenetreMs: FENETRE_503_MS, signal: SIGNAUX_PROD.emails503 },
+        pousser: (n) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(n)) }),
+      new Promise((ok) => setTimeout(ok, 3000)),
+    ]);
+  } catch (_) {}
+}
 async function repondre(res, code, corps) {
   const contexte = contexteVendeur.getStore() || {};
   // Une ligne par Message-ID : les reprises mettent à jour le même suivi.
@@ -194,6 +211,7 @@ async function repondre(res, code, corps) {
     // sur le texte remis en forme.
     if (range && !incident) await garderHtmlOrigine(cle, String(corps.type || 'information'), resume, contexte.html);
   }
+  if (code === 503 || (code < 400 && ecritureRatee())) await noter503();
   if (code < 400 && ecritureRatee()) {
     res.status(503).json({
       ok: false, erreur: 'base-injoignable',
