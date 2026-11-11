@@ -894,6 +894,48 @@ const motEtat = (it) => (it.etat === 'a-envoyer' ? (it.emise ? `Facture ${it.num
   : it.etat === 'a-annuler' ? `Vente annulée · facture ${it.numero}`
   : it.etat === 'lecture' ? 'Lecture…'
   : it.raison ? it.raison.replace(/^acheteur pas prouvé : /, 'Pas prouvé : ') : '');
+// (11 nov., lot actions-serie) « Facture Pro » sur une SÉLECTION de ventes (Ventes →
+// Sélectionner) : EXACTEMENT les gestes de « Tout envoyer » ci-dessous (émettre si pas
+// émise, puis envoyer à SON acheteur prouvé), limités aux ventes cochées ; une vente qui
+// n'est pas Pro, pas prouvée ou déjà envoyée est « pas faite » avec SA raison. Une
+// confirmation d'abord ; un 429/503 arrête la série (comme l'unitaire). Rend
+// { faits, pasFaits } (src/selectionSerie.js) ou null si Annuler.
+export async function envoyerFacturesSerie(deps, txs, ventes) {
+  const voulues = [...new Set((txs || []).map(String))];
+  const [d, etat] = await Promise.all([relireFactures(deps), relireEtatEnvoi(deps)]);
+  let cfg = _cfg;
+  if (cfg === undefined || cfg === null) { try { const x = await deps.lireReglage(ID_CFG); cfg = x === null ? null : { ...VIDE, ...migrerAncienne(x) }; poserCfg(cfg); } catch (_) { cfg = null; } }
+  if (!d) return { faits: [], pasFaits: voulues.map((tx) => ({ cle: tx, raison: 'ventes Pro pas lues' })) };
+  const commandesParTx = commandesDeCoque(ventes) || new Map();
+  const liste = listeAEnvoyer({ ventesPro: d.ventesPro, factures: d.factures, avoirs: d.avoirs, commandesParTx, classer: deps.classifyOrderStatus || (() => 'pending'), adresseLisible: adresseVintedLisible, txsEnPlus: voulues.filter((tx) => { const c = (commandesParTx.get(tx) || [])[0]; return c && d.comptesPro.get(c.uid) === true; }) });
+  const parTx = new Map((liste || []).map((it) => [String(it.tx), it]));
+  const prets = [], pasFaits = [];
+  for (const tx of voulues) {
+    const it = parTx.get(tx);
+    if (!it) { pasFaits.push({ cle: tx, raison: (d.factures.get(tx) && (d.factures.get(tx).envoi || d.factures.get(tx).envois)) ? 'déjà envoyée' : 'pas une vente Pro' }); continue; }
+    if (it.etat !== 'a-envoyer') { pasFaits.push({ cle: tx, raison: it.raison ? String(it.raison).replace(/^acheteur pas prouvé : /, 'pas prouvé : ') : 'acheteur pas prouvé' }); continue; }
+    prets.push(it);
+  }
+  const mv = cfg ? manquantsVendeur(cfg) : [{ l: 'ta fiche de facturation' }];
+  const bloque = mv.length ? { texte: `il manque ${mv.map((m) => m.l).join(', ')}` } : bloqueEnvoi(cfg, etat);
+  if (prets.length && bloque) { for (const it of prets.splice(0)) pasFaits.push({ cle: String(it.tx), raison: (bloque.texte || bloque.geste || 'envoi pas possible').replace(/\.$/, '').toLowerCase() }); }
+  if (!prets.length) return { faits: [], pasFaits };
+  if (!(await deps.askConfirm({ title: `Envoyer ${prets.length} facture${prets.length > 1 ? 's' : ''} ?`, desc: `Chacune à SON acheteur prouvé${cfg && cfg.envoiPar === 'boite' ? '' : ', par VRM, toi en copie'}.${pasFaits.length ? ` ${pasFaits.length} vente${pasFaits.length > 1 ? 's' : ''} de la sélection ne ${pasFaits.length > 1 ? 'partent' : 'part'} pas (raison dite après).` : ''}`, ok: 'Envoyer', cancel: 'Annuler' }))) return null;
+  const faits = [];
+  for (let i = 0; i < prets.length; i++) {
+    const it = prets[i], tx = String(it.tx);
+    if (!it.emise) {
+      const r = await route(deps, { action: 'emettre', confirme: true, tx, compte: it.compte || '' });
+      if (r.code !== 200) { pasFaits.push({ cle: tx, raison: r.j.manquants ? `il manque ${r.j.manquants.map((m) => m.l).join(', ')}` : (r.j.message || 'pas émise') }); if (r.code === 503 || r.j.manquants) { for (const x of prets.slice(i + 1)) pasFaits.push({ cle: String(x.tx), raison: 'série arrêtée' }); break; } continue; }
+    }
+    const r2 = await route(deps, { action: 'envoyer', confirme: true, tx });
+    if (r2.j.issue === 'envoye') { faits.push(tx); continue; }
+    pasFaits.push({ cle: tx, raison: (r2.j.envoi && r2.j.envoi.message) || r2.j.message || 'pas envoyée' });
+    if (r2.code === 429 || r2.code === 503 || r2.code === 0) { for (const x of prets.slice(i + 1)) pasFaits.push({ cle: String(x.tx), raison: 'série arrêtée' }); break; }
+  }
+  relireFactures(deps); relireEtatEnvoi(deps);
+  return { faits, pasFaits };
+}
 export function FacturesAEnvoyer({ deps }) {
   const d = useFactures(deps);
   const cfg = useFicheFacturation(deps);

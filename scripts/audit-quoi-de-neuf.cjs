@@ -103,7 +103,10 @@ async function verifier(racine, { muet = false } = {}) {
   dit(!!carte && /<button type="button"/.test(carte[0]) && !/role="dialog"|aria-modal|createPortal/.test(carte[0]) && /if \(!Array\.isArray\(aVoir\) \|\| !aVoir\.length\) return null;/.test(carte[0]), 'la carte : un bouton discret, jamais une fenêtre ; rien à voir ⇒ rien');
   dit(/onToutVu/.test(C) && /data-quoi-de-neuf-vu/.test(C), '« Tout vu » dans la feuille');
   const R = sansCom(lire('src/ecrans/Reglages.jsx'));
-  dit(/id:'quoi-de-neuf'[^\n]*lib:'Quoi de neuf'[^\n]*el:<QuoiDeNeufParametres onNav=\{setTab\}\/>/.test(R), 'Paramètres → Aide → « Quoi de neuf »');
+  // (11 nov., lot traduction) Le libellé passe par `tr()` : sa valeur française se lit dans le dictionnaire.
+  const frApp = lire('src/i18n/langues/fr.js');
+  dit(/id:'quoi-de-neuf'[^\n]*lib:(?:'Quoi de neuf'|tr\('reglages\.quoi-de-neuf\.lib'\))[^\n]*el:<QuoiDeNeufParametres onNav=\{setTab\}\/>/.test(R)
+    && (/lib:'Quoi de neuf'/.test(R) || /"reglages\.quoi-de-neuf\.lib": "Quoi de neuf"/.test(frApp)), 'Paramètres → Aide → « Quoi de neuf »');
   const cm = lire('CLAUDE.md');
   dit(/src\/nouveautes\.js/.test(cm) && /chaque lot visible ajoute sa ligne/i.test(cm), 'CLAUDE.md §9 : la règle pour la suite (chaque lot visible ajoute sa ligne)');
   return ko;

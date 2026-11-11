@@ -4,6 +4,7 @@ import {
   conserverRetraitsNonConfirmes,
 } from "./bilanSynchronisation.js";
 import "./bilanSynchronisation.css";
+import { lignesPeutEtre } from "./retirerAilleurs.js";
 import { PhotoVide } from "./composants/PhotoVide.jsx";
 // (5 nov., chantier E2) Le composant seul (sa place dans Ma journée appartient à E1) :
 // « Rien à retirer » plutôt que « 0 annonce à vérifier » (revue 3.5), des pluriels
@@ -64,6 +65,11 @@ export function useVerifVendusAilleurs({ owner, ownerActuel, charger }) {
           manques: data.manques || [],
           ...calcul,
           lignes,
+          // (11 nov., anti double vente) les annonces à l'état pas confirmé, même
+          // identité : « peut-être encore en ligne · vérifier » (src/retirerAilleurs.js).
+          peutEtre: lignesPeutEtre(data, lignes),
+          // Les lectures COMPLÈTES par site et compte (la preuve de « retiré ✓ relu »).
+          completes: data.completes || [],
           confirmes: precedents.filter(
             (a) => !lignes.some((x) => cle(x) === cle(a)),
           ).length,

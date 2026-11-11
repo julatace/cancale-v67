@@ -18,8 +18,9 @@ import {endpointPushPermis} from './abonnement-push.js';
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { accesVendeur } from './abonnement.js';
-import { decisionNotif, CATEGORIES_RETIREES, dansHeuresCalmes, regrouper } from './notif-textes.js';
-import { rangerNotif, corrigerEtat, lireLu, nonLuesDeGenre } from './journal-notifs.js';
+import { decisionNotif, CATEGORIES_RETIREES, dansHeuresCalmes, regrouper, familleDe } from './notif-textes.js';
+import { rangerNotifGroupe, vidangerAttente, corrigerEtat, lireLu, nonLuesDeGenre } from './journal-notifs.js';
+import { fenetreGroupe, estUrgent, cleDuJour, resumeDeGroupe } from './notif-groupe.js';
 import { embellir, genreDe, etiquette, etiquetteGroupe, texteGroupe, imageSure, actionDe, ICONE_NOTIF, BADGE_NOTIF } from './notif-belle.js';
 
 // La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
@@ -107,6 +108,7 @@ export const PUSH_DEFAUT = {
   soir:     true,   // la veille au soir : « Demain : N colis à poster » (api/ship-reminders.js?moment=soir)
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
+  rappel:   true,   // « Me le rappeler » : un rappel posé par LUI (api/_lib/rappels-perso.js)
   lbcsuppression: true, // Leboncoin a supprimé une annonce : ouvrir « Mes annonces » (api/_lib/lbc-suppression.js)
   veille:   true,   // un chiffre (stock, CA d'un mois passé) a chuté d'un coup sans raison (api/_lib/veille-chiffres.js)
   relecture: true,  // un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h (api/_lib/comptes-a-relire.js)
@@ -340,11 +342,13 @@ const cleSansRapport = (e) => {
 // (`VRM_NOTIF_HORLOGE`, ISO — scripts/_horloge-notif.cjs) : une heure calme
 // allumée par défaut ne doit pas rendre un banc vert le jour et rouge la nuit.
 // Jamais posée en production : l'heure réelle décide.
-const instantCalme = () => {
+export const instantNotif = () => {
   const v = typeof process !== 'undefined' && process.env ? process.env.VRM_NOTIF_HORLOGE : '';
   const t = v ? Date.parse(v) : NaN;
   return Number.isFinite(t) ? t : Date.now();
 };
+// Ancien nom (rappels perso, audit-rappels-perso) : la MÊME horloge.
+export const instantCalme = instantNotif;
 export async function sendPushToAll(payload) {
   // ⚠️ QUI NE PAIE PLUS NE REÇOIT PLUS RIEN (Julien, 4 octobre). La règle est
   //    celle de la base (`vrm_acces_pour`), la même qui ferme ses données. On
@@ -370,7 +374,16 @@ export async function sendPushToAll(payload) {
   //   `discret`  : une information sans geste — rangée dans la cloche, ne sonne pas ;
   //   `photo`    : `{ url, preuve: 'meme-email' }` — seule une photo prouvée part ;
   //   `maj`      : la mise à jour d'un objet déjà annoncé — remplace sans re-sonner.
-  const { cat: catBrute = null, _cat, echeance = null, discret = false, photo = null, maj = false, image: _imageNue, ...brut } = payload || {};
+  //   `cle`      : (11 nov.) l'identité de l'objet pour l'idempotence (sinon `tag` + titre).
+  //   `urgent`   : (11 nov.) l'émetteur sait que ça expire aujourd'hui (rappel du matin) :
+  //                passe pendant un JOUR calme et n'attend pas la fenêtre.
+  // (11 nov., lot `notifs-groupees`) Puis, pour une notification de vendeur (une
+  // famille) : JAMAIS DEUX FOIS la même chose (objet + jour, `cleDuJour`) et la
+  // FENÊTRE de regroupement (api/_lib/notif-groupe.js) : un événement non urgent
+  // qui arrive moins de N min après une sonnerie attend le résumé ; l'urgent
+  // (échéance < 24 h, double vente) passe tout de suite. Décidé et rangé dans la
+  // MÊME écriture du journal (deux e-mails simultanés ne sonnent pas tous deux).
+  const { cat: catBrute = null, _cat, echeance = null, discret = false, photo = null, maj = false, cle: cleBrute = '', urgent: urgentBrut = false, image: _imageNue, ...brut } = payload || {};
   const cat = catBrute || _cat || null;
   const notif = { ...brut, ...embellir({ title: brut.title, body: brut.body }, cat) };
   const genre = genreDe(brut.tag);
@@ -379,16 +392,29 @@ export async function sendPushToAll(payload) {
     prefs = (await prefsDuVendeur()) || {};
     if (!decisionNotif(prefs, cat)) return { sent: 0, total: null, coupe: 'preference' };
   }
+  const t = instantNotif();
+  const duVendeur = !!familleDe(cat);
+  const cleIdem = duVendeur && !maj ? cleDuJour({ cle: cleBrute, tag: brut.tag, title: notif.title }, t) : null;
+  // `VRM_NOTIF_FENETRE` : posée par les bancs seulement (scripts/_horloge-notif.cjs), jamais en production.
+  const fenBanc = typeof process !== 'undefined' && process.env ? process.env.VRM_NOTIF_FENETRE : undefined;
+  const fenetre = !duVendeur ? 0 : (fenBanc !== undefined && fenBanc !== '' && Number.isFinite(Number(fenBanc)) ? Math.min(Number(fenBanc), fenetreGroupe(prefs)) : fenetreGroupe(prefs));
+  const urgent = urgentBrut === true || estUrgent({ cat, echeance }, t);
+  const attendre = !!genre && !maj && !urgent;
   const ranger = async (etat) => {
     if (!cat || !owner) return null;
-    try { return await rangerNotif({ cat, titre: notif.title, texte: notif.body, url: notif.url, etat, genre: genre ? genre.id : null }); } catch (_) { return null; }
+    try {
+      return await rangerNotifGroupe({ cat, titre: notif.title, texte: notif.body, url: notif.url, etat, genre: genre ? genre.id : null, cle: cleIdem },
+        { fenetre, attendre: etat === 'envoyee' && attendre, maintenant: t });
+    } catch (_) { return null; }
   };
   if (discret) {
     rangee = await ranger('discret');
+    if (rangee && rangee.doublon) return { sent: 0, total: null, doublon: true };
     return { sent: 0, total: null, discret: true, ...(rangee ? { seq: rangee.seq } : {}) };
   }
-  if (cat && dansHeuresCalmes(prefs, cat, instantCalme(), echeance)) {
+  if (cat && dansHeuresCalmes(prefs, cat, t, echeance, { urgent: urgentBrut === true })) {
     rangee = await ranger('calme');
+    if (rangee && rangee.doublon) return { sent: 0, total: null, doublon: true };
     return { sent: 0, total: null, calme: true, ...(rangee ? { seq: rangee.seq } : {}) };
   }
   // ⚠️ Sans clé privée (variable d'environnement absente), on n'envoie RIEN et
@@ -404,15 +430,28 @@ export async function sendPushToAll(payload) {
   // abonnés », jamais « ce qu'on a réussi à faire ».
   if (!PUSH_PRET) {
     const abonnes = await loadSubs();
-    await ranger('serveur');
+    const r0 = await ranger('serveur');
+    if (r0 && r0.doublon) return { sent: 0, total: null, doublon: true };
     // Même règle un cran plus loin : `total: 0` sur une liste qu'on n'a PAS pu
     // lire serait « aucun appareil abonné ». On rend `null` — « pas su ».
     return { sent: 0, total: abonnes === null ? null : abonnes.length, erreur: 'VAPID_PRIVATE_KEY absente' };
   }
   const subs = await loadSubs();
   if (subs === null) return { sent: 0, total: null, erreur: 'base-injoignable' };
-  if (!subs.length) { await ranger('sans-appareil'); return { sent: 0, total: 0 }; }
+  if (!subs.length) { const r0 = await ranger('sans-appareil'); if (r0 && r0.doublon) return { sent: 0, total: 0, doublon: true }; return { sent: 0, total: 0 }; }
   rangee = await ranger('envoyee');
+  if (rangee && rangee.doublon) return { sent: 0, total: subs.length, doublon: true };
+  if (rangee && rangee.etat === 'attente') return { sent: 0, total: subs.length, attente: true, seq: rangee.seq };
+  // Fenêtre libre et d'autres attendaient : elles partent AVEC celle-ci, en UN résumé.
+  if (rangee && rangee.groupe && rangee.groupe.length) {
+    const ici = (rangee.entrees || []).find((x) => x && x.seq === rangee.seq);
+    const r = resumeDeGroupe([...rangee.groupe, ...(ici ? [ici] : [])]);
+    if (r) {
+      const out = await pousserAuxAppareils(subs, aEnvoyerResume(r, rangee.seq));
+      if (out.sent === 0) { try { await corrigerEtat(rangee.seq, 'echec'); } catch (_) {} }
+      return { ...out, seq: rangee.seq, resume: r.n };
+    }
+  }
   const regroupe = !cat || cat === 'test' ? false : regrouper(prefs);
   const aEnvoyer = {
     ...notif,
@@ -439,6 +478,26 @@ export async function sendPushToAll(payload) {
   }
   const act = actionDe(cat, brut.tag);
   if (act) aEnvoyer.actions = [{ action: act.action, title: act.title, url: aEnvoyer.url || '/' }];
+  const out = await pousserAuxAppareils(subs, aEnvoyer);
+  const { sent, perimes } = out;
+  // Aucun appareil ne l'a acceptée : le centre ne dit pas « envoyée ».
+  if (rangee && sent === 0) { try { await corrigerEtat(rangee.seq, 'echec'); } catch (_) {} }
+  // `perimes` remonte jusqu'à l'écran : « 0 envoyé sur 2 » ne dit pas POURQUOI,
+  // « 2 appareils scellés sur une ancienne clé » dit quoi faire (rouvrir l'app).
+  return { sent, total: subs.length, ...(perimes ? { perimes } : {}), ...(rangee ? { seq: rangee.seq } : {}) };
+}
+
+// La notification d'un résumé (api/_lib/notif-groupe.js) : son étiquette propre
+// (un résumé remplace le précédent), un geste par genre, aucune photo.
+function aEnvoyerResume(r, seq) {
+  const n = { title: r.title, body: r.body, url: r.url, tag: 'vrm-resume', renotify: true, icon: ICONE_NOTIF, badge: BADGE_NOTIF };
+  if (Number.isSafeInteger(seq)) n.notif = seq;
+  if (r.actions && r.actions.length) n.actions = r.actions.map((a) => ({ action: a.action, title: a.title, url: a.url || r.url }));
+  return n;
+}
+
+// Envoie une charge à la liste d'appareils LUE ; purge les morts. Rend { sent, total, perimes }.
+async function pousserAuxAppareils(subs, aEnvoyer) {
   const body = JSON.stringify(aEnvoyer);
   const alive = [];
   let sent = 0, perimes = 0;
@@ -468,9 +527,29 @@ export async function sendPushToAll(payload) {
       return reste.length === cur.length ? null : reste;
     });
   }
-  // Aucun appareil ne l'a acceptée : le centre ne dit pas « envoyée ».
-  if (rangee && sent === 0) { try { await corrigerEtat(rangee.seq, 'echec'); } catch (_) {} }
-  // `perimes` remonte jusqu'à l'écran : « 0 envoyé sur 2 » ne dit pas POURQUOI,
-  // « 2 appareils scellés sur une ancienne clé » dit quoi faire (rouvrir l'app).
-  return { sent, total: subs.length, ...(perimes ? { perimes } : {}), ...(rangee ? { seq: rangee.seq } : {}) };
+  return { sent, total: subs.length, ...(perimes ? { perimes } : {}) };
+}
+
+// (11 nov., lot `notifs-groupees`) LA FIN D'UNE FENÊTRE, sans nouvel envoi : le
+// passage de 15 min (`api/ship-reminders.js?moment=groupe`) appelle ceci, au nom
+// du vendeur du tour. Ce qui attend part en UN résumé ; pendant ses heures
+// calmes, rien ne sonne (les entrées passent « heures calmes » : le récapitulatif
+// du réveil les dira). Appareils pas sus ⇒ RIEN n'est touché (on repassera).
+export async function vidangerResume() {
+  const owner = vendeurDuPush();
+  if (!owner) return { vidange: 'sans-vendeur' };
+  if ((await accesVendeur(owner)) === false) return { vidange: 'abonnement' };
+  const t = instantNotif();
+  const prefs = (await prefsDuVendeur()) || {};
+  const subs = await loadSubs();
+  if (subs === null) return { vidange: 'pas-su' };
+  const muet = !PUSH_PRET ? 'serveur' : !subs.length ? 'sans-appareil' : null;
+  const v = await vidangerAttente({ maintenant: t, etatPour: (x) => (dansHeuresCalmes(prefs, x.cat, t) ? 'calme' : muet || 'groupee') });
+  if (!v) return { vidange: 'pas-su' };
+  if (v.rien) return { vidange: 'rien' };
+  if (!v.groupe.length) return { vidange: muet || 'calme' };
+  const r = resumeDeGroupe(v.groupe);
+  const seq = v.groupe.reduce((m, x) => Math.max(m, x.seq || 0), 0) || null;
+  const out = await pousserAuxAppareils(subs, aEnvoyerResume(r, seq));
+  return { vidange: 'envoye', n: r.n, sent: out.sent };
 }
