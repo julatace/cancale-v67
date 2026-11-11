@@ -22,13 +22,13 @@
 .vrm-oa-vide { margin: 10px 0; font-size: 14px; color: var(--w-gris, var(--vrm-muted)); line-height: 1.4; }
 .vrm-oa-pied { margin: 4px 0 6px; font-size: 12.5px; color: var(--w-gris, var(--vrm-muted)); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .vrm-oa-offre, .vrm-oa-histo {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom puce" "chiffres compte"; gap: 3px 10px; align-items: center;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom nom" "chiffres compte" "puce puce"; gap: 4px 10px; align-items: center;
   padding: 10px 0; border-bottom: .5px solid var(--w-filet, var(--vrm-line)); min-width: 0;
 }
 .vrm-oa-histo { grid-template-areas: "puce chiffres" "nom nom"; grid-template-columns: auto minmax(0, 1fr); }
 .vrm-oa-histo .vrm-oa-chiffres { justify-self: end; }
 .vrm-oa-offre .vrm-oa-nom, .vrm-oa-histo .vrm-oa-nom { grid-area: nom; }
-.vrm-oa-offre .vrm-oa-puce, .vrm-oa-histo .vrm-oa-puce { grid-area: puce; justify-self: end; }
+.vrm-oa-offre .vrm-oa-puce, .vrm-oa-histo .vrm-oa-puce { grid-area: puce; justify-self: start; }
 .vrm-oa-histo .vrm-oa-puce { justify-self: start; }
 .vrm-oa-chiffres { grid-area: chiffres; font-size: 13px; color: var(--w-gris, var(--vrm-muted)); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
 .vrm-oa-chiffres b { color: var(--w-encre, var(--vrm-ink)); font-weight: 700; }
@@ -63,6 +63,10 @@ html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; widt
   background: var(--w-carte, var(--vrm-surface)); border-radius: 999px; box-shadow: 0 6px 24px -6px rgba(0,0,0,.25); }
 .vrm-oa-refus { width: 100%; box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px 12px; margin: 6px 0; font: inherit; font-size: 16px; line-height: 1.4; resize: vertical;
   background: var(--w-remplir, var(--vrm-card2)); color: var(--w-encre, var(--vrm-ink)); min-height: 64px; }
+@media (min-width: 700px) {
+  .vrm-oa-offre { grid-template-areas: "nom puce" "chiffres compte"; }
+  .vrm-oa-offre .vrm-oa-puce { justify-self: end; }
+}
 @media (min-width: 900px) {
   .vrm-oa-paire { grid-template-columns: 44px minmax(0, 1fr) 300px; grid-template-areas: "case nom seuils"; }
   .vrm-oa-seuils { padding-left: 0; }

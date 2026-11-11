@@ -87,14 +87,14 @@ const offre = (oid, item, titre, prix, uid = 111) => ({ id: `harvest_${uid}_conv
         // ── A : l'aperçu ──
         // Allumées, l'app REPUBLIE la garde (src/offresGarde.js) ~4 s après la lecture des ventes :
         // le banc l'attend, puis juge l'aperçu sur la garde PUBLIÉE (complète ⇒ « Acceptée » ;
-        // une plateforme pas relue ⇒ « Pas acceptée · un site n’a pas pu être relu »).
+        // une plateforme pas relue ⇒ « Pas acceptée · un site pas relu »).
         await pg.waitForFunction((t0) => { try { return Number(JSON.parse(localStorage.getItem('vinted_offres_garde')).at) > t0; } catch (_) { return false; } }, t, { timeout: 15000 }).catch(() => {});
         await attendre(600);
         const gComplet = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_offres_garde')).complet === true; } catch (_) { return null; } });
         const ACC = gComplet ? 'accepter' : 'garde';
         await pg.waitForFunction(() => document.querySelectorAll('[data-oa-offre]').length >= 4, null, { timeout: 15000 }).catch(() => {});
         const dec = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-oa-offre]')].map((e) => [e.getAttribute('data-oa-offre'), e.getAttribute('data-oa-decision') + '|' + e.innerText.replace(/\s+/g, ' ')])));
-        dit(gComplet ? /^accepter\|.*Acceptée 3 à 20 min après/.test(dec['111_301'] || '') : /^garde\|.*Pas acceptée · un site n’a pas pu être relu/.test(dec['111_301'] || ''), `A ${tag} : 48 € sur N°2 (dès 45) ⇒ ${gComplet ? '« Acceptée 3 à 20 min après »' : 'garde incomplète publiée par l’app : « Pas acceptée · un site n’a pas pu être relu »'}`, dec['111_301']);
+        dit(gComplet ? /^accepter\|.*Acceptée 3 à 20 min après/.test(dec['111_301'] || '') : /^garde\|.*Pas acceptée · un site pas relu/.test(dec['111_301'] || ''), `A ${tag} : 48 € sur N°2 (dès 45) ⇒ ${gComplet ? '« Acceptée 3 à 20 min après »' : 'garde incomplète publiée par l’app : « Pas acceptée · un site pas relu »'}`, dec['111_301']);
         dit(/^refuser\|.*Refusée/.test(dec['111_302'] || ''), `A ${tag} : 20 € sur N°4 (refus sous 30) ⇒ « Refusée »`, dec['111_302']);
         dit(/^sans\|.*Aucune règle/.test(dec['111_303'] || ''), `A ${tag} : 40 € sur N°5 sans seuil ⇒ « Aucune règle »`, dec['111_303']);
         dit(/^sans\|.*seuil illisible/.test(dec['111_304'] || ''), `A ${tag} : mini « 45,5 » (ignoré par le moteur) ⇒ « seuil illisible », jamais « Acceptée »`, dec['111_304']);
@@ -124,7 +124,7 @@ const offre = (oid, item, titre, prix, uid = 111) => ({ id: `harvest_${uid}_conv
         await pg.locator('[data-oa-paire="51003"] .vrm-oa-case input').check().catch(() => {});
         dit(await pg.locator('[data-oa-serie-ouvrir="2"]').count() === 1, `S ${tag} : deux paires cochées ⇒ « Régler en série · 2 »`);
         const petits = await pg.evaluate(() => [...document.querySelectorAll('[data-offres-auto-ecran] button, [data-offres-auto-ecran] input, [data-offres-auto-ecran] label.vrm-oa-case, [data-offres-auto-ecran] textarea')].filter((x) => { if (x.closest('[hidden],details:not([open])') || x.type === 'checkbox') return false; const r = x.getBoundingClientRect(); return r.height && r.height < 43.5; }).map((x) => (x.getAttribute('aria-label') || x.textContent || x.tagName).trim().slice(0, 30)));
-        dit(!petits.length, `F ${tag} : cibles ≥ 44 px dans l’écran`, petits);
+        if (tel) dit(!petits.length, `F ${tag} : cibles ≥ 44 px au doigt dans l’écran`, petits);   // (souris : 36 px, la règle de l'app)
         const deb = await pg.evaluate(() => { const el = document.querySelector('[data-offres-auto-ecran]'); const r = el.getBoundingClientRect(); const trop = [...el.querySelectorAll('*')].filter((x) => { const q = x.getBoundingClientRect(); return q.width && (q.right > r.right + 1 || q.left < r.left - 1); }).map((x) => x.className || x.tagName).slice(0, 5); return { page: document.documentElement.scrollWidth - innerWidth, trop }; });
         dit(deb.page <= 0 && !deb.trop.length, `F ${tag} : aucun débordement`, deb);
         await pg.locator('[data-oa-paires]').scrollIntoViewIfNeeded().catch(() => {});

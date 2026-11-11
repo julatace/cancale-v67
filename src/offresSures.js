@@ -97,7 +97,7 @@ export const RAISON_GARDE = {
   'vendue-ailleurs': 'vendue ailleurs',
   'garde-absente': 'ouvre VRM pour vérifier les autres sites',
   'garde-perimee': 'ouvre VRM pour vérifier les autres sites',
-  'garde-incomplete': 'un site n’a pas pu être relu',
+  'garde-incomplete': 'un site pas relu',
 };
 
 // offres : la Map de Messages (`${uid}_${conv}` → { prix, tx, oid, item, titre, side })

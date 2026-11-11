@@ -61,7 +61,7 @@ function ChampSeuil({ valeur, onPoser, label, data }) {
   );
 }
 
-export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg, annonces, numeros, offres, garde, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null }) {
+export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg, annonces, numeros, offres, lireGarde = () => null, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null }) {
   const nomDe = React.useCallback((u) => { const a = (comptes || []).find((c) => String(c.uid) === String(u)); return a ? a.nom : ''; }, [comptes]);
   const uids = React.useMemo(() => new Set((comptes || []).map((c) => String(c.uid))), [comptes]);
   // 1. Le plafond du compte de l'onglet (la jauge, et l'alerte avant l'arrêt).
@@ -70,7 +70,15 @@ export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg
   const alerte = u && rowsJauge !== undefined ? alertePlafond(jaugeDuCompte(rowsJauge, u, tJauge)) : null;
   const calme = journeeCalme(freinsVus);
   const pauseMin = pause && Number(pause.jusqua) > Date.now() ? Math.max(1, Math.ceil((Number(pause.jusqua) - Date.now()) / 60000)) : 0;
-  // 2. L'aperçu (rien n'est envoyé).
+  // 2. L'aperçu (rien n'est envoyé). La garde est republiée par l'app (src/offresGarde.js) :
+  //    relue à chaque écriture de `vinted_offres_garde` (`vrm:save`), jamais figée.
+  const [garde, setGarde] = React.useState(() => lireGarde());
+  React.useEffect(() => {
+    setGarde(lireGarde());
+    const f = (e) => { if (!e || !e.detail || e.detail.k === 'vinted_offres_garde') setGarde(lireGarde()); };
+    window.addEventListener('vrm:save', f);
+    return () => window.removeEventListener('vrm:save', f);
+  }, [lireGarde]);
   const apercu = apercuMoteur({ offres, numeros, garde, comptes: uids.size ? uids : null });
   // 3. Les paires.
   const [filtre, setFiltre] = React.useState('toutes');

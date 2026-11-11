@@ -39526,6 +39526,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
   // (11 nov., lot DJ8) Favoris & offres : deux vues, « Favoris » et « Offres auto ».
   const [zoneFav,setZoneFav]=useVueSession('favoris-zone','favoris');
+  const lireGardeOffres=React.useCallback(()=>load('vinted_offres_garde', null),[]);
   // (31 oct., navigation par tâche) Les entrées « Republier », « Favoris &
   // offres », « Retraits » et « Achats » ouvrent CET écran sur la bonne vue : la
   // demande est consommée une fois (DEMANDE_VUE), à l'ouverture ou, l'écran déjà
@@ -44898,7 +44899,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
           refusMsg={refusMsg} setRefusMsg={(v)=>{ setRefusMsg(v); save('vinted_offre_refus_msg', v); }}
           annonces={Array.isArray(listings.items) && !listings.error ? annSelectionnables.filter(a=>a.etat==='en-ligne') : null} numeros={numeros}
-          offres={offresConv} garde={load('vinted_offres_garde', null)} comptes={(accounts||[]).filter(a=>/^\d{1,20}$/.test(String(a.vinted_user_id||''))&&!acctOffOf({_acc:a})).map(a=>({ uid:String(a.vinted_user_id), nom:accNameOf(a) }))}
+          offres={offresConv} lireGarde={lireGardeOffres} comptes={(accounts||[]).filter(a=>/^\d{1,20}$/.test(String(a.vinted_user_id||''))&&!acctOffOf({_acc:a})).map(a=>({ uid:String(a.vinted_user_id), nom:accNameOf(a) }))}
           uidOnglet={(vintedDeChrome()||{}).uid||''} pause={__vmrEtat && __vmrEtat.pause ? __vmrEtat.pause : null} freinsVus={lireFreinsVus()}
           poserSeuils={(liste)=>{ const idx=new Map((listings.items||[]).map(it=>[String(it.id),it])); let n=0; for (const w of liste||[]) { const it=idx.get(String(w.id)); if (!it) continue; const patch={}; if (w.min!==undefined) patch.min=montantSeuil(w.min); if (w.refuse!==undefined) patch.refuse=montantSeuil(w.refuse); updatePair(it, patch); n++; } if ((liste||[]).length>1) toast(`${n} seuil${n>1?'s':''} posé${n>1?'s':''}`); }}
           ouvrirSerie={(ids)=>{ const set=new Set(ids.map(String)); setMiniSel(annSelectionnables.filter(a=>a.etat==='en-ligne'&&set.has(String(a.id)))); }}/>}
