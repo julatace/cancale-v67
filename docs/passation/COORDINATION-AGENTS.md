@@ -146,6 +146,8 @@ aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
 
 - **Agent principal (11 nov. ~18 h 10) — nouveaux chantiers validés par Julien, chez moi** : `claude/retours-litiges` (ext **5.359** réservée si besoin), `claude/tva-marge`, `claude/achats-auto` (e-mails Leboncoin/eBay/Vestiaire), `claude/ebay-complet` (connexion, fenêtres guidées, tous les paramètres eBay), `claude/suivi-travail` (VRM figé + détail + barre de progression pendant Republier/Publier ; ext **5.360** réservée si besoin). Second agent : ne pas y toucher ; prochaines versions libres pour toi : 5.361+.
 
+- **Agent principal (11 nov. ~18 h 20)** : nouveaux chantiers validés par Julien, chez moi : `claude/lbc-plus` (baisse de prix en série, remise en main propre, atelier Republier Leboncoin — ext **5.363** réservée), `claude/vestiaire-plus` (suivi authentification, photos exigées, baisse de prix, offres dans Ma journée — ext **5.364** réservée) ; eBay (offres aux observateurs, promotions, messages eBay) dans `claude/ebay-complet` ; prix modifié partout dans `claude/publier-partout`. Second agent : tes versions libres = 5.361, 5.362, 5.365+.
+
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
