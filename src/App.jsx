@@ -664,6 +664,7 @@ import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as mo
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
+import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
@@ -8531,6 +8532,9 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     const t = v ? Date.parse(v) : 0;
     if (eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
+    // (11 nov., lot vinted-pro) Compte Vinted PRO : un prix que Vinted contredit (liste ≠ article,
+    // relevé muet) n'est pas su ⇒ mise à part et NOMMÉE — sauf une vente déjà déclarée, qui garde son mois.
+    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: o._prixPro.raison || 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
     const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
     if (garde(l)) lignes.push(place(l));
   }
@@ -9226,6 +9230,28 @@ const posteSansDepart = ({ o, cocheLe, captureAt, joursLimite, vuParTransporteur
 // Recupere une page d'achats ou de ventes pour un compte (endpoint reel
 // trouve via "Copy as fetch" : www.vinted.fr/api/v2/my_orders).
 // type: 'purchased' | 'sold' ; statusFilter: 'completed' | 'pending' | 'cancelled' | 'all'
+// ── (11 nov., lot vinted-pro) LES VENTES D'UN COMPTE PRO ─────────────────────────
+// Le profil (Pro ?) puis, POUR UN COMPTE PRO SEULEMENT, les scalaires de ses transactions et
+// les lignes de SON relevé — trois lectures bornées au compte, gardées 60 s (`cachedRow`).
+// Profil pas lu ⇒ rien ne change (« pas su » n'est pas « Pro ») ; transactions pas lues ⇒
+// chaque vente le dit (`_prixPro`), jamais un prix choisi.
+const lecturePrixPro = (uid) => cachedRow(`prixpro_${uid}`, async () => {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return { pro: null };
+  const p = await lireTout(`id=eq.harvest_${u}_profile&select=business:data->payload->user->business,business_account_id:data->payload->user->business_account_id,business_account:data->payload->user->business_account`, { strict: true }).catch(() => null);
+  const pro = Array.isArray(p) && p[0] ? typeCompteVinted({ user: p[0] }) : null;
+  if (pro !== true) return { pro };
+  const [t, r] = await Promise.all([
+    lireTout(`id=like.harvest_${u}_txn_*&select=${SELECT_TXN_PRO}`, { strict: true }).catch(() => null),
+    lireTout(`id=like.harvest_${u}_releve_*&select=id,l:data->lignes`, { strict: true }).catch(() => null),
+  ]);
+  const txns = Array.isArray(t) ? new Map(t.filter((x) => x && x.tx).map((x) => [String(x.tx), x])) : null;
+  const releve = Array.isArray(r) ? relevesProParTx(r.flatMap((x) => (x && Array.isArray(x.l) ? x.l : []))) : null;
+  return { pro, txns, releve };
+});
+const appliquerPrixProCompte = async (uid, items) => {
+  try { const l = await lecturePrixPro(uid); return appliquerPrixPro(items, l || {}); } catch (_) { return items; }
+};
 const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'completed', opts = {}) => {
   const applyStatus = (items) => {
     if (statusFilter === 'pending') return items.filter(it => classifyOrderStatus(it.status) === 'pending');
@@ -9256,7 +9282,10 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
     if (h && Array.isArray(h.my_orders)) {
       // Moisson NON vide : c'est la réponse.
       if (h.my_orders.length > 0) {
-        return { ok: true, items: applyStatus(h.my_orders), pagination: h.pagination || null, source: 'harvest' };
+        // (11 nov., lot vinted-pro) Sur un compte Vinted PRO (profil lu), le prix de chaque vente
+        // est confronté à sa transaction et au relevé (src/vintedPro.js, `_prixPro`).
+        const lus = type === 'sold' ? await appliquerPrixProCompte(account.vinted_user_id, h.my_orders) : h.my_orders;
+        return { ok: true, items: applyStatus(lus), pagination: h.pagination || null, source: 'harvest' };
       }
       // Moisson PRÉSENTE mais vide. On ne va PAS interroger Vinted pour autant :
       // avec 8 comptes, ça faisait ~20 appels depuis l'IP du serveur à chaque
