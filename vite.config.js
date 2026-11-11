@@ -92,7 +92,15 @@ export default defineConfig({
         // le navigateur le garde en cache d'un déploiement à l'autre. À chaque
         // mise à jour de l'app (rechargements fréquents), seul le code applicatif
         // est re-téléchargé, pas les ~130 Ko de React.
-        manualChunks: { react: ['react', 'react-dom'] },
+        // (11 nov.) en fonction : la forme objet ne savait pas regrouper un paquet ET ses dépendances.
+        manualChunks(id) {
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react';
+          // (11 nov., chargement léger) pdf-lib et ce qu'il emporte (pako, ses polices, upng) :
+          // un morceau nommé, demandé seulement par les `import('pdf-lib')` (tampon, factures,
+          // exports). Jamais dans le JS initial : banc scripts/bancs/poids-initial.cjs.
+          if (/[\\/]node_modules[\\/](pdf-lib|@pdf-lib[\\/][^\\/]+|pako)[\\/]/.test(id)) return 'pdf-lib';
+          return undefined;
+        },
       },
     },
   },

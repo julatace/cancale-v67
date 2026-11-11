@@ -10,7 +10,16 @@
 //  Bornes : PDF ≤ 3 Mo, 4 pages, 2 Mo de contenu décodé, 20 000 caractères rendus.
 //  Rend une chaîne ('' = aucun texte lisible) ou null (PDF illisible).
 // ════════════════════════════════════════════════════════════════════════════
-import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, PDFRef, decodePDFRawStream } from 'pdf-lib';
+// (11 nov., chargement léger) pdf-lib est chargé AU PREMIER APPEL de `texteDuPdf`, plus en
+// statique : ce fichier vit aussi dans l'app (transporteur-pdf, chargé à la demande), et son
+// import statique faisait recoller pdf-lib (~390 Ko compressés) au morceau App — téléchargé et
+// évalué à CHAQUE ouverture. Même lecteur, mêmes classes ; seul le moment du chargement change.
+// Banc : scripts/bancs/poids-initial.cjs (rouge si pdf-lib revient dans le JS initial).
+let PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, PDFRef, decodePDFRawStream;
+let pdfLibPret = null;
+const chargerPdfLib = () => pdfLibPret || (pdfLibPret = import('pdf-lib').then((m) => {
+  ({ PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, PDFRef, decodePDFRawStream } = m);
+}, (e) => { pdfLibPret = null; throw e; }));
 
 export const PDF_MAX_OCTETS = 3_000_000;
 const PAGES_MAX = 4;
@@ -243,6 +252,7 @@ function lireContenu(ctx, octets, ressources, sortie, prof, budget) {
 export async function texteDuPdf(src) {
   const u = octetsDe(src);
   if (!u || !estPdf(u) || u.length > PDF_MAX_OCTETS) return null;
+  await chargerPdfLib();
   let doc;
   try { doc = await PDFDocument.load(u, { ignoreEncryption: true, updateMetadata: false, throwOnInvalidObject: false }); } catch (_) { return null; }
   try {
