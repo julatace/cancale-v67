@@ -13,6 +13,7 @@
 import React from 'react';
 import { santeComptes, lireEnvois, EVT_ENVOIS, SEUILS, FENETRE_J } from './santeComptes.js';
 import { SUPABASE_URL, sbAuth, AUTH, load, onCloudReady, useVentesCoque, classifyOrderStatus } from './App.jsx';
+import { lireEtatsComptes } from './etatsComptesLecture.js';
 import { tr, nombre, dateRelative } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './styles-sante-comptes.css';
@@ -27,7 +28,7 @@ export async function lireSourcesSante() {
   const [p, f, e, m] = await Promise.all([
     get(`app_data?id=like.harvest_*_profile&select=${SEL_PROFIL}`),
     get('app_data?id=like.harvest_*_feedbacks&data->>type=eq.feedbacks&select=id,avis:data->payload->user_feedbacks,pag:data->payload->pagination,hist:data->payload->historique'),
-    get('app_data?id=eq.panel_comptes_etat&select=c:data->comptes'),
+    lireEtatsComptes(),   // (11 nov., intégration) partagée avec « Tout va bien ? »
     get('app_data?id=like.moderation_vinted_*&select=id,e:data->e'),
   ]);
   let profils = null;
@@ -40,7 +41,7 @@ export async function lireSourcesSante() {
       return { uid, at: x.at, login: x.login, rep: x.rep, n: x.n, pos: x.pos, neu: x.neu, neg: x.neg, avis: a ? a.avis : undefined, pag: a && a.pag && typeof a.pag === 'object' ? a.pag : null, hist: a && Array.isArray(a.hist) ? a.hist : null };
     });
   }
-  const etats = e ? ((e[0] && e[0].c && typeof e[0].c === 'object') ? e[0].c : {}) : null;
+  const etats = e === null || e === undefined ? null : e;
   let moderation = null;
   if (m) { moderation = {}; for (const x of m) { const u = String((x && x.id) || '').match(/^moderation_vinted_(\d+)$/); if (u && Array.isArray(x.e)) moderation[u[1]] = { e: x.e }; } }
   return { profils, etats, moderation };

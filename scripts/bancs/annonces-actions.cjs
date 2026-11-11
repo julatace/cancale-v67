@@ -204,7 +204,9 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           // (11 nov., rouges A) « Baisser le prix… » (lot C, 10 nov.) est `parPaire` comme « à la main » :
           //  comptes mélangés permis, chaque annonce d'un autre compte que l'onglet ne part JAMAIS
           //  (scripts/audit-annonces-actions.cjs B23–B26 le juge). Les QUATRE tuiles au nom d'un compte restent grisées ici.
-          const parCompte = mix.filter(([k]) => k !== 'mini' && k !== 'main' && k !== 'baisser');
+          // (11 nov., intégration) « Publier partout… » et « Nouveautés de la semaine » non plus : rien ne part
+          //  chez Vinted (multiComptes, non robot — audit-annonces-actions B15/B18).
+          const parCompte = mix.filter(([k]) => k !== 'mini' && k !== 'main' && k !== 'baisser' && k !== 'partout' && k !== 'visuels');
           dit(parCompte.length === 4 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
           dit(mix.some(([k, ok]) => k === 'mini' && ok === 'oui'), `A ${T} « Prix mini… » reste possible sur deux comptes (rien ne part chez Vinted)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
           dit(mix.some(([k, ok]) => k === 'baisser' && ok === 'oui'), `A ${T} « Baisser le prix… » ouvre sa feuille sur deux comptes (une annonce à la fois, autre compte que l’onglet jamais envoyé)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));

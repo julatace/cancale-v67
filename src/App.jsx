@@ -30387,7 +30387,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // lien posé par VRM, référence VRM-{n°}, N° donné au produit) — la même règle que `sitesDuNumero`.
   // Illisible ⇒ Set vide : aucune pastille Vestiaire, jamais une fausse.
   const [vcNumsAnn, setVcNumsAnn] = useState(() => new Set());
-  useEffect(() => { let stop = false; (async () => {
+  // (11 nov., intégration) Lue seulement là où les pastilles se montrent (Annonces) : sur Achats ou Ma
+  // journée, elle doublait la lecture de `vc_listings` d'un autre écran (budget-vitesse).
+  const besoinVcAnn = !only || only === 'annonces';
+  useEffect(() => { if (!besoinVcAnn) return undefined; let stop = false; (async () => {
     let rows = null;
     try { rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`); } catch (_) { rows = null; }
     if (stop || !Array.isArray(rows)) return;
@@ -30397,7 +30400,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const k = numeroVcIdentite(id, it, d.liens || {}); if (k) out.add(k);
     }
     setVcNumsAnn(out);
-  })(); return () => { stop = true; }; }, []);
+  })(); return () => { stop = true; }; }, [besoinVcAnn]);
   useEffect(() => { (async () => {
     try {
       const r = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
@@ -52595,7 +52598,7 @@ const ecrireReglage = async (id, data) => {
     return r.ok;
   } catch (_) { return false; }
 };
-const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus, vendActuel: () => vendActuel(), exemples: () => exemplesActuels() };
+const DEPS_FACTURE = { lireReglage, lireReglageMontage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus, vendActuel: () => vendActuel(), exemples: () => exemplesActuels() };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
 async function lireAbonnement() {
   try {

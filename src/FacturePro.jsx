@@ -45,6 +45,15 @@ const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville
 // ── Une seule lecture de la fiche pour tout l'écran (trois états) ────────────
 const _ecoutesCfg = new Set(); let _cfg; // undefined en cours · null pas su · objet
 function poserCfg(v) { _cfg = v; _ecoutesCfg.forEach((f) => { try { f(v); } catch (_) {} }); }
+// (11 nov., intégration) UNE lecture en vol pour toutes les cartes qui montent ensemble (Ma journée,
+// Argent, TVA sur marge : jusqu'à 5 lectures identiques au démarrage — budget-vitesse). Rien n'est
+// gardé après la réponse : un « pas su » (null) relit à la prochaine demande.
+let _cfgEnVol = null;
+function lireCfgPartagee(deps) {
+  if (_cfgEnVol) return _cfgEnVol;
+  const p = Promise.resolve().then(() => (deps.lireReglageMontage || deps.lireReglage)(ID_CFG)).finally(() => { if (_cfgEnVol === p) _cfgEnVol = null; });
+  _cfgEnVol = p; return p;
+}
 // (9 nov., soir) « Ma configuration » écrit aussi cette fiche (SIRET et ce que le registre
 // propose, sur son « C'est bon ») : elle annonce la ligne ENTIÈRE qu'elle vient d'écrire,
 // la lecture partagée la reprend (sinon « Ma facture » montrerait l'ancienne).
@@ -55,7 +64,7 @@ export function useFicheFacturation(deps) {
   const [cfg, setCfg] = React.useState(_cfg);
   React.useEffect(() => {
     _ecoutesCfg.add(setCfg);
-    if (_cfg === undefined || _cfg === null) deps.lireReglage(ID_CFG).then((d) => poserCfg(d === null ? null : { ...VIDE, ...migrerAncienne(d) })).catch(() => poserCfg(null));
+    if (_cfg === undefined || _cfg === null) lireCfgPartagee(deps).then((d) => poserCfg(d === null ? null : { ...VIDE, ...migrerAncienne(d) })).catch(() => poserCfg(null));
     return () => { _ecoutesCfg.delete(setCfg); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -65,7 +74,7 @@ export function useFicheFacturation(deps) {
 // Comptabilité ne publie la TVA sur marge que pour « marge ») : '' = pas choisi, null = pas su.
 export async function regimeTvaFiche(deps) {
   if (_cfg === undefined || _cfg === null) {
-    try { const d = await deps.lireReglage(ID_CFG); if (d === null || d === undefined) return null; if (_cfg === undefined || _cfg === null) poserCfg({ ...VIDE, ...migrerAncienne(d) }); } catch (_) { return null; }
+    try { const d = await lireCfgPartagee(deps); if (d === null || d === undefined) return null; if (_cfg === undefined || _cfg === null) poserCfg({ ...VIDE, ...migrerAncienne(d) }); } catch (_) { return null; }
   }
   return _cfg ? String(_cfg.tva_regime || '') : null;
 }
