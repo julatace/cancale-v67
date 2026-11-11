@@ -7,7 +7,7 @@
 //  est parti — le signal du banc `chargement.cjs`. Calme = aucune lecture depuis 3 s.
 //  TABS=journee,colis,ventes ; DETAIL=<préfixe> écrit la liste des requêtes (URL,
 //  octets, départ, arrivée, pile d'appel) dans <préfixe>-<onglet>.json.
-//  REPRISE=1 : ouvre l'onglet DEUX fois dans le même navigateur (2e ouverture).
+//  REPRISE=1 : ouvre l'onglet DEUX fois dans le même navigateur (2e ouverture) ; REPRISE=2 : trois.
 //  PROFIL=<préfixe> (9 nov.) : profil CPU (CDP, 500 µs) du démarrage jusqu'au calme,
 //  agrégé par fonction:ligne (propre et inclusif) dans <préfixe>-<onglet>.json — build
 //  NON minifié pour des noms lisibles (npx vite build --minify false --outDir …).
@@ -146,7 +146,8 @@ async function ouvrir(ctx, tab, etiquette) {
         onCommitFiberRoot(id, root) { const t = Math.round(performance.now()); window.__commits.push(t); try { const pile = [root.current]; while (pile.length) { const f = pile.pop(); if (!f) continue; if (f.child) pile.push(f.child); if (f.sibling) pile.push(f.sibling); if (estCompta(f.memoizedProps)) { const av = vus.has(f) ? vus.get(f) : (f.alternate && vus.has(f.alternate) ? vus.get(f.alternate) : undefined); if (av === undefined || av !== f.memoizedState) window.__compta.push(t + (av === undefined ? 'm' : '')); vus.set(f, f.memoizedState); if (f.alternate) vus.set(f.alternate, f.memoizedState); } } } catch (_) {} } };
     });
     console.log(JSON.stringify(await ouvrir(ctx, tab, tab)));
-    if (process.env.REPRISE) console.log(JSON.stringify(await ouvrir(ctx, tab, tab + '-2e')));
+    // REPRISE=2 (11 nov.) : une 3e ouverture aussi (une lecture faite tard à la 1re n'est gardée qu'à la 2e).
+    for (let k = 2; k <= 1 + Math.max(1, Number(process.env.REPRISE) || 1) && process.env.REPRISE; k++) console.log(JSON.stringify(await ouvrir(ctx, tab, tab + '-' + k + 'e')));
     await ctx.close();
   }
   await b.close(); srv.close();

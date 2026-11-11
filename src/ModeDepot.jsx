@@ -14,7 +14,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { useLectureCamera, vibrer, creerBip } from './ScannerColis.jsx';
+import { useLectureCamera, phraseSansCamera, vibrer, creerBip } from './ScannerColis.jsx';
 import { useEcranAllume } from './ModeRelais.jsx';
 import { LogoTransporteur, LogoInconnu } from './PastilleTransporteur.jsx';
 import { ordreDeSeance } from './preparerRelais.js';
@@ -107,7 +107,7 @@ export default function ModeDepot({ colis, etatDe = () => '', onDeposer, onAnnul
         <div className="vrm-depot-scan">
           <div className="vrm-depot-video">
             <video ref={video} playsInline muted autoPlay aria-hidden="true"/>
-            {camera === 'sans' ? <p className="vrm-depot-sans" data-depot-sans-camera="">Pas de caméra : tape le n° du bordereau.</p> : <span className="vrm-depot-viseur" aria-hidden="true"/>}
+            {camera === 'sans' ? <p className="vrm-depot-sans" data-depot-sans-camera="">{phraseSansCamera('Pas de caméra : tape le n° du bordereau.')}</p> : <span className="vrm-depot-viseur" aria-hidden="true"/>}
           </div>
           <div className="vrm-depot-res" role="status" aria-live="assertive" data-depot-resultat={res ? res.etat : ''} data-depot-res-cle={rc ? rc.cle : ''} data-depot-n={res ? res.n : 0}>
             {!res ? <span className="vrm-depot-attente">Scanne chaque bordereau.</span>

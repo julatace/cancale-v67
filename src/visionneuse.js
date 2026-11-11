@@ -125,7 +125,9 @@ export function ouvrirVisionneuse(photos, index = 0, legende = null) {
   if (!L.length) return false;
   const titre = legende && legende.titre ? String(legende.titre).slice(0, 80) : '';
   const sous = legende && legende.sous ? String(legende.sous).slice(0, 120) : '';
-  try { window.dispatchEvent(new CustomEvent(EVT_VISIONNEUSE, { detail: { photos: L, index: Math.max(0, Math.min(Number(index) || 0, L.length - 1)), titre, sous } })); return true; } catch (_) { return false; }
+  // `article` : le titre de l'article montré (mode stream : la photo en grand dit son article, `data-stream-article`).
+  const article = legende && legende.article ? String(legende.article).slice(0, 200) : '';
+  try { window.dispatchEvent(new CustomEvent(EVT_VISIONNEUSE, { detail: { photos: L, index: Math.max(0, Math.min(Number(index) || 0, L.length - 1)), titre, sous, article } })); return true; } catch (_) { return false; }
 }
 
 // Le zoom : borné, et un double toucher bascule 1 ⇄ 2,5.

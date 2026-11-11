@@ -163,7 +163,7 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
             const pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null');
             const attr = (s, a) => (document.querySelector(s) || { getAttribute: () => null }).getAttribute(a);
             return {
-              pub: pub && { total: pub.total, aVerifier: pub.aVerifier, colis: (pub.colis || []).map((c) => c[3]) },
+              pub: pub && { total: pub.total, aVerifier: pub.aVerifier, enVerification: pub.enVerification, colis: (pub.colis || []).map((c) => c[3]) },
               // (11 nov., lot DJ3) Plus d'onglet « À retirer » ni de grande carte dans Achats : le nombre est porté par l'entrée
               // « Achats » de la navigation (la même publication) — la règle (un nombre, le même partout) ne change pas.
               onglet: attr('[data-badge-nav="achats"]', 'data-badge-n'), carte: pub ? String(pub.total) : null,
@@ -171,6 +171,9 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
               lignesJournal: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point [data-cc-carte]')].filter((l) => /journal/i.test(((l.closest('.vrm-rpf-point') || {}).textContent) || '')).length,
               avenir: document.querySelectorAll('.vrm-rpf-section:not(.is-repli) [data-rp-code-a-venir]').length,
               double: attr('[data-rp-section="double"]', 'data-rp-section-n'), verif: attr('.vrm-rpf-verifier', 'data-retirer-a-verifier'),
+              // (11 nov.) Les moitiés Vinted : « Comptés avec un autre colis » (titres) et celles finies avec leur témoin (sortis).
+              titresDouble: [...document.querySelectorAll('.vrm-rpf-double [data-rp-titre]')].map((l) => l.textContent.trim().slice(0, 40)),
+              sortisDoute: [...document.querySelectorAll('[data-sorti-via="doute"]')].map((l) => l.textContent.trim().slice(0, 200)),
               texte: (document.querySelector('.vrm-main') || document.body).innerText,
             };
           });
@@ -178,8 +181,19 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
           dit(m.onglet === String(ATTENDU) && m.carte === String(ATTENDU), '« À retirer · 3 » : la pastille d’Achats et la publication disent le même nombre', `${m.onglet}/${m.carte}`);
           dit(m.journal === 1 && m.lignesJournal === 3, '« Maison du Journal » : UN point, ses 3 colis dedans (même avec un code à venir)', `${m.journal} carte(s), ${m.lignesJournal} ligne(s)`);
           dit(m.avenir === 1, 'le colis sans code garde sa puce « Code à venir » dans la carte du point', String(m.avenir));
-          dit(m.double === '9', '« Peut-être en double · 9 » : les moitiés Vinted sans identité, montrées, jamais comptées', String(m.double));
-          dit(m.pub && m.pub.aVerifier === Number(m.verif || 0), '« à vérifier » : la carte et la liste disent le même nombre', `${m.pub && m.pub.aVerifier}/${m.verif}`);
+          // (11 nov.) Depuis le 9 nov., 17 h 24 (Julien : « TU NE PEUX PAS AVOIR D'HÉSITATION », passation
+          // 2026-11-09-retraits-frais.md) il n'y a plus de « Peut-être en double » : chaque moitié Vinted sans
+          // identité reçoit SON témoin (un témoin = un carton) — comptée AVEC un colis encore au point
+          // (« Comptés avec un autre colis »), ou FINIE avec un colis retiré (dite dans les sortis). Les 9 moitiés
+          // (3 achats « déposé » sans n° + 6 d'une adresse sans compte) sont toutes montrées, chacune UNE fois,
+          // jamais comptées (le total reste 3, ci-dessus) ; il n'y a que 3 colis au point pour les « compter avec ».
+          const nDouble = Number(m.double || 0), nFinies = m.sortisDoute.length;
+          const deuxEtats = m.sortisDoute.filter((t) => m.titresDouble.some((d) => d && t.startsWith(d)));
+          dit(nDouble + nFinies === 9 && nDouble <= ATTENDU && !deuxEtats.length, 'les 9 moitiés Vinted sans identité : chacune UN état (comptée avec un colis au point, ou finie avec lui), montrées, jamais comptées', `${nDouble} comptées avec + ${nFinies} finies${deuxEtats.length ? ' · deux états : ' + deuxEtats.join(' | ') : ''}`);
+          // La liste « À vérifier » porte aussi les achats au point relais qu'aucune identité ne relie
+          // (`enVerification`) : le nombre publié qu'elle doit égaler est celui que lit À trancher (src/aTrancher.js).
+          const pubVerif = m.pub ? Number(m.pub.aVerifier) + (Number(m.pub.enVerification) || 0) : null;
+          dit(pubVerif === Number(m.verif || 0), '« à vérifier » : la publication (à vérifier + en vérification, comme À trancher) et la liste disent le même nombre', `${pubVerif}/${m.verif}`);
           const d = await deborde(pg); dit(d.deb <= 1 && !d.hors.length, 'rien ne déborde', `${d.deb}px ${d.hors.join(' | ')}`);
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-${nom}.png`) });
         });

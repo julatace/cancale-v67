@@ -1,0 +1,28 @@
+/* (11 nov.) Paramètres → Sécurité et sauvegarde → Revenir en arrière (src/restauration.js,
+   `RevenirEnArriere` dans src/App.jsx). La liste reprend celle de la Corbeille (variables DA6) ;
+   l'aperçu : une case par catégorie, ses lignes « maintenant → au moment choisi ». Aucune couleur
+   d'alerte sauf l'ambre pour la question des valeurs plus récentes (un geste à faire, §7). */
+.vrm-retour { display: flex; flex-direction: column; gap: 10px; }
+.vrm-retour-tete { margin: 0 2px; font-size: 13px; color: var(--w-gris, #6E6E73); overflow-wrap: anywhere; }
+.vrm-retour-titre { margin: 0 2px; font-size: 17px; font-weight: 600; color: var(--w-encre, #1D1D1F); }
+.vrm-retour-resume { margin: 0 2px; font-size: 15px; font-weight: 600; color: var(--w-encre, #1D1D1F); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-retour-cats { list-style: none; margin: 0; padding: 0; border-radius: var(--w-r, 24px); background: var(--w-carte, #fff); overflow: hidden; }
+.vrm-retour-cat { padding: 6px 14px 8px 12px; }
+.vrm-retour-cat + .vrm-retour-cat { border-top: .5px solid var(--w-filet, rgba(60,60,67,.18)); }
+.vrm-retour-case { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
+.vrm-retour-case input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--accent, #0071E3); }
+.vrm-retour-case span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-retour-case b { font-size: 15px; font-weight: 600; color: var(--w-encre, #1D1D1F); }
+.vrm-retour-case small { font-size: 12.5px; color: var(--w-gris, #6E6E73); }
+.vrm-retour-lignes { list-style: none; margin: 2px 0 0 34px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-retour-ligne { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; font-size: 13px; color: var(--w-encre, #1D1D1F); }
+.vrm-retour-lib { min-width: 0; max-width: 62%; overflow-wrap: anywhere; }
+.vrm-retour-val { color: var(--w-gris, #6E6E73); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: right; }
+.vrm-retour-ligne.is-garde .vrm-retour-val, .vrm-retour-ligne.is-refus .vrm-retour-val { font-style: italic; }
+.vrm-retour-plus { font-size: 13px; }
+.vrm-retour-conflits { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 16px; background: var(--w-carte, #fff); box-shadow: inset 3px 0 0 var(--warn, #B25E00); }
+.vrm-retour-conflits p { margin: 0; font-size: 13.5px; color: var(--w-encre, #1D1D1F); }
+.vrm-retour-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-retour-actions .vrm-b { min-height: 44px; }
+.vrm-retour-plus { margin-top: 4px; }
+.vrm-retour-lignes.is-conflits { margin: 0; }

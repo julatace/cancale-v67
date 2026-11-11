@@ -33,6 +33,7 @@ export const PREFIXES_INSTANTANE = Object.freeze({
   journee: 'vrm_journee_instantane:',
   colis: 'vrm_colis_instantane:',
   ventes: 'vrm_ventes_instantane:',
+  annonces: 'vrm_annonces_instantane:',   // (11 nov., ouverture-legere-2) src/annoncesInstantanee.js
 });
 const TXT_MAX = 90;
 

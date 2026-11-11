@@ -214,26 +214,31 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
           await capture(pg, 'plus-telephone');
-          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Argent|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Argent · Moi', JSON.stringify(f && f.groupes));
+          // (11 nov.) Depuis le 10 nov. (lot AO, Julien : « l'onglet Compta est trop flou, relie-le avec Stats ») UNE entrée « Argent »
+          // (`compta`, dans « Gérer ») remplace Statistiques et Compta : plus de groupe « Argent » à part (src/App.jsx, GROUPES_PLUS).
+          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Moi', JSON.stringify(f && f.groupes));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           // (5 nov.) « E-mails » rejoint « Gérer » (demande du 5 nov., `docs/passation/2026-11-05-onglet-emails.md`).
           dit(exp.join('|') === 'trancher|garage|emails|compta', 'J. « Gérer » : À trancher (lot AC), Stock, E-mails, Argent ; Achats est dans la barre (lot DJ3), aucune entrée « Colis à retirer »', exp.join('|'));
+          const libArgent = await pg.evaluate(() => { const e = document.querySelector('.vrm-sheet [data-nav-entree="compta"]'); return e ? e.innerText.trim() : ''; });
+          dit(libArgent === 'Argent', 'J. l’entrée `compta` s’appelle « Argent »', libArgent);
           dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
           dit(!!f && !['journee', 'annonces', 'ventes', 'achats', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && new Set(f.entrees).size === f.entrees.length, 'I. aucune entrée deux fois', JSON.stringify(f && f.entrees));
           // (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages et Republier dans Annonces »)
           // « Republier » et « Favoris & offres » ne sont plus des entrées : ils vivent DANS Annonces et Messages (banc navigation-fusion).
-          dit(!!f && ['messages', 'garage', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('republier') && !f.entrees.includes('favoris'), 'I. « Plus » porte Messages, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres — plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
+          dit(!!f && ['messages', 'garage', 'compta', 'communaute'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('settings') && !f.entrees.includes('dashboard') && !f.entrees.includes('republier') && !f.entrees.includes('favoris') && !f.entrees.includes('achats'), 'I. « Plus » porte Messages, Achats, Stock, Argent (Statistiques + Compta, lot AO), Communauté — Paramètres derrière le profil (lot DJ6), plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
+          dit(await pg.evaluate(() => !!document.querySelector('[data-profil-tete]')), 'I. au téléphone, Paramètres derrière la photo du profil (en-tête)');
           dit(!!f && f.petits === 0, 'I. rangées ≥ 44 px', String(f && f.petits));
         } else {
           const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="ventes"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
           dit(col.taches.join('|') === 'journee|annonces|ventes|messages|achats', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Achats (lot DJ3)', col.taches.join('|'));
           // (9 nov., lot AL) « Vendre » n'avait plus que Republier et Favoris & offres dans la colonne : vide, il disparaît.
-          dit(col.groupes.join('|') === 'Gérer|Argent|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
+          dit(col.groupes.join('|') === 'Gérer|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'trancher|garage|emails|compta' && !col.toutes.includes('retraits') && !col.toutes.includes('cat_bord'), 'J. colonne, « Gérer » : À trancher (lot AC), Stock, E-mails, Argent ; aucune entrée « Colis » ni « Colis à retirer » (lot DJ3)', exp.join('|'));
+          dit(exp.join('|') === 'trancher|garage|emails|compta' && !col.toutes.includes('retraits') && !col.toutes.includes('cat_bord') && !col.toutes.includes('dashboard'), 'J. colonne, « Gérer » : À trancher (lot AC), Stock, E-mails, Argent (lot AO ; Achats est dans la colonne des tâches, lot DJ3) ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.length === 0, 'J. colonne sans section « Plateformes », sites dans les tâches', plat.join('|'));
           // (6 nov.) La cloche se calcule après ses lectures (passage asynchrone) : sur une
@@ -249,7 +254,10 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(!cpt.cat_bord && cpt.ventes === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster, sur Ventes SEULEMENT depuis le lot DJ3 ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
           dit(!cpt.plat_ebay && !cpt.plat_leboncoin && !cpt.messages, 'J. aucun compteur sans nombre connu (eBay, Leboncoin, Messages)', JSON.stringify(cpt));
           dit(new Set(col.toutes).size === col.toutes.length, 'A. aucune entrée deux fois dans la colonne', col.toutes.join('|'));
-          dit(col.toutes[col.toutes.length - 1] === 'settings', 'A. Paramètres en bas', col.toutes.join('|'));
+          // (11 nov., lot DJ6 — Julien : « Paramètres caché derrière le profil ») Paramètres n'est plus une entrée :
+          // la carte du compte, au pied de la colonne, ouvre le menu du profil (Paramètres en tête, src/profil/MenuProfil.jsx).
+          const profilPied = await pg.evaluate(() => { const c = document.querySelector('.vrm-sidebar [data-nav-compte-ouvre="profil"]'); const der = [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].pop(); return { carte: !!c, sous: !!(c && c.closest('.vrm-rail-pied')) }; });   // au pied de la colonne (avec Communauté)
+          dit(!col.toutes.includes('settings') && profilPied.carte && profilPied.sous, 'A. Paramètres derrière le profil : la carte du compte, au pied de la colonne', col.toutes.join('|') + ' · ' + JSON.stringify(profilPied));
           dit(col.badge !== '' && col.badge === String(col.pub) && Number(col.badge) > 0, 'H. badge des colis à poster (Ventes) = le nombre publié', JSON.stringify({ b: col.badge, pub: col.pub }));
         }
         dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
@@ -445,9 +453,9 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
       });
       if (!tel) await essaie('1512×900 : la colonne tient sans défiler', async () => {
         const { ctx, pg } = await ouvrir(b, false, 'journee', { hauteur: 900 });
-        const h = await pg.evaluate(() => { const z = document.querySelector('.vrm-sidebar .vrm-rail-scroll'); const der = [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].pop(); return z && der ? { sh: z.scrollHeight, ch: z.clientHeight, bas: Math.round(der.getBoundingClientRect().bottom), vh: innerHeight, der: der.getAttribute('data-nav-entree') } : null; });
+        const h = await pg.evaluate(() => { const z = document.querySelector('.vrm-sidebar .vrm-rail-scroll'); const der = [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].pop(); const prof = document.querySelector('.vrm-sidebar [data-nav-compte-ouvre="profil"]'); return z && der ? { sh: z.scrollHeight, ch: z.clientHeight, bas: Math.round(der.getBoundingClientRect().bottom), vh: innerHeight, der: der.getAttribute('data-nav-entree'), profil: prof ? Math.round(prof.getBoundingClientRect().bottom) : null } : null; });
         await capture(pg, 'colonne-900');
-        dit(!!h && h.sh <= h.ch + 1 && h.bas <= h.vh && h.der === 'settings', 'J. à 900 px de haut, toute la colonne se voit sans défiler (Paramètres en dernier)', JSON.stringify(h));
+        dit(!!h && h.sh <= h.ch + 1 && h.bas <= h.vh && h.der === 'communaute' && h.profil != null && h.profil <= h.vh, 'J. à 900 px de haut, toute la colonne se voit sans défiler (Communauté en dernier, le profil — Paramètres — visible)', JSON.stringify(h));
         await ctx.close();
       });
 

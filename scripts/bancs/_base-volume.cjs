@@ -222,10 +222,12 @@ function filtreId(expr) {
 function filtreOr(expr) {
   // or=(id.like.a,id.like.b) — et (8 nov.) or=(data->>x.is.null,data->>x.neq.v)
   const corps = expr.replace(/^\(|\)$/g, '');
-  const parts = corps.split(/,(?=id\.|data->)/);
+  // (11 nov.) et or=(updated_at.gte."…",data->>capturedAt.gte."…") — la version d'une famille.
+  const parts = corps.split(/,(?=id\.|data->|updated_at\.)/);
   const fs = parts.map((p) => {
     let m = /^id\.(.*)$/.exec(p); if (m) { const f = filtreId(m[1]); return (row) => f(row.id); }
     m = /^(data(?:->>|->)[A-Za-z_]+)\.(.*)$/.exec(p); if (m) return filtreData(m[1], m[2]);
+    m = /^updated_at\.(gte|gt)\.(.*)$/.exec(p); if (m) { const b = Date.parse(m[2].replace(/^"(.*)"$/, '$1')); return (row) => { const t = Date.parse(row.updated_at || ''); return Number.isFinite(t) && (m[1] === 'gte' ? t >= b : t > b); }; }
     return () => false;
   });
   return (row) => fs.some((f) => f(row));
@@ -239,8 +241,9 @@ function filtreData(cle, expr) {
     let m;
     if ((m = /^eq\.(.*)$/.exec(expr))) return String(v) === m[1];
     if ((m = /^neq\.(.*)$/.exec(expr))) return v != null && String(v) !== m[1];   // SQL : NULL <> x n'est pas vrai
-    if ((m = /^gte\.(.*)$/.exec(expr))) return v != null && String(v) >= m[1];
-    if ((m = /^gt\.(.*)$/.exec(expr))) return v != null && String(v) > m[1];
+    // Une valeur entre guillemets (`gte."2026-…"`) est la même valeur, comme chez PostgREST.
+    if ((m = /^gte\.(.*)$/.exec(expr))) return v != null && String(v) >= m[1].replace(/^"(.*)"$/, '$1');
+    if ((m = /^gt\.(.*)$/.exec(expr))) return v != null && String(v) > m[1].replace(/^"(.*)"$/, '$1');
     if ((m = /^lt\.(.*)$/.exec(expr))) return v != null && String(v) < m[1];
     return true;
   };
@@ -271,7 +274,7 @@ function repondre(url, rangeHeader, { rows, main, accounts }) {
   if (mr) { from = Number(mr[1]); to = Math.min(Number(mr[2]), from + 999, total - 1); }
   let page = L.slice(from, to + 1);
   if (limit != null) page = page.slice(0, limit);
-  return { status: 200, body: page.map((r) => projette(r, select)), headers: { 'content-range': `${from}-${from + page.length - 1}/${total}` } };
+  return { status: 200, body: page.map((r) => projette(r, select)), headers: { 'content-range': `${from}-${from + page.length - 1}/${total}`, 'access-control-expose-headers': 'Content-Range' } };   // (11 nov.) Supabase expose `Content-Range` au navigateur (CORS)
 }
 
 module.exports = { fabriquer, repondre, projette };

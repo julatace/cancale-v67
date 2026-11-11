@@ -1,0 +1,99 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « ME LE RAPPELER » (11 nov.) — src/Rappels.jsx
+   Neutre (§7 : un rappel n'est pas une alerte) : carte blanche, encre, gris
+   d'iOS ; l'accent bleu seulement sur le choix retenu et « Enregistrer ».
+   Cibles au doigt 44 px. Variables `--w-*` (styles-widgets-ios.css : clair/sombre).
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-rp-icone { flex-shrink: 0; }
+.vrm-rp-bouton {
+  font-family: inherit; -webkit-tap-highlight-color: transparent; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%;
+  min-height: 44px; padding: 0 14px; border: 0; border-radius: 14px; margin: 0;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F);
+  font-size: 15px; font-weight: 500; text-align: left;
+}
+.vrm-rp-bouton .vrm-rp-icone { color: var(--w-gris, #6E6E73); }
+.vrm-rp-bouton.is-ligne { width: auto; display: inline-flex; min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; position: relative; }
+.vrm-rp-bouton.is-ligne::after { content: ''; position: absolute; inset: -4px 0; }
+.vrm-rp-bouton:focus-visible, .vrm-rp-geste:focus-visible, .vrm-rp-choix:focus-visible, .vrm-rp-ouvrir:focus-visible, .vrm-rp-rapide:focus-visible, .vrm-rp-enregistrer:focus-visible { outline: 2px solid var(--w-accent, #0071E3); outline-offset: 2px; }
+
+/* ── La feuille ─────────────────────────────────────────────────────────────── */
+.vrm-rp-feuille { display: grid; gap: 14px; padding: 4px 0 8px; }
+.vrm-rp-deja { margin: 0; font-size: 13px; color: var(--w-gris, #6E6E73); }
+.vrm-rp-quand { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: 0; }
+.vrm-rp-quand legend, .vrm-rp-note > span { font-size: 13px; font-weight: 600; color: var(--w-gris, #6E6E73); padding: 0 0 6px; }
+.vrm-rp-note small { font-weight: 400; }
+.vrm-rp-choix {
+  font-family: inherit; -webkit-tap-highlight-color: transparent; cursor: pointer; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 58px; min-width: 0;
+  padding: 8px 12px; border-radius: 14px; border: 1.5px solid transparent; margin: 0; text-align: left;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F);
+}
+.vrm-rp-choix b { font-size: 15px; font-weight: 600; }
+.vrm-rp-choix small { font-size: 12px; color: var(--w-gris, #6E6E73); }
+.vrm-rp-choix[aria-pressed="true"], .vrm-rp-choix.is-choisi { border-color: var(--w-accent, #0071E3); background: var(--w-carte, #fff); }
+.vrm-rp-date input {
+  font: inherit; font-size: 14px; color: var(--w-encre, #1D1D1F); background: transparent; border: 0; padding: 2px 0 0; min-height: 26px; width: 100%; min-width: 0;
+}
+.vrm-rp-note { display: grid; gap: 0; }
+.vrm-rp-note input {
+  font: inherit; font-size: 16px; box-sizing: border-box; width: 100%; min-height: 44px; padding: 0 12px;
+  border-radius: 12px; border: 1px solid var(--w-filet, rgba(60,60,67,.18)); background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F);
+}
+.vrm-rp-rapides { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
+.vrm-rp-rapide {
+  font-family: inherit; cursor: pointer; position: relative; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 0; margin: 0;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); font-size: 13px; font-weight: 500;
+}
+.vrm-rp-rapide::after { content: ''; position: absolute; inset: -5px 0; }
+.vrm-rp-rapide[aria-pressed="true"] { background: var(--w-encre, #1D1D1F); color: var(--w-carte, #fff); }
+.vrm-rp-quand-dit { margin: 0; font-size: 13px; color: var(--w-gris, #6E6E73); line-height: 1.4; }
+.vrm-rp-quand-dit b { color: var(--w-encre, #1D1D1F); font-weight: 600; }
+.vrm-rp-enregistrer {
+  font-family: inherit; cursor: pointer; width: 100%; min-height: 50px; border: 0; border-radius: 14px; margin: 0;
+  background: var(--w-accent, #0071E3); color: #fff; font-size: 17px; font-weight: 600;
+}
+.vrm-rp-enregistrer:disabled { opacity: .4; cursor: default; }
+
+/* ── La carte (Ma journée) et la liste (Paramètres) ─────────────────────────── */
+.vrm-rp-carte {
+  background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F); border-radius: var(--w-r, 24px);
+  box-shadow: var(--w-ombre, none); padding: 14px 16px 6px; margin: 16px 0; box-sizing: border-box; max-width: 100%;
+}
+.vrm-rp-carte h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+.vrm-rp-carte h3 .vrm-rp-icone { color: var(--w-gris, #6E6E73); }
+.vrm-rp-carte h3 small { margin-left: auto; font-size: 15px; font-weight: 500; color: var(--w-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-rp-liste { list-style: none; margin: 0; padding: 0; }
+.vrm-rp-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 0; border-top: .5px solid var(--w-filet, rgba(60,60,67,.18)); min-width: 0; }
+.vrm-rp-liste > .vrm-rp-ligne:first-child { border-top: 0; }
+.vrm-rp-ouvrir {
+  font-family: inherit; cursor: pointer; flex: 1 1 220px; min-width: 0; min-height: 44px; display: flex; flex-direction: column; justify-content: center;
+  gap: 2px; border: 0; margin: 0; padding: 0; background: transparent; color: inherit; text-align: left;
+}
+.vrm-rp-obj { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.vrm-rp-texte { font-weight: 400; }
+.vrm-rp-sous { font-size: 13px; color: var(--w-gris, #6E6E73); overflow-wrap: anywhere; }
+.vrm-rp-gestes { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.vrm-rp-geste {
+  font-family: inherit; cursor: pointer; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 999px; border: 0; margin: 0;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); font-size: 14px; font-weight: 500;
+}
+.vrm-rp-geste.is-discret { background: transparent; color: var(--w-gris, #6E6E73); }
+.vrm-rp-params { display: grid; gap: 14px; }
+.vrm-rp-bloc h4 { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--w-gris, #6E6E73); text-transform: none; }
+.vrm-rp-pied { margin: 0; font-size: 12px; color: var(--w-gris, #6E6E73); }
+.vrm-rp-vide { display: flex; gap: 10px; align-items: flex-start; color: var(--w-gris, #6E6E73); font-size: 14px; }
+.vrm-rp-vide p { margin: 0; line-height: 1.4; }
+
+/* ── Le bandeau (ouvert par la notification) ────────────────────────────────── */
+.vrm-rp-bandeau {
+  position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); z-index: 19000;
+  margin: 0 auto; max-width: 560px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+  padding: 10px 10px 10px 14px; border-radius: 18px; background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F);
+  box-shadow: 0 8px 30px -6px rgba(0,0,0,.25), 0 0 0 .5px var(--w-filet, rgba(60,60,67,.18));
+}
+.vrm-rp-bandeau > .vrm-rp-icone { color: var(--w-gris, #6E6E73); }
+.vrm-rp-bandeau-txt { flex: 1 1 180px; min-width: 0; display: grid; gap: 2px; }
+.vrm-rp-bandeau-txt b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.vrm-rp-bandeau-txt small { font-size: 13px; color: var(--w-gris, #6E6E73); }
+@media (min-width: 768px) { .vrm-rp-bandeau { bottom: 24px; } }

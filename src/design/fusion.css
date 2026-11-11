@@ -873,7 +873,7 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] >
    recherche collée était BLANCHE sur une page grise, et le texte qui défilait passait dessous
    coupé net. Elle prend le fond de la page (translucide, flou façon Apple) et un filet sous
    elle : ce qui passe dessous est voilé, jamais tranché ; ailleurs, même geste sur fond blanc. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   html body .vrm-app-shell .vrm-main > .vrm-barre-haut {
     background-color: color-mix(in srgb, var(--vrm-bg, #fff) 84%, transparent) !important;
     -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
@@ -924,7 +924,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-va-titre 
 /* Ordinateur (#13) : les quatre écrans Fusion tiennent dans une colonne lisible de 760 px,
    centrée (la carte sombre ne s'étire plus sur 1 150 px) ; Ventes perd ses en-têtes de
    colonnes (« Article / État / Prix… ») que les cartes ne suivent pas. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   /* (3 nov.) Sauf la messagerie en volets (liste · fil · fiche) : à 760 px le fil n'avait plus que 100 px. */
   /* (5 nov.) Et jamais une couche plein écran (role=dialog|alertdialog) : voir jetons.css §9. */
   html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran):not(:has(.vrm-message-workspace)) > :not(.vrm-barre-haut):not(style):not(script):not([role="dialog"]):not([role="alertdialog"]) { max-width: var(--vrm-largeur-contenu, 760px) !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }

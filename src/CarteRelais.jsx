@@ -29,6 +29,7 @@
 //  sont sous « Point pas encore connu », avec la raison et le geste.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import LigneGlissable from './LigneGlissable.jsx';   // (11 nov., gestes-glisser) « Retiré » / « Le code » au glisser
 import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN, surLaCarte } from './relaisColis.js';
 import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, selecteurVilles as selecteurVillesRegle, CLE_AUTRES, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
 import './styles-colis-colonnes.css';
@@ -402,8 +403,16 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '',  // (lot AJ) l'arrivée lue qui range la ligne
     'data-rp-sources': marques.join(','), 'data-rp-verifie': Number.isFinite(x.verifieMs) ? String(x.verifieMs) : '', 'data-rp-code-sur': x.code && x.codeSur ? '1' : undefined, 'data-rp-codes-desaccord': desaccord ? desaccord.map((d) => d.source + ':' + d.code).join(',') : undefined };
   const basculer = () => setOuvert((o) => !o);
+  // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
+  // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
+  // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).
+  const actionsG = [
+    retirer ? { cle: 'retire', libelle: 'Retiré', icone: <IcoCoche/>, faire: () => retirer(x), data: { 'data-lg-retire': x.cle } } : null,
+    aCode ? { cle: 'code', libelle: desaccord ? '2 codes' : 'Le code', icone: <IcoCode/>, faire: () => (desaccord ? setOuvert(true) : voirCode()), data: { 'data-lg-code': x.cle } } : null,
+  ];
   return (
-    <div className="vrm-rpf-ligne" {...attrs} data-ouvert={ouvert ? '1' : undefined}>
+    <LigneGlissable actions={actionsG} cle={x.cle} libelle={x.titre || 'colis'}>{(gp, tiroirG) => (
+    <div className="vrm-rpf-ligne" {...attrs} {...gp} data-ouvert={ouvert ? '1' : undefined}>
       {/* Le code de CE colis, lisible par les autres écrans et les bancs (`data-code-retrait`) ; affiché au toucher. */}
       {x.code ? <span hidden data-code-retrait={x.code}/> : null}
       <div className="vrm-rpf-rang">
@@ -445,9 +454,13 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
       </div> : null}
+      {tiroirG}
     </div>
+    )}</LigneGlissable>
   );
 }
+const IcoCoche = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>;
+const IcoCode = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h3v3h-3zM20.5 14v3M17.5 20.5h3"/></svg>;
 // (3 nov., Julien : « si il y a 2 villes sur la carte, je veux que l'on puisse sélectionner une ville »)
 // (3 nov., 18 h 59 : « il ne reconnaît pas les villes ») LA RÈGLE est dans src/villeRelais.js : la ville
 // LUE (avec ou sans code postal — les consignes Vinted Go n'en écrivent jamais), normalisée (casse,

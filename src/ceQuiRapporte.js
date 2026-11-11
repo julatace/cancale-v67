@@ -175,18 +175,46 @@ export const classementRapporte = (lignes, axe = 'modele') => {
 // Leboncoin, eBay et Vestiaire : `autres` (= `ventesAutresBenefice`, déjà
 // finalisées, en euros, prix d'achat par identité) et le titre de LA vente
 // retrouvé par SON identifiant (`titreDe`).
-export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, numero = () => '', versement = () => '', autres = [], titreDe = {}, an0 }) => {
+// (11 nov., lot ventes-lot) `articles(o)` : les articles d'une vente EN LOT, [[titre, N°, part
+// (centimes), achat (centimes|null), item]] (src/venteLot.js) — rangés en [10] de SA ligne, la vente
+// reste UNE ligne (CA, frais, compte inchangés) ; `eclaterReleveLots` en fait une ligne par article
+// pour les marges par modèle / marque / taille.
+export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, numero = () => '', versement = () => '', autres = [], titreDe = {}, an0, articles = () => null }) => {
   const out = [];
   for (const o of (Array.isArray(vinted) ? vinted : [])) {
     if (!o || estMasquee(o) || !estFinalisee(o)) continue;
     const t = o.date ? Date.parse(o.date) : NaN;
     if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
     const vers = versement(o);
-    out.push(['Vinted', String(compte(o) || ''), String(o.transaction_id || ''), t, montant(o), achat(o), frais(o), String(o.title || '').slice(0, 90), String(numero(o) || ''), vers ? String(vers) : '']);
+    const ligne = ['Vinted', String(compte(o) || ''), String(o.transaction_id || ''), t, montant(o), achat(o), frais(o), String(o.title || '').slice(0, 90), String(numero(o) || ''), vers ? String(vers) : ''];
+    const arts = articles(o);
+    if (Array.isArray(arts) && arts.length > 1) ligne.push(arts);
+    out.push(ligne);
   }
   for (const x of (Array.isArray(autres) ? autres : [])) {
     if (!x || !isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
     out.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90), String(x.num || ''), new Date(x.ts).toISOString()]);
+  }
+  return out;
+};
+
+// (11 nov., lot ventes-lot) UNE LIGNE PAR ARTICLE pour les marges par groupe : chaque article d'un
+// lot prend SA part du prix (déjà répartie au centime, src/venteLot.js), son prix d'achat, et une part
+// des frais au même prorata ; la somme des lignes vaut la vente (rien perdu, rien compté deux fois).
+// Une ligne sans articles reste telle quelle. [10] d'une ligne éclatée = l'identifiant d'annonce.
+export const eclaterReleveLots = (lignes) => {
+  const out = [];
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    const arts = Array.isArray(r) && Array.isArray(r[10]) ? r[10] : null;
+    if (!arts || arts.length < 2 || !arts.every((a) => Array.isArray(a) && Number.isSafeInteger(a[2]))) { out.push(Array.isArray(r) && Array.isArray(r[10]) ? r.slice(0, 10) : r); continue; }
+    const total = arts.reduce((s, a) => s + a[2], 0);
+    const fraisC = r[6] == null ? null : Math.round(Number(r[6]) * 100);
+    let fraisReste = fraisC;
+    arts.forEach((a, i) => {
+      let f = null;
+      if (fraisC != null) { f = i === arts.length - 1 ? fraisReste : (total > 0 ? Math.round(fraisC * a[2] / total) : 0); fraisReste -= f; }
+      out.push([r[0], r[1], r[2], r[3], a[2] / 100, a[3] == null ? null : a[3] / 100, f == null ? null : f / 100, String(a[0] || '').slice(0, 90), String(a[1] || ''), r[9], String(a[4] || '')]);
+    });
   }
   return out;
 };

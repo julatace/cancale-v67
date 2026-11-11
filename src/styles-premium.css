@@ -459,7 +459,7 @@
    Elle était translucide (84 % + flou) : les rangées, la carte sombre et le bleu de
    la frise passaient dessous en transparence, comme si l'en-tête chevauchait le
    contenu. La bande au-dessus d'elle (rembourrage de la page) se couvre aussi. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-main > .vrm-barre-haut {
     background: var(--p-fond) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
     box-shadow: 0 -32px 0 0 var(--p-fond), 0 .5px 0 0 var(--p-filet) !important;
@@ -994,7 +994,7 @@
 /* 12.6 LA BARRE DU BAS (téléphone), sur TOUS les écrans — fond PLEIN (le contenu ne
    transparaît plus sous un flou), filet de 0,5 px, libellé 10/500 gris, l'actif en
    600 à l'encre et son icône bleue ; compteur = pastille ambre de 18 px tabulaire. */
-@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse) {
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
   .vrm-app-shell .vrm-tabbar {
     background: var(--p-carte) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
     border-top: .5px solid var(--p-filet) !important; box-shadow: none !important;
@@ -1035,7 +1035,7 @@ html body .vrm-fs button.vrm-fs-croix:disabled { cursor: not-allowed !important;
 /* 13.3 LES MESSAGES ET LA PILULE « ANNULER » AU TÉLÉPHONE — au-dessus de la barre du bas
    ET du clavier (`--vrm-clavier`, posé par Toaster depuis `visualViewport`) ; un message
    dit pendant que la pilule est là monte d'un cran au lieu de la couvrir. */
-@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse) {
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
   .vrm-pil-zone:not([data-pilule-place="haut"]) { bottom: max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px)) !important; }
   body:has(.vrm-pil-zone[data-pilule-place="bas"] .vrm-pil) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px)) + 60px) !important; }
   body:has(.vrm-pil-zone[data-pilule-place="haut"] .vrm-pil) .vrm-toasts[data-toasts-place="haut"] { top: calc(72px + env(safe-area-inset-top)) !important; }

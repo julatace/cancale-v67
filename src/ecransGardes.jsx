@@ -47,7 +47,9 @@ export const MAX_GARDES = 4;
 export const AGE_MAX_CACHE_MS = 10 * 60 * 1000;
 // Clés dont la sauvegarde ne rend aucun écran périmé : des préférences d'affichage
 // d'UN écran (repliée / dépliée), réécrites à chaque montage de Comptabilite.
-export const CLES_NEUTRES = ['vinted_analyse_open', 'vinted_tips_open', 'vinted_off_open'];
+// (11 nov., reprise-ecrans) + `vrm_reprise_ecrans` : l'écran ouvert et les filtres retenus,
+// réécrits à CHAQUE changement d'écran — sans elle, aucun écran ne resterait jamais gardé.
+export const CLES_NEUTRES = ['vinted_analyse_open', 'vinted_tips_open', 'vinted_off_open', 'vrm_reprise_ecrans'];
 // Signaux de données (même sans sauvegarde) : l'écran caché ne les a pas suivis.
 const SIGNAUX = ['vrm:transp-maj', 'vrm:ebay-maj', 'vrm:suivis-relire', 'vrm:suivis-manuels', 'vrm:nuage-relu', 'vrm-prefixe', 'vrm-numero-ecrit'];
 
