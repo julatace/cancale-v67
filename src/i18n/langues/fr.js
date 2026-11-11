@@ -6,7 +6,11 @@
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_journee from './fr/journee.js';
 import ecran_ventes from './fr/ventes.js';
+import ecran_commun from './fr/commun.js';
+import ecran_achats from './fr/achats.js';
 export default {
+  ...ecran_achats,
+  ...ecran_commun,
   ...ecran_ventes,
   ...ecran_journee,
   // ── commun

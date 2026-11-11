@@ -1,7 +1,11 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
 import ecran_journee from './it/journee.js';
 import ecran_ventes from './it/ventes.js';
+import ecran_commun from './it/commun.js';
+import ecran_achats from './it/achats.js';
 export default {
+  ...ecran_achats,
+  ...ecran_commun,
   ...ecran_ventes,
   ...ecran_journee,
   // ── commun

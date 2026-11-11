@@ -1,7 +1,11 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 import ecran_journee from './en/journee.js';
 import ecran_ventes from './en/ventes.js';
+import ecran_commun from './en/commun.js';
+import ecran_achats from './en/achats.js';
 export default {
+  ...ecran_achats,
+  ...ecran_commun,
   ...ecran_ventes,
   ...ecran_journee,
   // ── commun

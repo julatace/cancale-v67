@@ -131,6 +131,7 @@ function lister() {
   const dansTr = (p) => !!p.findParent((q) => q.isCallExpression() && q.node.callee.type === 'Identifier' && (q.node.callee.name === 'tr' || q.node.callee.name === 't'));
   const garder = (p, n, quoi, texte, vars) => {
     if (!dans(n)) return;
+    if (typeof dansPhrase === 'function' && dansPhrase(n)) return;
     if (!dansFonction(p)) { manuels.push({ ligne: ligne(n), pourquoi: 'niveau module', texte }); return; }
     if (sousIgnore(p) || dansTr(p)) return;
     if (trLocal(p)) { manuels.push({ ligne: ligne(n), pourquoi: '`tr` est une variable locale ici', texte }); return; }
@@ -139,7 +140,8 @@ function lister() {
   };
   const lit = (p, quoi) => {
     const n = p.node;
-    if (n.type === 'StringLiteral') { if (estTexte(n.value) && (quoi !== 'enfant' || !/^[a-z][\w-]*$/.test(n.value))) garder(p, n, quoi, n.value, null); return; }
+    // Un mot-identifiant (« offresauto », « brouillon ») hors du texte JSX n'est pas une phrase : jamais traduit.
+    if (n.type === 'StringLiteral') { if (estTexte(n.value) && !/^[a-z][a-z0-9_-]*$/.test(n.value)) garder(p, n, quoi, n.value, null); return; }
     if (n.type === 'TemplateLiteral') {
       const brut = n.quasis.map((q) => q.value.cooked).join(' ');
       if (!estTexte(brut)) return;
@@ -199,6 +201,7 @@ function lister() {
         if (pp.isJSXAttribute() && pp.node.name && ATTR.has(pp.node.name.name)) return 'attrexpr';
         return null;
       }
+      if (par.isObjectProperty() && q.key === 'value' && par.parentPath.parentPath && par.parentPath.parentPath.isNewExpression()) return null;   // new CustomEvent('x', { detail: '…' })
       if (par.isObjectProperty() && q.key === 'value') { const k = par.node.key; const nomK = k.type === 'Identifier' ? k.name : k.type === 'StringLiteral' ? k.value : null; return CHAMPS.has(nomK) ? 'champ' : null; }
       if (par.isCallExpression() && q.listKey === 'arguments') {
         const c = par.node.callee; const nomC = c.type === 'Identifier' ? c.name : c.type === 'MemberExpression' ? `${c.object.type === 'Identifier' ? c.object.name : '_'}.${c.property.name || ''}` : '';
@@ -211,6 +214,67 @@ function lister() {
       return null;
     }
   };
+  // ── 1. Les PHRASES : un élément dont les enfants ne sont que du texte et des {valeurs} devient
+  //       UNE clé (`Aucun colis à envoyer à {quand}.`), un `{n > 1 ? 's' : ''}` en fait un pluriel.
+  //       Rendu par trj() (src/i18n/react.js) : chaque valeur telle que React l'aurait rendue.
+  const phrases = [];
+  const plurielJsx = (e) => {
+    if (e.type !== 'ConditionalExpression' || e.consequent.type !== 'StringLiteral' || e.alternate.type !== 'StringLiteral') return null;
+    const t = e.test; if (t.type !== 'BinaryExpression') return null;
+    const un = (x) => x.type === 'NumericLiteral' && x.value === 1, deux = (x) => x.type === 'NumericLiteral' && x.value === 2;
+    let X = null, sens = null;
+    if (un(t.right) && ['>', '!==', '!='].includes(t.operator)) { X = t.left; sens = 'autre'; }
+    else if (un(t.right) && ['===', '==', '<='].includes(t.operator)) { X = t.left; sens = 'un'; }
+    else if (deux(t.right) && t.operator === '<') { X = t.left; sens = 'un'; }
+    else if (deux(t.right) && t.operator === '>=') { X = t.left; sens = 'autre'; }
+    if (!X) return null;
+    const [a, b] = [e.consequent.value, e.alternate.value];
+    return { X: src.slice(X.start, X.end), one: sens === 'un' ? a : b, other: sens === 'un' ? b : a };
+  };
+  const porteTexte = (e) => { let oui = false; traverse(e, { noScope: true, enter(q) { const t = q.node.type; if ((t === 'StringLiteral' && /[A-Za-zÀ-ÿ]/.test(q.node.value)) || t === 'TemplateLiteral' || t === 'JSXElement' || t === 'JSXFragment') oui = true; } }, null, null, null); if ((e.type === 'StringLiteral' && /[A-Za-zÀ-ÿ]/.test(e.value)) || e.type === 'TemplateLiteral' || e.type === 'JSXElement' || e.type === 'JSXFragment') oui = true; return oui; };
+  traverse(ast, {
+    JSXElement(p) {
+      const n = p.node; const nomEl = n.openingElement.name && n.openingElement.name.name;
+      if (['style', 'script', 'svg', 'path', 'code', 'kbd', 'pre', 'option', 'textarea', 'title'].includes(nomEl)) return;
+      const enf = n.children; if (enf.length < 2) return;
+      if (!enf.every((c) => c.type === 'JSXText' || (c.type === 'JSXExpressionContainer' && c.expression.type !== 'JSXEmptyExpression'))) return;
+      const exprs = enf.filter((c) => c.type === 'JSXExpressionContainer');
+      if (!exprs.length) return;
+      let compteur = null, ok = true;
+      for (const c of exprs) { const pl = plurielJsx(c.expression); if (pl) { if (compteur && compteur !== pl.X) ok = false; compteur = pl.X; } else if (porteTexte(c.expression)) ok = false; }
+      if (!ok) return;
+      const debut = enf[0].start, fin = enf[enf.length - 1].end;
+      const brutTout = src.slice(debut, fin);
+      if (!dans({ start: debut, end: fin })) return;
+      if (!p.findParent((q) => q.isFunction()) || sousIgnore(p) || dansTr(p) || trLocal(p)) return;
+      const noms = new Map(); const vars = [];
+      if (compteur) noms.set(compteur, 'n');
+      const forme = (quelle) => enf.map((c) => {
+        if (c.type === 'JSXText') return cuireJsx(c.value);
+        const e = c.expression; const pl = plurielJsx(e); if (pl) return pl[quelle];
+        const sE = src.slice(e.start, e.end);
+        if (!noms.has(sE)) {
+          let nom = e.type === 'Identifier' ? e.name : e.type === 'MemberExpression' && e.property.type === 'Identifier' ? e.property.name : e.type === 'CallExpression' ? (e.callee.type === 'Identifier' ? e.callee.name : e.callee.property && e.callee.property.name) || 'x' : 'x';
+          nom = String(nom).replace(/\W/g, '') || 'x';
+          if (/^(length|toFixed|join|map)$/.test(nom)) nom = e.type === 'MemberExpression' && e.object.type === 'Identifier' ? e.object.name + 'N' : 'x';
+          if (nom === 'n' || nom === 'count') nom = 'x';
+          let k = nom, i = 2; while ([...noms.values()].includes(k)) k = nom + i++;
+          noms.set(sE, k);
+        }
+        return `{${noms.get(sE)}}`;
+      }).join('');
+      const fO = forme('other'), fU = compteur ? forme('one') : null;
+      const lettres = fO.replace(/\{\w+\}/g, ' ');
+      if (!estTexte(lettres)) return;
+      // La phrase garde ses espaces de bord DANS la clé (JSX les rendait).
+      const texte = compteur ? { one: fU, other: fO } : fO;
+      for (const [sE, nom] of noms) vars.push({ nom, expr: sE });
+      phrases.push([debut, fin]);
+      items.push({ start: debut, end: fin, ligne: ligne(n), quoi: 'phrase', texte, vars, brut: brutTout });
+      p.skip();
+    },
+  });
+  const dansPhrase = (n) => phrases.some(([a, b]) => n.start >= a && n.end <= b);
   traverse(ast, {
     JSXText(p) {
       const n = p.node; const cuit = cuireJsx(n.value);
@@ -237,7 +301,7 @@ function lister() {
   }
   const plan = { fichier, prefixe, zones, items: items.sort((a, b) => a.start - b.start), nouvelles, manuels };
   fs.writeFileSync(sortie, JSON.stringify(plan, null, 1));
-  fs.writeFileSync(sortie + '.tsv', Object.entries(nouvelles).map(([k, v]) => `${k}\t${typeof v === 'string' ? v : v.one + ' ¦ ' + v.other}`).join('\n') + '\n');
+  fs.writeFileSync(sortie + '.tsv', Object.entries(nouvelles).map(([k, v]) => `${k}\t${(typeof v === 'string' ? v : v.one + ' ¦ ' + v.other).replace(/\n/g, '\\n')}`).join('\n') + '\n');
   console.log(`${fichier} · ${zones.join(', ')} — ${items.length} texte(s), ${Object.keys(nouvelles).length} clé(s) nouvelle(s), ${manuels.length} à la main`);
   for (const m of manuels) console.log(`  à la main  ${String(m.ligne).padStart(6)}  ${m.pourquoi} : ${String(m.texte).slice(0, 110)}`);
 }
@@ -250,7 +314,7 @@ function appliquer() {
     if (!l.trim() || l.startsWith('#')) continue;
     const c = l.split('\t');
     if (c.length !== 5) { console.log(`ligne mal formée (5 colonnes) : ${l.slice(0, 120)}`); process.exit(1); }
-    trad[c[0]] = c.slice(1).map((x) => x.trim());
+    trad[c[0]] = c.slice(1).map((x) => x.trim().replace(/\\n/g, '\n'));
     const f0 = plan.nouvelles[c[0]]; const f1 = typeof f0 === 'string' ? f0 : f0 && f0.other;
     if (typeof f1 === 'string') { const a = f1.match(/^\s*/)[0], b = f1.match(/\s*$/)[0]; trad[c[0]] = trad[c[0]].map((x) => x.split(/\s*¦\s*/).map((y) => a + y + b).join(' ¦ ')); }
   }
@@ -274,6 +338,7 @@ function appliquer() {
       const b = it.brut; const tete = b.match(/^[ \t\r\n]*/)[0], queue = b.slice(tete.length).match(/[ \t\r\n]*$/)[0];
       rempl = `${tete}{${appel}}${queue}`;
     } else if (it.quoi === 'attr') rempl = `{${appel}}`;
+    else if (it.quoi === 'phrase') rempl = `{trj('${it.cle}', { ${it.vars.map((v) => `${v.nom}: ${v.expr}`).join(', ')} })}`;
     else rempl = appel;
     src = src.slice(0, it.start) + rempl + src.slice(it.end);
   }
@@ -285,6 +350,13 @@ function appliquer() {
     const ligneImp = `import { tr } from '${spec}';\n`;
     if (imp) src = src.slice(0, imp.index + imp[0].length) + ligneImp + src.slice(imp.index + imp[0].length);
     else src = ligneImp + src;
+  }
+  if (plan.items.some((it) => it.quoi === 'phrase') && !/import\s*\{[^}]*\btrj\b[^}]*\}\s*from\s*['"][./]*(?:\.\.\/)*i18n\/react\.js['"]/.test(src)) {
+    const rel = path.relative(path.dirname(f), path.join(R, 'src', 'i18n', 'react.js')).replace(/\\/g, '/');
+    const spec = rel.startsWith('.') ? rel : './' + rel;
+    const imp = [...src.matchAll(/^import [^\n]*\n/gm)].pop();
+    const l = `import { trj } from '${spec}';\n`;
+    src = imp ? src.slice(0, imp.index + imp[0].length) + l + src.slice(imp.index + imp[0].length) : l + src;
   }
   fs.writeFileSync(f, src);
   // Les dictionnaires.

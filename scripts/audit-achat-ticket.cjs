@@ -123,7 +123,9 @@ if (MUT) {
 
   console.log('— Le formulaire —');
   const ach = SRC['ecrans/Achats.jsx'];
-  dit(/Valider \$\{form\.price\}\\u00a0€ et ajouter/.test(ach), 'le bouton dit le montant à valider');
+  // (11 nov., traduction) La phrase vit dans src/i18n/langues/fr/achats.js ; le bouton l'appelle avec LE montant du formulaire.
+  const frAch = (() => { try { return fs.readFileSync(path.join(R, 'src', 'i18n', 'langues', 'fr', 'achats.js'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/Valider \$\{form\.price\}\\u00a0€ et ajouter/.test(ach) || (/tr\('achats\.validerAjouter', \{ price: String\(form\.price\) \}\)/.test(ach) && /"achats\.validerAjouter": "Valider \{price\}\u00a0€ et ajouter"/.test(frAch)), 'le bouton dit le montant à valider');
   dit(/data-achat-ticket-bouton/.test(ach) && /lireTexteTicket\(/.test(ach), 'le bouton « Photo du ticket » lit par la lecture locale');
   const code = (s) => s.replace(/\/\/[^\n]*/g, '');
   dit(!/\/api\/|anthropic|openai|photoroom/i.test(code(SRC['depensesTicket.js']) + code(SRC['achatTicket.js'])), 'aucun service distant ni payant (§2.9)');

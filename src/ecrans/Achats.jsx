@@ -15,6 +15,7 @@ import { ReventeModele } from '../ReventeModele.jsx';
 import { ImportAchatsFeuille } from '../composants/ImportAchats.jsx';
 import { prendrePhotoPartagee } from '../partagePhoto.js';
 import { exemplesActuels, Bouton, C, FermeAuRetour, SheetShell, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
+import { tr } from '../i18n/index.js';
 
 
 // ⟦← App.jsx #1⟧
@@ -89,7 +90,7 @@ const openReceipt = (a) => {
   const paid = texteCentimesRecu(r.paye);
   const line = (label, val, strong) => val ? `<tr><td style="padding:9px 0;color:#667;font-size:15px">${esc(label)}</td><td style="padding:9px 0;text-align:right;font-size:15px;${strong ? 'font-weight:800;color:#111' : 'color:#111'}">${esc(val)}</td></tr>` : '';
   const breakdown = r.lignes.map((l) => `<tr data-recu-ligne="${esc(l.libelle)}" data-recu-centimes="${l.centimes == null ? '' : l.centimes}"><td style="padding:9px 0;color:#667;font-size:15px">${esc(l.libelle)}</td><td style="padding:9px 0;text-align:right;font-size:15px;color:#111;white-space:nowrap">${l.centimes == null ? '—' : esc(texteCentimesRecu(l.centimes))}</td></tr>`).join('');
-  const meta = [line('Vendeur', vendeur), line('Mode de paiement', mode), line('Date du paiement', datePaie), line('N° de transaction', trans), line('Compte', compte)].join('');
+  const meta = [line('Vendeur', vendeur), line(tr('achats.modePaiement'), mode), line(tr('achats.datePaiement'), datePaie), line(tr('achats.transaction'), trans), line('Compte', compte)].join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
   <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#F2F2F7;color:#111;-webkit-print-color-adjust:exact">
     <div class="topbar" style="position:sticky;top:0;z-index:10;background:#F2F2F7;padding:12px 16px 8px;display:flex;align-items:center;gap:10px">
@@ -219,46 +220,46 @@ function FeuilleRecuAchat({ recu, fermer }) {
       <FermeAuRetour fermer={fermer}/>
       <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label={NOM_RECU_ACHAT} tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-          <button type="button" data-recu-retour="" onClick={fermer} aria-label="Retour" style={{...cible,width:44,height:44,padding:0,fontSize:22,fontWeight:600,lineHeight:1}}>‹</button>
+          <button type="button" data-recu-retour="" onClick={fermer} aria-label={tr('commun.retour')} style={{...cible,width:44,height:44,padding:0,fontSize:22,fontWeight:600,lineHeight:1}}>‹</button>
           <div style={{flex:1,minWidth:0,fontSize:17,fontWeight:700,color:C.text}}>{NOM_RECU_ACHAT}</div>
-          <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title="Imprimer / PDF" style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
+          <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title={tr('achats.imprimerPdf')} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
         </div>
         {aPdf && (
           <div data-recu-pj={pj ? pj.etat : 'repos'} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,padding:'8px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-            <button type="button" data-recu-pj-ouvrir="" disabled={!!(pj && pj.etat === 'lecture')} onClick={ouvrirPj} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="receipt" size={15}/>{pj && pj.etat === 'lecture' ? 'Lecture du PDF…' : 'PDF joint à l’e-mail'}</button>
-            {pj && pj.etat === 'pret' && estIOS() && <a data-recu-pj-lien="" href={pj.url} target="_blank" rel="noopener" style={{...cible,padding:'0 14px',fontSize:15,fontWeight:600,textDecoration:'none'}}>Ouvrir le PDF</a>}
-            {pj && pj.etat === 'passu' && <span style={{fontSize:13,color:C.muted}}>La base n'a pas répondu — réessaie dans un instant.</span>}
-            {pj && pj.etat === 'absent' && <span style={{fontSize:13,color:C.muted}}>Ce reçu n'a plus son PDF — le texte de l'email est ci-dessous.</span>}
+            <button type="button" data-recu-pj-ouvrir="" disabled={!!(pj && pj.etat === 'lecture')} onClick={ouvrirPj} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="receipt" size={15}/>{pj && pj.etat === 'lecture' ? tr('achats.lecturePdf') : tr('achats.pdfJointE')}</button>
+            {pj && pj.etat === 'pret' && estIOS() && <a data-recu-pj-lien="" href={pj.url} target="_blank" rel="noopener" style={{...cible,padding:'0 14px',fontSize:15,fontWeight:600,textDecoration:'none'}}>{tr('achats.ouvrirPdf')}</a>}
+            {pj && pj.etat === 'passu' && <span style={{fontSize:13,color:C.muted}}>{tr('achats.baseReponduReessaie')}</span>}
+            {pj && pj.etat === 'absent' && <span style={{fontSize:13,color:C.muted}}>{tr('achats.recuPlusPdf')}</span>}
           </div>
         )}
-        <div ref={defile} className="vrm-recu-defile" data-recu-defile="" tabIndex={0} role="region" aria-label="Détail du reçu" style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
+        <div ref={defile} className="vrm-recu-defile" data-recu-defile="" tabIndex={0} role="region" aria-label={tr('achats.detailRecu')} style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
           <div style={{background:C.card,borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
             <div style={{background:COULEUR_PLATEFORME.vinted,color:'#fff',padding:'16px 18px'}}>
-              <div style={{fontSize:11,opacity:0.9,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>
+              <div style={{fontSize:11,opacity:0.9,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>{tr('achats.recuAchatVinted')}</div>
               <div style={{fontSize:20,fontWeight:600,marginTop:3,lineHeight:1.3,overflowWrap:'anywhere'}}>{r.article}</div>
             </div>
             {r.hasStructured ? (
               <div style={{padding:'14px 18px 16px'}}>
                 {r.paye != null && (
                   <div data-recu-total={r.paye} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
-                    <span style={{fontSize:15,color:C.muted,fontWeight:500}}>Montant payé</span>
+                    <span style={{fontSize:15,color:C.muted,fontWeight:500}}>{tr('achats.montantPaye')}</span>
                     <span style={{fontSize:28,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{texteCentimesRecu(r.paye)}</span>
                   </div>
                 )}
                 {r.lignes.map((l, i) => <Row key={i} montant label={l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
                 <div data-recu-somme={r.somme} hidden={!r.phrase} style={{fontSize:13,lineHeight:1.5,color:C.muted,padding:'10px 0 2px'}}>{r.phrase}</div>
                 <div style={{height:10}}/>
-                <Row label="Vendeur" val={r.vendeur}/>
-                <Row label="Mode de paiement" val={r.mode}/>
-                <Row label="Date du paiement" val={r.datePaie}/>
-                <Row label="N° de transaction" val={r.trans} attrs={{ 'data-recu-transaction': r.trans }}/>
-                <Row label="Compte" val={r.compte}/>
+                <Row label={tr('achats.vendeur2')} val={r.vendeur}/>
+                <Row label={tr('achats.modePaiement')} val={r.mode}/>
+                <Row label={tr('achats.datePaiement')} val={r.datePaie}/>
+                <Row label={tr('achats.transaction')} val={r.trans} attrs={{ 'data-recu-transaction': r.trans }}/>
+                <Row label={tr('ventes.compte4')} val={r.compte}/>
               </div>
             ) : (
               <div style={{padding:'16px 18px',whiteSpace:'pre-wrap',lineHeight:1.6,fontSize:15,color:C.text}}>{r.cleaned}</div>
             )}
           </div>
-          <div data-recu-fin="" style={{textAlign:'center',color:C.muted,fontSize:12,marginTop:12,lineHeight:1.5}}>Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
+          <div data-recu-fin="" style={{textAlign:'center',color:C.muted,fontSize:12,marginTop:12,lineHeight:1.5}}>{tr('achats.recuReconstruitDepuis')}</div>
         </div>
       </div>
     </div>, document.body);
@@ -364,7 +365,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
       if (d.photoPartagee) prendrePhotoPartagee().then(async (blob) => {
         const b64 = blob ? await compressImage(blob, 480, 0.62) : null;
         if (b64) setForm((f) => f && !f.photo ? { ...f, photo: b64 } : f);
-        else setErreur("La photo partagée n'a pas pu être lue : touche « Photo ».");
+        else setErreur(tr('achats.photoPartageePu'));
       });
       // L'écran finit de se poser après (listes, défilement remis en haut) : le formulaire est ramené en vue tant qu'il n'y est pas.
       [400, 1200, 2500].forEach((ms) => setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (!f) return; const r = f.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.6) f.scrollIntoView({ block: 'center' }); } catch (_) {} }, ms));
@@ -403,15 +404,15 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     ev.target.value = '';
     if (!f) return;
     const b64 = await compressImage(f, 480, 0.62);
-    if (!b64) { setErreur("Cette photo n'a pas pu être lue — essaie une autre, ou enregistre sans photo."); return; }
+    if (!b64) { setErreur(tr('achats.photoPuEtre')); return; }
     setForm(d => d && ({ ...d, photo: b64 }));
   };
   const enregistrer = async () => {
     if (!form || envoi) return;
     const titre = form.title.trim();
-    if (!titre) { setErreur(`Donne un nom à cet achat (${exemplesActuels().achat}).`); return; }
+    if (!titre) { setErreur(tr('achats.donneNomAchat', { achat: String(exemplesActuels().achat) })); return; }
     const prix = prixAchatSaisi(form.price);
-    if (prix === null) { setErreur('Le prix payé doit être un montant en euros (ex : 25 ou 25,50).'); return; }
+    if (prix === null) { setErreur(tr('achats.prixPayeDoit')); return; }
     setEnvoi(true);
     const id = editId || ('ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
     let photoOk = form.photoAvant;
@@ -430,8 +431,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     if (rec.numero && prochainNumero != null && rec.numero === String(prochainNumero) && onReserverNumero) onReserverNumero(rec.numero);
     setEnvoi(false);
     if (!ouvert) onBasculer(true);
-    if (photoRatee) toast("Achat enregistré — mais la photo n'a pas pu être envoyée (la base n'a pas répondu). Modifie l'achat pour la remettre.");
-    else toast(editId ? 'Achat modifié' : 'Achat ajouté');
+    if (photoRatee) toast(tr('achats.achatEnregistreMais'));
+    else toast(editId ? tr('achats.achatModifie') : tr('achats.achatAjoute'));
     fermer();
   };
   // (10 nov., lot Y) Plus de « Ça ne se rattrape pas » : il part à la corbeille 30 jours (pilule
@@ -465,18 +466,18 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: '6px 0', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
           <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={18} /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>Achats hors plateforme</span>
+            <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{tr('achats.achatsHorsPlateforme')}</span>
             <span data-achats-hors-resume style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sousTitre}</span>
           </span>
           {liste.length > 0 && <span aria-hidden="true" style={{ fontSize: 17, color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .2s ease', flexShrink: 0, padding: '0 4px' }}>›</span>}
         </button>
-        <Bouton variante="secondaire" data-achat-hors-ajouter onClick={ouvrirAjout} aria-label="Ajouter un achat hors plateforme" style={{ flexShrink: 0, minHeight: 44 }}>+ Ajouter</Bouton>
+        <Bouton variante="secondaire" data-achat-hors-ajouter onClick={ouvrirAjout} aria-label={tr('achats.ajouterAchatHors')} style={{ flexShrink: 0, minHeight: 44 }}>{tr('journee.ajouter')}</Bouton>
       </div>
       {form && (
         <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 32 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
-            {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>Importer un tableur</Bouton> : null}
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? tr('achats.modifierAchat') : tr('achats.nouvelAchat')}</div>
+            {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>{tr('achats.importerTableur')}</Bouton> : null}
           </div>
           {/* 0. (11 nov., lot achat-photo) Le TICKET en photo : il propose prix, date et lieu. */}
           {!editId && (() => {
@@ -490,8 +491,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                   onClick={() => ticketRef.current && ticketRef.current.click()} style={{ borderColor: C.border, background: C.card, color: C.text }}>
                   <span className="vrm-ahp-ticket-icone" aria-hidden="true" style={{ background: C.card2 || C.bg, color: C.text }}>{lecture ? <span className="vrm-ahp-ticket-roue" /> : <Icon name="receipt" size={20} />}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{lecture ? 'Lecture du ticket…' : t ? 'Lire un autre ticket' : 'Photo du ticket'}</span>
-                    <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 1 }}>{lecture ? 'Sur ton appareil, rien n’est envoyé.' : 'Remplit le prix, la date et le lieu.'}</span>
+                    <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{lecture ? tr('achats.lectureTicket') : t ? tr('achats.lireAutreTicket') : tr('achats.photoTicket')}</span>
+                    <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 1 }}>{lecture ? tr('achats.appareilRienEnvoye') : tr('achats.remplitPrixDate')}</span>
                   </span>
                   {!lecture ? <Icon name="camera" size={18} style={{ color: C.muted, flexShrink: 0 }} /> : null}
                 </button>
@@ -499,29 +500,29 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                 {t && t.etat !== 'lecture' ? (
                   <div role="status" aria-live="polite" data-achat-ticket-resume="" style={{ fontSize: 13, lineHeight: 1.4, color: t.etat === 'lu' ? C.text : C.muted, padding: '8px 4px 0' }}>
                     {resume}
-                    {t.articles > 1 ? <span data-achat-ticket-articles={t.articles} style={{ display: 'block', color: C.muted }}>{`${t.articles} articles sur ce ticket : c'est le total.`}</span> : null}
+                    {t.articles > 1 ? <span data-achat-ticket-articles={t.articles} style={{ display: 'block', color: C.muted }}>{tr('achats.articlesTicketTotal', { articles: String(t.articles) })}</span> : null}
                   </div>
                 ) : null}
               </div>
             );
           })()}
           {/* 1. La photo d'abord : une grande tuile, un toucher (appareil photo ou galerie). */}
-          <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? 'Changer la photo' : 'Ajouter une photo'} style={{ borderColor: C.border, background: C.card, color: C.text }}>
-            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" /> : <span className="vrm-ahp-photo-vide"><Icon name="camera" size={28} /><span>Photo de l’article</span></span>}
-            {photoForm ? <span className="vrm-ahp-photo-changer">Changer</span> : null}
+          <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? tr('achats.changerPhoto') : tr('achats.ajouterPhoto')} style={{ borderColor: C.border, background: C.card, color: C.text }}>
+            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" /> : <span className="vrm-ahp-photo-vide"><Icon name="camera" size={28} /><span>{tr('achats.photoArticle')}</span></span>}
+            {photoForm ? <span className="vrm-ahp-photo-changer">{tr('achats.changer')}</span> : null}
           </button>
-          {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>Retirer la photo</Bouton>}
+          {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{tr('achats.retirerPhoto')}</Bouton>}
           <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
           {/* 2. Ce que c'est. */}
-          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder={exemplesActuels().achat} enterKeyHint="next" autoComplete="off" style={inp} />)}
+          {champ(tr('achats.asAchete'), <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder={exemplesActuels().achat} enterKeyHint="next" autoComplete="off" style={inp} />)}
           {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
           {/* (10 nov., lot AV) Ce que tu as revendu ce modèle : le passé, jamais un conseil (src/reventeModele.js). */}
           {titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}
           {/* 3. Le prix payé, en grand : c'est LUI qui le tape (§2.5). */}
-          {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>Lu sur le ticket — vérifie</span> : 'Prix payé', <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label="Prix payé" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
+          {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>{tr('achats.luTicketVerifie')}</span> : 'Prix payé', <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label={tr('achats.prixPaye')} value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
           {/* 4. Où : ses derniers lieux d'abord, puis la liste courte ; un champ libre. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {champ(champEncoreLu(form, 'source') ? 'Où · lu sur le ticket' : 'Où', <input data-champ="lieu" data-champ-lu={champEncoreLu(form, 'source') ? '1' : undefined} value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, magasin…" autoComplete="off" style={inp} />)}
+            {champ(champEncoreLu(form, 'source') ? 'Où · lu sur le ticket' : 'Où', <input data-champ="lieu" data-champ-lu={champEncoreLu(form, 'source') ? '1' : undefined} value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder={tr('achats.brocanteVideGrenier')} autoComplete="off" style={inp} />)}
             <div className="vrm-rangee vrm-ahp-lieux" data-achat-hors-lieux={lieux.filter((x) => x.recent).length} style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {lieux.map(({ l: s, recent }) => {
                 const actif = form.source.trim().toLowerCase() === s.toLowerCase();
@@ -534,69 +535,69 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           {champ(champEncoreLu(form, 'date') ? 'Date · lue sur le ticket' : 'Date', <input data-champ="date" data-champ-lu={champEncoreLu(form, 'date') ? '1' : undefined} type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
           {/* 6. Le N° de rangement : le prochain libre PROPOSÉ, posé par SON toucher seulement. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {champ('N° de rangement (facultatif)', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder="—" style={inp} />)}
-            {numPropose && form.numero !== numPropose ? <Bouton variante="secondaire" data-achat-hors-num-propose={numPropose} onClick={() => setForm(d => ({ ...d, numero: numPropose }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{`Prendre le N°${numPropose}`}</Bouton> : null}
+            {champ(tr('achats.rangementFacultatif'), <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder="—" style={inp} />)}
+            {numPropose && form.numero !== numPropose ? <Bouton variante="secondaire" data-achat-hors-num-propose={numPropose} onClick={() => setForm(d => ({ ...d, numero: numPropose }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{tr('achats.prendre', { numPropose: String(numPropose) })}</Bouton> : null}
           </div>
           {/* (10 nov., lot BH) La référence de l'achat : c'est ELLE (jamais le nom ni le prix) qui dit qu'un achat est saisi deux fois. */}
-          {champ('N° de commande ou de facture (facultatif)', <input data-champ="ref" value={form.ref || ''} onChange={e => setForm(d => ({ ...d, ref: e.target.value }))} placeholder="ex : n° de transaction Vinted" autoComplete="off" spellCheck={false} maxLength={40} style={inp} />)}
+          {champ(tr('achats.commandeFactureFacultatif'), <input data-champ="ref" value={form.ref || ''} onChange={e => setForm(d => ({ ...d, ref: e.target.value }))} placeholder={tr('achats.exTransactionVinted')} autoComplete="off" spellCheck={false} maxLength={40} style={inp} />)}
           {facture ? (() => {
             const cf = editId ? cleFacture('hors', editId) : '';
             const deja = cf && facture.factures ? facture.factures[cf] : null;
             return (
               <div data-achat-hors-facture="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {deja && !form.facture ? <PastilleFacture cle={cf} f={deja} onOuvrir={facture.ouvrir} enCours={facture.enCours === cf} Icon={Icon} /> : null}
-                {form.facture ? <span data-achat-hors-facture-choisie="" data-facture-du-ticket={form.factureDuTicket ? '1' : undefined} style={{ fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{form.factureDuTicket ? 'Ticket joint comme facture' : form.facture.name}</span> : null}
+                {form.facture ? <span data-achat-hors-facture-choisie="" data-facture-du-ticket={form.factureDuTicket ? '1' : undefined} style={{ fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{form.factureDuTicket ? tr('achats.ticketJointComme') : form.facture.name}</span> : null}
                 <Bouton variante="secondaire" icone="doc" data-achat-hors-facture-bouton onClick={() => factureRef.current && factureRef.current.click()} style={{ minHeight: 44 }}>
-                  {form.facture || deja ? 'Changer la facture' : 'Facture (facultatif)'}
+                  {form.facture || deja ? tr('achats.changerFacture') : tr('achats.factureFacultatif')}
                 </Bouton>
-                {form.facture && <Bouton variante="discret" data-achat-hors-facture-retirer="" onClick={() => setForm(d => ({ ...d, facture: null, factureDuTicket: false }))}>Retirer</Bouton>}
+                {form.facture && <Bouton variante="discret" data-achat-hors-facture-retirer="" onClick={() => setForm(d => ({ ...d, facture: null, factureDuTicket: false }))}>{tr('achats.retirer')}</Bouton>}
                 <input data-achat-hors-facture-input ref={factureRef} type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
                   onChange={(e) => { const fi = e.target.files && e.target.files[0]; e.target.value = ''; if (!fi) return; const v = verifierFichier({ type: fi.type, taille: fi.size, nom: fi.name }); if (!v.ok) { setErreur(v.message); return; } setErreur(''); setForm(d => d && ({ ...d, facture: fi, factureDuTicket: false })); }} />
               </div>
             );
           })() : null}
           <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} >
-            <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 13 }}>Relier à une annonce (facultatif)</summary>
+            <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 13 }}>{tr('achats.relierAnnonceFacultatif')}</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
-              {Array.isArray(paires) && paires.length > 0 && champ('Une de tes annonces en ligne',
+              {Array.isArray(paires) && paires.length > 0 && champ(tr('achats.annoncesLigne'),
                 <select value="" onChange={e => { const p = paires.find(x => String(x.id) === e.target.value); if (!p) return; setForm(d => ({ ...d, numero: p.num, title: d.title.trim() ? d.title : (p.title || '') })); }} style={inp}>
-                  <option value="">— choisir —</option>
+                  <option value="">{tr('achats.choisir')}</option>
                   {paires.map(p => <option key={p.id} value={String(p.id)}>N°{p.num} · {(p.title || '').slice(0, 40)}</option>)}
                 </select>)}
-              <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de l'article dans son bénéfice.</div>
+              <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{tr('achats.avecPrixDevient')}</div>
             </div>
           </details>
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 13, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
           <div className="vrm-ahp-gestes" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Bouton variante="primaire" data-achat-hors-enregistrer data-prix-a-valider={prixEncoreLu(form) ? '1' : '0'} disabled={envoi} onClick={enregistrer}
-              style={{ width: '100%', minHeight: 54, fontSize: 17, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : (prixEncoreLu(form) ? `Valider ${form.price}\u00a0€ et ajouter` : "Ajouter l'achat"))}</Bouton>
-            <Bouton variante="discret" data-achat-hors-annuler onClick={fermer} style={{ width: '100%', minHeight: 44 }}>Annuler</Bouton>
+              style={{ width: '100%', minHeight: 54, fontSize: 17, opacity: envoi ? 0.7 : 1 }}>{envoi ? tr('auth.bouton.enregistrement') : (editId ? tr('commun.enregistrer') : (prixEncoreLu(form) ? tr('achats.validerAjouter', { price: String(form.price) }) : tr('achats.ajouterAchat')))}</Bouton>
+            <Bouton variante="discret" data-achat-hors-annuler onClick={fermer} style={{ width: '100%', minHeight: 44 }}>{tr('achats.annuler')}</Bouton>
           </div>
-          {editId && <Bouton variante="discret" icone="trash" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start' }}>Supprimer cet achat</Bouton>}
+          {editId && <Bouton variante="discret" icone="trash" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start' }}>{tr('achats.supprimerAchat')}</Bouton>}
         </div></div>
       )}
       {importOuvert && importer && <ImportAchatsFeuille Feuille={SheetShell} Bouton={Bouton} existants={importer.existants} numeroDe={importer.numeroDe} etatNumero={importer.etatNumero}
         onClose={() => setImportOuvert(false)} onImporter={(w) => { importer.onImporter(w); setImportOuvert(false); fermer(); if (!ouvert) onBasculer(true); }} />}
       {ouvert && liste.length > 0 && (
         <div data-achats-hors-liste style={{ borderTop: `1px solid ${C.border}` }}>
-          {photos === null && avecPhoto && <div style={{ fontSize: 12, color: C.muted, padding: '8px 14px 0' }}>Photos pas lues (la base n'a pas répondu) — elles reviendront.</div>}
+          {photos === null && avecPhoto && <div style={{ fontSize: 12, color: C.muted, padding: '8px 14px 0' }}>{tr('achats.photosLuesBase')}</div>}
           {liste.map((b, i) => {
             const src = b.photo && photos ? photos[idPhotoAchatHors(b.id)] : null;
             const p = prixAchatHorsNombre(b);
             const d = b.date ? new Date(String(b.date).length === 10 ? b.date + 'T12:00:00' : b.date) : null;
             const meta = [libelleSourceAchat(b.source), d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join(' · ');
             return (
-              <button key={b.id} type="button" data-achat-hors-id={b.id} onClick={() => ouvrirEdition(b)} title="Modifier ou supprimer"
+              <button key={b.id} type="button" data-achat-hors-id={b.id} onClick={() => ouvrirEdition(b)} title={tr('achats.modifierSupprimer')}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', minHeight: 64, border: 'none', borderTop: i > 0 ? `1px solid ${C.border}` : 'none', borderRadius: 0, background: editId === b.id ? (C.card2 || C.bg) : 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 <span style={{ width: 44, height: 44, borderRadius: 12, background: C.card2 || C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {src ? <img src={src} alt="" data-vrm-vignette="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={17} style={{ color: C.muted, opacity: .6 }} />}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || 'Achat'}</span>
+                  <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || tr('ventes.achat')}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginTop: 2, minWidth: 0 }}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{meta || '—'}</span>
                     {b.numero && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 6, padding: '1px 6px' }}>N°{b.numero}</span>}
-                    {facture && facture.factures && facture.factures[cleFacture('hors', b.id)] ? <span data-achat-hors-a-facture="" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, color: C.text }}><Icon name="doc" size={12} />Facture</span> : null}
+                    {facture && facture.factures && facture.factures[cleFacture('hors', b.id)] ? <span data-achat-hors-a-facture="" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, color: C.text }}><Icon name="doc" size={12} />{tr('achats.facture')}</span> : null}
                   </span>
                 </span>
                 <span data-achat-hors-prix style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>{p != null ? `${p.toFixed(2).replace('.', ',')}\u00a0€` : '—'}</span>
@@ -669,8 +670,8 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
           {pris ? <div data-relier-deja={pris} style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pris}</div> : null}
         </div>
         <div data-relier-prix style={{ fontSize: 15, fontWeight: 700, color: C.text, flexShrink: 0 }}>{px != null ? prixCourt(px) : '—'}</div>
-        {pris ? <Bouton variante="discret" data-relier-deplacer={String(a.transaction_id)} onClick={() => onRelier(a, { deplacer: true })} style={{ flexShrink: 0, minHeight: 44 }}>Déplacer ici</Bouton>
-          : <Bouton variante="secondaire" data-relier-achat={String(a.transaction_id)} onClick={() => onRelier(a)} style={{ flexShrink: 0, minHeight: 44 }}>Relier</Bouton>}
+        {pris ? <Bouton variante="discret" data-relier-deplacer={String(a.transaction_id)} onClick={() => onRelier(a, { deplacer: true })} style={{ flexShrink: 0, minHeight: 44 }}>{tr('achats.deplacerIci')}</Bouton>
+          : <Bouton variante="secondaire" data-relier-achat={String(a.transaction_id)} onClick={() => onRelier(a)} style={{ flexShrink: 0, minHeight: 44 }}>{tr('journee.relier')}</Bouton>}
       </div>
     );
   };
@@ -681,51 +682,51 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
         <div data-relier-actuel={String(actuel.transaction_id || '')} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{orderPhoto(actuel) ? <PhotoVinted src={orderPhoto(actuel)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="link" size={18} style={{ color: C.muted }}/>}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: C.muted }}>Relié à</div>
+            <div style={{ fontSize: 12, color: C.muted }}>{tr('achats.relie')}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actuel.title || '—'}</div>
           </div>
-          {onDelier ? <Bouton variante="discret" data-relier-delier={String(actuel.transaction_id || '')} onClick={onDelier} style={{ flexShrink: 0, minHeight: 44 }}>Délier</Bouton> : null}
+          {onDelier ? <Bouton variante="discret" data-relier-delier={String(actuel.transaction_id || '')} onClick={onDelier} style={{ flexShrink: 0, minHeight: 44 }}>{tr('achats.delier')}</Bouton> : null}
         </div>
       ) : null}
       {!autre && sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang }))}</div>}
-      {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>Choisir un autre achat</Bouton>}
+      {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>{tr('ventes.choisirAutreAchat')}</Bouton>}
       {voirTous && (
         <div data-tous-achats={liste.length} style={{ marginTop: sugg.length ? 10 : 0 }}>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Titre, marque, n° de transaction" data-tous-achats-recherche autoFocus={!!autre} type="search" enterKeyHint="search" aria-label="Chercher dans mes achats"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('achats.titreMarqueTransaction')} data-tous-achats-recherche autoFocus={!!autre} type="search" enterKeyHint="search" aria-label={tr('achats.chercherDansMes')}
             style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit' }}/>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            {filtres.comptes.length > 1 && <select aria-label="Compte" data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">Tous les comptes</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
-            <Bouton variante="discret" data-filtres-plus={nFiltres} aria-expanded={plus} onClick={() => { setPlus((v) => !v); if (onFiltres) onFiltres(); }} style={{ minHeight: 44, flex: '0 0 auto' }}>{nFiltres ? `Filtres · ${nFiltres}` : 'Filtres'}</Bouton>
-            {filtres.mois.length > 1 && <select aria-label="Mois" data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={sel}><option value="">Tous les mois</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
+            {filtres.comptes.length > 1 && <select aria-label={tr('ventes.compte4')} data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">{tr('achats.tousComptes')}</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
+            <Bouton variante="discret" data-filtres-plus={nFiltres} aria-expanded={plus} onClick={() => { setPlus((v) => !v); if (onFiltres) onFiltres(); }} style={{ minHeight: 44, flex: '0 0 auto' }}>{nFiltres ? tr('achats.filtres', { nFiltres: String(nFiltres) }) : tr('achats.filtres2')}</Bouton>
+            {filtres.mois.length > 1 && <select aria-label={tr('achats.mois')} data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={sel}><option value="">{tr('achats.tousMois')}</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
           </div>
           {plus && (
             <div data-filtres-achat="" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 8 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>Prix payé, de
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.prixPaye2')}
                 <input inputMode="decimal" value={prixMin} onChange={(e) => setPrixMin(e.target.value)} placeholder="€" data-filtre-prix-min style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>à
                 <input inputMode="decimal" value={prixMax} onChange={(e) => setPrixMax(e.target.value)} placeholder="€" data-filtre-prix-max style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
               {receptionDe ? <>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>Reçu du
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.recu')}
                   <input type="date" value={recuDu} onChange={(e) => setRecuDu(e.target.value)} data-filtre-recu-du style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>au
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.texte3')}
                   <input type="date" value={recuAu} onChange={(e) => setRecuAu(e.target.value)} data-filtre-recu-au style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
               </> : null}
-              {filtres.marques.length > 1 && <select aria-label="Marque" data-filtre-marque value={marque} onChange={(e) => setMarque(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">Toutes les marques</option>{filtres.marques.map((m) => <option key={m} value={m}>{m}</option>)}</select>}
-              {filtres.tailles.length > 1 && <select aria-label="Taille" data-filtre-taille value={taille} onChange={(e) => setTaille(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">Toutes les tailles</option>{filtres.tailles.map((t) => <option key={t} value={t}>{t}</option>)}</select>}
-              {nFiltres ? <Bouton variante="discret" data-filtres-effacer onClick={() => { setPrixMin(''); setPrixMax(''); setRecuDu(''); setRecuAu(''); setMarque(''); setTaille(''); }} style={{ minHeight: 44, gridColumn: '1 / -1', justifySelf: 'start' }}>Effacer les filtres</Bouton> : null}
+              {filtres.marques.length > 1 && <select aria-label={tr('achats.marque')} data-filtre-marque value={marque} onChange={(e) => setMarque(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">{tr('achats.toutesMarques')}</option>{filtres.marques.map((m) => <option key={m} value={m}>{m}</option>)}</select>}
+              {filtres.tailles.length > 1 && <select aria-label={tr('achats.taille')} data-filtre-taille value={taille} onChange={(e) => setTaille(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">{tr('achats.toutesTailles')}</option>{filtres.tailles.map((t) => <option key={t} value={t}>{t}</option>)}</select>}
+              {nFiltres ? <Bouton variante="discret" data-filtres-effacer onClick={() => { setPrixMin(''); setPrixMax(''); setRecuDu(''); setRecuAu(''); setMarque(''); setTaille(''); }} style={{ minHeight: 44, gridColumn: '1 / -1', justifySelf: 'start' }}>{tr('achats.effacerFiltres')}</Bouton> : null}
             </div>
           )}
-          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? 'Je lis les dates de réception de tes achats…' : 'Dates de réception pas lues : seules « Je l’ai retiré » comptent.'}</div> : null}
-          {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{detail.sansReception} achat{detail.sansReception > 1 ? 's' : ''} sans date de réception lue, pas dans cette liste.</div>}
+          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? tr('achats.jeLisDates') : tr('achats.datesReceptionLues')}</div> : null}
+          {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{detail.sansReception} {tr('achats.achat')}{detail.sansReception > 1 ? 's' : ''} {tr('achats.sansDateReception')}</div>}
           {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
           {(() => {
             const pris = detail.pris || [];
             if (!pris.length) return null;
             const cherche = !!(q.trim() || nFiltres || compte || mois);
-            if (!cherche && !voirPris) return <Bouton variante="discret" data-relier-voir-pris={pris.length} onClick={() => setVoirPris(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>{`Déjà reliés (${pris.length})`}</Bouton>;
+            if (!cherche && !voirPris) return <Bouton variante="discret" data-relier-voir-pris={pris.length} onClick={() => setVoirPris(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>{tr('achats.dejaRelies', { prisN: String(pris.length) })}</Bouton>;
             return (
               <div data-relier-pris={pris.length} style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.muted }}>Déjà reliés</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.muted }}>{tr('achats.dejaRelies2')}</div>
                 {pris.slice(0, 100).map((a) => ligne(a, { 'data-achat-pris': String(a.transaction_id) }, (dejaRelie && dejaRelie(a)) || 'Déjà relié'))}
               </div>
             );
