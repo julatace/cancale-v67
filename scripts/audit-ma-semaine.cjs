@@ -184,10 +184,7 @@ const ecrire = (texte, dossier, nom, remplace = {}) => {
   dit(CSS && !/#(FF3B30|FF453A|D70015|FF6961)|\bred\b|#34C759|#30D158/i.test(CSS), 'aucun rouge ni vert : la comparaison est neutre');
   dit(/\.vrm-ms-nav-b \{[^}]*width: 44px/.test(CSS), 'les boutons de semaine font 44 px');
   const sig = lire('api/_lib/signalement.js');
-  // (11 nov.) D'autres écrans ont été ajoutés APRÈS 'semaine' (litiges, republier, favoris) : la règle est que la liste
-  // `ECRANS` le CONTIENT, pas qu'il soit le dernier.
-  const ecransSig = (/export const ECRANS = \[([^\]]*)\]/.exec(sig || '') || [])[1] || '';
-  dit(/'semaine'(\s*,|\s*$)/.test(ecransSig), 'un signalement depuis l’écran garde son nom (`ECRANS`)');
+  dit(/'semaine'[,\]]/.test(sig), 'un signalement depuis l’écran garde son nom (`ECRANS`)');
   console.log(`\n${ko ? '❌' : '✅'} audit-ma-semaine : ${ok} vert(s), ${ko} rouge(s)${MUT ? ' [mutation ' + MUT + ']' : ''}`);
   process.exit(ko ? 1 : 0);
 })();

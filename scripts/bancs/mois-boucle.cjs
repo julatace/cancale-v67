@@ -53,9 +53,9 @@ const VENTES_BASE = [
   ['222', 91002, 80, jourM(-1, 10), jourM(-1, 15), 35],
   ['111', 91003, 60, jourM(-2, 25), jourM(-1, 2), 25],      // vendue le mois d'avant, VERSÉE en M
 ];
-// Les achats (registre) : deux en M, un annulé en M, aucun le mois d'avant.
+// Les achats (registre) : deux en M (dont un lot de 3 : 4 paires, 11 nov. C5), un annulé en M, aucun le mois d'avant.
 const ACHATS = [
-  { transaction_id: 70001, title: 'Achat inventé A', price: { amount: '40', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(jourM(-1, 4)) },
+  { transaction_id: 70001, title: 'Lot 3 paires inventées', price: { amount: '40', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(jourM(-1, 4)) },
   { transaction_id: 70002, title: 'Achat inventé B', price: { amount: '30', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(jourM(-1, 18)) },
   { transaction_id: 70003, title: 'Achat inventé C', price: { amount: '25', currency_code: 'EUR' }, status: 'Commande annulée', date: iso(jourM(-1, 20)) },
 ];
@@ -239,16 +239,16 @@ const attendreMb = (pg) => pg.waitForFunction(() => { const e = document.querySe
         await aller(pg, 'dashboard', '[data-comparer]', 2500);
         await pg.selectOption('[data-comparer-mois="a"]', YM_M);
         await pg.selectOption('[data-comparer-mois="b"]', YM_AVANT);
-        await pg.waitForFunction(() => { const e = document.querySelector('[data-comparer-ligne="achats"]'); return e && e.getAttribute('data-a') !== ''; }, null, { timeout: 20000 }).catch(() => {});
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-comparer-ligne="paires"]'); return e && e.getAttribute('data-a') !== ''; }, null, { timeout: 20000 }).catch(() => {});
         await pg.waitForTimeout(400);
         const K = await attrs(pg, '[data-comparer]');
-        const L = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-comparer-ligne]')].map((e) => [e.getAttribute('data-comparer-ligne'), { a: e.getAttribute('data-a'), b: e.getAttribute('data-b'), sens: e.getAttribute('data-sens'), ap: e.getAttribute('data-a-partiel'), bp: e.getAttribute('data-b-partiel'), fleche: !!e.querySelector('.vrm-cm-fleche') }])));
+        const L = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-comparer-ligne]')].map((e) => [e.getAttribute('data-comparer-ligne'), { a: e.getAttribute('data-a'), b: e.getAttribute('data-b'), sens: e.getAttribute('data-sens'), ap: e.getAttribute('data-a-partiel'), bp: e.getAttribute('data-b-partiel'), aa: e.getAttribute('data-a-achats'), sous: (e.querySelector('.vrm-cm-v.is-a small') || {}).innerText || '', fleche: !!e.querySelector('.vrm-cm-fleche') }])));
         dit(K && K['comparer-a'] === YM_M && K['comparer-b'] === YM_AVANT && K.comparer === 'precedent' && K['comparer-meme-point'] === '0', `${nom} : deux sélecteurs : ${YM_M} et ${YM_AVANT}, deux mois entiers`, JSON.stringify(K));
-        dit(Object.keys(L).join(',') === 'vendu,recu,benefice,ventes,achats', `${nom} : vendu, reçu, bénéfice, ventes, achats`, Object.keys(L).join(','));
+        dit(Object.keys(L).join(',') === 'vendu,recu,benefice,ventes,paires', `${nom} : vendu, reçu, bénéfice, ventes, paires achetées`, Object.keys(L).join(','));
         dit(L.vendu && Number(L.vendu.a) === J0.venduM * 100 && Number(L.vendu.b) === J0.venduAvant * 100, `${nom} : vendu ${J0.venduM} € face à ${J0.venduAvant} € (date de la VENTE)`, JSON.stringify(L.vendu));
         dit(L.recu && Number(L.recu.a) === J0.recuM * 100 && L.recu.b === '0' || (nomJeu === 'D' && L.recu && L.recu.ap === '1'), `${nom} : reçu ${J0.recuM} € en ${NOM_M}, 0 le mois d'avant (date du VERSEMENT)`, JSON.stringify(L.recu));
         dit(L.ventes && Number(L.ventes.a) === J0.nM && Number(L.ventes.b) === J0.nAvant, `${nom} : ${J0.nM} ventes face à ${J0.nAvant}`, JSON.stringify(L.ventes));
-        dit(L.achats && L.achats.a === '2' && L.achats.b === '0', `${nom} : achats 2 face à 0 (le registre des achats : l'annulé n'y est pas)`, JSON.stringify(L.achats));
+        dit(L.paires && L.paires.a === '4' && L.paires.aa === '2' && L.paires.b === '0' && /^2 achats$/.test(L.paires.sous), `${nom} : (C5) 4 paires face à 0 — le lot de 3 compte 3 ; « 2 achats » en petit (l'annulé n'y est pas)`, JSON.stringify(L.paires));
         dit(L.vendu.sens === 'hausse' && L.vendu.fleche && L.ventes.fleche, `${nom} : flèche (neutre) là où les deux côtés sont sus et complets`, JSON.stringify(L.vendu));
         if (nomJeu === 'D') dit(L.recu.ap === '1' && !L.recu.sens && !L.recu.fleche, `${nom} : reçu « au moins » (une vente à dater) ⇒ aucune flèche`, JSON.stringify(L.recu));
         dit(Object.values(L).every((x) => (x.sens ? x.fleche : !x.fleche)), `${nom} : aucune flèche sans écart`, JSON.stringify(L));

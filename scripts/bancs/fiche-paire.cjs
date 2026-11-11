@@ -185,7 +185,7 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
       await essaie('E', async () => {
         await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });
         const champ = await pg.$('[data-recherche-champ]');
-        if (!champ || !(await champ.isVisible())) { await pg.locator('button[aria-label="Rechercher une paire"]').first().click(); await pg.waitForSelector('[data-recherche-champ]', { timeout: 8000 }); }
+        if (!champ || !(await champ.isVisible())) { await pg.locator('button[data-recherche-loupe]').first().click(); await pg.waitForSelector('[data-recherche-champ]', { timeout: 8000 }); }
         await pg.fill('[data-recherche-champ]', '117');
         await pg.waitForSelector('[data-tout-parcours]', { timeout: 15000 });
         await pg.click('[data-tout-parcours]');

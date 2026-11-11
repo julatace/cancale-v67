@@ -158,3 +158,11 @@
   transition: transform .2s ease;
 }
 .vrm-outils[open] > summary::after, .vrm-bilan-sync[open] > summary::after { transform: rotate(45deg); }
+
+/* (11 nov., C10) La ligne d'Outils qui mène à la vue « À compléter » (l'ancien bloc y est fondu). */
+:root:root body button.vrm-outils.vrm-outils-vers {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; box-sizing: border-box;
+  min-height: 44px; font: 600 13px/1.25 inherit; text-align: left; cursor: pointer;
+  border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 12px; padding: 10px 14px;
+}
+:root:root body button.vrm-outils.vrm-outils-vers > span { font-weight: 600; opacity: .65; font-variant-numeric: tabular-nums; }

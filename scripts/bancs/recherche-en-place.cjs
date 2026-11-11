@@ -142,7 +142,7 @@ const etat = (pg) => pg.evaluate(() => {
         // A. ouvrir
         // Ordinateur : la touche « / » depuis le bas de la page (la barre reste
         // en haut), puis le clic dans la barre ; téléphone : la loupe.
-        if (tel) await pg.locator('button[aria-label="Rechercher une paire"]').first().tap();
+        if (tel) await pg.locator('button[data-recherche-loupe]').first().tap();
         else await pg.keyboard.press('/');
         await pg.waitForTimeout(400);
         const e1 = await etat(pg);
@@ -174,7 +174,7 @@ const etat = (pg) => pg.evaluate(() => {
         dit(!e4.panneau, `${T} D : Échap ferme le panneau`);
         dit(e4.tab === e0.tab && e4.defile === e0.defile, `${T} D : même écran, même place`, `${e4.tab} · ${e4.defile}`);
         // E. dehors
-        if (tel) await pg.locator('button[aria-label="Rechercher une paire"]').first().tap(); else await pg.locator('[data-barre-recherche]').first().click();
+        if (tel) await pg.locator('button[data-recherche-loupe]').first().tap(); else await pg.locator('[data-barre-recherche]').first().click();
         await pg.keyboard.type('nike', { delay: 30 }); await pg.waitForTimeout(400);
         const e5 = await etat(pg);
         dit(e5.panneau, `${T} E : rouvert`);

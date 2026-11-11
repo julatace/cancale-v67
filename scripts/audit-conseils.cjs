@@ -249,7 +249,7 @@ if (process.argv.includes('--prouve')) {
     dit(String(dire(c.texte)).split(/[.!?]/).filter((x) => x.trim()).length <= 1 && String(dire(c.texte)).length <= 90, `« ${c.cle} » : une phrase courte`, dire(c.texte));
     dit(!/\b(17|20|41|43|7)\b/.test(mots), `« ${c.cle} » : aucun nombre de l’écran redit dans la bulle (§7)`, mots);
   }
-  dit(/<Conseils\b[\s\S]{0,400}tour:\s*!!\(bienvenue \|\| visite \|\| (?:configOuverte \|\| )?\(premierJour && !load\(CLE_VISITE/.test(app), 'monté avec `tour` = Bienvenue, visite, Ma configuration ouverte, ou une personne neuve qui ne l’a pas vue');   // (11 nov.) + Ma configuration (feuille d'accueil)
+  dit(/<Conseils\b[\s\S]{0,400}tour:\s*!!\(bienvenue \|\| visite \|\| (?:configOuverte \|\| )?(?:parcoursOuvert \|\| )?\(premierJour && !load\(CLE_VISITE/.test(app), 'monté avec `tour` = Bienvenue, visite, Ma configuration ou le parcours d’arrivée ouverts, ou une personne neuve qui ne l’a pas vue');   // (11 nov.) + Ma configuration (feuille d'accueil)
   dit(/<Conseils\b[\s\S]{0,500}exemple:\s*exempleActif\(\)[\s\S]{0,80}stream:\s*!!streamOn/.test(app), 'le mode exemple et le mode stream font taire les conseils');
   dit(/lireLigneAccompagnement[\s\S]{0,400}if \(!r\.ok\) return null;/.test(app) && /data->>rev=eq\.\$\{rev\}/.test(app.slice(app.indexOf('const ecrireLigneAccompagnement'))), 'la ligne `vrm_accompagnement` : lecture ratée ⇒ null, écriture en comparer-et-échanger sur rev');
   const iVu = comp.indexOf('noterVu('), iMontre = comp.indexOf('setMontre({ ...choix');
