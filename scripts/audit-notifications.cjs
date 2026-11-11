@@ -230,7 +230,8 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
     dit(T.decisionNotif({ message: false }, 'message') === false && T.decisionNotif({}, 'message') === true && T.decisionNotif({ familles: { messages: true }, message: false }, 'message') === true, 'F4 sans famille posée, l’ancien réglage décide ; la famille posée l’emporte');
     const fams = new Set(Object.values(T.FAMILLE_DE));
     // (5 nov.) Sept types : la double vente a le sien, « Compta » devient « Rappels » (héritage de l’ancien réglage).
-    dit(['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes'].every((f) => fams.has(f)) && T.FAMILLES.length === 8, 'F5 huit types : Ventes, Offres, Messages, Colis à poster, Codes de retrait, Double vente, Rappels, Nouveau compte relié');
+    // (11 nov., lot avis-negatif) Neuf : « Avis négatif reçu » (src/avisNegatif.js).
+    dit(['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes', 'avis'].every((f) => fams.has(f)) && T.FAMILLES.length === 9, 'F5 neuf types : Ventes, Offres, Messages, Colis à poster, Codes de retrait, Double vente, Rappels, Nouveau compte relié, Avis négatif reçu');
     dit(T.decisionNotif({ familles: { ventes: false } }, 'doublevente') === false && T.decisionNotif({ familles: { ventes: false, doublevente: true } }, 'doublevente') === true && T.decisionNotif({ familles: { compta: false } }, 'urssaf') === false && T.decisionNotif({ familles: { poster: false } }, 'soir') === false, 'F6 un type neuf hérite de l’ancien réglage tant qu’il n’est pas posé');
   });
 

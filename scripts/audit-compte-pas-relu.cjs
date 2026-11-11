@@ -154,7 +154,7 @@ const iso = (ms) => new Date(ms).toISOString();
     dit(d(l, undefined) === false, 'A24 mémo illisible ⇒ rien (pas su)');
     dit(d([], null) === false && d(null, null) === false, 'A25 aucun compte à relire, ou pas su ⇒ rien');
     const T = await import('file://' + path.join(R, 'api', '_lib', 'notif-textes.js'));
-    dit(T.familleDe(L.CAT_RELECTURE) === 'rappels' && T.FAMILLES.length === 8, 'A26 la catégorie est rangée dans la famille « Rappels » des huit familles', T.familleDe(L.CAT_RELECTURE));
+    dit(T.familleDe(L.CAT_RELECTURE) === 'rappels' && T.FAMILLES.length === 9, 'A26 la catégorie est rangée dans la famille « Rappels » des neuf familles (11 nov. : + Avis négatif reçu)', T.familleDe(L.CAT_RELECTURE));
     dit(T.decisionNotif({ familles: { rappels: false } }, L.CAT_RELECTURE) === false && T.decisionNotif({ familles: { compta: false } }, L.CAT_RELECTURE) === false && T.decisionNotif({}, L.CAT_RELECTURE) === true, 'A27 elle suit le choix du type « Rappels » (et l’ancien « Compta » hérité), allumée par défaut');
     const A = await import('file://' + path.join(R, 'api', '_lib', 'notif-apercus.js'));
     const ap = A.apercuFamille('rappels');
