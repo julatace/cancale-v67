@@ -9,6 +9,7 @@
        anti-patron d'accessibilité (et c'est signalé par les audits). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="VRM" />
   <!-- Couleur de l'interface système (barre du navigateur / PWA sur iPhone).
@@ -22,7 +23,40 @@
   <meta name="theme-color" content="#F2F2F7" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/vrm-apple-touch-icon-v5.png" />
-  <link rel="icon" type="image/png" href="/vrm-icon-v5-192.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/vrm-apple-touch-icon-v5-152.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="/vrm-apple-touch-icon-v5-167.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/vrm-apple-touch-icon-v5.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/vrm-icon-v5-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/vrm-icon-v5-192.png" />
+  <!-- (11 nov., lot app-installable) ÉCRANS DE DÉMARRAGE de l'app posée sur
+       l'écran d'accueil de l'iPhone : iOS ne les fabrique pas, il montrait un
+       écran blanc. Même dessin que #vrm-demarrage (logo au même endroit), un par
+       taille d'iPhone, clair et sombre. ⚠️ iOS ne connaît que le thème du
+       SYSTÈME à cet instant (pas le choix `vinted_dark`) : public/demarrage/. -->
+  <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-440x956@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-440x956@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-430x932@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-430x932@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-402x874@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-402x874@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-393x852@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-393x852@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-428x926@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-428x926@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-390x844@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-390x844@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-414x896@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-414x896@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-375x812@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-375x812@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-414x896@2-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-414x896@2-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-414x736@3-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-414x736@3-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-375x667@2-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-375x667@2-sombre.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-320x568@2-clair.png" />
+  <link rel="apple-touch-startup-image" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-320x568@2-sombre.png" />
   <!-- Connexion anticipée à Supabase : le tout premier chargement de données
        (comptes, moisson) démarre son handshake TLS pendant que le JS se parse. -->
   <link rel="preconnect" href="https://lgonxzrzjcqthjtbdpzo.supabase.co" crossorigin />
@@ -286,6 +320,10 @@
     /* 4) DÉFILEMENT : élastique sur iOS + barres discrètes sur desktop. */
     html{-webkit-text-size-adjust:100%;}
     body{overscroll-behavior-y:none;}
+    /* (11 nov., lot app-installable) Le RECHARGEMENT au tirer (Chrome Android) se
+       règle sur la racine, pas sur body : tiré en haut, l'écran ne recharge plus
+       la page. Le rebond doux du contenu (iOS) reste. */
+    html{overscroll-behavior:none;}
     ::-webkit-scrollbar{width:10px;height:10px;}
     ::-webkit-scrollbar-thumb{background:rgba(92,102,114,.32);border-radius:999px;border:3px solid transparent;background-clip:content-box;}
     ::-webkit-scrollbar-thumb:hover{background:rgba(92,102,114,.48);border:3px solid transparent;background-clip:content-box;}
