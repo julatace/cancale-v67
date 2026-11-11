@@ -68,7 +68,8 @@ async function scenario(b, avecCategorie) {
   await pg.waitForTimeout(1500);
   surEbay = surEbay && !!(await pg.$('[data-tache="annonces"][data-tache-site="ebay"]'));
   dit(surEbay, `${avecCategorie ? 'A' : 'B'} · le lien d'Annonces · eBay ouvre Annonces filtrée sur eBay (et y reste)`);
-  const ouvrir = await pg.$('text=Vendre un article sur eBay'); if (ouvrir) await ouvrir.click();
+  // (11 nov., ebay-rouges) L'entrée « Vendre sur eBay » (6 nov.) : ouverte par sa règle, `data-poster="ebay"`.
+  const ouvrir = await pg.$('[data-poster="ebay"]'); if (ouvrir) await ouvrir.click();
   await pg.waitForTimeout(500);
   const btn = await pg.$('[data-publier-un-clic="401"]');
   dit(!!btn, `${avecCategorie ? 'A' : 'B'} · chaque article a son bouton « Publier » (un clic)`);

@@ -609,8 +609,14 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         const g = await pg.$eval('[data-publier-garde]', (e) => ({ k: e.getAttribute('data-publier-garde'), t: e.textContent })).catch(() => ({ k: null, t: '' }));
         const dis = await pg.$eval('button:has-text("Publier sur eBay")', (e) => e.disabled).catch(() => null);
         await pg.locator('button:has-text("Publier sur eBay")').click({ force: true, timeout: 3000 }).catch(() => {});
+        // (11 nov., ebay-rouges) Depuis le 3 nov., une annonce qui a un point à revoir (ici « 2 photos
+        //  seulement ») passe par la feuille de vérification avant toute publication : le banc répond
+        //  comme Julien, « Publier quand même » (`data-verif-publier`). Les paires bloquées doivent
+        //  RESTER bloquées même après ce oui — le contrôle n'en est que plus dur.
+        let verif = null;
+        try { await pg.waitForSelector('[data-verif-publier]', { timeout: 3000 }); verif = await pg.$$eval('[data-verif-probleme]', (els) => els.map((e) => e.getAttribute('data-verif-probleme'))); await pg.click('[data-verif-publier]'); } catch (_) {}
         await pg.waitForTimeout(500);
-        return { g, dis };
+        return { g, dis, verif };
       };
       await essaie('D', async () => {
         await versAnnonces(pg);

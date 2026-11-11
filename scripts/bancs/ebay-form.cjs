@@ -116,15 +116,18 @@ const envoisEbay = []; let avertir = false;
     parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre un article sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }
-  const total = Object.values(parOnglet).reduce((a, x) => a + x.vendre, 0);
+  // (11 nov., ebay-rouges) Le 6 nov., l'entrée est devenue UNE ligne « Vendre sur eBay » (elle remplace le
+  //  gros bouton « Vendre un article sur eBay » ET « Publier une annonce Vinted sur eBay ») : le banc
+  //  comptait un libellé disparu (0 partout). Il compte la RÈGLE, l'attribut `data-poster="ebay"` (§6.4).
+  const total = Object.values(parOnglet).reduce((a, x) => a + x.n, 0);
   dit(!introuvables.length, 'le banc trouve chaque sous-onglet eBay', introuvables.join(', '));
-  dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre un article en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
-  dit(parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
+  dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre un article en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.n]))));
+  dit(parOnglet['Compte'].n === 0 && parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
   try { await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-tache-site="ebay"]', { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
-  const openBtn = await pg.$('text=Vendre un article sur eBay');
-  dit(!!openBtn, 'le bouton d\'ouverture dit « Vendre un article sur eBay »');
+  const openBtn = await pg.$('[data-poster="ebay"]');
+  dit(!!openBtn && /Vendre sur eBay/.test(await openBtn.innerText()), 'l\'entrée unique (data-poster="ebay") dit « Vendre sur eBay »', openBtn ? (await openBtn.innerText()).replace(/\s+/g, ' ') : 'absente');
   if (openBtn) await openBtn.click();
   await pg.waitForTimeout(400);
   let txt = await T();
