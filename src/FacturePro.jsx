@@ -30,7 +30,7 @@ import { SheetShell } from './composants/SheetShell.jsx';
 import {
   REGIMES_TVA, FORMES, COULEURS, TAUX_TVA, estSociete, verifierSiret, manquantsVendeur, manquantsVente,
   contenuFacture, contenuApercu, estTrou, euros, emailValide, LOGO_MAX, MESSAGE_DEFAUT, nomFichier, jourParis,
-  adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes,
+  adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes, refusMarge,
 } from './facturePro/regle.js';
 import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/rattachement.js';
 import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriode, trousNumerotation, csvRegistre, totauxRegistre, nomZip, SELECT_FACTURES_PRO } from './facturePro/registre.js';
@@ -58,6 +58,14 @@ export function useFicheFacturation(deps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return cfg;
+}
+// (11 nov., lot tva-marge) Le régime de TVA de SA fiche, pour qui n'affiche pas l'écran (la
+// Comptabilité ne publie la TVA sur marge que pour « marge ») : '' = pas choisi, null = pas su.
+export async function regimeTvaFiche(deps) {
+  if (_cfg === undefined || _cfg === null) {
+    try { const d = await deps.lireReglage(ID_CFG); if (d === null || d === undefined) return null; if (_cfg === undefined || _cfg === null) poserCfg({ ...VIDE, ...migrerAncienne(d) }); } catch (_) { return null; }
+  }
+  return _cfg ? String(_cfg.tva_regime || '') : null;
 }
 // La fiche d'avant (16 oct.) : `tauxTva` « 0 » = franchise. On ne DEVINE pas
 // le régime à partir de rien : un taux > 0 dit « TVA classique », « 0 » ne dit
@@ -272,6 +280,9 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   try { if (deps && typeof deps.vendActuel === 'function' && deps.vendActuel() !== 'sneakers' && typeof deps.exemples === 'function') exemple = { ...EXEMPLE, designation: deps.exemples().annonce.titre + ' (exemple)' }; } catch (_) { exemple = EXEMPLE; }
   try { apercu = contenuApercu(cfg, exemple, { numero: numeroExemple, emiseLe: Date.now() }).contenu; } catch (_) { apercu = null; }
   const mentionsKo = apercu ? new Set(mentionsManquantes(apercu)) : new Set();
+  // (11 nov., lot tva-marge) En TVA sur marge, une facture qui montrerait de la TVA n'est jamais faite : la raison est DITE ici
+  // (sinon l'aperçu disparaîtrait sans un mot) — p. ex. « TTC » écrit dans la note.
+  const refusTva = cfg.tva_regime === 'marge' ? refusMarge(cfg, exemple) : '';
   const societe = estSociete(cfg.forme);
   const champ = ({ k, label, aide, type = 'text', placeholder, mode, auto, large: lg = false, majuscules = false }) => (
     <label key={k} className={`vrm-fp-champ${lg ? ' is-large' : ''}`} data-fp-champ={k} data-fp-manque={champManque.has(k) ? '1' : undefined}>
@@ -288,6 +299,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           {manque.length
             ? <><b>{manque.length === 1 ? 'Il manque une information' : `Il manque ${manque.length} informations`} pour faire une facture conforme</b><span>{manque.map((m) => m.l).join(' · ')}</span></>
             : <><b>Ta fiche est complète</b><span>Chaque vente prouvée d'un compte Pro peut recevoir sa facture.</span></>}
+          {refusTva ? <span data-fp-refus-tva="">{refusTva}</span> : null}
           <div className="vrm-fp-voir-apercu"><button type="button" className="vrm-b vrm-b-secondaire" data-fp-voir-apercu="" onClick={() => { try { apercuRef.current && apercuRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }}>Voir l'aperçu</button></div>
         </div>
 

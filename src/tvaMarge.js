@@ -139,7 +139,7 @@ export const eurosC = (c) => {
   return `${neg ? '−' : ''}${String(Math.floor(a / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')},${String(a % 100).padStart(2, '0')} €`;
 };
 const virg = (c) => (Number.isSafeInteger(c) ? `${c < 0 ? '-' : ''}${Math.floor(Math.abs(c) / 100)},${String(Math.abs(c) % 100).padStart(2, '0')}` : '');
-const jour = (ts) => {
+export const jourParisTs = (ts) => {
   if (!Number.isFinite(ts)) return '';
   try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(ts)); } catch (_) { return ''; }
 };
@@ -155,7 +155,7 @@ export function csvDeclarationMarge(d) {
   ];
   const etat = (v) => (v.etat === 'ok' ? 'comptée' : v.etat === 'perte' ? 'perte : TVA 0, non imputée' : `exclue : ${RAISON_EXCLUE[v.etat] || v.etat}`);
   for (const v of [...d.comptees, ...d.aCompleter].sort((a, b) => (a.ts || 0) - (b.ts || 0))) {
-    rows.push([jour(v.ts), v.plateforme, v.num, v.titre, virg(v.prixC), virg(v.achatC), virg(v.margeC), virg(v.baseC), virg(v.tvaC), etat(v)]);
+    rows.push([jourParisTs(v.ts), v.plateforme, v.num, v.titre, virg(v.prixC), virg(v.achatC), virg(v.margeC), virg(v.baseC), virg(v.tvaC), etat(v)]);
   }
   rows.push([]);
   rows.push([d.complet ? 'Total' : 'Total (au moins : des ventes sont exclues)', '', '', `${d.nComptees} vente(s) comptée(s)`, virg(d.prixC), virg(d.achatC), virg(d.margeC), virg(d.baseC), virg(d.tvaC), '']);
@@ -166,20 +166,6 @@ export function csvDeclarationMarge(d) {
   rows.push([`Sources : ${SOURCES_TVA_MARGE.map((s) => s.ref).filter((x, i, a) => a.indexOf(x) === i).join(' ; ')}`]);
   rows.push([A_VERIFIER]);
   return '﻿' + rows.map((r) => r.map(q).join(';')).join('\n');
-}
-
-// ── LA MÊME DÉCLARATION EN PAGE IMPRIMABLE (« Enregistrer en PDF ») ─────────
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export function htmlDeclarationMarge(d, { vendeur = '' } = {}) {
-  const lignes = [...d.comptees, ...d.aCompleter].sort((a, b) => (a.ts || 0) - (b.ts || 0)).map((v) => `<tr><td>${esc(jour(v.ts))}</td><td>${esc(v.plateforme)}</td><td>${esc(v.num)}</td><td>${esc(v.titre)}</td><td class="n">${esc(eurosC(v.prixC))}</td><td class="n">${esc(eurosC(v.achatC))}</td><td class="n">${esc(eurosC(v.margeC))}</td><td class="n">${esc(eurosC(v.tvaC))}</td><td>${esc(v.etat === 'ok' ? '' : v.etat === 'perte' ? 'perte : TVA 0' : `exclue : ${RAISON_EXCLUE[v.etat]}`)}</td></tr>`).join('');
-  const am = d.complet ? '' : 'au moins ';
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>TVA sur marge — ${esc(d.libelle)}</title>
-<style>body{font:12px -apple-system,system-ui,sans-serif;color:#111;margin:24px}h1{font-size:18px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:12px}td,th{border-bottom:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}.n{text-align:right;font-variant-numeric:tabular-nums}.tot{margin-top:12px;font-size:14px}.pied{margin-top:16px;color:#555;font-size:11px}</style></head><body>
-<h1>TVA sur marge — biens d'occasion — ${esc(d.libelle)}</h1>${vendeur ? `<div>${esc(vendeur)}</div>` : ''}
-<div class="tot">Base hors taxe des marges : <b>${esc(am + eurosC(d.baseC))}</b> · TVA due : <b>${esc(am + eurosC(d.tvaC))}</b> · ${d.nComptees} vente(s) comptée(s)${d.aCompleter.length ? ` · ${d.aCompleter.length} exclue(s) à compléter` : ''}${d.nPertes ? ` · ${d.nPertes} à perte (${esc(eurosC(d.perteC))} non imputés)` : ''}</div>
-<table><thead><tr><th>Date</th><th>Plateforme</th><th>N°</th><th>Article</th><th class="n">Vente</th><th class="n">Achat</th><th class="n">Marge TTC</th><th class="n">TVA</th><th></th></tr></thead><tbody>${lignes}</tbody></table>
-<div class="pied">Taux ${TAUX_MARGE} % · TVA = marge × ${TAUX_MARGE}/${100 + TAUX_MARGE}, arrondie vente par vente · Date retenue : ${esc(Object.entries(DATE_PAR_PLATEFORME).map(([p, t]) => `${p} = ${t}`).join(' ; '))}<br>Sources : ${esc(SOURCES_TVA_MARGE.map((s) => s.ref).filter((x, i, a) => a.indexOf(x) === i).join(' ; '))}<br>${esc(A_VERIFIER)}</div>
-</body></html>`;
 }
 
 // ── LA PUBLICATION (Comptabilité publie, la carte consomme — §11) ───────────
@@ -197,6 +183,11 @@ export function publierTvaMarge(lignes, { owner = '', partiel = [] } = {}) {
     if (avant && avant.replace(/,"at":\d+}$/, '}') === neuf) return;
     localStorage.setItem(CLE_TVA_MARGE, JSON.stringify({ ...p, at: Date.now() }));
   } catch (_) { /* stockage refusé : la carte dit « — » */ }
+  try { window.dispatchEvent(new CustomEvent(EVT_TVA_MARGE)); } catch (_) {}
+}
+// Pas (ou plus) en TVA sur marge : la publication est retirée de cet appareil.
+export function retirerTvaMarge() {
+  try { if (localStorage.getItem(CLE_TVA_MARGE) == null) return; localStorage.removeItem(CLE_TVA_MARGE); } catch (_) { return; }
   try { window.dispatchEvent(new CustomEvent(EVT_TVA_MARGE)); } catch (_) {}
 }
 // Lecture : null = rien de publié (« pas su »), sinon { lignes, partiel, at }.
