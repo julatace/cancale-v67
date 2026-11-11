@@ -2561,7 +2561,7 @@ function AppareilsConnectes() {
       <button type="button" className="vrm-sec-ligne" data-appareil-groupe={grp.appareil} data-groupe-n={grp.n} aria-expanded={ouvert(grp.appareil)} onClick={() => basculer(grp.appareil)} style={{ width: '100%', border: 0, background: 'transparent', textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
         <div className="vrm-sec-corps">
           <span className="vrm-sec-titre">{grp.appareil}</span>
-          <span className="vrm-sec-sous">{grp.ici ? 'Cet appareil · ' : ''}{resume(grp)}</span>
+          <span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{grp.ici ? 'Cet appareil · ' : ''}{resume(grp)}</span>
         </div>
         <span aria-hidden="true" style={{ color: 'var(--fu-gris2, #6e6e73)', fontSize: 13 }}>{ouvert(grp.appareil) ? 'Masquer' : 'Détail'}</span>
       </button>
@@ -2603,7 +2603,7 @@ function AppareilsConnectes() {
         </>
       )}
       <div style={{ marginTop: 12, textAlign: 'center' }}>
-        <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44 }}>Se déconnecter partout</button>
+        <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>Se déconnecter partout</button>
       </div>
     </div>
   );

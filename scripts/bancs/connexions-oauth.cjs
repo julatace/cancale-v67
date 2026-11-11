@@ -338,6 +338,46 @@ async function parcours(b, largeur) {
     dit(reste.every((x) => !x) && adressePropre(p2.url()) && !errs2.length, `${tag} · P14 tout vérificateur effacé après l’échange, adresse propre`, JSON.stringify(reste) + ' ' + p2.url());
     await o.ctx.close();
   });
+
+  // ── P15 : « Appareils connectés » regroupés (capture de Julien : 5 Mac · Chrome…) ──
+  await essai('P15', async () => {
+    const fiche = ficheVieille([ident('email', 'vendeuse@exemple.test')]);
+    const ap = (id, appareil, min, ici) => ({ id: `0000000${id}-0000-4000-8000-00000000000${id}`, appareil, creeLe: ilYa(min + 5), actifLe: ilYa(min), ici: !!ici });
+    const LISTE = [ap(1, 'Mac · Chrome', 2, true), ap(2, 'Mac · Chrome', 3), ap(3, 'Mac · Chrome', 60), ap(4, 'Mac · Chrome', 61), ap(5, 'Mac · Chrome', 62), ap(6, 'Mac · Firefox', 300), ap(7, 'Mac · Edge', 10), ap(8, 'iPhone · Safari', 120), ap(9, 'Windows · Chrome', 60 * 24 * 45)];
+    const o = await ouvrir(b, largeur, { session: SESSION(), fiche, url: '/?tab=settings&section=appareils', attente: 1500, authorize: () => ({}), token: () => ({ status: 500, body: {} }) });
+    const posts = [], logouts = [];
+    await o.ctx.route('**/api/compte?mode=appareils', (r) => { if (r.request().method() === 'POST') { const c = JSON.parse(r.request().postData() || '{}'); if (c.action) return json(r, { ok: true, nouveaux: 0 }); posts.push(c.session); return json(r, { ok: true, ferme: c.session }); } return json(r, { ok: true, appareils: LISTE }); });
+    await o.ctx.route('**/auth/v1/logout**', (r) => { logouts.push(r.request().url()); return r.fulfill({ status: 204, body: '' }); });
+    await o.pg.goto(`http://localhost:${srv.address().port}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' }); await o.pg.waitForTimeout(5000);
+    await toucher(o.pg, o.pg.locator('[data-sous-ouvrir="appareils"]'), mobile); await o.pg.waitForTimeout(800);
+    await o.pg.waitForSelector('[data-appareils="9"]', { timeout: 10000 }).catch(() => {});
+    const avant = await o.pg.evaluate(() => ({
+      ici: [...document.querySelectorAll('[data-appareils-ici] [data-appareil-groupe]')].map((g) => [g.getAttribute('data-appareil-groupe'), g.getAttribute('data-groupe-n'), g.innerText.replace(/\n/g, ' · ')]),
+      autres: document.querySelector('[data-appareils-autres]') ? document.querySelector('[data-appareils-autres]').getAttribute('data-appareils-autres') : null,
+      ouvert: !!(document.querySelector('[data-appareils-autres]') || {}).open,
+      boutons: [...document.querySelectorAll('[data-appareil-fermer]')].filter((x) => x.getClientRects().length).length,
+    }));
+    dit(avant.ici.length === 1 && avant.ici[0][0] === 'Mac · Chrome' && avant.ici[0][1] === '5' && /Cet appareil · 5 connexions · dernière il y a 2 min/.test(avant.ici[0][2]), `${tag} · P15 « Mac · Chrome · cet appareil · 5 connexions · dernière il y a 2 min », en tête`, JSON.stringify(avant.ici));
+    dit(avant.autres === '3' && !avant.ouvert && avant.boutons === 0, `${tag} · P15 les autres repliés derrière « Voir les appareils (3) », aucun « Déconnecter » par ligne`, JSON.stringify(avant));
+    await capture(o.pg, `${tag}-p15-appareils-replies`);
+    await toucher(o.pg, o.pg.locator('[data-appareils-autres] > summary'), mobile); await o.pg.waitForTimeout(400);
+    const deplie = await o.pg.evaluate(() => ({ groupes: [...document.querySelectorAll('[data-appareils-autres] [data-appareil-groupe]')].map((g) => g.getAttribute('data-appareil-groupe')), anciennes: (document.querySelector('[data-appareils-anciennes]') || {}).getAttribute ? document.querySelector('[data-appareils-anciennes]').getAttribute('data-appareils-anciennes') : null }));
+    dit(deplie.groupes.join('|') === 'Mac · Edge|iPhone · Safari|Mac · Firefox' && deplie.anciennes === '1', `${tag} · P15 déplié : un groupe par appareil, du plus récent ; 1 ancienne (> 30 j) à part`, JSON.stringify(deplie));
+    await toucher(o.pg, o.pg.locator('[data-appareil-groupe="Mac · Edge"]'), mobile); await o.pg.waitForTimeout(300);
+    dit(await o.pg.locator('[data-appareil-fermer]').filter({ visible: true }).count() === 1, `${tag} · P15 le détail par connexion seulement en dépliant un groupe`);
+    await capture(o.pg, `${tag}-p15-appareils-deplies`);
+    await toucher(o.pg, o.pg.locator('[data-deconnexion-autres]'), mobile); await o.pg.waitForTimeout(700);
+    await capture(o.pg, `${tag}-p15-confirmer-autres`);
+    { const okb = o.pg.getByRole('button', { name: /^Déconnecter$/ }).last(); if (mobile) await okb.tap({ timeout: 8000 }); else await okb.click({ timeout: 8000 }); }
+    await o.pg.waitForTimeout(1200);
+    dit(logouts.length === 1 && /\/auth\/v1\/logout\?scope=others$/.test(logouts[0]) && !!(await sessionDe(o.pg)), `${tag} · P15 « Déconnecter les autres appareils » : confirmé, UN appel scope=others, VRM reste ouvert ici`, JSON.stringify(logouts));
+    await toucher(o.pg, o.pg.locator('[data-appareils-fermer-anciennes]'), mobile); await o.pg.waitForTimeout(600);
+    { const okb = o.pg.getByRole('button', { name: /^Fermer$/ }).last(); if (mobile) await okb.tap({ timeout: 8000 }); else await okb.click({ timeout: 8000 }); }
+    await o.pg.waitForTimeout(1200);
+    dit(posts.length === 1 && /9$/.test(posts[0]), `${tag} · P15 « Fermer » les anciennes : sur son clic, seulement elles`, JSON.stringify(posts));
+    dit(!o.j.errs.length, `${tag} · P15 aucune erreur d’app`, o.j.errs.join('|'));
+    await o.ctx.close();
+  });
 }
 
 (async () => {

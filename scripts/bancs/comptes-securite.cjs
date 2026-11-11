@@ -132,9 +132,14 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           await pg.goto(`http://localhost:${NV.PORT}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' }); await attendre(1800);
           await pg.click('[data-sous-ouvrir="appareils"]').catch(() => {});
           await pg.waitForSelector('[data-appareils="2"]', { timeout: 8000 }).catch(() => {});
+          // (11 nov., lot connexions-oauth) Regroupé : cet appareil en tête, les autres repliés.
+          const groupes = await pg.evaluate(() => ({ ici: [...document.querySelectorAll('[data-appareils-ici] [data-appareil-groupe]')].map((g) => g.getAttribute('data-appareil-groupe')), autres: [...document.querySelectorAll('[data-appareils-autres] [data-appareil-groupe]')].map((g) => g.getAttribute('data-appareil-groupe')), boutonsVisibles: [...document.querySelectorAll('[data-appareil-fermer]')].filter((b) => b.getClientRects().length).length }));
+          await pg.click('[data-appareils-autres] > summary').catch(() => {}); await attendre(200);
+          await pg.click('[data-appareil-groupe="Mac · Chrome"]').catch(() => {}); await attendre(200);
           const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-appareil]')].map((l) => ({ ici: l.getAttribute('data-appareil'), bouton: !!l.querySelector('[data-appareil-fermer]') })));
           if (PARTIES.includes('C') && issue === 'oui') {
-            dit(lignes.length === 2 && lignes[0].ici === 'ici' && !lignes[0].bouton && lignes[1].bouton, `C ${tag} : la liste, « cet appareil » sans bouton`, JSON.stringify(lignes));
+            dit(groupes.ici.join() === 'iPhone · Safari' && groupes.autres.join() === 'Mac · Chrome' && groupes.boutonsVisibles === 0, `C ${tag} : cet appareil en tête, les autres repliés, aucun « Déconnecter » avant de déplier`, JSON.stringify(groupes));
+            dit(lignes.length === 1 && lignes[0].ici === 'autre' && lignes[0].bouton, `C ${tag} : déplié, la connexion de l'autre appareil porte « Déconnecter »`, JSON.stringify(lignes));
             await capture(pg, `C-${tag}-appareils`);
             await pg.click('[data-appareil-fermer]');
             await FEUILLE(pg).getByRole('button', { name: 'Déconnecter', exact: true }).waitFor({ timeout: 5000 }).catch(() => {});

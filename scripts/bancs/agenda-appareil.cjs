@@ -126,8 +126,10 @@ const S_ICI = 'a1b2c3d4-0000-4000-8000-000000000001', S_NEUF = 'c3d4e5f6-0000-40
         await attendre(500);
         const L = await pg.evaluate(() => [...document.querySelectorAll('[data-appareil]')].map((l) => ({ nouveau: l.getAttribute('data-appareil-nouveau'), bouton: (l.querySelector('[data-appareil-fermer]') || {}).getAttribute ? l.querySelector('[data-appareil-fermer]').getAttribute('data-appareil-fermer') : null, fond: getComputedStyle(l).backgroundColor, visible: l.getBoundingClientRect().top < innerHeight && l.getBoundingClientRect().bottom > 0 })));
         const n = L.filter((x) => x.nouveau === 'oui');
-        dit(L.length === 3 && n.length === 1 && n[0].bouton === S_NEUF, `G ${tag} : la notification ouvre Appareils connectés, CETTE session seule en évidence`, JSON.stringify(L));
-        dit(n[0] && n[0].fond !== L[1].fond, `G ${tag} : en évidence (ambre), les autres neutres`, JSON.stringify(L.map((x) => x.fond)));
+        // (11 nov., lot connexions-oauth) Regroupé : SEUL le groupe de cette connexion s'ouvre.
+        const fondGroupe = await pg.evaluate(() => { const g = document.querySelector('[data-appareil-groupe="Mac · Chrome"]'); return g ? getComputedStyle(g).backgroundColor : null; });
+        dit(L.length === 1 && n.length === 1 && n[0].bouton === S_NEUF && n[0].visible, `G ${tag} : la notification ouvre Appareils connectés, le groupe de CETTE session déplié, elle seule en évidence`, JSON.stringify(L));
+        dit(n[0] && fondGroupe !== null && n[0].fond !== fondGroupe, `G ${tag} : en évidence (ambre), les autres neutres`, JSON.stringify([n[0] && n[0].fond, fondGroupe]));
         await capture(pg, `G-${tag}-nouvel-appareil`);
         await pg.click(`[data-appareil-fermer="${S_NEUF}"]`).catch(() => {});
         await FEUILLE(pg).getByRole('button', { name: 'Déconnecter', exact: true }).click({ timeout: 5000 }).catch(() => {});
