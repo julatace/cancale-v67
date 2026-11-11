@@ -47,7 +47,7 @@ const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
     <div class="t">
       <div class="m"><img src="data:image/png;base64,${logo}" alt=""><b>VRM</b></div>
       <h1>Tes ventes, tes colis et ta compta, au même endroit.</h1>
-      <p>Pour les revendeurs Vinted, Leboncoin et eBay — vêtements, chaussures, sacs, tout ce qui se revend.</p>
+      <p>Pour les revendeurs Vinted, Leboncoin et eBay — vêtements, sacs, livres, tout ce qui se revend.</p>
       <div class="u">vrm.center</div>
       <div class="ex">À droite : l’app VRM, données d’exemple.</div>
     </div>

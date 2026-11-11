@@ -165,7 +165,7 @@ async function controlesRendu(nav, nom, opt, S) {
     const variante = await pg.evaluate(() => { const e = document.querySelector('[data-prerequis]'); return e && e.getAttribute('data-variante'); });
     dit(variante === (opt.mobile ? 'tactile' : 'souris'), `${nom} : le prérequis parle à ${opt.mobile ? 'un téléphone' : 'un ordinateur'}`, `variante ${variante}`);
     const cta = await visibleDansEcran(pg, '[data-section="hero"] [data-cta="inscription"]');
-    dit(cta && cta.bottom <= H && cta.top >= 0, `${nom} : « Créer mon compte » est dans le premier écran`, cta ? `${Math.round(cta.top)}–${Math.round(cta.bottom)}` : 'absent');
+    dit(cta && cta.bottom <= H && cta.top >= 0, `${nom} : « Essayer gratuitement » (data-cta=inscription) est dans le premier écran`, cta ? `${Math.round(cta.top)}–${Math.round(cta.bottom)}` : 'absent');
     const offert = S.reglages.ACCES_OFFERT;
     const off = await pg.evaluate(() => ({ a: document.querySelectorAll('[data-acces-offert]').length, carte: document.querySelectorAll('[data-sans-carte]').length }));
     if (offert === 'true') dit(off.a > 0 && off.carte > 0, `${nom} : ACCES_OFFERT = true → « Gratuit pour l'instant » et « Aucune carte bancaire »`, JSON.stringify(off));
@@ -260,7 +260,7 @@ async function controlesRendu(nav, nom, opt, S) {
     await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(400);
     const navCta = () => pg.evaluate(() => { const b = document.querySelector('.av-nav [data-cta-nav="inscription"]'); return b ? { op: Number(getComputedStyle(b).opacity), tab: b.tabIndex, d: getComputedStyle(b).display } : null; });
     const haut = await navCta();
-    dit(haut && (haut.op === 0 || haut.d === 'none') && haut.tab === -1, `${nom} : en haut de page, « Créer mon compte » n'est PAS doublé dans la barre`, JSON.stringify(haut));
+    dit(haut && (haut.op === 0 || haut.d === 'none') && haut.tab === -1, `${nom} : en haut de page, le bouton d'inscription n'est PAS doublé dans la barre`, JSON.stringify(haut));
     if (!opt.mobile) {
       await pg.evaluate(() => window.scrollTo(0, 1600));
       await pg.waitForFunction(() => { const b = document.querySelector('.av-nav [data-cta-nav="inscription"]'); return b && getComputedStyle(b).opacity === '1'; }, null, { timeout: 2000 }).catch(() => {});

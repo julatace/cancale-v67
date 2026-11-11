@@ -72,7 +72,7 @@ const MOMENTS = [
   },
   {
     id: 'numeros', capture: 'numeros',
-    alt: 'L’écran Annonces de VRM : chaque article en ligne porte son numéro de rangement en pastille noire — N°12 une paire d’Air Max 90 à 110 €, N°11 une veste en jean à 105 €. Données d’exemple.',
+    alt: 'L’écran Annonces de VRM : chaque article en ligne porte son numéro de rangement en pastille noire — N°12 à 110 €, N°11 une veste en jean à 105 €. Données d’exemple.',
     titre: 'Un numéro par article. Jamais deux fois.',
     texte: 'Chaque annonce reçoit un numéro de rangement : il dit où est l’article (carton, étagère, bac…). Une vente est reliée à son article par une identité — l’annonce, la photo, la transaction —, jamais par un titre qui se ressemble.',
     points: ['Un numéro n’est jamais redonné à un autre article.', 'Deux articles sous un même numéro : VRM te le dit, en rouge, tout de suite.'],
@@ -301,7 +301,7 @@ export default function Accueil({ onEntrer }) {
     return () => { try { mq && mq.removeEventListener && mq.removeEventListener('change', poser); } catch (_) {} document.body.style.background = avant; document.title = titre; };
   }, []);
 
-  // La barre : le fond dès 8 px ; « Créer mon compte » n'y paraît que quand le
+  // La barre : le fond dès 8 px ; « Essayer gratuitement » n'y paraît que quand le
   // bouton du haut est sorti de l'écran (un seul bouton principal à la fois).
   const sentinelle = React.useRef(null), ctaHaut = React.useRef(null);
   const [defile, setDefile] = React.useState(false);
@@ -361,7 +361,7 @@ export default function Accueil({ onEntrer }) {
   // ⚠️ Des fonctions qui RENDENT un bouton, pas des composants déclarés ici
   //    (un composant redéfini à chaque rendu perdrait le focus clavier).
   const creer = (extra) => (
-    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>Créer mon compte</a>
+    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>Essayer gratuitement</a>
   );
   const connexion = (extra) => (
     <a href="/?connexion" className="av-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>Se connecter<span aria-hidden="true">›</span></a>
@@ -385,7 +385,7 @@ export default function Accueil({ onEntrer }) {
             <a href="/aide">Aide</a>
           </nav>
           <div className="av-droite">
-            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte</a>
+            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Essayer gratuitement</a>
             <a href="/?connexion" className="av-lien" data-cta-nav="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>Se connecter</a>
           </div>
         </div>
@@ -394,9 +394,9 @@ export default function Accueil({ onEntrer }) {
       <main>
         <section className="av-hero" data-section="hero">
           <div className="av-in">
-            <p className="av-pour" data-pour-qui="">L’outil des revendeurs Vinted, Leboncoin et eBay</p>
+            <p className="av-pour" data-pour-qui="">L’outil des revendeurs Vinted, Leboncoin et eBay. Tous articles.</p>
             <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">Chaque matin, VRM te dit quoi faire — colis, retraits, offres, URSSAF — sans te tromper d’article. Vêtements, chaussures, sacs : tout ce qui se revend.</p>
+            <p className="av-sous">Chaque matin, VRM te dit quoi faire, sans te tromper d’article.</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
@@ -425,7 +425,7 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <div className="av-journee-tete" data-reveil="">
               <h2 className="av-h2">Ta journée de revendeur, en cinq moments.</h2>
-              <p className="av-chapo">Le matin, au relais, au stock, avec tes acheteurs, en fin de mois : ce qu’il y a à faire, rien de plus.</p>
+              <p className="av-chapo">Le matin, au relais, au stock, avec tes acheteurs, en fin de mois.</p>
             </div>
             <div className="av-split">
               <div className="av-plateau" aria-hidden="true">
@@ -482,7 +482,7 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <div className="av-prix-tete" data-reveil="">
               <h2 className="av-h2">Deux offres. Tout VRM.</h2>
-              <p className="av-chapo">Toutes les fonctions, l’extension et l’app sur ton téléphone, dans les deux. La seule différence : combien de tes comptes vendent.</p>
+              <p className="av-chapo">Toutes les fonctions dans les deux. La seule différence : combien de tes comptes vendent.</p>
             </div>
             <div className="av-offres" data-reveil="">
               {/* Les noms et les phrases : OFFRES (api/_lib/plan-regle.js, la phrase
