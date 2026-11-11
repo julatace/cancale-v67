@@ -123,7 +123,7 @@ const PONT = ({ suppr }) => {
 };
 
 async function ouvrir(b, vp, pont, url) {
-  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', /* (lot lbc-plus) les textes traduits suivent la langue du navigateur : le banc parle français */ ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
