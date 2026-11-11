@@ -21,7 +21,7 @@ import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres } from './offresGarde.js';
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
 import { jugerBrouillon, lectureBrouillons } from './brouillonsProposables.js';
-import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
+import {ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
 import SynchronisationVinted from './SynchronisationVinted.jsx';
@@ -11110,13 +11110,17 @@ const ecrireCartouche = (PL, page, c, x, y, k = 1, fond = false) => {
   if (fond) page.drawRectangle({ x: Math.min(a.x, z.x), y: Math.min(a.y, z.y), width: Math.abs(z.x - a.x), height: Math.abs(z.y - a.y), color: PL.rgb(1, 1, 1) });
   for (const l of c.lignes) {
     const p = versPdfAffiche(b, r, x + c.pad * k, y + l.y * k);
-    page.drawText(l.texte, { x: p.x, y: p.y, size: l.taille * k, font: l.font, color: PL.rgb(0, 0, 0), rotate: PL.degrees(r) });
+    const g = l.gris || 0;
+    page.drawText(l.texte, { x: p.x, y: p.y, size: l.taille * k, font: l.font, color: PL.rgb(g, g, g), rotate: PL.degrees(r) });
   }
 };
 // Cherche une fenêtre libre (cartouche + marges) sur une carte de pixels RGBA.
 // `marge` : un nombre (les quatre côtés) ou { mx, my } en pixels. Une cellule
 // de `cellule` px est de l'encre si au moins 2 de ses pixels sont sous le
 // seuil de luminance. Rend le coin haut-gauche du CARTOUCHE, ou null.
+// (11 nov.) `opts.bloques` : des rectangles { x, y, w, h } en pixels, comptés
+// comme de l'encre (l'étiquette à découper, le tampon déjà posé…).
+// `opts.depuisBas` : la recherche part du coin bas-droit (la mention VRM).
 const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge, opts = {}) => {
   const mx = typeof marge === 'number' ? marge : marge.mx, my = typeof marge === 'number' ? marge : marge.my;
   const seuil = opts.encre != null ? opts.encre : TAMPON.encre, k = opts.cellule || TAMPON.cellule;
@@ -11125,10 +11129,16 @@ const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge, opts = {})
     const i = (y * width + x) * 4;
     if (0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2] < seuil) { const c = ((y / k) | 0) * cw + ((x / k) | 0); if (encre[c] < 2) encre[c]++; }
   }
+  for (const b of opts.bloques || []) {
+    const x0 = Math.max(0, Math.floor(b.x / k)), y0 = Math.max(0, Math.floor(b.y / k)), x1 = Math.min(cw, Math.ceil((b.x + b.w) / k)), y1 = Math.min(ch, Math.ceil((b.y + b.h) / k));
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) encre[y * cw + x] = 2;
+  }
   const stride = cw + 1, sums = new Uint32Array(stride * (ch + 1));
   for (let y = 0; y < ch; y++) { let row = 0; for (let x = 0; x < cw; x++) { row += encre[y * cw + x] >= 2 ? 1 : 0; sums[(y + 1) * stride + x + 1] = sums[y * stride + x + 1] + row; } }
   const w = Math.ceil((boxW + 2 * mx) / k), h = Math.ceil((boxH + 2 * my) / k);
-  for (let y = 0; y + h <= ch; y++) for (let x = 0; x + w <= cw; x++) {
+  const bas = !!opts.depuisBas;
+  for (let j = 0; j + h <= ch; j++) for (let i = 0; i + w <= cw; i++) {
+    const y = bas ? ch - h - j : j, x = bas ? cw - w - i : i;
     const n = sums[(y + h) * stride + x + w] - sums[y * stride + x + w] - sums[(y + h) * stride + x] + sums[y * stride + x];
     if (n === 0) return { x: x * k + mx, y: y * k + my };
   }
@@ -11163,6 +11173,55 @@ const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null) 
     if (p) return { x: p.x / s, y: p.y / s, c, v };
   }
   return null;
+};
+// ── LA MENTION « Créé par VRM » (11 nov.) ────────────────────────────────────
+// Julien : une toute petite mention, PAS à côté du N°, SEULEMENT s'il y a un
+// espace libre sûr ; sinon rien. La même recherche que le tampon (encre sous
+// 200, marges 5 × 3,5 mm), partie du coin bas-droit, avec en plus, comptés
+// comme de l'encre : le tampon élargi de 25 mm, chaque étiquette à découper
+// (`zoneEtiquette`, + 4 mm), chaque code-barres / QR repéré (+ 5 mm) et une
+// bordure de 6 mm (la marge non imprimable). Étiquette introuvable, page qui
+// EST l'étiquette (10×15, thermique), aperçu indisponible : aucune mention.
+const MENTION = { texte: 'Créé par VRM', taille: 6.5, gris: 0.62, ecart: 25 * 72 / 25.4, etiquette: 4 * 72 / 25.4, codes: 5 * 72 / 25.4, bord: 6 * 72 / 25.4 };
+// Le point PDF → la page AFFICHÉE (l'inverse de `versPdfAffiche`).
+const versAffiche = (b, r, X, Y) => {
+  if (r === 90) return { x: Y - b.y, y: X - b.x };
+  if (r === 180) return { x: b.x + b.width - X, y: Y - b.y };
+  if (r === 270) return { x: b.y + b.height - Y, y: b.x + b.width - X };
+  return { x: X - b.x, y: b.y + b.height - Y };
+};
+const elargir = (z, m) => ({ x: z.x - m, y: z.y - m, w: z.w + 2 * m, h: z.h + 2 * m });
+// Pur : où poser une mention de bw × bh points sur `rendu`, hors des zones
+// `interdits` (points, page affichée). Rend { x, y } (points) ou null.
+const placeMentionVrm = (rendu, bw, bh, interdits) => {
+  const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = MENTION.bord;
+  const zones = [...(interdits || []), { x: 0, y: 0, w: W, h: B }, { x: 0, y: H - B, w: W, h: B }, { x: 0, y: 0, w: B, h: H }, { x: W - B, y: 0, w: B, h: H }];
+  const bloques = zones.map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
+  const marge = { mx: Math.round(TAMPON.mx * s), my: Math.round(TAMPON.my * s) };
+  const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(bw * s), Math.ceil(bh * s), marge, { depuisBas: true, bloques });
+  return p ? { x: p.x / s, y: p.y / s } : null;
+};
+// Pose la mention sur la page 1 si une place sûre existe. `rendu` : la page
+// AVANT le tampon ; `tampon` : la boîte du cartouche (points, page affichée).
+// Rend true si posée. Ne lève jamais (le bordereau s'imprime toujours).
+const poserMentionVrm = (PL, pdf, reg, rendu, tampon) => {
+  try {
+    if (!rendu || typeof zoneEtiquette !== 'function') return false;
+    const page = pdf.getPages()[0], b = page.getCropBox(), r = rotationPage(page);
+    const z = zoneEtiquette(PL, page); if (!z || !z.ok) return false;
+    const interdits = [];
+    for (const e of (z.etiquettes && z.etiquettes.length ? z.etiquettes : [z])) {
+      const a = versAffiche(b, r, e.x, e.y), c = versAffiche(b, r, e.x + e.w, e.y + e.h);
+      interdits.push(elargir({ x: Math.min(a.x, c.x), y: Math.min(a.y, c.y), w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }, MENTION.etiquette));
+    }
+    if (tampon) interdits.push(elargir(tampon, MENTION.ecart));
+    for (const q of zonesCodesTampon(rendu)) interdits.push(elargir(q, MENTION.codes));
+    const txt = texteEcrivable(reg, MENTION.texte), T = MENTION.taille; if (!txt) return false;
+    const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris: MENTION.gris }] };
+    const p = placeMentionVrm(rendu, c.w, c.h, interdits); if (!p) return false;
+    ecrireCartouche(PL, page, c, p.x, p.y);
+    return true;
+  } catch (_) { return false; }
 };
 // ── LE TAMPON LIBRE (3 nov., 18 h 59) ────────────────────────────────────────
 // Julien : « on doit pouvoir être LIBRE de le mettre où on veut, MÊME SUR DU
@@ -11291,12 +11350,18 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
   if (choixTamponValide(choix)) {
     const page = pdf.getPages()[0], pl = placeLibreTampon(page, bold, reg, n, t, choix);
-    if (pl) { ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k, true); return { mode: 'libre', raison: '', place: { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k } }; }
+    if (pl) {
+      let rendu = null; try { rendu = await rendrePremierePage(pdf); } catch (_) {}
+      const place = { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k };
+      ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k, true);
+      return { mode: 'libre', raison: '', place, mention: poserMentionVrm(PL, pdf, reg, rendu, place) };
+    }
   }
   let raison = '';
   try {
-    const place = await chercherPlaceTampon(pdf, bold, reg, n, t);
-    if (place) { ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '' }; }
+    const rendu = await rendrePremierePage(pdf);
+    const place = await chercherPlaceTampon(pdf, bold, reg, n, t, rendu);
+    if (place) { ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '', mention: poserMentionVrm(PL, pdf, reg, rendu, { x: place.x, y: place.y, w: place.c.w, h: place.c.h }) }; }
     raison = 'aucun espace libre sur la page';
   } catch (e) {
     raison = 'aperçu du PDF indisponible (' + String((e && e.message) || e).slice(0, 60) + ')';
@@ -37264,7 +37329,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return annoncesACompleter(enLigne.map((it) => { const e = numeros[it.id] || {}; const a = prixAchatDe(e, buyByNum);
       return { id: it.id, titre: it.title, photo: photoArticle(it) || '', num: e.numero ? String(e.numero) : '', compte: unCompte ? '' : ((it._acc && (it._acc.login || it._acc.username)) || ''),
         domaine: it._acc && it._acc.domain, prix: it.price, ts: it.createdTs, nPhotos: it.champsLus && it.champsLus.photos ? it.photoCount : null, marque: it.brand, taille: it.size, etat: it.condition, champsLus: it.champsLus,
-        descNumero: it.numEcritDesc, prixAchat: a != null && !isNaN(a) ? a : null }; }),
+        descNumero: it.numEcritDesc, desc: typeof it.desc === 'string' ? it.desc : typeof it.description === 'string' ? it.description : undefined, descLen: it.descLen, prixAchat: a != null && !isNaN(a) ? a : null }; }),
       { numeroEcrit: numeroEcritActif() && (!Array.isArray(ouN) || ouN.includes('description')) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, listings.loading, numeros, buyByNum]);
@@ -42114,7 +42179,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {bordGeste ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
                   <div className="vrm-recap-grille">
-                    {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('messages', null, ONGLETS_DEPLACES).tab); onNav('messages'); }}>Conversation</Bouton> : null}
+                    {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('cat_msg', null, ONGLETS_DEPLACES).tab); onNav('cat_msg'); }}>Conversation</Bouton> : null}
                     {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche de la paire</Bouton> : null}
                     {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
                     {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
@@ -43995,7 +44060,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           );
         })()}
-                  {!noAcc && <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>}
+                  {/* (11 nov., décision C10 — Julien : « tranche ») L'ancien bloc « Annonces à compléter » est
+                      FONDU dans la vue d'Annonces « À compléter » (un seul endroit, une seule règle :
+                      src/annoncesACompleter.js) ; ici, une ligne qui y mène. */}
+                  {!noAcc && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>À compléter<span>{annACompleter.n}</span></button> : null}
                   </div>
                   {[
                     {k:'lot', icon:'grid', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
@@ -44315,7 +44383,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it, propose)=>openPicker({ ...it, _autre: propose ? String(propose.transaction_id || '1') : undefined, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='acompleter' ? (
-          <VueACompleter Photo={PhotoVinted} res={annACompleter} onPrixAchat={(id)=>{ const it=(listings.items||[]).find(x=>x&&String(x.id)===String(id)); if (it) saisirPrixAnnonce(it); }}/>
+          <VueACompleter Photo={PhotoVinted} res={annACompleter} onBrouillon={(id)=>setAtelier(String(id))} onPrixAchat={(id)=>{ const it=(listings.items||[]).find(x=>x&&String(x.id)===String(id)); if (it) saisirPrixAnnonce(it); }}/>
         ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
@@ -48439,7 +48507,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           vestiaire: ()=>{ DEMANDE_VC_PAIRE.id = String(it.id); DEMANDE_VC_PAIRE.at = Date.now(); onNav && onNav('vestiaire_annonces'); setTimeout(()=>setDortAgir(null), 400); },
           // La file « Envoyer une offre aux favoris » (Messages → Favoris reçus) du compte
           // de l'annonce : c'est LUI qui choisit et envoie.
-          favoris: ()=>{ if (uidIt && typeof setCompteSel === 'function') setCompteSel(uidIt); demanderVue('favoris'); onNav && onNav('messages'); setTimeout(()=>setDortAgir(null), 400); },
+          favoris: ()=>{ if (uidIt && typeof setCompteSel === 'function') setCompteSel(uidIt); demanderVue('favoris'); onNav && onNav('cat_msg'); setTimeout(()=>setDortAgir(null), 400); },
         };
         // (9 nov.) Seulement les sites qu'il AFFICHE (« Mes plateformes ») : un site masqué ramenait sur Vinted, le clic ne menait nulle part.
         const sitesAffiches = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
@@ -51149,7 +51217,7 @@ function AncreDefilement() {
 // les sites où il a un compte (`sites` : Set, ou `null` = pas su ⇒ tous). Le
 // site choisi reste toujours montré, même si son compte n'est plus lu. La forme
 // est celle des pastilles de filtre de l'app (`vrm-filtres`, §7).
-function FiltreSites({ tache, site, sites, onSite }) {
+function FiltreSites({ tache, site, sites, onSite, onChoix = null }) {
   // (5 nov.) Le sélecteur À LOGOS (`SelecteurSites`, règles `src/plateformes.js`) :
   // Les sites choisis ou reliés, dans le même ordre ; « Tous » sur Ventes.
   // Un site choisi avant sa connexion dit ce qui manque et le geste (`OngletManque`).
@@ -51162,7 +51230,7 @@ function FiltreSites({ tache, site, sites, onSite }) {
   // Avant, les quatre sites s'affichaient puis la rangée disparaissait (un seul site affiché) :
   // la barre du haut passait de 82 à 60 px et tout l'écran remontait (banc chargement, Annonces).
   if (!Array.isArray(p.plateformes)) return null;
-  return <SelecteurSites id={tache} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={onSite}/>;
+  return <SelecteurSites id={tache} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={(v) => { onSite(v); if (onChoix) onChoix(v); }}/>;
 }
 // (5 nov.) UN ONGLET SANS DONNÉE : ce qui manque et le geste (`ONGLET_SANS_DONNEE`,
 // src/plateformes.js). Montré quand le site choisi n'a aucun compte relevé
@@ -54362,7 +54430,7 @@ function AppCoeur() {
           <PhraseEcran cle={t}/>
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
-          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)}/></DansBarreHaut>
+          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>retenirFiltre(t,s,true)}/></DansBarreHaut>
           {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
