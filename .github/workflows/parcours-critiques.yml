@@ -12,6 +12,9 @@ jobs:
   comptes-et-reception:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # (11 nov.) La garde réseau : un banc qui joint un vrai serveur (la production, Internet) est ROUGE.
+      NODE_OPTIONS: --require=${{ github.workspace }}/scripts/bancs/_garde-reseau.cjs
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +31,8 @@ jobs:
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
           echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+      - name: Vérifier la garde réseau des bancs (aucun banc ne joint la production)
+        run: node scripts/tests/garde-reseau.cjs
       - name: Vérifier récupération et fermeture de l'espace privé
         run: |
           node scripts/bancs/recuperation-auth.cjs

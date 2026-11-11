@@ -34,6 +34,14 @@
 //     sources rangées à cet instant ; la toucher ouvre À trancher.
 //  Z  Rien à trancher (tout à 0, lecture fraîche) : « Rien à trancher », aucun badge,
 //     aucune ligne dans Ma journée.
+// ⚠️ (11 nov., lot DJ4 — Julien : « pas d'onglet exprès ») Plus d'écran « À trancher » : `?tab=trancher`
+// ouvre Ma journée, la carte ouverte EN PLACE. Ma journée monte ses propres écrans propriétaires,
+// qui republient LEURS sources (sur ces données inventées, la plupart à 0) : le total « fait à la
+// main » (23) n'est plus servi tel quel. Le banc juge donc : total = somme des sources rangées À
+// CET INSTANT, une ligne par source rangée non nulle (dans l'ordre), aucun onglet ni badge, et le
+// parcours « Tu l'as encore ? » : Oui / Non (UN toucher, case libérée), « Annuler » qui rend tout
+// puis DISPARAÎT (le bug « Annuler reste affiché »). Une source remise à 0 par son écran est dite
+// (« -- »), pas jugée.
 require('./_porte-banc.cjs');
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -111,12 +119,12 @@ const projette = (row, sel) => {
   return out;
 };
 // Un contexte : la base servie, les semis rangés UNE fois (au premier chargement).
-async function contexte(b, vp, { theme = 'light', zero = false } = {}) {
+async function contexte(b, vp, { theme = 'light', zero = false, slots = false } = {}) {
   const ctx = await b.newContext({ viewport: vp, colorScheme: theme, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   // L'annonce porte déjà son N° (posé à la main) : aucun écran n'a à la numéroter pendant le banc.
   // (10 nov.) + la fiche 7002 (N°12) vue en ligne il y a 2 jours, absente de la lecture complète :
   // la VRAIE carte « supprimé de Vinted » de la coque (`cycleCartes`), qui la publie.
-  const MAIN = { vinted_dark: theme === 'dark', vinted_account_emails: {}, ...(zero ? {} : { vinted_annonce_numeros: { '800001': { numero: '7', title: 'Nike Dunk Low taille 42', auto: false, manuelAt: iso(MAINTENANT - 86400e3) }, '7002': FICHE_SUPPR }, vrm_vus_en_ligne: { '7002': VU_SUPPR } }) };
+  const MAIN = { vinted_dark: theme === 'dark', vinted_account_emails: {}, ...(zero ? {} : { vinted_annonce_numeros: { '800001': { numero: '7', title: 'Nike Dunk Low taille 42', auto: false, manuelAt: iso(MAINTENANT - 86400e3) }, '7002': FICHE_SUPPR }, vrm_vus_en_ligne: { '7002': VU_SUPPR } }), ...(slots ? { vrm_meubles: [{ id: 'm1', name: 'Étagère banc', cols: 3, rows: 2 }], vrm_slots: { '12': { m: 'm1', i: 3 } } } : {}) };
   const ROWS = lignesBase(zero ? 60000 : 3 * 86400e3, zero);
   const semis = { uid: UID, s: Object.fromEntries(Object.entries(SEMIS).filter(([k]) => zero || k !== 'supprimes-vinted').map(([k, n]) => [k, { n: zero ? 0 : n, at: MAINTENANT, ...(!zero && SEMIS_EX[k] ? { ex: SEMIS_EX[k] } : {}) }])) };
   if (zero) semis.s['adresses-sans-compte'] = { n: 0, at: MAINTENANT };
@@ -171,8 +179,18 @@ const lire = (pg) => pg.evaluate(() => {
     lignes: [...document.querySelectorAll('[data-a-trancher-ligne]')].map((e) => ({ cle: e.getAttribute('data-a-trancher-ligne'), n: Number(e.getAttribute('data-n')), geste: !!e.querySelector('button') })),
     passu: [...document.querySelectorAll('[data-a-trancher-passu]')].map((e) => ({ cle: e.getAttribute('data-a-trancher-passu'), valeur: (e.querySelector('.vrm-ios-valeur') || {}).textContent || '' })),
     vide: (document.querySelector('[data-a-trancher-vide]') || { getAttribute: () => null }).getAttribute('data-a-trancher-vide'),
-    badge: badge ? Number(badge.getAttribute('data-badge-n')) : null };
+    badge: badge ? Number(badge.getAttribute('data-badge-n')) : null, entree: !!document.querySelector('[data-nav-entree="trancher"]') };
 });
+// Les sources RANGÉES à cet instant (cle ⇒ n), relues dans la page.
+const rangees = (pg) => pg.evaluate((uid) => {
+  const j = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } };
+  const out = {}; const p = j('vrm_a_trancher');
+  if (p && p.uid === uid) for (const [k, v] of Object.entries(p.s || {})) if (Number(v && v.n) > 0) out[k] = Number(v.n);
+  const r = j('vrm_colis_retirer'); const nr = r ? (Number(r.aVerifier) || 0) + (Number(r.enVerification) || 0) : 0; if (nr) out['colis-retirer'] = nr;
+  const u = j('vinted_urssaf_mois'); if (u && u.aDater && Number(u.aDater.n) > 0) out['ventes-a-dater'] = Number(u.aDater.n);
+  return out;
+}, UID);
+const note = (m) => console.log('--  ' + m);
 // La somme des sources RANGÉES à cet instant, relue dans la page (indépendante de l'écran) ;
 // `comptes` : les comptes à relire, connus à la main (la lecture servie a 3 jours ou 1 min).
 const sommeRangee = (pg, comptes) => pg.evaluate(([uid, comptes]) => {
@@ -202,15 +220,17 @@ const actif = (pg) => pg.evaluate(() => {
     await pg.waitForTimeout(3000);
     const r = await lire(pg);
     const somme = await sommeRangee(pg, 1);
-    dit(r.total === TOTAL_MAIN, `S ${nom} : le total est celui fait à la main`, `${r.total} / ${TOTAL_MAIN}`);
     dit(r.total === somme, `S ${nom} : le total = la somme des sources rangées`, `${r.total} / ${somme}`);
     dit(r.partiel === '1', `S ${nom} : une source pas comptée ⇒ « au moins »`, r.partiel);
-    dit(JSON.stringify(r.lignes.map((l) => l.cle)) === JSON.stringify(ORDRE), `S ${nom} : une ligne par source, dans l'ordre (un colis d'abord)`, r.lignes.map((l) => l.cle).join(','));
-    const nAttendu = { ...SEMIS, 'colis-retirer': 2, 'comptes-a-relire': 1, 'ventes-a-dater': ADATER };
-    dit(r.lignes.every((l) => l.n === nAttendu[l.cle]), `S ${nom} : chaque ligne porte le nombre de sa source`, r.lignes.map((l) => `${l.cle}=${l.n}`).join(' '));
+    const rg = { ...(await rangees(pg)), 'comptes-a-relire': 1 };
+    const attendues = ORDRE.filter((k) => rg[k] > 0);
+    dit(attendues.length >= 4 && JSON.stringify(r.lignes.map((l) => l.cle)) === JSON.stringify(attendues), `S ${nom} : une ligne par source rangée non nulle, dans l'ordre (un colis d'abord)`, r.lignes.map((l) => l.cle).join(',') + ' / ' + attendues.join(','));
+    dit(r.lignes.every((l) => l.n === rg[l.cle]), `S ${nom} : chaque ligne porte le nombre de sa source`, r.lignes.map((l) => `${l.cle}=${l.n}`).join(' '));
     dit(r.lignes.every((l) => l.geste), `S ${nom} : chaque ligne a UN geste`);
     dit(r.passu.length === 1 && r.passu[0].cle === 'adresses-sans-compte' && r.passu[0].valeur.trim() === '—', `S ${nom} : la source jamais comptée dit « — », pas 0`, JSON.stringify(r.passu));
-    if (vp.width > 600) dit(r.badge === TOTAL_MAIN, `S ${nom} : le badge de la colonne = le total`, r.badge);
+    dit(r.badge == null && !r.entree, `S ${nom} : (DJ4) plus d'onglet « À trancher » ni de badge dans la navigation`, JSON.stringify({ badge: r.badge, entree: r.entree }));
+    const ici = await actif(pg);
+    if (vp.width > 600) dit(ici.ecran === 'journee', `S ${nom} : (DJ4) l'ancien lien ouvre Ma journée, la carte ouverte en place`, ici.ecran);
     dit(ecritures.length === e0, `S ${nom} : aucune écriture vers la base sans geste (écran ouvert 3 s)`, JSON.stringify(ecritures.slice(e0)));
     dit(!errs.length, `S ${nom} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
     await shot(pg, 'S-' + nom);
@@ -230,6 +250,8 @@ const actif = (pg) => pg.evaluate(() => {
     const pg = await ctx.newPage();
     await aller(pg, 'trancher'); await ecranTrancher(pg);
     const avantMain = JSON.parse(JSON.stringify(MAIN));
+    if (cle === 'supprimes-vinted') { note('G supprimes-vinted : (DJ4) répondue SUR PLACE, trois réponses — jugée en « C geste » et « N »'); await ctx.close(); return; }
+    if (cle !== 'adresses-sans-compte' && !(await pg.$(`[data-a-trancher-ligne="${cle}"]`))) { note(`G ${cle} : source remise à 0 par son écran (Ma journée) — rien à ouvrir`); await ctx.close(); return; }
     const sel = cle === 'adresses-sans-compte' ? `[data-a-trancher-passu="${cle}"] button` : `[data-a-trancher-ligne="${cle}"] [data-a-trancher-ouvrir]`;
     const e0 = ecritures.length;
     await pg.click(sel);
@@ -269,6 +291,7 @@ const actif = (pg) => pg.evaluate(() => {
     const { ctx, ecritures, MAIN } = await contexte(b, PC, {});
     const pg = await ctx.newPage();
     await aller(pg, 'trancher'); await ecranTrancher(pg);
+    const t0 = (await lire(pg)).total;
     await pg.click('[data-a-trancher-passu="adresses-sans-compte"] button');
     await pg.waitForSelector('[data-adresses-sans-compte="1"]', { timeout: 20000 });
     await pg.waitForTimeout(800);
@@ -276,7 +299,7 @@ const actif = (pg) => pg.evaluate(() => {
     let r = await lire(pg);
     const l1 = r.lignes.find((l) => l.cle === 'adresses-sans-compte');
     dit(!!l1 && l1.n === 1, 'T : l\'adresse, comptée par SON écran, devient une ligne (1)', JSON.stringify(l1));
-    dit(r.total === TOTAL_MAIN + 1 && r.badge === TOTAL_MAIN + 1, 'T : total et badge +1', `${r.total} / ${r.badge}`);
+    dit(r.total === t0 + 1 && r.badge == null, 'T : total +1 (et aucun badge)', `${r.total} / ${t0} / ${r.badge}`);
     const avantGeste = ecritures.length;
     await pg.click('[data-a-trancher-ligne="adresses-sans-compte"] button');
     await pg.waitForSelector('[data-compte-acheteur="achat@exemple.test"]', { timeout: 20000 });
@@ -289,11 +312,10 @@ const actif = (pg) => pg.evaluate(() => {
     await pg.waitForTimeout(2500);
     const parGeste = ecritures.slice(avantGeste).filter((w) => w.cles.includes('vrm_adresses_acheteur'));
     dit(parGeste.length >= 1 && MAIN.vrm_adresses_acheteur && MAIN.vrm_adresses_acheteur['achat@exemple.test'], 'T : SON geste écrit (et lui seul) le choix « compte acheteur »', JSON.stringify(parGeste.map((w) => w.ids)));
-    await pg.click('[data-nav-entree="trancher"]');
-    await ecranTrancher(pg);
+    await aller(pg, 'trancher'); await ecranTrancher(pg);
     r = await lire(pg);
     dit(!r.lignes.some((l) => l.cle === 'adresses-sans-compte') && !r.passu.some((l) => l.cle === 'adresses-sans-compte'), 'T : tranchée, la ligne SORT', JSON.stringify(r.lignes.map((l) => l.cle)));
-    dit(r.total === TOTAL_MAIN && r.badge === TOTAL_MAIN && r.partiel === '0', 'T : total et badge reviennent (et plus rien n\'est « pas su »)', `${r.total} / ${r.badge} / ${r.partiel}`);
+    dit(r.total === t0 && r.badge == null && r.partiel === '0', 'T : le total revient (et plus rien n\'est « pas su »)', `${r.total} / ${t0} / ${r.partiel}`);
     await shot(pg, 'T-apres');
     await ctx.close();
   });
@@ -329,20 +351,24 @@ const actif = (pg) => pg.evaluate(() => {
     const S = c.sources;
     const sup = S['supprimes-vinted'] && S['supprimes-vinted'].cartes[0];
     dit(!!sup && sup.id === '7002' && sup.num === '12' && sup.photos.length === 1 && sup.photos[0] > 0, `C ${nom} : « supprimé de Vinted » = la vraie carte de la coque, photo de SA fiche et N°12`, JSON.stringify(S['supprimes-vinted']));
-    dit(!!sup && sup.oui && sup.non, `C ${nom} : geste binaire ⇒ deux boutons (oui / non)`);
+    dit(!!sup && sup.oui && sup.non, `C ${nom} : « L’enlever du stock ? » ⇒ « Enlever du stock », « Non, je l’ai », « Plus tard » sur la carte`);
     const dbl = S['numeros-double'] && S['numeros-double'].cartes;
-    dit(!!dbl && dbl.length === 1 && dbl[0].num === '31' && dbl[0].photos.length === 2 && dbl[0].photos.every((w) => w > 0) && dbl[0].ton === 'rouge', `C ${nom} : deux paires sous N°31 : une carte, ses deux photos, en rouge`, JSON.stringify(dbl));
+    if (!dbl) note(`C ${nom} : « deux paires sous un N° » remise à 0 par son écran — pas jugée`);
+    else dit(!!dbl && dbl.length === 1 && dbl[0].num === '31' && dbl[0].photos.length === 2 && dbl[0].photos.every((w) => w > 0) && dbl[0].ton === 'rouge', `C ${nom} : deux paires sous N°31 : une carte, ses deux photos, en rouge`, JSON.stringify(dbl));
     const asp = S['achats-sans-prix'];
-    dit(!!asp && asp.cartes.length === 3 && asp.autres === '1' && asp.cartes.map((x) => x.num).join(',') === '51,52,53', `C ${nom} : 4 sans prix d'achat ⇒ 3 cartes (N°51, 52, 53) et « + 1 »`, JSON.stringify(asp));
-    dit(!!asp && asp.cartes[2].photos.length === 0, `C ${nom} : une chose sans photo publiée n'en reçoit aucune (pas de ressemblance)`, JSON.stringify(asp && asp.cartes[2]));
+    if (!asp || asp.n !== 4) note(`C ${nom} : « sans prix d'achat » recomptée par son écran (${asp ? asp.n : 0}) — pas jugée`);
+    else dit(!!asp && asp.cartes.length === 3 && asp.autres === '1' && asp.cartes.map((x) => x.num).join(',') === '51,52,53', `C ${nom} : 4 sans prix d'achat ⇒ 3 cartes (N°51, 52, 53) et « + 1 »`, JSON.stringify(asp));
+    if (asp && asp.n === 4) dit(!!asp && asp.cartes[2].photos.length === 0, `C ${nom} : une chose sans photo publiée n'en reçoit aucune (pas de ressemblance)`, JSON.stringify(asp && asp.cartes[2]));
     const cp = S['colis-postes'];
-    dit(!!cp && cp.cartes.length === 1 && cp.cartes[0].nombre === '2' && !cp.cartes[0].id, `C ${nom} : une source sans choses publiées = UNE carte, son nombre dans la vignette`, JSON.stringify(cp));
-    dit(JSON.stringify(c.groupes.map((g) => g.type)) === JSON.stringify(['numeros', 'colis', 'paires', 'comptes', 'compta']) && c.groupes.every((g) => g.n === g.somme), `C ${nom} : groupes par type, dans l'ordre, chacun compte ses sources`, JSON.stringify(c.groupes));
+    if (!cp) note(`C ${nom} : « colis postés » remise à 0 par son écran — pas jugée`);
+    else dit(!!cp && cp.cartes.length === 1 && cp.cartes[0].nombre === '2' && !cp.cartes[0].id, `C ${nom} : une source sans choses publiées = UNE carte, son nombre dans la vignette`, JSON.stringify(cp));
+    const TYPES = ['numeros', 'colis', 'paires', 'comptes', 'compta'];
+    dit(c.groupes.length >= 2 && JSON.stringify(c.groupes.map((g) => g.type)) === JSON.stringify(TYPES.filter((x) => c.groupes.some((g) => g.type === x))) && c.groupes.every((g) => g.n === g.somme), `C ${nom} : groupes par type, dans l'ordre, chacun compte ses sources`, JSON.stringify(c.groupes));
     const longues = c.questions.filter((q) => q.m > 12);
-    dit(c.questions.length >= 12 && !longues.length, `C ${nom} : chaque question tient en 12 mots`, `${c.questions.length} questions ; trop longues : ${JSON.stringify(longues)}`);
+    dit(c.questions.length >= 4 && !longues.length, `C ${nom} : chaque question tient en 12 mots`, `${c.questions.length} questions ; trop longues : ${JSON.stringify(longues)}`);
     const petits = c.boutons.filter((x) => x.h < 44);
-    dit(c.boutons.length >= 14 && !petits.length, `C ${nom} : chaque geste fait 44 px au moins`, `${c.boutons.length} boutons ; petits : ${JSON.stringify(petits)}`);
-    dit(c.rouges.length >= 1 && c.rouges.every((x) => x === 'numeros-double'), `C ${nom} : le rouge sur « deux paires sous un N° » seulement`, JSON.stringify(c.rouges));
+    dit(c.boutons.length >= 4 && !petits.length, `C ${nom} : chaque geste fait 44 px au moins`, `${c.boutons.length} boutons ; petits : ${JSON.stringify(petits)}`);
+    dit((dbl ? c.rouges.length >= 1 : true) && c.rouges.every((x) => x === 'numeros-double'), `C ${nom} : le rouge sur « deux paires sous un N° » seulement`, JSON.stringify(c.rouges));
     dit(!c.deborde, `C ${nom} : rien ne déborde en largeur`);
     dit(!errs.length, `C ${nom} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
     await shot(pg, 'C-' + nom);
@@ -366,7 +392,7 @@ const actif = (pg) => pg.evaluate(() => {
     await pg.waitForTimeout(250);
     const v1 = await pg.evaluate((sel) => ({ carte: !!document.querySelector(sel), total: Number((document.querySelector('[data-a-trancher]') || { getAttribute: () => NaN }).getAttribute('data-a-trancher')),
       confirmation: !!document.querySelector('.vrm-confirmation'), annuler: !!document.querySelector('[data-pilule-annuler]') }), CARTE_SUPPR);
-    dit(!v1.carte && v1.total === avant.total - 1, 'C geste : « Oui, chez moi » ⇒ la carte sort TOUT DE SUITE, total −1', JSON.stringify({ ...v1, avant: avant.total }));
+    dit(!v1.carte && v1.total === avant.total - 1, 'C geste : « Non, je l’ai » ⇒ la carte sort TOUT DE SUITE, total −1', JSON.stringify({ ...v1, avant: avant.total }));
     dit(!v1.confirmation && !dialogue && v1.annuler, 'C geste : aucune confirmation, la pilule « Annuler » est là', JSON.stringify(v1));
     if (avant.badge != null) dit(Number(await pg.getAttribute('[data-badge-nav="trancher"]', 'data-badge-n').catch(() => NaN)) === avant.total - 1, 'C geste : le badge baisse aussi');
     for (let i = 0; i < 40 && !(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']); i++) await pg.waitForTimeout(200);
@@ -382,6 +408,48 @@ const actif = (pg) => pg.evaluate(() => {
     const v2 = await pg.evaluate((sel) => ({ carte: !!document.querySelector(sel), total: Number(document.querySelector('[data-a-trancher]').getAttribute('data-a-trancher')) }), CARTE_SUPPR);
     dit(v2.carte && v2.total === avant.total, '« Annuler » ⇒ la carte revient, le total aussi', JSON.stringify(v2));
     dit(!(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']), '« Annuler » ⇒ la décision est retirée (valeur d\'avant exacte : absente)', JSON.stringify(MAIN.vrm_cycle_decisions || null));
+    await ctx.close();
+  });
+
+  // ── N (11 nov., lot DJ4) « Enlever du stock » : UN toucher, puis « Annuler » qui DISPARAÎT ──
+  // Le bug de Julien : « le bouton Annuler reste constamment sur l'app » après cette suppression
+  // (le bouton cliqué garde le focus en disparaissant : la pause ne se levait jamais).
+  if (!SEUL || SEUL === 'N') for (const [nom, vp, theme] of [['390-clair', TEL, 'light'], ['1512-sombre', PC, 'dark']]) await essaie('N ' + nom, async () => {
+    const { ctx, ecritures, MAIN } = await contexte(b, vp, { theme, slots: true });
+    const pg = await ctx.newPage(); let dialogue = false; pg.on('dialog', (d) => { dialogue = true; d.dismiss().catch(() => {}); });
+    const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    await aller(pg, 'trancher'); await ecranTrancher(pg);
+    await pg.waitForSelector(CARTE_SUPPR, { timeout: 30000 });
+    await pg.waitForTimeout(1200);
+    await pg.evaluate((sel) => document.querySelector(sel).scrollIntoView({ block: 'center' }), CARTE_SUPPR);
+    const avant = await lire(pg);
+    await shot(pg, `N-${nom}-1-question`);
+    const avantMain = JSON.parse(JSON.stringify(MAIN));
+    if (vp.width < 600) await pg.tap(CARTE_SUPPR + ' [data-a-trancher-non]'); else await pg.click(CARTE_SUPPR + ' [data-a-trancher-non]');
+    await pg.waitForTimeout(250);
+    const v1 = await pg.evaluate((sel) => ({ carte: !!document.querySelector(sel), raisons: !!document.querySelector('[data-a-trancher-raisons]'), total: Number((document.querySelector('[data-a-trancher]') || { getAttribute: () => NaN }).getAttribute('data-a-trancher')),
+      confirmation: !!document.querySelector('.vrm-confirmation'), annuler: !!document.querySelector('[data-pilule-annuler]') }), CARTE_SUPPR);
+    dit(!v1.carte && !v1.raisons && v1.total === avant.total - 1, `N ${nom} : « Enlever du stock » = UN toucher : la carte sort, total −1, aucune étape de plus`, JSON.stringify({ ...v1, avant: avant.total }));
+    dit(!v1.confirmation && !dialogue && v1.annuler, `N ${nom} : aucune confirmation, la pilule « Annuler » est là`, JSON.stringify(v1));
+    await shot(pg, `N-${nom}-2-annuler`);
+    for (let i = 0; i < 40 && !(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']); i++) await pg.waitForTimeout(200);
+    const dec = MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002'];
+    dit(!!dec && dec.choix === 'separe' && dec.numero === '12', `N ${nom} : écrit « séparée » (N°12)`, JSON.stringify(dec));
+    dit(!(MAIN.vrm_slots && MAIN.vrm_slots['12']) && JSON.stringify(MAIN.vinted_annonce_numeros) === JSON.stringify(avantMain.vinted_annonce_numeros), `N ${nom} : sa case est libérée, le N° jamais touché`, JSON.stringify(MAIN.vrm_slots || null));
+    const pl = Object.entries(MAIN.vinted_pairs_lost || {}).find(([, v]) => v && String(v.id) === '7002');
+    dit(!!pl, `N ${nom} : déclarée partie par SON annonce (7002)`, JSON.stringify(MAIN.vinted_pairs_lost || null));
+    if (vp.width < 600) await pg.tap('[data-pilule-annuler]'); else await pg.click('[data-pilule-annuler]');
+    await pg.waitForSelector(CARTE_SUPPR, { timeout: 15000 }).catch(() => {});
+    for (let i = 0; i < 40 && MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']; i++) await pg.waitForTimeout(200);
+    dit(!!(await pg.$(CARTE_SUPPR)) && !(MAIN.vrm_cycle_decisions && MAIN.vrm_cycle_decisions['7002']) && MAIN.vrm_slots && MAIN.vrm_slots['12'] && MAIN.vrm_slots['12'].i === 3 && !Object.entries(MAIN.vinted_pairs_lost || {}).find(([, v]) => v && String(v.id) === '7002'),
+      `N ${nom} : « Annuler » rend tout (la carte, la décision, la case exacte, la déclaration)`, JSON.stringify({ d: MAIN.vrm_cycle_decisions || null, s: MAIN.vrm_slots || null, l: MAIN.vinted_pairs_lost || null }));
+    await shot(pg, `N-${nom}-3-annule`);
+    // Le bug : la pilule ne doit PAS rester (focus resté sur le bouton disparu). Souris immobile hors de la pilule.
+    if (vp.width >= 600) await pg.mouse.move(5, 5);
+    let t = 0; for (; t < 60 && (await pg.$('[data-pilule]')); t++) await pg.waitForTimeout(200);
+    dit(!(await pg.$('[data-pilule]')), `N ${nom} : « Annuler » puis « Annulé » DISPARAISSENT tout seuls (${(t * 0.2).toFixed(1)} s ≤ 12 s)`, String(t * 0.2));
+    await shot(pg, `N-${nom}-4-plus-de-pilule`);
+    dit(!errs.length, `N ${nom} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
     await ctx.close();
   });
 
@@ -408,12 +476,12 @@ const actif = (pg) => pg.evaluate(() => {
   if (!SEUL || SEUL === 'Z') for (const [nom, vp, theme] of [['1512-clair', PC, 'light'], ['390-sombre', TEL, 'dark']]) await essaie('Z ' + nom, async () => {
     const { ctx } = await contexte(b, vp, { theme, zero: true });
     const pg = await ctx.newPage();
-    await aller(pg, 'trancher'); await ecranTrancher(pg);
+    await aller(pg, 'trancher');
+    await pg.waitForSelector('[data-job], [data-attente-ecran="journee"][data-attente="pret"]', { timeout: 30000 }).catch(() => {});
+    await pg.waitForTimeout(2000);
     const r = await lire(pg);
-    dit(r.total === 0 && r.vide === 'zero' && !r.lignes.length, `Z ${nom} : « Rien à trancher »`, JSON.stringify({ t: r.total, v: r.vide, l: r.lignes.length, p: r.passu }));
-    dit(r.badge == null, `Z ${nom} : aucun badge (jamais « 0 »)`, r.badge);
+    dit(r.badge == null && !r.entree && !r.lignes.length, `Z ${nom} : rien à trancher ⇒ ni carte, ni badge (jamais « 0 »), ni onglet`, JSON.stringify({ b: r.badge, e: r.entree, l: r.lignes.length }));
     await shot(pg, 'Z-' + nom);
-    await aller(pg, 'journee');
     await pg.waitForSelector('[data-job], [data-attente-ecran="journee"][data-attente="pret"]', { timeout: 30000 }).catch(() => {});
     await pg.waitForTimeout(3000);
     const zj = await pg.evaluate(() => { const e = document.querySelector('[data-job="a-trancher"]'); return { n: e ? e.getAttribute('data-n') : null, s: localStorage.getItem('vrm_a_trancher') }; });

@@ -173,7 +173,7 @@ html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::be
    flotter pour que le contenu passe SOUS le verre faisait sauter la carte sombre de
    Colis de 149 px pendant le chargement (banc `chargement`, CLS 0,106 contre 0,012 —
    mesuré avec et sans). Le contenu sous le verre est à reprendre avec la coque. */
-@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
   html body .vrm-app-shell > .vrm-app-header {
     border-bottom: .5px solid transparent !important;
     transition: background-color 200ms ease-out, border-color 200ms ease-out;

@@ -1,6 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- 016 — LE MODE ÉQUIPE (fonction n°37 retenue le 11 octobre 2026). PAS APPLIQUÉE.
 -- ════════════════════════════════════════════════════════════════════════════
+-- ⚠️⚠️ PRÉALABLE (revue de sécurité du 11 nov.) : NE L'APPLIQUER QU'AVEC
+--    « Confirm email » ALLUMÉ chez Supabase (Authentication → Providers →
+--    Email). L'acceptation d'une invitation se fie à `email_confirmed_at` : si
+--    la confirmation est coupée, Supabase le remplit à l'inscription, et la
+--    première personne qui crée un compte à l'adresse invitée devient membre.
+--    Récit : docs/passation/2026-11-11-securite-revue.md.
 -- Le vendeur invite un MEMBRE (un aide, un proche) qui prépare les colis. Le
 -- membre a un accès LIMITÉ, tenu PAR LA BASE (RLS), pas par l'écran :
 --   • il LIT les colis du vendeur : bordereaux (email et capturés), suivis
@@ -342,8 +348,18 @@ end $$;
 -- vendeur qui paie, DEMANDÉ par l'en-tête (`vrm_equipe_vendeur` vérifie
 -- l'adhésion et l'accès du VENDEUR). Le
 -- `with check` ne change pas : une écriture exige toujours l'accès de l'appelant.
-alter policy abonnement_requis on public.app_data
+-- ⚠️ (11 novembre) LA 027 PEUT ÊTRE PASSÉE AVANT : elle pose `using (true)`
+-- (sans abonnement, on LIT ses lignes, on n'écrit rien). Réécrire ici l'expression
+-- d'avant refermerait cette lecture — l'aperçu de Julien du 8 novembre mourrait
+-- en silence. `true` laisse déjà passer le membre ; l'équipe reste bornée par
+-- `equipe_lit` et `vrm_lecture_privee` (abonnement du VENDEUR compris). On n'y
+-- touche donc pas.
+do $$ begin
+  if coalesce((select p.qual from pg_catalog.pg_policies p where p.schemaname = 'public' and p.tablename = 'app_data' and p.policyname = 'abonnement_requis'), '') <> 'true' then
+    alter policy abonnement_requis on public.app_data
   using ((select public.vrm_acces_ok()) or owner = (select public.vrm_equipe_vendeur()));
+  end if;
+end $$;
 
 -- ── 11 bis. LA RESTRICTIVE DE LECTURE DE LA 021 (22 octobre) ─────────────────
 -- La 021 (confidentialité) a été appliquée en production le 21 octobre, AVANT
@@ -373,7 +389,8 @@ do $$ declare b text; begin
    where p.schemaname = 'public' and p.tablename = 'app_data' and p.permissive = 'RESTRICTIVE'
      and p.cmd in ('SELECT', 'ALL')
      and (p.roles @> array['authenticated']::name[] or p.roles @> array['public']::name[])
-     and coalesce(p.qual, '') not like '%vrm_equipe_vendeur%';
+     and coalesce(p.qual, '') not like '%vrm_equipe_vendeur%'
+     and coalesce(p.qual, '') <> 'true';  -- une restrictive `true` (027) ne ferme rien
   if b is not null then
     raise exception 'vrm_equipe_lecture_bloquee : la restrictive % fermerait la lecture du membre — rien n''est installé', b;
   end if;

@@ -151,16 +151,19 @@ export default function JournalEmails({ headers, filtreInitial = '', typeInitial
 // Le compteur « à vérifier » pour Colis : une lecture (les compteurs seuls, deux
 // scalaires par email), au montage, jamais relue toute seule. Pas su ⇒ le lien
 // reste, sans chiffre (« pas su » n'est pas « 0 »).
+// (11 nov., lot sante-donnees) LA lecture du compteur, partagée avec la Santé de tes données :
+// un entier (lu) · null (pas su — jamais 0).
+export async function lireAVerifierEmails(headers) {
+  try {
+    const r = await requeteJsonBornee('/api/email-rattacher?mode=journal&compte=1', { headers: headers ? headers() : {}, cache: 'no-store' });
+    return r.ok && r.json && r.json.ok === true && r.json.compteurs && Number.isInteger(r.json.compteurs.aVerifier) && r.json.compteurs.aVerifier >= 0 ? r.json.compteurs.aVerifier : null;
+  } catch (_) { return null; }
+}
 export function EntreeJournalEmails({ headers, onOuvrir }) {
   const [n, setN] = useState(undefined);
   useEffect(() => {
     let vivant = true;
-    (async () => {
-      try {
-        const r = await requeteJsonBornee('/api/email-rattacher?mode=journal&compte=1', { headers: headers ? headers() : {}, cache: 'no-store' });
-        if (vivant) setN(r.ok && r.json && r.json.ok === true && r.json.compteurs && typeof r.json.compteurs.aVerifier === 'number' ? r.json.compteurs.aVerifier : null);
-      } catch (_) { if (vivant) setN(null); }
-    })();
+    (async () => { const v = await lireAVerifierEmails(headers); if (vivant) setN(v); })();
     return () => { vivant = false; };
   }, [headers]);
   return (

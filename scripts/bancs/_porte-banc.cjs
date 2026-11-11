@@ -27,6 +27,7 @@
 //  Posé une fois sur `playwright` (chromium.launch / launchPersistentContext) ;
 //  `BANC_PORTE_STRICTE=1` le retire pour juger la porte elle-même.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_garde-reseau.cjs');   // (11 nov.) la garde réseau : aucun banc ne joint la production ni Internet
 const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
   const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };

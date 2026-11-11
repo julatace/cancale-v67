@@ -127,8 +127,9 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
     const rogne = (n) => { for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p); if (/hidden|clip|auto|scroll/.test(o.overflowX) && p.getBoundingClientRect().right <= largeur + 1) return true; } return false; };
     const feuille = document.querySelector('[data-boite-feuille]');
     const hors = [...document.querySelectorAll(feuille ? '[data-boite-feuille] *' : '[data-boite-emails] *')].filter((n) => vis(n) && n.getBoundingClientRect().right > largeur + 1 && !rogne(n)).map((n) => (n.className && String(n.className).slice(0, 40)) || n.tagName).slice(0, 5);
+    // (11 nov., lot emails-ecran) 44 px AU DOIGT (§7) ; à la souris d'un ordinateur, l'écran est dense comme Mail : 26 px (même requête que la CSS).
     const petits = [...document.querySelectorAll('[data-boite-emails] button, [data-boite-emails] select, [data-boite-emails] a[href], [data-boite-feuille] button, [data-boite-feuille] a[href]')]
-      .filter((n) => vis(n) && !n.closest('[aria-hidden="true"]') && !n.matches('[data-boite-lien]')).filter((n) => { const b = n.getBoundingClientRect(); return b.height < 43.5 || b.width < 43.5; }).map((n) => (n.innerText || n.getAttribute('aria-label') || n.className || '').trim().slice(0, 30)).slice(0, 6);
+      .filter((n) => vis(n) && !n.closest('[aria-hidden="true"]') && !n.matches('[data-boite-lien]')).filter((n) => { const b = n.getBoundingClientRect(), min = (matchMedia('(min-width:900px) and (hover:hover) and (pointer:fine)').matches ? 25.5 : 43.5); return b.height < min || b.width < min; }).map((n) => (n.innerText || n.getAttribute('aria-label') || n.className || '').trim().slice(0, 30)).slice(0, 6);
     return { mots, deborde, hors, petits };
   }, [racine]);
 }
@@ -284,7 +285,7 @@ async function regles(pg, nom, base, { tactile, appels }) {
     await pg.waitForTimeout(200);
     const copie = await pg.evaluate(() => navigator.clipboard.readText().catch(() => null));
     const etat = await puce.getAttribute('data-copie');
-    dit(bb && bb.height >= 44 && bb.width >= 44 && copie === brut && etat === '1' && (await pg.locator('[data-boite-lecture]').count()) === 0, `${nom} : R2 un toucher sur le code le COPIE (sans ouvrir l'e-mail), 44 px`, JSON.stringify({ copie, brut, etat, bb }));
+    dit(bb && bb.height >= (nom.startsWith('390') ? 44 : 26) && bb.width >= 44 && copie === brut && etat === '1' && (await pg.locator('[data-boite-lecture]').count()) === 0, `${nom} : R2 un toucher sur le code le COPIE (sans ouvrir l'e-mail), 44 px`, JSON.stringify({ copie, brut, etat, bb }));
   }
   // R3. Non lu : point bleu, filtre, ouvrir = lu (écrit), « Tout marquer lu ».
   const nonLus = lignes.filter((x) => x.lu === '0');

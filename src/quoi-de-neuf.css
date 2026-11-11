@@ -1,0 +1,42 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   « QUOI DE NEUF » (11 nov., src/QuoiDeNeuf.jsx) — discret : une ligne grise,
+   la pastille seule porte l'accent (rare). Jetons seulement ; 44 px au doigt.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root body .vrm-qdn-carte {
+  display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+  min-height: 48px; margin: 12px 0 4px; padding: 10px 14px;
+  border: 0; border-radius: 14px; background: var(--vrm-surface, #fff);
+  box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18));
+  color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 15px; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
+}
+:root body .vrm-qdn-carte:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
+:root body .vrm-qdn-carte:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+.vrm-qdn-pastille {
+  flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; letter-spacing: .01em;
+  color: var(--vrm-accent-texte, var(--vrm-accent, #0066CC)); background: color-mix(in srgb, var(--vrm-accent, #0071E3) 12%, transparent);
+}
+.vrm-qdn-texte { flex: 0 0 auto; font-weight: 600; }
+.vrm-qdn-premier { flex: 1 1 auto; min-width: 0; color: var(--vrm-muted, #6E6E73); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-qdn-chevron { flex: 0 0 auto; color: var(--vrm-muted, #6E6E73); opacity: .6; }
+
+.vrm-qdn-liste {
+  list-style: none; margin: 4px 0 0; padding: 0;
+  background: var(--vrm-surface, #fff); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18));
+}
+.vrm-qdn-ligne { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 16px; }
+.vrm-qdn-ligne + .vrm-qdn-ligne::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: .5px; background: var(--vrm-line, #E5E5EA); }
+.vrm-qdn-corps { flex: 1 1 auto; min-width: 0; }
+.vrm-qdn-titre { font-size: 16px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em; color: var(--vrm-ink, #1D1D1F); }
+.vrm-qdn-point { display: inline-block; width: 7px; height: 7px; margin: 0 7px 2px 0; border-radius: 50%; background: var(--vrm-accent, #0071E3); vertical-align: middle; }
+.vrm-qdn-phrase { margin-top: 2px; font-size: 14px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); }
+.vrm-qdn-date { margin-top: 2px; font-size: 12px; color: var(--vrm-muted, #6E6E73); opacity: .8; font-variant-numeric: tabular-nums; }
+:root body .vrm-qdn-voir {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 10px;
+  border-radius: 10px; font-size: 15px; font-weight: 500; text-decoration: none;
+  color: var(--vrm-accent-texte, var(--vrm-accent, #0066CC)); -webkit-tap-highlight-color: transparent;
+}
+:root body .vrm-qdn-voir:active { background: var(--vrm-card2, #F2F2F7); }
+:root body .vrm-qdn-voir:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-qdn-vide { margin: 8px 0; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
