@@ -71,7 +71,10 @@ const joursEntre = (a, b) => Math.max(0, Math.floor((b - a) / J));
 export function villeCourte(lieu) {
   let s = propre(lieu, 120);
   if (!s) return '';
-  s = s.split(/\s+-\s+/)[0];
+  // « Plateforme, 69007 LYON, FR » : la ville qui suit le code postal.
+  const apresCp = /\b\d{5}\s*(?:-\s*)?([A-Za-zÀ-ÿ'’][A-Za-zÀ-ÿ'’ -]{1,39}?)(?:\s*,|\s+-\s+|$)/.exec(s);
+  if (apresCp) s = apresCp[1];
+  else s = s.split(/\s+-\s+/)[0];
   s = s.replace(/\b\d{5}\b/g, '').replace(/\b(?:FR|FRANCE|CEDEX\s*\d*)\b/gi, '').replace(/[,;]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s || s.length > 40 || /^\d+$/.test(s)) return '';
   return s.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
