@@ -59,7 +59,8 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
-import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';   // (11 nov., lot DJ6)
+import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';
+import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)   // (11 nov., lot DJ6)
 import PorteSansCompte from './auth/PorteSansCompte.jsx';
 import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
@@ -1498,7 +1499,8 @@ const authCall = async (path, body) => {
       const brut = json.error_description || json.msg || json.message || `Erreur ${res.status}`;
       // GoTrue : « captcha protection: request disallowed (…) » / code captcha_failed.
       if (/captcha/i.test(String(brut) + ' ' + String(json.error_code || json.code || ''))) return { ok: false, status: res.status, captcha: true, error: MSG_CAPTCHA_REFUS };
-      return { ok: false, status: res.status, error: brut };
+      // (11 nov., lot connexions-oauth) le code stable de GoTrue (`error_code`), pour traduire.
+      return { ok: false, status: res.status, error: brut, ...(typeof json.error_code === 'string' ? { code: json.error_code } : {}) };
     }
     return { ok: true, status: res.status, json };
   } catch (e) { return { ok: false, status: 0, error: e.name === 'AbortError' ? 'Le serveur met trop de temps à répondre. Réessaie dans un instant.' : 'La connexion au serveur a été interrompue. Réessaie.' }; }
@@ -2016,20 +2018,34 @@ const compteOAuthNeuf=(u)=>{
     return Date.now()-cree<10*60*1000?fourn:'';
   }catch(_){return'';}
 };
-// Les refus de Supabase au retour, en français, avec le geste.
-const erreurRetourOAuth=(err,provider)=>{
-  const t=String(err||'');const nom=provider==='google'?'Google':'Discord';
-  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
-  if(/manual.*link.*disabled|manual_linking/i.test(t))return `La liaison de comptes n'est pas encore activée sur le serveur de VRM. Ton compte reste inchangé.`;
-  return t;
+// Le fournisseur `f` dont l'identité vient d'être créée (< 10 min) sur un compte plus
+// vieux (> 10 min) : la liaison automatique de Supabase par adresse vérifiée. Sinon ''.
+const identiteRelieeAuto=(u,f)=>{
+  try{
+    if(f!=='google'&&f!=='discord')return'';
+    const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree)||Date.now()-cree<10*60*1000)return'';
+    const id=(Array.isArray(u?.identities)?u.identities:[]).find(i=>i&&i.provider===f);
+    const t=Date.parse(id?.created_at||'');return Number.isFinite(t)&&Date.now()-t>=-60000&&Date.now()-t<10*60*1000?f:'';
+  }catch(_){return'';}
 };
+// Les refus de Supabase au retour, en français, avec le geste (src/auth/erreursOAuth.js :
+// le CODE d'abord, jamais le texte anglais, jamais « annulée » pour un autre refus).
+const erreurRetourOAuth=(e,provider,liaison)=>messageErreurOAuth(e,provider,liaison?'liaison':'connexion');
 const consumeAuthRedirect = async () => {
   if (!MULTI_USER) return null;
   const q = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { const li=lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: erreurRetourOAuth(err, li?.provider) }; }
+  if (err) {
+    // Le fournisseur : celui de la liaison en cours, sinon celui du bouton cliqué
+    // (avant, « Discord » par défaut même pour Google). Tout ce départ est consommé.
+    const li=lireLiaisonOAuth(sessionStorage,localStorage),it=lireIntentionOAuth([sessionStorage,localStorage]);
+    try{sessionStorage.removeItem(PKCE_KEY);localStorage.removeItem(PKCE_KEY);}catch(_){}
+    const e={error:q.get('error')||hash.get('error')||'',code:q.get('error_code')||hash.get('error_code')||'',description:q.get('error_description')||hash.get('error_description')||''};
+    cleanAuthUrl();
+    return { error: erreurRetourOAuth(e, li?.provider||it?.fournisseur||'', !!li), ...(li?{liaisonRatee:li.provider}:{}) };
+  }
 
   const code = q.get('code');
   if (code) {
@@ -2042,9 +2058,13 @@ const consumeAuthRedirect = async () => {
       if (!verifier && o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) verifier = o.v;
     } catch (_) {}
     cleanAuthUrl();
-    if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
+    // (11 nov.) Le fournisseur du bouton, lu AVANT l'échange (un refus doit le nommer).
+    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
+    const fourn=liaison?.provider||intention?.fournisseur||'';
+    if (!verifier) return { error: fourn ? `Cette connexion a commencé sur un autre appareil ou a expiré. ${liaison?`Reclique « Relier ${fourn==='google'?'Google':'Discord'} ».`:`Reclique « Continuer avec ${fourn==='google'?'Google':'Discord'} » ici.`}` : 'Cette connexion a commencé sur un autre appareil ou a expiré. Recommence depuis cet appareil.' };
     const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
-    if (!r.ok) return { error: r.error };
+    // Code déjà servi (double clic, retour arrière), expiré, autre appareil : la phrase, jamais l'anglais.
+    if (!r.ok) return { error: r.status === 0 ? r.error : erreurRetourOAuth({ code: r.code || '', description: r.error || '' }, fourn, !!liaison), ...(liaison?{liaisonRatee:liaison.provider}:{}) };
     if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
     if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
     const recovery=q.get('type')==='recovery';
@@ -2057,9 +2077,13 @@ const consumeAuthRedirect = async () => {
     const nouveauOAuth=!liaison&&!recovery?compteOAuthNeuf(r.json.user):'';
     // (11 nov., lot DJ6) Le bouton cliqué était « Continuer avec … » (connexion) :
     // ce compte neuf n'a été voulu par personne ⇒ `sansCompte` (PorteSansCompte l'annule).
-    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
     const sansCompte=nouveauOAuth&&intention?.intention==='connexion'&&intention.fournisseur===nouveauOAuth?nouveauOAuth:'';
-    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth, sansCompte };
+    // (11 nov., lot connexions-oauth) Compte ANCIEN + identité de CE fournisseur toute
+    // neuve : Supabase vient de la rattacher (même adresse e-mail vérifiée). Pas de
+    // second compte — on le DIT une fois, pour qu'il sache comment il est entré.
+    const relieAuto=!liaison&&!recovery&&!nouveauOAuth?identiteRelieeAuto(r.json.user,fourn):'';
+    if(relieAuto)setTimeout(()=>{try{toast(`${relieAuto==='google'?'Google':'Discord'} est maintenant relié à ton compte VRM (même adresse e-mail).`,'ok');}catch(_){}},2500);
+    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth, sansCompte, relieAuto };
   }
 
   const at = hash.get('access_token');

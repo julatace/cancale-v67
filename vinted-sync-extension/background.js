@@ -830,6 +830,48 @@ function b64url(octets) {
 }
 async function noterEtatOAuth(v) { try { await chrome.storage.local.set({ [OAUTH_ETAT]: Object.assign({ at: Date.now() }, v) }); } catch (_) {} }
 const NOM_FOURN = { google: 'Google', discord: 'Discord' };
+// (5.346, lot connexions-oauth) Les refus de Supabase / Google / Discord en français :
+// MÊME règle que l'app, recopiée de src/auth/erreursOAuth.js par
+// `node scripts/audit-connexions-oauth.cjs --recopie` (ne pas modifier ici).
+// <regle-erreurs-oauth>
+const NOMS_FOURNISSEURS_OAUTH = { google: 'Google', discord: 'Discord' };
+// `e` : { error, code, description } · `fournisseur` : 'google' | 'discord' | '' (pas su) ·
+// `contexte` : 'connexion' (app) · 'liaison' (Relier, connecté) · 'extension'.
+function messageErreurOAuth(e, fournisseur, contexte) {
+  const x = e || {};
+  const code = String(x.code || '').toLowerCase().replace(/[^a-z_]/g, '');
+  const err = String(x.error || '').toLowerCase();
+  const desc = String(x.description || '');
+  const nomConnu = NOMS_FOURNISSEURS_OAUTH[fournisseur] || '';
+  const nom = nomConnu || 'ce compte';
+  const ctx = contexte === 'liaison' || contexte === 'extension' ? contexte : 'connexion';
+  const recommencer = ctx === 'liaison' ? (nomConnu ? `Reclique « Relier ${nomConnu} ».` : 'Recommence depuis Mon compte.')
+    : ctx === 'extension' ? 'Recommence depuis le logo VRM.'
+    : (nomConnu ? `Reclique « Continuer avec ${nomConnu} ».` : 'Recommence depuis la connexion.');
+  const parEmail = ctx === 'liaison' ? '' : ' Ou connecte-toi avec ton e-mail VRM.';
+  const a = (c) => code === c;
+  // Liens reçus par e-mail (confirmation, mot de passe) : aucun fournisseur en jeu.
+  if (a('otp_expired') || (!code && /email link is invalid|has expired/i.test(desc) && !nomConnu)) return 'Ce lien e-mail a expiré ou a déjà servi. Redemande un e-mail depuis la connexion.';
+  if (a('provider_email_needs_verification') || a('email_not_confirmed') || /unverified email/i.test(desc)) {
+    if (/confirmation email has been sent/i.test(desc) || a('email_not_confirmed')) return `Un e-mail de confirmation est parti vers ton adresse ${nom}. Ouvre-le, puis reviens te connecter.`;
+    return `Ton adresse e-mail ${nom} n’est pas vérifiée. Vérifie-la chez ${nom}, puis réessaie.${parEmail}`;
+  }
+  if (/error getting user email/i.test(desc)) return `${nomConnu || 'Ce compte'} n’a pas donné d’adresse e-mail. Ajoute une adresse vérifiée chez ${nom}, puis réessaie.${parEmail}`;
+  if (a('identity_already_exists') || /identity is already linked/i.test(desc)) {
+    // « Identity is already linked » (à CE compte) ≠ « … to another user » (un autre compte VRM).
+    if (/already linked\s*\.?$/i.test(desc.trim()) && !/another/i.test(desc)) return `${nomConnu || 'Ce compte'} est déjà relié à ton compte VRM. Rien à faire.`;
+    return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
+  }
+  if (a('manual_linking_disabled') || /manual.?linking/i.test(desc)) return 'La liaison n’est pas encore activée sur VRM. Ton compte reste inchangé.';
+  if (a('email_exists') || /already been registered/i.test(desc)) return `Cette adresse a déjà un compte VRM. Connecte-toi avec elle, puis relie ${nom} dans ton profil.`;
+  if (a('signup_disabled') || /signups not allowed/i.test(desc)) return 'Les inscriptions sont fermées sur VRM pour le moment. Aucun compte n’a été créé.';
+  if (a('user_banned') || /user is banned/i.test(desc)) return 'Ce compte VRM est suspendu. Écris au support de VRM.';
+  if (['bad_oauth_state', 'bad_oauth_callback', 'flow_state_not_found', 'flow_state_expired', 'flow_state_already_used', 'bad_code_verifier'].includes(code)
+    || /flow state|oauth state|code verifier|code challenge/i.test(desc)) return `Cette connexion a expiré ou a déjà servi. ${recommencer}`;
+  if (!code && (err === 'access_denied' || /denied|cancel/i.test(desc))) return nomConnu ? `Connexion avec ${nomConnu} annulée. Rien n’a changé.` : 'Connexion annulée. Rien n’a changé.';
+  return `La connexion${nomConnu ? ' avec ' + nomConnu : ''} n’a pas pu aboutir. Réessaie dans un instant. ${recommencer}`;
+}
+// </regle-erreurs-oauth>
 // 5.329 (Julien, 8 nov. : « que ça n'ouvre AUCUN autre onglet ») : depuis la
 // carte du logo, Google / Discord ne s'ouvrent QUE dans une petite fenêtre
 // (`chrome.windows.create`, type popup) que `oauthRetour` referme. Un navigateur
@@ -906,6 +948,17 @@ async function oauthDepart(fournisseur, ongletDepart, opts) {
 }
 // Le code rendu par Supabase, remis par `oauth-retour.js`. `fixe` : la page de
 // retour de l'extension (sinon : la page d'accueil de VRM, repli de Supabase).
+// `true` seulement si vrm.center a ANNULÉ le compte (réponse `annule: true`). Tout
+// le reste (refus 409, panne, réseau) ⇒ false : on ne devine rien.
+const SANS_COMPTE_API = 'https://vrm.center/api/compte?mode=oauth-sans-compte';
+async function annulerCompteNeufOAuth(jeton) {
+  if (typeof jeton !== 'string' || !jeton) return false;
+  try {
+    const r = await fetch(SANS_COMPTE_API, { method: 'POST', headers: { Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(12000) });
+    const j = await r.json().catch(() => null);
+    return !!(r.ok && j && j.annule === true);
+  } catch (_) { return false; }
+}
 async function oauthRetour(msg, sender) {
   const src = (sender && sender.tab && sender.tab.url) || (sender && (sender.origin || sender.url)) || '';
   if (!ORIGINE_APP.test(src)) return { ok: false, code: 'origine' };
@@ -929,8 +982,9 @@ async function oauthRetour(msg, sender) {
     try { if (typeof d.tab === 'number') chrome.tabs.update(d.tab, { active: true }, () => { void chrome.runtime.lastError; }); } catch (_) {}
   };
   if (msg && msg.error) {
-    const t = String(msg.error_description || msg.error || '').slice(0, 160);
-    const message = /access_denied|denied|cancel/i.test(t) ? `Connexion avec ${nom} annulée : rien n’a changé.` : `${nom} a refusé la connexion (${t || 'sans raison'}). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    // 5.346 : le CODE de Supabase d'abord (`error_code`) — `access_denied` vaut AUSSI pour
+    // une adresse non vérifiée ou une inscription fermée : jamais « annulée » à tort.
+    const message = messageErreurOAuth({ error: String(msg.error || '').slice(0, 60), code: String(msg.error_code || '').slice(0, 60), description: String(msg.error_description || '').slice(0, 200) }, d.f, 'extension');
     await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
     return rendre({ ok: false, code: 'refus', message });
   }
@@ -942,7 +996,7 @@ async function oauthRetour(msg, sender) {
     j = await r.json().catch(() => null);
   } catch (_) { r = null; }
   if (!r || !r.ok || !j || typeof j.access_token !== 'string' || typeof j.refresh_token !== 'string' || !j.user || typeof j.user.id !== 'string') {
-    const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : (j && (j.error_code || j.msg)) ? messageErreurOAuth({ code: String(j.error_code || ''), description: String(j.msg || j.error_description || '') }, d.f, 'extension') : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
     await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
     return rendre({ ok: false, code: 'echange', message });
   }
@@ -954,6 +1008,17 @@ async function oauthRetour(msg, sender) {
     const ids = Array.isArray(j.user.identities) ? j.user.identities : [];
     neuf = isFinite(cree) && Date.now() - cree < 10 * 60000 && !ids.some((x) => x && x.provider === 'email');
   } catch (_) { neuf = false; }
+  // 5.346 (lot connexions-oauth) : même règle que l'app (lot DJ6). Ce bouton est
+  // « Continuer avec … » — une CONNEXION. Un compte que ce clic vient de faire créer
+  // n'a été voulu par personne : le serveur l'annule (il refait toutes les preuves,
+  // `?mode=oauth-sans-compte`) et la session n'est PAS rangée. Refusé ou pas su ⇒
+  // comme avant (session rangée, « compte neuf » dit).
+  if (neuf && (await annulerCompteNeufOAuth(j.access_token)) === true) {
+    const message = `Aucun compte VRM n’est relié à ce ${nom}. Rien n’a été créé. Connecte-toi sur vrm.center avec ton e-mail. Puis relie ${nom} dans ton profil.`;
+    await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message, sansCompte: true }, enPlus));
+    fermer();
+    return rendre({ ok: false, code: 'sans-compte', message });
+  }
   const email = String(j.user.email || emailDuJwt(j.access_token) || '');
   await saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((Number(j.expires_in) || 3600) * 1000), user_id: j.user.id, email, depuis: Date.now() });
   Promise.resolve().then(() => noterDiag('session_oauth_' + d.f)).catch(() => {});

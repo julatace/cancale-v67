@@ -10,6 +10,7 @@ import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
 import { HistoriqueModifications } from '../OutilsParcours.jsx';
 import { dateImportValide } from '../brouillonsReglages.js';
 import { preparerLiaisonOAuth } from '../auth/liaisonOAuth.js';
+import { planDelier, refusDelier } from '../auth/delierOAuth.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ChampRecherche } from '../composants/ChampRecherche.jsx';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
@@ -125,13 +126,17 @@ const lireConnexionsOAuth = async()=>{
  try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
 };
 // (11 nov., lot DJ6) « Délier » Google/Discord : sur son clic, confirmé ; jamais la dernière façon de se connecter.
-const oauthDelier = async (provider, id, nbIdentites) => {
+// (11 nov., lot connexions-oauth) La fiche est RELUE au clic (le compte affiché peut dater) ;
+// règle et phrases : src/auth/delierOAuth.js (refus de GoTrue traduits, e-mail qui change dit).
+const oauthDelier = async (provider, id) => {
  const nom=provider==='google'?'Google':'Discord';
- if(nbIdentites<2)return{ok:false,error:`${nom} est ta seule façon de te connecter : ajoute d’abord un mot de passe (Changer mon mot de passe).`};
- if(!id)return{ok:false,error:'Je n’ai pas pu lire cette liaison. Recharge la page.'};
- if(!(await askConfirm({title:`Délier ${nom} ?`,desc:`Tu ne pourras plus te connecter avec ${nom}. Ton compte VRM ne change pas.`,ok:'Délier',cancel:'Annuler'})))return{ok:false};
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});
-  if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:/single.identity|last.identity|at least/i.test(String(j?.msg||j?.message||j?.error_code||''))?`${nom} est ta seule façon de te connecter.`:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
+ let fiche=null;
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(r.ok)fiche=await r.json();}catch(_){fiche=null;}
+ const plan=planDelier(fiche,provider,id);
+ if(!plan.ok)return{ok:false,error:plan.error};
+ if(!(await askConfirm({title:`Délier ${nom} ?`,desc:plan.avertissement,ok:'Délier',cancel:'Annuler'})))return{ok:false};
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(plan.id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});
+  if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:refusDelier(r.status,j,provider)};}
   try{relireFiche(AUTH.user?.id);}catch(_){}return{ok:true};
  }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
 };
