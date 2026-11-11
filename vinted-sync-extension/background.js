@@ -9842,6 +9842,15 @@ function offreGardeDit(garde, item, maintenant) {
   return null;
 }
 // </offres-garde-regle>
+// Un seuil posé par LUI : nombre, « 45.5 » ou « 45,5 » (espaces et « € » tolérés).
+// Vide, 0, illisible ⇒ null (aucune règle) — jamais un nombre inventé.
+function seuilOffreLu(v) {
+  if (v == null || typeof v === 'object' || typeof v === 'boolean') return null;
+  const t = String(v).replace(/\s|€/g, '').replace(',', '.');
+  if (!t) return null;
+  const n = Number(t);
+  return isFinite(n) && n > 0 ? n : null;
+}
 async function offreAutoReglages() {
   const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offres_garde']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
@@ -9849,8 +9858,9 @@ async function offreAutoReglages() {
   const nums = m.vinted_annonce_numeros || {};
   const mins = {}, refuses = {};
   for (const k in nums) {
-    const n = Number(nums[k] && nums[k].min); if (isFinite(n) && n > 0) mins[String(k)] = n;
-    const rf = Number(nums[k] && nums[k].refuse); if (isFinite(rf) && rf > 0) refuses[String(k)] = rf;   // seuil de refus posé par LUI
+    // (5.342, P4) « 45,5 » (clavier français) se lit 45,5 comme à l'écran — avant : NaN, mini ignoré sans un mot.
+    const n = seuilOffreLu(nums[k] && nums[k].min); if (n != null) mins[String(k)] = n;
+    const rf = seuilOffreLu(nums[k] && nums[k].refuse); if (rf != null) refuses[String(k)] = rf;   // seuil de refus posé par LUI
   }
   // Le message de refus est SON texte (jamais inventé) ; vide ⇒ on refuse sans écrire.
   const msgRefus = String(m.vinted_offre_refus_msg || '').trim();
@@ -9895,11 +9905,20 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
   const stop = await garde(uid, acc); if (stop) return stop;          // anti-blocage : compte de l'onglet + plafond horaire + pause
-  let r;
-  if (quoi === 'accept') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, null);
-  else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
-  else return { ok: false, error: 'action inconnue' };
+  if (quoi !== 'accept' && quoi !== 'reject') return { ok: false, error: 'action inconnue' };
+  // ⚠️⚠️ 5.342 (étude « ne jamais être banni », P1) : la réponse part de l'ONGLET
+  //    vinted.fr (cookies du site, jeton csrf de la page, aucun `Authorization`),
+  //    comme Republier et les favoris depuis la restriction d'angeled92. Avant :
+  //    le service worker (`Bearer`, `credentials:'omit'`), la forme retirée partout
+  //    ailleurs. Sans onglet Vinted : RIEN ne part, l'offre attend (pas « faite »).
+  const chemin = quoi === 'accept' ? `/api/v2/transactions/${tx}/offer_requests/${oid}/accept` : `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`;
+  const r = await vintedPage(acc, 'PUT', chemin, null, { timeoutMs: 12000 });
+  if (r.sansPage) { noterDiag('offre_auto_sans_onglet'); return { ok: false, status: 0, code: 'onglet-vinted', sansPage: r.sansPage, error: 'ouvre vinted.fr dans ce Chrome : rien n\'est parti' }; }
   noterDiag(r.ok ? `offre_auto_${quoi}` : `offre_auto_${quoi}_refuse_${r.status}`);
+  // (5.342, P3) Vinted dit « restreint / suspendu » sur une offre ⇒ le compte est
+  // freiné 24 h (même frein que Republier, relu par le moteur) ; un refus ordinaire
+  // (offre expirée…) arrête seulement ce passage du moteur.
+  if (!r.ok && !r.pause && refusRestreint(r)) await poserFreinRepub(uid, r);
   // Refus : si LE VENDEUR a écrit un message (jamais inventé), on l'envoie APRÈS
   // le refus réussi — même file « une requête à la fois », vide ⇒ rien n'est écrit.
   // ⚠️ 2 nov. (audit « plateformes » P11) : le message est une SECONDE requête chez
@@ -9909,7 +9928,7 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     try {
-      const rm = await vintedSend(acc, 'POST', `/api/v2/conversations/${conv}/replies`, { message: String(msg) });
+      const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, { message: String(msg) }, { timeoutMs: 12000 });
       noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
     } catch (_) {}
   }
@@ -9924,6 +9943,8 @@ async function autoAccepterOffres(uid) {
     const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
     if (await garde(uid, acc)) return 0;               // compte de l'onglet, plafond, pause
+    // (5.342) Vinted a freiné CE compte (refus, « restreint ») : aucun geste automatique.
+    if (await lireFreinRepub(uid)) { noterDiag('offre_auto_frein'); return 0; }
     const offres = await offresEnAttente(uid);
     if (!offres.length) return 0;
     const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
@@ -9969,6 +9990,17 @@ async function autoAccepterOffres(uid) {
       if (pv[o.oid].at > Date.now()) continue;
       if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux gestes
       const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? reg.msgRefus : null });
+      // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
+      if (r && r.sansPage) {
+        const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
+        if (!dits[o.oid]) {
+          dits[o.oid] = Date.now();
+          for (const k in dits) if (dits[k] < Date.now() - 7 * 86400000) delete dits[k];
+          await chrome.storage.local.set({ vrmOffresOngletDit: dits });
+          logActivity(`⏸ Offre de ${o.prix.toFixed(2)} € pas encore traitée : VRM répond depuis l'onglet vinted.fr, ouvre-le dans Chrome`);
+        }
+        break;
+      }
       st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
       await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv });   // écrit AVANT de boucler : un worker tué ne retraite pas
       if (r && r.ok) {
@@ -9977,7 +10009,7 @@ async function autoAccepterOffres(uid) {
         if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
         else logActivity(`↩️ Offre de ${o.prix.toFixed(2)} € refusée automatiquement (ton seuil : ${refuse} €)${reg.msgRefus ? ' + ton message' : ''}`);
         notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
-      } else if (r && r.code) { break; }                // garde-fou atteint (pause/plafond/autre compte) : on arrête le lot
+      } else { break; }                                 // garde-fou atteint ou refus de Vinted : on arrête le lot (pas de refus en série)
     }
     if (pvChange) await chrome.storage.local.set({ vrmOffresPrevues: pv });
     if (faites) noterDiag(`offres_auto_traitees_${faites}`);
@@ -13286,7 +13318,14 @@ async function executerPourApp(msg, sender) {
     if(permis.favorisOuvrir)return ouvrirFavoriNatif(msg.uid,acc,msg.body);
     if(permis.favorisListe)return lirePageFavoris(msg.uid,acc,msg.body);
     if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body);
-    return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);
+    if (methode === 'GET') return vintedGet(acc, msg.endpoint);
+    // (5.342, P1) Son geste part de l'onglet vinted.fr quand il est ouvert (comme le
+    // site). Sans onglet (téléphone, autre navigateur) : son clic part comme avant —
+    // c'est un geste humain, un à la fois. Un onglet qui a quitté Vinted : rien ne part.
+    const rp = await vintedPage(acc, methode, msg.endpoint, msg.body, { timeoutMs: 12000 });
+    if (rp && rp.horsVinted) return { status: 0, ok: false, json: { message: "l'onglet Vinted a changé de page — rien n'est parti, réessaie" } };
+    if (rp && rp.sansPage && !rp.pause) return vintedSend(acc, methode, msg.endpoint, msg.body);
+    return rp;
   });
   if (arret) return arret;
   // (5.337) Le journal « ce que VRM a fait » : seulement un geste ACCEPTÉ par Vinted ;

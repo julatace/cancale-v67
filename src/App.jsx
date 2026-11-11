@@ -4,7 +4,7 @@ import './stylesApp.js';
 import ChampSaisie from './composants/ChampSaisie.jsx';
 import ChoixPlateformes from './ChoixPlateformes.jsx';
 import ConfigurationDepart from './ConfigurationDepart.jsx';
-import { CLE_CONFIGURATION, lireConfiguration, configurationAOuvrir } from './configurationDepart.js';
+import { CLE_CONFIGURATION, lireConfiguration, configurationAOuvrir, questionVendsAOuvrir, ecritureVendsVu } from './configurationDepart.js';
 import { CLE_SOCIETE_TVA, cotisationsUrssaf, profilFiscal, rappelDac7Journee } from './profilFiscal.js';
 import { dac7ParPlateforme } from './seuilsAnnee.js';
 import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './plateformesAffichage.js';
@@ -19,6 +19,7 @@ import BilanSynchronisation from './BilanSynchronisation.jsx';
 import VendusAilleurs, { useVerifVendusAilleurs, VendusAilleursDetail } from './VendusAilleurs.jsx';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres } from './offresGarde.js';
+import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
 import { jugerBrouillon, lectureBrouillons } from './brouillonsProposables.js';
 import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
@@ -31,7 +32,8 @@ import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfi
 import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
 import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
-import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j } from './profilVendeur.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends } from './profilVendeur.js';
+import { exemplesVendeur, motTaille } from './vocabulaireVendeur.js';   // (11 nov., lot DJ2) exemples et petits mots selon ce qu'il vend
 // (9 nov.) Le bandeau discret d'un incident ouvert par les sondes de /statut.
 import { bandeauStatut, CLE_VUS as CLE_STATUT_VUS } from './statutBandeau.js';
 // ⟦→ ecrans/Ebay.jsx #1⟧
@@ -57,6 +59,10 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
+import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';   // (11 nov., lot DJ6)
+import PorteSansCompte from './auth/PorteSansCompte.jsx';
+import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
+import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
 import { SqueletteChargement } from "./Chargement.jsx";
 import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.jsx';
 // (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
@@ -209,6 +215,8 @@ function aLaDemande(charger, feuille = false) {
   };
 }
 const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
+// (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
+const OffresAuto = aLaDemande(() => import('./OffresAuto.jsx'));
 const AchatsOutils = aLaDemande(() => import('./AchatsOutils.jsx'));
 // ⟦→ ecrans/Vestiaire.jsx #3⟧
 // ⟦→ ecrans/Compta.jsx #3⟧
@@ -315,7 +323,7 @@ import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
 import { GuideDemarrage, BandeauExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
 import { etatGuide, preuveCompte, preuveExtension, preuveListe, preuveNombre, compterNumeros, compterVentes, CLE_PLUS_TARD, CHOIX_NUMEROTATION, choixNumerotation, numerotationAChoisir, reglageDuChoix, reporteeActive, verifierInstallation } from "./guideDemarrage.js";
-import { PHRASES_ECRAN } from "./phrasesEcran.js";
+import { PHRASES_ECRAN, phraseEcranPour } from "./phrasesEcran.js";
 import { AIDE_ECRANS } from "./aideEcrans.js";
 // ⟦→ ecrans/Reglages.jsx #12⟧
 import { noterPlantage, viderPlantages, ecouterViolationsCspDans, derniersPlantages, erreursRecentes } from "./plantages.js";
@@ -600,6 +608,7 @@ import Visionneuse from "./Visionneuse.jsx";
 import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
 import { cleFacture } from "./factureAchat.js";
 import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille de vignettes, par compte — même couche, après la DA6
+import "./styles-profil.css";   // (11 nov., lot DJ6) la photo du profil et son menu
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
 import { enregistrerGaleries } from "./visionneuse.js";
@@ -1067,7 +1076,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { importdepart: '5.344.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1959,9 +1968,12 @@ const providerEnabled = (id) => AUTH_SETTINGS?.external?.[id]===true;
 // dit AVANT que la personne tape son mot de passe.
 const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfirm === false);
 
-const oauthStart = async (provider) => {
+const oauthStart = async (provider, intention) => {
   try {
     try{sessionStorage.removeItem('vrm_oauth_liaison');localStorage.removeItem('vrm_oauth_liaison');}catch(_){}
+    // (11 nov., lot DJ6) « connexion » ou « inscription » : au retour, un compte que
+    // le bouton de CONNEXION a fait créer est annulé (src/auth/compteNeuf.js).
+    poserIntentionOAuth([sessionStorage,localStorage],intention,provider);
     const verifier = makeVerifier();
     sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet
     // Téléphone : l'app Discord/Google renvoie souvent le retour dans un NOUVEL
@@ -2008,7 +2020,7 @@ const compteOAuthNeuf=(u)=>{
 // Les refus de Supabase au retour, en français, avec le geste.
 const erreurRetourOAuth=(err,provider)=>{
   const t=String(err||'');const nom=provider==='google'?'Google':'Discord';
-  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce compte ${nom} a déjà son propre compte VRM, il ne peut pas être relié à celui-ci. Connecte-toi avec ${nom}, choisis « J'ai déjà un compte VRM » pour supprimer ce compte vide, puis reviens ici le relier.`;
+  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
   if(/manual.*link.*disabled|manual_linking/i.test(t))return `La liaison de comptes n'est pas encore activée sur le serveur de VRM. Ton compte reste inchangé.`;
   return t;
 };
@@ -2044,7 +2056,11 @@ const consumeAuthRedirect = async () => {
     // repère (créé il y a moins de 10 min, aucune identité email) pour le dire
     // AVANT d'ouvrir l'app — sinon il croit être sur sa boutique, vide.
     const nouveauOAuth=!liaison&&!recovery?compteOAuthNeuf(r.json.user):'';
-    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth };
+    // (11 nov., lot DJ6) Le bouton cliqué était « Continuer avec … » (connexion) :
+    // ce compte neuf n'a été voulu par personne ⇒ `sansCompte` (PorteSansCompte l'annule).
+    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
+    const sansCompte=nouveauOAuth&&intention?.intention==='connexion'&&intention.fournisseur===nouveauOAuth?nouveauOAuth:'';
+    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth, sansCompte };
   }
 
   const at = hash.get('access_token');
@@ -3028,7 +3044,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
         </div>
       </div>
       {paires.length > 6 && (
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="N°, marque, pointure…" inputMode="search"
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`N°, marque, ${motTaille(vendActuel()).toLowerCase()}…`} inputMode="search"
           style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',marginBottom:10}}/>
       )}
       {liste.length === 0 && (
@@ -3048,7 +3064,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
             <span style={{flex:'1 1 120px',minWidth:0}}>
               <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accentTexte}}>N°{p.numero}</span>
               <span style={{display:'block',fontSize:12,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || '—'}</span>
-              {p.taille ? <span className="vrm-label" style={{color:C.muted}}>Pointure {p.taille}</span> : null}
+              {p.taille ? <span className="vrm-label" style={{color:C.muted}}>{motTaille(vendActuel())} {p.taille}</span> : null}
             </span>
             <span style={{flexShrink:0,color:C.muted}}><Icon name="home" size={17}/></span>
           </button>
@@ -3986,8 +4002,8 @@ const abonnerNotes = (fn) => {
 const poserNotesVue = (f) => { _notesVue = notesPropres(typeof f === 'function' ? f(lireNotesPaires()) : f); notifierNotes(); };
 const editerNotePaire = async (paire, actuelle) => {
   const num = String((paire && paire.numero) || '').trim();
-  const v = await askText({ title: num ? `Note · N°${num}` : 'Note sur cette paire', desc: 'Toi seul la vois. Jamais envoyée sur Vinted ni ailleurs.',
-    value: actuelle || '', placeholder: 'ex : petite tache semelle gauche', ok: 'Enregistrer', max: NOTE_MAX, data: 'note-paire' });
+  const v = await askText({ title: num ? `Note · N°${num}` : `Note sur ${motsArticle(vendActuel()).ce}`, desc: 'Toi seul la vois. Jamais envoyée sur Vinted ni ailleurs.',
+    value: actuelle || '', placeholder: exemplesActuels().note, ok: 'Enregistrer', max: NOTE_MAX, data: 'note-paire' });
   if (v == null) return;
   const ops = opsNote(lireNotesPaires(), paire, v, { cleNum });
   if (!ops.length) return;
@@ -8873,6 +8889,13 @@ function textePerime() {
 }
 const __vmrJobs = {};                       // jobId → dernière étape connue
 const __vmrNotifier = () => __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+// (11 nov., lot DJ8 — « comment ne jamais te faire ban ») Les freins de Vinted VUS par
+// l'app : la pause que l'extension pose sur un 429/403 (`etat.pause.jusqua`) est notée
+// UNE fois, sur CET appareil (confort d'affichage, jamais une règle) ; l'écran « Offres
+// auto » conseille alors une journée calme (src/offresSures.js, `journeeCalme`).
+const CLE_FREINS_VUS = 'vrm_freins_vus';
+const lireFreinsVus = () => { try { const l = JSON.parse(localStorage.getItem(CLE_FREINS_VUS) || '[]'); return Array.isArray(l) ? l : []; } catch (_) { return []; } };
+__vmrExtSubs.add(() => { try { const p = __vmrEtat && __vmrEtat.pause; if (!p) return; const avant = lireFreinsVus(); const apres = noterPause(avant, p); if (apres.length !== avant.length || apres.some((x, i) => x !== avant[i])) localStorage.setItem(CLE_FREINS_VUS, JSON.stringify(apres)); } catch (_) {} });
 // ⚠️⚠️ UN PONT ORPHELIN RÉPONDAIT « RIEN » PLUS VITE QUE LE PONT VIVANT
 //    (5 octobre — « je ne peux pas appuyer sur le bordereau, ça met que
 //    l'extension ne répond pas »). Après une mise à jour ou un rechargement de
@@ -12120,7 +12143,7 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   const titre = String(o.title || '—');
   const coupe = (t, max) => { const w=t.split(' '); const r=[]; let c=''; for(const x of w){ if((c+' '+x).trim().length>max){ r.push(c.trim()); c=x; } else c+=' '+x; } if(c.trim()) r.push(c.trim()); return r; };
   const lignesTitre = coupe(titre, img ? 34 : 46).slice(0, 2);
-  const carac = [extractBrand(titre), extractSize(titre) ? 'pointure ' + String(extractSize(titre)).replace('.',',') : ''].filter(Boolean).join(' · ');
+  const carac = [extractBrand(titre), extractSize(titre) ? motTaille(vendActuel()).toLowerCase() + ' ' + String(extractSize(titre)).replace('.',',') : ''].filter(Boolean).join(' · ');
   // ⚠️ LA HAUTEUR DU BLOC SE CALCULE, elle n'est pas figée. Une hauteur fixe
   // laissait un trou de 94 px quand il n'y a ni photo (pas d'extension) ni
   // marque/pointure reconnue — sur un document d'une page, ça se voit tout de
@@ -13760,6 +13783,13 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
   const aRepublier = rep ? liste.filter((a) => coches.has(cle(a))) : [];
   return (
     <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
+      {/* (11 nov., lot DJ8) Le conseil passe AVANT les suivis : en arrivant, « À la main » se voit d'abord. */}
+      {/* (10 nov., lot AP — demande 17) À LA MAIN, CONSEILLÉ : le moins risqué (c'est lui qui publie,
+          rien ne part d'ici), rendu attirant — trois gestes prêts, le N° qui suit la paire. */}
+      {rep && <div className="vrm-kit-conseil vrm-kit-conseil-vue" data-republier-conseil="main">
+        <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
+        <div><b>À la main : conseillé, le moins risqué.</b><span>Photos dans ta galerie, N° et description à copier.</span></div>
+      </div>}
       {suivis.length > 0 && suivis.map((s) => (
         <div key={s.ancienId} data-suivi-main={s.ancienId} data-suivi-main-etat={s._etat} className="vrm-act-paire">
           <span className="vrm-act-paire-nom">{s.num ? <Numero n={s.num} taille="petit"/> : null}<b>{s.titre || 'Annonce'}</b></span>
@@ -13767,17 +13797,12 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
           <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>Reprendre</Bouton></div>
         </div>
       ))}
-      {/* (10 nov., lot AP — demande 17) À LA MAIN, CONSEILLÉ : le moins risqué (c'est lui qui publie,
-          rien ne part d'ici), rendu attirant — trois gestes prêts, le N° qui suit la paire. */}
-      {rep && <div className="vrm-kit-conseil vrm-kit-conseil-vue" data-republier-conseil="main">
-        <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
-        <div><b>À la main : conseillé, le moins risqué.</b><span>Photos dans ta galerie, N° et description à copier.</span></div>
-      </div>}
       <div className="vrm-sel-tete" data-sel-tete="">
         {/* (10 nov., lot AI) La consigne RÉÉCRITE en une phrase courte, sans pop-up (le geste suffit) ;
             sur la vue « Republier » (navigation fusionnée) : c'est toujours lui qui choisit et lance. */}
         <span data-sel-consigne="" style={{ minWidth: 0, flex: '1 1 auto' }}>{rep ? <>Coche des annonces, puis choisis <b>À la main</b> ou <b>Par VRM</b>.</> : filtre === 'brouillon' ? <>Coche tes brouillons, puis <b>Actions</b>.</> : <>Coche des annonces d’un compte, puis <b>Actions</b>.</>}</span>
-        {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
+        {/* (11 nov., lot DJ8) Un seul compte : son « Tout décocher » suffit (le même geste ne s'écrit pas deux fois). */}
+        {nCoches > 0 && groupes.length !== 1 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
         {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>Un par un</Bouton> : null}
       </div>
       {charge ? <div className="vrm-sel-vide" data-selection-charge="">{PAS_SU.enCours}</div>
@@ -13848,6 +13873,14 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
     <SheetShell onClose={onClose} maxWidth={520} titre={`Actions · ${n} annonce${n > 1 ? 's' : ''}`}>
       <div className="vrm-act" data-actions-selection={n} data-actions-tuiles={tuiles.length}>
         {tete ? <p className="vrm-act-raison" data-actions-raison="" role="status">{tete}</p> : null}
+        {/* (11 nov., lot DJ8 — « la repu à la main au premier plan ») « Republier à la main » AVANT
+            les tuiles : conseillé, le moins risqué (c'est lui qui publie, rien ne part d'ici). */}
+        {main ? (
+          <div className="vrm-act-main vrm-act-main-conseil" data-action-sel="main" data-action-sel-ok={main.ok ? 'oui' : 'non'}>
+            <Bouton variante={main.ok ? 'secondaire' : 'discret'} icone="shield" disabled={!main.ok} title={main.ok ? main.desc : main.raison} onClick={() => { if (main.ok) onLancer('main'); }}>{main.titre}</Bouton>
+            {main.ok || main.raison !== tete ? <span>{main.ok ? 'Conseillé : tu publies toi-même, VRM prépare tout.' : main.raison}</span> : null}
+          </div>
+        ) : null}
         <div className="vrm-act-tuiles">
           {tuiles.map((x) => { const sous = parTuile[x.k] || ''; return (
             <button key={x.k} type="button" className="vrm-act-choix" data-action-sel={x.k} data-action-sel-ok={x.ok ? 'oui' : 'non'} aria-disabled={x.ok ? undefined : 'true'} title={x.ok ? undefined : x.raison}
@@ -13857,12 +13890,6 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
             </button>
           ); })}
         </div>
-        {main ? (
-          <div className="vrm-act-main" data-action-sel="main" data-action-sel-ok={main.ok ? 'oui' : 'non'}>
-            <Bouton variante="discret" disabled={!main.ok} title={main.ok ? main.desc : main.raison} onClick={() => { if (main.ok) onLancer('main'); }}>{main.titre}</Bouton>
-            {main.ok || main.raison !== tete ? <span>{main.ok ? 'Sans l’extension : VRM te prépare tout, tu publies toi-même.' : main.raison}</span> : null}
-          </div>
-        ) : null}
         {mini ? (
           <div className="vrm-act-main" data-action-sel="mini" data-action-sel-ok={mini.ok ? 'oui' : 'non'}>
             <Bouton variante="discret" disabled={!mini.ok} title={mini.ok ? mini.desc : mini.raison} onClick={() => { if (mini.ok) onLancer('mini'); }}>{mini.titre}</Bouton>
@@ -14178,7 +14205,7 @@ const DICTEE_REFUS = { non: false };
 function BoutonPhotoRecherche() {
   return (
     <button className="vrm-micro" type="button" data-recherche-photo-ouvrir="" onClick={(e) => { e.preventDefault(); ouvrirRecherchePhoto(); }}
-      aria-label="Chercher par photo" title="Chercher par photo : prends la paire, VRM montre les annonces qui lui ressemblent">
+      aria-label="Chercher par photo" title={`Chercher par photo : prends ${motsArticle(vendActuel()).le}, VRM montre les annonces qui lui ressemblent`}>
       <Icon name="camera" size={19}/>
     </button>
   );
@@ -14521,9 +14548,12 @@ const GROUPES_PLUS=[
     // restent (`dashboard`, `compta`) : leurs liens mènent à leur segment.
     {id:'compta',    icon:'euro',  label:'Argent'},
   ]},
+  // (11 nov., lot DJ6 — Julien : « qu'on ne voie pas les Paramètres mais que quand on
+  // clique sur le profil ils apparaissent ») Paramètres n'est plus une entrée : la photo
+  // du profil (pied de la colonne, en-tête du téléphone) ouvre le menu du profil
+  // (src/profil/MenuProfil.jsx). « g p », ⌘K et `?tab=settings` y mènent toujours.
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
-    {id:'settings',   icon:'gear', label:'Paramètres'},
   ]},
 ];
 // ⚠️ (2 nov., Julien : « il ne doit pas y avoir des écritures partout à côté des
@@ -14560,7 +14590,7 @@ function titreEcran(tab) {
   if (tab === 'semaine') return 'Ma semaine';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  return { settings: 'Paramètres', dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
@@ -14957,7 +14987,7 @@ function PeriodePicker({ value, onChange, titre = 'Période', vide, datation }) 
 
 function EmptyState({ icon, title, desc, action }) {
   return <div className="vrm-empty-state vrm-empty-clair">
-    <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true"><Illustration nom={depuisIcone(icon)} taille={64}/></div>
+    <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true"><Illustration nom={depuisIcone(icon)} taille={64} vend={vendActuel()}/></div>
     <div className="vrm-empty-corps"><h3>{title}</h3>{desc&&<p>{desc}</p>}{action&&<div className="vrm-empty-actions">{action}</div>}</div>
   </div>;
 }
@@ -15305,7 +15335,8 @@ function CibleNotif({ tab, sub }) {
 // (8 nov.) Le « ? » d'aide SUIT la phrase (dans le même paragraphe, icône seule :
 // le texte de la phrase ne change pas) ; sans phrase, il reste seul.
 function PhraseEcran({ cle, className = '' }) {
-  const t = cle && PHRASES_ECRAN[cle];
+  const p = useProfilVendeur();   // (11 nov., lot DJ2) « paires » seulement pour Sneakers
+  const t = cle && phraseEcranPour(cle, p.vend || vendActuel());
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
   if (!t) return aide ? <p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p> : null;
   return <p className={'vrm-phrase-ecran' + (className ? ' ' + className : '')} data-phrase-ecran={cle}>{t}{aide}</p>;
@@ -15635,6 +15666,48 @@ function BadgeNav({ t, badges, place }) {
 // Vendre · Expédier · Gérer · Argent · Plateformes · Moi (Paramètres en
 // dernier) ; un compteur ambre à droite de chaque entrée qui a un geste à faire.
 // Tout tient sans défiler à 900 px de haut (styles-vitrine.css).
+// ── LE MENU DU PROFIL (11 nov., lot DJ6, src/profil/MenuProfil.jsx) ─────────────
+// Un seul menu, monté par la coque ; la carte de la colonne et la photo de l'en-tête
+// du téléphone l'ouvrent (`vrm:profil-ouvrir`).
+const ouvrirMenuProfil = () => { try { window.dispatchEvent(new Event('vrm:profil-ouvrir')); } catch (_) {} };
+// La fiche GoTrue (identités Discord/Google reliées) : projetée, jamais rangée ailleurs qu'en mémoire.
+poserLecteurFiche(async () => {
+  const tok = AUTH.session && AUTH.session.access_token; if (!tok) return null;
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (!j || j.id !== (AUTH.user && AUTH.user.id)) return null;
+  return { identities: (Array.isArray(j.identities) ? j.identities : []).map((i) => ({ provider: i && i.provider, identity_id: i && i.identity_id, last_sign_in_at: i && i.last_sign_in_at, updated_at: i && i.updated_at,
+    identity_data: { avatar_url: i && i.identity_data && i.identity_data.avatar_url, picture: i && i.identity_data && i.identity_data.picture } })) };
+});
+function MenuProfilCoque({ setTab, entreprise }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:profil-ouvrir', f); return () => window.removeEventListener('vrm:profil-ouvrir', f); }, []);
+  const [, rafraichir] = React.useState(0);
+  React.useEffect(() => suivreAbonnement(() => rafraichir((n) => n + 1)), []);
+  if (!ouvert || !AUTH.user || !AUTH.user.id) return null;
+  const planLu = (reglePlanCourante() || {}).plan;
+  const aller = (sous) => { setOuvert(false); if (sous) { DEMANDE_REGLAGE_SOUS.id = sous; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } setTab('settings'); };
+  return <MenuProfil owner={AUTH.user.id} headers={enTeteSession} email={String(AUTH.user.email || '')} nom={(entreprise && entreprise.nom) || ''}
+    offre={planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : ''} theme={C} Feuille={SheetShell} Icon={Icon}
+    onFermer={() => setOuvert(false)} onParametres={() => aller('')} onAppareils={() => aller('appareils')}
+    onDeconnexion={async () => { setOuvert(false); if (await askConfirm({ title: 'Se déconnecter ?', desc: 'Tes données restent dans VRM.', ok: 'Se déconnecter', cancel: 'Annuler' })) authSignOut(); }}/>;
+}
+// La photo du profil dans l'en-tête du téléphone (à droite) : ouvre le même menu.
+function BoutonProfilTete() {
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  if (!uid) return null;
+  return <button type="button" className="vrm-hbtn vrm-hdr-profil" data-profil-tete="" aria-haspopup="dialog" aria-label="Mon profil" onClick={ouvrirMenuProfil}>
+    <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/>
+  </button>;
+}
+// Le nom de l'entreprise dans l'en-tête : rien quand il est masqué (ou pas encore lu).
+function NomEntrepriseCoque({ entreprise, className }) {
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const n = useNomCoque({ owner: uid, headers: enTeteSession, nom: (entreprise && entreprise.nom) || '', email: '' });
+  if (MULTI_USER && uid && n.masque !== false) return null;
+  return <NomEntreprise entreprise={entreprise} className={className}/>;
+}
 function SideBar({ tab, setTab, entreprise, sites, badges }) {
   useProfilVendeur();   // (8 nov.) Simple / Complet : la colonne se redessine au changement
   const groupes = groupesVisibles(sites, t => !t.tel, true);
@@ -15726,14 +15799,18 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   const nomCompte = (entreprise && entreprise.nom) || '';
   const planLu = (reglePlanCourante() || {}).plan;
   const offre = planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : '';
-  const initiale = (nomCompte || mail).trim().charAt(0).toUpperCase();
-  // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE : elle ouvre Paramètres (un bouton, clavier compris).
-  const carteCompte = (nomCompte || mail) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="settings"
-    aria-label={`${nomCompte || mail}${offre ? ' · ' + offre : ''} — ouvrir Paramètres`} title="Paramètres" onClick={() => setTab('settings')}>
-    <span className="vrm-nav-avatar vrm-sensible" aria-hidden="true">{initiale}</span>
+  // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE. (11 nov., lot DJ6) Elle ouvre le
+  // MENU DU PROFIL (Paramètres, Appareils, Se déconnecter) ; la photo est celle du profil, et
+  // « Masquer mon nom » (ou pas encore lu) ⇒ « Mon compte », ni nom ni e-mail.
+  const uidCompte = (AUTH.user && AUTH.user.id) || '';
+  const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
+  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={tab === 'settings' ? 'page' : undefined}
+    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ouvrir mon profil`} title="Mon profil" onClick={() => ouvrirMenuProfil()}>
+    <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
     <span className="vrm-nav-compte-txt">
-      {nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
-      {(offre || (nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
+      {nomCoque.masque !== false ? <span className="vrm-nav-compte-nom" data-nav-compte-masque="">{nomCoque.texte}</span>
+        : nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
+      {(offre || (nomCoque.masque === false && nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCoque.masque === false && nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
     </span>
   </button> : null;
   return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
@@ -16162,7 +16239,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       {etape === 'confirmer' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite :</p>
-        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
+        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
@@ -16172,7 +16249,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       {etape === 'fait' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Le compte vide est supprimé. Ensuite :</p>
-        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
+        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
         <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
       </>}
     </div>
@@ -16381,11 +16458,11 @@ function AuthScreen() {
     if(resetEnvoye){setResetEnvoye('');setFinAttente(0);}
   };
 
-  const oauth = async (p) => {
+  const oauth = async (p, intention) => {
     if(busy||demandeEnCours.current)return;
     demandeEnCours.current=true;setErr('');setInfo('');setBusy(true);setFournisseurEnCours(p);
     try {
-      const r=await oauthStart(p);
+      const r=await oauthStart(p, intention||(mode==='up'?'inscription':'connexion'));
       if (!r.ok) {demandeEnCours.current=false;setErr(r.error);setBusy(false);setFournisseurEnCours('');}
     } catch (_) {demandeEnCours.current=false;setErr('Impossible d’ouvrir cette connexion. Réessaie.');setBusy(false);setFournisseurEnCours('');}
     // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
@@ -16614,6 +16691,12 @@ function AuthScreen() {
               Connecte-toi ici : l'extension {NAV.de} se connecte aussi, rien à taper.
             </div>
           )}
+          {/* (11 nov., lot DJ6) « Continuer avec Discord » sans compte VRM : rien n'a été créé (annulé par le serveur). */}
+          {AUTH_REDIRECT?.sansCompteFournisseur && mode==='in' && (()=>{ const p=AUTH_REDIRECT.sansCompteFournisseur, nom=p==='google'?'Google':'Discord'; return <div role="alert" data-sans-compte={p} style={{fontSize:14,color:C.text,border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'10px 12px',marginBottom:14,lineHeight:1.45}}>
+            <div style={{fontWeight:600}}>Aucun compte VRM relié à ce {nom}.</div>
+            <div style={{color:C.muted,marginTop:2}}>Connecte-toi d’abord, puis relie {nom} dans ton profil.</div>
+            {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Créer un nouveau compte avec {nom}</button>}
+          </div>; })()}
           {lierFournisseurMot && (mode==='in' || mode==='up') && <div role="status" data-lier-fournisseur-mot={lierFournisseur} style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>{lierFournisseurMot}</div>}
           {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>Plus de 10 minutes : l’extension n’est pas connectée.</div><div>Connecte-toi, puis reclique « Continuer avec Google » (ou Discord) dans l’extension.</div></div>}
 
@@ -19013,7 +19096,7 @@ async function ecrirePushPrefs(next) {
     return !!(r && r.ok);
   } catch (_) { return false; }
 }
-function ConfigurationDepartApp({ onFin }) {
+function ConfigurationDepartApp({ onFin, seule = null }) {
   const p = useProfilVendeur();
   const lus = React.useMemo(() => ({
     jeVends: load(CLE_JE_VENDS, null), plateformes: load(CLE_PLATEFORMES, null), regime: load('vinted_regime', null),
@@ -19024,8 +19107,10 @@ function ConfigurationDepartApp({ onFin }) {
   const ecrire = React.useCallback((liste) => Promise.all((liste || []).map((w) => w.ligne
     ? ecrirePushPrefs(w.valeur)
     : new Promise((res) => save(w.cle, w.valeur, (ok) => res(ok !== false))))).then((r) => r.every(Boolean)), []);
-  const fermer = () => { if (!lireConfiguration(load(CLE_CONFIGURATION, null))) save(CLE_CONFIGURATION, { etat: 'plusTard', at: new Date().toISOString(), statut: null, version: 1 }); onFin && onFin('plusTard'); };
-  return <><FermeAuRetour fermer={fermer}/><ConfigurationDepart lus={lus} relies={p.relies || {}} contexte={p.contexte || null} entreprise={{ lireReglage, ecrireReglage, chercherEntreprise }} lirePushPrefs={() => lireReglage('push_prefs')} ecrire={ecrire} onFin={(etat) => { toast(etat === 'fait' ? 'Ta configuration est enregistrée.' : 'Tes choix sont gardés. Tu peux reprendre dans Réglages → Ma configuration.'); onFin && onFin(etat); }}/></>;
+  // (11 nov., lot DJ2) La question seule « Tu vends quoi ? » : « Plus tard » ⇒ `vu` (rien d'autre).
+  const vuSeule = React.useCallback(() => { const w = ecritureVendsVu(load(CLE_JE_VENDS, null)); return w ? ecrire([w]) : Promise.resolve(true); }, [ecrire]);
+  const fermer = () => { if (seule) { vuSeule(); onFin && onFin('plusTard'); return; } if (!lireConfiguration(load(CLE_CONFIGURATION, null))) save(CLE_CONFIGURATION, { etat: 'plusTard', at: new Date().toISOString(), statut: null, version: 1 }); onFin && onFin('plusTard'); };
+  return <><FermeAuRetour fermer={fermer}/><ConfigurationDepart seule={seule} onPlusTardSeule={seule ? vuSeule : null} lus={lus} relies={p.relies || {}} contexte={p.contexte || null} entreprise={{ lireReglage, ecrireReglage, chercherEntreprise }} lirePushPrefs={() => lireReglage('push_prefs')} ecrire={ecrire} onFin={(etat) => { toast(seule ? (etat === 'fait' ? 'C’est noté : VRM adapte ses mots.' : 'Tu pourras choisir dans Paramètres → Affichage → Je vends.') : etat === 'fait' ? 'Ta configuration est enregistrée.' : 'Tes choix sont gardés. Tu peux reprendre dans Réglages → Ma configuration.'); onFin && onFin(etat); }}/></>;
 }
 // La carte de Ma journée qui RAMÈNE à la configuration (elle remplace la question
 // « Où vends-tu ? » posée ici avant le 9 nov.) : seulement si elle a été mise de côté,
@@ -20840,7 +20925,7 @@ function descriptionDeFaits(p) {
   const l = [];
   if (p.title) l.push(String(p.title).trim());
   if (p.marque) l.push(`Marque : ${p.marque}`);
-  if (p.tailleVinted || p.taille) l.push(`Pointure : ${String(p.tailleVinted || p.taille).replace('.', ',')}`);
+  if (p.tailleVinted || p.taille) l.push(`${motTaille(vendActuel())} : ${String(p.tailleVinted || p.taille).replace('.', ',')}`);
   if (p.etat) l.push(`État : ${p.etat}`);
   if (p.num) l.push(`Référence : VRM-${p.num}`);
   return l.length > 1 ? l.join('\n') : '';
@@ -21716,7 +21801,7 @@ function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
   },[ventes,panelOff]);
   const [gagnes,setGagnes]=React.useState(false);
   return <div style={{padding:16}} data-ebay-achats-onglet="">
-    <RechercheEbay headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
+    <RechercheEbay vend={vendActuel()} exemple={exemplesActuels().achat} headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
     <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
     {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
     <details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
@@ -36857,10 +36942,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const clean = listQ.trim().replace(/\s+/g,' ');
     const withBrand = brand && !normTitle(clean).includes(normTitle(brand)) ? `${brand} ${clean}` : clean;
     const sz = String(listSize).trim();
-    const title = (withBrand.charAt(0).toUpperCase()+withBrand.slice(1)) + (sz?` — Pointure ${sz}`:'');
+    const title = (withBrand.charAt(0).toUpperCase()+withBrand.slice(1)) + (sz?` — ${motTaille(vendActuel())} ${sz}`:'');
     const desc = [
       title,
-      sz?`Pointure : ${sz}`:null,
+      sz?`${motTaille(vendActuel())} : ${sz}`:null,
       'État : très bon état, voir photos 👟',
       'Modèle authentique. Envoi rapide et soigné 📦',
       'Offres bienvenues, n\'hésitez pas à me contacter 😊',
@@ -39068,7 +39153,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const f = x.x.itemId ? numD[x.x.itemId] : null; const num = (f && f.numero != null) ? String(f.numero).trim() : '';
         const titre = x.x.titre || o.title || '(sans titre)';
         L.push({ cle: 'lbc:' + x.x.txId, site: 'leboncoin', num, etatNum: etatN(num), titre, compte: 'Leboncoin', transporteur: nomTr(x), trCle: (x.tr && x.tr.cle) || '', limite: '', limiteAmbre: false,
-          photo: sure ? (photoArticle(o) || null) : null, paire: sure ? 'sure' : 'a-verifier', raisonPaire: sure ? '' : 'Cette vente Leboncoin n’a pas encore été relue : VRM ne montre pas de photo devinée. Vérifie la paire sur le carton.',
+          photo: sure ? (photoArticle(o) || null) : null, paire: sure ? 'sure' : 'a-verifier', raisonPaire: sure ? '' : `Cette vente Leboncoin n’a pas encore été relue : VRM ne montre pas de photo devinée. Vérifie ${motsArticle(vendActuel()).le} là où ${motsArticle(vendActuel()).elle} est rangé${motsArticle(vendActuel()).e}.`,
           pdf: false, sansBordereau: o.label && o.label.voucherUrl ? 'Le bordereau Leboncoin s’imprime, tamponné, depuis l’écran Colis Leboncoin.' : 'Bordereau à générer sur Leboncoin.',
           suivi: '', peutFaire: true, geste: { site: 'leboncoin', cle: 'lbc:' + x.x.txId, txId: x.x.txId, num, titre } });
         continue;
@@ -39087,7 +39172,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         taille: (e && e.taille ? String(e.taille) : '') || (o ? String(o.size_title || o.size || '') : ''), compte: o && o._acc ? accNameOf(o._acc) : '', transporteur: nomTr(x), trCle: (() => { try { return (transporteurVente(b, x.txn) || {}).cle || ''; } catch (_) { return ''; } })(),
         limite: texteEnvoiColis(texteLimiteEnvoi(x.lim) || ''), limiteAmbre: x.dl != null && x.dl <= 1,
         photo: sure ? (orderPhoto(o) || null) : null, paire: sure ? 'sure' : 'a-verifier',
-        raisonPaire: sure ? '' : 'Ce bordereau n’est relié à aucune vente par son n° de transaction : VRM ne montre pas de photo devinée. Vérifie la paire sur le bordereau et sur son carton.',
+        raisonPaire: sure ? '' : `Ce bordereau n’est relié à aucune vente par son n° de transaction : VRM ne montre pas de photo devinée. Vérifie ${motsArticle(vendActuel()).le} sur le bordereau et là où ${motsArticle(vendActuel()).elle} est rangé${motsArticle(vendActuel()).e}.`,
         pdf, x, sansBordereau: pdf ? '' : 'Bordereau pas encore là : l’extension le génère quand tu passes sur Vinted.',
         suivi: (b && b.suivi) || '', peutFaire: true, geste: { site: 'vinted', cle: 'v:' + (x.txn || x.key), o, b, num, titre } });
     }
@@ -39312,7 +39397,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Import direct (pas depuis une vente) : on demande le N° + le titre.
     if (ctx.standalone) {
       const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de l\'article (laisse vide si aucun) :', value: '' }) || '').trim();
-      const title = (await askText({ desc: 'Titre / description (ex : Nike Air Max 90) :', value: '' }) || '').trim();
+      const title = (await askText({ desc: `Titre / description (${exemplesActuels().achat}) :`, value: '' }) || '').trim();
       ctx = { numero, title };
     }
     try { await processBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ toast('Erreur : '+String(err)); }
@@ -39577,6 +39662,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const favorisUid = String(compteSel && compteSel!=='*' ? compteSel : msgCompteActif || '');
   const favorisCompte = accounts.find(a=>String(a.vinted_user_id)===favorisUid);
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
+  // (11 nov., lot DJ8) Favoris & offres : deux vues, « Favoris » et « Offres auto ».
+  const [zoneFav,setZoneFav]=useVueSession('favoris-zone','favoris');
+  const lireGardeOffres=React.useCallback(()=>load('vinted_offres_garde', null),[]);
   // (31 oct., navigation par tâche) Les entrées « Republier », « Favoris &
   // offres », « Retraits » et « Achats » ouvrent CET écran sur la bonne vue : la
   // demande est consommée une fois (DEMANDE_VUE), à l'ouverture ou, l'écran déjà
@@ -39590,6 +39678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
       if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
+      if(only==='messages' && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
@@ -41423,7 +41512,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
               if (nGestes === 0) return { prochain: null, section: pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
-                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96}/><p>Rien à faire</p></div> };
+                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96} vend={vendActuel()}/><p>Rien à faire</p></div> };
               // (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE sort de la liste : elle se pose EN TÊTE,
               // dans la carte sombre, avant l'argent (Julien : l'ordre = ce qu'il faut faire maintenant, puis
               // l'argent, puis le reste). L'ordre de toujours (le plus pressé d'abord) la désigne ; les
@@ -43876,6 +43965,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
             </div>
             {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
+            {/* (11 nov., lot DJ8) L'écran complet : seuils par paire, aperçu, historique (Messages → Favoris & offres → Offres auto). */}
+            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>Régler par paire, voir l’historique ›</button>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
                 <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
@@ -44357,12 +44448,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div data-chiffres className="vrm-fiche-chiffres" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
                       <div className="vrm-fiche-cell" style={cell} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter d'un geste — et, si tu as activé l'acceptation automatique, acceptée à ta place">
                         <span style={lib}>Accepter dès</span>
-                        <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
+                        <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:montantSeuil(v)})} inputMode="decimal" placeholder="€" largeur={56}
                           titre="Prix mini d'acceptation d'offre — touche pour le saisir" rendu={<span data-vide={mn!=null&&isFinite(mn)&&mn>0?undefined:''} style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title="Seuil de refus : si l'acceptation auto est activée, une offre sous ce montant est refusée toute seule (avec ton message, si tu en as écrit un)">
                         <span style={lib}>Refuser sous</span>
-                        <EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
+                        <EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:montantSeuil(v)})} inputMode="decimal" placeholder="€" largeur={56}
                           titre="Seuil de refus d'offre — touche pour le saisir" rendu={<span data-vide={rf!=null&&isFinite(rf)&&rf>0?undefined:''} style={valeur}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
@@ -44943,7 +45034,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" data-messages-zone="favoris" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><Icon name="heart" size={17}/>Favoris & offres</button>
         </div>
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
-        <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;const px=Number(it?.price&&typeof it.price==='object'?it.price.amount:it?.price);return it||n?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null,prix:Number.isFinite(px)&&px>0?px:null}:null;}} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
+        <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>
+        {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
+          refusMsg={refusMsg} setRefusMsg={(v)=>{ setRefusMsg(v); save('vinted_offre_refus_msg', v); }}
+          annonces={Array.isArray(listings.items) && !listings.error ? annSelectionnables.filter(a=>a.etat==='en-ligne') : null} numeros={numeros}
+          offres={offresConv} lireGarde={lireGardeOffres} comptes={(accounts||[]).filter(a=>/^\d{1,20}$/.test(String(a.vinted_user_id||''))&&!acctOffOf({_acc:a})).map(a=>({ uid:String(a.vinted_user_id), nom:accNameOf(a) }))}
+          uidOnglet={(vintedDeChrome()||{}).uid||''} pause={__vmrEtat && __vmrEtat.pause ? __vmrEtat.pause : null} freinsVus={lireFreinsVus()}
+          poserSeuils={(liste)=>{ const idx=new Map((listings.items||[]).map(it=>[String(it.id),it])); let n=0; for (const w of liste||[]) { const it=idx.get(String(w.id)); if (!it) continue; const patch={}; if (w.min!==undefined) patch.min=montantSeuil(w.min); if (w.refuse!==undefined) patch.refuse=montantSeuil(w.refuse); updatePair(it, patch); n++; } if ((liste||[]).length>1) toast(`${n} seuil${n>1?'s':''} posé${n>1?'s':''}`); }}
+          ouvrirSerie={(ids)=>{ const set=new Set(ids.map(String)); setMiniSel(annSelectionnables.filter(a=>a.etat==='en-ligne'&&set.has(String(a.id)))); }}/>}
+        <div hidden={zoneFav==='offres'} style={{display:zoneFav==='offres'?'none':undefined}}>
+        <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;const px=Number(it?.price&&typeof it.price==='object'?it.price.amount:it?.price);return it||n?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null,prix:Number.isFinite(px)&&px>0?px:null}:null;}} ecranActif={zoneMessages==='favoris'&&zoneFav!=='offres'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        </div>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         {/* (5 nov., chantier G) Le champ de recherche commun (`ChampRecherche`) : plus un champ teinté posé dans un champ bordé. */}
@@ -47010,10 +47112,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
               <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
-                <input value={listQ} onChange={e=>setListQ(e.target.value)} placeholder="Modèle (ex : Nike Air Max 90, gel-lyte…)" autoFocus
+                <input value={listQ} onChange={e=>setListQ(e.target.value)} placeholder={exemplesActuels().modele} autoFocus
                   style={{flex:'2 1 200px',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <MicDictee onText={(t)=>setListQ(t)} titre="Dicter le modèle"/>
-                <input value={listSize} onChange={e=>setListSize(e.target.value)} placeholder="Pointure" inputMode="decimal"
+                <input value={listSize} onChange={e=>setListSize(e.target.value)} placeholder={motTaille(vendActuel())} inputMode="decimal"
                   style={{flex:'1 1 80px',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <input value={listBuy} onChange={e=>setListBuy(e.target.value)} placeholder="Prix d'achat&nbsp;€" inputMode="decimal"
                   style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
@@ -47132,7 +47234,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:2}}>🔍 Vérificateur d'achat</div>
                 <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Modèle + prix demandé : tes ventes disent si ça vaut le coup.</div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:checker?10:0}}>
-                  <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder="Modèle (ex : gel-lyte, spezial…)"
+                  <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder={vendActuel()==='sneakers' ? 'Modèle (ex : gel-lyte, spezial…)' : exemplesActuels().modele}
                     style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
                   <input value={srcPrice} onChange={e=>setSrcPrice(e.target.value)} placeholder="Prix demandé&nbsp;€" inputMode="decimal"
                     style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
@@ -47191,7 +47293,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 };
                 return (<>
                   <Section title="Par marque" rows={sourcing.brands} hint="Trié par nb de ventes. Le bénéfice/article aide à prioriser les rachats."/>
-                  <Section title="Par taille" rows={sourcing.sizes} hint="Taille estimée depuis le titre — approximatif. « ? » = pointure non détectée."/>
+                  <Section title="Par taille" rows={sourcing.sizes} hint="Taille estimée depuis le titre — approximatif. « ? » = taille non détectée."/>
                   <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Bénéfice : seulement les ventes avec un prix d'achat (🔗 dans Annonces).</div>
                 </>);
               })()}
@@ -48439,7 +48541,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (10 nov., lot AP) Le kit « à la main » : rien ne part chez Vinted ; « Pas à pas » = la feuille en cinq étapes.
         <PreparerALaMain paires={kitMain} onClose={()=>setKitMain(null)}
           onUneParUne={()=>{ const l=kitMain; setKitMain(null); setRepubMainFile(l.length>1 ? { liste:l, i:0 } : null); setRepubMainOuvert(l[0]); }}
-          onOuvrirVinted={()=>{ for (const p of kitMain) { if (p.numero && !repubMain[String(p.id)]) poserRepubMain(String(p.id), { uid:String(p.uid||''), num:String(p.numero), titre:p.titre||'', domain:p.domain||'www.vinted.fr', at:new Date().toISOString() }); } }}/>
+          onOuvrirVinted={(l)=>{ for (const p of (Array.isArray(l) ? l : kitMain)) { if (p.numero && !repubMain[String(p.id)]) poserRepubMain(String(p.id), { uid:String(p.uid||''), num:String(p.numero), titre:p.titre||'', domain:p.domain||'www.vinted.fr', at:new Date().toISOString() }); } }}/>
       )}
       {brouillonsOpen && (
         <BrouillonsVinted br={brVinted} brouillonOk={extSait('brouillon')==='ok'} onClose={()=>setBrouillonsOpen(false)} onFile={()=>{ setBrouillonsOpen(false); setRepubAction('enLigne'); }}
@@ -50002,7 +50104,7 @@ const ecrireReglage = async (id, data) => {
     return r.ok;
   } catch (_) { return false; }
 };
-const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus };
+const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus, vendActuel: () => vendActuel(), exemples: () => exemplesActuels() };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
 async function lireAbonnement() {
   try {
@@ -50097,6 +50199,13 @@ function vendActuel() {
 }
 // Les mots (« paire » / « article ») du vendeur, pour un écran qui s'abonne.
 function useMotsArticle() { const p = useProfilVendeur(); return motsArticle(p.vend || vendActuel()); }
+// (11 nov., lot DJ2) Les EXEMPLES (note, annonce, placeholders) selon ce qu'il vend
+// (src/vocabulaireVendeur.js) : jamais un exemple de chaussure hors « Sneakers ».
+function exemplesActuels() {
+  const cats = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && PROFIL_VENDEUR.categories !== undefined ? PROFIL_VENDEUR.categories : lireReglageJeVends(load(CLE_JE_VENDS, null)).categories;
+  return exemplesVendeur({ vend: vendActuel(), categories: cats });
+}
+function useExemplesVendeur() { useProfilVendeur(); return exemplesActuels(); }
 // Ouvre Stripe (paiement ou gestion). Rend un message à afficher si ça échoue.
 async function ouvrirStripe(mode, extra) {
   try {
@@ -50956,6 +51065,11 @@ export default function App() {
   // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
   if(MULTI_USER&&!authState.user?.id)return <AuthScreen/>;
+  // (11 nov., lot DJ6) Connexion par Discord/Google sans compte VRM : le compte créé
+  // en silence est annulé (serveur), puis l'écran de connexion le DIT ; refusé ⇒ la porte d'avant.
+  if(MULTI_USER&&AUTH_REDIRECT?.sansCompte)return <PorteSansCompte fournisseur={AUTH_REDIRECT.sansCompte} theme={C} entetes={enTeteSession}
+    onAnnule={()=>{AUTH_REDIRECT={sansCompteFournisseur:AUTH_REDIRECT.sansCompte};writeSession(null);}}
+    onRepli={()=>{AUTH_REDIRECT={...AUTH_REDIRECT,sansCompte:''};setAuthState({...AUTH});}}/>;
   if(MULTI_USER&&AUTH_REDIRECT?.nouveauOAuth)return <PorteNouveauOAuth fournisseur={AUTH_REDIRECT.nouveauOAuth} email={authState.user?.email||''} onContinuer={()=>{AUTH_REDIRECT={...AUTH_REDIRECT,nouveauOAuth:''};setAuthState({...AUTH});}}/>;
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
@@ -52316,16 +52430,19 @@ function AppCoeur() {
   // jamais été fait. Rejouable : Réglages → « Ma configuration », la carte de Ma journée
   // (évènement `vrm:configuration`). La visite et les conseils attendent qu'elle soit fermée.
   const [configOuverte,setConfigOuverte]=useState(false);
+  const [configSeule,setConfigSeule]=useState(null);   // (11 nov., lot DJ2) 'vends' : la question seule
   useEffect(()=>{
     if(bienvenue||!accountsLoaded||baseKO) return undefined;
     let vivant=true;
     const stop=onCloudReady(()=>{ lireProprietaire().then((proprio)=>{
       if(!vivant) return;
-      if(configurationAOuvrir({ pret:true, baseKO, exemple:exempleActif(), bienvenue, proprietaire:proprio, configuration:load(CLE_CONFIGURATION,null), plateformes:load(CLE_PLATEFORMES,null) })) setConfigOuverte(true);
+      if(configurationAOuvrir({ pret:true, baseKO, exemple:exempleActif(), bienvenue, proprietaire:proprio, configuration:load(CLE_CONFIGURATION,null), plateformes:load(CLE_PLATEFORMES,null) })) { setConfigSeule(null); setConfigOuverte(true); }
+      // (11 nov., lot DJ2) Un compte déjà installé (Julien compris) : « Tu vends quoi ? », seule, une fois.
+      else if(questionVendsAOuvrir({ pret:true, baseKO, exemple:exempleActif(), bienvenue, proprietaire:proprio, configuration:load(CLE_CONFIGURATION,null), plateformes:load(CLE_PLATEFORMES,null), jeVends:load(CLE_JE_VENDS,null) })) { setConfigSeule('vends'); setConfigOuverte(true); }
     }).catch(()=>{}); });
     return ()=>{ vivant=false; if(typeof stop==='function') stop(); };
   },[bienvenue,accountsLoaded,baseKO]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(()=>{ const o=()=>setConfigOuverte(true); window.addEventListener('vrm:configuration',o); return ()=>window.removeEventListener('vrm:configuration',o); },[]);
+  useEffect(()=>{ const o=(e)=>{ setConfigSeule(e && e.detail && e.detail.seule === 'vends' ? 'vends' : null); setConfigOuverte(true); }; window.addEventListener('vrm:configuration',o); return ()=>window.removeEventListener('vrm:configuration',o); },[]);
 
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   // (29 oct., revue) Le point « nouveau » de l'onglet Messages suit le geste
@@ -53481,7 +53598,7 @@ function AppCoeur() {
     const usage = { stock: meubles ? true : pret ? false : null, republier: repub ? true : pret ? false : null };
     const ebayRelie = !Array.isArray(comptesEbay) || !sitesLus ? null : (comptesEbay.some((c) => !c.implicite) || !!sitesLus.ebay);
     const relies = { vinted: accountsLoaded && Array.isArray(vintedAccounts) ? vintedAccounts.length > 0 : null, leboncoin: sitesLus ? !!sitesLus.leboncoin : null, vestiaire: sitesLus ? !!sitesLus.vestiaire : null, ebay: ebayRelie };
-    poserProfilVendeur({ uid: AUTH.user?.id || '', mode: aff.mode, auto: aff.auto, vend: vd.vend, vendAuto: vd.auto, usage, relies, plateformes: pret ? plateformesAffichees(load(CLE_PLATEFORMES, null), relies) : null, contexte });
+    poserProfilVendeur({ uid: AUTH.user?.id || '', mode: aff.mode, auto: aff.auto, vend: vd.vend, vendAuto: vd.auto, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories, usage, relies, plateformes: pret ? plateformesAffichees(load(CLE_PLATEFORMES, null), relies) : null, contexte });
   }, [liveStatsVus, proprioProfil, accountsLoaded, vintedAccounts, sitesLus, comptesEbay, profilTick, nuagePret]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
@@ -54662,7 +54779,7 @@ function AppCoeur() {
   const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
   const champRecherche = (mobile) => <RechercheVivante rendre={(fil)=>(
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
-      aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, suivi, code de retrait, montant, titre…'}
+      aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : `Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, suivi, code de retrait, montant, titre…'}
       role="combobox" aria-autocomplete="list" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats" aria-keyshortcuts={mobile ? undefined : '/ Meta+K Control+K'}
       title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction ou de commande, montant, facture, e-mail, message, titre, marque, taille (touche / ou ⌘K)'}
       value={fil.q} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
@@ -54704,6 +54821,8 @@ function AppCoeur() {
       <PiluleAnnulerCoque/>
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
       <RaccourcisClavier Feuille={SheetShell}/>
+      {/* (11 nov., lot DJ6) Le menu du profil (photo de la colonne / de l'en-tête). */}
+      {MULTI_USER && <MenuProfilCoque setTab={setTab} entreprise={entreprise}/>}
       {/* (10 nov., lot AN) La photo d'un article en grand, depuis n'importe quel écran (src/Visionneuse.jsx). */}
       <Visionneuse Photo={PhotoVinted} Retour={FermeAuRetour}/>
       <DefilementPartout/>
@@ -54739,7 +54858,7 @@ function AppCoeur() {
             <VrmLogo size={36} anim={false}/>
           </div>
           {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
-          <NomEntreprise entreprise={entreprise} className="vrm-hdr-entreprise"/>
+          <NomEntrepriseCoque entreprise={entreprise} className="vrm-hdr-entreprise"/>
         </div>
         {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
         {!ordi && gsOpen && champRechercheMobile}
@@ -54769,9 +54888,11 @@ function AppCoeur() {
             {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
             {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
-            {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
+            {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label={`Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}
+            {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}
+            {!ordi && MULTI_USER && <BoutonProfilTete/>}
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}
@@ -55169,7 +55290,7 @@ function AppCoeur() {
         {tab==='sales'    &&<GardeEcran nom="sales"><Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/></GardeEcran>}
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
-        {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} onTrancher={trancherAT} Photo={PhotoVinted} entete={<ScreenHead icon="help" title="À trancher"/>}/></GardeEcran>}
+        {tab==='trancher'&&<GardeEcran nom="trancher"><ATrancher etat={aTrancherEtat} onAller={allerTrancher} onTrancher={trancherAT} Photo={PhotoVinted} vend={PROFIL_VENDEUR.vend || vendActuel()} entete={<ScreenHead icon="help" title="À trancher"/>}/></GardeEcran>}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab}/>}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}
         {tab==='communaute'&&<GardeEcran nom="communaute"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense></GardeEcran>}
@@ -55235,7 +55356,7 @@ function AppCoeur() {
       {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark} vend={vendActuel()} ouInstaller={ouExtensionIci()}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
         onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/></GardeEcran>}
-      {configOuverte && !bienvenue && <GardeEcran nom="configuration" feuille onFermer={()=>setConfigOuverte(false)}><ConfigurationDepartApp onFin={()=>{ setConfigOuverte(false); if(tab!=='journee'&&!load(CLE_VISITE,null)) setTab('journee'); }}/></GardeEcran>}
+      {configOuverte && !bienvenue && <GardeEcran nom="configuration" feuille onFermer={()=>setConfigOuverte(false)}><ConfigurationDepartApp key={configSeule || 'tout'} seule={configSeule} onFin={()=>{ setConfigOuverte(false); setConfigSeule(null); if(!configSeule&&tab!=='journee'&&!load(CLE_VISITE,null)) setTab('journee'); }}/></GardeEcran>}
       {visite && !bienvenue && !configOuverte && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}
         onTerminer={(raison)=>{ setVisite(false); if(raison!=='rien') save(CLE_VISITE,{at:new Date().toISOString(),fin:raison}); }}/></GardeEcran>}
       {/* (6 nov.) L'ACCOMPAGNEMENT (src/Conseils.jsx) : une bulle au plus, jamais pendant
@@ -55285,4 +55406,4 @@ export { useProfilFiscal, profilFiscalLu };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
-export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
+export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };

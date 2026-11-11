@@ -227,7 +227,7 @@ async function scenario(b, tel, sombre) {
     });
 
     await essaie(`${T} K2`, async () => {
-      if (tel) { const bt = pg.locator('button[aria-label="Rechercher une paire"]').first(); if (await bt.count()) await bt.tap(); }
+      if (tel) { const bt = pg.locator('button[data-recherche-loupe]').first(); if (await bt.count()) await bt.tap(); }
       else { await pg.mouse.click(5, 300); await pg.keyboard.press('Control+K'); }
       await pg.waitForSelector('[data-recherche-champ]', { timeout: 8000 });
       await pg.evaluate(() => { const el = document.querySelector('[data-recherche-champ]'); const poser = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; poser.call(el, 'calculette'); el.dispatchEvent(new Event('input', { bubbles: true })); el.focus(); });
