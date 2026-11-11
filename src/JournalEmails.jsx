@@ -62,7 +62,7 @@ function LigneEmail({ e, headers, delies, onNav, onNum, onDelier, onRelier }) {
         {l.delier && l.delier.offert && !l.delier.delie && <button type="button" data-journal-delier={l.delier.id} onClick={() => onDelier && onDelier(l.delier.id, l.delier.tx)}>Ce n’est pas ça</button>}
         {l.delier && l.delier.offert && l.delier.delie && <button type="button" data-journal-relier={l.delier.id} onClick={() => onRelier && onRelier(l.delier.id)}>Relier à nouveau</button>}
       </div>
-      {l.delier && l.delier.offert && l.delier.delie && <p className="vrm-journal-note">Ce reçu n’apparaît plus sur l’achat n° {l.delier.tx}. Rien n’est supprimé : « Relier à nouveau » le remet.</p>}
+      {l.delier && l.delier.offert && l.delier.delie && <p className="vrm-journal-note">Reçu retiré de l’achat n° {l.delier.tx}, pas supprimé : « Relier à nouveau » le remet.</p>}
       {l.delier && !l.delier.offert && l.delier.pourquoi && <details className="vrm-journal-pourquoi"><summary>Et si ce n’est pas ça ?</summary><p>{l.delier.pourquoi}</p></details>}
       {texte && <TexteEmail id={e.id} headers={headers}/>}
     </li>
@@ -105,7 +105,7 @@ export default function JournalEmails({ headers, filtreInitial = '', typeInitial
       <header className="vrm-journal-entete">
         <div>
           <h3>Tes e-mails, un par un</h3>
-          <p>Le plus récent d’abord. Chaque e-mail dit ce que VRM en a fait ; ce qui demande un geste est en ambre.</p>
+          <p>Le plus récent d’abord. En ambre : un geste à faire.</p>
         </div>
         {/* (5 nov., chantier G, revue 3.8) Pas d'« Actualiser » à côté du « Réessayer » d'une panne. */}
         {pages !== null && <button type="button" className="vrm-journal-actualiser" onClick={() => charger(0)} disabled={lecture}>{lecture ? 'Lecture…' : 'Actualiser'}</button>}

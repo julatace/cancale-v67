@@ -772,7 +772,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       <div data-stock-plus-en-ligne={plusEnLigne.length}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Plus en ligne · {plusEnLigne.length}</div>
         <InfoPop nom="stock-plus-en-ligne" titre="Plus en ligne" style={{ margin: '2px 0 4px' }} resume="Retire-les de leur case, ou garde-les">
-          <p>Rangées, mais plus en annonce nulle part : retire-les de leur case, ou garde-les si elles reviennent en vente.</p>
+          <p>Rangées, mais plus en annonce : retire-les de leur case, ou garde-les.</p>
         </InfoPop>
         {plusEnLigne.map((f) => ligneRangee(f, <>
           <button className="vrm-b vrm-b-secondaire" type="button" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>Je l'ai retirée</button>
@@ -788,7 +788,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       phrase="Une lecture manque : ni « en ligne », ni « partie » n'est dit.">
       {/* (6 nov., onglets B) La lecture qui manque est déjà NOMMÉE en tête (« pas lu : … ») : elle ne se redit
           pas ici (§7, une phrase une fois — mesuré sur sa base : « Vestiaire (jamais lu : ouvre… ») deux fois). */}
-      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. Je ne dis ni qu'elles sont en ligne, ni qu'elles sont parties.</p>
+      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. En ligne ou partie : pas su.</p>
     </InfoPop>) : null;
   // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
   const blocListe = aa && aa.su && articlesVus.length ? (
@@ -1423,7 +1423,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         </button>}/>
 
       <p style={{fontSize:13,color:C.muted,margin:'0 0 14px',lineHeight:1.5}}>
-        L'<b>ancienne</b> liste tenue à la main (<b>Annonces</b> a pris le relais). Ajoute tes numéros ci-dessous.
+        L'<b>ancienne</b> liste tenue à la main (<b>Annonces</b> a pris le relais). Ajoute tes N° ici.
       </p>
       <div style={{fontSize:13,color:C.muted,margin:'-8px 0 14px'}}><Pourquoi label="Comment elle bouge">Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.</Pourquoi></div>
 

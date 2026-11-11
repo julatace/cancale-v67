@@ -70,7 +70,7 @@ export default function GuideIphone({ onFermer }) {
       <div className="vrm-gi-tete">
         <div className="vrm-gi-titres">
           <h3 id="vrm-gi-titre" className="vrm-gi-titre">Installer VRM sur l’iPhone</h3>
-          <p className="vrm-gi-sous">Sur iPhone, les notifications n’arrivent que dans l’app posée sur l’écran d’accueil. Trois gestes, une seule fois.</p>
+          <p className="vrm-gi-sous">Sur iPhone, les notifications passent par l’app sur l’écran d’accueil. Trois gestes.</p>
         </div>
         <button type="button" className="vrm-gi-fermer" data-guide-iphone-fermer="" aria-label="Fermer le guide d’installation" onClick={onFermer}>
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M4 4l8 8M12 4l-8 8" /></svg>

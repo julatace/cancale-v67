@@ -1940,10 +1940,10 @@ function ExportComptableCarte(props) {
   return (
     <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <span data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</span>
-          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</span>
-        </span>
+        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</div>
+          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</div>
+        </div>
         {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
       </div>
       {ouvert && <ExportComptableCorps {...props} />}
@@ -2276,7 +2276,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
             {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
             {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret client de TON compte Super PDP. Envois facturés par Super PDP, pas par VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret de TON compte Super PDP. Il facture ses envois, pas VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
             <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
