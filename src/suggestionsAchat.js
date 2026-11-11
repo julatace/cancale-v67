@@ -196,10 +196,13 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
   const parDate = (rDu != null || rAu != null) && typeof receptionDe === 'function';
   const mq = String(marque || '').trim().toLowerCase();
   const tq = taille ? tailleNorm(taille) : '';
-  const out = [];
+  const out = [], pris = [];
   let sansReception = 0;
   for (const a of (Array.isArray(achats) ? achats : [])) {
-    if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, curTx)) continue;
+    if (!a || !txDe(a) || achatAnnule(a)) continue;
+    // (11 nov., lot DJ5) Un achat déjà relié ailleurs passe les MÊMES filtres et part dans `pris`
+    // (« Déjà relié à N°… », après les libres) : visible, jamais mêlé aux libres.
+    const libre = achatDisponible(a, liens, curTx);
     if (compte && typeof compteDe === 'function' && String(compteDe(a) || '') !== compte) continue;
     const d = dateMs(a.date);
     if (mois && !(Number.isFinite(d) && new Date(d).toISOString().slice(0, 7) === mois)) continue;
@@ -216,12 +219,13 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
     }
     if (parDate) {
       const r = receptionDe(a);
-      if (r == null || !Number.isFinite(Number(r))) { sansReception++; continue; }
+      if (r == null || !Number.isFinite(Number(r))) { if (libre) sansReception++; continue; }
       if ((rDu != null && r < rDu) || (rAu != null && r > rAu)) continue;
     }
-    out.push({ a, d: Number.isFinite(d) ? d : -Infinity });
+    (libre ? out : pris).push({ a, d: Number.isFinite(d) ? d : -Infinity });
   }
-  return { liste: out.sort((x, y) => y.d - x.d).map((x) => x.a), sansReception };
+  const parDateDesc = (x, y) => y.d - x.d;
+  return { liste: out.sort(parDateDesc).map((x) => x.a), sansReception, pris: pris.sort(parDateDesc).map((x) => x.a) };
 }
 export const tousAchatsLibres = (o = {}) => tousAchatsLibresDetail(o).liste;
 // Les mois, comptes, marques et tailles présents (filtres rapides), du plus récent au plus ancien.

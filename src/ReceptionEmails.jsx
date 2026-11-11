@@ -86,7 +86,7 @@ function ApercuEmails({d,erreur,lecture,maintenant,quarantaine,preuves,onActuali
   {d&&(gestes.length>0
    ?<section className="vrm-apercu-bloc" data-apercu-gestes={gestes.length}><h4>À faire</h4><ul className="vrm-apercu-lignes">{gestes.map(g=><li key={g.k} data-apercu-geste={g.k} data-n={g.n}><span>{g.phrase}</span><button type="button" className="vrm-apercu-geste" aria-label={g.vers==='a-traiter'?'Vérifier les e-mails mis de côté':`${g.bouton} : ${g.phrase}`} onClick={()=>aller(g)}>{g.bouton}</button></li>)}</ul></section>
    :toutLu?<p className="vrm-apercu-rien" data-apercu-gestes="0">Rien à faire de ton côté.</p>:null)}
-  {d&&quarantaine===null&&<p className="vrm-apercu-note" data-apercu-mis-de-cote="pas-su">Je n’ai pas pu lire les e-mails mis de côté — rien n’est perdu, rouvre cet écran dans un moment.</p>}
+  {d&&quarantaine===null&&<p className="vrm-apercu-note" data-apercu-mis-de-cote="pas-su">E-mails mis de côté pas lus — rien n’est perdu, rouvre l’écran plus tard.</p>}
   {fait&&<section className="vrm-apercu-bloc" data-apercu-fait={fait.sur}><h4>Ce que VRM en a fait</h4>
    {fait.lignes.length?<ul className="vrm-apercu-lignes">{fait.lignes.map(l=><li key={l.k} data-apercu-famille={l.k} data-n={l.n}><button type="button" className="vrm-apercu-lien" onClick={()=>onJournal?.(l.etat||'',l.type||'')}><span>{l.phrase}</span><span aria-hidden="true">›</span></button></li>)}</ul>:<p className="vrm-apercu-note">Aucun e-mail suivi pour l’instant : le prochain apparaîtra ici.</p>}
    {fait.sur>0&&<p className="vrm-apercu-note" data-apercu-sur={fait.sur}>Sur tes {fait.sur} derniers e-mails{fait.plus?' (les plus anciens ne sont pas comptés)':''}. Touche une ligne pour voir les e-mails.</p>}

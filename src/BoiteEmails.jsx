@@ -235,7 +235,7 @@ function MessageOrigine({ e, stream }) {
   const o = e.origine;
   const texte = typeof e.texte === 'string' && e.texte.trim()
     ? <Corps texte={e.texte} coupe={!!e.texteCoupe}/>
-    : <p className="vrm-boite-doux" data-boite-corps="absent">Le texte de cet e-mail n’est pas gardé dans VRM (rangé avant le 31 oct.). Il est dans ta messagerie.</p>;
+    : <p className="vrm-boite-doux" data-boite-corps="absent">Texte pas gardé dans VRM (rangé avant le 31 oct.) : il est dans ta messagerie.</p>;
   if (stream) return <><p className="vrm-boite-doux" data-boite-origine="stream">Mise en page d’origine masquée en mode stream (elle contient noms et adresses).</p>{texte}</>;
   if (o && o.etat === 'garde' && typeof o.html === 'string') return <div data-boite-origine="html"><CadreEmail html={o.html} images={Number(o.images) || 0} sombreEmail={!!o.sombre} appSombre={appSombre()} titre={`Message d’origine : ${e.subject || 'e-mail sans objet'}`}/></div>;
   const [cle, note] = o === null ? ['pas-su', 'Mise en page d’origine pas lue cette fois : voici le texte.']
