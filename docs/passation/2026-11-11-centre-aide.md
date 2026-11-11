@@ -68,8 +68,14 @@ Principe : « plus beau, simple, surtout PRATIQUE : les gens doivent gagner du t
   chaque écran a questions, gestes, animation (scènes = gestes, 3–5 s), 3 à 5 fiches pour les
   4 profils ; 14 requêtes fautives ⇒ la bonne fiche en tête ; chaque fiche retrouvée par sa
   question.
-- Banc `scripts/bancs/centre-aide.cjs` (390 tactile + 1512, clair + sombre) — résultat dans
-  le rapport de fin de session.
+- Banc `scripts/bancs/centre-aide.cjs` (390 tactile + 1512, clair + sombre) : **151 OK, tout
+  vert**. Le « ? » de Ma journée, Colis, Paramètres : rien d'ouvert seul, une scène par geste,
+  l'animation avance, le geste allumé, 3–5 fiches, pause qui arrête, cibles ≥ 44 px ; dans la
+  feuille « imprimer bordreau » ⇒ « Imprimer un bordereau » ⇒ « M'y emmener » ⇒ Colis ; loupe
+  « imprimer bordereau » ⇒ « Comment faire » ⇒ fiche dépliée ⇒ Colis ; « vacances » ⇒ Réglages,
+  « Mode vacances » ouvert ; « réduire les animations » ⇒ immobile ; vendeur « autre » ⇒ aucun
+  « paire ». Rien écrit hors des publications ordinaires de l'app. Captures regardées : l'icône
+  pause s'affichait en grand (corrigé).
 - `npm run build` vert ; audits verts : variables, tdz, coherence, identite, icones,
   textes-courts, fonctions-api, secrets, csp, aide-signalement, import-partage-aide,
   recherche-universelle. `audit-signalement` : 2 rouges déjà sur `origin/main` (pas de ce lot).
