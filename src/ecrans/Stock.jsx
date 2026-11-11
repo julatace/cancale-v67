@@ -248,7 +248,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // le réseau (changement d'écran), elle ne se rouvrira pas toute seule.
   // (10 nov., lot W) L'INVENTAIRE DE FIN D'ANNÉE (src/InventaireAnnuel.jsx) ; « Je vérifie mes
   // cartons » ouvre l'inventaire ci-dessus, et le referme sur la fin d'année.
-  const [annuel, setAnnuel] = React.useState(() => { const t = DEMANDE_INVENTAIRE_ANNUEL.at; DEMANDE_INVENTAIRE_ANNUEL.at = 0; return !!t && Date.now() - t < 30000; });
+  // (11 nov.) Ouverte depuis « Clôturer l'année » : la demande vaut 30 s et n'est consommée qu'à la
+  // fermeture de la feuille (l'écran peut se monter deux fois pendant son chargement).
+  const [annuel, setAnnuel] = React.useState(() => { const t = DEMANDE_INVENTAIRE_ANNUEL.at; return !!t && Date.now() - t < 30000; });
   const retourAnnuel = React.useRef(false);
   React.useEffect(() => { INVENTAIRE_FEUILLE.ouverte = !!inventaire; }, [inventaire]);
   React.useEffect(() => () => { try { if (typeof navigator === 'undefined' || navigator.onLine !== false) INVENTAIRE_FEUILLE.ouverte = false; } catch (_) {} }, []);
@@ -876,8 +878,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
   // (5 nov.) Qui découvre : l'explication animée (données inventées), puis le
   // geste. Sans annonce actuelle ni meuble, il n'y a rien d'autre à montrer.
+  // (11 nov.) La feuille de fin d'année, montée sur les DEUX chemins (Stock vide compris : « Clôturer l'année » l'ouvre).
+  const elAnnuel = annuel ? <InventaireAnnuel owner={AUTH.user?.id || ''} cle={cleNum} Feuille={SheetShell} lire={lireLigneInventaire} onFermer={() => { DEMANDE_INVENTAIRE_ANNUEL.at = 0; setAnnuel(false); }} onSaisirPrix={saisirPrixStock}
+      onVerifier={() => { retourAnnuel.current = true; setAnnuel(false); setInventaire(true); }}
+      onAnnonces={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} }}/> : null;
   if (!fiches.length && !meubles.length) return (<>
     {elInventaire}
+    {elAnnuel}
     {blocResume}
     <StockExplication sneakers={motsStock.nom === 'paire'} />
     {aa && aa.su && !aa.n && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? 'Aucune annonce lue pour l’instant — une lecture manque (voir plus haut).' : 'Aucune annonce en ligne en ce moment : dès qu’une annonce est en ligne, elle arrive ici, prête à ranger.'}</Card>}
@@ -985,9 +992,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
       lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
     <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>Inventaire de fin d’année</span><span aria-hidden="true">›</span></button>
-    {annuel ? <InventaireAnnuel owner={AUTH.user?.id || ''} cle={cleNum} Feuille={SheetShell} lire={lireLigneInventaire} onFermer={() => setAnnuel(false)} onSaisirPrix={saisirPrixStock}
-      onVerifier={() => { retourAnnuel.current = true; setAnnuel(false); setInventaire(true); }}
-      onAnnonces={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} }}/> : null}
+    {elAnnuel}
     {blocCherche}
     {meubles.length === 0 && <StockExplication sneakers={motsStock.nom === 'paire'} />}
     {blocVendues}

@@ -31,8 +31,8 @@ chaque étape, synchronisé). La carte dit alors « 2026 clôturée le … » + 
 Déclarer sur la liste et note l'année vue (`vrm_cloture_vue`, son clic) ; elle ne revient pas. Ni
 pour un particulier, ni avant d'avoir lu le statut, ni pour une année clôturée.
 
-Un particulier ne voit rien (rien à clôturer). Le zip « Pour mon comptable » n'est pas sur `main` :
-la porte 8 ouvre l'export existant (CSV + PDF) sur l'année.
+Un particulier ne voit rien (rien à clôturer). La porte 8 ouvre la carte « Pour mon comptable » (zip,
+tableur, PDF) réglée sur l'année ; rien n'est téléchargé avant son clic.
 
 ## Les règles
 
@@ -78,7 +78,14 @@ service-public.gouv.fr dans le réseau de l'environnement, relire ces trois page
   revient, liste pas montée, carte pas poussée, écriture au rendu). Sur l'arbre d'`origin/main`
   (git archive) : rouge.
 - Banc `scripts/bancs/cloture-annee.cjs` (horloge de la page fixée : 15 janv. 2027, 10 févr. 2027,
-  11 nov. 2026 ; 390 tactile et 1512, clair et sombre) : résultat ci-dessous. Captures regardées.
+  11 nov. 2026 ; 390 tactile et 1512, clair et sombre) : **117 verts, 0 rouge** sur le code fusionné
+  avec `main`. Captures regardées (liste claire/sombre, confirmation, carte de Ma journée, export sur
+  2026 — zip « Pour mon comptable » de `main` compris —, « clôturée »). Vu au banc et corrigé :
+  l'inventaire disait « ouvre Ventes » (⇒ « liste pas encore lue : ouvre Annonces ») ; les seuils
+  sur un CA minimum disaient « une lecture d'annonces manque » ; « Rouvrir » chevauchait le titre ;
+  **la porte « inventaire » n'ouvrait rien quand le Stock est vide** (ce chemin de l'écran ne
+  montait pas la feuille de fin d'année — elle est maintenant montée sur les deux chemins).
+  Banc `inventaire-annuel` relancé : 72 verts.
 - `npm run build` vert ; audits variables, tdz, coherence, identite, icones, textes-courts,
   fonctions-api, secrets, urssaf verts ; fusion-nuage, mois-boucle, inventaire-annuel,
   rappel-urssaf, suivi-urssaf verts.
