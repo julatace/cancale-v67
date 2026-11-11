@@ -217,6 +217,28 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         const garde = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_partout_prix') || 'null'); } catch (_) { return null; } });
         dit(garde && garde.ebay && garde.ebay.mode === 'eur' && garde.ebay.valeur === 5, `${nomVp} · D · le réglage est gardé (vrm_partout_prix)`, JSON.stringify(garde));
         await capture(pg, `partout-prix-${nomVp}`);
+        // H. Tous les paramètres : un DÉFAUT (Vestiaire · matière « Cuir ») ⇒ « à finir sur Vestiaire » ;
+        //    puis PAR ANNONCE (Leboncoin · livraison « non », que la voie contredirait) ⇒ dit et bloquant.
+        await pg.click('[data-pp-defauts-bouton]');
+        const matiere = '[data-pp-defaut-site="vestiaire"] [data-pp-champ="vestiaire:matiere"]';
+        await pg.fill(matiere, 'Cuir'); await pg.press(matiere, 'Enter');
+        await pg.waitForSelector('[data-pp-case="9012:vestiaire"] [data-pp-finir]', { timeout: 5000 }).catch(() => {});
+        const fin = await pg.evaluate(() => { const e = document.querySelector('[data-pp-case="9012:vestiaire"] [data-pp-finir]'); return e ? e.innerText : ''; });
+        dit(/Mati[eè]re « Cuir »/.test(fin), `${nomVp} · H · défaut Vestiaire « matière Cuir » ⇒ « à finir sur Vestiaire » nommé`, fin);
+        const gp = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_partout_params') || 'null'); } catch (_) { return null; } });
+        dit(gp && gp.vestiaire && gp.vestiaire.matiere === 'Cuir', `${nomVp} · H · le défaut est gardé (vrm_partout_params)`, JSON.stringify(gp));
+        const liv = '[data-pp-case="9012:leboncoin"] [data-pp-champ="leboncoin:livraison"][data-pp-champ-quoi="annonce"]';
+        await pg.selectOption(liv, 'non');
+        await pg.waitForSelector('[data-pp-case="9012:leboncoin"] [data-pp-manque="hors-voie-livraison"]', { timeout: 5000 }).catch(() => {});
+        const hv = await pg.evaluate(() => { const e = document.querySelector('[data-pp-case="9012:leboncoin"] [data-pp-manque="hors-voie-livraison"]'); return e ? e.getAttribute('data-bloque') : ''; });
+        dit(hv === '1', `${nomVp} · H · par annonce : livraison « non » que la voie contredirait ⇒ dit et bloquant`, hv);
+        const champs = await pg.evaluate(() => [...document.querySelectorAll('[data-pp-case="9012:leboncoin"] [data-pp-champ-ligne]')].map((x) => x.getAttribute('data-pp-champ-ligne').split(':').pop()));
+        dit(['categorie', 'sousCategorie', 'marque', 'taille', 'couleur', 'etat', 'matiere', 'livraison', 'mainPropre', 'lieu', 'options'].every((c) => champs.includes(c)), `${nomVp} · H · Leboncoin : tous ses paramètres sont réglables`, JSON.stringify(champs));
+        await pg.locator('[data-pp-case="9012:leboncoin"] [data-pp-champ-ligne$=":livraison"]').scrollIntoViewIfNeeded();
+        await capture(pg, `partout-parametres-${nomVp}`);
+        await sain(pg, `${nomVp} · paramètres`);
+        await pg.selectOption(liv, '');
+        await pg.fill(matiere, ''); await pg.press(matiere, 'Enter');
         await pg.click('[data-pp-fermer]');
       });
       await essaie('E/F. En série, puis le brouillon eBay', async () => {

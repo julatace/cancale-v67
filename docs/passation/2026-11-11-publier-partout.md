@@ -60,3 +60,42 @@ L'annonce Vinted est la source ; VRM la reporte sur Leboncoin, Vestiaire et eBay
 2. Quand VRM ne trouve pas une catégorie, une couleur ou une taille, il la **demande** (jamais inventée). C'est déjà le principe de `lignePartout` (`demandes`), à étendre à chaque champ.
 3. Pendant la publication, VRM reste **figé**, avec le détail de chaque étape et une barre de progression : utiliser le composant commun **`SuiviTravail`** (branche `claude/suivi-travail`, son API dans le fichier de coordination), en le fusionnant ici. N'en pas refaire un autre : `executerPartout(surEtat)` donne déjà l'état par case pour le nourrir.
 4. Les paramètres eBay viennent de **`claude/ebay-complet`** (`src/ebay/parametres.js`) : y brancher la partie eBay (aujourd'hui `preparerBrouillonPartout`, dans `src/ecrans/Ebay.jsx`). Périmètre de cette branche : la feuille + Leboncoin + Vestiaire.
+
+## Reprise du 11 nov. (soir) — les précisions de Julien appliquées
+- **Tous les paramètres, par défaut puis par annonce** (`src/publierPartout.js`, `CHAMPS_PARTOUT`, `champsSite`,
+  `reglageParams`, clé synchronisée `vrm_partout_params`) :
+  Leboncoin = catégorie, sous-catégorie (vocabulaire mesuré `LBC_CAT_*` : Mode / Famille / Loisirs), marque, taille,
+  couleur, état (`LBC_ETATS`), matière, livraison, remise en main propre, lieu, options payantes (affichées « aucune »,
+  jamais réglables : le boost est impossible par construction, 17 oct.) ; Vestiaire = univers (Mode femme / homme),
+  catégorie, marque, taille, état, couleur, matière, preuve d'authenticité ; prix : réglage par site + prix de CETTE
+  annonce (Leboncoin, eBay ; Vestiaire reste le prix Vinted). Valeur = annonce > défaut > ce que la voie pose
+  d'elle-même (« Auto · … ») > rien ⇒ **demandé** (requis), jamais inventé. Une valeur hors liste n'est jamais rangée.
+- **Tranché (pas d'extension dans ce lot, aucune version libre réservée)** : chaque champ dit COMMENT la voie
+  d'aujourd'hui le pose (`porte` : fiche · vinted · reglages · fixe · site). La voie Leboncoin ne prend de la fiche
+  que titre, description, prix, photos, état (`appliquerAnnonceLbc`) ; le reste vient de l'annonce Vinted, de la ville
+  des Réglages (`vrm_ville`), ou n'est pas posé. Donc :
+  · Leboncoin (publie tout seul) : un choix que la voie CONTREDIRAIT (livraison « non », autre marque, autre lieu)
+    ⇒ case bloquée et dite (`hors-voie-*`) ; un requis introuvable ⇒ « à choisir sur Leboncoin pendant le dépôt » (le
+    dépôt l'attend, VRM attend sa fin) ; un facultatif que la voie ne pose pas (matière, main propre) ⇒ « ne partira
+    pas », dit AVANT (`perdu-*`, non bloquant) ;
+  · Vestiaire : un choix que la voie ne porte pas, ou un requis introuvable ⇒ `vcPreparer` part avec
+    `publier: false` et la case finit « à finir sur Vestiaire : Matière « Cuir », … » ; ce site s'arrête ensuite (un
+    seul dépôt en attente).
+  ⚠️ Une extension qui saura recevoir ces champs n'aura qu'à passer leur `porte` à `'fiche'` (et la fiche à les
+  porter) : à faire dans un lot extension avec une version réservée dans COORDINATION-AGENTS.md.
+- **VRM figé pendant l'envoi** : la feuille ne se ferme plus (×, voile, Échap, **retour du navigateur** — la garde
+  `FermeAuRetour` est remontée après un retour), `beforeunload` posé ; une barre fine « N sur M ».
+  **SuiviTravail** (branche `claude/suivi-travail`) : **pas fusionné** — à 18 h il était WIP (CSS absente ⇒ son
+  build casse). Branchement propre : `src/suiviBranchement.js` (`import.meta.glob('./suiviTravail.js')` : rien tant
+  que le fichier n'existe pas, s'allume tout seul à la fusion) + `src/publierPartoutSuivi.js` (pur : envoi ⇒ debut +
+  étape, attente ⇒ étape « depot », publié ⇒ ok, à finir ⇒ main, refus ⇒ refus, pas envoyé ⇒ saute ; Pause /
+  Arrêter lus ENTRE deux envois par `executerPartout({ doitSArreter })` ; « Reprendre » relance ce qui est « pas
+  envoyé »). Il reste au lot suivi-travail de monter `SuiviTravailHote` dans `AppCoeur` (son étape 3).
+- **eBay** : `src/ebay/parametres.js` n'existe pas encore sur `claude/ebay-complet` (seulement
+  `api/_lib/ebay-parametres.js`, côté serveur). Laissé : `preparerBrouillonPartout` (brouillon, catégorie suggérée,
+  critères des faits Vinted) ; la feuille dit « eBay : catégorie et critères se règlent dans le brouillon eBay ».
+  Point de branchement : `HotePublierPartout` → `envoyer.ebay` (App.jsx) et la ligne `partout.ebay.params`.
+- Preuves : `audit-publier-partout` **69/69**, **22/22 mutations** (9 nouvelles : paramètre pas bloqué, annonce
+  ignorée, valeur hors liste, Vestiaire publié quand même, arrêt ignoré, catégorie inventée, « à finir » compté fait,
+  `publier` de l'app, synchro oubliée). Banc : scénario H ajouté (défaut Vestiaire ⇒ à finir ; livraison « non » par
+  annonce ⇒ bloquant ; tous les champs Leboncoin présents).
