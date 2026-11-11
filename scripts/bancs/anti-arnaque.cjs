@@ -143,7 +143,7 @@ const attendre = async (pg, sel, ms = 15000) => pg.waitForSelector(sel, { timeou
       if (principal) {
         // C — 302 (ses messages) et 303 (normal) : aucune bannière
         for (const id of ['302', '303']) {
-          if (vp.width < 600) { await r.pg.keyboard.press('Escape').catch(() => {}); await r.pg.goBack().catch(() => {}); await attendre(r.pg, `[data-conv="${id}"]`); await r.pg.waitForTimeout(500); }
+          if (vp.width < 600) { await r.pg.click('.vrm-chat-panel .vrm-chat-back').catch(() => {}); await attendre(r.pg, `[data-conv="${id}"]`); await r.pg.waitForTimeout(500); }
           await r.pg.click(`[data-conv="${id}"]`).catch(() => {});
           await attendre(r.pg, `.vrm-chat-panel .vrm-bulle`, 10000);
           await r.pg.waitForTimeout(500);
