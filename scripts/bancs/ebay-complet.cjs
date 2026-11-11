@@ -47,7 +47,8 @@ const remettre = (sc = {}) => {
     { id: 'vinted_item_details', data: DETAILS },
     { id: 'ebay_listings', data: { items: [{ itemId: '110000000044', title: 'Nike Air Max 90 taille 42', price: '95.0', sku: 'VRM-99' }], capturedAt: MAINTENANT } },
     { id: 'ebay_comptes', data: { comptes: [{ principal: true, cle: 'aaaaaaaaaaaaaaaa', pseudo: 'vendeur_pro', type: 'pro', site: 'FR' }] } },
-    { id: 'ebay_orders', data: { orders: [], capturedAt: MAINTENANT } },
+    // Une vente payée : l'acheteur a payé 106,50 € (port compris) ; dû au vendeur 105, frais eBay 5 ⇒ REÇU 100 €.
+    { id: 'ebay_orders', data: { orders: [{ orderId: '07-11111-22222', creationDate: '2026-11-10T10:00:00.000Z', orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', lineItems: [{ sku: 'VRM-99', title: 'Nike Air Max 90 taille 42', quantity: 1 }], pricingSummary: { total: { value: '106.50', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '105.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '5.00', currency: 'EUR' } }], capturedAt: MAINTENANT } },
   ];
   envois = [];
 };
@@ -351,6 +352,17 @@ const ok = async (pg, nom = /Oui, publier/) => { if (/publier/i.test(String(nom)
         const r = action('repondre')[0];
         dit(!!r && r.confirme === true && r.messageId === '5550001' && r.itemId === '110000000044' && r.body === 'Elle taille normalement.', '   « Envoyer » sur SON clic confirmé : `repondre` sur CETTE question', JSON.stringify(r));
         await capt(pg2, `K-${tag}`);
+      });
+      await garde('L', async () => {
+        await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=ventes`, { waitUntil: 'domcontentloaded' });
+        await pg2.waitForSelector('[data-ebay-vente="07-11111-22222"]', { timeout: 25000 });
+        const t = await pg2.$eval('[data-ebay-vente="07-11111-22222"]', (e) => e.innerText);
+        dit(/100,00/.test(t) && !/106,50/.test(t), 'L. Ventes eBay : la ligne dit l’argent REÇU (100,00 €), pas ce que l’acheteur a payé port compris (106,50 €)', t.replace(/\s+/g, ' ').slice(0, 160));
+        await capt(pg2, `L-${tag}`);
+        await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=compte`, { waitUntil: 'domcontentloaded' });
+        await pg2.waitForSelector('[data-ebay-argent-recu]', { state: 'attached', timeout: 25000 });
+        const v = await pg2.$eval('[data-ebay-argent-recu]', (e) => e.getAttribute('data-ebay-argent-recu'));
+        dit(v === '100.00', '   Comptes eBay → Argent : « reçu » = 100,00 (le port n’est pas une recette, §2.8)', v);
       });
       const tous = [...errs, ...o2.errs];
       dit(tous.length === 0, `aucune erreur de page (${tag})`, tous.join(' | '));
