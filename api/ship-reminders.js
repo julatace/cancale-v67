@@ -22,10 +22,10 @@
 
 import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
-import { sendPushToAll, pushCategorieActive, prefsDuVendeur, instantCalme } from './_lib/push.js';
+import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif, instantCalme } from './_lib/push.js';
 import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRappel, texteRappels, lienRappel, TAG_RAPPEL } from './_lib/rappels-perso.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
-import { reglageCalme, reglageSoir, soirALHeure, dansHeuresCalmes } from './_lib/notif-textes.js';
+import { reglageCalme, reglageSoir, soirALHeure, reglageJours, dansHeuresCalmes } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
@@ -943,7 +943,8 @@ async function traiterVendeurApresRelecture() {
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
-      await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
+      // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
+      await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
     return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, overdue, aVerifier, dueToday, dueTomorrow, total,
@@ -1216,7 +1217,7 @@ async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
 // mémo pas écrit ⇒ rien ne part.
 // (11 nov.) Le passage du réveil sert AUSSI les rappels posés par le vendeur (« Me le rappeler ») :
 // ils sonnent à 9 h (Paris), après les heures calmes. Un échec de l'un n'empêche pas l'autre.
-async function traiterVendeurReveil(maintenant = Date.now()) {
+async function traiterVendeurReveil(maintenant = instantNotif()) {   // (11 nov.) l’horloge des notifications (bancs : simulée ; production : maintenant)
   let r;
   try { r = await recapReveil(maintenant); } catch (e) { r = { reveil: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   return { ...r, rappels: await rappelsPersoSur() };
@@ -1231,7 +1232,7 @@ async function traiterVendeurReveil(maintenant = Date.now()) {
 // La réponse ne porte que des nombres : jamais une note, un N° ou un titre.
 async function rappelsPersoSur() {
   try {
-    const maintenant = Date.now();
+    const maintenant = instantNotif();
     const main = await getRowProjete('main', [CLE_RAPPELS]);
     if (main === undefined) return { etat: 'pas-su' };
     const rappels = lireRappels(main && main[CLE_RAPPELS]);
@@ -1256,20 +1257,47 @@ async function rappelsPersoSur() {
     return { etat: 'envoye', n: dus.length, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
   } catch (e) { return { etat: 'echec' }; }
 }
-async function recapReveil(maintenant = Date.now()) {
+async function recapReveil(maintenant = instantNotif()) {
   const prefs = await prefsDuVendeur();
   // (8 nov.) Heures calmes allumées par défaut : seul un `actif: false` posé les éteint.
   // Préférences pas sues ⇒ rien (« pas su » n'envoie pas un récapitulatif inventé).
   if (!prefs) return { reveil: 'pas-su' };
-  if (!reglageCalme(prefs).actif) return { reveil: 'calme-eteint' };
+  // (11 nov.) Des jours calmes posés suffisent (heures calmes éteintes ou non).
+  const rj = reglageJours(prefs);
+  if (!reglageCalme(prefs).actif && !rj.jours.length && !rj.conges) return { reveil: 'calme-eteint' };
   const memo = await getRow(ID_REVEIL);
   if (memo === undefined) return { reveil: 'pas-su' };
   const [journal, lu] = await Promise.all([lireJournal(), lireLu()]);
-  const r = resumeReveil({ prefs, journal, lu, dejaJour: memo && memo.jour, maintenant });
+  const r = resumeReveil({ prefs, journal, lu, dejaJour: memo && memo.jour, dejaSeq: memo && Number.isSafeInteger(memo.seq) ? memo.seq : null, dejaAt: memo && memo.at, maintenant });
   if (!r.envoyer) return { reveil: r.raison };
-  if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString() }))) return { reveil: 'memo-non-ecrit' };
+  if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString(), ...(Number.isSafeInteger(r.seq) ? { seq: r.seq } : {}) }))) return { reveil: 'memo-non-ecrit' };
   const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url, tag: 'vrm-reveil' });
   return { reveil: 'envoye', n: r.n, sent: envoi && envoi.sent };
+}
+// (11 nov., lot `notifs-groupees`) LE PASSAGE DE 15 MIN. Seuls les vendeurs qui
+// ont une fenêtre échue (`push_journal.data->>attenteJusqua` ≤ maintenant, une
+// projection : aucun `select=data`). (L'heure du résumé du soir a son passage
+// horaire, décision C8 : `traiterVendeurSoirHeure`.) Une
+// lecture ratée ⇒ rien (503, on repassera). Un vendeur qui plante n'arrête pas
+// les autres. Budget : 240 s.
+async function passageGroupe(maintenant = Date.now()) {
+  const debut = Date.now();
+  const iso = new Date(maintenant).toISOString();
+  const dus = await fetchPaginated(`app_data?id=eq.push_journal&data->>attenteJusqua=lte.${encodeURIComponent(iso)}&select=owner`);
+  if (!dus) return { fait: false, raison: 'pas su' };
+  const uniq = (l) => [...new Set(l.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
+  const aVider = uniq(dus);
+  let echecs = 0, envoyes = 0, budgetAtteint = false;
+  const bilans = [];
+  const tache = async (o, f) => { try { return await contexteVendeur.run({ owner: o }, f); } catch (e) { echecs += 1; return { erreur: String((e && e.message) || e).slice(0, 120) }; } };
+  const files = aVider;
+  for (let i = 0; i < files.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 240000) { budgetAtteint = true; break; }
+    const lot = files.slice(i, i + VENDEURS_EN_PARALLELE);
+    const out = await Promise.all(lot.map((o) => tache(o, () => vidangerResume())));
+    out.forEach((r) => { if (r && r.vidange === 'envoye') envoyes += 1; bilans.push(r && typeof r === 'object' ? r : {}); });
+  }
+  return { fait: true, fenetres: aVider.length, resumes: envoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
 }
 // (11 nov., décision C8) Le passage horaire : le résumé seul (ni eBay relu, ni bilan de la semaine).
 async function traiterVendeurSoirHeure() {
@@ -1469,6 +1497,19 @@ export default async function handler(req, res) {
       r = await passageFacturesAuto({ lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000 });
     } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
     res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'factures', vendeurs: r && r.vendeurs, traites: r && r.traites, envoyees: r && r.envoyees, refusees: r && r.refusees, pauses: r && r.pauses, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint, ...(r && !r.fait ? { raison: r.raison || 'pas-su' } : {}) });
+    return;
+  }
+  // (11 nov., lot `notifs-groupees`) `?moment=groupe` : toutes les 15 min
+  // (.github/workflows/notifs-groupees.yml). Le résumé des fenêtres échues, et
+  // le résumé du soir de ceux qui ont choisi leur heure. RIEN d'autre.
+  if (moment === 'groupe') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'groupe', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageGroupe(instantNotif());
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r });
     return;
   }
   const soir = moment === 'soir';

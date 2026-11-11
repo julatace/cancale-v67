@@ -71,7 +71,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   const ebay = sans(lire('src/ecrans/Ebay.jsx')), rep = sans(lire('src/ecrans/Republier.jsx'));
   const gardees = [
     ['Supprimer de Leboncoin', /title: l\.length > 1 \? `Supprimer \$\{l\.length\} annonces de Leboncoin \?`/.test(A)],
-    ['Vérifier avant impression', /askConfirm\(\{title:'Vérifier les articles avant impression'/.test(A)],
+    // (11 nov., Julien — « inadmissible » : plus de confirmation « N sur M contrôlés » à chaque impression) Ce qui reste GARDÉ :
+    // un lot dont un article a changé (compte, N°, état) est refusé au lancement (`verifierContexte`).
+    ['Lot changé refusé avant impression', /const verifierContexte\s*=/.test(A) && /avantOuverture:verifierContexte/.test(A) && !/askConfirm\(\{title:'Vérifier les articles avant impression'/.test(A)],
     ['Accepter une offre Vinted', /askConfirm\(\{ title: `Accepter \$\{fmtE\(off\.prix\)\} \?`/.test(A)],
     ['Acceptation auto des offres', /askConfirm\(\{ title: 'Accepter les offres tout seul sur Vinted \?'/.test(A)],
     ['Supprimer une annonce eBay', /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(ebay)],

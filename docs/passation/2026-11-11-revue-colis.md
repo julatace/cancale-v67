@@ -117,3 +117,60 @@ Sur `claude/revue-colis`, pas de PR (la session principale intègre).
    réaffaiblir ; la preuve est avant/après : vert sur `main` avec Cancale 4, vert ici avec 3, chacun rouge sur
    l'autre), `iphone-reprise` B9/R2, `retrait-relais-carte`, `retrait-autre-ville`, `vestiaire-colis` (ports de
    sélecteur : ils mesurent la même règle qu'avant, sur la nouvelle place).
+
+## Suite 2 : fusion de `integration-11nov-e3` et demande (g)
+
+* **Merge `origin/claude/integration-11nov-e3`** (lot journee-perso : feuille « Bordereaux à imprimer » allégée, InPost =
+  Mondial Relay, étiquette lue par son code 56…, logo Chronopost, achats « encore au point relais »). Pas de
+  contradiction de fond, deux décisions de Julien qui vont dans le même sens :
+  - « Tout imprimer » : la feuille en 3 temps du lot DJ3 est gardée (elle n'a déjà ni case « Contrôlé » ni confirmation) ;
+    la confirmation « N sur M contrôlés » est retirée aussi du moteur (`batchBordereaux`), `verifierContexte` refuse
+    toujours un lot dont un article a changé (audit-annuler-commandes porté : « Lot changé refusé avant impression »).
+    L'emplacement sous chaque paire (arbitrage c) suit LEUR règle : dit seulement quand il est connu (plus
+    « emplacement non noté » sur chaque ligne) — banc tout-imprimer C ajusté.
+  - Étiquettes : leur relecture des « aucun » (règle du code 56…) et la mienne (« inpost », « plusieurs ») sous UNE marque
+    `REGLE_PDF` (importée de transporteur-pdf.js — la déclarer deux fois aurait cassé le module) ; la décision neuve
+    porte `g` et `v`.
+  - Logo : le dessin relevé à 15 h 55 (« toujours pas bon ») remplace celui du matin, pour Chronopost ET Shop2Shop
+    (un pictogramme) ; audit-logos-bordereaux porté.
+  - Ma journée personnalisable : la carte « Commandes à vérifier » devient une carte réglable (`suivi`,
+    src/journeePerso.js) ; elle compte dans « N gestes » et se cache comme les autres.
+  - Navigation : Achats dans la barre (lot DJ3), avec leur `entreeNav`.
+* **(g) « Tes meilleures sources »** posée APRÈS la liste d'Achats (avant les reçus). Mesuré au banc
+  `annonces-ventes-brouillon`, 1512 px : les étapes des achats passent de **1586 à 1301 px** (390 px : 1936 ⇒ 1523) ;
+  captures avant/après regardées : premier écran identique (« À retirer »), au second la liste suit directement les
+  chiffres d'Achats. Le contrôle « dans le premier écran » reste rouge (la section « À retirer » est en tête, par décision).
+* À signaler (hors périmètre, pas touché) : au banc (navigateur en anglais) la navigation s'affiche en anglais
+  (« My day », « Listings »…) — c'est le lot Traduction, alors que §3 dit « VRM reste sur la France ».
+
+## ÉTAT À LA REPRISE (arrêt demandé par Julien, 11 nov. soir — le travail continue dans la session principale)
+
+**Branche** `claude/revue-colis` (poussée). Pas de PR.
+
+**Fusions faites** : `integration-11nov-e2`, `ventes-achats-visuel`, `integration-11nov-e3` (vrais merges, deux côtés
+gardés ; `agent2-nsk5su` déjà ancêtre). **À faire** : `origin/main` à jour avec E3 si E3 y a bougé depuis, et
+`claude/journee-perso` à `c69e8b1a` (pas encore fusionnée ici) — vrai `git merge`, puis relancer les bancs ci-dessous.
+
+**Bancs sur le dernier build (après E3)** : verts — tout-imprimer 28, lot-bordereaux 17, logos-bordereaux 16,
+colis-a-leur-place 184, tout-imprimer-garde 8, achats-retirer-site 24, liens-colis-anciens 42, colis-relier-carte 20,
+suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 et logos-bordereaux 41 portés).
+**Rouges à reprendre** (pas finis) :
+* `journee-perso` E (4) : l'éditeur compte 18 cartes (+ `suivi`, « Commandes à vérifier ») — banc porté à 18 dans ce
+  dernier commit, PAS relancé.
+* `retraits-fiables` F4 (2) : le banc attend le code d'un autre e-mail du même n° ; avec l'arbitrage (d) ce code est
+  daté d'AVANT le changement ⇒ « à confirmer ». Porter le banc (dater l'e-mail du code après le changement, et ajouter
+  le cas « avant ⇒ à confirmer »), ne pas affaiblir la règle.
+* `navigation-tache` A (390) : les libellés de la barre sortent EN ANGLAIS (« Today »…) au banc — c'est le lot
+  Traduction (langue du navigateur) ; et un `tap` qui n'aboutit plus. À voir avec ce lot (§3 : VRM reste en français).
+* `colis-envoi` B (4) : la barre d'Achats diffère par conception + 1 px entre « À envoyer » et « Envoyés ».
+* Pas relancés après E3 : selection-bordereaux, transporteurs-logos, colis-propre-logos, journee-photos et les bancs
+  portés plus haut (colis-sms, iphone-reprise, navigation…).
+
+**Pièges** :
+* `REGLE_PDF` vient de `api/_lib/transporteur-pdf.js` et est RÉ-EXPORTÉE par transporteur-anciens.js — ne pas la
+  redéclarer (le module ne se charge plus).
+* `TXN_COPIE_SELECT` porte déjà `cap` par `VERSION_META` : ne pas l'ajouter une 2e fois.
+* Deux moteurs `Comptabilite only="bordereaux"` (Ventes et Achats, écrans gardés) : toute demande globale (« Tout
+  imprimer », etc.) doit être prise par le moteur MONTRÉ (`prendImpression`).
+* Achats n'a pas de « Toutes » : Vinted est l'écran d'arrivée et montre TOUS les colis à retirer.
+* CLAUDE.md doit rester < 60 Ko : déplacer telles quelles les plus anciennes lignes du §9 vers historique-divers.
