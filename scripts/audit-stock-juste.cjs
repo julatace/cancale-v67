@@ -13,8 +13,8 @@
 //       une paire sur Vinted, Leboncoin, eBay et Vestiaire (même N°) = UN article, 4 sites ;
 //       50 paires au même titre, N° différents = 50 articles (jamais réunies par le titre) ;
 //       un vieux compte (lu il y a 90 j) ne met RIEN dans « en ligne ».
-//   B · « Tu l'as encore ? » (`opsChezToi`) : garder ⇒ chez-moi seul ; enlever SANS raison ⇒
-//       rien ; enlever + raison ⇒ séparée + déclarée partie par IDENTITÉ + case libérée, le N°
+//   B · « Tu l'as encore ? » (`opsChezToi`) : garder ⇒ chez-moi seul ; enlever = UN toucher (raison facultative, inconnue ⇒ rien) ⇒
+//       sinon ; séparée + déclarée partie par IDENTITÉ + case libérée, le N°
 //       jamais touché (`vinted_annonce_numeros` absent des opérations) ; une clé de
 //       déclaration portée par une AUTRE annonce n'est jamais écrasée ; « plus tard » ⇒ la
 //       question se tait (cartesSupprimees) puis revient après 20 h ; une vendue prouvée et
@@ -38,6 +38,7 @@ const lire = (r) => fs.readFileSync(path.join(RACINE, r), 'utf8');
 const MUTATIONS = {
   'tout-en-ligne': ['src/stockAnnonces.js', "    if (a.etat === 'enligne') enLigne.push(a);", '    if (a) enLigne.push(a);'],
   'raison-facultative': ['src/cycleArticle.js', '  if (!R) return null;\n', "  if (!R) return { texte: '', ops: [] };\n"],
+  'non-deux-gestes': ['src/cycleArticle.js', "const R = raison == null ? ['sortie', 'Sortie'] :", 'const R ='],
   'case-gardee': ['src/cycleArticle.js', "  if (kn && S[kn]) ops.push(", '  if (false) ops.push('],
   'plus-tard-muet': ['src/cycleArticle.js', '    if (repousseeJusqua(o.plusTard, id, o.maintenant) > 0) { plusTard++; continue; }\n', ''],
   'pause-sans-fin': ['src/gesteAnnulable.js', "garde = minuterie(() => { garde = null; if (!pause) return; pause = false; if (visible != null) armer(Math.max(1200, resteMs)); }, pauseMax);", 'garde = null;'],
@@ -90,7 +91,12 @@ async function main(dir) {
         cleDeclaration: (n) => String(n) };
       const g = f({ ...base, reponse: 'garde' });
       dit(g && g.ops.length === 1 && g.ops[0].k === 'vrm_cycle_decisions' && g.ops[0].apres.choix === 'chez-moi' && g.ops[0].avant === undefined, 'B1 · « Oui, je la garde » ⇒ chez-moi, rien d’autre (N° gardé)', JSON.stringify(g));
-      dit(f({ ...base, reponse: 'enleve' }) === null, 'B2 · « Non » sans raison ⇒ rien n’est écrit');
+      // (11 nov., « gagner du temps ») « Non, enlève-la du stock » = UN toucher, sans raison.
+      const e1 = f({ ...base, reponse: 'enleve' });
+      dit(!!e1 && e1.ops.some((o) => o.k === 'vrm_cycle_decisions' && o.apres.choix === 'separe') && e1.ops.some((o) => o.k === 'vrm_slots'), 'B2 · « Non » en UN toucher ⇒ séparée, case libérée', JSON.stringify(e1));
+      dit(f({ ...base, reponse: 'enleve', raison: 'inventee' }) === null, 'B2b · une raison inconnue ⇒ rien n’est écrit');
+      const AT = lire('src/ATrancher.jsx');
+      dit(/data-a-trancher-non=\{carte\.id\} onClick=\{\(\) => onTrancher\(carte, 'non'\)\}/.test(AT) && !/setRaisons/.test(AT), 'B2c · le bouton « Non » tranche tout de suite (pas d’étape « raison »)');
       const e = f({ ...base, reponse: 'enleve', raison: 'donnee' });
       const ks = e ? e.ops.map((o) => o.k) : [];
       const dec = e && e.ops.find((o) => o.k === 'vrm_cycle_decisions');

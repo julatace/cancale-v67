@@ -57,6 +57,17 @@ export function completerVersementsParReleve(map450, mapReleve) {
   if (map450 == null) return map450;
   if (!mapReleve) return map450;
   const out = Object.assign({}, map450);
-  for (const [tx, d] of Object.entries(mapReleve)) if (out[tx] == null) out[tx] = d;
+  const parReleve = new Set();
+  for (const [tx, d] of Object.entries(mapReleve)) if (out[tx] == null) { out[tx] = d; parReleve.add(tx); }
+  // (11 nov., lot DJ7) Lesquelles le relevé a datées : propriété NON énumérable
+  // (les lecteurs de la carte tx → date n'en voient rien), lue par `versementsParReleve`.
+  Object.defineProperty(out, PAR_RELEVE, { value: parReleve, enumerable: false });
   return out;
+}
+
+const PAR_RELEVE = '__vrmParReleve';
+// Les n° de transaction datés par le relevé (et non par la transaction 450). Toujours un Set.
+export function versementsParReleve(map) {
+  const s = map && map[PAR_RELEVE];
+  return s instanceof Set ? s : new Set();
 }

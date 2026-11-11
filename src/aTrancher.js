@@ -225,7 +225,7 @@ export const QUESTIONS = {
   'numeros-a-verifier': { n: () => 'N° à vérifier sur place', x: () => 'Vérifie ce N° là où est la paire' },
   'sms-vestiaire': { n: (n) => (n > 1 ? 'Ventes Vestiaire reçues par SMS, à relier' : 'Vente Vestiaire reçue par SMS, à relier') },
   'sms-pickup': { n: () => 'Colis Pickup reçus par SMS, sans code' },
-  'supprimes-vinted': { n: () => 'Supprimés de Vinted : tu les as encore ?', x: () => 'Supprimée de Vinted. Tu l’as encore ?' },
+  'supprimes-vinted': { n: () => 'Supprimés de Vinted : les enlever du stock ?', x: () => 'Supprimée de Vinted. L’enlever du stock ?' },
   'remise-en-ligne': { n: () => 'Remises en ligne : même paire ?', x: (x) => (x.de ? `Remise en ligne : même paire que N°${x.de} ?` : 'Remise en ligne : même paire qu’une ancienne ?') },
   'achats-doubles': { n: (n) => (n > 1 ? 'Achats saisis deux fois : garde le bon' : 'Achat saisi deux fois : garde le bon') },
   'achats-sans-prix': { n: () => 'Annonces sans prix d’achat', x: () => 'Prix d’achat pas saisi' },
@@ -239,10 +239,12 @@ export const QUESTIONS = {
 // (la même écriture que la pilule de Ma journée, `vrm_cycle_decisions`) ; une
 // remise en ligne « même paire » CHANGE un N° (§5) : elle reste dans Annonces.
 // (11 nov., lot DJ4) « Tu l'as encore ? » : trois réponses faites ICI (src/cycleArticle.js
-// `opsChezToi`) — « Oui, je la garde » · « Non, enlève-la du stock » (puis la raison, un
-// toucher) · « Plus tard ». Toutes annulables 5 s ; « Non » n'ouvre plus Ma journée.
+// `opsChezToi`) — « Oui, je l’ai » · « Enlever du stock » (un toucher, sans raison demandée)
+// · « Plus tard ». Toutes annulables 5 s ; « Non » n'ouvre plus Ma journée.
 export const BINAIRES = {
-  'supprimes-vinted': { oui: 'Oui, je la garde', non: 'Non, enlève-la du stock', plusTard: 'Plus tard', raisons: true },
+  // (11 nov., DJ4) Les mots de Julien : « L'enlever du stock ? » — sa réponse la plus fréquente en
+  // premier, pleine largeur (« Enlever du stock »), puis « Non, je l’ai » et « Plus tard ».
+  'supprimes-vinted': { oui: 'Non, je l’ai', non: 'Enlever du stock', plusTard: 'Plus tard', trois: true },
 };
 export const PAR_SOURCE = 3;     // au plus 3 cartes par source, le reste « + N »
 export const MOTS_MAX = 12;
@@ -264,14 +266,14 @@ export function cartesATrancher(etat, { parSource = PAR_SOURCE } = {}) {
       const ex = Array.isArray(l.ex) ? l.ex : [];
       let cartes;
       if (ex.length && Q.x) {
-        cartes = ex.slice(0, BINAIRES[cle] && BINAIRES[cle].raisons ? ex.length : parSource).map((x) => ({ cle, id: x.id, num: x.num || '', photo: x.photo || '', photo2: x.photo2 || '',
+        cartes = ex.slice(0, BINAIRES[cle] && BINAIRES[cle].trois ? ex.length : parSource).map((x) => ({ cle, id: x.id, num: x.num || '', photo: x.photo || '', photo2: x.photo2 || '',
           question: Q.x(x), binaire: BINAIRES[cle] || null,
           geste: CIBLE_CHOSE[cle] ? { ...l.geste, cible: CIBLE_CHOSE[cle](x) } : l.geste }));
       } else {
         cartes = [{ cle, id: '', n: l.n, question: Q.n(l.n), binaire: null, geste: l.geste, noms: l.noms || null }];
       }
       const montrees = cartes[0].id ? cartes.length : l.n;
-      sources.push({ cle, n: l.n, ton, cartes, autres: Math.max(0, l.n - montrees), ensuite: !!(BINAIRES[cle] && BINAIRES[cle].raisons && cartes[0].id), geste: l.geste, nom: l.nom });
+      sources.push({ cle, n: l.n, ton, cartes, autres: Math.max(0, l.n - montrees), ensuite: !!(BINAIRES[cle] && BINAIRES[cle].trois && cartes[0].id), geste: l.geste, nom: l.nom });
     }
     if (!sources.length) continue;
     const n = sources.reduce((t, s) => t + s.n, 0);
