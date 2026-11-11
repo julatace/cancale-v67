@@ -251,7 +251,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   // sans son « C'est bon », un champ qu'il a rempli n'est jamais écrasé sans son accord
   // (src/RechercheEntreprise.jsx, la même règle que « Ma configuration »). Avant, le nom
   // et l'adresse se posaient seuls dans les champs vides.
-  const recherche = useRechercheEntreprise(deps.chercherEntreprise, cfg ? cfg.siret : '');
+  const recherche = useRechercheEntreprise(deps.chercherEntreprise, cfg ? (cfg.siret || '') : null);
   // (11 nov., lot DJ1) « Pareil lorsqu'on choisit le statut » : la forme choisie montre ses mentions.
   const [formeVue, setFormeVue] = React.useState('');
   const allerAuChamp = (k) => { const el = document.querySelector(`[data-fp-champ="${k}"] input, [data-fp-champ="${k}"] select`); if (el) { try { el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'center' }); } catch (_) {} } };

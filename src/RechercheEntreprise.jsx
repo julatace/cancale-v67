@@ -32,6 +32,11 @@ export function useRechercheEntreprise(chercher, numero) {
   const ch = String(numero || '').replace(/\D/g, '');
   const [rep, setRep] = React.useState(undefined);
   const [lance, setLance] = React.useState({ ch: '', n: 0 });
+  // Le numéro déjà enregistré à l'ouverture : pas de « Rechercher » qui traîne sur une fiche
+  // déjà remplie (Entrée dans le champ relance quand même).
+  // `numero` null = la fiche n'est pas encore lue : le départ est pris à la première lecture.
+  const auDepart = React.useRef(numero === null ? null : ch);
+  if (auDepart.current === null && numero !== null) auDepart.current = ch;
   React.useEffect(() => { setRep(undefined); }, [ch]);
   React.useEffect(() => {
     if (verif.etat !== 'ok' || typeof chercher !== 'function' || lance.ch !== ch || !lance.n) return undefined;
@@ -48,7 +53,7 @@ export function useRechercheEntreprise(chercher, numero) {
   const lancer = () => { if (verif.etat === 'ok') setLance((x) => ({ ch, n: x.ch === ch ? x.n + 1 : 1 })); };
   // Une validation déjà faite pour CE numéro ne relance pas (sortie du champ répétée).
   const lancerUneFois = () => { if (verif.etat === 'ok' && !(lance.ch === ch && lance.n)) lancer(); };
-  return { verif, ch, rep, relancer: lancer, lancer, lancerUneFois };
+  return { verif, ch, rep, relancer: lancer, lancer, lancerUneFois, touche: auDepart.current !== null && ch !== auDepart.current };
 }
 
 // Le squelette : les libellés de la carte, des barres qui se remplissent une à une.
@@ -85,6 +90,7 @@ export function CarteVerifEntreprise({ recherche, actuel, avecSiret = false, onE
   React.useEffect(() => { setIssue(''); setPrendre({}); setVille(''); setErreur(''); }, [ch, rep]);
   if (verif.etat === 'vide') return null;
   if (verif.etat === 'invalide') return <p className="vrm-ent-refus" data-ent-recherche="invalide" role="status" {...(data || {})}>Ce numéro ne semble pas valide : {verif.raison}. Aucune recherche n’est faite.</p>;
+  if (rep === undefined && !recherche.touche) return null;
   if (rep === undefined) return (
     <div className="vrm-ent vrm-ent-pret" data-ent-recherche="pret" {...(data || {})}>
       <span className="vrm-ent-pret-t"><b>Numéro valide</b><small>Trouve ton entreprise au registre public.</small></span>

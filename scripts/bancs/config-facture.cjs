@@ -152,32 +152,34 @@ async function maFacture(nav, W, theme) {
   const inv = await o.pg.$('[data-fp-registre][data-ent-recherche="invalide"]');
   dit(!!inv && o.journal.registre.length === 0, `${T} F2 SIRET faux (clé de Luhn) ⇒ « ne semble pas valide », AUCUNE requête au registre`, `${!!inv} · ${o.journal.registre.join(',')}`);
   await capture(o.pg, `cf-${W}-${theme}-F2-siret-faux`);
-  // F1 : le bon SIRET ⇒ la recherche, TENUE.
+  // F1 : le bon SIRET ⇒ la recherche, TENUE — (11 nov., lot DJ1) à la VALIDATION (Entrée).
   await champ.fill(SIRET);
+  await o.pg.waitForTimeout(300);
+  dit(o.journal.registre.length === 0 && !!(await o.pg.$('[data-fp-registre][data-ent-recherche="pret"]')), `${T} F1 (11 nov.) taper le SIRET ne cherche rien : « Rechercher » attend sa validation`, o.journal.registre.join(','));
+  await champ.press('Enter');
   const vuEncours = await attendre(o.pg, async () => !!(await o.pg.$('[data-fp-registre][data-ent-recherche="encours"]')), 5000);
   const texteEncours = vuEncours ? await o.pg.locator('[data-fp-registre]').innerText() : '';
-  dit(vuEncours && /Recherche de l’entreprise…/.test(texteEncours) && o.journal.registre.includes(SIRET), `${T} F1 SIRET valide ⇒ « Recherche de l’entreprise… » pendant la requête`, texteEncours);
+  dit(vuEncours && /Recherche de ton entreprise…/.test(texteEncours) && o.journal.registre.includes(SIRET), `${T} F1 SIRET validé ⇒ « Recherche de ton entreprise… » pendant la requête`, texteEncours);
   await capture(o.pg, `cf-${W}-${theme}-F1a-recherche`);
   await o.pg.waitForTimeout(900);                                 // la frappe du SIRET s'enregistre (600 ms)
   lacher();
   const trouve = await attendre(o.pg, async () => !!(await o.pg.$('[data-fp-registre][data-ent-recherche="trouve"]')), 6000);
-  dit(trouve, `${T} F1 puis la carte « Vérifie ces informations »`);
+  dit(trouve, `${T} F1 puis la carte « C’est bien toi ? »`);
   await o.pg.waitForTimeout(900);
   let f = ligne(base, 'vrm_pro_facture') || {};
-  dit(f.nom === 'Mon Atelier' && !f.adresse && !f.forme && !f.ville && !f.tva, `${T} F1 RIEN n’est écrit avant « C’est bon » (seul le SIRET tapé)`, JSON.stringify(f));
+  dit(f.nom === 'Mon Atelier' && !f.adresse && !f.forme && !f.ville && !f.tva, `${T} F1 RIEN n’est écrit avant « Oui, c’est moi » (seul le SIRET tapé)`, JSON.stringify(f));
   const lignes = await o.pg.$$eval('[data-ent-ligne]', (els) => els.map((e) => ({ c: e.getAttribute('data-ent-ligne'), cas: e.getAttribute('data-ent-cas'), t: e.innerText.replace(/\s+/g, ' ') })));
   const L = (c) => lignes.find((x) => x.c === c) || {};
   dit(L('nom').cas === 'ecart' && /Tu as écrit : Mon Atelier/.test(L('nom').t) && L('adresse').cas === 'vide' && L('forme').cas === 'vide' && L('tva').cas === 'vide' && !L('rcs').c, `${T} F1 chaque champ proposé ; le nom qu’il a écrit montre l’ÉCART ; aucun RCS inventé`, JSON.stringify(lignes));
-  const notes = await o.pg.locator('[data-fp-registre] [data-ent-note]').allInnerTexts();
-  dit(notes.some((n) => /Kbis/.test(n)), `${T} F1 l’immatriculation : la carte dit de la recopier du Kbis`, notes.join(' | '));
+  const imm = await o.pg.locator('[data-fp-registre] [data-ent-ligne="imm"]').innerText().catch(() => '');
+  dit(/Kbis/.test(imm) && /RCS/.test(imm), `${T} F1 l’immatriculation : RCS + la ville du greffe à recopier du Kbis (jamais inventée)`, imm);
   await o.pg.locator('[data-fp-registre]').scrollIntoViewIfNeeded();
   await capture(o.pg, `cf-${W}-${theme}-F1b-verifie`);
   if (o.tel) { const p = await petites(o.pg, '[data-fp-registre] button'); dit(!p.length, `${T} cibles de 44 px`, p.join(' | ')); }
-  await o.pg.click('[data-ent-garder="nom"]');
-  await o.pg.click('[data-ent-ok="adresse"]');
-  dit(await attendre(o.pg, async () => (ligne(base, 'vrm_pro_facture') || {}).adresse === '12 RUE DE L’EXEMPLE'), `${T} F1 « C’est bon » sur l’adresse l’écrit (sans le code postal)`, JSON.stringify(ligne(base, 'vrm_pro_facture')));
+  await o.pg.click('[data-ent-oui]');
+  dit(await attendre(o.pg, async () => (ligne(base, 'vrm_pro_facture') || {}).adresse === '12 RUE DE L’EXEMPLE'), `${T} F1 « Oui, c’est moi » écrit l’adresse (sans le code postal)`, JSON.stringify(ligne(base, 'vrm_pro_facture')));
   f = ligne(base, 'vrm_pro_facture') || {};
-  dit(f.nom === 'Mon Atelier' && !f.ville && !f.forme && f.siret === SIRET, `${T} F1 « Garder la mienne » garde son nom ; les autres champs ne bougent pas`, JSON.stringify(f));
+  dit(f.nom === 'Mon Atelier' && f.ville === 'RENNES' && f.forme === 'SAS' && f.siret === SIRET && !f.rcs, `${T} F1 son nom (écart) est GARDÉ par défaut ; ville, forme écrites ; aucun RCS sans ville du greffe`, JSON.stringify(f));
   const valNom = await o.pg.locator('[data-fp-champ="nom"] input').inputValue();
   dit(valNom === 'Mon Atelier', `${T} F1 le champ « nom » affiché est toujours le sien`, valNom);
   dit(!(await deborde(o.pg)), `${T} rien ne déborde`);
@@ -189,9 +191,10 @@ async function maFacture(nav, W, theme) {
   const o3 = await ouvrir(nav, { W, sombre, base: base3, tab: 'invoices', registre: { panne: true } });
   await o3.pg.getByRole('button', { name: 'Ma facture' }).first().click({ timeout: 20000 }).catch(() => {});
   await o3.pg.locator('[data-fp-champ="siret"] input').fill(SIRET).catch(() => {});
+  await o3.pg.locator('[data-fp-champ="siret"] input').press('Enter').catch(() => {});
   const passu = await attendre(o3.pg, async () => !!(await o3.pg.$('[data-fp-registre][data-ent-recherche="passu"]')), 8000);
   const t3 = passu ? await o3.pg.locator('[data-fp-registre]').innerText() : '';
-  dit(passu && /ne répond pas/.test(t3) && !!(await o3.pg.$('[data-ent-reessayer]')), `${T} F3 registre KO ⇒ dit, « Réessayer »`, t3);
+  dit(passu && /ne répond pas/.test(t3) && /à la main/.test(t3) && !!(await o3.pg.$('[data-ent-reessayer]')), `${T} F3 registre KO ⇒ dit, « remplis à la main », « Réessayer »`, t3);
   await o3.pg.waitForTimeout(900);
   const f3 = ligne(base3, 'vrm_pro_facture') || {};
   dit(f3.nom === 'Mon Atelier' && !f3.adresse, `${T} F3 rien d’autre n’est écrit`, JSON.stringify(f3));
@@ -249,12 +252,13 @@ async function configuration(nav, W, theme) {
   const champ = o.pg.locator('[data-configuration-siret-champ]');
   dit(await champ.count() === 1, `${T} C2 micro-entreprise ⇒ le champ SIRET apparaît`);
   await champ.fill(SIRET);
+  await champ.press('Enter');
   const vu = await attendre(o.pg, async () => !!(await o.pg.$('[data-configuration-registre][data-ent-recherche="encours"]')), 5000);
-  dit(vu, `${T} C2 la MÊME recherche (« Recherche de l’entreprise… »)`);
+  dit(vu, `${T} C2 la MÊME recherche (« Recherche de ton entreprise… »)`);
   await capture(o.pg, `cf-${W}-${theme}-C2a-recherche`, true);
   lacher();
   const trouve = await attendre(o.pg, async () => !!(await o.pg.$('[data-configuration-registre][data-ent-recherche="trouve"]')), 6000);
-  dit(trouve, `${T} C2 la MÊME carte « Vérifie ces informations »`);
+  dit(trouve, `${T} C2 la MÊME carte « C’est bien toi ? »`);
   e = await etat(o.pg);
   dit(!!(await o.pg.$('[data-configuration-statut-propose="societe"]')) && e.cartes.find((c) => c.cle === 'statut:micro-vente').coche && !e.cartes.find((c) => c.cle === 'statut:societe').coche, `${T} C2 le registre dit SAS ⇒ « Société » PROPOSÉ, rien coché sans son geste`, JSON.stringify(e.cartes.filter((c) => c.coche)));
   dit(!ligne(base, 'vrm_pro_facture'), `${T} C2 rien n’est écrit dans la fiche avant son geste`, JSON.stringify(ligne(base, 'vrm_pro_facture')));
@@ -263,8 +267,8 @@ async function configuration(nav, W, theme) {
   await o.pg.click('[data-ent-statut-ok]');
   e = await etat(o.pg);
   dit(e.cartes.find((c) => c.cle === 'statut:societe').coche, `${T} C2 « C’est bon » ⇒ Société cochée`);
-  await o.pg.click('[data-ent-tout]');
-  dit(await attendre(o.pg, async () => { const f = ligne(base, 'vrm_pro_facture') || {}; return f.siret === SIRET && f.nom === 'ATELIER EXEMPLE' && f.forme === 'SAS' && f.ville === 'RENNES' && f.tva === TVA; }), `${T} C2 « Tout est bon » ⇒ la fiche de facture porte SIRET, nom, forme, ville, TVA`, JSON.stringify(ligne(base, 'vrm_pro_facture')));
+  await o.pg.click('[data-ent-oui]');
+  dit(await attendre(o.pg, async () => { const f = ligne(base, 'vrm_pro_facture') || {}; return f.siret === SIRET && f.nom === 'ATELIER EXEMPLE' && f.forme === 'SAS' && f.ville === 'RENNES' && f.tva === TVA; }), `${T} C2 « Oui, c’est moi » ⇒ la fiche de facture porte SIRET, nom, forme, ville, TVA`, JSON.stringify(ligne(base, 'vrm_pro_facture')));
   if (o.tel) { const p = await petites(o.pg, '[data-configuration-registre] button, .vrm-cfg-siret button'); dit(!p.length, `${T} C2 cibles de 44 px`, p.join(' | ')); }
   e = await continuer(o.pg);
   dit(e && e.etape === 'societe' && await attendre(o.pg, async () => ligneMain(base).vinted_regime === 'societe'), `${T} C2 statut Société écrit, l’étape TVA suit`, `${e && e.etape} · ${ligneMain(base).vinted_regime}`);
