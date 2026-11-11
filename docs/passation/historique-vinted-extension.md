@@ -1026,3 +1026,8 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 - `audit-vc-messages` M9 jugeait `EXT_CAPACITES.vcfil` = version du manifeste (rouge à chaque montée) : il juge
   désormais la version d'ARRIVÉE (5.317.0).
 - Versions : `CODE_VERSION`, manifeste, `CAPTEUR_VERSION`, `relaisVersion`, `EXT_ATTENDUE` = 5.319.0 ; zip régénéré.
+
+
+## Déplacé de CLAUDE.md §9 le 11 nov. (lot achat-photo), tel quel
+
+- **11 nov. · Extension 5.340 (finitions)** : mode vacances au journal (accepté et relu seulement) ; prix de vente Vestiaire (`sellerPrice`) ⇒ facture Pro Vestiaire, sinon refus d'avant ; avis : historique daté par lecture (« +N avis », 90 j, nombres seuls) ; audits : imports recollés dédoublonnés. `docs/passation/2026-11-11-extension-5340.md`. Geste : installer 5.340.0.
