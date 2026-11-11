@@ -177,7 +177,8 @@ export function progression(s, now = Date.now()) {
   const ecoule = Math.max(0, (fin - s.debut) / 1000);
   const restants = total - finis.length;
   // Rythme réel : temps écoulé (pauses comprises) par article fini.
-  const restant = s.statut === 'cours' && finis.length > 0 && restants > 0 ? (ecoule / finis.length) * restants : (restants === 0 ? 0 : null);
+  // Moins d'une seconde écoulée : aucun rythme mesurable, pas d'estimation (« — »).
+  const restant = s.statut === 'cours' && finis.length > 0 && restants > 0 && ecoule >= 1 ? (ecoule / finis.length) * restants : (restants === 0 ? 0 : null);
   const pause = s.pause && s.pause.jusqua > now ? { raison: s.pause.raison, sec: (s.pause.jusqua - now) / 1000 } : null;
   return {
     total, nFinis: finis.length, nOk, nMain: finis.filter((a) => a.etat === 'main').length, nRefus: finis.filter((a) => a.etat === 'refus' || a.etat === 'saute').length,

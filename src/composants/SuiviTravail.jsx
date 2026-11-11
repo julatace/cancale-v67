@@ -154,7 +154,7 @@ export function SuiviTravailFeuille({ s, jobs = null }) {
             <div><dt>{tr('suivi.temps.ecoule')}</dt><dd data-suivi-ecoule={Math.round(p.ecoule)}>{duree(p.ecoule)}</dd></div>
             <div><dt>{tr('suivi.temps.restant')}</dt><dd data-suivi-restant={p.restant == null ? '' : Math.round(p.restant)}>{fini ? '—' : p.restant == null ? '—' : p.restant === 0 ? tr('suivi.temps.presque') : tr('suivi.temps.environ', { duree: duree(p.restant) })}</dd></div>
           </dl>
-          {p.pause ? <p className="vrm-st-pause" role="status" data-suivi-pause={Math.round(p.pause.sec)}>{p.pause.raison} · {duree(p.pause.sec)}</p> : null}
+          {p.pause ? <p className="vrm-st-pause" role="status" data-suivi-pause={Math.round(p.pause.sec)}>{p.pause.raison} · <b>{duree(p.pause.sec)}</b></p> : null}
           {s.uid && !fini ? <div className="vrm-st-jauge"><JaugeActions uid={s.uid}/></div> : null}
         </div>
 

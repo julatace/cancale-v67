@@ -44,7 +44,7 @@ function batir() {
     if (u === '/h.js' || u === '/h.css') { const f = path.join(dist, u.slice(1)); if (!fs.existsSync(f)) { r.writeHead(200, { 'content-type': 'text/css' }); r.end(''); return; } r.writeHead(200, { 'content-type': u.endsWith('.js') ? 'text/javascript' : 'text/css' }); r.end(fs.readFileSync(f)); return; }
     r.writeHead(200, { 'content-type': 'text/html' }); r.end(page0);
   }).listen(PORT, '127.0.0.1');
-  const nav = await chromium.launch({ args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const tailles = [[390, 844, true], [1512, 900, false]];
   const themes = (process.env.THEMES || 'clair,sombre').split(',');
   for (const [w, h, tactile] of tailles) for (const theme of themes) {
@@ -69,7 +69,7 @@ function batir() {
     const lu = await p.evaluate(() => { const f = document.querySelector('[data-suivi-travail]'); const b = f.querySelector('[role=progressbar]'); return { n: f.getAttribute('data-suivi-n'), now: b.getAttribute('aria-valuenow'), max: b.getAttribute('aria-valuemax'), part: Number(b.getAttribute('data-suivi-part')), enCours: (f.querySelector('[data-suivi-en-cours]') || {}).getAttribute && f.querySelector('[data-suivi-en-cours]').getAttribute('data-suivi-en-cours'), ici: (f.querySelector('[data-etat=ici]') || {}).getAttribute ? f.querySelector('[data-etat=ici]').getAttribute('data-suivi-etape-cle') : '', restant: f.querySelector('[data-suivi-restant]').getAttribute('data-suivi-restant'), pause: Number((f.querySelector('[data-suivi-pause]') || { getAttribute: () => -1 }).getAttribute('data-suivi-pause')), lignes: f.querySelectorAll('[data-suivi-ligne]').length }; });
     dit(lu.n === '2/4' && lu.now === '2' && lu.max === '4' && lu.part > 50 && lu.part < 75, `${tag} 3 « 2 sur 4 », barre entre 2 et 3 annonces`, lu);
     dit(lu.enCours === '103' && lu.ici === 'brouillon', `${tag} 3b l'annonce en cours et son étape (brouillon)`, lu);
-    dit(lu.restant !== '' && Number(lu.restant) >= 0 && lu.pause > 80 && lu.pause <= 95, `${tag} 3c temps restant estimé, pause avec compte à rebours`, lu);
+    dit(Math.abs(Number(lu.restant) - 240) < 10 && lu.pause > 80 && lu.pause <= 95, `${tag} 3c temps restant estimé au rythme réel (4 min pour 2 ⇒ environ 4 min), pause avec compte à rebours`, lu);
     dit(lu.lignes >= 8, `${tag} 3d le journal détaille chaque geste`, lu.lignes);
     if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await p.screenshot({ path: path.join(SHOTS, `cours-${w}-${theme}.png`), fullPage: false }); }
     // 4
