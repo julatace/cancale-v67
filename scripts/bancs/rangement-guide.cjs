@@ -103,11 +103,13 @@ async function passe(b, vp, sombre) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
 
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir, .vrm-pickup-collect').first().waitFor({ timeout: 30000 });
-  if (!(await pg.locator('.vrm-pickup-collect').count())) await pg.locator('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir').first().click();
-  await pg.locator('.vrm-pickup-collect').first().waitFor({ timeout: 12000 });
+  // « J'ai retiré » : sur la ligne du colis (Colis → À retirer, `data-colis-retire`) ou sur sa carte (`.vrm-pickup-collect`).
+  const RETIRE = '[data-colis-retire], .vrm-pickup-collect';
+  await pg.locator(`[data-cc-colonne="retirer"] .vrm-rpf-ouvrir, ${RETIRE}`).first().waitFor({ timeout: 30000 });
+  if (!(await pg.locator(RETIRE).count())) await pg.locator('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir').first().click();
+  await pg.locator(RETIRE).first().waitFor({ timeout: 12000 }).catch(async (e) => { await capture(pg, `rangement-${vp.width}-debug`); throw e; });
   const avant = await lireLocal(pg);
-  await pg.locator('.vrm-pickup-collect').first().click();
+  await pg.locator(RETIRE).first().click();
 
   // R1 — la feuille, ce qu'elle propose, rien d'écrit.
   const prop = await attendre(() => pg.evaluate(() => { const l = document.querySelector('[data-ranger-feuille] [data-ranger-ligne="0"]'); if (!l) return null;
