@@ -660,6 +660,28 @@ function clocheFavorisNative(activer=false,origine){
     } catch (_) {}
   };
 
+  // ── LE MODE VACANCES, TEL QU'IL LE POSE (10 nov., 5.338) ──────────────────
+  // Le geste « vacances » de Vinted n'a jamais été vu (aucune écriture
+  // « holiday » dans ses requêtes rangées) : on ne le devine pas. Quand LUI le
+  // pose ou le retire sur vinted.fr, la page envoie une écriture dont le corps
+  // porte « holiday/vacation » : après un 2xx seulement, on transmet la méthode,
+  // le chemin et le corps (4 Ko au plus). Le fond juge s'il se rejoue
+  // (`recetteVacances`). Lecture de ce que la page vient de faire : zéro requête
+  // de plus vers Vinted (§3).
+  const noteVacances = (method, url, status, corps) => {
+    try {
+      const mt = String(method || '').toUpperCase();
+      if (mt !== 'PUT' && mt !== 'POST' && mt !== 'PATCH') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !/^\/api\//.test(U.pathname)) return;
+      const t = (typeof corps === 'string' && corps.length <= 4000) ? corps : '';
+      if (!t || !/holiday|vacation/i.test(t)) return;
+      post({ kind: 'vacances', methode: mt, chemin: U.pathname, corps: t, status: st });
+    } catch (_) {}
+  };
+
   // ── SES BROUILLONS (28 octobre) ────────────────────────────────────────────
   // Mesuré dans ses requêtes : un brouillon s'enregistre par
   // `POST /api/v2/item_upload/drafts` (`{draft:{id:null,…}}`) et se met en ligne
@@ -1223,6 +1245,7 @@ function nettoyerRelaisSuivi(r) {
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
+            noteVacances(method, url, res.status, corpsEnvoye);   // 10 nov. (5.338)
             noteBrouillon(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 28 oct.
             noteCatalogueVinted(method, url, res.status, () => res.clone().text());
             noteCouleursVinted(method, url, res.status, () => res.clone().text());
@@ -1271,6 +1294,7 @@ function nettoyerRelaisSuivi(r) {
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
+            noteVacances(this.__cancaleMethod, url, this.status, bodyArg);   // 10 nov. (5.338)
             noteBrouillon(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 28 oct.
             noteCatalogueVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteCouleursVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
