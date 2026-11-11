@@ -85,9 +85,16 @@ const offre = (oid, item, titre, prix, uid = 111) => ({ id: `harvest_${uid}_conv
         dit(ouvert, `O ${tag} : Annonces → Outils → « Régler par paire » ouvre Favoris & offres → Offres auto`);
         dit(await pg.getAttribute('[data-offres-auto-ecran] [data-offres-auto-toggle]', 'data-offres-auto-toggle').catch(() => null) === '1', `O ${tag} : l’interrupteur dit « allumé » (le même réglage)`);
         // ── A : l'aperçu ──
+        // Allumées, l'app REPUBLIE la garde (src/offresGarde.js) ~4 s après la lecture des ventes :
+        // le banc l'attend, puis juge l'aperçu sur la garde PUBLIÉE (complète ⇒ « Acceptée » ;
+        // une plateforme pas relue ⇒ « Pas acceptée · un site n’a pas pu être relu »).
+        await pg.waitForFunction((t0) => { try { return Number(JSON.parse(localStorage.getItem('vinted_offres_garde')).at) > t0; } catch (_) { return false; } }, t, { timeout: 15000 }).catch(() => {});
+        await attendre(600);
+        const gComplet = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_offres_garde')).complet === true; } catch (_) { return null; } });
+        const ACC = gComplet ? 'accepter' : 'garde';
         await pg.waitForFunction(() => document.querySelectorAll('[data-oa-offre]').length >= 4, null, { timeout: 15000 }).catch(() => {});
         const dec = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-oa-offre]')].map((e) => [e.getAttribute('data-oa-offre'), e.getAttribute('data-oa-decision') + '|' + e.innerText.replace(/\s+/g, ' ')])));
-        dit(/^accepter\|.*Acceptée 3 à 20 min après/.test(dec['111_301'] || ''), `A ${tag} : 48 € sur N°2 (dès 45) ⇒ « Acceptée 3 à 20 min après »`, dec['111_301']);
+        dit(gComplet ? /^accepter\|.*Acceptée 3 à 20 min après/.test(dec['111_301'] || '') : /^garde\|.*Pas acceptée · un site n’a pas pu être relu/.test(dec['111_301'] || ''), `A ${tag} : 48 € sur N°2 (dès 45) ⇒ ${gComplet ? '« Acceptée 3 à 20 min après »' : 'garde incomplète publiée par l’app : « Pas acceptée · un site n’a pas pu être relu »'}`, dec['111_301']);
         dit(/^refuser\|.*Refusée/.test(dec['111_302'] || ''), `A ${tag} : 20 € sur N°4 (refus sous 30) ⇒ « Refusée »`, dec['111_302']);
         dit(/^sans\|.*Aucune règle/.test(dec['111_303'] || ''), `A ${tag} : 40 € sur N°5 sans seuil ⇒ « Aucune règle »`, dec['111_303']);
         dit(/^sans\|.*seuil illisible/.test(dec['111_304'] || ''), `A ${tag} : mini « 45,5 » (ignoré par le moteur) ⇒ « seuil illisible », jamais « Acceptée »`, dec['111_304']);
@@ -101,18 +108,18 @@ const offre = (oid, item, titre, prix, uid = 111) => ({ id: `harvest_${uid}_conv
         // ── H : l'historique ──
         await pg.waitForFunction(() => { const g = document.querySelector('[data-oa-historique]'); return g && !/lecture/.test(g.getAttribute('data-oa-historique')); }, null, { timeout: 8000 }).catch(() => {});
         const h = await pg.evaluate(() => [...document.querySelectorAll('[data-oa-histo]')].map((e) => e.getAttribute('data-oa-histo') + ':' + e.getAttribute('data-oa-histo-auto') + ':' + e.innerText.replace(/\s+/g, ' ')));
-        dit(h.length === 2 && /^acceptee:1:Acceptée \(auto\).*47,00/.test(h[0]) && /^refusee:1:/.test(h[1]) && !h.some((x) => /99/.test(x)), `H ${tag} : les 2 offres notées du compte 111, la plus récente d’abord (jamais celle du 1110)`, h);
+        dit(h.length === 2 && /^acceptee:1:Acceptée \(auto\) N°2 Adidas.*47(,00)? €/.test(h[0]) && /^refusee:1:/.test(h[1]) && !h.some((x) => /99/.test(x)), `H ${tag} : les 2 offres notées du compte 111, la plus récente d’abord (jamais celle du 1110)`, h);
         // ── S : les seuils ──
         dit(await pg.locator('[data-oa-illisibles="1"]').count() === 1, `S ${tag} : 1 seuil à virgule signalé`);
         await pg.click('[data-oa-corriger]');
         await pg.waitForFunction(() => (document.querySelector('[data-oa-paire="51002"]') || { getAttribute: () => '' }).getAttribute('data-oa-min') === '45.5', null, { timeout: 5000 }).catch(() => {});
         const apres = await pg.evaluate(() => ({ min: (document.querySelector('[data-oa-paire="51002"]') || { getAttribute: () => null }).getAttribute('data-oa-min'), d: (document.querySelector('[data-oa-offre="111_304"]') || { getAttribute: () => null }).getAttribute('data-oa-decision'), ill: document.querySelectorAll('[data-oa-illisibles]').length }));
-        dit(apres.min === '45.5' && apres.d === 'accepter' && apres.ill === 0, `S ${tag} : « Corriger » ⇒ N°3 à 45.5, l’offre de 50 € passe « Acceptée »`, apres);
+        dit(apres.min === '45.5' && apres.d === ACC && apres.ill === 0, `S ${tag} : « Corriger » ⇒ N°3 à 45.5, l’offre de 50 € passe « ${ACC} » (plus « sans règle »)`, apres);
         const champ = pg.locator('[data-oa-paire="51004"] [data-oa-seuil="min"] input');
         await champ.scrollIntoViewIfNeeded().catch(() => {});
         await champ.fill('39,5'); await champ.press('Enter'); await attendre(400);
         const s5 = await pg.evaluate(() => ({ min: (document.querySelector('[data-oa-paire="51004"]') || { getAttribute: () => null }).getAttribute('data-oa-min'), d: (document.querySelector('[data-oa-offre="111_303"]') || { getAttribute: () => null }).getAttribute('data-oa-decision') }));
-        dit(s5.min === '39.5' && s5.d === 'accepter', `S ${tag} : « 39,5 » tapé sur N°5 s’écrit 39.5 et l’aperçu suit (40 € ⇒ Acceptée)`, s5);
+        dit(s5.min === '39.5' && s5.d === ACC, `S ${tag} : « 39,5 » tapé sur N°5 s’écrit 39.5 et l’aperçu suit (40 € ⇒ ${ACC})`, s5);
         await pg.locator('[data-oa-paire="51001"] .vrm-oa-case input').check().catch(() => {});
         await pg.locator('[data-oa-paire="51003"] .vrm-oa-case input').check().catch(() => {});
         dit(await pg.locator('[data-oa-serie-ouvrir="2"]').count() === 1, `S ${tag} : deux paires cochées ⇒ « Régler en série · 2 »`);

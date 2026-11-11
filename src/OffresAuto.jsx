@@ -44,9 +44,11 @@ const quand = (t) => {
 // Un seuil modifiable en place : la saisie s'écrit au départ du champ (ou Entrée),
 // normalisée pour que le MOTEUR la lise (« 45,5 » ⇒ « 45.5 »).
 function ChampSeuil({ valeur, onPoser, label, data }) {
-  const [v, setV] = React.useState(valeur || '');
-  React.useEffect(() => { setV(valeur || ''); }, [valeur]);
-  const poser = () => { const n = montantSeuil(v); if (n !== montantSeuil(valeur || '')) onPoser(n); else if (n !== v) setV(n); };
+  // Affiché à la française (« 45,5 »), écrit avec un point (« 45.5 ») : le moteur le lit.
+  const aff = (x) => String(x || '').replace('.', ',');
+  const [v, setV] = React.useState(aff(valeur));
+  React.useEffect(() => { setV(aff(valeur)); }, [valeur]);
+  const poser = () => { const n = montantSeuil(v); if (n !== montantSeuil(valeur || '')) onPoser(n); else setV(aff(valeur)); };
   return (
     <label className="vrm-oa-seuil" data-oa-seuil={data}>
       <span className="vrm-oa-seuil-mot">{label}</span>
@@ -86,6 +88,7 @@ export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg
   }, []);
   React.useEffect(() => { lireJournal(); }, [lireJournal]);
   const histo = journalOffres(rowsJournal, { uids: uids.size ? uids : null });
+  const titreDe = React.useMemo(() => new Map((Array.isArray(annonces) ? annonces : []).map((x) => [String(x.id), x.titre || ''])), [annonces]);
   // 5. « Tout arrêter » : offres auto + mode auto des favoris (et sa file) sur chaque compte.
   const [arret, setArret] = React.useState(null);
   const toutArreter = async () => {
@@ -204,7 +207,7 @@ export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg
           : histo.map((h) => { const f = h.item ? (numeros || {})[h.item] : null; return (
             <div key={`${h.uid}:${h.t}:${h.tx || ''}:${h.sorte}`} className="vrm-oa-histo" data-oa-histo={h.sorte} data-oa-histo-auto={h.auto ? '1' : '0'}>
               <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? 'Acceptée' : 'Refusée'}{h.auto ? ' (auto)' : ''}</span>
-              <span className="vrm-oa-nom">{f && f.numero ? <Numero n={f.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{(f && f.title) || (h.tx ? `commande ${h.tx}` : '')}</span></span>
+              <span className="vrm-oa-nom">{f && f.numero ? <Numero n={f.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{(h.item && titreDe.get(h.item)) || (f && f.title) || (h.tx ? `commande ${h.tx}` : '')}</span></span>
               <span className="vrm-oa-chiffres">{h.prix != null ? <b>{montant(h.prix)}</b> : '—'} · {quand(h.t)}{nomDe(h.uid) ? ` · ${nomDe(h.uid)}` : ''}</span>
             </div>
           ); })}
