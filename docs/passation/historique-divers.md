@@ -1353,3 +1353,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé de CLAUDE.md §9 (11 nov., lot decisions-11nov)
 
 - **11 nov. · Achats (lot DJ5)** : à côté de chaque proposition d'achat (Sans achat relié, coût d'une vente, numérotage, saisie en série) « Choisir un autre achat » : recherche dans SES achats, libres d'abord, « Déjà relié à N°… » + « Déplacer ici », « Délier » ; SON clic relie par le n° de la ligne (`src/relierAutreAchat.js`) ; « Reçu » d'un achat relié OUVRE (feuille du reçu e-mail, sinon visionneuse PDF) ; « Nouvel achat » refait (photo d'abord, prix en grand, derniers lieux, N° proposé réservé au pool) ; icônes `vitrine` / `soleilLevant`. `docs/passation/2026-11-11-achats-relier.md`. Geste : aucun.
+## Déplacé de CLAUDE.md §9 (11 nov., parité des plateformes)
+
+- **11 nov. · Ventes sans date de versement (lot DJ7)** : mesuré, 1 751 sur UN compte, détail de transaction jamais relu ; relevé : 0 vente datable. « Déclarer » : « N datées ✓ · M sans date », une raison par ligne + geste (« Ouvrir Vinted » par compte, Leboncoin à la main) ; jamais devinée (`src/versementRaisons.js`). `docs/passation/2026-11-11-dates-versement.md`. Geste : ouvrir vinted.fr sur ce compte.
