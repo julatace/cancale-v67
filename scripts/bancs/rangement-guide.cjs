@@ -138,7 +138,7 @@ async function passe(b, vp, sombre) {
 
   // R3 — « Rangé ».
   await pg.locator('[data-ranger-ok]').click();
-  const ecrit = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f && l.slots['13'] ? { l, f } : null; }, 8000);
+  const ecrit = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f && l.slots['13'] && l.couts['13'] != null ? { l, f } : null; }, 10000);
   dit(!!ecrit && ecrit.f.numero === '13' && ecrit.f.achat && ecrit.f.achat.tx === '9301' && ecrit.f.taille === '43' && ecrit.f.prixAchat === 38 && ecrit.f.case && ecrit.f.case.i === 4,
     `${T} R3 · « Rangé » : fiche N°13 liée à la transaction 9301 (taille tapée, prix lu), case niveau 2 · case 2`, ecrit && ecrit.f);
   dit(!!ecrit && ecrit.l.slots['13'] && ecrit.l.slots['13'].m === 'mA' && ecrit.l.slots['13'].i === 4 && ecrit.l.pool.includes('13') && String(ecrit.l.couts['13']) === '38'
@@ -151,7 +151,7 @@ async function passe(b, vp, sombre) {
 
   // R4 — « Annuler » : tout se défait, sauf le N° servi.
   await pg.locator('[data-pilule-annuler]').first().click();
-  const defait = await attendre(async () => { const l = await lireLocal(pg); return !Object.keys(l.fiches).length && !l.slots['13'] ? l : null; }, 8000);
+  const defait = await attendre(async () => { const l = await lireLocal(pg); return !Object.keys(l.fiches).length && !l.slots['13'] && l.couts['13'] == null ? l : null; }, 10000);
   dit(!!defait && defait.pool.includes('13') && defait.couts['13'] == null && defait.slots.B230 && defait.slots['7'],
     `${T} R4 · « Annuler » défait fiche, case et coût ; N°13 reste servi (jamais redonné)`, defait);
 
