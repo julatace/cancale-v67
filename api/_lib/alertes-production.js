@@ -272,3 +272,21 @@ export function refusEnSerie(bilans) {
   if (lus + echecs < 5) return null;   // trop peu pour juger : pas su
   return echecs * 2 >= lus + echecs;
 }
+
+// ── LES ERREURS GARDÉES 30 JOURS AU PLUS (cron du matin) ────────────────────
+// `plantages_terrain_<jour>` du propriétaire (le jour est dans l'id) et les
+// `plantage_*` de chaque vendeur (date copiée dans `meta`, migration 004).
+// Une suppression par filtre : ce qui n'a pas de date n'est jamais touché.
+export async function purgerErreursAnciennes({ url, headers, proprio, fetcher = fetch, maintenant = Date.now() }) {
+  const seuil = new Date(maintenant - GARDE_MS);
+  const jour = seuil.toISOString().slice(0, 10);
+  const out = { fait: true, seuil: seuil.toISOString() };
+  const p = String(proprio || '').trim().toLowerCase();
+  const del = async (q) => {
+    try { const r = await fetcher(`${url}/rest/v1/app_data?${q}`, { method: 'DELETE', headers: { ...headers, Prefer: 'return=minimal' } }); return !!(r && r.ok); } catch (_) { return false; }
+  };
+  out.terrain = RE_UUID.test(p) ? await del(`owner=eq.${p}&id=like.plantages_terrain_*&id=lt.plantages_terrain_${jour}`) : null;
+  out.plantages = await del(`id=like.plantage_*&meta->>at=lt.${encodeURIComponent(seuil.toISOString())}`);
+  out.fait = out.terrain !== false && out.plantages;
+  return out;
+}

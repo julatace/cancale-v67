@@ -92,7 +92,7 @@ import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
 import { passageSondes } from './_lib/statut-sondes.js';
-import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie } from './_lib/alertes-production.js';
+import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie, purgerErreursAnciennes } from './_lib/alertes-production.js';
 import { pushConfigure } from './_lib/push.js';
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
@@ -1457,6 +1457,9 @@ export default async function handler(req, res) {
       const proprio = String(process.env.VRM_OWNER_UID).trim().toLowerCase();
       try { alertesPlantages = await vidangerAlertesPlantages({ proprio, maintenant: debutCron, pousser: (n) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(n)) }); } catch (e) { alertesPlantages = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     }
+    // (11 nov.) Les erreurs (plantages) gardées 30 jours au plus.
+    let purgeErreurs = null;
+    if (!soir && !reveil) { try { purgeErreurs = await purgerErreursAnciennes({ url: SUPABASE_URL, headers: HEADERS, proprio: await proprietaireInstallation(), maintenant: debutCron }); } catch (e) { purgeErreurs = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (9 nov.) Un point par jour pour les courbes du tableau du propriétaire (api/_lib/pilotage.js).
     let pilotage = null;
     if (!soir && !reveil) { try { pilotage = await noterPilotageDuJour({ maintenant: debutCron }); } catch (e) { pilotage = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
@@ -1497,7 +1500,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
