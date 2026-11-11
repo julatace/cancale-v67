@@ -24,6 +24,7 @@ import StockExplication from "../StockExplication.jsx";
 import { InventaireStock } from "../InventaireStock.jsx";
 import { InventaireAnnuel } from "../InventaireAnnuel.jsx";   // (10 nov., lot W) l'inventaire de fin d'année
 import { DEMANDE_INVENTAIRE_ANNUEL } from "../inventaireAnnuel.js";   // (11 nov.) ouverte depuis « Clôturer l'année »
+const BANDE_MAX = 60;   // la bande « À ranger » (pire cas, 11 nov.)
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
 
 // ⟦← App.jsx #3⟧
@@ -1088,7 +1089,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>{souris ? 'glisse un article dans une case (ou clique-le, puis une case)' : 'touche un article puis une case'}</span>
         </div>
         <div data-bande-a-ranger="" style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
-          {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
+          {/* (11 nov., pire cas) 60 vignettes au plus dans la bande : 2 000 « à ranger » y dessinaient
+              1 700 photos d'un coup (1,1 s de gel au défilement). Les autres sont dans la liste, plus bas. */}
+          {aRanger.slice(0, BANDE_MAX).map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
               <button type="button" key={f.id} data-a-ranger={cleDeFiche(f)} data-paire-a-ranger={String(f.numero)} data-paire-plateformes={(f.plateformes || []).join(',')} data-paire-aussi={(f.aussi || []).join(',')} {...dragProps(cleDeFiche(f))} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger l’article N°${f.numero}${(f.aussi || []).length ? ' (aussi N°' + f.aussi.join(', N°') + ')' : ''}${f.title ? ' · ' + f.title : ''}${(f.plateformes || []).length && !f.plateformes.includes('vinted') ? ' · seulement sur ' + f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' et ') : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
@@ -1099,6 +1102,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               </button>
             );
           })}
+          {aRanger.length > BANDE_MAX ? <span className="vrm-s2d-bande-reste" data-bande-reste={aRanger.length - BANDE_MAX}>+{aRanger.length - BANDE_MAX}<small>dans la liste</small></span> : null}
         </div>
       </Card>
     )}

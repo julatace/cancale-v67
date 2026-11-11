@@ -1479,3 +1479,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ### Déplacé de CLAUDE.md §9 (11 nov., ci-vert — fichier au-delà de 59 000 octets), tel quel
 
 - **11 nov. · Rouges d'intégration + garde réseau** : contrôles GitHub de `main` remis au vert — défauts de l'app corrigés (barre d'objectif qui débordait, photos du mode relais/scanner hors `PhotoVinted`, rouge du doublon en dur, « · » en tête de ligne, hook mort) ; contrôles portés sur les formes voulues (Ma journée v2, Ma configuration, Argent dans Gérer, alerte nouvel appareil…), chacun rougi par mutation ; **garde réseau** : aucun banc ne joint la production ni Internet (`scripts/bancs/_garde-reseau.cjs`, sinon rouge). `docs/passation/2026-11-11-rouges-integration.md`. Geste : aucun.
+## Déplacé tel quel de CLAUDE.md §9 (11 nov., pour rester sous 59 000 octets)
+
+- **11 nov. · Clôturer l'année** : Argent → Déclarer (déc.–mai), 8 étapes CONSTATÉES (règles existantes) + portes ; « J'ai fini » = son clic (`vrm_cloture_annee`) ; Ma journée déc./janv. une fois. Sites officiels injoignables ici : cases/seuils non revérifiés. `2026-11-11-cloture-annee.md`.
+
+- **11 nov. · États vides (banc `etats-vides`)** : 13 écrans × vide / pas su / base injoignable / hors ligne ; aucun compte relié PROUVÉ ⇒ « aucun compte relié » (plus « lecture… » à l'infini), Messages et Stock disent « Relier un compte », plus de « au moins 0 », la sonde de Paramètres n'écrit plus base injoignable, au retour du réseau les listes « pas relues » sont relues. `docs/passation/2026-11-11-etats-vides.md`. Geste : aucun.
