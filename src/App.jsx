@@ -70,6 +70,8 @@ import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
 // (9 nov., soir) Colis et Ventes tout de suite : la même règle d'instantané (src/instantaneEcran.js).
 import { ColisInstantane, VentesInstantanee } from './ColisVentesInstantanes.jsx';
+import { AnnoncesInstantanee } from './AnnoncesInstantanee.jsx';   // (11 nov., ouverture-legere-2)
+import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } from './annoncesInstantanee.js';
 import { capturerColis, capturerVentes, ecrireInstantaneColis, ecrireInstantaneVentes, lireInstantaneColis, lireInstantaneVentes } from './colisVentesInstantanes.js';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
@@ -422,7 +424,7 @@ import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
-import { lireAvecCopie, SEL_VERSION, stockageApp, effacerCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
+import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
@@ -5009,6 +5011,32 @@ const lireTout = async (query, opts = {}) => {
   return sansComptesSupprimes(out);
 };
 
+// ── (11 nov., ouverture-legere-2) UNE FAMILLE GARDÉE SUR L'APPAREIL, REVALIDÉE PAR SA VERSION ──
+// src/copieLignes.js (`lireFamilleAvecCopie`) : le NOMBRE de lignes (`Prefer: count=exact`,
+// une ligne, `Range` posé ⇒ le filtre des comptes supprimés ne touche pas la réponse) et les
+// lignes ÉCRITES depuis la copie (dates de `meta`, scalaires, §4.4 ; toutes les pages, §4.5).
+// Version illisible ⇒ la lecture d'avant (famille entière) ; ratée ⇒ `null` (pas su).
+// `select` doit porter `id,updated_at,cap:meta->>capturedAt,…,pg:meta->>purgedAt` (la version).
+const VERSION_META = 'id,updated_at,cap:meta->>capturedAt,rev:meta->>rev,sup:meta->>supprime,pg:meta->>purgedAt';
+const compterFamille = async (filtre) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${filtre}&select=id&limit=1`, { headers: sbAuth({ Range: '0-0', 'Range-Unit': 'items', Prefer: 'count=exact' }), vrmVoirSupprimes: true, cache: 'no-store' });
+    if (!r || !(r.ok || r.status === 416)) return null;
+    const m = /\/(\d+)\s*$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');
+    return m ? Number(m[1]) : null;
+  } catch (_) { return null; }
+};
+const lireFamilleCopiee = async (famille, filtre, select) => {
+  const uid = AUTH.user?.id || '';
+  if (!uid) return lireTout(`${filtre}&select=${select}`);
+  const q = (x) => `%22${encodeURIComponent(x)}%22`;
+  const r = await lireFamilleAvecCopie({ uid, famille, stockage: stockageApp(), local: localStorage,
+    lireCompte: () => compterFamille(filtre),
+    lireDepuis: (x) => lireTout(`${filtre}&or=(updated_at.gte.${q(x)},meta->>capturedAt.gte.${q(x)},meta->>purgedAt.gte.${q(x)})&select=${select}`, { voirSupprimes: true }),
+    lireComplet: () => lireTout(`${filtre}&select=${select}`, { voirSupprimes: true }) });
+  return r.ok ? sansComptesSupprimes(r.rows) : null;
+};
+
 // ── UNE LIGNE MOISSONNÉE N'EST TÉLÉCHARGÉE QU'UNE FOIS ────────────────────
 // Mesuré au chronomètre : au démarrage, l'app demandait 24 fois les lignes
 // « annonces » de 8 comptes (chacune pèse ~765 Ko) et 32 fois les commandes —
@@ -6753,6 +6781,22 @@ const fetchCapturedLabelMetas = async (uid) => {
 // `lecturesPartagees` n'en fait partir qu'un. Chaque fonction garde SA règle
 // (« pas su » : `{}` pour l'un, `null` pour l'autre), rien d'autre ne change.
 const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title';
+// (11 nov., ouverture-legere-2) La MÊME lecture, gardée sur l'appareil et revalidée par
+// sa version (`lireFamilleCopiee`) : à la 2e ouverture, ~250 Ko ⇒ le nombre de lignes et
+// les quelques transactions écrites depuis. Les champs de version s'ajoutent aux cinq
+// (personne ne lit `id`, `cap`… ici). Partagée 60 s, comme `memo` ; un échec n'est pas gardé.
+const TXN_FILTRE = 'id=like.harvest_%25_txn_%25';
+const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title`;
+let _txnMeta = null;
+const lireTxnMeta = () => {
+  const qui = AUTH.user?.id || '';
+  if (_txnMeta && _txnMeta.qui === qui && Date.now() - _txnMeta.at < ROW_TTL_MS) return _txnMeta.p;
+  const p = lireFamilleCopiee('txn', TXN_FILTRE, TXN_COPIE_SELECT).catch(() => null);
+  const e = { qui, at: Date.now(), p };
+  _txnMeta = e;
+  p.then((rows) => { if (!Array.isArray(rows) && _txnMeta === e) _txnMeta = null; });
+  return p;
+};
 // ── L'ÉTAT DE LA TRANSACTION, PLUS FRAIS QUE LA LISTE DES VENTES (17 oct.) ──
 // Plainte de Julien : « la vente nike air max 1 blanc noir et rouge nB546 est un
 // LITIGE et elle réapparaît dans les colis à faire ». Mesuré (lecture seule) :
@@ -6779,7 +6823,7 @@ const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
 const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') }); };
-const lireEtatsTxn = async () => { try { const rows = await lireTout(TXN_META_SELECT); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
+const lireEtatsTxn = async () => { try { const rows = await lireTxnMeta(); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
 const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
 // Une expédition qui a déjà bougé (le colis est parti, ou revient).
@@ -6795,7 +6839,7 @@ const fetchTxnItemIds = async () => {
     // `meta` : la base y range les petits champs à chaque écriture — lire la
     // transaction ne décompresse plus ses ~30 Ko (2 140 ms → 8 ms, 3 oct.).
     // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
-    const rows = await lireTout(TXN_META_SELECT, { memo: true });
+    const rows = await lireTxnMeta();
     if (rows === null) { TXN_ETATS_LU = false; return {}; }
     noterEtatsTxn(rows); TXN_ETATS_LU = true;
     const map = {};
@@ -6815,7 +6859,7 @@ const fetchTxnItemIds = async () => {
 // lignes et Supabase coupe à 1 000 sans le dire (§4.5).
 const fetchVersementsVinted = async () => {
   try {
-    const rows = await lireTout(TXN_META_SELECT, { memo: true });
+    const rows = await lireTxnMeta();
     if (rows === null) return null;
     noterEtatsTxn(rows);
     const map = {};
@@ -25799,7 +25843,9 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 // de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
 async function lireCapturesDetail() {
   try {
-    const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
+    // (11 nov., ouverture-legere-2) Gardée sur l'appareil, revalidée par sa version
+    // (`lireFamilleCopiee`) : ~244 Ko à chaque ouverture ⇒ le nombre et les lignes écrites depuis.
+    const rows = await lireFamilleCopiee('captures', 'id=like.harvest_*&meta->>supprime=is.null', VERSION_META);
     if (!rows) return null;
     const by = {}, ventes = {}, annonces = {}, achats = {};
     rows.forEach(r => {
@@ -27038,7 +27084,7 @@ const lireExtrasRepartition = async () => {
     lireTout('id=like.harvest_%25_listings&select=items:data->payload->items').catch(() => null),
     fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, { headers: sbAuth() })
       .then((r) => (r.ok ? r.json() : null)).then((j) => (Array.isArray(j) ? ((j[0] && j[0].data) || {}) : null)).catch(() => null),
-    lireTout(TXN_META_SELECT).catch(() => null),
+    lireTxnMeta().catch(() => null),
   ]);
   const txn = (pays === null || txnItems === null) ? null : {};
   if (txn) {
@@ -51724,6 +51770,10 @@ function CaptureColis({ uid }) {
 function CaptureVentes({ uid }) {
   return <CaptureInstantane uid={uid} ecran="ventes" racine={() => racineEcranPret('ventes', 'section.vrm-tache[data-tache="ventes"]')} capturer={capturerVentes} ecrire={ecrireInstantaneVentes}/>;
 }
+// (11 nov., ouverture-legere-2) Annonces · Vinted, compte « Tous », recherche vide (src/annoncesInstantanee.js).
+function CaptureAnnonces({ uid }) {
+  return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
+}
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
@@ -52358,7 +52408,7 @@ function AppCoeur() {
       // (6 nov.) Projetée (§4.4). TOUS les comptes, exprès : « Tout sur le N° »
       // retrouve aussi une vente d'un ancien compte (rien n'y filtre les ventes).
       sb('app_data?id=like.harvest_*_orders_sold&select=id,mo:data->payload->my_orders'),
-      (async()=>{ try{ const rows=await lireTout(TXN_META_SELECT,{strict:true}); if(rows===null) return null; noterEtatsTxn(rows); const m={}; for(const r of rows){ if(r&&r.tx&&r.item) m[String(r.tx)]=String(r.item); }
+      (async()=>{ try{ const rows=await lireTxnMeta(); if(rows===null) return null; noterEtatsTxn(rows); const m={}; for(const r of rows){ if(r&&r.tx&&r.item) m[String(r.tx)]=String(r.item); }
         // (1er nov.) La date de versement (transaction finalisée, 450) — la règle
         // de `fetchVersementsVinted`, lue dans la MÊME réponse (aucune requête de plus).
         const ver={}; for(const r of rows){ if(r&&r.tx&&String(r.s)==='450'&&r.su&&!isNaN(Date.parse(r.su))) ver[String(r.tx)]=r.su; } versementsLus=ver; return m; }catch(_){ return null; } })(),
@@ -54456,12 +54506,17 @@ function AppCoeur() {
   const snapColis = React.useMemo(() => (vueColisOuverture && uidInstantane ? lireInstantaneColis(uidInstantane) : null), [vueColisOuverture, uidInstantane]);
   const vueVentesTous = tab === 'ventes' && siteDeTache('ventes', platSub) === 'toutes';
   const snapVentes = React.useMemo(() => (vueVentesTous && uidInstantane ? lireInstantaneVentes(uidInstantane) : null), [vueVentesTous, uidInstantane]);
+  // (11 nov.) Annonces : sur sa vue d'ouverture (Vinted · Annonces) et le compte « Tous » (rien de choisi d'autre).
+  const vueAnnoncesOuverture = tab === 'annonces' && siteDeTache('annonces', platSub) === 'vinted' && sectionDeTache('annonces', platSub) === 'annonces'
+    && compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u)) === '';
+  const snapAnnonces = React.useMemo(() => (vueAnnoncesOuverture && uidInstantane ? lireInstantaneAnnonces(uidInstantane) : null), [vueAnnoncesOuverture, uidInstantane]);
   const instantanePermis = !baseKO && !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
   const instantaneEcranIci = !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueColisOuverture && snapColis && (!ongletColis || ongletColis === snapColis.onglet) && (platSub !== 'retirer' || snapColis.onglet === 'retirer')
       ? <ColisInstantane snap={snapColis} Icon={Icon} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
+    : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
     : null;
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
@@ -55303,6 +55358,7 @@ function AppCoeur() {
         {tab==='journee'&&uidInstantane&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
         {tab==='cat_bord'&&uidInstantane&&<GardeEcran nom="capture-cat_bord"><CaptureColis uid={uidInstantane}/></GardeEcran>}
         {tab==='ventes'&&uidInstantane&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
+        {tab==='annonces'&&uidInstantane&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
