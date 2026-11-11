@@ -41815,6 +41815,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
             {AF.section}
 
+            {/* (11 nov.) « Rappels du jour » : ceux qu'il a posés lui-même (« Me le rappeler »), sous « À faire ». */}
+            <RappelsJourCoque/>
+
             {/* (2 nov., 22 h) La grille des widgets (Vendu du mois, semaine, attente, dernières
                 ventes, stock, tendances) n'est plus rendue sur Ma journée : la maquette n'a que la
                 tête et « À faire ». Les chiffres vivent dans Ventes, Statistiques et Comptabilité.
@@ -55464,7 +55467,6 @@ function AppCoeur() {
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
         {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
-        {tab==='journee'&&<GardeEcran nom="journee:rappels"><RappelsJourCoque/></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
