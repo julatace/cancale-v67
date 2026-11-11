@@ -377,6 +377,7 @@ export default {
   "photosComptes.lecture": "Leyendo anuncios…",
   "photosComptes.lectureRatee": "Huellas no leídas: vuelve a intentarlo más tarde.",
   "photosComptes.extension": "La extensión {v} comprueba tus fotos: actualízala.",
+  "photosComptes.extensionAbsente": "En el ordenador donde abres Vinted, instala la extensión {v}: comprueba tus fotos.",
   "photosComptes.pasRelus": "Sin leer: {noms}",
   "photosComptes.ouvrir": "Abrir en Vinted",
   "photosComptes.republier": "Volver a publicar con otras fotos",

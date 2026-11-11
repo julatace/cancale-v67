@@ -142,7 +142,7 @@ const BRUIT = /vrm_journee|push_|_vues|vrm_reprise|vrm_ecran|vrm_lu_|vrm_nouveau
 
 async function ouvrir(b, vp, sc, { sombre = false, tab = 'journee', images }) {
   const tel = vp.width < 600;
-  const ctx = await b.newContext({ viewport: vp, deviceScaleFactor: tel ? 2 : 1, timezoneId: 'Europe/Paris', ...(tel ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light' });
+  const ctx = await b.newContext({ viewport: vp, deviceScaleFactor: tel ? 2 : 1, timezoneId: 'Europe/Paris', locale: 'fr-FR', ...(tel ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = [], ecritures = [], api = [];
   pg.on('pageerror', (e) => errs.push(e.message));
@@ -165,7 +165,7 @@ async function ouvrir(b, vp, sc, { sombre = false, tab = 'journee', images }) {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
-    if (req.method() !== 'GET' && req.method() !== 'HEAD') { ecritures.push({ m: req.method(), u: u.slice(0, 200) }); return j([]); }
+    if (req.method() !== 'GET' && req.method() !== 'HEAD') { ecritures.push({ m: req.method(), u: u.slice(0, 200) + ' ' + String(req.postData() || '').replace(/"data":[\s\S]*$/, '').slice(0, 160) }); return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     if (/photo_emprunte/.test(u)) {
@@ -201,14 +201,18 @@ const lireFeuille = (pg) => pg.evaluate(() => {
     const vigs = [...g.querySelectorAll('[data-pc-annonce]')].map((v) => {
       const img = v.querySelector('img'); const r = v.getBoundingClientRect();
       const a = v.querySelector('[data-pc-ouvrir]');
-      return { id: v.getAttribute('data-pc-annonce'), charge: !!(img && img.complete && img.naturalWidth > 0), top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width),
+      const ph = v.querySelector('.vrm-phc-photo'), cap = v.querySelector('figcaption'), rg = v.closest('.vrm-phc-rangee');
+      const rc = cap && cap.getBoundingClientRect(), rr = rg && rg.getBoundingClientRect();
+      const chaine = []; for (let e = ph; e && chaine.length < 6; e = e.parentElement) { const cs = getComputedStyle(e); chaine.push(`${e.tagName}.${String(e.className).slice(0, 30)} h${Math.round(e.getBoundingClientRect().height)} mh${cs.maxHeight} ov${cs.overflow} d${cs.display}`); }
+      return { hPhoto: ph ? Math.round(ph.getBoundingClientRect().height) : 0, legendeVue: !!(rc && rr && rc.height > 10 && rc.bottom <= rr.bottom + 1), chaine: chaine.join(' < '),
+        id: v.getAttribute('data-pc-annonce'), charge: !!(img && img.complete && img.naturalWidth > 0), top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width),
         legende: (v.querySelector('figcaption') || {}).textContent || '', href: a && a.getAttribute('href'), cible: a && a.getAttribute('target') };
     });
     const geste = g.querySelector('[data-pc-republier]'); const gr = geste && geste.getBoundingClientRect();
     return { id: g.getAttribute('data-pc-groupe'), d: Number(g.getAttribute('data-pc-distance')), vigs, geste: geste && geste.getAttribute('data-pc-republier'), hGeste: gr ? Math.round(gr.height) : 0 };
   });
-  const coupe = [...s.querySelectorAll('*')].some((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1 && !e.closest('.vrm-pc-rangee'); });
-  return { feuille: true, n: Number(s.getAttribute('data-pc-groupes')), verifiees: Number(s.getAttribute('data-pc-verifiees')), pasVerifiees: Number(s.getAttribute('data-pc-pas-verifiees')),
+  const coupe = [...s.querySelectorAll('*')].some((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1 && !e.closest('.vrm-phc-rangee'); });
+  return { feuille: true, lu: s.getAttribute('data-pc-lu'), n: Number(s.getAttribute('data-pc-groupes')), verifiees: Number(s.getAttribute('data-pc-verifiees')), pasVerifiees: Number(s.getAttribute('data-pc-pas-verifiees')),
     manqueDit: !!s.querySelector('[data-pc-manque]'), pasRelus: (s.querySelector('[data-pc-pas-relus]') || { getAttribute: () => '' }).getAttribute('data-pc-pas-relus'),
     etat: (s.querySelector('[data-pc-etat]') || {}).textContent || '', groupes, coupe, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     boutonsSupprimer: [...s.querySelectorAll('button')].filter((x) => /supprim/i.test(x.textContent)).length };
@@ -234,9 +238,9 @@ const lireFeuille = (pg) => pg.evaluate(() => {
     if (CAPT) for (const n of ['P1', 'P1b', 'P3', 'P3v']) fs.writeFileSync(path.join(CAPT, `photo-${n}.jpg`), Buffer.from(F[n].b64, 'base64'));
     const SC = scenarios(F);
 
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 945 }]) {
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 945 }].filter((v) => !process.env.BANC_SEUL || String(v.width) === process.env.BANC_SEUL)) {
       const tel = vp.width < 600, nomVp = tel ? '390' : '1512';
-      for (const sombre of [false, true]) {
+      for (const sombre of [false, true].filter((x) => !process.env.BANC_THEME || (x ? 'sombre' : 'clair') === process.env.BANC_THEME)) {
         const th = sombre ? 'sombre' : 'clair';
         console.log(`\n── ${nomVp} px · ${th}`);
         await essaie(`A ${nomVp} ${th}`, async () => {
@@ -278,6 +282,7 @@ const lireFeuille = (pg) => pg.evaluate(() => {
             const vigs = f.groupes.flatMap((g) => g.vigs);
             dit(vigs.length === 4 && vigs.every((v) => v.charge), 'A2 les 4 miniatures sont CHARGÉES (les photos inventées)', JSON.stringify(vigs.map((v) => [v.id, v.charge])));
             dit(f.groupes.every((g) => g.vigs.length === 2 && g.vigs[0].top === g.vigs[1].top && g.vigs[1].left >= g.vigs[0].left + g.vigs[0].w), 'A2 côte à côte (même ligne)', JSON.stringify(f.groupes.map((g) => g.vigs.map((v) => [v.top, v.left]))));
+            dit(vigs.every((v) => v.hPhoto >= 150 && v.legendeVue), 'A2 chaque miniature ENTIÈRE (≥ 150 px de haut) et sa légende VISIBLE (compte, N°)', JSON.stringify(vigs.map((v) => [v.hPhoto, v.legendeVue, v.chaine]).slice(0, 1)));
             const leg = Object.fromEntries(vigs.map((v) => [v.id, v.legende]));
             dit(/compte-alpha/.test(leg['vinted:111|5000001']) && /N°12/.test(leg['vinted:111|5000001']) && /compte-beta/.test(leg['vinted:222|6000001']) && /N°40/.test(leg['vinted:222|6000001']) && /compte-gamma/.test(leg['vinted:333|8000001']) && /N°70/.test(leg['vinted:333|8000001']), 'A2 chaque vignette : son compte et son N°', JSON.stringify(leg));
             dit(vigs.every((v) => /^https:\/\/www\.vinted\.fr\/items\/\d+/.test(v.href || '') && v.cible === '_blank'), 'A2 « Ouvrir sur Vinted » : vinted.fr, nouvel onglet', JSON.stringify(vigs.map((v) => v.href)));
@@ -293,7 +298,7 @@ const lireFeuille = (pg) => pg.evaluate(() => {
           const rm = await pg.evaluate(() => { const e = document.querySelector('[data-repub-main]'); return e ? e.getAttribute('data-repub-main') : null; });
           dit(rm === '6000001', 'A3 « Republier avec d’autres photos » (depuis Ma journée) ouvre Republier à la main sur 6000001', String(rm));
           const ecr = ecritures.slice(avant).filter((e) => !BRUIT.test(e.u));
-          const cmd = api.slice(avantApi).filter((x) => !/\/api\/(push|sante)/.test(x));
+          const cmd = api.slice(avantApi).filter((x) => !/\/api\/(push|sante)|mode=mesures/.test(x));   // mesures d'usage (compteurs anonymes) : pas une commande
           dit(ecr.length === 0 && cmd.length === 0, 'A3 ouvrir la feuille et le geste : rien écrit, aucune commande', JSON.stringify([...ecr, ...cmd].slice(0, 3)));
           dit(!pg.selectData && pg.lectEmpreintes >= 1, 'les empreintes lues par PROJECTION (jamais select=data)', `${pg.lectEmpreintes} lecture(s), select=data ${!!pg.selectData}`);
           dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
@@ -333,7 +338,8 @@ const lireFeuille = (pg) => pg.evaluate(() => {
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `pc-C-${nomVp}-feuille.png`) });
         const f = await lireFeuille(pg);
         dit(f.feuille && f.n === 0 && f.verifiees === 0 && f.pasVerifiees === 9 && f.manqueDit, 'C la feuille : 0 groupe, 9 photos pas vérifiées, DIT', JSON.stringify({ f: f.feuille, n: f.n, v: f.verifiees, p: f.pasVerifiees }));
-        dit(/pas/i.test(f.etat) && !/aucune/i.test(f.etat), 'C « pas lues », jamais « aucun doublon »', f.etat);
+        dit(f.lu === '0' && f.n === 0, 'C « pas lues » (data-pc-lu=0), jamais « aucun doublon »', JSON.stringify({ lu: f.lu, etat: f.etat }));
+        dit(/pas lues/i.test(f.etat) && !/aucune/i.test(f.etat), 'C la phrase (français) : « pas lues », pas « aucune »', f.etat);
         dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
         await ctx.close();
       });
@@ -346,7 +352,7 @@ const lireFeuille = (pg) => pg.evaluate(() => {
         await pg.waitForTimeout(500);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `pc-D-${nomVp}-feuille.png`) });
         const f = await lireFeuille(pg);
-        dit(f.feuille && f.n === 1 && /compte-beta/.test(f.pasRelus || '') && f.pasVerifiees >= 3, 'D la feuille : 1 groupe, beta nommé « pas relu », ses photos pas vérifiées', JSON.stringify({ n: f.n, pr: f.pasRelus, p: f.pasVerifiees }));
+        dit(f.feuille && f.n === 1 && /compte-beta/.test(f.pasRelus || ''), 'D la feuille : 1 groupe, beta NOMMÉ « pas relu » (jamais un silence)', JSON.stringify({ n: f.n, pr: f.pasRelus, p: f.pasVerifiees }));
         dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
         await ctx.close();
       });

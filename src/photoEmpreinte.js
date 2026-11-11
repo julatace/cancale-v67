@@ -146,6 +146,9 @@ export function photosEnDouble({ annonces = [], empreintes = {}, comptesLus = {}
     const manquent = photos.filter((k) => !empreinteValide(emp[k])).length;
     nPasVerifiees += photos.length ? manquent : (connues.length ? 0 : 1);
   }
+  // Un compte pas relu est NOMMÉ même quand aucune de ses annonces n'est montrée (lecture de
+  // plus de 24 h : ses annonces sont « à confirmer », hors de la liste) — jamais un silence.
+  for (const [cc, v] of Object.entries(comptesLus || {})) if (v === false) comptesPasVerifies.add(cc);
   // Union-find par annonce (une annonce = un nœud), sur les paires de photos proches :
   // comparaison complète, bornée (quelques milliers de photos au plus chez un vendeur).
   const cle = (it) => `${it.cc}|${it.a.id}`;

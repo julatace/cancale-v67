@@ -31,8 +31,8 @@ export function textePhotosComptes(res) {
 
 function Vignette({ a, PhotoVinted }) {
   return (
-    <figure className="vrm-pc-vignette" data-pc-annonce={`${a.cc}|${a.id}`}>
-      <a className="vrm-pc-photo" href={lienVinted(a)} target="_blank" rel="noopener noreferrer" aria-label={`${tr('photosComptes.ouvrir')} · ${nomDe(a)}`} data-pc-ouvrir={a.id}>
+    <figure className="vrm-phc-vignette" data-pc-annonce={`${a.cc}|${a.id}`}>
+      <a className="vrm-phc-photo" href={lienVinted(a)} target="_blank" rel="noopener noreferrer" aria-label={`${tr('photosComptes.ouvrir')} · ${nomDe(a)}`} data-pc-ouvrir={a.id}>
         {a.photo && PhotoVinted ? <PhotoVinted src={a.photo} alt="" loading="lazy"/> : <PhotoVide remplir/>}
       </a>
       <figcaption>
@@ -45,34 +45,34 @@ function Vignette({ a, PhotoVinted }) {
 
 export function PhotosEntreComptesDetail({ res, PhotoVinted = null, onRepublier = null, extension = 'ok', versionExt = '' }) {
   useLangue();
-  if (!res) return <p className="vrm-pc-etat" data-pc-pas-pret="">{tr('photosComptes.lecture')}</p>;
+  if (!res) return <p className="vrm-phc-etat" data-pc-pas-pret="">{tr('photosComptes.lecture')}</p>;
   const g = res.groupes || [];
   const pasRelus = (res.comptesPasVerifies || []).map((cc) => res.noms[cc] || cc.replace(/^vinted:/, ''));
   return (
-    <div className="vrm-pc" data-photos-comptes="" data-pc-groupes={g.length} data-pc-verifiees={res.nVerifiees} data-pc-pas-verifiees={res.nPasVerifiees}>
-      <p className="vrm-pc-risque">{tr('photosComptes.risque')}</p>
-      <p className="vrm-pc-etat" data-pc-etat="">
+    <div className="vrm-phc" data-photos-comptes="" data-pc-groupes={g.length} data-pc-lu={res.lu ? '1' : '0'} data-pc-verifiees={res.nVerifiees} data-pc-pas-verifiees={res.nPasVerifiees}>
+      <p className="vrm-phc-risque">{tr('photosComptes.risque')}</p>
+      <p className="vrm-phc-etat" data-pc-etat="">
         {!res.lu ? tr('photosComptes.lectureRatee')
           : g.length ? tr('photosComptes.verifiees', { n: res.nVerifiees })
           : res.nVerifiees ? tr('photosComptes.aucuneParmi', { n: res.nVerifiees }) : null}
         {res.nPasVerifiees > 0 ? <span data-pc-manque={res.nPasVerifiees}>{tr('photosComptes.pasVerifiees', { n: res.nPasVerifiees })}</span> : null}
       </p>
-      {extension !== 'ok' ? <p className="vrm-pc-ext" data-pc-ext={extension}>{tr('photosComptes.extension', { v: versionExt })}</p> : null}
+      {extension !== 'ok' ? <p className="vrm-phc-ext" data-pc-ext={extension}>{tr(extension === 'absente' ? 'photosComptes.extensionAbsente' : 'photosComptes.extension', { v: versionExt })}</p> : null}
       {g.map((x) => {
         const cible = cibleRepublier(x);
         return (
-          <section key={x.id} className="vrm-pc-groupe" data-pc-groupe={x.id} data-pc-distance={String(x.distance)}>
-            <div className="vrm-pc-rangee">{x.annonces.map((a) => <Vignette key={`${a.cc}|${a.id}`} a={a} PhotoVinted={PhotoVinted}/>)}</div>
+          <section key={x.id} className="vrm-phc-groupe" data-pc-groupe={x.id} data-pc-distance={String(x.distance)}>
+            <div className="vrm-phc-rangee">{x.annonces.map((a) => <Vignette key={`${a.cc}|${a.id}`} a={a} PhotoVinted={PhotoVinted}/>)}</div>
             {cible && onRepublier ? (
-              <button type="button" className="vrm-pc-geste" data-pc-republier={`${cible.compte}:${cible.id}`} onClick={() => onRepublier(cible)}
+              <button type="button" className="vrm-phc-geste" data-pc-republier={`${cible.compte}:${cible.id}`} onClick={() => onRepublier(cible)}
                 title={tr('photosComptes.republierAide', { numero: cible.numero ? `N°${cible.numero}` : tr('photosComptes.sansNumero'), compte: nomDe(cible) })}>
                 {tr('photosComptes.republier')}<small>{nomDe(cible)}{cible.numero ? ` · N°${cible.numero}` : ''}</small>
               </button>
-            ) : cible ? <a className="vrm-pc-geste" href={lienVinted(cible)} target="_blank" rel="noopener noreferrer" data-pc-ouvrir-geste={cible.id}>{tr('photosComptes.ouvrir')}<small>{nomDe(cible)}</small></a> : null}
+            ) : cible ? <a className="vrm-phc-geste" href={lienVinted(cible)} target="_blank" rel="noopener noreferrer" data-pc-ouvrir-geste={cible.id}>{tr('photosComptes.ouvrir')}<small>{nomDe(cible)}</small></a> : null}
           </section>
         );
       })}
-      {pasRelus.length ? <p className="vrm-pc-manque" data-pc-pas-relus={pasRelus.join(' ')}>{tr('photosComptes.pasRelus', { noms: et(pasRelus) })}</p> : null}
+      {pasRelus.length ? <p className="vrm-phc-manque" data-pc-pas-relus={pasRelus.join(' ')}>{tr('photosComptes.pasRelus', { noms: et(pasRelus) })}</p> : null}
     </div>
   );
 }
@@ -102,15 +102,15 @@ export function EncartPhotosAutresComptes({ sources = [], photos = [], compteCib
   if (r.annonces.length) {
     const comptes = [...new Set(r.annonces.map(nomDe))];
     return (
-      <div className="vrm-pc-encart" role="status" data-pc-encart="risque" data-pc-encart-n={r.annonces.length}>
-        <div className="vrm-pc-encart-photos">{r.annonces.slice(0, 3).map((a) => (
-          <span key={`${a.cc}|${a.id}`} className="vrm-pc-encart-photo" data-pc-encart-annonce={`${a.cc}|${a.id}`}>{a.photo && Photo ? Photo(a.photo) : a.photo && PhotoVinted ? <PhotoVinted src={a.photo} alt="" loading="lazy"/> : <PhotoVide remplir/>}</span>
+      <div className="vrm-phc-encart" role="status" data-pc-encart="risque" data-pc-encart-n={r.annonces.length}>
+        <div className="vrm-phc-encart-photos">{r.annonces.slice(0, 3).map((a) => (
+          <span key={`${a.cc}|${a.id}`} className="vrm-phc-encart-photo" data-pc-encart-annonce={`${a.cc}|${a.id}`}>{a.photo && Photo ? Photo(a.photo) : a.photo && PhotoVinted ? <PhotoVinted src={a.photo} alt="" loading="lazy"/> : <PhotoVide remplir/>}</span>
         ))}</div>
         <p><b>{tr('photosComptes.encart.dejaSur', { comptes: et(comptes) })}</b><span>{tr('photosComptes.encart.possible')}</span></p>
       </div>
     );
   }
-  if (r.nPasVerifiees > 0) return <p className="vrm-pc-encart-manque" data-pc-encart="pas-verifie" data-pc-manque={r.nPasVerifiees}>{tr('photosComptes.pasVerifiees', { n: r.nPasVerifiees })}</p>;
+  if (r.nPasVerifiees > 0) return <p className="vrm-phc-encart-manque" data-pc-encart="pas-verifie" data-pc-manque={r.nPasVerifiees}>{tr('photosComptes.pasVerifiees', { n: r.nPasVerifiees })}</p>;
   return null;
 }
 export default PhotosEntreComptesDetail;

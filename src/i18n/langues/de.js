@@ -377,6 +377,7 @@ export default {
   "photosComptes.lecture": "Anzeigen werden gelesen…",
   "photosComptes.lectureRatee": "Fingerabdrücke nicht gelesen: später erneut versuchen.",
   "photosComptes.extension": "Die Erweiterung {v} prüft deine Fotos: aktualisiere sie.",
+  "photosComptes.extensionAbsente": "Installiere auf dem Computer, auf dem du Vinted öffnest, die Erweiterung {v}: Sie prüft deine Fotos.",
   "photosComptes.pasRelus": "Nicht gelesen: {noms}",
   "photosComptes.ouvrir": "Auf Vinted öffnen",
   "photosComptes.republier": "Mit anderen Fotos neu einstellen",

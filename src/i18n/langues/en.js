@@ -377,6 +377,7 @@ export default {
   "photosComptes.lecture": "Reading listings…",
   "photosComptes.lectureRatee": "Fingerprints not read: try again later.",
   "photosComptes.extension": "Extension {v} checks your photos: update it.",
+  "photosComptes.extensionAbsente": "On the computer where you open Vinted, install extension {v}: it checks your photos.",
   "photosComptes.pasRelus": "Not read: {noms}",
   "photosComptes.ouvrir": "Open on Vinted",
   "photosComptes.republier": "Repost with other photos",
