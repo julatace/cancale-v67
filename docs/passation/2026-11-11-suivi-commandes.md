@@ -8,6 +8,25 @@ statut pour voir la cohérence ; est-ce que tu regardes les infos de suivi ? ».
 
 Extension : **rien changé** (aucune version). Fonctions `api/` : aucune ajoutée (12/12).
 
+
+## ⚠️ EN TÊTE — La ligne de suivi compacte (capture de Julien en production, Achats, ordinateur)
+Julien : « c'est nul, le logo prend toute la page, c'est moche, je veux que tout soit mieux ; si tu peux mettre le
+numéro de suivi à côté de chaque achat ce serait top ». Avant : une puce grise PLEINE LARGEUR, le logo Mondial
+Relay centré, puis la phrase du transporteur sur trois lignes.
+- **Maintenant** (`LigneSuivi`, src/SuiviCommande.jsx + src/design/suivi-ligne.css) : UNE ligne de 24 px au plus,
+  13 px gris — `[logo 18 px] Mondial Relay · N° 30000201 ↗ · Pris en charge · Lieusaint · il y a 47 min ›`.
+  Le n° se copie d'un tap (cible de 44 px au doigt par un bord invisible, le dessin reste fin), « ↗ » ouvre la page
+  publique du transporteur, « › » déplie la phrase EXACTE du transporteur (et sa source). Au téléphone (colonne
+  ≈ 230 px) : deux lignes fines (le n°, puis le statut entier ; l'heure dans le détail) — jamais « P… ».
+- **Sur CHAQUE achat qui a un n° prouvé** (Payé, en route, livré, finalisé) ; aucun n° ⇒ aucune ligne. Plus de puce
+  grise ni de logo agrandi dans Achats. Même ligne dans Ventes · Envoyés (et l'incohérence d'À envoyer).
+- « Pris en charge · Lieusaint » vient de la phrase du transporteur (`lieuDuLibelle`, `statutCourt`,
+  api/_lib/suivi-commandes.js), recopiée en court — jamais devinée ; rien de lisible ⇒ rien.
+- Preuves : banc `suivi-commandes` 112 verts (390/1512, clair/sombre : ligne ≤ 24 px — deux fines ≤ 48 px au
+  téléphone —, logo ≤ 20 px, 13 px, statut ENTIER, rien ne déborde, n° présent sur l'achat livré, aucune ligne sans
+  n°, plus de puce, détail = phrase exacte, cible au doigt) ; sur la tête d'avant (5fdd506) : 28 rouges.
+  `audit-suivi-commandes` 59 verts. Captures regardées.
+
 ## Réponse à sa question : oui, et maintenant aussi pour ses ventes
 
 Avant : les ACHATS étaient lus chez le transporteur jusqu'au bout (`transp_`) ; les VENTES ne l'étaient que

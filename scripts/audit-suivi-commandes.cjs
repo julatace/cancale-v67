@@ -114,6 +114,12 @@ function mrFragment({ n, cp, k, jours }) {
     const tm = T.ligneApresEssai(null, lm, { carrier: 'mondialrelay', suivi: MR, voie: 'mr-fr-mvc', maintenant: NOW - 2 * H, cp: CP });
     const sm = statut({ transporteur: tm, sens: 'entrant' });
     dit(sm && /^En transit · hier 18:02$/.test(sm.texte) && /Mondial Relay/.test(sm.sourceTexte), 'Mondial Relay (achat) : « En transit · hier 18:02 — lu chez Mondial Relay »', JSON.stringify(sm));
+    // (11 nov., soir) La capture de Julien : « Prise en charge de votre colis sur notre site logistique de HUB LIEUSAINT. »
+    const tl = { carrier: 'mondialrelay', etat: 'en_route', libelle: 'Prise en charge de votre colis sur notre site logistique de HUB LIEUSAINT.', etatAt: iso(NOW - 47 * 60000), lu: iso(NOW - 2 * 60000), essaiRes: 'ok' };
+    const sc = fn(S, 'statutCourt')(statut({ transporteur: tl, sens: 'entrant' }), NOW);
+    dit(sc && sc.court === 'Pris en charge · Lieusaint' && sc.quand === 'il y a 47 min' && /HUB|Lieusaint/.test(sc.detail), 'ligne courte : « Pris en charge · Lieusaint » · « il y a 47 min » (la phrase du transporteur, recopiée en court)', JSON.stringify(sc));
+    dit(fn(S, 'lieuDuLibelle')('Colis remis à Mondial Relay') === '' && fn(S, 'lieuDuLibelle')('Envoi en cours d’acheminement') === '', 'aucun lieu lisible dans la phrase ⇒ aucun lieu (jamais deviné)');
+    dit(fn(S, 'statutCourt')(null) === null, 'rien de lu ⇒ aucune ligne courte');
     dit(D.carrierDepart('Mondial Relay', MR) === null && D.carrierDepart('InPost', MR) === null, 'Mondial Relay / InPost VENDU : jamais lu comme départ (code postal de l’acheteur, jamais deviné)');
     const lien = fn(S, 'lienPublic')(SC.lienSuivi, 'InPost', MR);
     dit(lien && /mondialrelay\.fr/.test(lien.url) && lien.site, 'InPost ⇒ la page publique Mondial Relay', lien && lien.url);
@@ -213,16 +219,19 @@ function mrFragment({ n, cp, k, jours }) {
   console.log('§5 l’app : les cartes et Ma journée lisent la MÊME règle');
   const lit = (f) => { try { return fs.readFileSync(path.join(RACINE, f), 'utf8'); } catch (_) { return ''; } };
   const app = lit('src/App.jsx'), comp = lit('src/SuiviCommande.jsx');
-  dit(/from '\.\.\/api\/_lib\/suivi-commandes\.js'/.test(app) && /import SuiviCommande from '\.\/SuiviCommande\.jsx'/.test(app), 'App importe la règle et la carte');
+  dit(/from '\.\.\/api\/_lib\/suivi-commandes\.js'/.test(app) && /import \{ LigneSuivi \} from '\.\/SuiviCommande\.jsx'/.test(app), 'App importe la règle et la ligne compacte');
   const fv = (app.match(/const suiviVente = \(x\) => \{[\s\S]*?\n  \};/) || [''])[0];
   dit(/x\.b && x\.b\.suivi/.test(fv) && /x\.v && x\.v\.suivi/.test(fv) && !/titre|title|marque|brand|taille/.test(fv), 'le n° d’une vente vient de SON bordereau ou de SA vente Vestiaire — jamais du titre', fv.slice(0, 120));
-  dit(/const sv = suiviVente\(x\);[\s\S]{0,200}<SuiviCommande /.test(app), 'Ventes · Envoyés : la carte de suivi sur chaque colis en cours');
-  dit(/code === 'imprime-pas-depose'[\s\S]{0,200}<SuiviCommande /.test(app), 'Ventes · À envoyer : seulement « imprimé, pas déposé »');
-  dit(/suiviAchat\(o, su,[\s\S]{0,1200}<SuiviCommande [^>]*sansStatut/.test(app), 'Achats en route : n°, lien, incohérence (le statut reste dit une fois par `LigneTransporteur`)');
+  dit(/const sv = suiviVente\(x\);[\s\S]{0,500}ligneSuiviVente\(x, sv\)/.test(app), 'Ventes · Envoyés : la ligne de suivi sur chaque colis en cours');
+  dit(/code === 'imprime-pas-depose'[\s\S]{0,200}ligneSuiviVente\(/.test(app), 'Ventes · À envoyer : seulement « imprimé, pas déposé »');
+  dit(/\{!cancelled && \(\(\)=>\{ const su = suivi \|\| suivisAchat\(o, indexSuivisAchats\)\[0\]; if \(!su\) return null;[\s\S]{0,900}<LigneSuivi /.test(app), 'Achats : la ligne de suivi sur CHAQUE achat qui a un n° prouvé (pas seulement en route)');
+  dit(!/<PastilleTransporteur t=\{trA\}/.test(app), 'Achats : plus de puce grise pleine largeur au logo centré (capture de Julien)');
   dit(/const aVerifier = commandesAVerifier\(\);/.test(app) && /data-journee-suivi-verifier=/.test(app) && /\(aVerifier\.n \? 1 : 0\)/.test(app), 'Ma journée : « N commandes à vérifier », compté dans les gestes');
   dit(/const commandesAVerifier = \(\) => \{[\s\S]{0,300}suiviVente\(x\)[\s\S]{0,700}suiviAchat\(o, su/.test(app), 'Ma journée compte avec les MÊMES fonctions que les cartes');
   dit(/cap:meta->>capturedAt'/.test(app) && /cap: r\.cap \|\| null/.test(app), 'l’état Vinted porte l’heure de SA lecture (une incohérence se fonde sur une lecture datée)');
-  dit(/data-suivi-copier=/.test(comp) && /navigator\.clipboard\.writeText\(suivi\)/.test(comp) && /data-suivi-lien=/.test(comp), 'la carte : n° copiable d’un tap, lien public');
+  dit(/data-suivi-copier=/.test(comp) && /navigator\.clipboard\.writeText\(suivi\)/.test(comp) && /data-suivi-lien=/.test(comp) && /data-suivi-deplier=/.test(comp), 'la ligne : n° copiable d’un tap, lien public, détail en dépliant');
+  const sl = (() => { try { return fs.readFileSync(path.join(RACINE, 'src/design/suivi-ligne.css'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/\.vrm-sl-rang \{[^}]*height: 24px/.test(sl) && /\.vrm-sl-logo > \* \{ width: 18px/.test(sl) && /::after \{ content: ''; position: absolute; inset: -11px/.test(sl), 'la ligne fait 24 px, le logo 18 px, la cible au doigt 44 px');
   dit(/x\.prisEnCharge \|\| x\.change/.test(app), 'l’app relit les départs quand un colis suivi bouge');
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s), ${ok} vert(s).` : `\n✅ suivi des commandes : ${ok} contrôles verts.`);
   process.exit(ko ? 1 : 0);

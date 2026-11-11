@@ -44,7 +44,12 @@ const dep = (c, n, o) => ({ id: `depart_${c}_${n}`, data: { v: 1, sens: 'sortant
 const lignes = () => [
   { id: 'main', data: { vinted_used_numeros: V.map((v) => Number(v.num)), vinted_annonce_numeros: Object.fromEntries(V.map((v) => [`i${v.tx}`, { numero: v.num, title: TITRE, auto: false, numberedAt: ilYa(30) }])) } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: iso(MS - 600e3), payload: { my_orders: V.map((v) => ({ transaction_id: v.tx, title: TITRE, price: { amount: '80.0', currency_code: 'EUR' }, status: v.status, transaction_user_status: v.tus, date: ilYa(6) })) } } },
-  { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [{ transaction_id: 7001, title: 'Adidas Samba OG 43', price: { amount: '55.0', currency_code: 'EUR' }, status: 'Le vendeur prépare le colis', transaction_user_status: 'waiting', date: ilYa(5) }] } } },
+  { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(MS - 600e3), payload: { my_orders: [
+    { transaction_id: 7001, title: 'Adidas Samba OG 43', price: { amount: '55.0', currency_code: 'EUR' }, status: 'Le vendeur prépare le colis', transaction_user_status: 'waiting', date: ilYa(5) },
+    { transaction_id: 7002, title: 'Chemise en lin', price: { amount: '18.0', currency_code: 'EUR' }, status: 'Colis en cours d’acheminement', transaction_user_status: 'waiting', date: ilYa(3) },
+    { transaction_id: 7003, title: 'Asics Gel-Lyte III 42', price: { amount: '40.0', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: ilYa(20) },
+    { transaction_id: 7004, title: 'Puma Suede 41', price: { amount: '30.0', currency_code: 'EUR' }, status: 'Colis en cours d’acheminement', transaction_user_status: 'waiting', date: ilYa(2) },
+  ] } } },
   ...V.map((v) => ({ id: `harvest_111_txn_${v.tx}`, data: { capturedAt: iso(MS - H), payload: { transaction: { id: v.tx, item_id: `i${v.tx}`, status: v.s, status_updated_at: ilYa(6), shipment: { status_title: 'Colis en route' } } } } })),
   ...V.map((v) => ({ id: 'email_bord_' + v.tx, data: { transaction: String(v.tx), uid: '111', filename: `bordereau-${v.tx}.pdf`, modele: TITRE, article: TITRE, receivedAt: ilYa(6), pdfB64: PDF_B64, suivi: v.suivi } })),
   // 9501 : noté « Colis fait » il y a 4 j (localStorage), Chronopost n'a que l'étiquette (lu il y a 2 h).
@@ -60,6 +65,11 @@ const lignes = () => [
   dep('vinted', 'VGS1000000000201', { etat: 'en_route', etatAt: iso(MS - 4 * H), priseAt: ilYa(2), derAt: iso(MS - 4 * H), derLib: 'Colis en transit', derLieu: 'Plateforme, 69007 LYON, FR', lu: iso(MS - H), essai: iso(MS - H), fini: true }),
   // L'achat 7001 : son n° relevé par Vinted (SA transaction), l'étiquette créée il y a 4 j.
   { id: 'harvest_111_suivi_7001', data: { tx: '7001', suivi: 'XW300000001TS', transporteur: 'Chronopost', capturedAt: iso(MS - 2 * H), dernier: { t: 'Le vendeur a généré le bordereau', at: ilYa(4) } } },
+  // 7002 : la capture de Julien (Mondial Relay, « HUB LIEUSAINT », lu il y a 47 min).
+  { id: 'harvest_111_suivi_7002', data: { tx: '7002', suivi: '30000201', transporteur: 'Mondial Relay', capturedAt: iso(MS - 2 * H), dernier: { t: 'Colis en route', at: ilYa(1) } } },
+  { id: 'transp_mondialrelay_30000201', data: { v: 1, suivi: '30000201', carrier: 'mondialrelay', etat: 'en_route', etatAt: iso(MS - 47 * 60e3), libelle: 'Prise en charge de votre colis sur notre site logistique de HUB LIEUSAINT.', lu: iso(MS - 47 * 60e3), essai: iso(MS - 47 * 60e3), essaiRes: 'ok', essais: 0, source: 'serveur', cp: '35000', fini: false } },
+  // 7003 : finalisé (« Livré ») — son n° est montré quand même ; 7004 : AUCUN n° ⇒ aucune ligne.
+  { id: 'harvest_111_suivi_7003', data: { tx: '7003', suivi: 'XW300000003TS', transporteur: 'Chronopost', capturedAt: ilYa(15), dernier: { t: 'Colis livré', at: ilYa(16) } } },
   { id: 'transp_chronopost_XW300000001TS', data: { v: 1, suivi: 'XW300000001TS', carrier: 'chronopost', etat: 'en_route', detail: 'prepare', etatAt: ilYa(4), libelle: 'Envoi en cours de préparation', lu: iso(MS - 3 * H), essai: iso(MS - 3 * H), essaiRes: 'ok', essais: 0, source: 'serveur', fini: false } },
 ];
 let ko = 0, ok = 0;
@@ -142,7 +152,7 @@ const sain = async (pg, ecran) => {
 };
 const lireSuivis = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-suivi-commande]')].map((x) => [x.getAttribute('data-suivi-commande'), {
   n: x.getAttribute('data-suivi-n'), src: x.getAttribute('data-suivi-source'), inc: x.getAttribute('data-suivi-incoherence') || '',
-  texte: (x.querySelector('[data-suivi-texte]') || {}).innerText || '', lu: (x.querySelector('[data-suivi-lu]') || {}).innerText || '',
+  texte: ((x.querySelector('[data-suivi-texte]') || {}).textContent || '').trim(), lu: ((x.querySelector('[data-suivi-lu]') || {}).textContent || '').trim(),
   lien: (x.querySelector('[data-suivi-lien]') || { getAttribute: () => '' }).getAttribute('href') || '',
 }])));
 
@@ -162,11 +172,11 @@ const lireSuivis = (pg) => pg.evaluate(() => Object.fromEntries([...document.que
             await pg.waitForTimeout(1200);
             const S = await lireSuivis(pg);
             const v2 = S['p:9502'] || S['v:9502'], v1 = S['v:9501'], v3 = S['p:9503'] || S['v:9503'], vc = S['vc:VC1'], v4 = S['p:9504'] || S['v:9504'];
-            dit(v2 && v2.n === 'XW200000002TS' && v2.src === 'transporteur' && v2.texte === 'En transit · Lyon · hier 18:02' && /^lu chez Chronopost il y a 2 h$/.test(v2.lu.replace(/^ — /, '')), 'E. 9502 : « En transit · Lyon · hier 18:02 — lu chez Chronopost il y a 2 h »', JSON.stringify(v2 || Object.keys(S)));
+            dit(v2 && v2.n === 'XW200000002TS' && v2.src === 'transporteur' && v2.texte === 'En transit · Lyon' && /^il y a 18 h$/.test(v2.lu), 'E. 9502 : une ligne « Chronopost · N° … ↗ · En transit · Lyon · il y a 18 h »', JSON.stringify(v2 || Object.keys(S)));
             dit(v2 && /chronopost\.fr\/tracking-no-cms\/suivi-page\?listeNumerosLT=XW200000002TS/.test(v2.lien), 'E. « Suivre ↗ » ouvre la page publique de Chronopost, n° pré-rempli', v2 && v2.lien);
             dit(v1 && v1.inc === 'pas-pris', 'E. 9501 noté déposé il y a 4 j, Chronopost n’a que l’étiquette ⇒ ambre « pas pris en charge »', JSON.stringify(v1));
             dit(v3 && v3.inc === 'livre-pas-finalise', 'E. 9503 retiré il y a 5 j, Vinted pas finalisé (lu après) ⇒ ambre', JSON.stringify(v3));
-            dit(vc && vc.n === 'VGS1000000000201' && /^En transit · Lyon · aujourd’hui 08:00$/.test(vc.texte) && /Vinted Go/.test(vc.lu), 'E. Vestiaire « envoyée » : suivie chez Vinted Go (« En transit · Lyon · aujourd’hui 08:00 »)', JSON.stringify(vc));
+            dit(vc && vc.n === 'VGS1000000000201' && vc.texte === 'En transit · Lyon' && /^il y a 4 h$/.test(vc.lu), 'E. Vestiaire « envoyée » : suivie chez Vinted Go (« En transit · Lyon · il y a 4 h »)', JSON.stringify(vc));
             dit(v4 && v4.src === 'vinted' && !/Lyon/.test(v4.texte) && v4.inc === '', 'I. 9504, même titre que 9502 : pas de lecture de SON n° ⇒ seulement ce que dit Vinted, jamais « Lyon »', JSON.stringify(v4));
             const ambres = await pg.evaluate(() => document.querySelectorAll('[data-incoherence]').length);
             dit(ambres === 2, 'E. exactement deux incohérences en ambre (aucune inventée)', String(ambres));
@@ -175,8 +185,11 @@ const lireSuivis = (pg) => pg.evaluate(() => Object.fromEntries([...document.que
             await pg.waitForTimeout(300);
             const copie = await pg.evaluate(() => (document.querySelector('[data-suivi-copier="XW200000002TS"] [data-suivi-copie]') || {}).getAttribute && document.querySelector('[data-suivi-copier="XW200000002TS"] [data-suivi-copie]').getAttribute('data-suivi-copie'));
             dit(copie === '1', 'E. « Copier » : le n° est copié (« Copié ✓ »)', String(copie));
-            const tailles = await pg.evaluate(() => [...document.querySelectorAll('[data-suivi-copier],[data-suivi-lien]')].map((x) => Math.round(x.getBoundingClientRect().height)));
-            dit(tailles.length > 0 && tailles.every((h) => h >= 44), 'E. cibles au doigt de 44 px', tailles.join(','));
+            if (process.env.DIAG) console.log(await pg.evaluate(() => { const r = document.querySelector('[data-suivi-ligne] .vrm-sl-rang'); return JSON.stringify([r.getBoundingClientRect().width, ...[...r.children].map((c) => [c.className, Math.round(c.getBoundingClientRect().left), Math.round(c.getBoundingClientRect().top), Math.round(c.getBoundingClientRect().width), Math.round(c.getBoundingClientRect().height)])]); }));
+            const forme = await pg.evaluate(() => [...document.querySelectorAll('[data-suivi-ligne] .vrm-sl-rang')].map((r) => ({ h: Math.round(r.getBoundingClientRect().height), statutW: Math.round(((r.querySelector('.vrm-sl-statut') || { getBoundingClientRect: () => ({ width: 99 }) }).getBoundingClientRect()).width), entier: (() => { const e = r.querySelector('.vrm-sl-statut'); return !e || e.scrollWidth <= e.clientWidth + 1; })(), dans: [...r.children].every((c) => c.getBoundingClientRect().right <= r.getBoundingClientRect().right + 0.5), logo: Math.round(((r.querySelector('.vrm-sl-logo [data-transporteur-logo]') || r.querySelector('.vrm-sl-logo') || {}).getBoundingClientRect ? (r.querySelector('.vrm-sl-logo [data-transporteur-logo]') || r.querySelector('.vrm-sl-logo')).getBoundingClientRect().width : 0)), fs: getComputedStyle(r).fontSize })));
+            dit(forme.length >= 5 && forme.every((f) => f.h <= (vp.width < 600 ? 48 : 24) && f.logo > 0 && f.logo <= 20 && f.fs === '13px' && f.statutW >= 30 && f.entier && f.dans), `E. chaque ligne de suivi : ${vp.width < 600 ? 'deux lignes fines (≤ 48 px)' : 'une ligne ≤ 24 px'}, logo ≤ 20 px, texte 13 px, statut ENTIER, rien ne déborde`, JSON.stringify(forme));
+            const cible = await pg.evaluate(() => { const b = document.querySelector('[data-suivi-copier="XW200000002TS"]'); const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top - 8); return !!(e && e.closest('[data-suivi-copier="XW200000002TS"]')); });
+            dit(cible, 'E. le n° se touche aussi 8 px au-dessus du texte (cible au doigt plus grande que le dessin)');
             await pg.evaluate(() => { const e = document.querySelector('[data-suivi-commande="v:9501"]'); if (e) e.scrollIntoView({ block: 'center' }); });
             await shot(pg, `suivi-commandes-envoyes-${k}`);
             await sain(pg, 'Ventes · Envoyés');
@@ -186,13 +199,24 @@ const lireSuivis = (pg) => pg.evaluate(() => Object.fromEntries([...document.que
         { const { ctx, pg, errs } = await ouvrir(b, vp, { sombre, tab: 'cat_achats' });
           await essaie('Achats', async () => {
             await pg.waitForSelector('[data-suivi-commande="a:7001"]', { timeout: 30000, state: 'visible' }).catch(() => {});
+            await pg.waitForSelector('[data-suivi-commande="a:7002"]', { timeout: 15000, state: 'visible' }).catch(() => {});
             await pg.waitForTimeout(800);
             const S = await lireSuivis(pg);
             const a = S['a:7001'];
             dit(a && a.n === 'XW300000001TS' && a.inc === 'pas-depose-vendeur', 'A. achat en route : son n°, et « Étiquette créée il y a 4 j » + « Écris au vendeur »', JSON.stringify(a || Object.keys(S)));
             const t = await pg.evaluate(() => { const e = document.querySelector('[data-suivi-commande="a:7001"]'); return e ? e.innerText : ''; });
+            const a2 = S['a:7002'], a3 = S['a:7003'];
+            dit(a2 && a2.n === '30000201' && a2.texte === 'Pris en charge · Lieusaint' && a2.lu === 'il y a 47 min', 'A. la capture de Julien : « Mondial Relay · N° 30000201 ↗ · Pris en charge · Lieusaint · il y a 47 min » en UNE ligne', JSON.stringify(a2));
+            dit(a3 && a3.n === 'XW300000003TS', 'A. achat finalisé (« Livré ») : son n° est à côté de lui aussi', JSON.stringify(a3));
+            dit(!S['a:7004'], 'A. achat sans n° : aucune ligne (rien de bruyant)', JSON.stringify(S['a:7004']));
+            const forme = await pg.evaluate(() => { const b = document.querySelector('[data-suivi-commande="a:7002"]'); if (!b) return null; const r = b.querySelector('.vrm-sl-rang'); const l = b.querySelector('.vrm-sl-logo'); const carte = b.closest('.vrm-buy-transp'); return { h: Math.round(r.getBoundingClientRect().height), logo: Math.round(l.getBoundingClientRect().width), statutW: Math.round(b.querySelector('.vrm-sl-statut').getBoundingClientRect().width), entier: (() => { const e = b.querySelector('.vrm-sl-statut'); return e.scrollWidth <= e.clientWidth + 1; })(), dans: [...r.children].every((c) => c.getBoundingClientRect().right <= r.getBoundingClientRect().right + 0.5), puce: !!(carte && carte.querySelector('.vrm-puce-transp')), larges: [...document.querySelectorAll('.vrm-buy-transp [data-transporteur-logo]')].map((x) => Math.round(x.getBoundingClientRect().width)).filter((w) => w > 20) }; });
+            dit(forme && forme.h <= (vp.width < 600 ? 48 : 24) && forme.logo <= 20 && forme.statutW >= 30 && forme.entier && forme.dans && !forme.puce && forme.larges.length === 0, 'A. une ligne ≤ 24 px (deux fines au téléphone), logo ≤ 20 px, statut ENTIER, rien ne déborde, plus de puce grise pleine largeur ni de logo agrandi', JSON.stringify(forme));
+            await pg.click('[data-suivi-commande="a:7002"] [data-suivi-deplier]');
+            const det = await pg.evaluate(() => { const d = document.querySelector('[data-suivi-commande="a:7002"] [data-suivi-detail]'); return d ? d.innerText : ''; });
+            dit(/HUB LIEUSAINT/.test(det) && /il y a 47 min/.test(det), 'A. « › » déplie la phrase EXACTE du transporteur (et l’heure)', det.slice(0, 160));
+            await pg.click('[data-suivi-commande="a:7002"] [data-suivi-deplier]');
             dit(/Étiquette créée il y a 4 j\. Pas encore chez Chronopost\./.test(t) && /Écris au vendeur sur Vinted\./.test(t), 'A. la phrase et le geste sont écrits', t.replace(/\n/g, ' | ').slice(0, 200));
-            await pg.evaluate(() => { const e = document.querySelector('[data-suivi-commande="a:7001"]'); if (e) e.scrollIntoView({ block: 'center' }); });
+            await pg.evaluate(() => { const e = document.querySelector('[data-suivi-commande="a:7002"]'); if (e) e.scrollIntoView({ block: 'center' }); });
             await shot(pg, `suivi-commandes-achats-${k}`);
             await sain(pg, 'Achats');
           });
