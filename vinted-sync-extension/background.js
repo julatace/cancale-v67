@@ -12785,6 +12785,8 @@ async function creerVintedFiche(msg) {
   const stop0 = await gardeStricte(uid, acc, { lecture: true });
   if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
   { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_fiche_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
+  // Sans onglet vinted.fr, rien ne part — dit AVANT toute question (aucune requête).
+  { const pg = await pageVintedPour(acc); if (pg.refus) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage({ sansPage: pg.refus }) }; }
   // Jamais deux brouillons pour la même fiche (ce Chrome, puis la base : tous ses Chrome).
   const v0 = await verrouFiche(ficheId);
   if (v0 && v0.draftId) return { accepte: false, code: 'deja', draftId: String(v0.draftId), raison: 'cette fiche a déjà son brouillon sur Vinted — rien n’a été envoyé' };
@@ -12854,7 +12856,7 @@ async function creerVintedFiche(msg) {
       let blob = blobPhotoFiche(photos[i]);
       if (!blob) { try { const r = await fetch(photos[i], { signal: AbortSignal.timeout(30000) }); if (r.ok) blob = await r.blob(); } catch (_) { blob = null; } }
       if (!blob) return { accepte: true, etape: 'echec', raison: `la photo ${i + 1} n’a pas pu être lue — rien n’a été créé sur Vinted` };
-      try { blob = await photoReglee(blob, null); } catch (e) { return { accepte: true, etape: 'echec', raison: String(e && e.message || e).slice(0, 80) }; }
+      try { blob = await photoReglee(blob, reglagesPhotoSurs(null)); } catch (e) { return { accepte: true, etape: 'echec', raison: String(e && e.message || e).slice(0, 80) }; }
       const rp = await vintedPagePhoto(acc, blob, `photo-${i + 1}.jpg`, temp);
       if (rp && rp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rp) };
       if (rp && rp.pause) return { accepte: false, code: 'vinted-pause', raison: `${rp.raison || 'Vinted demande de ralentir'} — rien n’a été créé sur Vinted.` };
