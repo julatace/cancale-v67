@@ -413,9 +413,10 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         </span>
         <span className="vrm-rpf-quoi">
           <span className="vrm-rpf-titre" title={x.titre} data-rp-titre="">{x.num ? `N°${x.num} · ` : ''}{(titreDe && titreDe(x)) || x.titre || 'Colis'}</span>
-          {(st || e || (avecTransp && x.transp)) ? <span className="vrm-rpf-puces">
+          {(st || e || x.lieuDeplace || (avecTransp && x.transp)) ? <span className="vrm-rpf-puces">
             {avecTransp && x.transp ? <span className="vrm-rpf-transp-ligne"><PastilleTransporteur t={x.transp} C={C} seul taille={16}/></span> : null}
             {st ? <span className="vrm-rpf-puce is-ambre" data-rp-statut="">{st}</span> : null}
+            {x.lieuDeplace ? <span className="vrm-rpf-puce is-ambre" data-rp-deplace={x.lieuDeplace.carrier || ''}>{texteDeplace(x.lieuDeplace)}</span> : null}
             {e ? <span className={'vrm-rpf-puce' + (e.ambre ? ' is-ambre' : '')} data-rp-echeance={e.code || ''}>{e.t}</span> : null}
             {!aCode && !x.horsCompte ? <span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span> : null}
           </span> : (!aCode && !x.horsCompte ? <span className="vrm-rpf-puces"><span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span></span> : null)}
@@ -523,6 +524,9 @@ function useEnLigne() {
 }
 const mouvementReduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
 const auDoigt = () => { try { return window.matchMedia('(pointer: coarse)').matches; } catch (_) { return false; } };
+// (11 nov., retraits fiables) Le transporteur dit le colis ailleurs, plus récemment que l'e-mail : dit, daté.
+const NOMS_RESEAU = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', colissimo: 'Colissimo', relaiscolis: 'Relais Colis', dpd: 'DPD', ups: 'UPS', gls: 'GLS' };
+export const texteDeplace = (d) => { if (!d) return ''; const h = Number.isFinite(d.at) ? new Date(d.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : ''; return `déplacé · selon ${NOMS_RESEAU[d.carrier] || 'le transporteur'}${h ? ' à ' + h : ''}`; };
 const PREF_ORDRE = 'vrm_retirer_ordre';
 const PREF_MASQUES = 'vrm_retirer_points_masques';
 function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [] }) {

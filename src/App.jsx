@@ -38829,7 +38829,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Le lieu d'un e-mail : complété par le suivi du MÊME n°, puis par la conversation de SON
     // achat (relié par identité) quand elle nomme le même point avec une adresse plus complète,
     // puis par le même point déjà connu.
-    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); let lu = lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null));
+    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); let lu = lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null), Date.parse((t && (t.emailAt || t.receivedAt)) || '') || null);
       const ra = a ? relaisDe(a) : null; if (ra && ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
       return completer(lu, t && t.carrier, t && t.account); };
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
