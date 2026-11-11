@@ -23,7 +23,7 @@
 //   · lignes ≥ 44 px, aucun débordement, aucune erreur de page.
 // Captures : $TMPDIR/loupe-*.png (À REGARDER).
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, metaDe, filtreData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 12210;
@@ -86,6 +86,9 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    // (11 nov.) La colonne `meta` ENTIÈRE, comme `public.vrm_meta` (lecture des suivis sans QR,
+    // src/suivisSansQr.js) : sans elle l'app relisait chaque e-mail de suivi ENTIER (`select=id,data`).
+    if (src === 'meta') { out[alias] = metaDe(row.data); continue; }
     let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
     out[alias] = v == null ? null : (/->>/.test(src) && typeof v !== 'object' ? String(v) : v);
   }
@@ -117,7 +120,7 @@ async function preparer(b, vp, { sombre = false, stream = false } = {}) {
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = motif(lk[1]); let l = ROWS.filter((r) => re.test(r.id)); const rg = req.headers()['range']; if (rg) { const m = /(\d+)-(\d+)/.exec(rg); if (m) l = l.slice(+m[1], +m[2] + 1); } return j(l.map(forme)); }
+    if (lk) { const re = motif(lk[1]), garde = filtreData(u); let l = ROWS.filter((r) => re.test(r.id) && garde(r)); const rg = req.headers()['range']; if (rg) { const m = /(\d+)-(\d+)/.exec(rg); if (m) l = l.slice(+m[1], +m[2] + 1); } return j(l.map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => {
@@ -290,8 +293,10 @@ const ouvrirLoupe = async (pg, tel) => {
         await pg.waitForTimeout(200);
         await pg.locator('[data-recherche-resultat="facture"]').first().click();
         await pg.waitForTimeout(1500);
-        const fa = await pg.evaluate(() => ({ url: location.search, h: [...document.querySelectorAll('h1,h2')].map((x) => x.textContent.trim()).join(' | ').slice(0, 120), champ: [...document.querySelectorAll('input:not([data-recherche-champ])')].map((i) => i.value).filter(Boolean) }));
-        dit(/Factures|Comptabilit/i.test(fa.h) && !fa.champ.includes('PRO-2026-0007'), `${TT} la facture Pro ouvre Factures (liste des Pro en tête, aucune recherche « 0 résultat » posée)`, JSON.stringify(fa));
+        // (11 nov.) Depuis le 10 nov. (src/argent.js), Factures est un segment d'Argent : l'écran
+        // s'appelle « Argent » et c'est le segment allumé (`data-argent-nav`) qui dit où l'on est.
+        const fa = await pg.evaluate(() => ({ url: location.search, seg: [...document.querySelectorAll('[data-argent-nav]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-argent-nav')), h: [...document.querySelectorAll('h1,h2')].map((x) => x.textContent.trim()).join(' | ').slice(0, 120), champ: [...document.querySelectorAll('input:not([data-recherche-champ])')].map((i) => i.value).filter(Boolean) }));
+        dit(fa.seg.length === 1 && fa.seg[0] === 'factures' && !fa.champ.includes('PRO-2026-0007'), `${TT} la facture Pro ouvre Factures (liste des Pro en tête, aucune recherche « 0 résultat » posée)`, JSON.stringify(fa));
         // Champ vide après un résultat ouvert : la recherche récente est là.
         await ouvrirLoupe(pg, tel);
         await pg.locator('[data-recherche-champ]').first().fill('');
