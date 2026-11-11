@@ -91,6 +91,7 @@ import { traiterPartage, CSP_PAGE as CSP_PARTAGE } from './_lib/partage-fiche.js
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
 import { effacerCompte } from './_lib/effacer-compte.js';
+import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov., lot DJ6)
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
@@ -1457,6 +1458,41 @@ async function supprimerCompte(req, res) {
   return repondre(res, r.ok ? 200 : 502, { ok: r.ok, etapes, message });
 }
 
+// ── « CONTINUER AVEC DISCORD » SANS COMPTE VRM (11 nov., lot DJ6) ─────────────
+// `?mode=oauth-sans-compte` (POST, session). Le bouton de CONNEXION (pas celui de
+// l'inscription) a fait créer par Supabase un compte que personne n'a voulu. On
+// l'annule, SEULEMENT si tout est prouvé ici (chaque garde refuse sans rien toucher) :
+// les gardes de « Supprimer mon compte » (session, jamais le propriétaire) · la fiche
+// lue avec la clé de service : UNE identité Discord/Google, créée il y a < 10 min,
+// jamais reconnectée depuis (`compteOAuthAnnulable`, src/auth/compteNeuf.js) · un
+// inventaire LU et entièrement à 0 (aucune donnée, aucun compte Vinted…) · aucune
+// abonnement Stripe. Sinon 409 : l'app montre la porte d'avant (son choix).
+async function annulerCompteOAuthNeuf(req, res) {
+  const g = await gardesSuppression(req, res);
+  if (!g) return;
+  const { u, SERVICE, proprio } = g;
+  const REFUS = (raison) => repondre(res, 409, { ok: false, annule: false, raison, message: NON_TOUCHE });
+  let fiche = null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return repondre(res, 503, { ok: false, annule: false, raison: 'fiche', message: NON_TOUCHE });
+    fiche = await r.json();
+  } catch (_) { return repondre(res, 503, { ok: false, annule: false, raison: 'fiche', message: NON_TOUCHE }); }
+  if (!fiche || fiche.id !== u.id) return REFUS('fiche');
+  const fournisseur = compteOAuthAnnulable(fiche);
+  if (!fournisseur) return REFUS('pas-neuf');
+  const inv = await inventaire({ url: SUPABASE_URL, service: SERVICE, owner: u.id, proprio });
+  if (!inv) return repondre(res, 503, { ok: false, annule: false, raison: 'inventaire', message: NON_TOUCHE });
+  if (Object.values(inv).some((n) => n !== 0)) return REFUS('pas-vide');
+  const ligne = await ligneDe(req);
+  if (ligne === undefined) return repondre(res, 503, { ok: false, annule: false, raison: 'abonnement', message: NON_TOUCHE });
+  if (ligne && (ligne.abonnement_stripe || ligne.client_stripe)) return REFUS('abonnement');
+  await fermerSessions(req);
+  const r = await effacerCompte({ url: SUPABASE_URL, service: SERVICE, owner: u.id, proprio, inv });
+  try { await noterJournal({ url: SUPABASE_URL, service: SERVICE, owner: u.id, ok: r.ok, nombres: { ...inv, oauthSansCompte: 1 } }); } catch (_) {}
+  return repondre(res, r.ok ? 200 : 502, { ok: r.ok, annule: r.ok, fournisseur });
+}
+
 // La session est vérifiée avant toute lecture du CDN.
 async function photo(req, res) {
   const vendeur = await vendeurExige(req,res);
@@ -1784,6 +1820,7 @@ export default async function handler(req, res) {
   if (mode === 'discord-deja') return m === 'GET' ? discordDeja(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   // (9 nov.) « Supprimer mon compte » : GET l'inventaire, POST la suppression ;
   // l'ancien `fermer` mène à la MÊME fonction (même confirmation forte).
+  if (mode === 'oauth-sans-compte') return m === 'POST' ? annulerCompteOAuthNeuf(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'supprimer' || mode === 'fermer') return m === 'POST' ? supprimerCompte(req, res) : (m === 'GET' && mode === 'supprimer') ? apercuSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

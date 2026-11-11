@@ -56,11 +56,15 @@ const DESSINS = {
 const PAR_ICONE = { bag: 'sac', cart: 'sac', link: 'lien', tag: 'etiquette', box: 'boite', truck: 'boite', doc: 'boite', mail: 'courrier', chat: 'courrier' };
 export const depuisIcone = (icone) => PAR_ICONE[icone] || 'basket';
 export const NOMS_ILLUSTRATIONS = Object.keys(DESSINS);
+// (11 nov., lot DJ2) Julien : « arrête de faire allusion à des chaussures ». La basket
+// n'est dessinée que pour un vendeur de sneakers ; sinon l'étiquette (un article).
+export const dessinDe = (nom, vend) => { const n = DESSINS[nom] ? nom : 'basket'; return n === 'basket' && vend !== 'sneakers' ? 'etiquette' : n; };
 
-export default function Illustration({ nom = 'basket', taille = 120, className = '' }) {
-  const d = DESSINS[nom] || DESSINS.basket;
+export default function Illustration({ nom = 'basket', taille = 120, className = '', vend = 'sneakers' }) {
+  const n = dessinDe(nom, vend);
+  const d = DESSINS[n];
   return (
-    <svg className={'vrm-illustration ' + className} data-illustration={DESSINS[nom] ? nom : 'basket'} width={taille} height={Math.round(taille * 0.75)} viewBox="0 0 120 90" aria-hidden="true" focusable="false">
+    <svg className={'vrm-illustration ' + className} data-illustration={n} width={taille} height={Math.round(taille * 0.75)} viewBox="0 0 120 90" aria-hidden="true" focusable="false">
       <ellipse cx="60" cy="80" rx="38" ry="4.5" fill="currentColor" opacity=".08" />
       {d}
     </svg>
