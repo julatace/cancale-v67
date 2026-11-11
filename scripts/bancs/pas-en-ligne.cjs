@@ -73,7 +73,7 @@ const projette = (row, sel) => {
 };
 
 async function rendre(b, { tel, sombre, scenario, tab }) {
-  const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light' });
+  const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
@@ -153,7 +153,7 @@ const lignesFeuille = (pg) => pg.evaluate(() => [...document.querySelectorAll('[
         dit(!(await pg.$('[data-pas-en-ligne]')), `${t} : E — compte_beta pas relu : aucune carte dans Ma journée (rien de prouvé)`);
         await finPage(pg, errs, t, 'vieux journée');
         await ctx.close();
-        const r2 = await rendre(b, { tel, sombre, scenario: 'vieux', tab: 'cat_achats' });
+        const r2 = await rendre(b, { tel, sombre, scenario: 'vieux', tab: 'achats' });
         await r2.pg.waitForSelector('[data-pel-entree]', { timeout: 30000 }).catch(() => {});
         const e = await r2.pg.evaluate(() => { const el = document.querySelector('[data-pel-entree]'); return el ? { n: el.getAttribute('data-pel-entree'), t: el.innerText.replace(/\s+/g, ' ') } : null; });
         dit(!!e && e.n === '0' && /36/.test(e.t), `${t} : E — Achats : l'entrée dit « 36 à confirmer », 0 prouvé`, JSON.stringify(e));
@@ -168,7 +168,7 @@ const lignesFeuille = (pg) => pg.evaluate(() => [...document.querySelectorAll('[
         await r2.ctx.close();
       });
       await essaie(t + ' rien', async () => {
-        const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'rien', tab: 'cat_achats' });
+        const { ctx, pg, errs } = await rendre(b, { tel, sombre, scenario: 'rien', tab: 'achats' });
         await pg.waitForSelector('[data-achats-hors]', { timeout: 30000 }).catch(() => {});
         await pg.waitForTimeout(3000);
         dit(!(await pg.$('[data-pel-entree]')), `${t} : F — annonces pas lues : aucune entrée (rien d'inventé)`);

@@ -37724,7 +37724,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c.source === 'import') { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} return; }
     DEMANDE_OUVRIR_ACHAT.id = c.source === 'hors' ? c.achatId : null; DEMANDE_OUVRIR_ACHAT.at = Date.now();
     if (c.source === 'hors') setOffSecOpen(true);
-    if (onNav) onNav('cat_achats');
+    if (onNav) onNav('achats');
   };
   const detailPasEnLigne = <PasEnLigneDetail r={pasEnLigne.r} seuil={pasEnLigne.seuil} onSeuil={pasEnLigne.setSeuil} onOuvrir={ouvrirPasEnLigne} onRelire={pasEnLigne.relire}
     onAnnonces={() => { setFeuillePasEnLigne(false); if (onNav) onNav('vinted_annonces'); }} Bouton={Bouton} Segmente={Segmente} Pourquoi={Pourquoi} Photo={PhotoVinted} lirePhotos={lirePhotosHorsPasEnLigne}/>;
