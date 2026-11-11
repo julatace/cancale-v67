@@ -45,7 +45,8 @@ const textesCoupes = (pg) => pg.evaluate(() => {
   let n;
   while ((n = w.nextNode())) {
     const t = n.textContent.replace(/\s+/g, ' ').trim(); if (t.length < 2) continue;
-    const el = n.parentElement; if (!el || el.closest('[aria-hidden="true"],[inert],script,style,.vrm-sr-seul,[hidden]')) continue;
+    // (un texte caché au LECTEUR mais affiché compte : c'est l'œil qui le lit coupé)
+    const el = n.parentElement; if (!el || el.closest('[inert],script,style,.vrm-sr-seul,[hidden]')) continue;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.display === 'none') continue;
     const r = document.createRange(); r.selectNodeContents(n); const b = r.getBoundingClientRect();
     if (!b.width || !b.height) continue;
@@ -95,11 +96,18 @@ const lireFocus = (pg) => pg.evaluate(() => {
     for (let i = pile.length - 1; i >= 0; i--) f = melange(pile[i], f);
     return f;
   };
-  const cibles = [[el, null], [el, '::before'], [el, '::after'], [el.parentElement, null], [el.parentElement && el.parentElement.parentElement, null]].filter((x) => x[0]);
+  // L'indicateur peut être posé sur l'élément, ses pseudo-éléments, un parent proche (`:has`,
+  // `:focus-within`) ou un enfant direct (la pastille du « ? » d'aide) : on lit tout, avant et après.
+  const cibles = [[el, null], [el, '::before'], [el, '::after'], [el.parentElement, null], [el.parentElement && el.parentElement.parentElement, null],
+    ...[...el.children].slice(0, 3).map((c) => [c, null])].filter((x) => x[0]);
   const lire = () => cibles.map(([x, p]) => { const s = getComputedStyle(x, p); return { o: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 1 ? s.outlineColor : '', ow: parseFloat(s.outlineWidth) || 0, sh: s.boxShadow, bc: s.borderTopColor, bw: parseFloat(s.borderTopWidth) || 0, bg: s.backgroundColor }; });
   const r = el.getBoundingClientRect();
   const cs = getComputedStyle(el);
-  const visible = r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && +cs.opacity > 0 && r.bottom > -2 && r.right > -2 && r.top < innerHeight * 4 && r.left < innerWidth + 2;
+  // Un contrôle natif transparent posé SUR son habillage (le <select> du tri, à opacité 0, couvre
+  // son bouton dessiné) est « visible » si cet habillage l'est et le couvre.
+  const p = el.parentElement, pr = p && p.getBoundingClientRect(), pcs = p && getComputedStyle(p);
+  const habille = +cs.opacity === 0 && p && pcs.visibility !== 'hidden' && +pcs.opacity > 0 && pr.width > 0 && Math.abs(pr.left - r.left) < 2 && Math.abs(pr.top - r.top) < 2 && Math.abs(pr.width - r.width) < 2 && Math.abs(pr.height - r.height) < 2;
+  const visible = r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && (+cs.opacity > 0 || habille) && r.bottom > -2 && r.right > -2 && r.top < innerHeight * 4 && r.left < innerWidth + 2;
   const cache = !!el.closest('[aria-hidden="true"]');
   const avec = lire();
   el.setAttribute('data-banc-focus', '1'); el.blur();
