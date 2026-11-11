@@ -627,12 +627,31 @@ async function lireResumeCommandes(id, owner) {
 // Trois issues, comme `storeData` + `lireDonnee` : true écrit · false écriture
 // ratée (ou toujours devancée) · null pas su (la LECTURE a échoué ⇒ rien
 // n'est écrit — repartir de vide effacerait la ligne).
+// ⚠️ (11 nov., H28 de la revue serveur) Les lignes eBay sont LOURDES
+//    (`ebay_orders`, `ebay_listings`) : devancé, on ne relit plus la ligne entière
+//    à chaque essai (jusqu'à 6 fois l'égress). On relit la VERSION seule
+//    (`data->>rev`, quelques octets) jusqu'à ce qu'elle ne bouge plus (l'autre
+//    écrivain a fini), puis la ligne entière UNE fois. Au plus `PLEINES_MAX`
+//    lectures entières par appel ; au-delà ⇒ false (toujours devancé), comme avant.
+const PLEINES_MAX = 3;
 async function modifierDonnee(id, owner, modifier, essais = 6) {
   if (!sbKey() || !/^[a-z0-9_]+$/i.test(String(id || ''))) return null;
   const p = await portee(owner);
   if (!p) return null;
   const json = { ...sbCle(sbKey()), 'content-type': 'application/json' };
-  for (let n = 0; n < essais; n++) {
+  // La version seule : null (ligne sans version ou absente) · texte · undefined (pas su).
+  const lireRev = async () => {
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=rev:data->>rev`, { headers: { ...sbCle(sbKey()) } });
+      if (!r.ok) return undefined;
+      const rows = await r.json();
+      if (!Array.isArray(rows)) return undefined;
+      return rows[0] && rows[0].rev != null ? String(rows[0].rev) : null;
+    } catch (_) { return undefined; }
+  };
+  let pleines = 0;
+  for (let n = 0; n < essais && pleines < PLEINES_MAX; n++) {
+    pleines++;
     let rows;
     try {
       const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
@@ -665,8 +684,14 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
       if (out.length >= 1) return true;
       // 0 ligne : un autre a écrit (ou supprimé) entre la lecture et l'écriture.
       // Une attente FIXE et courte (nos propres lectures, pas Vinted — §3 ne
-      // s'applique pas) laisse l'autre finir.
-      await new Promise((ok) => setTimeout(ok, 30 * (n + 1)));
+      // s'applique pas) laisse l'autre finir ; sa fin se voit à la VERSION seule.
+      let v = await lireRev();
+      for (let k = 0; k < 4 && v !== undefined; k++) {
+        await new Promise((ok) => setTimeout(ok, 30 * (k + 1)));
+        const v2 = await lireRev();
+        if (v2 === v) break;
+        v = v2;
+      }
     } catch (_) { return false; }
   }
   return false;

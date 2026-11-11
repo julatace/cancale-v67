@@ -98,6 +98,14 @@ global.fetch = async (url, opts = {}) => {
   if (!/\/rest\/v1\//.test(u)) return J({});
   if (/\/rpc\/vrm_acces_pour/.test(u)) return J(true);
   if (PANNE(meth, u)) return new Response('<html>522</html>', { status: 522, headers: { 'content-type': 'text/html' } });
+  if (meth === 'PATCH') {   // (11 nov., H14) le bail du passage : PATCH conditionnel sur data->>rev (la forme de modifierNeutre)
+    const q = new URL(brut).searchParams, own = (q.get('owner') || '').slice(3), idp = (q.get('id') || '').slice(3), rev = q.get('data->>rev');
+    const i = LIGNES.findIndex((l) => l.owner === own && l.id === idp);
+    const d = i >= 0 ? LIGNES[i].data : null;
+    if (i < 0 || (rev === 'is.null' ? d && d.rev != null : String(d && d.rev) !== String(rev || '').slice(3))) return J([]);
+    LIGNES[i] = { owner: own, id: idp, data: JSON.parse(opts.body).data };
+    return J([{ id: idp }]);
+  }
   if (meth !== 'GET') {
     let corps = []; try { corps = JSON.parse(opts.body || '[]'); } catch (_) {}
     for (const r of [].concat(corps)) {
