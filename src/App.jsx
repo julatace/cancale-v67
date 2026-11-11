@@ -10649,7 +10649,8 @@ function useVcLocal() {
 // su (rien ne change). Tous les écrans les reçoivent par `avecNumerosVc`.
 let _departsCarte = null, _departsAt = 0, _departsLecture = null;
 const departsCarte = () => _departsCarte;
-const departsCle = () => (_departsCarte ? [..._departsCarte.values()].filter((t) => t.priseAt).map((t) => t.suivi + ':' + t.priseAt).sort().join(',') : 'passu');
+// (11 nov.) + l'état et le dernier évènement : un colis suivi jusqu'à la livraison se redessine quand il bouge.
+const departsCle = () => (_departsCarte ? [..._departsCarte.values()].filter((t) => t.priseAt || t.etat).map((t) => t.suivi + ':' + (t.priseAt || '') + ':' + (t.etat || '') + ':' + (t.derAt || '')).sort().join(',') : 'passu');
 function chargerDeparts(force = false) {
   if (_departsLecture || (!force && Date.now() - _departsAt < 60000)) return _departsLecture;
   _departsAt = Date.now();
@@ -21143,7 +21144,7 @@ function relireTransporteursSiVieux({ force = false } = {}) {
       const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
       // (8 nov.) Un colis VENDU pris en charge chez le transporteur : Colis, Ma
       // journée et la cloche relisent les départs (jamais « à retirer »).
-      if (Array.isArray(j.departs) && j.departs.some((x) => x && x.prisEnCharge)) chargerDeparts(true);
+      if (Array.isArray(j.departs) && j.departs.some((x) => x && (x.prisEnCharge || x.change))) chargerDeparts(true);
       if (change) {
         try { if (window.__vrmLecturesPartagees) window.__vrmLecturesPartagees.invalider(); } catch (_) {}
         try { viderLecturesMemo(); } catch (_) {}   // (8 nov.) la mémoire des lectures de montage aussi
