@@ -122,11 +122,17 @@ le titre du groupe n'a pas été renommé : `audit-onglets-d` et le banc `onglet
   garde-numeros-rapide, masquees-numeros, numero-ecrit, numero-etiquette, numero-vinted,
   numeros-lettres, numeros-vestiaire, numerotation-lecteurs, prix-numerotage,
   recherche-numero, reprise-numero`) et `corbeille, geste-annulable, annuler-commandes` verts.
-- Les autres audits rouges de ce jour (`a-envoyer-preuves`, `achats-export`, `argent-a-venir`,
-  `chantier-f`, `chrome-en-dur`, `coque-parametres`, `garde-ecrans`, `pagination-ordre`,
-  `donnees-ecrans`, `conseils`, `journee-hors-ligne`, …) sont rouges **à l'identique sur
-  `origin/main`** (mêmes lignes comparées) ; `coque-parametres` : l'icône `restore` en double a
-  été évitée (nouvelle icône `undo`).
+- **Tous les audits (463), après le merge d'`origin/main`, comparés à `origin/main`** (arbre
+  extrait, même machine) : la branche a 5 rouges — `colis-envoi`, `photos-vinted`,
+  `relier-compte`, `rouge-doublon`, `violet` — **avec exactement les mêmes lignes rouges sur
+  `origin/main`** (pas de ce chantier). `argent-lbc` était tombé sur un port pris (deux suites en
+  parallèle) : vert relancé seul. `coque-parametres` (une icône par ligne) : l'icône `restore` en
+  double a été évitée (nouvelle icône `undo`), vert.
+- Bancs voisins : `achats-hors-plateforme` (la corbeille) **vert** ; `onglets-d` rouge
+  (K1, « Déclarer ») **à l'identique sur `origin/main`**.
+- ⚠️ Le point du jour part 30 s après l'ouverture : un banc qui tourne plus de 30 s verra un
+  GET `id=like.restore_*` puis un POST `restore_0` sur son faux serveur (aucun banc existant n'est
+  tombé pour ça dans la suite ci-dessus).
 
 ## Ce qui n'est pas restauré (exprès)
 
