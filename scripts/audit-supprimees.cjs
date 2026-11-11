@@ -121,7 +121,11 @@ function relais(messagesPage) {
   vm.createContext(g);
   vm.runInContext(F.content, g, { filename: 'content.js' });
   const fenetre = vm.runInContext('window', g);
-  for (const d of messagesPage) for (const fn of (ecoute.message || [])) fn({ source: fenetre, data: d });
+  // 5.356 : content.js ne croit que le canal PRIVÉ qu'inject.js lui remet au chargement
+  // (un port) — le banc le remet, puis livre les messages de la page PAR ce port.
+  const port = { postMessage() {} };
+  for (const fn of (ecoute.message || [])) fn({ source: fenetre, origin: g.location.origin, data: { __tag: 'CANCALE_VINTED_CANAL' }, ports: [port] });
+  for (const d of messagesPage) if (typeof port.onmessage === 'function') port.onmessage({ data: d });
   return envoyes;
 }
 
