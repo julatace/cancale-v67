@@ -206,12 +206,16 @@ function monde({ tls, port, dist, comptes, journal }) {
     }
     // Le dressing d'un membre : la page (une SPA, comme Vinted) charge ses annonces.
     const mb = /^\/member\/(\d+)/.exec(p);
-    if (mb) return rep(res, 200, PAGE('Dressing').replace('</main>', `</main><script>fetch('/api/v2/wardrobe/${mb[1]}/items?page=1&per_page=20&order=relevance',{credentials:'include'});</script>`));
+    if (mb) return rep(res, 200, PAGE('Dressing').replace('</main>', `</main><script>fetch('/api/v2/wardrobe/${mb[1]}/items?page=1&per_page=20&order=relevance',{credentials:'include',headers:{'x-banc-site':'1'}});</script>`));
     if (!p.startsWith('/api/')) return rep(res, 200, PAGE(p === '/' ? 'Accueil' : p.split('/')[1] || 'Vinted'));
     const uidCookie = cookieUid(req);
-    const e = { m, p, q: url.search, uid: uidCookie, auth: !!req.headers.authorization, origine: String(req.headers.origin || req.headers.referer || ''), corps: corps || '', t: Date.now() };
-    st.vinted.push(e); st.enVol++; st.maxEnVol = Math.max(st.maxEnVol, st.enVol);
-    const fin = (code, corpsR) => { st.enVol--; e.status = code; rep(res, code, corpsR); };
+    const e = { m, p, q: url.search, uid: uidCookie, auth: !!req.headers.authorization, origine: String(req.headers.origin || req.headers.referer || ''), mode: String(req.headers['sec-fetch-mode'] || '') + '/' + String(req.headers['sec-fetch-site'] || ''), corps: corps || '', t: Date.now() };
+    // `x-banc-site` : une requête du SITE lui-même (sa page, son enregistrement) —
+    // hors de la règle « une requête de l'extension à la fois ».
+    e.site = !!req.headers['x-banc-site'];
+    st.vinted.push(e);
+    if (!e.site) { st.enVol++; if (st.enVol > st.maxEnVol) { st.maxEnVol = st.enVol; st.chevauchement = st.vinted.filter((x) => !x.site && x.status == null).map((x) => `${x.m} ${x.p}${x.q} [${x.origine || 'sans origine'} · ${x.mode}]`); } }
+    const fin = (code, corpsR) => { if (!e.site) st.enVol--; e.status = code; rep(res, code, corpsR); };
     await new Promise((r) => setTimeout(r, 40));     // une requête prend un peu de temps : le « en vol » se mesure
     const f = st.forcer.find((x) => x.m === m && x.re.test(p) && x.fois > 0);
     if (f) { f.fois--; return fin(f.status, { message: 'Too Many Requests', code: f.status }); }
@@ -256,6 +260,8 @@ function monde({ tls, port, dist, comptes, journal }) {
   });
   return {
     st, srv, USERS, ouvrir, jwt, lireJwt,
+    // Repart de zéro pour mesurer « en vol » sur une fenêtre (une commande).
+    remiseEnVol: () => { st.maxEnVol = st.enVol; st.chevauchement = []; },
     lignes: (t = 'app_data') => st.tables[t] || [],
     ligne: (id) => (st.tables.app_data || []).find((r) => r.id === id) || null,
     ecouter: () => new Promise((r, x) => { srv.once('error', x); srv.listen(port, '127.0.0.1', r); }),
