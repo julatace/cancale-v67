@@ -135,14 +135,16 @@ export function photosEnDouble({ annonces = [], empreintes = {}, comptesLus = {}
   for (const a of Array.isArray(annonces) ? annonces : []) {
     if (!a || !a.id || !a.compte) continue;
     const cc = `${a.plateforme || 'vinted'}:${a.compte}`;
-    const photos = (Array.isArray(a.photos) && a.photos.length ? a.photos : [a.photo]).map(clePhotoEmpreinte).filter(Boolean);
-    const emp = (empreintes[cc] && empreintes[cc][String(a.id)]) || null;
+    // Les photos que l'écran connaît (couverture, fiche) : celles sans empreinte sont
+    // « pas encore vérifiées ». Toutes les empreintes rangées pour l'annonce comparent.
+    const photos = [...new Set((Array.isArray(a.photos) && a.photos.length ? a.photos : [a.photo]).map(clePhotoEmpreinte).filter(Boolean))];
+    const emp = (empreintes[cc] && empreintes[cc][String(a.id)]) || {};
     if (comptesLus[cc] === false) { comptesPasVerifies.add(cc); nPasVerifiees += photos.length || 1; continue; }
-    if (!photos.length) { nPasVerifiees += 1; continue; }
-    for (const k of photos) {
-      const h = emp && emp[k];
-      if (empreinteValide(h)) { items.push({ a, cc, k, h }); nVerifiees++; } else nPasVerifiees++;
-    }
+    const connues = Object.entries(emp).filter(([, h]) => empreinteValide(h));
+    for (const [k, h] of connues) items.push({ a, cc, k, h });
+    nVerifiees += connues.length;
+    const manquent = photos.filter((k) => !empreinteValide(emp[k])).length;
+    nPasVerifiees += photos.length ? manquent : (connues.length ? 0 : 1);
   }
   // Union-find par annonce (une annonce = un nœud), sur les paires de photos proches :
   // comparaison complète, bornée (quelques milliers de photos au plus chez un vendeur).
