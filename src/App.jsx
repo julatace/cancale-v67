@@ -291,6 +291,8 @@ function SuiviTravailCoque() {
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
 const AlerteModeration = lazy(() => import('./AlerteModeration.jsx'));   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
+// (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
+const PublierPartout = aLaDemande(() => import('./PublierPartout.jsx'), true);
 // ⟦→ ecrans/Reglages.jsx #10⟧
 // (8 nov., démarrage léger) Écrans sortis d’App.jsx vers src/ecrans/ (découpe mécanique) : chargés
 // quand ils sont rendus, comme les morceaux ci-dessus. Leur code n’a pas changé ; ce qu’ils empruntent
@@ -333,6 +335,8 @@ const LeboncoinScreen = aLaDemande(() => import('./ecrans/Leboncoin.jsx').then((
 const LeboncoinColis = aLaDemande(() => import('./ecrans/Leboncoin.jsx').then((m) => ({ default: m.LeboncoinColis })));
 const EbayAnnonces = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayAnnonces })));
 const EbayConnexion = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayConnexion })));
+const GuidesEbay = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.GuidesEbay })));
+const EbayRemises = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayRemises })));
 const EbayVentes = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayVentes })));
 const Garage = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Garage })));
 const StockVinted = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.StockVinted })));
@@ -590,7 +594,7 @@ import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJourn
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, refVente } from "./importStock.js";
 import { ImportStockReglage } from "./composants/ImportStock.jsx";
-import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
+import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
@@ -659,7 +663,11 @@ import {plancherVente,offreFacePlancher} from "./plancherOffre.js";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
 import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // (6 nov., v36-visuel-2) les dessins des états vides
-import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
+import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires, enLigneSur } from "./publierAilleurs.js";
+import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
+import { suiviPourPartout } from "./publierPartoutSuivi.js";
+import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
+import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
@@ -2727,6 +2735,10 @@ const SYNC_KEYS = [
   'vrm_apparence',
   // (11 nov., lot traduction) La langue choisie (Paramètres → Langue, src/i18n/) : la même partout.
   'vrm_langue',
+  // (11 nov.) « Publier partout » : l'écart de prix par site (égal par défaut, src/publierPartout.js).
+  'vrm_partout_prix',
+  // (11 nov. soir) … et TOUS les paramètres de publication par défaut, par site (src/publierPartout.js).
+  'vrm_partout_params',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -2844,6 +2856,9 @@ const SYNC_KEYS = [
   // Son rythme de programmation eBay (par jour, plage, jours, écart, ordre,
   // préréglages de départ) : le sien, sur tous ses appareils (5 octobre).
   'vrm_ebay_rythme',
+  // (11 nov., ebay-complet) Les réglages de publication eBay par défaut (Paramètres → Comptes eBay ;
+  // src/ebay/parametres.js `defautsDepuis` relit chaque valeur) et « 1re publication » déjà guidée.
+  'vrm_ebay_publication_defaut','vrm_ebay_guide_vu',
   'vrm_ebay_couts',
   'vrm_ebay_vue',             // l'onglet eBay : « Tous les comptes » ou UN compte (9 octobre)
   'vrm_ebay_compte_pub',      // le dernier compte eBay choisi pour publier / programmer
@@ -14174,6 +14189,8 @@ const MARQUES_PLAT = {
   vinted:    { nom: 'Vinted',    court: 'V',   bg: '#007782', fg: '#fff' },
   leboncoin: { nom: 'Leboncoin', court: 'lbc', bg: LBC_ORANGE, fg: '#fff' },
   ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0071E3', bord: '#D1D1D6' },
+  // (11 nov., « Publier partout ») Vestiaire, en neutre (aucune couleur de marque en plus, §7).
+  vestiaire: { nom: 'Vestiaire', court: 'VC', bg: '#fff', fg: '#1d1d1f', bord: '#D1D1D6' },
 };
 function MarquePlateforme({ p, taille = 18 }) {
   const m = MARQUES_PLAT[p]; if (!m) return null;
@@ -14977,6 +14994,8 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
   const mini = actions.find((x) => x.k === 'mini');
   // (10 nov., lot C) « Baisser le prix… » : un troisième lien discret (la feuille de baisse en série).
   const baisser = actions.find((x) => x.k === 'baisser');
+  // (11 nov.) « Publier partout… » : un lien discret de plus (la feuille de src/PublierPartout.jsx).
+  const partout = actions.find((x) => x.k === 'partout');
   const { tete, parTuile } = raisonCommune(actions);
   // Ce que VRM n'a pas lu : la MÊME phrase sur chaque paire ⇒ une fois, sous la liste.
   const cleNL = (l) => l.join(', ');
@@ -15013,6 +15032,12 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
           <div className="vrm-act-main" data-action-sel="baisser" data-action-sel-ok={baisser.ok ? 'oui' : 'non'}>
             <Bouton variante="discret" disabled={!baisser.ok} title={baisser.ok ? baisser.desc : baisser.raison} onClick={() => { if (baisser.ok) onLancer('baisser'); }}>{baisser.titre}</Bouton>
             <span>{baisser.ok ? '−X € ou −X %, une par une, prix relu.' : baisser.raison}</span>
+          </div>
+        ) : null}
+        {partout ? (
+          <div className="vrm-act-main" data-action-sel="partout" data-action-sel-ok={partout.ok ? 'oui' : 'non'}>
+            <Bouton variante="discret" disabled={!partout.ok} title={partout.ok ? partout.desc : partout.raison} onClick={() => { if (partout.ok) onLancer('partout'); }}>{partout.titre}</Bouton>
+            <span>{partout.ok ? 'Leboncoin, Vestiaire, eBay : une case par site, depuis l’annonce Vinted.' : partout.raison}</span>
           </div>
         ) : null}
         <div className="vrm-act-verif" data-avant-lancer={nManque}>
@@ -23504,6 +23529,137 @@ function EntreePublierAilleurs({ site }) {
     </div>
   );
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// PUBLIER PARTOUT — DEPUIS L'ANNONCE VINTED (11 nov., règle : src/publierPartout.js)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « Publier partout en un geste — mais ça doit PARTIR DE L'ANNONCE VINTED ».
+// `nums` : les N° des annonces (une, ou la sélection d'Annonces → Actions). La paire
+// est celle de la source partagée (`useEbayPaires`), EN LIGNE sur Vinted seulement ;
+// « déjà en ligne ailleurs » par `sitesDuNumero` (identité, jamais un titre). Chaque
+// site part par SA voie, l'un après l'autre : Leboncoin `lbcPublier` (+ la fiche,
+// `valideAnnonceLbc`), Vestiaire `vcPreparer`, eBay un brouillon
+// (`preparerBrouillonPartout`, jamais publié d'ici). Gardes de l'extension
+// (compte de l'onglet, 50 actions/h, une requête à la fois) inchangées.
+const ATTENTE_DEPOT_MS = 6 * 60000;
+function attendreFinJob(jobId, ms = ATTENTE_DEPOT_MS) {
+  return new Promise((ok) => {
+    const t0 = Date.now();
+    const tic = () => {
+      const j = __vmrJobs[jobId];
+      const e = j && String(j.etape || '');
+      if (e === 'fait' || e === 'abandonne' || e === 'echec') { ok({ etape: e, raison: (j && j.raison) || '' }); return; }
+      if (Date.now() - t0 > ms) { ok({ etape: 'delai' }); return; }
+      setTimeout(tic, 1500);
+    };
+    setTimeout(tic, 1500);
+  });
+}
+function HotePublierPartout({ comptes, nums, numData, onFermer }) {
+  const { paires, pret } = useEbayPaires(comptes);
+  useExtVivante();
+  const sansSouris = useSansSouris();
+  const [reglage, setReglage] = React.useState(() => reglagePrix(load(CLE_PRIX_PARTOUT, null)));
+  const [saisies, setSaisies] = React.useState({});
+  // (11 nov. soir) Les paramètres de publication par défaut (Leboncoin, Vestiaire) : '' = auto.
+  const [params, setParams] = React.useState(() => reglageParams(load(CLE_PARAMS_PARTOUT, null), { etatsLbc: LBC_ETATS }));
+  // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
+  const [autres, setAutres] = React.useState(undefined);
+  const relire = React.useCallback(async () => {
+    try { _lbcAnnoncesSession = null; } catch (_) {}
+    const [lbc, vc] = await Promise.all([lbcListingsSession().catch(() => null),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]);
+    const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
+    setAutres({ lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
+  }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  const voulus = React.useMemo(() => [...new Set((nums || []).map((n) => cleNum(n)).filter(Boolean))], [nums]);
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const choisies = pret && Array.isArray(paires) ? voulus.map((k) => paires.find((p) => !p.chezMoi && cleNum(p.num) === k) || null).filter(Boolean) : undefined;
+  const lecture = !numData || autres === undefined;
+  const regles = { titreLbc: (m, t, ta) => lbcTitre(m, t, ta), titreVc: (m, t, ta) => lbcTitre(m, t, ta, 80), titreEbay: (t, ta) => ebayTitre(t || '', ta || ''),
+    descriptionLbc: (o) => descriptionLbcDe(o), descriptionEbay: (pp) => (pp && pp.desc) || descriptionDeFaits(pp || {}),
+    etatsLbc: LBC_ETATS, categorieLbc: (t, d, ta, m) => categorieLbcDe(t, d, ta, '', m),
+    // La ville que la voie Leboncoin tape (Réglages de VRM) ; vide ⇒ celle de son profil Leboncoin.
+    ville: String(load('vrm_ville', '') || '').trim() };
+  const ext = {
+    leboncoin: (raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' }) || {}).texte || '',
+    vestiaire: (raisonExtGlobale(sansSouris, { cap: 'vcpublier', role: 'prépare tes annonces Vestiaire' }) || {}).texte || '',
+    ebay: '',
+  };
+  const enLigneDe = (p) => {
+    if (lecture) return { leboncoin: null, vestiaire: null, ebay: null };
+    const { rn } = rechercheParNumero(String(p.num), numData, comptes);
+    if (!rn || rn.etat === 'invalide') return { leboncoin: null, vestiaire: null, ebay: null };
+    const r = sitesPrixDe(String(p.num), rn, autres);
+    return { leboncoin: enLigneSur('leboncoin', r.sites, r.manques), vestiaire: enLigneSur('vestiaire', r.sites, r.manques), ebay: enLigneSur('ebay', r.sites, r.manques) };
+  };
+  const lignes = choisies === undefined ? undefined : choisies.map((p) => {
+    const fiche = fiches[String(p.id)] || {};
+    let achat = null; try { achat = prixAchatDe(fiche, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
+    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat,
+      famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, mpLbc: mpChoisi(fiche, 'lbc'), facultatifs: champsFacultatifs(vendActuel()) });
+  });
+  const vus = {};
+  for (const l of lignes || []) for (const x of l.sites) if (x.deja === true) vus[l.id + ':' + x.site] = true;
+  const parId = new Map((choisies || []).map((p) => [String(p.id), p]));
+  const envoyer = {
+    leboncoin: async (e) => {
+      const p = parId.get(e.id); if (!p) return { accepte: false, code: 'absente', raison: 'annonce plus en ligne sur Vinted' };
+      const saitFiche = relaisVivant() ? 'ok' : extSait('lbcfiche');
+      const v = valideAnnonceLbc({ title: e.apercu.titre, description: e.apercu.description, price: String(e.apercu.prix).replace('.', ','), etat: (e.vocab && e.vocab.etat) || '', photos: e.apercu.photos },
+        { ref: e.apercu.ref, photos: p.photos || [], etat: p.etat });
+      if (!v.ok) return { accepte: false, code: 'fiche', raison: 'à corriger : ' + v.erreurs[0].raison };
+      // Une extension qui ne sait pas recevoir la fiche publierait SA version (prix Vinted) :
+      // un prix réglé ne partirait pas — on le dit, rien ne part (jamais un autre prix en silence).
+      if (saitFiche !== 'ok' && Number(e.apercu.prix) !== Number(p.prix)) return { accepte: false, code: 'fiche-retard', raison: `ton extension ne sait pas encore recevoir la fiche de VRM (${EXT_CAPACITES.lbcfiche}) : le prix réglé ne partirait pas` };
+      let r = null; try { r = await vmrCmd({ cmd: 'lbcPublier', id: String(e.id), ...(saitFiche === 'ok' ? { annonce: v.annonce } : {}) }, 30000); } catch (_) { r = null; }
+      if (r && !r.accepte && r.code === 'confirmer') return { accepte: false, code: 'confirmer', raison: 'VRM n’a pas vu la fin d’un dépôt précédent de cette paire : si elle est en ligne, rien à refaire ; sinon relance-la depuis sa fiche Leboncoin' };
+      if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() }); __vmrNotifier(); }
+      return r;
+    },
+    vestiaire: async (e) => {
+      // Un champ à finir sur Vestiaire (son choix que la voie ne porte pas, ou un requis introuvable) :
+      // le dépôt s'ouvre SANS publier tout seul — il le finit là-bas (jamais publié avec un autre choix).
+      const finir = Array.isArray(e.finir) && e.finir.length > 0;
+      let r = null; try { r = await vmrCmd({ cmd: 'vcPreparer', id: String(e.id), publier: !finir && extSait('vcauto') === 'ok' }, 30000); } catch (_) { r = null; }
+      if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); }
+      return r;
+    },
+    ebay: async (e) => {
+      const p = parId.get(e.id); if (!p) return { accepte: false, code: 'absente', raison: 'annonce plus en ligne sur Vinted' };
+      try { const m = await import('./ecrans/Ebay.jsx'); return await m.preparerBrouillonPartout(p, { prix: e.apercu.prix, titre: e.apercu.titre }); }
+      catch (_) { return { accepte: false, code: 'charge', raison: 'l’écran eBay n’a pas pu se charger — réessaie' }; }
+    },
+  };
+  // Le lancement : le plan, le suivi commun (VRM figé, détail, barre — SuiviTravail, via
+  // src/publierPartoutSuivi.js), puis l'envoi l'un après l'autre. « Mettre en pause » attend
+  // ENTRE deux envois (`continuer()`), « Reprendre » repart d'où il en était.
+  const lancer = async ({ coches, surEtat, surTotal }) => {
+    const plan = planPartout(lignes || [], coches);
+    if (typeof surTotal === 'function') surTotal(plan.length);
+    const sv = suiviPourPartout(await chargerSuivi(), plan, { uid: String(vendActuel() || '') });
+    const res = await executerPartout({ plan, envoyer, attendre: (j) => attendreFinJob(j),
+      surEtat: (cle, e) => { surEtat(cle, e); if (sv) sv.surEtat(cle, e); }, doitSArreter: sv ? sv.doitSArreter : undefined });
+    if (sv) sv.terminer();
+    return res;
+  };
+  // (11 nov. soir) eBay : SES réglages de publication par défaut (lot ebay-complet, src/ebay/parametres.js) —
+  // le brouillon les reprend à sa mise en ligne ; la feuille les nomme (« Offres · Retours 30 j »).
+  let ebayReglages = [];
+  try { ebayReglages = resumeReglagesEbayPP(defautsEbayDepuis(load(CLE_DEFAUTS_EBAY_PP, null))).map((x) => tr(x.cle, x.vars || {})); } catch (_) { ebayReglages = []; }
+  return <PublierPartout lignes={lignes} lecture={lecture} reglage={reglage} params={params} etatsLbc={LBC_ETATS} saisies={saisies} vus={vus} ebayReglages={ebayReglages}
+    exclues={choisies === undefined ? 0 : voulus.length - choisies.length}
+    onReglage={(site, r) => setReglage((x) => { const n = reglagePrix({ ...x, [site]: r }); save(CLE_PRIX_PARTOUT, n); return n; })}
+    onParam={(site, champ, val) => setParams((x) => { const n = reglageParams({ ...x, [site]: { ...((x && x[site]) || {}), [champ]: val } }, { etatsLbc: LBC_ETATS }); save(CLE_PARAMS_PARTOUT, n); return n; })}
+    onParamAnnonce={(id, site, champ, val) => setSaisies((x) => { const a = x[id] || {}; const pr = a.params || {}; return { ...x, [id]: { ...a, params: { ...pr, [site]: { ...(pr[site] || {}), [champ]: val } } } }; })}
+    onSaisie={(id, champ, val) => setSaisies((x) => {
+      const a = x[id] || {};
+      if (champ === 'prixSite' && val && typeof val === 'object') return { ...x, [id]: { ...a, prixSite: { ...(a.prixSite || {}), [val.site]: val.valeur } } };
+      return { ...x, [id]: { ...a, [champ]: val } };
+    })}
+    onLancer={lancer}
+    onRelire={relire} onFermer={onFermer} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Retour={FermeAuRetour}/>;
+}
 // ⟦→ ecrans/Vestiaire.jsx #9⟧
 // ══════════════════════════════════════════════════════════════════════════════
 // VESTIAIRE COLLECTIVE : TES VENTES (27 octobre, 5.237)
@@ -30190,6 +30346,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!lu || stop) return;
     setEbayNums(lu.nums);
     setEbayStock(lu.liste);
+  })(); return () => { stop = true; }; }, []);
+  // (11 nov., « Publier partout ») Les N° EN LIGNE sur Vestiaire, par IDENTITÉ (`numeroVcIdentite` :
+  // lien posé par VRM, référence VRM-{n°}, N° donné au produit) — la même règle que `sitesDuNumero`.
+  // Illisible ⇒ Set vide : aucune pastille Vestiaire, jamais une fausse.
+  const [vcNumsAnn, setVcNumsAnn] = useState(() => new Set());
+  useEffect(() => { let stop = false; (async () => {
+    let rows = null;
+    try { rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`); } catch (_) { rows = null; }
+    if (stop || !Array.isArray(rows)) return;
+    const d = rows[0] || {}; const out = new Set();
+    for (const [id, it] of Object.entries(d.items || {})) {
+      if (!it || !/^(published|online|active)$/i.test(String(it.statut || '').trim())) continue;
+      const k = numeroVcIdentite(id, it, d.liens || {}); if (k) out.add(k);
+    }
+    setVcNumsAnn(out);
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { (async () => {
     try {
@@ -46688,9 +46859,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
                       <span data-plateformes style={{display:'inline-flex',alignItems:'center',gap:4,marginLeft:'auto',flexShrink:0}}>
                         <MarquePlateforme p="vinted"/>
-                        {ailleurs && <MarquePlateforme p="leboncoin"/>}
-                        {num && ebayNums.has(cleNum(num)) && <MarquePlateforme p="ebay"/>}
-                        {ailleurs && <span data-aussi-sur className="vrm-sr">aussi sur Leboncoin</span>}
+                        {/* (11 nov.) « aussi sur Leboncoin · eBay · Vestiaire » : chaque site PROUVÉ par identité (src/publierPartout.js `aussiSur`). */}
+                        {(() => { const l = aussiSur({ lbc: !!ailleurs, ebay: !!(num && ebayNums.has(cleNum(num))), vestiaire: !!(num && vcNumsAnn.has(cleNum(num))) });
+                          return <>{l.map((x) => <MarquePlateforme key={x} p={x}/>)}{l.length ? <span data-aussi-sur={l.join(',')} className="vrm-sr">{tr('partout.aussiSur', { sites: texteAussiSur(l).replace(/^aussi sur /, '') })}</span> : null}</>; })()}
                       </span>
                     </div>
                     {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:12,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
@@ -46754,6 +46925,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </button>
                       );
                     })}
+                    {/* (11 nov.) « Publier partout » : depuis CETTE annonce Vinted, Leboncoin · Vestiaire · eBay (src/publierPartout.js). */}
+                    {num && <button type="button" className="vrm-fiche-geste" data-fiche-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:publier-partout',{detail:{nums:[String(num)]}})); } catch (_) {} }} style={geste}>{tr('partout.entree')}</button>}
                     <button type="button" className="vrm-fiche-geste" data-fiche-relier-achat="" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
                     <button type="button" className="vrm-fiche-geste" data-fiche-passeport="" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
@@ -50697,6 +50870,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onLancer={(k)=>{ setActionsSelOpen(false);
             if (k==='main') { const a=choisies[0]; if (a) { setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(a); } return; }
             if (k==='mini') { setMiniSel(choisies); return; }
+            // (11 nov.) « Publier partout » sur les annonces cochées : la même feuille, par leur N°.
+            if (k==='partout') { const l=choisies.filter(a=>a.etat==='en-ligne'&&a.numero).map(a=>String(a.numero)); if (l.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout',{detail:{nums:l}})); } catch (_) {} } else toast('Aucune annonce en ligne avec un N° dans ta sélection.'); return; }
             // (10 nov., lot C) « Baisser le prix… » : la feuille de baisse en série (rien ne part avant SON clic).
             if (k==='baisser') { const idx2 = new Map((listings.items||[]).map((it)=>[String((it._acc&&it._acc.vinted_user_id)||'')+':'+String(it.id), it])); setBaisseSel(choisies.filter(a=>a.etat==='en-ligne').map(a=>{ const it=idx2.get(a.uid+':'+a.id); return it ? annonceBaisse(it) : { id:a.id, uid:a.uid, compte:a.compte, numero:a.numero, titre:a.titre, photo:a.photo, prix:null }; })); return; }
             setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
@@ -54580,7 +54755,13 @@ function AppCoeur() {
   // (5 nov.) « PUBLIER AILLEURS » : { num (null = choisir l'article), site (mis en avant) }.
   const [pubAil,setPubAil]=useState(null);
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const n=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null; const st=['leboncoin','vestiaire','ebay'].includes(d.site)?d.site:null; setPubAil({num:n,site:st});};window.addEventListener('vrm:publier-ailleurs',ouvrir);return()=>window.removeEventListener('vrm:publier-ailleurs',ouvrir);},[]);
-  const besoinNumData=gsOpen||!!ficheNum||!!prixNum||!!(pubAil&&pubAil.num);
+  // (11 nov.) « PUBLIER PARTOUT » : les N° des annonces Vinted (une, ou la sélection d'Annonces).
+  const [pubPartout,setPubPartout]=useState(null);
+  // (11 nov. soir) La baisse PROPOSÉE sur Vinted par « Changer le prix » : la feuille « Baisser le prix »
+  // existante, sur CETTE annonce ; rien ne part avant SON clic là-bas (src/BaissePrixSerie.jsx).
+  const [baisseCoque,setBaisseCoque]=useState(null);
+  useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const l=(Array.isArray(d.nums)?d.nums:[]).map(x=>String(x==null?'':x).trim()).filter(x=>x&&x.length<=64).slice(0,200); if(l.length) setPubPartout({nums:l,at:Date.now()});};window.addEventListener('vrm:publier-partout',ouvrir);return()=>window.removeEventListener('vrm:publier-partout',ouvrir);},[]);
+  const besoinNumData=gsOpen||!!ficheNum||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout;
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
   const [ficheExtra,setFicheExtra]=useState(null);
   const numOutil=ficheNum||prixNum||(pubAil&&pubAil.num)||null;
@@ -57016,10 +57197,10 @@ function AppCoeur() {
           )}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {sec==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
-          {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {sec==='agent'&&<div style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
-          {sec==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
+          {sec==='offres'&&<div style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };
   // Compte eBay : un panneau des Paramètres (« Comptes eBay »), dans le skin eBay.
@@ -57554,10 +57735,19 @@ function AppCoeur() {
           const lecture = !numData || !ex;
           const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(prixNum, rn, ex || { lbcItems: undefined, vcItems: undefined });
           const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
+          // (11 nov. soir) « Un prix modifié dans VRM change partout » : chaque site avec SON ajustement
+          // (`vrm_partout_prix`, réglé dans « Publier partout ») ; sur Vinted, VRM PROPOSE la baisse
+          // (la feuille « Baisser le prix », son clic) ; eBay relu après (src/prixPartout.js).
+          const reglageP = load(CLE_PRIX_PARTOUT, null);
           return <PrixPartout key={prixNum} num={rn.cle || prixNum} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
-            onFermer={()=>setPrixNum(null)}
+            onFermer={()=>setPrixNum(null)} prixDe={(site, p)=>prixParSite(site, p, reglageP)}
+            onProposer={(s, e)=>{ const fiche = (load('vinted_annonce_numeros', {}) || {})[String(s.id)] || {};
+              const delta = Math.round(((s.prix || 0) - (e.prix || 0)) * 100) / 100;
+              if (!(delta > 0)) return;
+              setBaisseCoque({ annonces: [{ id: String(s.id), uid: String(s.compte || ''), compte: (()=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===String(s.compte)); const lb=load('vinted_account_labels',{})||{}; return a ? (lb[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; })(), numero: String(fiche.numero || rn.cle || ''), titre: s.titre || '', photo: fiche.photo || '', prix: s.prix }],
+                baisse: { mode: 'eur', texte: String(delta).replace('.', ',') }, at: Date.now() }); }}
             onAppliquer={async({ coches, prix, surEtat })=>{
-              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat });
+              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat, reglage: reglageP });
               if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
               return r;
             }}/>;
@@ -57575,6 +57765,17 @@ function AppCoeur() {
           return <HotePublierAilleurs comptes={vintedAccounts} num={num} site={pubAil.site} sitesVus={sitesVus} manquesLecture={manquesL} lecture={lecture}
             onChoisir={(n)=>setPubAil((x)=>({ ...(x||{}), num: n }))} onFermer={()=>setPubAil(null)} onNav={setTab}/>;
         }}/></GardeEcran>}
+        {baisseCoque && <GardeEcran nom="baisse-coque" feuille resetKey={String(baisseCoque.at)} onFermer={()=>setBaisseCoque(null)}>{(()=>{
+          const vc = vintedDeChrome();
+          const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
+          return <BaissePrixSerie annonces={baisseCoque.annonces} baisseInitiale={baisseCoque.baisse} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
+            plancherDe={(a)=>plancherVente((load('vinted_annonce_numeros', {}) || {})[String(a.id)] || null)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
+            onFermer={()=>setBaisseCoque(null)}
+            onBaisser={(l)=>vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000)}/>;
+        })()}</GardeEcran>}
+        {pubPartout && <GardeEcran nom="partout" feuille resetKey={String(pubPartout.at)} onFermer={()=>setPubPartout(null)}>
+          <HotePublierPartout comptes={vintedAccounts} nums={pubPartout.nums} numData={numData} onFermer={()=>setPubPartout(null)}/>
+        </GardeEcran>}
         {/* (6 nov., filet 2) Le garde-fou de la COQUE (bandeaux et écrans) : le dernier rempart avant main.jsx ;
             chaque écran et chaque feuille a en plus le sien (GardeEcran nom=…). */}
         <GardeEcran nom={'coque:'+tab} resetKey={tab}>

@@ -82,6 +82,16 @@ export function convVestiaire(v) {
     at: v.date, apercu: v.apercu, deMoi: v.deMoi, nonLu: v.nonLu, titre: v.titre, photo: v.photo, nom: '' });
 }
 
+// (11 nov., ebay-complet) eBay : un échange `GetMemberMessages` lu en direct (VRM ne
+// le range pas). L'annonce eBay (ItemID) et l'acheteur eBay sont des IDENTITÉS de
+// SA plateforme (préfixées) : jamais confondues avec une annonce Vinted.
+export function convEbay(m, compte) {
+  if (!m || !txt(m.id)) return null;
+  const rep = Array.isArray(m.responses) ? m.responses.filter(Boolean) : [];
+  return entree({ plateforme: 'ebay', compte: compte || 'principal', conv: m.id, annonce: m.itemId, interlocuteur: m.sender,
+    at: m.date, apercu: rep.length ? rep[rep.length - 1] : (m.body || m.subject || ''), deMoi: rep.length > 0,
+    nonLu: /^unanswered$/i.test(String(m.status || '')) ? true : rep.length ? false : null, titre: m.titre, nom: '' });
+}
 // Les identités de paire d'une conversation (vide ⇒ aucune).
 export const identitesPaire = (e) => [e.annonce && 'a:' + e.annonce, e.tx && 't:' + e.tx, e.num && 'n:' + e.num].filter(Boolean);
 // La clé d'un lien posé par lui : les deux conversations, dans l'ordre.
