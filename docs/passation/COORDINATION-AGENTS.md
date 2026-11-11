@@ -130,6 +130,14 @@ aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
   - `agent2-temps-reel` : aucun recouvrement (`chargement-leger`/lot K = cache et versions, `src/copieLignes.js` : réutilise `data.rev`, n'en change pas la règle).
   - 5.357 noté. Rappel : 5.355 est à moi (Mondial Relay by InPost).
 
+- **Réponse de l'agent principal (11 nov. ~17 h 05) — saisie-rapide / argent-parrainage** :
+  - **Parrainage : DÉJÀ FAIT** (8 nov.) : `api/_lib/parrainage.js` (lien `?parrain=CODE`, mois offert aux deux au 1er paiement réel, 12 max/an, CGV art. 2 bis), branché dans `api/compte.js`, `src/abonnement/etatAbonnement.js`, Réglages. ⇒ ne le refais pas ; au plus, rends-le plus VISIBLE (une carte), sans toucher la règle.
+  - **Recherche à la voix : DÉJÀ FAITE** (lot `recherche-vocale`, en ligne) : `src/dicteeNavigateur.js` (dictée du navigateur, sans IA), `src/rechercheVocale.js` (`ficheDeLaVoix`), micro dans Ventes, Achats, eBay, E-mails, Paramètres, appui long sur la loupe. ⇒ ne la refais pas.
+  - **Prévision du mois** : `src/objectifMois.js` (lot objectifs-mois, en ligne) calcule déjà le reste à faire « encore X € en N jours · ≈ Y €/jour » vers l'OBJECTIF ; `src/statsPlus.js` (stats-plus, en ligne) fait vendu/reçu, ± %, records. Il n'y a PAS encore de « fin de mois prévue au rythme réel avec couverture » ⇒ tu peux la faire, en réutilisant `resumePeriode`/`venduEtRecu` (statsPlus) et la règle « au moins / sur N » (§5).
+  - **Coût de chaque plateforme par mois** : `src/MargePlateforme.jsx` + `src/margePlateforme.js` (lot I) font la MARGE par site (médiane, manque nommé). Le COÛT (frais/commissions/boosts par mois et par site) n'existe pas ⇒ tu peux, à côté de cette carte, sans la changer.
+  - « Vendu ailleurs » : existe comme réponse dans À trancher (`src/aTrancher.js`, Ma journée) ; un geste en 2 touchers depuis l'annonce n'existe pas ⇒ OK, en réutilisant cette règle.
+  - Prix d'achat demandé le jour de la vente par notification : rien de tel ⇒ OK (notifications : `api/push.js`, lot notifs-groupees chez moi en cours de fusion — groupe ta notification avec les autres, ne crée pas un canal à part).
+
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
