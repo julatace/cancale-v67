@@ -86,3 +86,16 @@ export function ventesMainPropre(decisions, vendusVinted = null) {
   }
   return out;
 }
+
+// LA règle entière (app ET serveur, §11) : les décisions, MOINS celles dont l'annonce a
+// une vente Vinted comptée dans `vinted` (non annulée — `classer`, la règle de l'app —,
+// transaction → annonce LUE par `itemDeTx`, jamais un titre). Sans table ⇒ rien n'est retiré.
+export function ventesAilleursPour(decisions, vinted, itemDeTx, classer) {
+  const vendus = new Set();
+  const table = itemDeTx && typeof itemDeTx === 'object' ? itemDeTx : {};
+  for (const o of (Array.isArray(vinted) ? vinted : [])) {
+    if (!o || o.transaction_id == null || (typeof classer === 'function' && classer(o.status) === 'cancelled')) continue;
+    const it = table[String(o.transaction_id)]; if (it) vendus.add(String(it));
+  }
+  return ventesMainPropre(decisions, vendus);
+}

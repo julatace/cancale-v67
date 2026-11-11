@@ -23,7 +23,7 @@ import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { sendPushToAll, pushCategorieActive } from './push.js';
 import { classifyOrderStatus } from './ventes-regle.js';
-import { CLE_DEMANDES, estNuitParis, texteDemande, lienDemande, aDemander, reserver, MAX_GROUPE } from '../../src/prixAchatVente.js';
+import { CLE_DEMANDES, estNuitParis, texteDemande, lienDemande, aDemander, reserver, MAX_GROUPE, ventesSansPrix, corpsDemande } from '../../src/prixAchatVente.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const cle = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -132,4 +132,49 @@ export async function notifierPrixAchat(body) {
   const t = texteDemande(reservees);
   const envoi = await sendPushToAll({ cat: 'vente', ...t, tag: 'prix-achat-' + reservees.map((v) => v.tx).join('-').slice(0, 60), url: lienDemande(reservees.map((v) => v.tx)) });
   return { status: 200, envoye: !!(envoi && envoi.sent), n: reservees.length, raison: (envoi && (envoi.coupe || envoi.erreur || (envoi.calme ? 'heures calmes' : ''))) || '' };
+}
+
+// ── LE FILET DU CRON (matin et soir, api/ship-reminders.js) : aucune app ouverte ──
+// Les MÊMES règles (`ventesSansPrix`, puis `notifierPrixAchat` : transaction relue, une
+// fois, jamais la nuit). Lectures projetées (§4.4), paginées (§4.5). Une lecture ratée
+// ⇒ rien n'est demandé (« pas su » ≠ « rien »).
+async function lireTout(chemin) {
+  const owner = proprietaireCourant();
+  if (!owner || !cle()) return null;
+  const out = [];
+  for (let de = 0; de < 50000; de += 1000) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}&owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(cle()), Range: `${de}-${de + 999}`, 'Range-Unit': 'items' } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!Array.isArray(j)) return null;
+      out.push(...j);
+      if (j.length < 1000) break;
+    } catch (_) { return null; }
+  }
+  return out;
+}
+export async function demandesDuCron({ maintenant = instant() } = {}) {
+  if (!proprietaireCourant()) return { status: 401, envoye: false, n: 0, raison: 'vendeur inconnu' };
+  if (estNuitParis(maintenant)) return { status: 200, envoye: false, n: 0, raison: 'nuit' };
+  const [main, txn, ventesL] = await Promise.all([
+    lire('app_data?id=eq.main&select=f:data->vinted_annonce_numeros,b:data->vinted_buyprice_by_num'),
+    lireTout('app_data?id=like.harvest_%25_txn_%25&select=id,it:meta->>item_id,ti:meta->>status_title'),
+    lireTout('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders'),
+  ]);
+  if (main === null || txn === null || ventesL === null) return { status: 503, envoye: false, n: 0, raison: 'lecture ratée — rien demandé' };
+  const fiches = (main[0] && main[0].f && typeof main[0].f === 'object') ? main[0].f : {};
+  const buy = (main[0] && main[0].b && typeof main[0].b === 'object') ? main[0].b : {};
+  const paires = [];
+  for (const r of txn) {
+    const m = /^harvest_(\d+)_txn_(\d+)$/.exec(String((r && r.id) || '')); const etat = String((r && r.ti) || '').trim();
+    if (m && r.it && etat && classifyOrderStatus(etat) !== 'cancelled') paires.push({ tx: m[2], uid: m[1], item: String(r.it) });
+  }
+  const ventes = [];
+  for (const l of ventesL) for (const o of (Array.isArray(l && l.orders) ? l.orders : [])) ventes.push(o);
+  const prixDe = (f) => { const n = String((f && f.numero) || '').trim(); const b = (f && f.buyPrice != null && String(f.buyPrice).trim() !== '') ? f.buyPrice : (n && buy[n] != null ? buy[n] : null); if (b == null || String(b).trim() === '') return null; const x = parseFloat(String(b).replace(',', '.')); return Number.isFinite(x) ? x : null; };
+  const montant = (o) => { const p = o && o.price; const v = p && typeof p === 'object' ? (p.amount ?? p.value) : p; const x = Number(String(v == null ? '' : v).replace(',', '.')); return v != null && String(v).trim() !== '' && Number.isFinite(x) ? x : null; };
+  const liste = ventesSansPrix({ paires, ventes, fiches, prixDe, annulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled', montant, maintenant });
+  if (!liste.length) return { status: 200, envoye: false, n: 0, raison: 'aucune vente à demander' };
+  return notifierPrixAchat(corpsDemande(liste));
 }

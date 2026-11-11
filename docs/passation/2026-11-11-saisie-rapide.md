@@ -23,8 +23,12 @@ Trois choses validées par Julien. Rien sur l'extension, aucune fonction `api/` 
   service worker) ⇒ la feuille « Combien tu l'avais payée ? », un champ par vente, rien d'autre.
   « Enregistrer » : `buyPrice` sur la fiche de l'annonce VENDUE (identité) + miroir par N°, en
   geste annulable 5 s (`gesteVrm`).
-- Reste : pas de filet par le cron quand aucune app n'est ouverte (la notification part à la
-  prochaine ouverture de VRM sur un appareil). Le lot `notifs-groupees` peut retarder/regrouper.
+- **Filet du cron** (ajouté ensuite, à la demande de l'agent principal) : `demandesDuCron`
+  (`api/_lib/prix-achat-demande.js`), appelé par `api/ship-reminders.js` matin et soir à côté de
+  `notifierComptesRelies`. Lectures projetées et paginées (fiches et prix par N° de `main`, méta des
+  transactions, ventes) ; mêmes règles (`ventesSansPrix`, puis `notifierPrixAchat` : transaction
+  relue, mémoire « une fois », jamais la nuit — la nuit, le cron ne lit même rien). Lecture ratée ⇒
+  rien demandé. Le lot `notifs-groupees` peut encore regrouper l'envoi.
 
 ## 2. « Vendu ailleurs »
 - Réutilise la vente en main propre qui EXISTAIT : `vrm_cycle_decisions[idAnnonce] =
@@ -35,8 +39,12 @@ Trois choses validées par Julien. Rien sur l'extension, aucune fonction `api/` 
   `main:<annonce>`, datée de la date SAISIE (main propre : payé le jour même = date
   d'encaissement, dit sous le champ). `ventesAilleursDe(vinted)` (App.jsx) retire toute décision
   dont l'annonce a une vente Vinted comptée (transaction → annonce lue) : jamais deux fois.
-  Miroir serveur refabriqué (`audit-bilan-semaine --recopie`) ; le serveur ne passe pas `main`
-  (bilans de semaine/mois : sans ces ventes — reste).
+  Miroir serveur refabriqué (`audit-bilan-semaine --recopie`). La sélection elle-même
+  (`ventesAilleursPour`, src/venteAilleurs.js) est importée telle quelle par l'app ET le serveur.
+- **Bilans serveur** (semaine, mois : `calculerBilan`, api/_lib/bilan-semaine.js) : `main` passé à
+  `ventesFaites` et `ventesDeclarables` ; `lireDonneesBilan` (api/ship-reminders.js) lit
+  `vrm_cycle_decisions` (projection de `main`) et `it:meta->>item_id` des transactions (table
+  transaction → annonce). Table illisible ⇒ décisions non lues (aucun double compte possible).
 - ⚠️ Les anciennes réponses « Vendu en main propre » avec montant entrent désormais dans le CA (au
   jour de la réponse) : c'était une vente qu'il avait dite.
 - **Fiche** (`blocVenduAilleurs`) : seulement vente SUE et pas vendue, et UNE annonce pour ce N°.
@@ -52,8 +60,8 @@ Vinted sur ce mois (`DEMANDE_PERIODE_VENTES`) ; tapé dans ⌘K, une action « V
 en tête. La règle de recherche universelle ne change pas. Sans reconnaissance : aucun micro.
 
 ## Preuves
-- `node scripts/audit-saisie-rapide.cjs` : 38 contrôles (règle, route EXÉCUTÉE sur une base servie,
-  totaux, voix, branchement) ; `--prouve` : 11 mutations toutes rouges ; sur `origin/main` : rouge
+- `node scripts/audit-saisie-rapide.cjs` : 49 contrôles (dont K1–K6 cron, B1–B4 bilans) (règle, route EXÉCUTÉE sur une base servie,
+  totaux, voix, branchement) ; `--prouve` : 14 mutations toutes rouges (dont bilan sans `main`, cron sans preuve, cron la nuit) ; sur `origin/main` : rouge
   (modules absents). Audits verts : variables, tdz, coherence, identite, icones, fonctions-api,
   recherche-vocale (mise à la règle : le mois passe d'abord), registres, bilan-semaine,
   cycle-article, geste-annulable. Build OK.

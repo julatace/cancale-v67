@@ -175,7 +175,7 @@ import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT,
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
 import { requeteDeLaVoix, ficheDeLaVoix, ventesDuMois } from "./rechercheVocale.js";
-import { ventesMainPropre, opsVenduAilleurs } from "./venteAilleurs.js";   // (11 nov., saisie rapide) « Vendu ailleurs »
+import { ventesAilleursPour, opsVenduAilleurs } from "./venteAilleurs.js";   // (11 nov., saisie rapide) « Vendu ailleurs »
 import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
 import { VenduAilleurs, FeuillePrixAchat, poserDemandesPrix, abonnerDemandesPrix, lireDemandesPrix } from "./SaisieRapide.jsx";
 import { VOIX, PHRASES_VOIX, ecouter, annulerVoix, arreterVoix, ecouteEnCours } from "./dicteeNavigateur.js";
@@ -8801,14 +8801,7 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, import
 // une vente Vinted comptée dans `vinted` (identité : transaction → annonce lue, jamais un
 // titre) — la même paire n'entre jamais deux fois dans un total. UNE fonction, à chaque
 // appel des règles (§11).
-const ventesAilleursDe = (vinted) => {
-  const vendus = new Set();
-  for (const o of (Array.isArray(vinted) ? vinted : [])) {
-    if (!o || o.transaction_id == null || classifyOrderStatus(o.status) === 'cancelled') continue;
-    const it = _txnItemConnu[String(o.transaction_id)]; if (it) vendus.add(String(it));
-  }
-  return ventesMainPropre(lireObjet(CYCLE_DECISIONS), vendus);
-};
+const ventesAilleursDe = (vinted) => ventesAilleursPour(lireObjet(CYCLE_DECISIONS), vinted, _txnItemConnu, classifyOrderStatus);
 // Le résumé VENDU — aujourd'hui, ce mois, mois par mois — avec les bornes de
 // Ma journée (minuit LOCAL, le 1er du mois LOCAL). ⚠️ Pour les écrans qui ne
 // montent pas l'écran Ventes (accueil, Statistiques, widget) : ils affichaient

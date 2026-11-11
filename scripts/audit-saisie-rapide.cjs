@@ -39,6 +39,9 @@ const MUTATIONS = {
   ailleurs_date_ignoree: ['src/venteAilleurs.js', "const t = DATE_OK.test(str(d.date)) ? Date.parse(str(d.date) + 'T12:00:00') : Date.parse(str(d.at));", 'const t = Date.parse(str(d.at));'],
   ailleurs_pas_du_stock: ['src/venteAilleurs.js', '  if (!dedans) ops.push(', '  if (false) ops.push('],
   regle_sans_main: ['api/_lib/ventes-regle.js', "    if (garde(l)) lignes.push(place(l));\n  }\n  return { lignes, aDater, ecartees, exclues", "  }\n  return { lignes, aDater, ecartees, exclues"],
+  bilan_sans_main: ['api/_lib/bilan-semaine.js', '  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, main });', '  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre });'],
+  cron_sans_preuve: ['api/_lib/prix-achat-demande.js', "if (m && r.it && etat && classifyOrderStatus(etat) !== 'cancelled') paires.push(", 'if (m && r.it) paires.push('],
+  cron_nuit: ['api/_lib/prix-achat-demande.js', "  if (estNuitParis(maintenant)) return { status: 200, envoye: false, n: 0, raison: 'nuit' };\n  const [main, txn, ventesL]", '  const [main, txn, ventesL]'],
   voix_mois_absent: ['src/rechercheVocale.js', '  const i = MOIS.indexOf(m[1]);\n  if (i < 0) return null;\n  const now', '  const i = MOIS.indexOf(m[1]);\n  if (i >= 0) return null;\n  const now'],
 };
 
@@ -116,8 +119,10 @@ async function audit(mut, bavard) {
     const SUB = ligne('push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/fcm/send/banc', keys: { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' } }], rev: 1 });
     const remettre = (rows) => { tables = { app_data: { lignes: [SUB, ...rows] } }; pushes.length = 0; };
     const fetchAvant = global.fetch;
+    let lectures = 0;
     global.fetch = async (url, opts = {}) => {
       const u = new URL(String(url));
+      if (u.pathname === '/rest/v1/app_data' && (opts.method || 'GET').toUpperCase() === 'GET' && /harvest_|id=eq\.main/.test(decodeURIComponent(u.search))) lectures++;
       const rep = (b, s = 200) => new Response(typeof b === 'string' ? b : JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
       if (u.pathname === '/auth/v1/user') return rep({ id: UID, email: 'vendeuse@exemple.test', created_at: '2025-01-10T10:00:00Z' });
       if (u.pathname === '/rest/v1/rpc/vrm_acces_pour') return rep(true);
@@ -142,8 +147,8 @@ async function audit(mut, bavard) {
       const r1 = await appel([V1]);
       dit(r1.status === 200 && pushes.length === 1 && pushes[0].title === 'Vendu 80 € · N°124' && /Combien tu l’avais payée/.test(pushes[0].body) && /cible=prixachat&tx=7001/.test(pushes[0].url), 'S1 vente prouvée sans prix ⇒ UNE notification « Vendu 80 € · N°124 »', JSON.stringify([r1, pushes]));
       dit(!!(memo() && memo().demandes && memo().demandes['7001']), 'S1 la vente est notée « demandée » dans SA ligne');
-      await appel([V1]);
-      dit(pushes.length === 1, 'S2 rappelée (autre appareil, rechargement) ⇒ rien de plus', String(pushes.length));
+      const r2 = await appel([V1]);
+      dit(r2.raison === 'déjà demandé' && pushes.length === 1, 'S2 rappelée (autre appareil, rechargement) ⇒ rien de plus', String(pushes.length));
       remettre([txn(111, 7001, 501, 'Bordereau envoyé')]);
       await Promise.all([appel([V1]), appel([V1]), appel([V1])]);
       dit(pushes.length === 1, 'S3 trois appels en même temps ⇒ une seule notification', String(pushes.length));
@@ -170,6 +175,33 @@ async function audit(mut, bavard) {
       remettre([txn(222, 7001, 501, 'Bordereau envoyé')]);
       await appel([V1]);
       dit(pushes.length === 0, 'S10 la transaction d\'un AUTRE compte que celui nommé ⇒ rien', String(pushes.length));
+      // ── K · le filet du cron (aucune app ouverte) : les MÊMES règles ──
+      const MAINL = ligne('main', { vinted_annonce_numeros: { '501': { numero: '124' }, '502': { numero: '125', buyPrice: '30,00' }, '503': { numero: '126' } }, vinted_buyprice_by_num: {} });
+      const VENDUES = ligne('harvest_111_orders_sold', { capturedAt: new Date(MAINT).toISOString(), payload: { my_orders: [
+        { transaction_id: 7001, price: { amount: '80.0' }, date: new Date(MAINT - 2 * 3600e3).toISOString(), status: 'Bordereau envoyé' },
+        { transaction_id: 7002, price: { amount: '50.0' }, date: new Date(MAINT - 2 * 3600e3).toISOString(), status: 'Bordereau envoyé' },
+        { transaction_id: 7003, price: { amount: '40.0' }, date: new Date(MAINT - 2 * 3600e3).toISOString(), status: 'En cours' } ] } });
+      const cron = () => contexteVendeur.run({ owner: UID }, () => S.demandesDuCron({ maintenant: Date.parse(process.env.VRM_NOTIF_HORLOGE || JOUR) }));
+      remettre([MAINL, VENDUES, txn(111, 7001, 501, 'Bordereau envoyé'), txn(111, 7002, 502, 'Bordereau envoyé'), txn(111, 7003, 503, '')]);
+      const k1 = await cron();
+      dit(pushes.length === 1 && pushes[0].title === 'Vendu 80 € · N°124', 'K1 cron, app fermée : UNE notification, la vente prouvée sans prix (pas celle qui a un prix, pas la conversation)', JSON.stringify([k1, pushes.map((p) => p.title)]));
+      await cron();
+      dit(pushes.length === 1, 'K2 le cron du soir après celui du matin ⇒ rien de plus (une fois par vente)', String(pushes.length));
+      remettre([MAINL, VENDUES, txn(111, 7001, 501, 'Bordereau envoyé')]);
+      await Promise.all([cron(), contexteVendeur.run({ owner: UID }, () => S.notifierPrixAchat({ ventes: [V1] }))]);
+      dit(pushes.length === 1, 'K3 le cron et une app ouverte en même temps ⇒ une seule notification', String(pushes.length));
+      process.env.VRM_NOTIF_HORLOGE = NUIT;
+      remettre([MAINL, VENDUES, txn(111, 7001, 501, 'Bordereau envoyé')]);
+      lectures = 0;
+      const k4 = await cron();
+      dit(pushes.length === 0 && !memo() && lectures === 0, 'K4 cron la nuit ⇒ rien envoyé, rien réservé', JSON.stringify(k4));
+      process.env.VRM_NOTIF_HORLOGE = JOUR;
+      remettre([MAINL, VENDUES, txn(111, 7001, 501, 'Remboursement effectué')]);
+      const k5 = await cron();
+      dit(pushes.length === 0 && k5.raison === 'aucune vente à demander', 'K5 cron : vente revenue (remboursée) ⇒ le cron ne la demande même pas', JSON.stringify(k5));
+      remettre([MAINL, VENDUES, txn(111, 7003, 503, '')]);
+      const k6 = await cron();
+      dit(pushes.length === 0 && k6.raison === 'aucune vente à demander', 'K6 cron : une conversation (état vide) n\'est pas une vente', JSON.stringify(k6));
     } finally { global.fetch = fetchAvant; delete process.env.VRM_NOTIF_HORLOGE; }
   });
 
@@ -191,7 +223,7 @@ async function audit(mut, bavard) {
     // Les règles des totaux.
     const RG = await charger('api/_lib/ventes-regle.js', mut);
     const appSrc = lire('src/App.jsx');
-    const ctx = vm.createContext({ ventesMainPropre: V.ventesMainPropre, classifyOrderStatus: RG.classifyOrderStatus, lbcAnnulee: RG.lbcAnnulee, lbcFinalisee: RG.lbcFinalisee,
+    const ctx = vm.createContext({ ventesMainPropre: V.ventesMainPropre, ventesAilleursPour: V.ventesAilleursPour, classifyOrderStatus: RG.classifyOrderStatus, lbcAnnulee: RG.lbcAnnulee, lbcFinalisee: RG.lbcFinalisee,
       commandeEbayEngagee: RG.commandeEbayEngagee, montantRecuEbay: RG.montantRecuEbay, vcVenteAnnulee: () => false, etapeMotVc: () => '', montantRecuVc: () => ({ eur: null }), dateVenteVc: () => null,
       cleNum: (v) => { const s = String(v == null ? '' : v).trim().toUpperCase(); const m = /^([A-Z]*)0*(\d+)$/.exec(s); return m ? m[1] + m[2] : s; },
       _txnItemConnu: { '900': '9002' }, CYCLE_DECISIONS: 'vrm_cycle_decisions', __dec: {}, Set, Object, Number, Date, isFinite, Math, String, Array });
@@ -217,6 +249,24 @@ async function audit(mut, bavard) {
     dit(vf.lignes.length === 2 && vf.lignes.some((l) => l.plateforme === 'Ailleurs' && new Date(l.ts).getDate() === 15 && new Date(l.ts).getMonth() === 9), 'V8 « vendu » : la vente en main propre au jour SAISI (15 oct.)', JSON.stringify(vf.lignes));
     const ben = ctx.VAB({ lbc: [], ebay: [], vestiaire: [], numeros: { '9001': { numero: '124', buyPrice: '20' } }, achat: (f) => Number(f.buyPrice), numLbc: () => null, numEbayLigne: () => null, main });
     dit(ben.length === 1 && ben[0].eur === 45 && ben[0].achat === 20 && ben[0].plateforme === 'Ailleurs', 'V9 bénéfice : 45 € vendu, 20 € d\'achat (son N°)', JSON.stringify(ben));
+  });
+
+  // ── B · les bilans serveur (semaine, mois : `calculerBilan`) ──
+  await essaie('B', async () => {
+    const BS = await charger('api/_lib/bilan-semaine.js', mut);
+    const debut = Date.parse('2026-10-12T00:00:00Z'), fin = Date.parse('2026-10-19T00:00:00Z');
+    const base = { debut, fin, maintenant: Date.parse('2026-10-20T08:00:00Z'), seuilCapture: debut, comptes: [{ uid: '111', login: 'compte_a' }],
+      commandes: { '111': { cap: '2026-10-19T06:00:00Z', orders: [{ transaction_id: 900, status: 'Commande finalisée', price: { amount: '70.0' }, date: '2026-10-14T10:00:00Z' }] } },
+      masquesTx: new Set(), masquesComptes: new Set(), panneau: {}, lbc: [], ebay: [], versements: { '900': '2026-10-16T10:00:00Z' }, regle: null,
+      decisions: { '9001': { choix: 'vendu-main', numero: '124', montant: 45, date: '2026-10-15' }, '9002': { choix: 'vendu-main', numero: '125', montant: 60, date: '2026-10-15' } },
+      txItem: { '900': '9002' } };
+    const b = BS.calculerBilan(base);
+    dit(b.vendu.n === 2 && b.vendu.eur === 115, 'B1 bilan : vendu = 70 € Vinted + 45 € main propre ; la main propre de la paire vendue sur Vinted n\'entre pas', JSON.stringify(b.vendu));
+    dit(b.recu.eur === 115, 'B2 bilan : reçu = 115 € (main propre payée le jour même)', JSON.stringify(b.recu));
+    const sans = BS.calculerBilan({ ...base, decisions: null });
+    dit(sans.vendu.eur === 70, 'B3 décisions illisibles ⇒ seulement ce qui est lu (jamais deviné)', JSON.stringify(sans.vendu));
+    const src = lire('api/ship-reminders.js');
+    dit(/'vrm_cycle_decisions'\]/.test(src) && /it:meta->>item_id'\)/.test(src) && /demandesPrixAchat\(\)/.test(src), 'B4 le cron lit les décisions et la table transaction → annonce, et demande les prix (filet)');
   });
 
   // ── R · la voix ──────────────────────────────────────────────────────────
@@ -247,6 +297,7 @@ async function audit(mut, bavard) {
 }
 
 (async () => {
+  { const i = process.argv.indexOf('--mutation'); if (i > 0) { const k = await audit(MUTATIONS[process.argv[i + 1]], true); console.log(k ? 'ROUGE' : 'vert'); process.exit(0); } }
   if (process.argv.includes('--prouve')) {
     let rate = 0;
     if (await audit(null, false)) { console.log('❌ l’audit n’est pas vert sur le code actuel'); process.exit(1); }
