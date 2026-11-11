@@ -1,0 +1,38 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SÉCURITÉ DES COMPTES (11 nov., lot securite-vinted) — src/SecuriteComptes.jsx.
+   Jetons seulement (--vrm-*). Neutre partout ; l'ambre seulement pour un geste à
+   faire (« fais la vérification toi-même sur vinted.fr »).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.vrm-secu { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vrm-secu-intro { margin: 0 4px; font-size: 15px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
+.vrm-secu-arret { display: flex; flex-direction: column; gap: 6px; margin: 0 4px; }
+.vrm-secu-arret > .vrm-b { align-self: flex-start; min-height: 44px; }
+.vrm-secu-etat-arret { margin: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-secu-aide { display: block; margin: 0; font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); font-weight: 400; overflow-wrap: anywhere; }
+.vrm-secu .vrm-ios-groupe { margin-top: 4px; }
+.vrm-secu-rangee { flex-direction: column; align-items: stretch; }
+.vrm-secu-rangee > .vrm-ios-rangee-zone { width: 100%; min-height: 44px; }
+.vrm-secu-initiale { font-size: 14px; font-weight: 600; }
+.vrm-secu .vrm-ios-detail { white-space: normal; overflow-wrap: anywhere; }
+:root:root body .vrm-app-shell .vrm-main .vrm-secu .vrm-ios-detail[data-ton="geste"] { color: var(--vrm-warn, #B25000) !important; }
+.vrm-secu-reglages { display: flex; flex-direction: column; gap: 10px; padding: 4px 16px 14px; }
+.vrm-secu-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; flex-wrap: wrap; }
+.vrm-secu-sous { justify-content: flex-start; min-height: 0; color: var(--vrm-ink, #1D1D1F); font-size: 15px; }
+.vrm-secu-titre-sous { min-height: 0; margin-top: 4px; }
+.vrm-secu-lib { flex: 1 1 160px; min-width: 0; font-size: 15px; color: var(--vrm-ink, #1D1D1F); }
+.vrm-secu-nombre, .vrm-secu-heure { min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; }
+.vrm-secu-nombre { width: 76px; text-align: right; }
+.vrm-secu-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.vrm-secu-type { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--vrm-ink, #1D1D1F); }
+.vrm-secu-jours { display: flex; flex-wrap: wrap; gap: 6px; }
+.vrm-secu-jour { min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 22px; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: transparent; color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 14px; cursor: pointer; }
+.vrm-secu-jour[aria-pressed="true"] { background: var(--vrm-ink, #1D1D1F); color: var(--vrm-surface, #fff); border-color: transparent; }
+.vrm-secu-conseil { color: var(--vrm-warn, #B25000); }
+.vrm-secu-conseil .vrm-secu-aide { color: var(--vrm-warn, #B25000); flex: 1 1 180px; }
+.vrm-secu-table-cadre { overflow-x: auto; padding: 4px 8px 8px; }
+.vrm-secu-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.vrm-secu-table th, .vrm-secu-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--vrm-line, rgba(0,0,0,.08)); color: var(--vrm-ink, #1D1D1F); }
+.vrm-secu-table th[scope="row"], .vrm-secu-table thead th:first-child { text-align: left; font-weight: 500; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-secu-table thead th { font-weight: 500; color: var(--vrm-muted, #6E6E73); font-size: 12px; }
+.vrm-secu-table td[data-vide] { color: var(--vrm-muted, #6E6E73); }
+.vrm-secu-refuse { margin: 0 4px; }

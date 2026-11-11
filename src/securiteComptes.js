@@ -403,7 +403,7 @@ export function etatDuCompte(rows, cle, maintenant = Date.now()) {
     if (!c || typeof c !== 'object') continue;
     vu = true;
     if (c.robot && Number(c.robot.depuis) > 0 && (!robot || c.robot.depuis > robot.depuis)) robot = { depuis: Number(c.robot.depuis) };
-    if (c.prudence && Number(c.prudence.jusqua) > maintenant && (!prudence || c.prudence.jusqua > prudence.jusqua)) prudence = { jusqua: Number(c.prudence.jusqua), raison: String(c.prudence.raison || '') };
+    if (c.prudence && Number(c.prudence.jusqua) > maintenant && (!prudence || c.prudence.jusqua > prudence.jusqua)) prudence = { jusqua: Number(c.prudence.jusqua), raison: String(c.prudence.raison || ''), depuis: Number(c.prudence.depuis) || null };
     if (Number(c.dernier) > dernier) dernier = Number(c.dernier);
     for (const [j, n] of Object.entries(c.jours && typeof c.jours === 'object' ? c.jours : {})) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(j) && Number.isFinite(Number(n && n.n))) jours[j] = (jours[j] || 0) + Number(n.n);

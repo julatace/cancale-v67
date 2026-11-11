@@ -13602,7 +13602,7 @@ async function secuPublier(force) {
       if (!/^(vinted|vestiaire|leboncoin):[\w-]{1,40}$/.test(cle) || !c) continue;
       const jours = {};
       for (const [j, v] of Object.entries(c.jours || {})) if (/^\d{4}-\d{2}-\d{2}$/.test(j)) jours[j] = { n: Number(v && v.n) || 0, t: Object.fromEntries(Object.entries((v && v.t) || {}).filter(([k]) => SECU_SORTES.includes(k)).map(([k, n]) => [k, Number(n) || 0])) };
-      comptes[cle] = { robot: c.robot ? { depuis: Number(c.robot.depuis) || 0 } : null, prudence: c.prudence ? { jusqua: Number(c.prudence.jusqua) || 0, raison: String(c.prudence.raison || '').slice(0, 30) } : null, dernier: Number(c.dernier) || null, jours };
+      comptes[cle] = { robot: c.robot ? { depuis: Number(c.robot.depuis) || 0 } : null, prudence: c.prudence ? { jusqua: Number(c.prudence.jusqua) || 0, raison: String(c.prudence.raison || '').slice(0, 30), depuis: Number(c.prudence.depuis) || 0 } : null, dernier: Number(c.dernier) || null, jours };
     }
     const evts = (Array.isArray(s.evts) ? s.evts : []).map((e) => ({ s: e.s === 'arret' ? 'arret' : 'relance', at: Number(e.at) || 0, par: e.par === 'app' ? 'app' : 'carte' }));
     await supabaseUpsert('app_data', [{ id: `${SECU_LIGNE}${moi}`, data: { nav: moi, v: CODE_VERSION, at: new Date().toISOString(), comptes, evts } }], 'id');
