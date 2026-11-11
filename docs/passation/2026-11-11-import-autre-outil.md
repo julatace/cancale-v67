@@ -6,8 +6,9 @@ Aucune PR, aucun merge dans `main`, aucune écriture dans la vraie base.
 ## Ce que voit le vendeur
 
 **Paramètres → Sécurité et sauvegarde → Importer** (lien direct : `/?tab=settings&section=importer`),
-et une étape **facultative** au pied de « Démarrer avec VRM » (« Tu arrives d'un tableur ou d'un autre
-logiciel ? » → « Importer mon stock ») — hors des 5 étapes comptées.
+et un lien **facultatif** sur la carte « Démarrer avec VRM » de Ma journée (`CarteParcours`,
+src/ParcoursArrivee.jsx : « Tu arrives d'un tableur ou d'un autre logiciel ? Importer mon stock ») —
+hors des étapes comptées (l'événement `vrm:aller` vers `?tab=settings&section=importer`).
 
 1. **Mon stock** · **Mes ventes passées** (un segment).
 2. « Choisir le fichier » : `.csv` (« ; », « , », tabulation ; UTF-8 ou Excel Windows) ou `.xlsx`,
@@ -99,8 +100,8 @@ fois) ; sinon la phrase le dit.
 - Banc `scripts/bancs/import-autre-outil.cjs` (390 tactile + 1512, clair + sombre) : tout vert —
   conflits, rien écrit avant le clic, pool gardé + 12/13, coût sur 12 seul, fiche N°7 intacte ; N°20
   servi entre l'aperçu et le clic ⇒ refusé, dit, aperçu relu ; annuler (pool non rétréci) ; ventes
-  (« à vérifier », « à dater ») ; 2 000 lignes (aucune tâche > 50 ms) ; l'étape du guide ouvre
-  Importer. Captures regardées. Sur `origin/main` : rouge.
+  (« à vérifier », « à dater ») ; 2 000 lignes (aucune tâche > 50 ms) ; le lien de la carte du
+  parcours ouvre Importer sans changer les étapes comptées. Captures regardées. Sur `origin/main` : rouge.
 - Audits retouchés (le memo a un nouvel argument) : `audit-urssaf.cjs` passe `ventesImp: []` à son
   exécution de `declRapport`. `declarablesCompta` (Compta.jsx) reçoit `importees` en paramètre (reste
   pure : `audit-registres`, `audit-dac7-comptes` verts).
