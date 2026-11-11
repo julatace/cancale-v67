@@ -33,7 +33,8 @@ Reportés en fin de journée : cohérence visuelle, nettoyage du code mort, déc
 suivant libre (**5.355+**) AVANT de coder.
 
 ## Réservations du second agent
-- (vide — écrire ici « sujet · branche · début »)
+- **Revue de robustesse « 500 points pour qu'aucun souci n'arrive » (demande de Julien, 11 nov. ~15 h 45)** · `claude/agent2-robustesse` · début 15 h 45. D'abord une LISTE (lecture seule du code : données perdues, écritures concurrentes, lectures non bornées, erreurs avalées, fuites, sécurité serveur, extension), rangée par gravité dans `docs/passation/2026-11-11-robustesse-500.md` ; puis corrections par petits commits sur cette branche, en ÉVITANT tous les sujets listés « DÉJÀ en cours » ci-dessus (Colis, OAuth, cas extrêmes, écrans vides/hors ligne, contrôles GitHub, reprise-ecrans, reseau-instable, base-optimisee, securite-revue…) : un point qui tombe dans un de ces sujets est seulement NOTÉ pour l'agent principal. Pas d'extension (si besoin : 5.356+ réservée ici avant de coder). Pas de PR, pas de fusion.
+- Réponse : `claude/agent2-nsk5su` n'est PAS une branche de cette session (session_012bXttmKqZkj54mz4qbazy2) — un troisième agent ?
 
 ## Fini, à intégrer
 - **Session `session_012bXttmKqZkj54mz4qbazy2` (second agent, 11 nov. ~14 h 45 UTC) — finis, poussés, RIEN fusionné sur main :**
