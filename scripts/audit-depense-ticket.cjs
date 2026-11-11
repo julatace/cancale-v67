@@ -14,8 +14,8 @@ let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d != null ? ' — ' + d : '')); };
 let S = ''; try { S = fs.readFileSync(path.join(R, 'src/depensesTicket.js'), 'utf8'); } catch (_) {}
 const muter = (a, b) => { if (!S.includes(a)) { console.log('❌ motif absent : ' + a.slice(0, 60)); process.exit(2); } S = S.replace(a, b); };
-if (MUT === 'plus-grand') muter('  return null;\n}\nexport const texteMontantSaisie', '  { const tous = lignes.flatMap(montantsDe); return tous.length ? Math.max(...tous) : null; }\n}\nexport const texteMontantSaisie');
-else if (MUT === 'ht') muter("const PAS_LE_TOTAL = /sous[\\s-]*total|\\bht\\b|\\btva\\b|rendu|monnaie|remise|[ée]conomie|avoir|points?\\b/i;", 'const PAS_LE_TOTAL = /rendu/i;');
+if (MUT === 'plus-grand') muter('  return null;\n}\nconst lignesDe', '  { const tous = lignes.flatMap(montantsDe); return tous.length ? Math.max(...tous) : null; }\n}\nconst lignesDe');
+else if (MUT === 'ht') muter("const PAS_LE_TOTAL = /sous[\\s-]*total|\\bht\\b|\\btva\\b(?!\\s*(?:incluse|comprise))|rendu|[àa]\\s*rendre|monnaie|remise|r[ée]duction|[ée]conomie|avoir|points?\\b|fid[ée]lit[ée]/i;", 'const PAS_LE_TOTAL = /rendu/i;');
 else if (MUT) { console.log('mutation inconnue'); process.exit(2); }
 (async () => {
   if (!S) { dit(false, 'src/depensesTicket.js existe'); return fin(); }
