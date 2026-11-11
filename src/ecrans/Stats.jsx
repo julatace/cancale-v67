@@ -39,7 +39,7 @@ import { statsOffres } from "../statsOffres.js";
 import { statsParCategorie, stockParFamille, familleDeVente, cleVente, tableFamilles, ecritureCategoriesMain, afficherCategories, FAMILLES_STATS, titreFamille, CLE_CATEGORIES_MAIN } from '../statsCategories.js';   // (11 nov., lot stats-categories)
 import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
 import '../stats-categories.css';
-import { resumePeriode, margeConnue, meilleuresVentes, ageDuStock, venduEtRecu, MIN_DONNEES } from '../statsPlus.js';   // (11 nov., lot stats-plus)
+import { resumePeriode, margeConnue, meilleuresVentes, ageDuStock, venduEtRecu, MIN_DONNEES, recordsDe, colonneCompte } from '../statsPlus.js';   // (11 nov., lot stats-plus)
 import '../stats-plus.css';
 
 // ⟦← App.jsx #6⟧
@@ -631,7 +631,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
-      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix}/>
+      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo}/>
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
       <div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
@@ -1557,7 +1557,147 @@ function GraphiqueVenduRecu({ VR, lib, titre }) {
     </div>
   );
 }
-function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, nomPrec, auMemePoint, titreBarres, noteBarres }) {
+// ── (11 nov., ajout de Julien) MES RECORDS ──────────────────────────────────
+// Chaque record se touche : une feuille dit d'où il vient (le mois ou la semaine : ses
+// ventes ; la vente : son détail) et mène à l'écran Ventes. Rien n'est rangé : recalculé.
+const MOIS_LONGS_SP = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const nomMoisSP = (ym) => { const [y, m] = String(ym).split('-').map(Number); return `${MOIS_LONGS_SP[m - 1]} ${y}`; };
+const dateSP = (ts) => new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+const delaiSP = (r) => (r.heures < 24 ? `${Math.max(1, r.heures)} h` : `${String(r.jours).replace('.', ',')} j`);
+function MesRecords({ vendu, releve, partiel, onGo }) {
+  const R = React.useMemo(() => recordsDe({ vendu, releve, partiel }), [vendu, releve, partiel]);
+  const [ouvert, setOuvert] = React.useState(null);
+  const ligne = (k, lib, x, val, sous, attrs) => {
+    const vide = x === undefined ? 'je lis…' : x === null ? 'pas pu être lu' : null;
+    const corps = (
+      <>
+        <span className="vrm-sp-rec-lib">{lib}</span>
+        <span className="vrm-display vrm-sp-rec-val" data-vide={vide || (x && x.pasAssez) ? '1' : undefined}>{vide || (x && x.pasAssez) ? '—' : val}</span>
+        <span className="vrm-sp-rec-sous">{vide || sous}</span>
+      </>
+    );
+    return x && !x.pasAssez
+      ? <button key={k} type="button" className="vrm-sp-rec" data-sp-record={k} {...attrs} onClick={() => setOuvert(k)} aria-label={`${lib} : ${typeof val === 'string' ? val : ''} — voir le détail`}>{corps}<span className="vrm-sp-rec-chev" aria-hidden="true">›</span></button>
+      : <div key={k} className="vrm-sp-rec" data-sp-record={k} data-sp-record-etat={x === undefined ? 'encours' : x === null ? 'passu' : 'pas-assez'}>{corps}</div>;
+  };
+  const lu = partiel ? ' · parmi les ventes lues' : '';
+  const M = R.mois, S = R.semaine, V = R.vente, Q = R.rapide;
+  const lignesDe = (de, a) => (Array.isArray(vendu) ? vendu.filter((l) => l && Number(l.ts) >= de && Number(l.ts) < a && connuSP(l.eur)).sort((x, y) => Number(y.eur) - Number(x.eur)) : []);
+  const bornesMois = (ym) => { const [y, m] = ym.split('-').map(Number); return [new Date(y, m - 1, 1).getTime(), new Date(y, m, 1).getTime()]; };
+  const feuille = () => {
+    if (!ouvert) return null;
+    const fermer = () => setOuvert(null);
+    let titre = '', sous = '', corps = null;
+    if (ouvert === 'mois' || ouvert === 'semaine') {
+      const [de, a] = ouvert === 'mois' ? bornesMois(M.k) : [S.de, S.a];
+      titre = ouvert === 'mois' ? `Meilleur mois · ${nomMoisSP(M.k)}` : `Meilleure semaine · du ${new Date(de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
+      const L = lignesDe(de, a);
+      sous = `${fmt((ouvert === 'mois' ? M : S).eur)} · ${plSP(L.length, 'vente')}`;
+      corps = (
+        <ol className="vrm-sp-top" data-sp-record-ventes={L.length}>
+          {L.slice(0, 60).map((l, i) => (
+            <li key={`${l.tx || ''}-${i}`} className="vrm-sp-top-ligne">
+              <span className="vrm-sp-top-rang" aria-hidden="true">{i + 1}</span>
+              <span className="vrm-sp-top-nom"><span>{new Date(Number(l.ts)).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</span><small>{l.plateforme === 'Vinted' && l.compte ? l.compte : l.plateforme}</small></span>
+              <span className="vrm-sv-chiffre vrm-sp-top-brut">{fmt(Number(l.eur))}</span>
+            </li>
+          ))}
+          {L.length > 60 ? <li className="vrm-sv-note vrm-sp-top-note">+ {plSP(L.length - 60, 'autre vente')}</li> : null}
+        </ol>
+      );
+    } else {
+      const x = ouvert === 'vente' ? V : Q;
+      titre = ouvert === 'vente' ? 'Meilleure vente' : 'Vente la plus rapide';
+      sous = x.titre || 'Sans titre';
+      corps = (
+        <dl className="vrm-sp-rec-detail" data-sp-record-detail={ouvert}>
+          <div><dt>Vendue le</dt><dd>{dateSP(x.ts)}</dd></div>
+          <div><dt>Où</dt><dd>{x.plateforme === 'Vinted' && x.compte ? `Vinted · ${x.compte}` : x.plateforme}</dd></div>
+          <div><dt>Prix de vente</dt><dd>{fmt(x.eur)}</dd></div>
+          {ouvert === 'vente' ? <><div><dt>Prix d’achat</dt><dd>{fmt(x.achat)}</dd></div><div><dt>{NOM_BENEFICE_BRUT}</dt><dd>{fmt(x.brut)}</dd></div></>
+            : <><div><dt>Mise en ligne</dt><dd>{dateSP(x.enLigne)}</dd></div><div><dt>Partie en</dt><dd>{delaiSP(x)}</dd></div></>}
+          {x.id ? <div><dt>N° de transaction</dt><dd>{String(x.id).replace(/^(lbc|ebay):/, '')}</dd></div> : null}
+        </dl>
+      );
+    }
+    return (
+      <SheetShell titre={titre} sousTitre={sous} onClose={fermer} z={20000} maxWidth={560} className="vrm-sp-rec-feuille" data-noswipe="" data-sp-record-feuille={ouvert}>
+        <div className="vrm-sp-rec-feuille-corps">
+          {corps}
+          {onGo ? <button type="button" className="vrm-lien-action vrm-sp-rec-aller" data-sp-record-aller="" onClick={() => { fermer(); onGo('cat_ventes'); }}>Voir mes ventes <span aria-hidden="true">›</span></button> : null}
+        </div>
+      </SheetShell>
+    );
+  };
+  return (
+    <>
+      <div className="vrm-sp-records" data-sp-records="">
+        {ligne('mois', 'Meilleur mois', M, M && !M.pasAssez ? fmt(M.eur) : '', M && !M.pasAssez ? `${nomMoisSP(M.k)} · ${plSP(M.n, 'vente')}${lu}` : M ? `pas assez de données (${plSP(M.nGroupes, 'mois', 'mois')} de ventes)` : '', M && !M.pasAssez ? { 'data-sp-record-k': M.k, 'data-sp-record-v': String(Math.round(M.eur * 100)) } : {})}
+        {ligne('semaine', 'Meilleure semaine', S, S && !S.pasAssez ? fmt(S.eur) : '', S && !S.pasAssez ? `du ${new Date(S.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} · ${plSP(S.n, 'vente')}${lu}` : S ? 'pas assez de données' : '', S && !S.pasAssez ? { 'data-sp-record-v': String(Math.round(S.eur * 100)) } : {})}
+        {ligne('vente', 'Meilleure vente', V, V && !V.pasAssez ? `+${fmt(V.brut)}` : '', V && !V.pasAssez ? `${V.titre || 'Sans titre'} · parmi les ventes au prix d’achat connu (${V.nCout} sur ${V.n})` : V ? `pas assez de données · prix d’achat connu ${V.nCout} sur ${V.n}` : '', V && !V.pasAssez ? { 'data-sp-record-v': String(Math.round(V.brut * 100)), 'data-sp-record-couv': `${V.nCout}/${V.n}` } : {})}
+        {ligne('rapide', 'Vente la plus rapide', Q, Q && !Q.pasAssez ? delaiSP(Q) : '', Q && !Q.pasAssez ? `${Q.titre || 'Sans titre'} · parmi ${plSP(Q.nDelai, 'vente Vinted datée', 'ventes Vinted datées')}` : Q ? 'pas assez de ventes Vinted à la date de mise en ligne connue' : '', Q && !Q.pasAssez ? { 'data-sp-record-h': String(Q.heures) } : {})}
+      </div>
+      {feuille()}
+    </>
+  );
+}
+const connuSP = (v) => v != null && String(v).trim() !== '' && isFinite(Number(v));
+
+// ── (11 nov., ajout de Julien) COMPARER DEUX COMPTES ────────────────────────
+const CLE_COMPARER_COMPTES = 'vrm_sp_comparer_comptes';   // commodité de CET appareil (protégée)
+function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
+  const [choix, setChoixEtat] = React.useState(() => { try { const v = JSON.parse(localStorage.getItem(CLE_COMPARER_COMPTES) || 'null'); return Array.isArray(v) ? v : []; } catch (_) { return []; } });
+  const setChoix = (v) => { setChoixEtat(v); try { localStorage.setItem(CLE_COMPARER_COMPTES, JSON.stringify(v)); } catch (_) {} };
+  if (!Array.isArray(comptes) || comptes.length < 2) return null;
+  const cles = comptes.map((c) => c.k);
+  const a = cles.includes(choix[0]) ? choix[0] : cles[0];
+  const b = cles.includes(choix[1]) && choix[1] !== a ? choix[1] : cles.find((k) => k !== a);
+  const col = (k) => {
+    const c = comptes.find((x) => x.k === k);
+    const bc = brutComptes && (c.plat === 'Vinted' || comptes.filter((x) => x.plat === c.plat).length === 1) ? brutComptes[cleBrutCompte(c.plat, k.split('|').slice(1).join('|'))] : null;
+    return colonneCompte(c, bc, enLigneDe(c), tauxVenteMois);
+  };
+  const A = col(a), B = col(b);
+  const nom = (c) => `${c.nom}${c.site && c.site !== c.nom ? ` (${c.site})` : ''}`;
+  const choisir = (i, k) => { const n = [a, b]; n[i] = k; if (n[0] === n[1]) n[1 - i] = cles.find((x) => x !== k); setChoix(n); };
+  const sel = (i, v) => (
+    <label className="vrm-sp-cmp-choix">
+      <span className="vrm-sr-seul">{i === 0 ? 'Premier compte' : 'Second compte'}</span>
+      <select value={v} data-sp-cmp-choix={i} onChange={(e) => choisir(i, e.target.value)}>
+        {comptes.map((c) => <option key={c.k} value={c.k}>{nom(c)}</option>)}
+      </select>
+    </label>
+  );
+  const pct = (v) => `${v} %`;
+  const jr = (j) => (j < 1 ? '< 1 j' : `${String(Math.round(j * 10) / 10).replace('.', ',')} j`);
+  const L = [
+    ['ventes', 'Ventes', (x) => String(x.n)],
+    ['vendu', 'Vendu', (x) => fmt(x.eur)],
+    ['benef', 'Bénéfice connu', (x) => (x.brut == null ? (x.nFin ? `— · prix d’achat 0 sur ${x.nFin}` : '—') : `${fmt(x.brut)}${x.nCout < x.nFin ? ` · ${x.nCout} sur ${x.nFin}` : ''}`)],
+    ['panier', 'Panier moyen', (x) => (x.panier == null ? '— · pas assez' : fmt(x.panier))],
+    ['delai', 'Temps pour vendre', (x) => (x.delai === undefined ? '— · pas sur ce site' : x.delai == null ? '— · aucune date' : jr(x.delai))],
+    ['taux', 'Taux de vente', (x) => (x.taux === undefined ? '— · pas sur ce site' : x.taux == null ? '— · en ligne pas lu' : pct(x.taux))],
+  ];
+  return (
+    <div className="vrm-sp-cmp" data-sv-etat="lu" data-sp-cmp={`${a}~${b}`}>
+      <div className="vrm-sp-cmp-tete">{sel(0, a)}<span className="vrm-sp-cmp-vs" aria-hidden="true">et</span>{sel(1, b)}</div>
+      <table className="vrm-sp-cmp-table">
+        <thead><tr><th scope="col"><span className="vrm-sr-seul">Chiffre</span></th><th scope="col">{A.nom}</th><th scope="col">{B.nom}</th></tr></thead>
+        <tbody>
+          {L.map(([k, lib, f]) => (
+            <tr key={k} data-sp-cmp-ligne={k}>
+              <th scope="row">{lib}</th>
+              <td data-sp-cmp-a="">{f(A)}</td>
+              <td data-sp-cmp-b="">{f(B)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="vrm-sv-note">Sur la période, comptes sélectionnés · seuls les comptes avec au moins une vente · bénéfice : ventes finalisées au prix d’achat connu · temps pour vendre : médiane, Vinted seulement · taux : vendues ÷ (vendues + en ligne aujourd’hui), Vinted seulement · panier : à partir de {MIN_DONNEES} ventes.</p>
+    </div>
+  );
+}
+function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, nomPrec, auMemePoint, titreBarres, noteBarres, venduTout, releveTout, partielTout, comptes, brutComptes, enLigneDe, onGo }) {
   const R = React.useMemo(() => resumePeriode(V === undefined ? undefined : V, partielVendu), [V, partielVendu]);
   const M = React.useMemo(() => margeConnue(lp === null ? null : lp), [lp]);
   const T = React.useMemo(() => meilleuresVentes(lp === null ? null : lp, 10), [lp]);
@@ -1643,13 +1783,17 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
             {carte('sp-vr', 'Vendu et reçu', `${titreBarres.replace('Vendu par ', 'par ')} · ${noteBarres}`, corpsVR, { 'data-sv-carte': 'vendu-recu' }, 'vrm-sv-large')}
             {carte('sp-age', 'L’âge de ton stock', A && A.total ? `aujourd’hui · ${plSP(A.datesConnues, 'annonce datée', 'annonces datées')}` : 'aujourd’hui', corpsAge, { 'data-sv-carte': 'age-stock' })}
           </div>
+          {carte('sp-records', 'Mes records', 'depuis le début', <MesRecords vendu={venduTout} releve={releveTout} partiel={partielTout} onGo={onGo}/>, { 'data-sv-carte': 'records' })}
+          {Array.isArray(comptes) && comptes.length >= 2
+            ? carte('sp-comptes', 'Comparer deux comptes', null, <ComparerComptes comptes={comptes} brutComptes={brutComptes} enLigneDe={enLigneDe}/>, { 'data-sv-carte': 'comparer-comptes' })
+            : carte('sp-comptes', 'Comparer deux comptes', null, vide(comptes === null ? 'Tes ventes n’ont pas pu être lues.' : comptes === undefined ? 'Je lis tes ventes…' : 'Il faut deux comptes avec au moins une vente sur la période.', { 'data-sv-etat': comptes == null ? 'passu' : 'pas-assez' }), { 'data-sv-carte': 'comparer-comptes' })}
           {carte('sp-top', 'Tes 10 meilleures ventes', T && T.nCout ? `bénéfice brut · ${T.nCout} sur ${T.n}` : null, corpsTop, { 'data-sv-carte': 'meilleures' })}
         </div>
       </RepliStats>
     </>
   );
 }
-function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
+function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null }) {
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
   const { releve, stock, benef, extras, lignes } = useReleveStats();
@@ -1859,7 +2003,11 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
       <div className="vrm-sv-tuiles">{tVendu}{tBenef}{tDelai}{tEnLigne}{tTotal}</div>
       {/* (11 nov., lot stats-plus) En bref (ventes, panier moyen, marge connue), puis « Plus de chiffres ». */}
       <StatsPlus b={b} V={vendu === undefined ? undefined : V} partielVendu={partielVendu} lp={lignes === null ? null : lp} stock={stockPlus} barres={barres} ligneUrssaf={ligneUrssafPlus}
-        lib={libBarre} nomPrec={nomPrec} auMemePoint={auMemePoint} titreBarres={titreBarres} noteBarres={noteBarres}/>
+        lib={libBarre} nomPrec={nomPrec} auMemePoint={auMemePoint} titreBarres={titreBarres} noteBarres={noteBarres}
+        venduTout={vendu} releveTout={!lignes ? (releve ? undefined : null) : extras === undefined ? undefined : datesPasSu ? lignes.map((l) => ({ ...l, enLigne: null })) : lignes}
+        partielTout={manque.length > 0 || nonCompteesDe(liveStats && liveStats.venduNonComptees, 0, Infinity).length > 0}
+        comptes={vendu === undefined ? undefined : comptes} brutComptes={brutComptes} onGo={onGo}
+        enLigneDe={(c) => { if (c.plat !== 'Vinted') return null; const l = Array.isArray(vendu) ? vendu.find((x) => x && x.plateforme === 'Vinted' && String(x.compte || '') === c.k.split('|').slice(1).join('|') && x.uid) : null; const E = liveStats && liveStats.annEnLigne; return l && E && Object.prototype.hasOwnProperty.call(E, l.uid) && Number.isFinite(E[l.uid]) ? E[l.uid] : null; }}/>
       <div className="vrm-sv-rangee vrm-sv-rangee-3">
         {carte('sv-barres', titreBarres, noteBarres, !barres
           ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues : aucune barre.' : 'Je lis tes ventes…')

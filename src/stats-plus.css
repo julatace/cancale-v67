@@ -41,3 +41,36 @@
 .vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-nom { white-space: nowrap; }
 .vrm-stats-vitrine .vrm-sv-ligne-taille.vrm-sp-age-ligne { grid-template-columns: 8.4em minmax(0, 1fr) max-content !important; column-gap: 12px; }
 .vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-nom { overflow: visible; text-overflow: clip; font-size: 14px; }
+
+/* (11 nov., ajouts de Julien) Mes records : quatre lignes qui se touchent. */
+.vrm-sp-records { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 900px) { .vrm-sp-records { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.vrm-sp-rec { all: unset; box-sizing: border-box; position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; min-height: 44px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-surface); }
+button.vrm-sp-rec { cursor: pointer; }
+button.vrm-sp-rec:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 2px; }
+@media (hover: hover) { button.vrm-sp-rec:hover { background: color-mix(in srgb, var(--vrm-surface) 85%, var(--vrm-ink)); } }
+.vrm-sp-rec-lib { font-size: 12px; color: var(--vrm-muted); font-weight: 500; }
+.vrm-sp-rec-val { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-sp-rec-val[data-vide] { color: var(--vrm-muted); }
+.vrm-sp-rec-sous { font-size: 12px; color: var(--vrm-muted); line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.vrm-sp-rec-chev { position: absolute; top: 10px; right: 12px; color: var(--vrm-muted); font-size: 18px; line-height: 1; }
+.vrm-sp-rec-feuille-corps { display: flex; flex-direction: column; gap: 14px; padding-bottom: 12px; }
+.vrm-sp-rec-detail { margin: 0; display: flex; flex-direction: column; }
+.vrm-sp-rec-detail > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--vrm-line); }
+.vrm-sp-rec-detail > div:first-child { border-top: 0; }
+.vrm-sp-rec-detail dt { color: var(--vrm-muted); font-size: 14px; }
+.vrm-sp-rec-detail dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--vrm-ink); text-align: right; font-variant-numeric: tabular-nums; }
+.vrm-sp-rec-aller { align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--vrm-accent-texte, var(--vrm-accent)); cursor: pointer; }
+
+/* Comparer deux comptes : deux listes de choix, puis un tableau compact (3 colonnes, même au téléphone). */
+.vrm-sp-cmp { display: flex; flex-direction: column; gap: 10px; }
+.vrm-sp-cmp-tete { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; }
+.vrm-sp-cmp-vs { font-size: 12px; color: var(--vrm-muted); }
+.vrm-sp-cmp-choix select { width: 100%; min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; font-size: 14px; font-weight: 600; }
+.vrm-sp-cmp-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.vrm-sp-cmp-table th, .vrm-sp-cmp-table td { padding: 8px 6px; border-top: 1px solid var(--vrm-line); text-align: right; font-size: 14px; color: var(--vrm-ink); overflow-wrap: anywhere; vertical-align: top; }
+.vrm-sp-cmp-table thead th { border-top: 0; font-size: 12px; color: var(--vrm-muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-sp-cmp-table tbody th { text-align: left; font-weight: 500; color: var(--vrm-muted); font-size: 13px; }
+.vrm-sp-cmp-table td { font-weight: 600; }
+.vrm-sp-cmp-table th:first-child { width: 34%; padding-left: 0; }
+@media (max-width: 420px) { .vrm-sp-cmp-table th, .vrm-sp-cmp-table td { font-size: 13px; padding: 7px 4px; } }

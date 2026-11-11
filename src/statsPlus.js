@@ -118,3 +118,85 @@ export const venduEtRecu = (barres, recuEntre) => {
   const tous = lues.length > 0 && lues.every((x) => x.recu != null);
   return { barres: out, recuLu: lues.some((x) => x.recu != null), recuComplet: tous && !lues.some((x) => x.recuPartiel), raison: tous ? '' : raison };
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MES RECORDS (11 nov., ajout de Julien au lot stats-plus)
+// ═══════════════════════════════════════════════════════════════════════════
+// Sur TOUT l'historique lu (comptes sélectionnés : la coque a déjà retiré les
+// écartés), recalculés à chaque lecture — rien n'est rangé :
+//   · meilleur mois / meilleure semaine : le VENDU (lignes de `ventesFaites`,
+//     date de vente, mois et semaine LOCAUX, lundi → lundi) ;
+//   · meilleure vente : vente − prix d'achat (la règle du brut), SEULEMENT parmi
+//     les ventes finalisées au prix d'achat connu (dit, « N sur M ») ;
+//   · vente la plus rapide : mise en ligne → vente (Vinted, date connue).
+// Un record a besoin de matière : moins de 2 mois / 2 semaines vendus, ou moins
+// de `MIN_DONNEES` ventes classables ⇒ `pasAssez`, jamais un « record » d'une
+// vente. `partiel` (un site pas lu, des montants pas lus) ⇒ « parmi les ventes lues ».
+const J = 86400000;
+const ymLocal = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const lundiLocal = (ts) => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)).getTime(); };
+const meilleurGroupe = (vendu, cle) => {
+  const par = new Map();
+  for (const l of vendu) {
+    if (!l || !isFinite(Number(l.ts)) || !(Number(l.ts) > 0) || !connu(l.eur)) continue;
+    const k = cle(Number(l.ts));
+    const g = par.get(k) || (par.set(k, { k, n: 0, c: 0 }), par.get(k));
+    g.n += 1; g.c += cents(l.eur);
+  }
+  const gs = [...par.values()];
+  if (gs.length < 2) return { pasAssez: true, nGroupes: gs.length };
+  gs.sort((a, b) => b.c - a.c || (a.k < b.k ? 1 : -1));   // égalité : le plus récent
+  const m = gs[0];
+  return { k: m.k, n: m.n, eur: m.c / 100, nGroupes: gs.length, pasAssez: false };
+};
+export const recordsDe = ({ vendu, releve, partiel = false } = {}) => {
+  const out = {};
+  if (vendu === undefined) { out.mois = undefined; out.semaine = undefined; }
+  else if (!Array.isArray(vendu)) { out.mois = null; out.semaine = null; }
+  else {
+    out.mois = { ...meilleurGroupe(vendu, ymLocal), partiel: !!partiel };
+    const s = meilleurGroupe(vendu, lundiLocal);
+    out.semaine = { ...s, partiel: !!partiel, ...(s.k != null ? { de: s.k, a: lundiLocal(s.k + 8 * J) } : {}) };
+  }
+  if (releve === undefined) { out.vente = undefined; out.rapide = undefined; return out; }
+  if (!Array.isArray(releve)) { out.vente = null; out.rapide = null; return out; }
+  const T = meilleuresVentes(releve, 1);
+  out.vente = T.nCout >= MIN_DONNEES ? { ...T.lignes[0], n: T.n, nCout: T.nCout, pasAssez: false } : { n: T.n, nCout: T.nCout, pasAssez: true };
+  let best = null, nDelai = 0;
+  for (const l of releve) {
+    if (!l || !isFinite(Number(l.ts))) continue;
+    const e = Number(l.enLigne);
+    if (l.enLigne == null || !isFinite(e) || e <= 0 || Number(l.ts) < e) continue;
+    nDelai += 1;
+    const j = (Number(l.ts) - e) / J;
+    if (!best || j < best.jours || (j === best.jours && Number(l.ts) > best.ts)) best = { jours: Math.round(j * 10) / 10, heures: Math.round((Number(l.ts) - e) / 3600000), ts: Number(l.ts), enLigne: e, eur: Number(l.eur), titre: String(l.titre || '').trim(), plateforme: l.plateforme || '', compte: l.compte || '', id: l.id == null ? '' : String(l.id) };
+  }
+  out.rapide = nDelai >= MIN_DONNEES ? { ...best, nDelai, pasAssez: false } : { nDelai, pasAssez: true };
+  return out;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPARER DEUX COMPTES (11 nov., ajout de Julien au lot stats-plus)
+// ═══════════════════════════════════════════════════════════════════════════
+// Une colonne par compte vendeur, sur la période ; chaque chiffre vient de la
+// règle de son bloc : ventes et vendu = « Quel compte vend le mieux » (les
+// lignes de la tuile « Vendu ») ; bénéfice connu = `brutParCompte` (avec sa
+// couverture « N sur M ») ; délai = la médiane de `delaisPar` (Vinted seulement :
+// Leboncoin, eBay et Vestiaire ne donnent pas la date de mise en ligne ⇒ hors) ;
+// taux de vente = `tauxVenteMois` : vendues ÷ (vendues + en ligne aujourd'hui),
+// Vinted seulement, le nombre en ligne LU par compte (sinon « — »).
+// `c` = une ligne de « Quel compte vend le mieux » { k, plat, nom, n, eur, mediane, nDelai } ;
+// `bc` = `brutParCompte(...)[cleBrutCompte]` ou null ; `enLigne` = nombre lu | null ;
+// `tauxVente` = la règle (src/statsVentes.js) passée par l'écran.
+export const colonneCompte = (c, bc, enLigne, tauxVente) => {
+  if (!c) return null;
+  const vinted = c.plat === 'Vinted';
+  return {
+    k: c.k, nom: c.nom, plat: c.plat, n: c.n, eur: c.eur,
+    panier: c.n >= MIN_DONNEES ? Math.round(cents(c.eur) / c.n) / 100 : null,
+    brut: bc && bc.brut != null ? bc.brut : null, nCout: bc ? bc.nCout : 0, nFin: bc ? bc.n : 0,
+    delai: vinted ? (c.nDelai > 0 ? c.mediane : null) : undefined, nDelai: c.nDelai || 0,
+    taux: vinted && Number.isFinite(enLigne) ? tauxVente(c.n, enLigne) : (vinted ? null : undefined),
+    enLigne: vinted && Number.isFinite(enLigne) ? enLigne : null,
+  };
+};
