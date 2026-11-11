@@ -159,7 +159,7 @@ function trouverVue(A, vue) {
 // Elles partent AVEC la vue, déclarées dans son corps : ce qu'elles lisent du composant est passé
 // comme le reste (mêmes règles : rien écrit, rien réaffecté après, rien déclaré après la branche).
 // Déclarées avant la branche seulement ; une déclaration qui n'est pas une fonction reste.
-function compagnons(fnPath, E) {
+function compagnons(A, fnPath, E) {
   const corps = fnPath.node.body && fnPath.node.body.type === 'BlockStatement' ? fnPath.get('body.body') : [];
   const s = E.node.start, e = E.node.end;
   const cand = [];
@@ -168,7 +168,9 @@ function compagnons(fnPath, E) {
     let noms = null;
     if (st.isFunctionDeclaration() && st.node.id) noms = [st.node.id.name];
     else if (st.isVariableDeclaration() && st.node.kind === 'const' && st.node.declarations.every((d) => d.id.type === 'Identifier' && d.init && /^(ArrowFunctionExpression|FunctionExpression)$/.test(d.init.type))) noms = st.node.declarations.map((d) => d.id.name);
-    if (noms) cand.push({ st, noms, b: noms.map((n) => fnPath.scope.getBinding(n)).filter(Boolean) });
+    // une fonction qui RÉAFFECTE une variable de tête d'App.jsx ne part pas (un module ne réaffecte pas un import)
+    const ecritTete = noms && Object.values(A.bindings).some((b) => b.constantViolations.some((v) => v.node.start >= st.node.start && v.node.end <= st.node.end));
+    if (noms && !ecritTete) cand.push({ st, noms, b: noms.map((n) => fnPath.scope.getBinding(n)).filter(Boolean) });
   }
   const pris = new Set();
   const dansZone = (n) => (n.start >= s && n.end <= e) || [...pris].some((c) => n.start >= c.st.node.start && n.end <= c.st.node.end);
@@ -227,7 +229,9 @@ function lectureVue(A, fnPath, E, H = []) {
       if (!fDecl || !f || f.node !== fDecl.node || !parIIFE || cv.node.end > s) refus.push(`la variable ${nom} qu'elle lit est réaffectée ailleurs (ligne ${cv.node.loc.start.line}) : la valeur passée pourrait différer`);
     }
   }
-  for (const nom of progRefs) for (const cv of A.bindings[nom].constantViolations) if (dedans(cv.node)) refus.push(`réaffecte ${nom} (tête d'App.jsx, ligne ${cv.node.loc.start.line})`);
+  // (11 nov., reprise) toute réaffectation d'une variable de tête DANS la branche (lue ou non : `x = …` n'est pas une lecture)
+  for (const [nom, b] of Object.entries(A.bindings)) for (const cv of b.constantViolations) if (dedans(cv.node)) refus.push(`réaffecte ${nom} (tête d'App.jsx, ligne ${cv.node.loc.start.line})`);
+  void progRefs;
   // (11 nov., reprise) LE MOMENT où les valeurs sont lues. Avant : le code de la branche tourne
   // DANS le rendu du composant, à sa place. Après : `v={{…}}` est évalué à cette même place, mais
   // le code de la branche tourne au rendu de la vue — APRÈS la fin du rendu du composant. Trois
@@ -390,7 +394,7 @@ function decouper(src, mod, appFile) {
     const t = trouverVue(A, v);
     if (t.absent) { R.absents.push(`${v.nom} (${t.absent})`); continue; }
     if (t.refus) { R.refus.push(`${v.nom} : ${t.refus}`); continue; }
-    let H = v.compagnons === false ? [] : compagnons(t.fnPath, t.E);
+    let H = v.compagnons === false ? [] : compagnons(A, t.fnPath, t.E);
     let L = lectureVue(A, t.fnPath, t.E, H);
     if (L.refus.length && H.length) { const L0 = lectureVue(A, t.fnPath, t.E, []); if (!L0.refus.length) { R.epingles.push(`${v.nom} : ses ${H.length} compagnon(s) restent dans ${v.composant} (${L.refus.slice(0, 2).join(' ; ')})`); H = []; L = L0; } }
     if (L.refus.length) { R.refus.push(`${v.nom} : ${L.refus.join(' ; ')}`); continue; }

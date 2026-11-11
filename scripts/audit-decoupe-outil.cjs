@@ -51,6 +51,11 @@ doitRefuser('la branche appelle une fonction qui écrit le composant', `const [t
   return (<div>{tab==='t' && (<b>{compter()}</b>)}{n}</div>);`);
   if (!R3.refus.length && R3.vues.length && R3.vues[0].compagnons) { ko++; console.log('❌ compagnon qui écrit le composant, appelé au rendu : devait être refusé'); } else console.log('✅ un compagnon qui écrit le composant au rendu ne part pas (' + (R3.refus[0] || R3.epingles[0] || '').slice(0, 90) + ')');
 }
+doitRefuser('la branche réaffecte une variable de tête sans la lire', `const [tab] = useState('t');
+  return (<div>{tab==='t' && (<b onClick={() => { aLaDemande = null; }}>a</b>)}</div>);`, /réaffecte aLaDemande/);
+{ const R4 = essai(`const [tab] = useState('t'); const vider = () => { aLaDemande = null; };
+  return (<div>{tab==='t' && (<b onClick={vider}>a</b>)}</div>);`);
+  if (R4.vues.length && R4.vues[0].compagnons) { ko++; console.log('❌ un compagnon qui réaffecte une variable de tête devait rester'); } else console.log('✅ un compagnon qui réaffecte une variable de tête reste dans le composant'); }
 doitRefuser('lit this', `const [tab] = useState('t');
   return (<div>{tab==='t' && (<b>{this}</b>)}</div>);`, /this/);
 // ── imports différés (sur des fichiers de synthèse dans un dossier temporaire)
