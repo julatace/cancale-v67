@@ -78,7 +78,7 @@ doublons. (Mutation « curseur un par jour » ⇒ rouge dans `audit-rappels-pers
 | `node scripts/audit-rappels-perso.cjs` — EXÉCUTE la règle, l'agenda (`echeancesAgenda` + `fichierIcs`) et la VRAIE route `api/ship-reminders.js` (`?moment=reveil` et `soir`) contre une fausse base à la vraie forme (projections, mémos, curseurs persistés), `sendPushToAll` réel, web-push intercepté, horloge fixée | **43/43** |
 | `--prouve` : 6 mutations (mémo ignoré, heures calmes ignorées, mémo non confirmé, curseur « un par jour », article sans identité, 9 h ignorée) | **6/6 rouges** |
 | `--sur` l'arbre d'`origin/main` | rouge (A0 : la règle n'existe pas) |
-| banc `scripts/bancs/rappels-perso.cjs` (J Ma journée, V fiche d'une vente, N adresse de notification, P Paramètres), 390 tactile et 1512, clair et sombre | voir le rapport de fin de session |
+| banc `scripts/bancs/rappels-perso.cjs` (J Ma journée, V fiche d'une vente, N adresse de notification, P Paramètres), 390 tactile et 1512, clair et sombre | **78/78** sur le code fusionné avec `main` (bandeau au premier plan, 44 px, rien ne déborde, aucune erreur JS ni requête en échec) ; captures regardées |
 | `npm run build` ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`, `textes-courts`, `fonctions-api` (12/12), `secrets`, `csp` | verts |
 | audits voisins `notifs-belles` 41, `notifications` 31, `reveil-calme` 13, `cron-lots` 18, `agenda-appareil`, `cibles-notif`, `flux-divers`, `notifs-centre` 28, `push`, `sans-bruit` 44, `file-envoi`, `rappel-urssaf` | verts |
 
