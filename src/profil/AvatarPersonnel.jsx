@@ -70,7 +70,7 @@ function Recadrage({source,theme:t,onAnnuler,onValider}){
  const sx=(w-cote)/2*(1+pos.dx),sy=(h-cote)/2*(1+pos.dy);
  const bouger=(e)=>{const g=glisse.current;if(!g)return;const mx=(w-cote)/2,my=(h-cote)/2;const ddx=(e.clientX-g.x)/ech,ddy=(e.clientY-g.y)/ech;setPos({dx:mx>0?Math.max(-1,Math.min(1,g.dx-ddx/mx)):0,dy:my>0?Math.max(-1,Math.min(1,g.dy-ddy/my)):0});};
  useEffect(()=>{const k=e=>{if(e.key==='Escape')onAnnuler();};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k);},[onAnnuler]);
- return createPortal(<div data-recadrage="" role="dialog" aria-modal="true" aria-label="Recadrer ta photo" onClick={onAnnuler} style={{position:'fixed',inset:0,zIndex:2147483000,background:'rgba(0,0,0,.45)',display:'grid',placeItems:'center',padding:16}}>
+ return createPortal(<div data-recadrage="" role="dialog" aria-modal="true" aria-label="Recadrer ta photo" onClick={onAnnuler} onPointerDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()} style={{position:'fixed',inset:0,zIndex:2147483000,background:'rgba(0,0,0,.45)',display:'grid',placeItems:'center',padding:16}}>
   <div onClick={e=>e.stopPropagation()} style={{background:t.card,color:t.text,borderRadius:18,padding:20,width:'min(100%,320px)',boxSizing:'border-box',display:'grid',gap:14,justifyItems:'center'}}>
    <b style={{fontSize:17}}>Recadrer ta photo</b>
    <div data-recadrage-cadre="" onPointerDown={e=>{e.currentTarget.setPointerCapture?.(e.pointerId);glisse.current={x:e.clientX,y:e.clientY,...pos};}} onPointerMove={bouger} onPointerUp={()=>{glisse.current=null;}} onPointerCancel={()=>{glisse.current=null;}}

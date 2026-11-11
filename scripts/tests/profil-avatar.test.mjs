@@ -26,3 +26,14 @@ test('photo facultative : propriétaire imposé par la session, partage explicit
  await appeler(A,'POST',{image:PNG,partageCarte:false});r=res();await routeAvatarPublic({method:'GET',query:q},r);assert.equal(r.code,404);
  await appeler(A,'POST',{retirer:true});r=await appeler(A,'GET');assert.equal(r.body.image,'');
  }finally{global.fetch=avant;}});
+// (11 nov., lot DJ6) « Masquer mon nom » : seul ce champ change ; la photo reste ; une photo neuve garde le réglage.
+test('masquer mon nom : rangé sur la même ligne privée, sans toucher la photo',async()=>{const avant=global.fetch,{fetch}=basePrivee();global.fetch=fetch;try{
+ const appeler=async(owner,method,body)=>{const r=res();await routeProfilAvatar({method,headers:{authorization:`Bearer h.${owner}.sig`},body},r);return r;};
+ await appeler(A,'POST',{image:PNG,partageCarte:false});
+ let r=await appeler(A,'POST',{nomMasque:true});assert.equal(r.code,200);assert.equal(r.body.nomMasque,true);assert.equal(r.body.image,PNG);
+ r=await appeler(A,'GET');assert.equal(r.body.nomMasque,true);assert.equal(r.body.image,PNG);
+ r=await appeler(B,'GET');assert.equal(r.body.nomMasque,false);
+ await appeler(A,'POST',{retirer:true});r=await appeler(A,'GET');assert.equal(r.body.image,'');assert.equal(r.body.nomMasque,true);
+ r=await appeler(A,'POST',{nomMasque:false});r=await appeler(A,'GET');assert.equal(r.body.nomMasque,false);
+ r=await appeler(A,'POST',{nomMasque:'oui'});assert.equal(r.code,400);
+ }finally{global.fetch=avant;}});

@@ -38,7 +38,7 @@ export default function MenuProfil({owner,headers,email,nom,offre,theme:C,Feuill
     </button>
     <div style={{minWidth:0}}>
      <div className="vrm-profil-nom vrm-sensible" data-stream-type="compte" data-profil-nom={masque===false?'visible':'masque'}>{nomVu}</div>
-     <div className="vrm-profil-mail vrm-sensible" data-stream-type="compte" data-profil-mail="">{masque===false?email:emailMasque(email)}</div>
+     {(masque!==false||String(nom||'').trim())?<div className="vrm-profil-mail vrm-sensible" data-stream-type="compte" data-profil-mail="">{masque===false?email:emailMasque(email)}</div>:null}
      {offre?<span className="vrm-profil-offre" data-profil-offre={offre}>{offre}</span>:null}
     </div>
    </div>

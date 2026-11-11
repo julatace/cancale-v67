@@ -15771,7 +15771,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   // « Masquer mon nom » (ou pas encore lu) ⇒ « Mon compte », ni nom ni e-mail.
   const uidCompte = (AUTH.user && AUTH.user.id) || '';
   const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
-  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog"
+  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={tab === 'settings' ? 'page' : undefined}
     aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ouvrir mon profil`} title="Mon profil" onClick={() => ouvrirMenuProfil()}>
     <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
     <span className="vrm-nav-compte-txt">
@@ -16206,7 +16206,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       {etape === 'confirmer' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite :</p>
-        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
+        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
@@ -16216,7 +16216,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       {etape === 'fait' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Le compte vide est supprimé. Ensuite :</p>
-        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
+        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
         <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
       </>}
     </div>
