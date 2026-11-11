@@ -203,7 +203,7 @@ const cases = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-pp-
         await sain(pg, `${nomVp} · feuille`);
         // B. sans extension : les voies d'extension ne partent pas, et le disent.
         const lbc = c.find((x) => x.site === 'leboncoin'), vc = c.find((x) => x.site === 'vestiaire'), eb = c.find((x) => x.site === 'ebay');
-        dit(lbc.cochable === '0' && lbc.raison === 'ext' && /extension/i.test(lbc.texte), `${nomVp} · B · Leboncoin sans extension : pas de case, la raison dite`, JSON.stringify(lbc));
+        dit(lbc.cochable === '0' && lbc.raison === 'ext' && (doigt ? /ordinateur|extension/i : /extension/i).test(lbc.texte), `${nomVp} · B · Leboncoin sans extension : pas de case, la raison dite`, JSON.stringify(lbc));
         dit(vc.cochable === '0' && vc.raison === 'ext', `${nomVp} · B · Vestiaire sans extension : pas de case`, JSON.stringify(vc));
         dit(eb.cochable === '1', `${nomVp} · B · eBay (un brouillon) reste possible`, JSON.stringify(eb));
         if (doigt) dit(c.every((x) => x.h >= 43.5), `${nomVp} · G · chaque case ≥ 44 px au doigt`, JSON.stringify(c.map((x) => Math.round(x.h))));

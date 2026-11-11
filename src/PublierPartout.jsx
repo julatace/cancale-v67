@@ -20,11 +20,15 @@ const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(N
 const ETAT_CLE = { envoi: 'partout.etat.envoi', attente: 'partout.etat.attente', publie: 'partout.etat.publie', 'publie-relu': 'partout.etat.relu', 'a-finir': 'partout.etat.aFinir', refuse: 'partout.etat.refuse', 'pas-envoye': 'partout.etat.pasEnvoye' };
 
 function ReglagePrix({ reglage, onReglage, bloque }) {
+  // Le mode CHOISI (« ± euros ») vit ici tant qu'aucun écart n'est tapé : la règle range un
+  // écart nul comme « prix Vinted », et le champ disparaissait avant qu'il puisse taper.
+  const [modes, setModes] = React.useState({});
   return (
     <section className="vrm-pp-reglage" data-pp-reglage="" aria-label={tr('partout.prix.titre')}>
       <h3>{tr('partout.prix.titre')}</h3>
       {SITES_PARTOUT.map((site) => {
-        const r = (reglage && reglage[site]) || { mode: 'egal', valeur: 0 };
+        const r0 = (reglage && reglage[site]) || { mode: 'egal', valeur: 0 };
+        const r = r0.mode === 'egal' && modes[site] && modes[site] !== 'egal' ? { mode: modes[site], valeur: 0 } : r0;
         if (!PRIX_REGLABLE[site]) {
           return (
             <div key={site} className="vrm-pp-reglage-ligne" data-pp-reglage-site={site} data-pp-reglable="0">
@@ -37,7 +41,7 @@ function ReglagePrix({ reglage, onReglage, bloque }) {
           <div key={site} className="vrm-pp-reglage-ligne" data-pp-reglage-site={site} data-pp-reglable="1" data-pp-mode={r.mode}>
             <span className="vrm-pp-site-nom"><LogoSite site={site}/>{NOM_PARTOUT[site]}</span>
             <select value={r.mode} disabled={bloque} aria-label={tr('partout.prix.mode', { site: NOM_PARTOUT[site] })} data-pp-mode-choix={site}
-              onChange={(e) => onReglage(site, { mode: e.target.value, valeur: e.target.value === 'egal' ? 0 : r.valeur })}>
+              onChange={(e) => { const m = e.target.value; setModes((x) => ({ ...x, [site]: m })); onReglage(site, { mode: m, valeur: m === 'egal' ? 0 : r.valeur }); }}>
               {MODES_PRIX.map((m) => <option key={m} value={m}>{tr('partout.prix.' + m)}</option>)}
             </select>
             {r.mode !== 'egal' ? (
