@@ -125,7 +125,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
                 📷 Choisir une photo
                 <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
               </label>
-              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>Prends la photo d'origine sur ton téléphone (meilleure qualité que celle de Vinted). Tu la recadreras ici, puis tu la mettras toi‑même sur Vinted.</div>
+              <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>Prends la photo d'origine (plus nette), recadre-la ici, puis mets-la sur Vinted.</div>
             </div>
           ) : (
             <div>

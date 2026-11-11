@@ -11,7 +11,7 @@ import './styles-annonces-outils.css';
 import { texteDuree } from './etatArticle.js';
 import { escalierPrix, eurosPrix } from './historiquePrix.js';
 
-const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'grid', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore', benefice: 'chart' };
+const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'vitrine', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore', benefice: 'chart' };
 // (9 nov.) « Ouvrir » : l'écran d'où vient l'étape (`source`, posée par
 // `histoireArticle` par identité). Le mot dit OÙ l'on va.
 const LIB_SOURCE_ETAPE = { achats: 'Achats', ventes: 'Ventes', cat_bord: 'Colis', compta: 'Compta', cat_annonces: 'Annonces' };
