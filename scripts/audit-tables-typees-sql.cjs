@@ -1,4 +1,4 @@
-// Migration 037 (tables typées remplies à côté d'app_data) sur PostgreSQL JETABLE,
+// Migration 038 (tables typées remplies à côté d'app_data) sur PostgreSQL JETABLE,
 // jamais sur Supabase. Modèle : scripts/audit-politiques-uniques-sql.cjs.
 //
 // On rebâtit app_data telle que la production la porte (owner, id, data JSONB,
@@ -42,7 +42,7 @@ const Q = (sql, db) => { const r = run(sql, db); if (!r.ok) throw Error(r.err.sl
 
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222', C = '33333333-3333-4333-8333-333333333333', D = '44444444-4444-4444-8444-444444444444';
 const lire = f => fs.readFileSync(path.join(RACINE, 'supabase/migrations', f), 'utf8');
-const M037 = lire('037-tables-typees.sql');
+const M038 = lire('038-tables-typees.sql');
 const M004 = lire('004-meta-et-rls-rapide.sql');
 const M013 = lire('013-anciens-numeros-en-b.sql');
 const M017 = lire('017-garde-numeros-rapide.sql');
@@ -197,16 +197,16 @@ const remplir = (lot = 2000) => { let tours = 0, t0 = Date.now(), tot = { traite
   return { ...tot, tours, ms: Date.now() - t0 }; };
 
 // ── La suite (rend la liste des contrôles) ─────────────────────────────────
-function suite(sql037, { taille, nOwners, mesurer }) {
+function suite(sql038, { taille, nOwners, mesurer }) {
   const res = []; const dit = (c, n) => res.push({ c: !!c, n });
   batir();
   const gen = generer(nOwners, taille); verser(gen);
   const avant = empreinteSource();
   const nLignes = +Q(`select count(*) from public.app_data`);
-  let t0 = Date.now(); const ap = run(sql037);
-  dit(ap.ok, `la 037 s’applique (${Date.now() - t0} ms)` + (ap.ok ? '' : ' — ' + ap.err.slice(0, 300)));
+  let t0 = Date.now(); const ap = run(sql038);
+  dit(ap.ok, `la 038 s’applique (${Date.now() - t0} ms)` + (ap.ok ? '' : ' — ' + ap.err.slice(0, 300)));
   if (!ap.ok) return res;
-  dit(Q(`select count(*) from public.annonces`) === '0' && Q(`select count(*) from public.comptes`) === '0', 'juste après la 037 : tables vides (le remplissage est un geste à part)');
+  dit(Q(`select count(*) from public.annonces`) === '0' && Q(`select count(*) from public.comptes`) === '0', 'juste après la 038 : tables vides (le remplissage est un geste à part)');
   const R1 = remplir(); const e1 = empreinteTables();
   dit(R1.erreurs === 0, `remplissage : ${R1.traitees} lignes recopiées en ${R1.tours} lots, ${R1.ms} ms, ${R1.erreurs} erreur(s)` + (R1.erreurs ? ' — ' + Q(`select string_agg(source||' '||detail, ' ; ') from (select * from public.vrm_projection_ecarts where raison='erreur' limit 3) z`) : ''));
   if (mesurer) dit(true, `  mesure : ${nLignes} lignes dans app_data, remplissage ${R1.ms} ms (${Math.round(R1.ms / Math.max(1, R1.traitees) * 1000)} µs par ligne recopiée)`);
@@ -348,7 +348,7 @@ try {
   let r = serveur('initdb', ['-D', DIR + '/data', '-U', 'postgres', '--auth=trust', '-E', 'UTF8', '--locale=C', '--no-sync']); if (r.status !== 0) throw Error(r.stderr);
   r = serveur('pg_ctl', ['-D', DIR + '/data', '-o', `-p ${PORT} -k ${DIR} -c listen_addresses='' -c fsync=off -c shared_buffers=256MB`, '-l', DIR + '/journal', '-w', 'start']); if (r.status !== 0) throw Error(r.stderr); demarre = true;
   const montre = (titre, res) => { console.log(`\n── ${titre}`); for (const x of res) { x.c ? ok++ : ko++; console.log(`${x.c ? '✅' : '❌'} ${x.n}`); } };
-  montre(PETIT ? 'suite (petite base)' : 'suite sur ~50 000 lignes inventées', suite(M037, PETIT ? { taille: PETITE, nOwners: 6, mesurer: false } : { taille: GRANDE, nOwners: 94, mesurer: true }));
+  montre(PETIT ? 'suite (petite base)' : 'suite sur ~50 000 lignes inventées', suite(M038, PETIT ? { taille: PETITE, nOwners: 6, mesurer: false } : { taille: GRANDE, nOwners: 94, mesurer: true }));
   // Mutations : chacune doit faire rougir au moins un contrôle.
   const MUT = [
     ['politique using (true)', s => s.replace("using (owner = (select auth.uid()))', t);", "using (true)', t);")],
@@ -360,8 +360,8 @@ try {
   ];
   console.log('\n── mutations (petite base) : chacune doit rougir');
   for (const [nom, f] of MUT) {
-    const m = f(M037);
-    if (m === M037) { ko++; console.log(`❌ mutation « ${nom} » : le texte visé n’existe plus dans la 037`); continue; }
+    const m = f(M038);
+    if (m === M038) { ko++; console.log(`❌ mutation « ${nom} » : le texte visé n’existe plus dans la 038`); continue; }
     const rr = suite(m, { taille: PETITE, nOwners: 6, mesurer: false });
     const rouges = rr.filter(x => !x.c);
     rouges.length ? ok++ : ko++;

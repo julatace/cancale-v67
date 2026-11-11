@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 037 — DE VRAIES TABLES, REMPLIES À CÔTÉ D'app_data (étape 1 sur 4)
+-- 038 — DE VRAIES TABLES, REMPLIES À CÔTÉ D'app_data (étape 1 sur 4)
 --       (11 novembre 2026) — PAS ENCORE APPLIQUÉE (geste de Julien, guidé :
 --       docs/passation/2026-11-11-base-tables.md §6).
 -- ════════════════════════════════════════════════════════════════════════════
@@ -57,7 +57,7 @@
 --   alter table public.app_data disable trigger vrm_projection_renomme;
 --   alter table public.app_data disable trigger vrm_projection_efface;
 --   alter table public.vinted_accounts disable trigger vrm_comptes_projection;
--- TOUT RETIRER : bloc « Annuler la 037 » à la fin du pas-à-pas (§6 du récit).
+-- TOUT RETIRER : bloc « Annuler la 038 » à la fin du pas-à-pas (§6 du récit).
 -- Prouvé sur PostgreSQL jetable : scripts/audit-tables-typees-sql.cjs.
 -- ════════════════════════════════════════════════════════════════════════════
 begin;
@@ -69,13 +69,13 @@ do $$
 begin
   if not exists (select 1 from information_schema.columns
                   where table_schema = 'public' and table_name = 'app_data' and column_name = 'meta') then
-    raise exception 'vrm_tables_037 : app_data.meta absente (appliquer la 004 d''abord) — rien n''est changé';
+    raise exception 'vrm_tables_038 : app_data.meta absente (appliquer la 004 d''abord) — rien n''est changé';
   end if;
   if to_regprocedure('public.vrm_cle_num(jsonb)') is null then
-    raise exception 'vrm_tables_037 : vrm_cle_num absente (appliquer la 013 d''abord) — rien n''est changé';
+    raise exception 'vrm_tables_038 : vrm_cle_num absente (appliquer la 013 d''abord) — rien n''est changé';
   end if;
   if to_regclass('public.vinted_accounts') is null then
-    raise exception 'vrm_tables_037 : vinted_accounts absente — rien n''est changé';
+    raise exception 'vrm_tables_038 : vinted_accounts absente — rien n''est changé';
   end if;
 end $$;
 

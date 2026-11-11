@@ -4,7 +4,7 @@ Branche `claude/base-tables` (partie de `origin/main` f04d4a58), **rien fusionn�
 Demande de Julien (validée) : une vraie base pour tenir des milliers de vendeurs, plus
 rapide, chiffres plus sûrs, par étapes, sans jamais casser l'app en ligne.
 
-Livré : `supabase/migrations/037-tables-typees.sql` (étape 1) et sa preuve
+Livré : `supabase/migrations/038-tables-typees.sql` (étape 1) et sa preuve
 `scripts/audit-tables-typees-sql.cjs` (PostgreSQL 16 JETABLE, créé puis supprimé).
 **Aucune écriture sur la vraie base** ; deux requêtes de LECTURE agrégées (comptes et
 tailles par famille, contrôle des formes par `meta`), aucune donnée de vendeur affichée.
@@ -72,12 +72,12 @@ Choix tranchés (et pourquoi) :
   quelle à l'étape 2.
 - **Leboncoin, Vestiaire, eBay pas encore** : leurs lignes (`lbc_*`, `vc_*`, `ebay_*`)
   n'ont pas été mesurées cette session ; la contrainte `plateforme in ('vinted')` le dit.
-  Elles s'ajoutent par une 038 après mesure de leur forme.
+  Elles s'ajoutent par une 039 après mesure de leur forme.
 - Les dates françaises (« 14 novembre ») restent en texte (`limite_texte`), jamais devinées.
 - Un N° n'est **jamais** modifié ni retiré de `numeros`, même si `main` en perd un (seul
   chemin : `vrm_tables_effacer_vendeur`, effacement RGPD d'un vendeur).
 
-## 3. Étape 1 — la 037 (livrée, pas appliquée)
+## 3. Étape 1 — la 038 (livrée, pas appliquée)
 
 - Tables + RLS + index ; trois déclencheurs **APRÈS** écriture sur `app_data` (écrit,
   renommé, effacé) et un sur `vinted_accounts` : ils RECOPIENT, ils ne touchent jamais la
@@ -139,11 +139,11 @@ une recopie ratée de se rattraper ; ce raccourci n'est permis que si la copie e
 
 **A. Essai annulé d'abord (rien ne reste)** — comme pour la 016 :
 1. Supabase → projet → **SQL Editor** → New query.
-2. Coller tout `supabase/migrations/037-tables-typees.sql`, puis **remplacer la ligne
+2. Coller tout `supabase/migrations/038-tables-typees.sql`, puis **remplacer la ligne
    `commit;`** (vers la fin) par `rollback;` et **effacer la toute dernière ligne**
    (`select * from public.vrm_tables_couverture();`). Run.
 3. Attendu : « Success », aucune erreur rouge ; tout a été annulé. Une erreur
-   `vrm_tables_037 : …` dit quelle migration manque : rien n'a changé.
+   `vrm_tables_038 : …` dit quelle migration manque : rien n'a changé.
 
 **B. Pour de vrai** :
 4. Nouvelle requête, coller le fichier **tel quel** (avec `commit;`), Run. La dernière
@@ -156,7 +156,7 @@ une recopie ratée de se rattraper ; ce raccourci n'est permis que si la copie e
 7. Rien d'autre à faire : l'app ne lit pas encore ces tables.
 
 **Couper la recopie** (sans rien perdre) : les quatre `alter table … disable trigger …`
-en tête du fichier. **Annuler la 037** entièrement :
+en tête du fichier. **Annuler la 038** entièrement :
 ```sql
 begin;
 drop trigger if exists vrm_projection_ecrit on public.app_data;
@@ -184,7 +184,7 @@ restantes sont inertes.)
 - Serveur d'abord (`api/widget.js`, `ship-reminders`, `api/_lib/ventes-regle.js`) :
   ils gagnent le plus (plus de relecture de la liste entière) ; règle par copie
   refabriquée par script, comme aujourd'hui.
-- Ajouter Leboncoin / Vestiaire / eBay (038) après mesure de leurs formes ; brancher
+- Ajouter Leboncoin / Vestiaire / eBay (039) après mesure de leurs formes ; brancher
   `vrm_tables_effacer_vendeur` dans la route d'effacement de compte.
 - Preuve : banc « deux lectures, mêmes chiffres » sur copies, et 7 jours d'ombre sans écart
   chez Julien avant l'étape 3.
@@ -204,8 +204,8 @@ n'y perdent rien.
 Aucun pour l'instant. Quand il le décide : §6 (A puis B), ~5 minutes.
 
 ## ÉTAT À LA REPRISE (11 nov., arrêt demandé par Julien via la session principale)
-- **Fait et poussé** (`claude/base-tables`) : 037 (tables, RLS, index, déclencheurs, remplissage, couverture, effacement vendeur), banc `scripts/audit-tables-typees-sql.cjs`, ce récit, ligne §9 de CLAUDE.md (58 971 octets).
+- **Fait et poussé** (`claude/base-tables`) : 038 (tables, RLS, index, déclencheurs, remplissage, couverture, effacement vendeur), banc `scripts/audit-tables-typees-sql.cjs`, ce récit, ligne §9 de CLAUDE.md (58 971 octets).
 - **Prouvé** : grande base ~50 000 lignes : 73 verts, 0 rouge, 6 mutations rouges (avant la dernière optimisation, puis `--petit` 67 verts sur la version allégée ; la grande mesure +36 ms a été prise sur la version allégée). Formes vérifiées en lecture seule sur la vraie base (§1).
-- **Reste** : relancer une fois `node scripts/audit-tables-typees-sql.cjs` (sans `--petit`, ~4 min) sur la tête poussée pour confirmer ; aucune PR, rien fusionné, 037 pas appliquée ; la ligne « Fini, à intégrer » de `docs/passation/COORDINATION-AGENTS.md` (branche `claude/coordination`) n'est PAS écrite.
-- **Prochaines étapes exactes** : intégrer la branche (fichiers neufs + une ligne §9, aucun conflit attendu) ; Julien : §6 (essai annulé puis Run, puis `vrm_tables_remplir(2000)` jusqu'à `fini`) ; puis étape 2 (§7 : drapeau `vrm_lecture_tables`, ombre sur Ventes et serveur d'abord ; 038 Leboncoin/Vestiaire/eBay après mesure).
+- **Reste** : relancer une fois `node scripts/audit-tables-typees-sql.cjs` (sans `--petit`, ~4 min) sur la tête poussée pour confirmer ; aucune PR, rien fusionné, 038 pas appliquée ; la ligne « Fini, à intégrer » de `docs/passation/COORDINATION-AGENTS.md` (branche `claude/coordination`) n'est PAS écrite.
+- **Prochaines étapes exactes** : intégrer la branche (fichiers neufs + une ligne §9, aucun conflit attendu) ; Julien : §6 (essai annulé puis Run, puis `vrm_tables_remplir(2000)` jusqu'à `fini`) ; puis étape 2 (§7 : drapeau `vrm_lecture_tables`, ombre sur Ventes et serveur d'abord ; 039 Leboncoin/Vestiaire/eBay après mesure).
 - **Pièges** : ne jamais remettre `<> all(array)` ni recalculer toutes les commandes (220 ms par écriture) ; le raccourci « liste inchangée » n'est permis que si la copie est propre (`v_propre`) ; les fonctions `vrm_projeter*` doivent rester fermées à anon/authenticated (droits par défaut Supabase) ; familles PDF lues par `meta` seulement.
