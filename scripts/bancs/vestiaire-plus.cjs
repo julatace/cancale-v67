@@ -127,6 +127,18 @@ async function preparer(b, vp, sombre) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   return { ctx, pg, errs };
 }
+// « Préparer sur Vestiaire » ouvre la feuille commune « VRM travaille » (lot suivi-travail), qui revient
+// « Interrompu » après un rechargement : le banc la referme comme lui (Arrêter, puis Fermer).
+const degeler = async (pg) => {
+  for (let k = 0; k < 3; k++) {
+    await pg.waitForTimeout(400);
+    const e = await pg.evaluate(() => ({ arr: !!document.querySelector('[data-suivi-arreter]'), oui: !!document.querySelector('[data-suivi-arreter-oui]'), fer: !!document.querySelector('[data-suivi-fermer]') }));
+    if (e.oui) { await pg.click('[data-suivi-arreter-oui]').catch(() => {}); continue; }
+    if (e.fer) { await pg.click('[data-suivi-fermer]').catch(() => {}); continue; }
+    if (e.arr) { await pg.click('[data-suivi-arreter]').catch(() => {}); continue; }
+    return;
+  }
+};
 const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, 'vp-' + nom + '.png'), fullPage: false }); };
 const sain = async (pg, ecran) => {
   const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, t: document.body.innerText }));
@@ -212,6 +224,7 @@ const sain = async (pg, ecran) => {
       await essaie('D. Baisser des prix', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-vc-baisse-ouvrir]', { timeout: 20000 });
+        await degeler(pg);
         await pg.click('[data-vc-baisse-ouvrir]');
         await pg.waitForSelector('[data-vc-baisse]', { timeout: 8000 });
         const r0 = await pg.evaluate(() => ({ rec: document.querySelector('[data-vc-baisse]').getAttribute('data-vc-baisse-recette'), lancer: document.querySelector('[data-bp-lancer]').disabled, t: document.querySelector('[data-vc-baisse]').innerText }));
@@ -221,6 +234,7 @@ const sain = async (pg, ecran) => {
         LIGNES = lignes(true);
         await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-vc-baisse-ouvrir]', { timeout: 20000 });
+        await degeler(pg);
         await pg.click('[data-vc-baisse-ouvrir]');
         await pg.waitForSelector('[data-vc-baisse-recette="pret"]', { timeout: 8000 });
         const l = await pg.evaluate(() => [...document.querySelectorAll('[data-bp-ligne]')].map((x) => [x.getAttribute('data-bp-ligne'), x.getAttribute('data-bp-ancien'), x.getAttribute('data-bp-nouveau'), x.getAttribute('data-bp-coche')].join(':')));
