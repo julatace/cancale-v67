@@ -81,6 +81,9 @@ Captures : `CAPTURE_DIR` du banc (hors dépôt).
 - Banc neuf `scripts/bancs/emails-densite.cjs` : **96 verts** sur ce code.
   Sur le code d'avant (`BANC_DIST=<dist d'origin/main>`) : **58 rouges**.
   Par mutation (ligne à 17 px, clavier coupé) : 3 rouges, comme attendu.
+  Contrôle « chaque ligne garde sa marge » ajouté après un défaut vu sur la capture
+  (une règle générique de bouton écrasait la marge des lignes) : rouge sur ce build-là
+  (marge 0), vert après la correction (`:where`).
 - Bancs e-mails existants, relancés après le changement :
   - verts : `boite-mail` (120/0), `emails-html`, `reception-emails`, `journal-emails`,
     `emails-action`, `attente-email`, `vente-email-fraiche`, `bordereau-des-email`,

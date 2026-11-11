@@ -521,7 +521,8 @@
 /* ── La densité au pointeur fin (souris, pavé) ─────────────────────────────── */
 @media(min-width:900px) and (hover:hover) and (pointer:fine){
   html .vrm-boite{font-size:13px;line-height:1.4}
-  html .vrm-boite[data-vue="boite"] button,html .vrm-boite[data-vue="boite"] select{min-height:30px;border-radius:8px;padding:0 12px;font-size:13px}
+  /* `:where` : cette règle de base ne doit jamais battre celles des lignes, puces et pastilles ci-dessous. */
+  html .vrm-boite:where([data-vue="boite"]) button,html .vrm-boite:where([data-vue="boite"]) select{min-height:30px;border-radius:8px;padding:0 12px;font-size:13px}
   html .vrm-boite .vrm-boite-vues{max-width:300px;margin:0 0 10px;padding:2px;border-radius:9px}
   html .vrm-boite .vrm-boite-vues button{min-height:26px;border-radius:7px;font-size:13px}
   /* Les outils de la liste : recherche 30 px, pastilles 26 px, compte 26 px. */

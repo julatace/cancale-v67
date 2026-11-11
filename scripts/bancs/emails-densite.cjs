@@ -130,6 +130,8 @@ const mesurerListe = (pg) => pg.evaluate(() => {
     ligneHauteur: med, premiereLigne: lignes[0] ? Math.round(r(lignes[0]).top) : null, visibles,
     chercheHauteur: cherche ? Math.round(r(cherche).height) : null, pastilleHauteur: pastille ? Math.round(r(pastille).height) : null,
     avatar: marque ? Math.round(r(marque).width) : null, pointNonLu: point ? Math.round(r(point).width) : null,
+    // La plus petite marge haute des 40 premières lignes : une règle générique qui l'écrase se voit ici.
+    margeMin: Math.min(...lignes.slice(0, 40).map((n) => parseFloat(getComputedStyle(n).paddingTop) * z(n))),
     extraitUneLigne: ess ? Math.round(r(ess).height) <= Math.round(px(ess, 'lineHeight') * 1.3) : null,
   };
 });
@@ -206,6 +208,7 @@ const mesurerLecture = (pg) => pg.evaluate(() => {
           dit(L.lignePolice >= 13 && L.lignePolice <= 15, `${nom} : la ligne de liste est en 13–15 px`, L.lignePolice);
           dit(L.extraitPolice >= 12 && L.extraitPolice <= 14 && L.piedPolice >= 11 && L.piedPolice <= 13, `${nom} : extrait 12–14 px, pied 11–13 px`, `${L.extraitPolice} / ${L.piedPolice}`);
           dit(L.ligneHauteur <= 64, `${nom} : une ligne de liste fait au plus 64 px`, L.ligneHauteur);
+          dit(L.margeMin >= 5, `${nom} : chaque ligne garde sa marge (≥ 5 px en haut)`, L.margeMin);
           dit(L.extraitUneLigne !== false, `${nom} : l'extrait tient sur une ligne`);
           // Avant : 5 lignes entières à 1512×950, 2 à 1280×800 (mesuré sur le code d'avant).
           dit(L.visibles >= (viewport.height >= 900 ? 8 : 6), `${nom} : au moins ${viewport.height >= 900 ? 8 : 6} e-mails visibles sans défiler (avant : ${viewport.height >= 900 ? 5 : 2})`, L.visibles);
@@ -229,6 +232,7 @@ const mesurerLecture = (pg) => pg.evaluate(() => {
           dit(!(await pg.locator('[data-boite-lecture]').count()), `${nom} : Échap ferme la lecture`);
         } else {
           dit(L.lignePolice >= 14 && L.lignePolice <= 17, `${nom} : la ligne de liste est en 14–17 px au doigt`, L.lignePolice);
+          dit(L.margeMin >= 6, `${nom} : chaque ligne garde sa marge (≥ 6 px en haut)`, L.margeMin);
           dit(L.ligneHauteur >= 44 && L.ligneHauteur <= 76, `${nom} : une ligne fait 44 à 76 px`, L.ligneHauteur);
           dit(Lt.titre >= 18 && Lt.titre <= 24, `${nom} : le titre de la lecture fait 18–24 px (plus 28)`, Lt.titre);
           dit(Lt.corps >= 15 && Lt.corps <= 17, `${nom} : le corps du message est en 15–17 px`, Lt.corps);
