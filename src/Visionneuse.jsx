@@ -141,7 +141,7 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', fermer, Photo,
         <div key={i} className="vrm-visionneuse-photo" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
           transform: `translate3d(${pos.x + glisse}px, ${pos.y}px, 0) scale(${z})`, transition: geste.current ? 'none' : 'transform .22s cubic-bezier(.2,.8,.2,1)' }}>
           {Photo ? <Photo src={src} alt="" draggable={false} data-visionneuse-img="" style={PLEIN} repli={null}/>
-            : <img src={src} alt="" draggable={false} data-visionneuse-img="" style={PLEIN}/>}
+            : null /* (11 nov.) sans la règle des photos (PhotoVinted), aucune <img> brute */}
         </div>
       </div>
       <div className="vrm-visionneuse-haut" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'max(10px, env(safe-area-inset-top)) 12px 0', pointerEvents: 'none' }}>

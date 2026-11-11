@@ -97,6 +97,8 @@ export function eligibleAuto(it, { cfg, essai = null, maintenant = Date.now() } 
 // émis. Le reçu Vinted d'un ACHAT vit aussi sous `email_invoice_tx…` : seules les
 // pièces de VRM (`facture_pro`, `avoir_pro`) entrent.
 const estPiece = (x) => !!(x && (x.type === 'facture_pro' || x.type === 'avoir_pro'));
+// (11 nov.) La lecture PROJETÉE des factures et avoirs (jamais le PDF) : la même pour l'écran Factures et l'export comptable.
+export const SELECT_FACTURES_PRO = 'id,numero:data->>number,status:data->>status,transaction:data->>transaction,emiseLe:data->>emiseLe,envoi:data->envoi,envois:data->envois,retour:data->>retourNom,annuleePar:data->>annuleePar,type:data->>type,buyerEmail:data->>buyerEmail,acheteur:data->contenu->acheteur->>nom,ttc:data->contenu->totaux->>ttc,ht:data->contenu->totaux->>ht,tva:data->contenu->totaux->>tva,regime:data->contenu->>regime,emiseJour:data->contenu->>emiseJour,venteJour:data->contenu->>venteJour,designation:data->contenu->lignes->0->>designation,origine:data->>origine,preuve:data->preuve->>tx';
 export const estAvoir = (x) => !!(x && (x.type === 'avoir_pro' || /^email_invoice_av/.test(String(x.id || ''))));
 const centimes = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.round(n) : null; };
 export function lignesRegistre(rows) {

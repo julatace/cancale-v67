@@ -171,7 +171,13 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     await route.default(vente(to), res);
     return { code: res.code, corps: res.corps, ecrites: ecrites.slice() };
   };
-  const metier = (w) => w.filter((x) => !/^email_quarantaine_/.test(x.id));
+  // (11 nov., lot alertes-production) Une panne de la route écrit UNE alerte au journal du
+  // PROPRIÉTAIRE (`alertes_production`, jamais à un vendeur) : ce n'est pas un e-mail rangé.
+  // Elle ne doit porter AUCUN contenu de l'e-mail (adresse, sujet, corps) — vérifié ici.
+  const estAlerte = (x) => x.id === 'alertes_production' && x.owner === J;
+  const horsAlerte = (w) => w.filter((x) => !estAlerte(x));
+  const alerteSansContenu = (w) => w.filter(estAlerte).every((x) => !/@vrm\.center|@gmail\.com|sophie|inconnue|Vendu|bordereau/i.test(JSON.stringify(x.data || {})));
+  const metier = (w) => w.filter((x) => !/^email_quarantaine_/.test(x.id) && !estAlerte(x));
   const quar = (w) => w.filter((x) => /^email_quarantaine_/.test(x.id));
   const nouvelle = async (tag) => import('file://' + path.join(__dirname, '..', 'api', 'email-inbound.js') + '?' + tag);
 
@@ -229,14 +235,14 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
   await essaie('route : registre illisible', async () => {
     const route = await nouvelle('registreKO');
     const o = await envoyer(route, 'sophie@vrm.center', { registreKO: true, lignes: [LIGNE_J, LIGNE_B] });
-    dit(o.code >= 500 && o.ecrites.length === 0,
+    dit(o.code >= 500 && horsAlerte(o.ecrites).length === 0 && alerteSansContenu(o.ecrites),
       'route : registre illisible → « renvoie-le » (5xx), et rien n’est rangé au hasard',
       `HTTP ${o.code} · ${o.ecrites.length} écriture(s) ${o.ecrites.map((x) => x.id + '@' + (x.owner === J ? 'J' : x.owner === B ? 'B' : '?')).join(', ')}`);
   });
   await essaie('route : sonde ratée', async () => {
     const route = await nouvelle('sondeKO');
     const a = await envoyer(route, 'inconnue@vrm.center', { sondeKO: true, lignes: [LIGNE_J, LIGNE_B] });
-    dit(a.code >= 500 && metier(a.ecrites).length === 0,
+    dit(a.code >= 500 && metier(a.ecrites).length === 0 && alerteSansContenu(a.ecrites),
       'route : sonde de cloisonnement ratée → « renvoie-le », jamais « une seule boutique »',
       `HTTP ${a.code} · ${a.ecrites.map((x) => x.id).join(', ')}`);
     // Et l'échec n'est pas mémorisé : l'email suivant, base revenue, est jugé pour de bon.
@@ -330,7 +336,7 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
   await essaie('route : base non cloisonnée', async () => {
     const route = await nouvelle('sansColonne');
     const o = await envoyer(route, 'inconnue@vrm.center', { sansColonne: true, lignes: [{ data: { adresses: { 'sophie@vrm.center': { owner: B } } } }] });
-    dit(o.code === 503 && o.ecrites.length === 0,
+    dit(o.code === 503 && horsAlerte(o.ecrites).length === 0 && alerteSansContenu(o.ecrites),
       'schéma non cloisonné : aucun traitement ni accusé de réception positif',
       `HTTP ${o.code} · ${JSON.stringify(o.ecrites.map((x) => x.id + '@' + (x.owner === J ? 'J' : x.owner || '-')))}`);
   });

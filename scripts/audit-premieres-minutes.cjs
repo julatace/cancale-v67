@@ -130,10 +130,13 @@ const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 
   const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
   let app = '';
   try { app = require('./_source-app.cjs').sourceApp ? require('./_source-app.cjs').sourceApp() : lire('src/App.jsx'); } catch (_) { app = lire('src/App.jsx'); }
-  const carte = app.slice(app.indexOf('function GuideDemarrageCarte'), app.indexOf('function VerifierInstallationApp'));
-  dit(/compte: preuveCompte\(AUTH\.user\?\.id/.test(carte) && /extension: preuveExtension\(etape, comptes\)/.test(carte) && /vinted: preuveListe\(comptes\)/.test(carte) && /emails: preuveListe\(emails\)/.test(carte) && /preuveNombre\(ventes\)/.test(carte), 'P7 chaque preuve vient d’une lecture de l’app');
-  dit(/numerotationAChoisir\(numEcrit, nNum\)/.test(carte) && /save\(CLE_NUMERO_ECRIT, r\)/.test(carte), 'P7 la question de la numérotation lit le réglage et les N°, le choix écrit `vrm_numero_ecrit`');
-  dit(/data->>nItems/.test(app.slice(app.indexOf('function useVentesGuide'), app.indexOf('function usePlusTardParcours'))) && !/select=data[&`]/.test(app.slice(app.indexOf('function useVentesGuide'), app.indexOf('function usePlusTardParcours'))), 'P7 la première vente se lit en scalaire (`nItems`), jamais `select=data`');
+  // (11 nov.) La carte du guide est devenue celle du parcours d'arrivée (six étapes, la
+  // question du numéro dans Ma configuration) : ses preuves et ses lectures sont jugées par
+  // scripts/audit-parcours-arrivee.cjs (R7). Ici, on garde ce qui reste de ce chantier :
+  // la carte de Ma journée EST la carte du parcours, et ses lectures restent scalaires.
+  const bloc = app.slice(app.indexOf("// ── LE PARCOURS D'ARRIVÉE, BRANCHÉ"), app.indexOf('// ── « VÉRIFIER MON INSTALLATION »'));
+  dit(/<CarteParcoursApp comptes=\{props\.comptes\}/.test(app) && /preuveExtensionParcours\(pont, comptes\)/.test(bloc) && /preuveEmails\(emails\)/.test(bloc), 'P7 la carte de Ma journée est celle du parcours, chaque preuve vient d’une lecture');
+  dit(/harvest_\*_orders_\*&select=id,n:data->>nItems/.test(bloc), 'P7 la première vente se lit en scalaire (`nItems`), jamais `select=data`');
   dit(/'vrm_parcours_plus_tard'/.test(app), 'P7 « Plus tard » est synchronisé (SYNC_KEYS)');
   const reg = lire('src/ecrans/Reglages.jsx');
   dit(/id:'verifier'[^\n]*VerifierInstallationApp/.test(reg), 'P7 Paramètres → Aide : « Vérifier mon installation »');
