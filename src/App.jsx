@@ -19200,7 +19200,23 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
   const [emailsOuverts, setEmailsOuverts] = React.useState(false);
   const { etat, pret, parcours } = useParcoursArrivee({ comptes, actif: true, tour });
   const ouvert = !!(pret && parcours && parcours.ouvert && !parcours.fini && !exempleActif());
-  const montree = ouvert ? etapeAMontrer(etat, parcours.etape) : null;
+  const voulue = ouvert ? parcours.etape : null;
+  const eVoulue = voulue ? etat.etapes.find((x) => x.cle === voulue) : null;
+  const etatVoulue = eVoulue ? eVoulue.etat : '';
+  // Une étape qui se CONSTATE faite sous ses yeux : « ✓ » une seconde, puis la suivante.
+  // (Le drapeau est une réf : l'effet qui range la position le voit dans le même passage.)
+  const vue = React.useRef({});
+  const tenue = React.useRef('');
+  React.useEffect(() => {
+    if (!voulue) return undefined;
+    if (etatVoulue !== 'fait') { vue.current[voulue] = 'pasfait'; return undefined; }
+    if (vue.current[voulue] !== 'pasfait') return undefined;
+    vue.current[voulue] = 'fait';
+    tenue.current = voulue; setSucces(voulue); setEmailsOuverts(false);
+    const t = setTimeout(() => { tenue.current = ''; setSucces(''); }, 1400);
+    return () => { clearTimeout(t); tenue.current = ''; setSucces(''); };
+  }, [voulue, etatVoulue]); // eslint-disable-line react-hooks/exhaustive-deps
+  const montree = ouvert ? (succes || etapeAMontrer(etat, voulue)) : null;
   React.useEffect(() => { onOuvert && onOuvert(ouvert && !retenu); }, [ouvert, retenu]); // eslint-disable-line react-hooks/exhaustive-deps
   // Relire pendant qu'une étape attend : toutes les 10 s, page visible, et au retour sur l'onglet.
   const attend = ouvert && !retenu && montree && montree !== 'pret' && montree !== 'configuration';
@@ -19212,20 +19228,7 @@ function ParcoursArriveeApp({ comptes, retenu = false, onNav, onOuvert }) {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', pousse); window.removeEventListener('focus', pousse); };
   }, [attend]);
   // La position suit l'écran : un rechargement revient exactement ici.
-  React.useEffect(() => { if (ouvert && montree && montree !== 'pret' && parcours.etape !== montree) ecrireParcoursIci({ etape: montree }); }, [ouvert, montree]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Une étape qui se CONSTATE faite sous ses yeux : « ✓ » une seconde, puis la suivante.
-  const vue = React.useRef({});
-  const eMontree = montree && etat.etapes.find((x) => x.cle === montree);
-  const etatMontree = eMontree ? eMontree.etat : '';
-  React.useEffect(() => {
-    if (!montree || montree === 'pret') return undefined;
-    if (etatMontree !== 'fait') { vue.current[montree] = 'pasfait'; return undefined; }
-    if (vue.current[montree] !== 'pasfait') return undefined;
-    vue.current[montree] = 'fait';
-    setSucces(montree); setEmailsOuverts(false);
-    const t = setTimeout(() => { setSucces(''); ecrireParcoursIci({ etape: etapeAMontrer({ ...etat, etapes: etat.etapes }, null) }); }, 1400);
-    return () => clearTimeout(t);
-  }, [montree, etatMontree]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (ouvert && !tenue.current && montree && montree !== 'pret' && voulue !== montree) ecrireParcoursIci({ etape: montree }); }, [ouvert, montree, succes]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!ouvert || retenu || !montree) return null;
   const affichee = succes || montree;
   const plusTard = (cle) => {

@@ -191,6 +191,6 @@ export function reussite(e) {
   }
   if (e.cle === 'emails') return 'Reçu ✓';
   if (e.cle === 'extension') return 'Connectée à ton compte';
-  if (e.cle === 'configuration') return 'Configuration enregistrée';
-  return 'C’est fait';
+  if (e.cle === 'configuration') return 'Enregistrée';
+  return 'Créé';
 }
