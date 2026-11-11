@@ -36,6 +36,9 @@ export const FAMILLES = [
   // (8 nov., Julien : « quand de nouveaux comptes sont liés, je veux des notifications »)
   // Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois (src/compteRelie.js).
   { id: 'comptes', titre: 'Nouveau compte relié', def: true },
+  // (11 nov., lot alertes-ebay) Une nouvelle annonce eBay pour une recherche dont IL a
+  // allumé l'alerte (api/_lib/ebay-alertes.js) : une notification par passage, groupée.
+  { id: 'alertesebay', titre: 'Alertes d’achat eBay', def: true },
 ];
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
@@ -64,6 +67,8 @@ export const FAMILLE_DE = {
   rappel: 'rappels',
   // (8 nov.) Un compte relié pour la première fois (api/_lib/compte-relie.js) : une fois par compte.
   compte: 'comptes',
+  // (11 nov.) Les alertes d'achat eBay (api/_lib/ebay-alertes.js).
+  alerteebay: 'alertesebay',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il

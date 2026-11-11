@@ -42,6 +42,8 @@
 // servies par un faux eBay au banc `scripts/audit-alertes-ebay.cjs`).
 import { criteresRecherche, reduireResultats, compterAppel, jourParis, ID_COMPTEUR, PLAFOND_VRM_JOUR, PLAFOND_FIL_JOUR, requeteBrowse } from './ebay-recherche.js';
 import { veillesEnAlerte, criteresDeVeille } from '../../src/operations/metier.js';
+import { notifAlertes, CAT_NOTIF, URL_NOTIF } from './ebay-alertes-texte.js';
+export { CAT_NOTIF, URL_NOTIF };
 
 export const ID_ETAT = 'ebay_tokens_alertes';
 export const ID_OPERATIONS = 'vrm_operations_v1';
@@ -54,8 +56,6 @@ export const MAX_DITS = 2000;
 export const MAX_ECARTEES = 500;
 export const GARDE_MS = 14 * 86400e3;
 export const PANNES_DE_SUITE = 3;
-export const CAT_NOTIF = 'alerteebay';
-export const URL_NOTIF = '/?tab=plat_ebay&section=achats';
 const ITEM_RE = /^[A-Za-z0-9|_.-]{1,80}$/;
 
 const iso = (t) => new Date(t).toISOString();
@@ -157,19 +157,8 @@ export function cloturer(d, { alerte, t, raison, refusees }) {
   return e;
 }
 
-// La notification d'un passage (pure) : une par vendeur, quel que soit le nombre.
-const eur = (c) => (Number.isFinite(c) ? (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €' : '');
-export function notifAlertes(nv) {
-  const n = nv.length;
-  const ligne = (x) => `${String(x.titre || '').slice(0, 60)} · ${x.total != null ? eur(x.total) + ' port compris' : eur(x.prix) + ' + port'}`;
-  const recherches = [...new Set(nv.map((x) => x.recherche).filter(Boolean))];
-  return {
-    cat: CAT_NOTIF, tag: 'ebay-alerte', url: URL_NOTIF,
-    cle: 'ebay-alerte-' + nv.map((x) => x.itemId).sort().join('.').slice(0, 200),
-    title: n === 1 ? `Nouvelle annonce eBay · ${String(nv[0].recherche || '').slice(0, 50)}` : `${n} nouvelles annonces eBay`,
-    body: (n === 1 ? ligne(nv[0]) : `${nv.slice(0, 2).map(ligne).join('\n')}${n > 2 ? `\net ${n - 2} autre${n - 2 > 1 ? 's' : ''}` : ''}${recherches.length > 1 ? ` · ${recherches.length} recherches` : ''}`).slice(0, 240),
-  };
-}
+// La notification d'un passage : api/_lib/ebay-alertes-texte.js (pure, l'aperçu de Paramètres la lit aussi).
+export { notifAlertes };
 
 // ── LE PASSAGE (toutes les heures) ────────────────────────────────────────
 // Dépendances passées par l'appelant (api/ship-reminders.js) : `lire` (paginé,

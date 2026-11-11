@@ -31,6 +31,8 @@ import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { creerRechercheEbay } from './_lib/ebay-recherche.js';
+import { creerRouteAlertes, lectureProjetee } from './_lib/ebay-alertes.js';
+import { portee as porteeEbay } from './_lib/ebay.js';
 import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
 import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
 import { televerserPhotoEbay } from './_lib/ebay-photo.js';
@@ -2022,6 +2024,8 @@ const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOri
 });
 
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
+// (11 nov., lot alertes-ebay) La liste « Nouvelles annonces pour tes recherches » : lecture projetée, « écarter ».
+const alertesEbay = creerRouteAlertes({ lireProjection: lectureProjetee({ portee: porteeEbay, cle: () => process.env.SUPABASE_SERVICE_KEY || '', sbCle }), modifierDonnee });
 
 async function handleApp(req, res) {
   if (req.method === 'GET') {
@@ -2073,6 +2077,11 @@ async function handleApp(req, res) {
     // vendeur et par jour, compté en base AVANT l'appel. Lecture seule.
     if (action === 'chercher') {
       const r = await rechercheEbay.chercher(b, owner);
+      res.status(r.status).json(r.body);
+      return;
+    }
+    if (action === 'alertes') {
+      const r = await alertesEbay.route(b, owner);
       res.status(r.status).json(r.body);
       return;
     }

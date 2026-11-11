@@ -43,7 +43,8 @@ import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } fr
 import { sbCle } from './_lib/cle.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
-import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+import { comptesActifs, normaliserRegistre, lireDonnee as lireDonneeEbay, modifierDonnee as modifierDonneeEbay, jetonApplication, oublierJetonApplication } from './_lib/ebay.js';
+import { passageAlertesEbay, notifAlertes } from './_lib/ebay-alertes.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
 // Vestiaire du bilan : les règles de l'app (un propriétaire, importé).
@@ -1510,6 +1511,25 @@ export default async function handler(req, res) {
       r = await passageGroupe(instantNotif());
     } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
     res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r });
+    return;
+  }
+  // (11 nov., lot alertes-ebay) `?moment=alertes` : les ALERTES D'ACHAT eBAY, et RIEN d'autre —
+  // GitHub chaque heure (.github/workflows/alertes-ebay.yml). Seuls les vendeurs qui ont allumé
+  // l'alerte d'une recherche sont visités (api/_lib/ebay-alertes.js) ; sélection pas lue ⇒ 503.
+  // La réponse ne porte que des NOMBRES (aucun vendeur, aucune annonce).
+  if (moment === 'alertes') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'alertes', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageAlertesEbay({
+        lire: fetchPaginated, lireDonnee: lireDonneeEbay, modifierDonnee: modifierDonneeEbay, jetonApplication, oublierJetonApplication,
+        notifier: (o, nv) => contexteVendeur.run({ owner: o }, () => sendPushToAll(notifAlertes(nv))),
+        exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000,
+      });
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    const { fait, ...nombres } = r || {};
+    res.status(fait ? (r.echecs || r.panne ? 500 : 200) : 503).json({ ok: !!fait && !r.echecs && !r.panne, moment: 'alertes', ...nombres });
     return;
   }
   const soir = moment === 'soir';
