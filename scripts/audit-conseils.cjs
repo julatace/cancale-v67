@@ -238,7 +238,8 @@ if (process.argv.includes('--prouve')) {
     dit(publies.has(c.chiffre), `« ${c.cle} » : son chiffre « ${c.chiffre} » est publié par un écran`, [...publies].join(', '));
     const attrs = c.cibles.flatMap((s) => [...s.matchAll(/\[(data-[a-z0-9-]+)/g)].map((m) => m[1]));
     const classes = c.cibles.flatMap((s) => [...s.matchAll(/\.([a-z][a-z0-9-]+)/g)].map((m) => m[1]));
-    const tout = app + lire(path.join(RACINE, 'src/GuideDemarrage.jsx'));
+    // (11 nov.) la ligne de fraîcheur du haut (src/LigneFraicheur.jsx) porte aussi des cibles
+    const tout = app + lire(path.join(RACINE, 'src/GuideDemarrage.jsx')) + lire(path.join(RACINE, 'src/LigneFraicheur.jsx'));
     dit(attrs.every((a) => tout.includes(a)) && classes.every((k) => tout.includes(k)), `« ${c.cle} » : sa cible existe dans le source (${c.cibles[0]})`, attrs.concat(classes).filter((a) => !tout.includes(a)).join(', '));
     // Des valeurs reconnaissables (17, 3/20, 7 sur 41…) : aucune ne doit se retrouver dans la bulle.
     const exemple = { 'prix-achat': { n: 3, m: 20 }, 'colis-imprimer': { nLot: 17, presse: true }, 'prix-mini': { offresAuto: true, nbMini: 7, total: 41 }, inventaire: { jamais: true, numeros: 43 } }[c.cle] ?? 17;
@@ -248,7 +249,7 @@ if (process.argv.includes('--prouve')) {
     dit(String(dire(c.texte)).split(/[.!?]/).filter((x) => x.trim()).length <= 1 && String(dire(c.texte)).length <= 90, `« ${c.cle} » : une phrase courte`, dire(c.texte));
     dit(!/\b(17|20|41|43|7)\b/.test(mots), `« ${c.cle} » : aucun nombre de l’écran redit dans la bulle (§7)`, mots);
   }
-  dit(/<Conseils\b[\s\S]{0,400}tour:\s*!!\(bienvenue \|\| visite \|\| \(premierJour && !load\(CLE_VISITE/.test(app), 'monté avec `tour` = Bienvenue, visite, ou une personne neuve qui ne l’a pas vue');
+  dit(/<Conseils\b[\s\S]{0,400}tour:\s*!!\(bienvenue \|\| visite \|\| (?:configOuverte \|\| )?\(premierJour && !load\(CLE_VISITE/.test(app), 'monté avec `tour` = Bienvenue, visite, Ma configuration ouverte, ou une personne neuve qui ne l’a pas vue');   // (11 nov.) + Ma configuration (feuille d'accueil)
   dit(/<Conseils\b[\s\S]{0,500}exemple:\s*exempleActif\(\)[\s\S]{0,80}stream:\s*!!streamOn/.test(app), 'le mode exemple et le mode stream font taire les conseils');
   dit(/lireLigneAccompagnement[\s\S]{0,400}if \(!r\.ok\) return null;/.test(app) && /data->>rev=eq\.\$\{rev\}/.test(app.slice(app.indexOf('const ecrireLigneAccompagnement'))), 'la ligne `vrm_accompagnement` : lecture ratée ⇒ null, écriture en comparer-et-échanger sur rev');
   const iVu = comp.indexOf('noterVu('), iMontre = comp.indexOf('setMontre({ ...choix');

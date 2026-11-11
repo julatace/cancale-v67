@@ -116,7 +116,10 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   console.log('\n── S. Le branchement dans l’app');
   const APP = sansCommentaires(fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8'));
   const i = APP.indexOf('<PrixMiniFeuille choisies={miniSel}');
-  const bloc = i >= 0 ? APP.slice(i, i + 2000) : '';
+  // (11 nov.) Le bloc s'arrête à la fin de l'élément (`}}/>`) : la feuille voisine « Baisser le prix »
+  // (lot baisseprix, ext. 5.336, son clic) commande Vinted, elle — elle n'est pas « Prix mini ».
+  const fin = i >= 0 ? APP.indexOf('}}/>', i) : -1;
+  const bloc = i >= 0 ? APP.slice(i, fin > i ? fin + 4 : i + 2000) : '';
   dit(/askConfirm\(\{ title: `Poser \$\{lignes\.length\} prix mini \?`, desc: lignes\.map\(\(l\)=>`\$\{l\.numero \? 'N°'\+l\.numero : 'Sans N°'\} · \$\{montant\(l\.prix\)\} → mini \$\{montant\(l\.mini\)\}/.test(bloc) && /if \(!ok\) return;/.test(bloc), 'S1 la confirmation liste N° · prix · mini, et rien ne s’écrit sans elle');
   dit(/const w = ecritureMini\(l, \{ avecRefus \}\); if \(it && w\) \{ updatePair\(it, w\); n\+\+; \}/.test(bloc), 'S2 l’écriture par le chemin de la carte : `updatePair` … `ecritureMini`');
   dit(!/vmrCmd|executerCommande|recreerVinted/.test(bloc), 'S3 aucune commande n’est envoyée à Vinted');

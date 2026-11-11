@@ -1833,7 +1833,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
-      AUTH.user && { id:'agenda', type:'panneau', ic:'calendar', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
+      AUTH.user && { id:'agenda', type:'panneau', ic:'clock', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
@@ -1892,11 +1892,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream-on', type:'switch', ic:'stream', lib:'Mode stream', desc:'Cache tes montants, pseudos et adresses quand tu filmes ton écran.', on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', desc:'Choisir les mots, marques et comptes à cacher.', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", desc:'Agrandir ou réduire les textes de VRM.', val:valZoom, el:<ZoomSetting nu/> },
-      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
+      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:'Siri et Raccourcis', desc:'Ajouter un achat ou trouver un N° en parlant à Siri.', data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
       // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
-      { id:'raccourcis-clavier', type:'action', ic:'grid', lib:'Raccourcis clavier', desc:'Sur ordinateur : « g » puis une lettre, « ? » pour la liste.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
+      { id:'raccourcis-clavier', type:'action', ic:'key', lib:'Raccourcis clavier', desc:'Sur ordinateur : « g » puis une lettre, « ? » pour la liste.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
@@ -1927,7 +1927,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'centre-aide', type:'action', ic:'search', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
       { id:'statut', type:'nav', ic:'cloud', lib:'État de VRM', desc:'La base, les e-mails et les notifications fonctionnent-ils ?', onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
-      { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      { id:'signaler', type:'action', ic:'chat', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul

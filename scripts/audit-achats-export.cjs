@@ -100,6 +100,7 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
     fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX);
     fs.writeFileSync(path.join(dir, 'registres.js'), REG);
     fs.writeFileSync(path.join(dir, 'exportComptable.js'), EXP);
+    fs.writeFileSync(path.join(dir, 'factureAchat.js'), lire('src/factureAchat.js'));   // (11 nov.) importé par exportComptable.js (mentionFacture)
     fs.writeFileSync(path.join(dir, 'vestiaire-regle.js'), VC.replace(/from '\.\/([^']+)\.js'/g, (x, n) => `from '${path.join(R0, 'api', '_lib', n + '.js').replace(/\\/g, '/')}'`));
     PRM = await import('file://' + path.join(dir, 'prixAchatPropose.js'));
     REGM = await import('file://' + path.join(dir, 'registres.js'));
