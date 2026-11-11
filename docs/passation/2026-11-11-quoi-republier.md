@@ -45,13 +45,27 @@ la mise en ligne lue, « pas su » dit), chaque ligne avec sa raison en une phra
   `--prouve` : 9 mutations toutes rouges (pas lu = peu, favoris ignorés, vues ignorées,
   plafond strict, âge recopié, identité par titre, seuil libre, pas lu = liste vide,
   journée comptant les « à vérifier »).
-- Banc `scripts/bancs/quoi-republier.cjs` (390 tactile, 1512 ; `BANC_CAPTURE` clair/sombre) :
-  carte Vinted, toucher ⇒ coché dans l'atelier, tout cocher, régler 90 j, Ma journée,
-  Leboncoin ; aucune commande envoyée. Sur l'arbre d'avant (origin/main f04d4a58) : rouge
-  (aucune carte).
+- Banc `scripts/bancs/quoi-republier.cjs` (390 tactile, 1512, clair et sombre, en français) :
+  **84 ✅ · 0 ❌** — carte Vinted (51 + 1 à vérifier, raison « 95 j en ligne · 0 favori · 10 vues »,
+  50 annonces au même titre = 50 lignes), toucher ⇒ coché dans l'atelier (« Par VRM · 1 »),
+  second toucher ⇒ décoché, « Tout cocher (51) », régler 90 j (gardé), Ma journée (51, « Voir »
+  ⇒ Republier), Leboncoin (N°13 cochée, « Continuer (1) ») ; aucune commande envoyée, aucun
+  débordement, aucune erreur. Captures 390/1512 regardées. Sur l'arbre d'avant (le `dist` de
+  main 76445c04, banc copié dedans) : **10 ❌ · 0 ✅** (aucune carte, aucune ligne de journée).
+- Premier passage du banc : 16 rouges, tous de LANGUE (Chromium du banc en anglais ⇒ l'app
+  en anglais, la traduction marche) ; le banc pose désormais `vrm_langue = fr` et `fr-FR`.
 - Audits du brief verts (variables, tdz, coherence, identite, icones, textes-courts,
   fonctions-api, secrets, quoi-de-neuf, traduction) + qui-dorment, vendre-plus, journee-perso.
 
 ## ÉTAT À LA REPRISE
 
-Voir la section « Fin » ci-dessous (mise à jour à la fin de la session).
+Livré et poussé sur `claude/quoi-republier` (origin/main fusionné). Rien de rouge connu.
+- Pas fait (choix) : pas d'entrée dans le menu Outils (le bouton « Republier… » mène déjà à
+  la vue où est la carte) ; seuils non synchronisés entre appareils (confort local, comme
+  « qui dort ») — à mettre dans SYNC_KEYS si Julien le veut.
+- La branche `claude/lbc-plus` touche aussi `src/ecrans/Leboncoin.jsx` (RepublierLeboncoin,
+  suivi de travail) : à sa fusion, garder les deux (mon ajout = 3 imports, 5 lignes d'état
+  avant `fiche`, le bloc `<QuoiRepublier site="leboncoin"…/>` sous la phrase « Supprimée puis
+  remise comme neuve »).
+- Non vérifié en vrai : la forme réelle des vues Vinted à 0 (`view_count` 0 est lu `null` par
+  l'app ⇒ « vues pas lues », l'annonce va dans « à vérifier », jamais proposée à tort).
