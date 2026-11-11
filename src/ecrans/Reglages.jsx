@@ -371,8 +371,14 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
         </div>}
       </> : <div style={aide}>{tr('impression.a4')}</div>}
       <div style={{ marginTop: 12 }}>
-        <Segmente label={tr('impression.tampon')} value={tampon} onChange={(v) => changer(th ? { tamponTh: v } : { tamponA4: v })}
-          options={TAMPONS.map((v) => ({ v, l: tr(`impression.tampon.${v}`), data: { 'data-impression-tampon-choix': v } }))}/>
+        {/* Une liste, pas des pastilles : quatre choix ne tiennent pas sur 390 px (« Rie… » coupé). */}
+        <div style={{ ...ligne, marginTop: 0 }}>
+          <label htmlFor="vrm-impression-tampon" style={lib}>{tr('impression.tampon')}</label>
+          <select id="vrm-impression-tampon" data-impression-tampon-choix={tampon} value={tampon} onChange={(e) => changer(th ? { tamponTh: e.target.value } : { tamponA4: e.target.value })}
+            style={{ minHeight: 44, flex: '1 1 180px', maxWidth: 320, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit' }}>
+            {TAMPONS.map((v) => <option key={v} value={v}>{tr(`impression.tampon.${v}`)}</option>)}
+          </select>
+        </div>
         {th && <div data-impression-pourquoi-titre="" style={aide}>{tr('impression.tampon.pourquoi')}</div>}
         <div style={aide}>{tr('impression.tampon.jamais')}</div>
       </div>
@@ -392,7 +398,7 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
           {ap.b && ap.b.codesFins > 0 && <div style={{ ...aide, color: C.warn }}>{tr('impression.apercu.fin', { n: ap.b.codesFins })}</div>}
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, alignItems: 'flex-start' }}>
             {Array.from({ length: ap.pages }, (_, i) => <ApercuPdf key={i} octets={ap.octets} page={i + 1} largeur={th ? 150 : 200}
-              label={ap.pages > 1 ? tr('impression.apercu.page', { n: i + 1, total: ap.pages }) : (th ? nomPapier(papier) : 'A4')}/>)}
+              label={ap.pages > 1 ? tr('impression.apercu.page', { n: i + 1, total: ap.pages }) : tr('impression.lot.apercu')}/>)}
           </div>
         </div>}
       </div>

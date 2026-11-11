@@ -194,7 +194,7 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
       figs: Array.from(el.querySelectorAll('[data-apercu]')).map((f) => { const c = f.querySelector('canvas'); let encre = 0; try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) if (d[i] < 200) encre++; } catch (_) { encre = -1; } return { etat: f.getAttribute('data-apercu'), w: c ? c.width : 0, h: c ? c.height : 0, encre }; }) }))[0] || null).catch(() => null);
     th.deborde = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.locator('[data-impression-reglage]').first().screenshot({ path: path.join(CAPT, `impression-${nom}-thermique.png`) }).catch(() => {}); }
-    await pg.locator('[data-impression-tampon-choix="num_titre_taille"]').first().click({ timeout: 3000 }).catch(() => {});
+    await pg.locator('#vrm-impression-tampon').selectOption('num_titre_taille').catch(() => {});
     await pg.waitForTimeout(1200);
     th.ecritTampon = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_impression') || 'null'); } catch (_) { return null; } });
     await pg.locator('[data-imprimante-choix="normale"]').first().click({ timeout: 3000 }).catch(() => {});
