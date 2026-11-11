@@ -25,6 +25,23 @@ sur `origin/main` (git archive) : **17 rouges**. `audit-urssaf` porte le point 3
 | 12 | §7 — bénéfice / marge négatif en rouge | K rouge (11 endroits) | encre neutre (Ventes, Bilan annuel, Rapport, Vérificateur, ventes saisies) ; « jours en stock > 60 » du catalogue : ambre | K ; mutation |
 | 13 | Moy. 47, 22 — N° sans `cleNum` | L rouges | `bordForItem`, `bordPhoto`, inventaire (`numeroExists`, association) par `cleNum` | L1-L2 ; mutation |
 
+## Banc des écrans rendus (demande de l'agent principal)
+`scripts/bancs/robustesse-metier.cjs` (jeu inventé de `nouveau-vendeur.cjs`, 390 px tactile et 1512 px,
+clair et sombre, captures regardées) :
+- **Ventes saisies (Compta)** : achat inconnu « — », « Bénéf. 15 € sur 2 ventes sur 3 », mois « 30 € sur
+  1 vente sur 2 », bénéfice négatif à l'encre — vert ; rouge sur `origin/main` (build à part, `BANC_DIST`).
+- **« Accepter » à la main** : N°2 vendue sur Leboncoin ⇒ « Déjà vendue sur un autre site », aucune
+  confirmation, rien envoyé ; Leboncoin pas relu ⇒ la confirmation dit « VRM n'a pas pu vérifier tes
+  autres sites » — vert ; rouge sur `origin/main`.
+  Le banc a trouvé deux défauts, corrigés : (1) la garde publiée n'existe que moteur d'offres ALLUMÉ
+  (éteint par défaut) ⇒ elle est maintenant RECALCULÉE au clic (`chargerRetraitsMulti`) ; (2) une vente
+  ailleurs PROUVÉE était masquée par « eBay pas relu » (garde incomplète ⇒ simple avertissement) ⇒ elle
+  bloque maintenant (audit H1b, H5 ; 15/15 mutations).
+- **Inventaire « Synchroniser les ventes »** : l'écran n'est monté par AUCUN chemin (lot DJ4 l'a retiré du
+  menu, `inventory` n'est pas dans `ONGLETS_LIENS`, `?tab=inventory` ⇒ Ma journée) : rien à rendre ; le
+  banc le constate et jouera tout le parcours si l'écran revient. La règle est jugée par l'audit (A1-A7).
+- `messagerie.cjs` (touché par « Accepter ») : vert.
+
 ## Pas fait (noté pour la suite)
 - Moy. 11 : deux appareils qui créent une facture au même instant (aucun comparer-et-échanger).
 - `App.jsx` ~43391 : « délai dépassé » en rouge dans Colis — zone de l'agent principal (Colis).
