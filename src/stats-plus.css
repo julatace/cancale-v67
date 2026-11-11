@@ -1,0 +1,41 @@
+/* (11 nov., lot stats-plus) Statistiques → « En bref » et « Plus de chiffres » (src/ecrans/Stats.jsx, StatsPlus).
+   Neutre partout ; l'accent (bleu) seulement sur la barre « Vendu » de la période choisie. */
+.vrm-stats-vitrine .vrm-sp-tuiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 899px) { .vrm-stats-vitrine .vrm-sp-tuiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vrm-stats-vitrine .vrm-sp-tuiles > :last-child { grid-column: 1 / -1; } }
+.vrm-stats-vitrine .vrm-sp-corps { display: flex; flex-direction: column; gap: 14px; }
+.vrm-stats-vitrine [data-stats-repli="plus"] > summary { min-height: 44px; }
+
+/* Vendu et reçu : deux barres par période ; la ligne du haut écrit les deux valeurs de la colonne choisie. */
+.vrm-sp-vr { display: flex; flex-direction: column; gap: 10px; }
+.vrm-sp-vr-lu { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 13px; color: var(--vrm-muted); min-height: 20px; }
+.vrm-sp-vr-quand { font-weight: 600; color: var(--vrm-ink); }
+.vrm-sp-vr-lu b { color: var(--vrm-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-sp-cle::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.vrm-sp-cle-vendu::before { background: var(--vrm-ink); }
+.vrm-sp-cle-recu::before { background: color-mix(in srgb, var(--vrm-muted) 45%, var(--vrm-bg)); }
+.vrm-sp-vr-barres { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; align-items: end; }
+.vrm-sp-vr-col { all: unset; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; min-width: 0; min-height: 44px; cursor: pointer; border-radius: 6px; padding: 2px 0; }
+.vrm-sp-vr-col:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 2px; }
+.vrm-sp-vr-zone { width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.vrm-sp-vr-b { width: min(14px, 34%); border-radius: 2px 2px 0 0; }
+.vrm-sp-vr-b.is-vendu { background: color-mix(in srgb, var(--vrm-ink) 72%, var(--vrm-bg)); }
+.vrm-sp-vr-b.is-recu { background: color-mix(in srgb, var(--vrm-muted) 45%, var(--vrm-bg)); }
+/* Reçu pas su : un filet pointillé sur toute la hauteur, jamais une barre « 0 ». */
+.vrm-sp-vr-b.is-recu.is-passu { background: none; border: 1px dashed color-mix(in srgb, var(--vrm-muted) 50%, transparent); border-bottom: 0; }
+.vrm-sp-vr-col[aria-pressed="true"] .vrm-sp-vr-b.is-vendu { background: var(--vrm-accent); }
+.vrm-sp-vr-col[aria-pressed="true"] .vrm-sp-vr-lib { color: var(--vrm-ink); font-weight: 600; }
+.vrm-sp-vr-lib { font-size: 11px; color: var(--vrm-muted); margin-top: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: clip; max-width: 100%; }
+
+/* Les 10 meilleures ventes */
+.vrm-sp-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vrm-sp-top-ligne { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--vrm-line); }
+.vrm-sp-top-ligne:first-child { border-top: 0; }
+.vrm-sp-top-rang { font-size: 13px; font-weight: 700; color: var(--vrm-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.vrm-sp-top-nom { display: flex; flex-direction: column; min-width: 0; }
+.vrm-sp-top-nom > span { font-size: 14px; font-weight: 600; color: var(--vrm-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-sp-top-nom > small { font-size: 12px; color: var(--vrm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-sp-top-brut { font-size: 15px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-sp-top-note { padding-top: 8px; border-top: 1px solid var(--vrm-line); }
+/* Âge du stock : la tranche des 90 jours et plus en ambre (un geste à faire, §7) seulement si elle n'est pas vide. */
+.vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-piste > span[data-vieux] { background: var(--vrm-ambre, #b25000); }
+.vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-nom { white-space: nowrap; }

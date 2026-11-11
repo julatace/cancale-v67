@@ -76,7 +76,7 @@ export const CHIFFRES = {
   // l'échéance URSSAF (`montantPeriodeUrssaf` de l'app, le rappel de Ma journée).
   stock:      { nom: 'Valeur du stock', court: 'stock', type: 'eur', periodes: null, sites: ['toutes'], compte: false, aller: 'annonces' },
   objectif:   { nom: 'Objectif du mois', court: 'objectif', type: 'pct', periodes: null, sites: ['toutes'], compte: false, aller: 'dashboard' },
-  apayer:     { nom: 'URSSAF à payer', court: 'URSSAF à payer', type: 'eur', periodes: null, sites: ['toutes'], compte: false, aller: 'compta' },
+  urssafapayer: { nom: 'URSSAF à payer', court: 'URSSAF à payer', type: 'eur', periodes: null, sites: ['toutes'], compte: false, aller: 'compta' },
 };
 // (6 nov., onglets A) « D'OÙ VIENT CE CHIFFRE ? » — une phrase par chiffre, rangée AVEC sa
 // définition (§5 : la phrase qui explique un chiffre vient de la même source que lui). La
@@ -100,7 +100,7 @@ export const AIDE_CHIFFRES = {
   dorment: 'Tes annonces en ligne depuis plus de 30 jours (l’écran Annonces).',
   stock: 'Le prix d’achat de tes paires encore chez toi, calculé par l’écran Annonces. Une paire sans prix d’achat n’y est pas : le montant est alors un minimum.',
   objectif: 'Où tu en es de ton objectif du mois (la barre de la carte) : la part atteinte, en pourcentage.',
-  apayer: 'Les cotisations de ta prochaine échéance URSSAF, sur l’argent reçu (le rappel de Ma journée). Période pas finie ⇒ « au moins ».',
+  urssafapayer: 'Les cotisations de ta prochaine échéance URSSAF, sur l’argent reçu (le rappel de Ma journée). Période pas finie ⇒ « au moins ».',
 };
 export const IDS_CHIFFRES = Object.keys(CHIFFRES);
 
@@ -477,7 +477,7 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     if (!prog || prog.pct == null) return vide('pasSu', { manque: (prog && prog.manque) || [] });
     return { valeur: prog.pct, partiel: !!prog.partiel, manque: prog.manque || [], hors: '', p: null, raison: '' };
   }
-  if (id === 'apayer') {
+  if (id === 'urssafapayer') {
     const U = typeof regles.urssafAPayer === 'function' ? regles.urssafAPayer(S.ligneUrssaf, maintenant) : null;
     if (S.ligneUrssaf === undefined) return vide('encours');
     if (U && U.hors) return vide('hors', { hors: U.hors });
