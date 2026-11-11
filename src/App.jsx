@@ -639,6 +639,7 @@ import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
+import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -1836,6 +1837,7 @@ const authConfirmFromLink = async (raw, email) => {
 const authResendConfirm = async (email) => {
   const r = await authCall(avecRetour('resend'), { type: 'signup', email: String(email).trim().toLowerCase() });
   if (!r.ok) return { ok: false, error: mapMailError(r.error), attente: delaiDemandeEmail(r.error) };
+  noterLienDemande(localStorage);
   return { ok: true };
 };
 
@@ -1847,6 +1849,7 @@ const authResendConfirm = async (email) => {
 const authMagicLink = async (email) => {
   const r = await authCall(avecRetour('otp'), { email: String(email).trim().toLowerCase(), create_user: false });
   if (!r.ok) return { ok: false, error: mapMailError(r.error), attente: delaiDemandeEmail(r.error) };
+  noterLienDemande(localStorage);
   return { ok: true };
 };
 
@@ -1899,6 +1902,8 @@ const useSecondesRestantes = (fin) => {
 };
 const authSignUp  = async (email, password) => {
   // (8 nov.) `data.langue` : la langue des e-mails de compte (modèles Supabase).
+  // (11 nov., sécurité) Le lien de confirmation ne s'ouvrira QUE dans ce navigateur (src/lienEmail.js).
+  noterLienDemande(localStorage);
   const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur() } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
@@ -1921,7 +1926,7 @@ const authSignUp  = async (email, password) => {
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
   return { ok: true, needsConfirm: true };
 };
-const authReset   = (email) => authCall(avecRetour('recover', '/recuperation.html'), { email: String(email).trim().toLowerCase() });
+const authReset   = (email) => { noterLienDemande(localStorage); return authCall(avecRetour('recover', '/recuperation.html'), { email: String(email).trim().toLowerCase() }); };
 
 // ── CONNEXION AVEC GOOGLE / DISCORD (OAuth, méthode PKCE) ─────────────────
 // Comment ça marche : on n'échange JAMAIS de mot de passe. On envoie le vendeur
@@ -2099,6 +2104,16 @@ const consumeAuthRedirect = async () => {
     cleanAuthUrl();
     const me = await fetchMe(at);                        // qui es-tu ?
     if(typeof me?.id!=='string'||!me.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
+    // (11 nov., sécurité) Un lien fabriqué par un tiers avec SES jetons ne
+    // remplace rien : il faut que CE navigateur ait demandé l'e-mail, et
+    // jamais par-dessus le compte d'un autre (src/lienEmail.js).
+    const avant=readSession();
+    // Un lien de RÉCUPÉRATION s'ouvre souvent sur un autre appareil : il n'exige pas
+    // la marque (il mène au choix d'un mot de passe, geste visible), mais jamais par-dessus un autre compte.
+    const verdict=adopterJetonsDuLien({demandeIci:type==='recovery'||lienDemandeIci(localStorage),sessionId:avant&&avant.user&&avant.user.id,jetonId:me.id});
+    if(verdict==='autre_session')return{error:MSG_LIEN_AUTRE_COMPTE};
+    if(verdict!=='oui')return{error:MSG_LIEN_PAS_DEMANDE};
+    oublierLienDemande(localStorage);
     if (type === 'recovery') RECOVERY_PENDING = true;
     writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, totpNoms: me._totpNoms } : {}) });
     return { ok: true, recovery: type === 'recovery' };
@@ -2190,6 +2205,13 @@ const wipeLocalData = () => {
   try { if (typeof caches !== 'undefined') caches.delete(CACHE_PDF).catch(() => {}); } catch (_) {}
   // (10 nov., lot K) Et les listes gardées sur l'appareil (src/copieLignes.js).
   try { effacerCopies(); } catch (_) {}
+  // (11 nov., revue de sécurité) Le cache des ventes/achats de l'onglet vit dans
+  // `sessionStorage` (il survit au `reload` de la connexion) : sans ceci, le
+  // vendeur suivant dans le même onglet voyait, 3 min durant, les ventes et
+  // achats du précédent dans la recherche. Et les empreintes de photos.
+  try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {}
+  try { for (const k of Object.keys(_acctCache)) delete _acctCache[k]; } catch (_) {}
+  try { import('./indexPhotos.js').then((m) => m.oublierIndex()).catch(() => {}); } catch (_) {}
 };
 // Mémorise à qui appartiennent les données présentes dans ce navigateur.
 const OWNER_MARK = 'vrm_local_owner';

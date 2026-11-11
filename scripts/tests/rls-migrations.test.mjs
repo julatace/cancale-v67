@@ -70,6 +70,15 @@ function retireePublic(nom, sql) {
   const blocs = sql.match(/do\s+\$\$[\s\S]*?\$\$/gi) || [];
   return blocs.some((b) => /revoke\s+all\s+on\s+function\s+%s\s+from\s+public/i.test(b) && new RegExp(`'${nom}'`, 'i').test(b));
 }
+// (11 nov., revue de sécurité) Retirer à PUBLIC ne suffit pas chez Supabase : ses
+// droits par défaut donnent EXECUTE directement à `anon` et `authenticated`. Le
+// rôle doit figurer dans un `revoke` qui nomme la fonction (ou dans la boucle).
+function retireeA(nom, sql, role) {
+  const ligne = new RegExp(`revoke\\s+(?:all|execute)[^;]*on\\s+function\\s+(?:public\\.)?${nom}\\s*\\([^;]*from\\s+[^;]*\\b${role}\\b`, 'i');
+  if (ligne.test(sql)) return true;
+  const blocs = sql.match(/do\s+\$\$[\s\S]*?\$\$/gi) || [];
+  return blocs.some((b) => new RegExp(`revoke\\s+all\\s+on\\s+function\\s+%s\\s+from\\s+[^']*\\b${role}\\b`, 'i').test(b) && new RegExp(`'${nom}'`, 'i').test(b));
+}
 function rendueA(nom, sql) {
   const roles = new Set();
   const re = new RegExp(`grant\\s+execute\\s+on\\s+function\\s+(?:public\\.)?${nom}\\s*\\([^)]*\\)\\s+to\\s+([^;]+);`, 'gi');
@@ -109,6 +118,9 @@ export function verifier(fichiers) {
     if (/returns\s+trigger/i.test(fn.entete)) continue;   // un déclencheur ne s'appelle pas par l'API
     if (!retireePublic(fn.nom, sql)) rouges.push(`3. public.${fn.nom} (${fn.f}) : SECURITY DEFINER jamais retirée à PUBLIC (ouverte à anon par défaut)`);
     const roles = rendueA(fn.nom, sql);
+    for (const role of ['anon', 'authenticated']) {
+      if (!roles.has(role) && !retireeA(fn.nom, sql, role)) rouges.push(`3b. public.${fn.nom} (${fn.f}) : SECURITY DEFINER jamais retirée à ${role} (droit par défaut de Supabase)`);
+    }
     const ouverte = roles.has('anon') || roles.has('authenticated') || roles.has('public');
     const prendUnId = /\buuid\b/i.test(fn.args);
     if (ouverte && prendUnId && !controleAppelant(fn, dernieres)) rouges.push(`4. public.${fn.nom} (${fn.f}) : rendue à ${[...roles].join('/')} avec un uuid en paramètre, sans contrôle de l'appelant`);
@@ -151,6 +163,7 @@ const MUTATIONS = [
   ['1. table sans RLS', (s) => s + '\ncreate table if not exists public.vrm_fuite (owner uuid, x text);\n'],
   ['2. definer sans search_path', (s) => s + "\ncreate or replace function public.vrm_m2() returns int language sql security definer as $$ select 1 $$;\nrevoke all on function public.vrm_m2() from public;\n"],
   ['3. definer ouverte à PUBLIC', (s) => s.replace(/revoke all on function public\.vrm_sessions_de\(uuid\) from public, anon, authenticated;/, '')],
+  ['3b. definer retirée à PUBLIC seulement', (s) => s.replace(/revoke all on function public\.vrm_sessions_de\(uuid\) from public, anon, authenticated;/, 'revoke all on function public.vrm_sessions_de(uuid) from public;')],
   ['4. uuid sans contrôle d’appelant', (s) => s + "\ncreate or replace function public.vrm_m4(p_x uuid) returns jsonb language sql stable security definer set search_path = '' as $$ select to_jsonb(a) from public.app_data a where a.owner = p_x $$;\nrevoke all on function public.vrm_m4(uuid) from public;\ngrant execute on function public.vrm_m4(uuid) to authenticated;\n"],
   ['5. vendeur en paramètre rendu aux connectés', (s) => s.replace(/grant execute on function public\.vrm_sessions_de\(uuid\) to service_role;/, 'grant execute on function public.vrm_sessions_de(uuid) to authenticated;')],
   ['6. politique permissive ouverte', (s) => s + '\ncreate policy tout_lire on public.app_data for select to authenticated using (true);\n'],
