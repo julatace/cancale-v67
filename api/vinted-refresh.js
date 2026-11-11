@@ -61,8 +61,17 @@ function readSetCookie(headers, name) {
   return null;
 }
 
+// (11 nov., revue de sécurité) `domain` est une colonne que le vendeur écrit
+// lui-même (RLS) : elle ne choisit qu'un site Vinted CONNU, jamais un hôte
+// quelconque (le serveur aurait posté vers n'importe quelle adresse). Même liste
+// que `vinted-connect`. Aucune redirection suivie, délai borné, comptes bornés.
+export const HOTE_VINTED = /^www\.vinted\.(fr|com|it|de|be|es|nl|pl)$/;
+export const hoteRefresh = (domain) => (typeof domain === 'string' && HOTE_VINTED.test(domain)) ? domain : 'www.vinted.fr';
+const REFRESH_MAX_COMPTES = 25;
+const REFRESH_DELAI_MS = 10000;
+
 async function refreshOne(acc) {
-  const host = (acc.domain && acc.domain.startsWith('www.')) ? acc.domain : 'www.vinted.fr';
+  const host = hoteRefresh(acc.domain);
   const cookie = [
     `access_token_web=${acc.access_token}`,
     acc.refresh_token ? `refresh_token_web=${acc.refresh_token}` : '',
@@ -79,8 +88,10 @@ async function refreshOne(acc) {
       'Content-Type': 'application/json',
     },
     body: '{}',
-  });
-  if (!res.ok) return null;
+    redirect: 'manual',
+    signal: AbortSignal.timeout(REFRESH_DELAI_MS),
+  }).catch(() => null);
+  if (!res || !res.ok) return null;
   let json = {};
   try { json = await res.json(); } catch { json = {}; }
   const newAccess = json.access_token || readSetCookie(res.headers, 'access_token_web');
@@ -119,7 +130,8 @@ export default async function handler(req, res) {
     if (!Array.isArray(accounts) || accounts.some(a => a.owner !== u.id)) { res.status(503).json({ error: "Propriété des comptes non confirmée. Aucun renouvellement effectué." }); return; }
     const now = Math.floor(Date.now() / 1000);
     const summary = [];
-    for (const acc of accounts) {
+    for (const [i, acc] of accounts.entries()) {
+      if (i >= REFRESH_MAX_COMPTES) { summary.push({ id: acc.vinted_user_id, action: 'skip_trop_de_comptes' }); continue; }
       if (!acc.refresh_token) { summary.push({ id: acc.vinted_user_id, action: 'skip_no_refresh' }); continue; }
       const exp = jwtExp(acc.access_token);
       if (exp && exp - now > REFRESH_MARGIN_S) { summary.push({ id: acc.vinted_user_id, action: 'still_valid' }); continue; }
