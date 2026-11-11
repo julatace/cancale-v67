@@ -107,3 +107,13 @@ Sur `claude/revue-colis`, pas de PR (la session principale intègre).
    162 (À trancher est une carte de Ma journée), `colis-envoyes-tri` 92 (le « ↗ » de la ligne de suivi).
    Restent rouges, les mêmes que sur `main` : `retraits-frais` F6 (ligne de fraîcheur), `gestes-annuler` G1 « avant
    toute écriture » et G3 (2), `achats-retraits` (8).
+5. **Preuve par mutation** (une build mutante, `/tmp`, jamais poussée) : entrée Achats sans nombre ⇒ `colis-sms`,
+   `journee-photos` C1, `retraits-frais` F1, `gestes-annuler` G1 rouges ; `lienPublic` muet ⇒ `colis-envoyes-tri` S
+   rouge ; « À trancher » remis dans « Gérer » ⇒ `navigation-tache` J rouge (2) ; emplacement retiré ⇒
+   `tout-imprimer` C rouge ; outils affichés partout ⇒ `achats-retirer-site` rouge sous eBay et Leboncoin ;
+   ellipse posée sur la date limite ⇒ `annonces-ventes-brouillon` rouge **à 1512 seulement** (au téléphone la carte a
+   une autre forme : le contrôle 390 ne voit pas cette mutation — à durcir). **Non prouvés par mutation** :
+   `colis-villes` (la complétion par le registre des points a été SUPPRIMÉE, il n'y a plus d'interrupteur à
+   réaffaiblir ; la preuve est avant/après : vert sur `main` avec Cancale 4, vert ici avec 3, chacun rouge sur
+   l'autre), `iphone-reprise` B9/R2, `retrait-relais-carte`, `retrait-autre-ville`, `vestiaire-colis` (ports de
+   sélecteur : ils mesurent la même règle qu'avant, sur la nouvelle place).
