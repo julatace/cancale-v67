@@ -53,6 +53,20 @@ transp-ext, tdz).
 - `a-envoyer-preuves` : bombe à retardement (bordereau « reçu il y a 48 h » devenu plus récent
   que le dépôt daté du 7 nov.) — date fixe.
 
+## Après le merge de `origin/main` (11 nov., reprise)
+
+- `_source-app.cjs` et `InventaireAnnuel.jsx` : `main` avait fait la même correction
+  (imports recollés ; « Dans tes rangements ») — sa version gardée.
+- `ma-semaine` : « semaine » n'est plus le dernier de `ECRANS` — la règle (présent) gardée.
+- `prix-mini` E4 : l'extension lit le mini par `seuilOffreLu` (5.342) — sa vraie règle EXÉCUTÉE
+  (« 41 » ⇒ 41, « 0 »/vide ⇒ rien).
+- `plans-solo-pro` : l'accueil dit « un compte vend par plateforme » (textes courts) — même sens.
+- `controle-prod-quotidien` : rouge sur un `dist/` d'avant le merge (5.339 servie, 5.342
+  attendue) ; vert après `npm run build`.
+- Mutations (chaque correction réaffaiblie ⇒ audit rouge) : pagination-ordre, chrome-en-dur,
+  signalement, conseils, coque-parametres, garde-ecrans, ma-semaine, chantier-f (12/12),
+  prix-mini (10/10), lus-deux-appareils (`--muter`).
+
 ## Encore rouges — hors de ce lot (zones d'autres sessions)
 
 - `colis-envoi` (B : la barre dépend de l'onglet — le Scanner a un mode « retrait », lot V),
