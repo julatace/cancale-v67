@@ -217,6 +217,26 @@ const mime = (o = {}) => [`From: ${FROM}`, `To: ${ADR}`, `Subject: =?UTF-8?Q?Com
     dit(out3.length === 1 && out3[0] === srv, 'R6 lecture ratée : la liste telle quelle');
   });
 
+  // (11 nov., Julien : « bcp de colis qui ne sont pas dans les retraits ») MESURÉ : 13 achats que leur commande
+  // Vinted dit encore « colis déposé en bureau de Poste ou point relais », sans n° de suivi, appariés à un colis
+  // Mondial Relay DÉJÀ RETIRÉ au même point ⇒ « sans doute fini », absents des retraits. Données INVENTÉES.
+  await essaie('Q', async () => {
+    const A = await import('file://' + path.join(R, 'api', '_lib', 'achat-arrive-relais.js'));
+    const LIEU = 'Tabac du Port, 35260 Cancale';
+    const moitie = { source: 'vinted-commande', conv: 'c-1', lieu: LIEU, account: 'compte_x', emailAt: '2026-11-10T10:00:00Z', status: 'available' };
+    const fini = { carrier: 'mondialrelay', suivi: '11112222', lieu: LIEU, account: 'compte_x', emailAt: '2026-11-10T09:00:00Z', status: 'available' };
+    const cmdAttend = { transaction_id: 900001, status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" };
+    const cmdFinie = { transaction_id: 900002, status: 'Transaction finalisée' };
+    const attendEncore = (c) => /point relais/.test(String(c && c.status)) && !/finalis/.test(String(c && c.status));
+    const run = (cmd) => A.regrouperArrivees([moitie], { commandeDe: (t) => (t === moitie ? cmd : null), temoins: [fini], sansIdentite: () => true, temoinActif: () => false, attendEncore });
+    const r1 = run(cmdAttend);
+    dit(r1.liste.length === 1 && !r1.probables.length, 'Q1 un achat que Vinted dit ENCORE au point relais n’est jamais « fini » avec un colis déjà retiré : il est à retirer', JSON.stringify({ liste: r1.liste.length, probables: r1.probables.length }));
+    const r2 = run(cmdFinie);
+    dit(r2.liste.length === 0 && r2.probables.length === 1, 'Q2 (témoin) un achat sans preuve d’attente reste apparié à son témoin fini, comme avant', JSON.stringify({ liste: r2.liste.length, probables: r2.probables.length }));
+    const r3 = A.regrouperArrivees([moitie], { commandeDe: () => cmdAttend, temoins: [fini], sansIdentite: () => true, temoinActif: () => true, attendEncore });
+    dit(r3.doutes.length === 1 && r3.liste.length === 0, 'Q3 avec un témoin ENCORE montré : compté avec lui, une fois (jamais deux cartons)', JSON.stringify({ doutes: r3.doutes.length, liste: r3.liste.length }));
+  });
+
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })();

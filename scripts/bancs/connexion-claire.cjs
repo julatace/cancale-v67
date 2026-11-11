@@ -1,5 +1,7 @@
 require("./_porte-banc.cjs");
 // Vraie application, faux service d’authentification. Aucun compte réel.
+const { lancer } = require("./_navigateur.cjs"); // (11 nov., webkit-fiable) NAVIGATEUR=webkit
+const PW_NAV = require("playwright");
 const { chromium } = require("playwright"),
   http = require("http"),
   fs = require("fs"),
@@ -29,7 +31,7 @@ const { chromium } = require("playwright"),
   });
   await new Promise((r) => srv.listen(0, "127.0.0.1", r));
   const origine = "http://127.0.0.1:" + srv.address().port;
-  const nav = await chromium.launch({
+  const nav = await lancer(PW_NAV, {
     executablePath: process.env.VRM_CHROMIUM_PATH || "/usr/bin/chromium",
     args: ["--no-sandbox"],
   });

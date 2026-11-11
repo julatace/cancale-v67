@@ -12,7 +12,9 @@ import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees, partagerParEtat } from '../stockAnnonces.js';
 import { LIGNE_INVENTAIRE } from '../inventaire.js';
 import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
-import { EmballagesCarte } from '../EmballagesCarte.jsx';   // (10 nov., lot L) le stock d'emballages
+import { EmballagesCarte } from '../EmballagesCarte.jsx';
+import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
+import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
 import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
@@ -756,10 +758,40 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </div>
     </Card>
   );
+  // (11 nov., lot actions-serie) Les rangées « Vendues à sortir » et « Plus en ligne » :
+  // sélectionner plusieurs paires, agir une fois. « Enlever du stock » = le geste de la
+  // ligne (« Je l'ai sortie » pour une vendue : partie + case libérée ; « Je l'ai retirée »
+  // pour une plus en ligne : la case seule), écrit EN UNE FOIS (une écriture des cases,
+  // pas N écritures qui s'écrasent), après une confirmation qui nomme les N°.
+  const serieStock = useSelectionSerie(useMemo(() => [...vendSortir, ...plusEnLigne].map(cleDeFiche), [vendSortir.map(cleDeFiche).join('|'), plusEnLigne.map(cleDeFiche).join('|')]), { nom: 'stock' });
+  const actionsSerieStock = () => {
+    const parCle = new Map([...vendSortir, ...plusEnLigne].map((f) => [cleDeFiche(f), f]));
+    const lignes = (cles) => cles.map((k) => parCle.get(k)).filter(Boolean);
+    return [
+      { k: 'enlever', libelle: 'Enlever du stock', icone: 'check', variante: 'primaire', faire: async (cles) => {
+        const { ok, pasFaits } = trierSerie(lignes(cles), (f) => (ouEst(f) || slots[cleDeFiche(f)]) ? true : 'case introuvable');
+        if (!ok.length) return resumeSerie({ faits: [], pasFaits }, { un: 'enlevée', plusieurs: 'enlevées' });
+        const nv = ok.filter((f) => rangeeEtat(f) === 'vendue').length;
+        if (!(await askConfirm({ title: `Enlever ${ok.length} paire${ok.length > 1 ? 's' : ''} du stock ?`, desc: `${ok.map((f) => 'N°' + f.numero).join(', ')}\n${nv ? `${nv} vendue${nv > 1 ? 's' : ''} : sortie${nv > 1 ? 's' : ''} du stock. ` : ''}${ok.length - nv ? `${ok.length - nv} plus en ligne : la case se libère. ` : ''}Les numéros restent pris, jamais redonnés.`, ok: 'Enlever', cancel: 'Annuler' }))) return { annule: true };
+        const u = { ...slots }; for (const f of ok) delete u[cleDeFiche(f)];
+        const vendues = ok.filter((f) => rangeeEtat(f) === 'vendue');
+        if (vendues.length) setPairsLost((prev) => { const n = { ...prev }; const at = new Date().toISOString(); for (const f of vendues) n[cleDeclarationPartie(f.numero, f.id, numeros)] = { id: String(f.id), at, title: f.title || '', from: 'stock' }; save('vinted_pairs_lost', n); return n; });
+        ecrireSlots(u);
+        return resumeSerie({ faits: ok, pasFaits }, { un: 'enlevée du stock', plusieurs: 'enlevées du stock' });
+      } },
+      { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
+        const L = lignes(cles);
+        const csv = csvDe(['N°', 'Article', 'État', 'Meuble', 'Rangée', 'Colonne'], L.map((f) => { const ou = ouEst(f); return [f.numero, f.title || '', rangeeEtat(f) === 'vendue' ? 'vendue à sortir' : 'plus en ligne', ou ? ou.meuble.name : '', ou ? ou.rangee : '', ou ? ou.colonne : '']; }));
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a');
+        a.href = url; a.download = `stock-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+        return resumeSerie({ faits: L, pasFaits: [] }, { un: 'paire exportée', plusieurs: 'paires exportées' });
+      } },
+    ];
+  };
   // ── Vendues à sortir · Plus en ligne : rangées, plus des annonces actuelles ──
   const ligneRangee = (f, gestes) => { const ou = ouEst(f); const sold = estVendu(f); return (
-    <div key={f.id} className="vrm-s2d-liste-ligne" data-stock-rangee={cleDeFiche(f)} style={{ flexWrap: 'wrap' }}>
-      <span className="vrm-s2d-vig"><Vignette f={f} sold={sold} hors={!sold && rangeeEtat(f) === 'plusenligne'} mini /></span>
+    <div key={f.id} {...serieStock.ligne(cleDeFiche(f))} className="vrm-s2d-liste-ligne" data-stock-rangee={cleDeFiche(f)} style={{ flexWrap: 'wrap' }}>
+      <span className="vrm-s2d-vig"><CaseSerie serie={serieStock} cle={cleDeFiche(f)} etiquette={'N°' + f.numero} surPhoto/><Vignette f={f} sold={sold} hors={!sold && rangeeEtat(f) === 'plusenligne'} mini /></span>
       <span className="vrm-s2d-txt"><span className="vrm-s2d-txt-t"><b>N°{f.numero}</b> · {f.title || '—'}</span>
         <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> · rangée {ou.rangee}, colonne {ou.colonne}</> : 'case introuvable'}</span></span>
       <div className="vrm-s2d-gestes">{ou && <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => montrer(f)}>Voir la case</button>}{gestes}</div>
@@ -770,11 +802,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
           <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Vendues à sortir · {vendSortir.length}</span>
           <span style={{ flex: 1 }} />
+          <OuvrirSerie serie={serieStock}/>
           {vendSortir.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={vendSortir.length} onClick={() => { setQ(''); setCibles(vendSortir.map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }}>Le chemin pour les sortir</button>}
         </div>
         {vendSortir.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-primaire" type="button" data-stock-sortir={cleDeFiche(f)} onClick={() => sortir(f)}>✓ Je l'ai sortie</button>))}
       </div>
     </Card>) : null;
+  const barreSerieStock = <BarreSerie serie={serieStock} actions={actionsSerieStock()} rendreIcone={(n, t) => <Icon name={n} size={t}/>}/>;
   const blocPlusEnLigne = plusEnLigne.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-plus-en-ligne={plusEnLigne.length}>
@@ -1037,6 +1071,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {meubles.length === 0 && <StockExplication sneakers={motsStock.nom === 'paire'} />}
     {blocVendues}
     {blocPlusEnLigne}
+    {barreSerieStock}
     {blocPasSu}
     {blocSortis}
     {/* à ranger */}

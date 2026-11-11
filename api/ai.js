@@ -109,6 +109,7 @@ Contraintes : le titre fait au plus 70 caractères ; la description fait 2 à 4 
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 600, system: sys, messages: [{ role: 'user', content: user }] }),
+      signal: AbortSignal.timeout(25000),   // (11 nov., robustesse) jamais pendu jusqu'à la coupure
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { res.status(200).json({ ok: false, reason: 'api-error', detail: (j && j.error && j.error.message) || String(r.status) }); return; }
@@ -151,6 +152,7 @@ Donne 3 à 5 suggestions, chacune dans un ton DIFFÉRENT, prêtes à copier. Ada
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 700, system: sys, messages: [{ role: 'user', content: user }] }),
+      signal: AbortSignal.timeout(25000),   // (11 nov., robustesse) jamais pendu jusqu'à la coupure
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { res.status(200).json({ ok: false, reason: 'api-error', detail: (j && j.error && j.error.message) || String(r.status) }); return; }
