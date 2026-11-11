@@ -36,7 +36,9 @@ Branche `claude/republier-programme` (partie d'`origin/main` f04d4a58 + `claude/
 
 ## Preuves
 - `node scripts/audit-republier-programme.cjs` : **54 verts** (P1–P6 programmation, H1–H6 historique, E1–E5 extension EXÉCUTÉE par `scripts/_fond-vm.cjs`, B1–B6 branchements) ; `--prouve` : **16/16 mutations rouges** (heure décalée, deux par compte, onglet pas su = oui, frein ignoré, jauge pas sue = oui, autre compte accepté, quota du jour ignoré, départ rattrapé après la fenêtre, départ pris deux fois, paire remplacée, lecture KO qui écrit, écriture sans garde `rev`, historique par titre, « pas su » = 0, chaîne sans borne, extension « aucun frein » sur stockage muet).
-- Banc `scripts/bancs/republier-programme.cjs` (vrai build, fausse base à état avec garde `rev`, faux pont 5.368 ; A programmer/annuler, B historique, C départ, D pas d'onglet, E heure passée ; 390 tactile / 1512, `THEMES`, `SHOTS`) : voir « ÉTAT » ci-dessous.
+- Banc `scripts/bancs/republier-programme.cjs` (vrai build, fausse base à état avec garde `rev`, faux pont 5.368 ; A programmer/annuler, B historique, C départ, D pas d'onglet, E heure passée ; 390 tactile / 1512, `THEMES=clair,sombre`, `SHOTS`, `SCENES`) : **76 OK · 0 KO** (4 combinaisons). Sur le build d'avant (`/home/user/wt/main-ref/dist`, main 76445c04) : rouge (historique absent, « Programmer… » absent).
+- Captures regardées (390 / 1512, clair / sombre : réglage, carte, pas partie, départ). Trois défauts vus et corrigés : (1) au départ, l'écran d'ouverture `#vrm-demarrage` (z 2147483000) restait PAR-DESSUS la feuille « VRM travaille » (rendu `inert`, donc invisible à `elementFromPoint` — seule la capture le montrait) ⇒ la veille appelle `finDemarrage` avant de partir ; (2) en sombre, le réglage était blanc sur blanc : `--vrm-card` n'est PAS posé par la coque (`variablesTheme` pose `--vrm-surface`) ⇒ `--vrm-surface` (⚠️ `src/composants/suivi-travail.css` utilise aussi `--vrm-card`, avec repli blanc : à vérifier par son lot) ; (3) espacement « Fixe 0 s » d'une programmation remplacé par 30 s ⇒ gardé tel quel.
+- Le parcours d'aujourd'hui d'Annonces → Republier (« Par VRM · N ») est celui que le banc joue.
 - Audits communs : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction — verts. Fichiers `RepubProgramme.jsx`, `HistoriqueRepub.jsx` ajoutés aux migrés de `audit-traduction` (F1).
 
 ## Choix tranchés (dans l'esprit de sa demande)
@@ -45,7 +47,7 @@ Branche `claude/republier-programme` (partie d'`origin/main` f04d4a58 + `claude/
 - « Modifier prix ou titre » et « Brouillons → en ligne » se programment aussi (même atelier) ; le quota du jour ne compte que Republier et En ligne → brouillon (ceux qui suppriment une annonce).
 
 ## ÉTAT À LA REPRISE
-(mis à jour en fin de session — voir la dernière section)
+Livré, poussé (`claude/republier-programme`), `origin/main` déjà dedans (rien de neuf au moment de la fin), `claude/suivi-travail` fusionnée. Build vert ; audit 54/0 + 16/16 mutations ; banc 76/0 ; audits communs verts. Rouges vus mais PAS de ce lot (aussi rouges sur `origin/main`) : `audit-lbc-plus-vue-pause` (« MeilleuresSources déjà déclaré » dans la lecture de source), `audit-politique-hotes` (adresses de ClotureAnnee / RetirerAilleurs), `audit-annuler-commandes` D (« Vérifier avant impression »).
 
 ## Restes
 - Notification serveur quand AUCUN appareil n'est ouvert à l'heure (le cron du soir pourrait relire `vrm_repub_programme`) : pas fait.
