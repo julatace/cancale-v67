@@ -155,3 +155,14 @@ retours) sont des replis, pas des promesses. Qu'un compte en politiques de vente
 - Tête poussée à chaque étape (`claude/ebay-complet`). Banc route 55/55 (16/16 mutations, 29 rouges sur l'avant) ; banc de rendu `ebay-complet` 70/70 avant l'ajout L (argent) — relance en cours sur la file lourde (machine saturée), comparée à l'arbre d'avant (`/home/user/wt/ebay-avant`, build de f04d4a580).
 - Bancs eBay voisins : la fenêtre « 1re publication » interceptait leurs publications ⇒ ils posent `vrm_ebay_guide_vu` (le banc ebay-complet prouve la fenêtre). Résultats comparés avant/après : voir le compte rendu final.
 - **Fin de séance (21 h 20)** : la file lourde n'a donné AUCUN créneau en 2 h (36 attentes) ; ma relance (build + `ebay-complet` avec L + bancs voisins) et celle de l'arbre d'avant ont été arrêtées par la limite de temps, sans avoir tourné. **À FAIRE EN PREMIER** : `npm run build` puis `node scripts/bancs/ebay-complet.cjs` (attendu 74 verts : 70 + L), puis `ebay-comptes`, `ebay-photos-agent-arret`, `ebay-programmer`, `ebay-annonces`, `ebay-form`, `ebay-un-clic` — et les mêmes depuis l'arbre de f04d4a580 pour séparer l'hérité du nouveau. Mesuré avant la pose de `vrm_ebay_guide_vu` dans ces bancs : ebay-form 4 KO (sous-onglets introuvables), ebay-annonces 3, ebay-comptes 2, ebay-programmer 21, ebay-un-clic 2, ebay-photos-agent-arret 2 ; fil-unique vert. L'hérité connu : ebay-un-clic (navigation `tab=plat_ebay`, rouge sur 33200ec6 d'après l'historique), ebay-form.
+- **Relance faite (11 nov., soir)** — build vert. Ce lot / arbre d'avant f04d4a580, mêmes bancs :
+  | banc | ce lot | f04d4a580 | verdict |
+  |---|---|---|---|
+  | ebay-complet (L inclus) | **74/74** | 28 KO (2 OK) | nouveau, rouge sur l'avant |
+  | ebay-comptes | 0 KO | 0 KO | vert (la fenêtre 1re publication ne l'intercepte plus : `vrm_ebay_guide_vu` posé) |
+  | ebay-photos-agent-arret | 37/37 | 37/37 | vert (idem) |
+  | ebay-programmer | 21 KO | 21 KO | mêmes rouges, hérités (`?tab=plat_ebay` n'ouvre plus l'écran attendu) |
+  | ebay-annonces | 4 KO | 4 KO | mêmes rouges, hérités |
+  | ebay-form | 4 KO | 4 KO | mêmes rouges, hérités (sous-onglets introuvables) |
+  | ebay-un-clic | 2 KO | 2 KO | mêmes rouges, hérités |
+  Comparaison faite ligne à ligne (libellés des KO identiques). Aucun rouge apporté par ce lot.
