@@ -34,6 +34,8 @@ const PERMIS = [
   ['src/App.jsx', /^'\^\(\?:chaussures|^'\(taille\|pointure/, 'expression de lecture d’un titre (aucun texte affiché)'],
   ['src/App.jsx', /^'Chaussures( enfants)?'$/, 'catégorie Leboncoin (le nom du site), choisie seulement pour un article chaussure'],
   ['src/Accueil.jsx', /seulement pour les baskets \?/, 'la question de l’accueil, dont la réponse est « Non : tout article »'],
+  // (11 nov., lot traduction) La même question, déplacée dans les dictionnaires (clé `accueil.faq.baskets.q`).
+  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}.js`, /^"accueil\.faq\.baskets\.q"/, 'la question de l’accueil (traduite), dont la réponse est « tout article »', 'ligne']),
   ['src/ebayRecherche.jsx', /^(>Pointure<|"Pointure")$/, 'critère de recherche eBay (veille) : la donnée elle-même s’appelle pointure (2 chiffres)'],
   ['src/operations/Operations.jsx', /Pointure/, 'le même critère de veille eBay (Organisation, retirée du menu)'],
   ['src/operations/metier.js', /Pointure attendue/, 'la validation du critère de veille eBay'],
@@ -119,8 +121,9 @@ async function verifier(racine, { muet = false } = {}) {
         if ((/(?:sur|à) (?:le|son|leur|leurs|les|ton|tes) cartons?\b(?! (?:fermé|du colis|d’envoi))(?!, l’étagère)/i.test(s) || /^['"`](?:son|leur|leurs|ton|tes) cartons?['"`]$/.test(s)) && !/[Pp]hoto du carton/.test(s)) cartons.push(`${rel}:${i + 1} ${s.slice(0, 90)}`);
         if (!MOTS.test(s)) continue;
         if (/^['"`][a-z-]+['"`]$/.test(s)) continue;                    // une clé (« sneakers », « chaussures »), pas un texte
+        if (/^['"`][a-z][\w-]*(?:\.[\w-]+)+['"`]$/.test(s)) continue;     // (11 nov.) une clé de traduction (« accueil.faq.baskets.q »), pas un texte
         if (/(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)/.test(l)) continue;   // gardé par ce qu'il vend
-        if (PERMIS.some(([fi, re]) => fi === rel && re.test(s))) continue;
+        if (PERMIS.some(([fi, re, , parLigne]) => fi === rel && (parLigne ? re.test(l.trim()) : re.test(s)))) continue;
         hors.push(`${rel}:${i + 1} ${s.slice(0, 90)}`);
       }
     });

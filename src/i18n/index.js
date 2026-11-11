@@ -124,6 +124,9 @@ export const date = (d, opts = { day: 'numeric', month: 'long', year: 'numeric' 
 export const heure = (d, opts = { hour: '2-digit', minute: '2-digit' }) => { try { return new Intl.DateTimeFormat(localeCourante(), opts).format(enDate(d)); } catch (_) { return ''; } };
 export const dateRelative = (valeur, unite) => { try { return new Intl.RelativeTimeFormat(localeCourante(), { numeric: 'auto' }).format(valeur, unite); } catch (_) { return ''; } };
 
+// Une liste de noms jointe dans la langue (« A, B or C »), les noms eux-mêmes jamais traduits.
+export const listeDansLaLangue = (noms, l = langue) => { try { return new Intl.ListFormat(LOCALES[l] || l, { style: 'long', type: 'disjunction' }).format(noms); } catch (_) { return noms.join(', '); } };
+
 // ── t() ──────────────────────────────────────────────────────────────────────
 // `t('reglages.titre')` · `t('colis.n', { n: 3 })` (pluriel par `n`) ·
 // `{nom}` remplacé par la variable (un nombre est formaté dans la langue).

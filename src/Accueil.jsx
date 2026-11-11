@@ -24,6 +24,10 @@
 //    offert, contact) sont lus par scripts/audit-accueil-navigateurs.cjs et
 //    scripts/audit-lancement.cjs : ne pas les retirer.
 import React from 'react';
+// (11 nov., lot traduction) Les textes passent par `tr()` (src/i18n/index.js), la langue par `useLangue`.
+import { tr, listeDansLaLangue } from './i18n/index.js';
+import { useLangue } from './i18n/react.js';
+import ChoixLangue from './i18n/ChoixLangue.jsx';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, PRIX_PRO_MOIS, PRO_OUVERT, ESSAI_JOURS } from './accueil-reglages.js';
 // (9 nov.) Deux offres : Solo (un compte vendeur par plateforme + comptes d'achat) et Pro (les ventes de tous les comptes).
@@ -49,40 +53,20 @@ function Capture({ nom, alt, taille = TEL, paresseuse = true, prioritaire = fals
 }
 
 // ── Les quatre moments de la journée ────────────────────────────────────────
+// (11 nov., lot traduction) Les textes des moments vivent dans src/i18n/langues/*.js
+// (`accueil.moment.<id>.titre|texte|alt|point1|point2`) : ici, l'ordre et les captures.
 const MOMENTS = [
-  {
-    id: 'matin', capture: 'journee',
-    alt: 'L’écran Ma journée de VRM : le montant vendu aujourd’hui, la semaine, et la liste « À faire » — 1 colis à envoyer, 2 colis à retirer, 2 messages. Données d’exemple.',
-    titre: 'Chaque matin, le prochain geste.',
-    texte: 'Ma journée met en haut ce qui presse : le colis à envoyer avant sa date limite, les achats arrivés au relais, les messages qui attendent. Un bouton par geste.',
-    points: ['Tous tes comptes Vinted, Leboncoin et eBay dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
-  },
-  {
-    id: 'colis', capture: 'retirer',
-    alt: 'L’écran Colis de VRM, onglet « À retirer » : le point relais Le Fournil à Rennes, deux colis, et le code de retrait 582913 prêt à copier. Données d’exemple.',
-    titre: 'Tes colis, à envoyer comme à retirer.',
-    texte: 'Les bordereaux s’impriment d’un geste, tamponnés du titre et du numéro de la paire. Au relais, tes codes de retrait t’attendent, rangés par point, même sans réseau.',
-    points: ['Le code, le QR et le point relais de chaque achat.', '« J’ai retiré » le sort de la liste ; un colis douteux reste visible, jamais caché.'],
-  },
-  {
-    id: 'numeros', capture: 'numeros',
-    alt: 'L’écran Annonces de VRM : chaque paire en ligne porte son numéro de rangement en pastille noire, N°14, N°15, N°16, N°9. Données d’exemple.',
-    titre: 'Un numéro par paire. Jamais deux fois.',
-    texte: 'Chaque annonce reçoit un numéro de rangement : il dit où est l’article (carton, étagère, bac…). Une vente est reliée à sa paire par une identité — l’annonce, la photo, la transaction —, jamais par un titre qui se ressemble.',
-    points: ['Un numéro n’est jamais redonné à une autre paire.', 'Deux paires sous un même numéro : VRM te le dit, en rouge, tout de suite.'],
-  },
-  {
-    id: 'compta', capture: 'compta',
-    alt: 'L’écran Compta de VRM : « Déclarer octobre 2026, avant le 30 novembre », le chiffre d’affaires et les cotisations estimées à 12,4 %, puis « J’ai déclaré ». Données d’exemple.',
-    titre: 'Ta compta et l’URSSAF, sans tableur.',
-    texte: 'Le chiffre d’affaires mois par mois, daté au jour du versement, et ce qu’il faut recopier sur le site de l’URSSAF. Quand un prix d’achat manque, VRM écrit « au moins » plutôt qu’un faux total.',
-    points: ['Vendu et reçu, séparés : une vente compte quand l’argent arrive.', '« J’ai déclaré » : une vente notée ne se recompte jamais ailleurs.'],
-  },
+  { id: 'matin', capture: 'journee' },
+  { id: 'colis', capture: 'retirer' },
+  { id: 'numeros', capture: 'numeros' },
+  { id: 'compta', capture: 'compta' },
 ];
+const texteMoment = (m, champ) => tr(`accueil.moment.${m.id}.${champ}`);
+const pointsMoment = (m) => [texteMoment(m, 'point1'), texteMoment(m, 'point2')];
 
 const LEGAL = [
-  ['CGV', '/legal/cgv.html'], ['CGU', '/legal/cgu.html'], ['Confidentialité', '/legal/confidentialite.html'],
-  ['Mentions légales', '/legal/mentions-legales.html'], ['Cookies', '/legal/cookies.html'],
+  ['legal.cgv', '/legal/cgv.html'], ['legal.cgu', '/legal/cgu.html'], ['legal.confidentialite', '/legal/confidentialite.html'],
+  ['legal.mentions', '/legal/mentions-legales.html'], ['legal.cookies', '/legal/cookies.html'],
 ];
 
 const CSS = `
@@ -211,6 +195,7 @@ const CSS = `
 /* Le pied : la marque revient, puis les liens utiles. */
 .av-pied{background:var(--fond2);padding:56px 0 calc(40px + env(safe-area-inset-bottom));font-size:13px;color:var(--gris)}
 .av-pied .av-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:start}
+.av-pied .av-langue{grid-column:1/-1;justify-self:end;color:var(--gris);font-size:13px}
 .av-pied nav{display:flex;flex-wrap:wrap;gap:0 4px;justify-content:flex-end}
 .av-pied nav a,.av-pied nav span{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;text-decoration:none;color:var(--gris)}
 @media (hover:hover) and (pointer:fine){.av-pied nav a:hover{color:var(--encre);text-decoration:underline;text-underline-offset:3px}}
@@ -265,6 +250,7 @@ const CSS = `
 `;
 
 export default function Accueil({ onEntrer }) {
+  const langue = useLangue();
   const moins = useMoinsDeMouvement();
   const sansSouris = useSansSouris();
   // Le fond du DOCUMENT suit la page (sinon iOS peint un autre fond au rebond).
@@ -274,9 +260,9 @@ export default function Accueil({ onEntrer }) {
     const poser = () => { document.body.style.background = mq && mq.matches ? '#000000' : '#FFFFFF'; };
     try { mq = window.matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener && mq.addEventListener('change', poser); } catch (_) {}
     poser();
-    document.title = 'VRM — tes ventes, tes colis et ta compta, au même endroit';
+    document.title = tr('accueil.titrePage');
     return () => { try { mq && mq.removeEventListener && mq.removeEventListener('change', poser); } catch (_) {} document.body.style.background = avant; document.title = titre; };
-  }, []);
+  }, [langue]);
 
   // La barre : le fond dès 8 px ; « Créer mon compte » n'y paraît que quand le
   // bouton du haut est sorti de l'écran (un seul bouton principal à la fois).
@@ -338,12 +324,15 @@ export default function Accueil({ onEntrer }) {
   // ⚠️ Des fonctions qui RENDENT un bouton, pas des composants déclarés ici
   //    (un composant redéfini à chaque rendu perdrait le focus clavier).
   const creer = (extra) => (
-    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>Créer mon compte</a>
+    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>{tr('auth.bouton.creer')}</a>
   );
   const connexion = (extra) => (
-    <a href="/?connexion" className="av-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>Se connecter<span aria-hidden="true">›</span></a>
+    <a href="/?connexion" className="av-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>{tr('auth.titre.in')}<span aria-hidden="true">›</span></a>
   );
-  const ligneEssai = `${ESSAI_JOURS} jours d’essai gratuit`;
+  const ligneEssai = tr('accueil.essai', { n: ESSAI_JOURS });
+  // La liste des navigateurs : la phrase française de la règle (« … ou Vivaldi ») ; ailleurs, la
+  // même liste jointe dans la langue (Intl.ListFormat), les noms jamais traduits.
+  const navsOrdi = langue === 'fr' ? NAVS_ORDI : listeDansLaLangue(SERVIS.ordinateur, langue);
 
   return (
     <div className="av" data-accueil="">
@@ -351,19 +340,19 @@ export default function Accueil({ onEntrer }) {
       <div className="av-sentinelle" ref={sentinelle} />
       <header className={`av-nav${defile ? ' defile' : ''}`}>
         <div className="av-in">
-          <a className="av-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label="VRM — haut de la page">
+          <a className="av-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label={tr('accueil.hautDePage')}>
             <img className="vrm-brand-asset" src="/vrm-logo-v5-96.png" srcSet="/vrm-logo-v5-96.png 1x, /vrm-logo-v5-192.png 2x" alt="" width="28" height="28" />
             <b>VRM</b>
           </a>
-          <nav className="av-liens" aria-label="Sections">
-            <a href="#journee" onClick={vers('journee')}>Fonctions</a>
-            <a href="#prix" onClick={vers('prix')}>Prix</a>
-            <a href="#faq" onClick={vers('faq')}>Questions</a>
-            <a href="/aide">Aide</a>
+          <nav className="av-liens" aria-label={tr('accueil.nav.sections')}>
+            <a href="#journee" onClick={vers('journee')}>{tr('accueil.nav.fonctions')}</a>
+            <a href="#prix" onClick={vers('prix')}>{tr('accueil.nav.prix')}</a>
+            <a href="#faq" onClick={vers('faq')}>{tr('accueil.nav.questions')}</a>
+            <a href="/aide">{tr('accueil.nav.aide')}</a>
           </nav>
           <div className="av-droite">
-            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte</a>
-            <a href="/?connexion" className="av-lien" data-cta-nav="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>Se connecter</a>
+            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>{tr('auth.bouton.creer')}</a>
+            <a href="/?connexion" className="av-lien" data-cta-nav="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>{tr('auth.titre.in')}</a>
           </div>
         </div>
       </header>
@@ -371,37 +360,37 @@ export default function Accueil({ onEntrer }) {
       <main>
         <section className="av-hero" data-section="hero">
           <div className="av-in">
-            <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">Vinted, Leboncoin, eBay : VRM te dit chaque matin quoi faire, sans erreur de paire.</p>
+            <h1 className="av-h1" data-definition="">{tr('accueil.hero.titre')}</h1>
+            <p className="av-sous">{tr('accueil.hero.sous')}</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
             </div>
             <p className="av-prix-ligne" data-prix-ligne="">
-              {ACCES_OFFERT && <><span className="nw" data-acces-offert="">Gratuit pour l’instant</span>, puis </>}
-              <span className="nw"><b>{PRIX_MOIS}&nbsp;€</b> par mois</span> après <span className="nw" data-essai={ESSAI_JOURS}>{ligneEssai}</span> · <span className="nw">sans engagement</span>
+              {ACCES_OFFERT && <><span className="nw" data-acces-offert="">{tr('accueil.gratuit')}</span>{tr('accueil.prix.puis')}</>}
+              <span className="nw"><b>{PRIX_MOIS}&nbsp;€</b> {tr('accueil.prix.parMois')}</span> {tr('accueil.prix.apres')} <span className="nw" data-essai={ESSAI_JOURS}>{ligneEssai}</span> · <span className="nw">{tr('accueil.prix.sansEngagement')}</span>
             </p>
             {/* Ce qui est VRAI (1er et 5 nov.) : VRM lit Vinted par l'extension, dans le
                 navigateur de l'ordinateur ; le téléphone consulte et commande. Pas
                 « Chrome obligatoire » : la liste des navigateurs SERVIS. */}
             <div className="av-prereq" data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
               {sansSouris
-                ? `Crée ton compte ici, puis installe l’extension une fois sur ton ordinateur : ${NAVS_ORDI}.`
-                : `L’extension s’installe une fois sur ton ordinateur, dans ${NAVS_ORDI} — il reste nécessaire pour lire Vinted. Ton téléphone suit tout.`}
+                ? tr('accueil.prereq.tactile', { navigateurs: navsOrdi })
+                : tr('accueil.prereq.souris', { navigateurs: navsOrdi })}
             </div>
           </div>
           <figure className="av-scene" data-scene-haut="">
-            <span className="av-ecran-bureau"><Capture nom="bureau" taille={BUREAU} alt="Ma journée de VRM sur ordinateur : le menu à gauche, le montant vendu aujourd’hui au centre, et à droite « À faire » — 1 colis à envoyer, 2 colis à retirer, 2 messages, 6 prix à baisser. Données d’exemple." /></span>
-            <span className="av-tel"><Capture nom="journee" paresseuse={false} prioritaire alt="Ma journée de VRM sur iPhone : le montant vendu aujourd’hui, la semaine, puis « À faire ». Données d’exemple." /></span>
-            <figcaption className="av-legende">L’app VRM telle qu’elle est. Données d’exemple.</figcaption>
+            <span className="av-ecran-bureau"><Capture nom="bureau" taille={BUREAU} alt={tr('accueil.capture.bureau')} /></span>
+            <span className="av-tel"><Capture nom="journee" paresseuse={false} prioritaire alt={tr('accueil.capture.iphone')} /></span>
+            <figcaption className="av-legende">{tr('accueil.capture.legende')}</figcaption>
           </figure>
         </section>
 
         <section className="av-journee" id="journee" data-section="journee">
           <div className="av-in">
             <div className="av-journee-tete" data-reveil="">
-              <h2 className="av-h2">Ta journée de revendeur, en quatre moments.</h2>
-              <p className="av-chapo">Le matin, au relais, au stock, en fin de mois : ce qu’il y a à faire, rien de plus.</p>
+              <h2 className="av-h2">{tr('accueil.journee.titre')}</h2>
+              <p className="av-chapo">{tr('accueil.journee.chapo')}</p>
             </div>
             <div className="av-split">
               <div className="av-plateau" aria-hidden="true">
@@ -414,11 +403,11 @@ export default function Accueil({ onEntrer }) {
               <div>
                 {MOMENTS.map((m) => (
                   <article key={m.id} className="av-moment" data-moment={m.id} {...(actif === m.id ? { 'data-actif': '' } : {})}>
-                    <h3>{m.titre}</h3>
-                    <p>{m.texte}</p>
-                    <ul>{m.points.map((x) => <li key={x}>{x}</li>)}</ul>
+                    <h3>{texteMoment(m, 'titre')}</h3>
+                    <p>{texteMoment(m, 'texte')}</p>
+                    <ul>{pointsMoment(m).map((x) => <li key={x}>{x}</li>)}</ul>
                     {/* Le premier moment est déjà la capture du haut de page : pas deux fois. */}
-                    {m.id !== MOMENTS[0].id && <span className="av-tel av-tel-seul"><Capture nom={m.capture} alt={m.alt} /></span>}
+                    {m.id !== MOMENTS[0].id && <span className="av-tel av-tel-seul"><Capture nom={m.capture} alt={texteMoment(m, 'alt')} /></span>}
                   </article>
                 ))}
               </div>
@@ -429,27 +418,27 @@ export default function Accueil({ onEntrer }) {
         <section className="av-bande" id="comment" data-section="comment">
           <div className="av-in av-deux">
             <div className="av-conf" data-confiance="" data-reveil="">
-              <h2 className="av-h2">Tes comptes restent les tiens.</h2>
-              <p>VRM agit sur le compte ouvert, 50 actions/heure au plus. Jamais ton mot de passe Vinted.</p>
-              <p>Rien ne part sans toi. Éteints tant que tu ne les allumes pas :</p>
+              <h2 className="av-h2">{tr('accueil.confiance.titre')}</h2>
+              <p>{tr('accueil.confiance.1')}</p>
+              <p>{tr('accueil.confiance.2')}</p>
               <ul className="av-auto">
-                <li data-automatisme="">retirer d’eBay une annonce vendue ailleurs ;</li>
-                <li data-automatisme="">accepter une offre au-dessus de ton prix mini.</li>
+                <li data-automatisme="">{tr('accueil.confiance.auto1')}</li>
+                <li data-automatisme="">{tr('accueil.confiance.auto2')}</li>
               </ul>
-              <p>Messages aux favoris et republication : seulement si tu les lances.</p>
-              <p>Aucune suppression sans ta confirmation.</p>
-              <p>Tes données servent ta boutique : VRM ne vend rien, aucune publicité.</p>
+              <p>{tr('accueil.confiance.3')}</p>
+              <p>{tr('accueil.confiance.4')}</p>
+              <p>{tr('accueil.confiance.5')}</p>
             </div>
             <div data-reveil="">
-              <h2 className="av-h2" data-prerequis-ordinateur="">Prêt en trois étapes.</h2>
+              <h2 className="av-h2" data-prerequis-ordinateur="">{tr('accueil.etapes.titre')}</h2>
               <ol className="av-etapes">
-                <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un e-mail et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
-                <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p>{`Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}${EXTENSION_SUR_LE_STORE ? ', depuis le Chrome Web Store. Puis connecte-la' : '. VRM te guide pas à pas, puis tu la connectes'} avec le même e-mail.`}</p></div></li>
-                <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes : ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
+                <li><span className="n">1</span><div><h3>{tr('accueil.etape1.titre')}</h3><p>{tr('accueil.etape1.texte')}{ACCES_OFFERT && <span data-sans-carte="">{tr('accueil.etape1.sansCarte')}</span>}</p></div></li>
+                <li><span className="n">2</span><div><h3>{tr('accueil.etape2.titre')}</h3><p>{tr(EXTENSION_SUR_LE_STORE ? 'accueil.etape2.store' : 'accueil.etape2.guide', { navigateurs: navsOrdi })}</p></div></li>
+                <li><span className="n">3</span><div><h3>{tr('accueil.etape3.titre')}</h3><p>{tr('accueil.etape3.texte')}</p></div></li>
               </ol>
-              <p className="av-note" data-ordinateur-necessaire="">Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. </p>
-              <p className="av-note">Le téléphone consulte ; les actions passent par l’ordinateur allumé, navigateur ouvert.</p>
-              {SERVIS.essai.length > 0 && <p className="av-note" data-navigateurs-essai={SERVIS.essai.join(',')}>{SERVIS.essai.join(', ')} (Mac, iPhone) : en essai, lecture de Vinted pas encore confirmée. {SERVIS.pasEncore.join(', ')} : pas encore.</p>}
+              <p className="av-note" data-ordinateur-necessaire="">{tr('accueil.note.ordinateur')}</p>
+              <p className="av-note">{tr('accueil.note.telephone')}</p>
+              {SERVIS.essai.length > 0 && <p className="av-note" data-navigateurs-essai={SERVIS.essai.join(',')}>{tr('accueil.note.essai', { essai: SERVIS.essai.join(', '), pasEncore: SERVIS.pasEncore.join(', ') })}</p>}
             </div>
           </div>
         </section>
@@ -458,19 +447,21 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <div className="av-carte-prix" data-reveil="">
               <div>
-                <h2 className="av-h2">Deux offres. Tout VRM.</h2>
-                {ACCES_OFFERT && <span className="av-offert" data-acces-offert="">Gratuit pour l’instant</span>}
-                <div className="av-montant" data-prix="" data-offre="solo"><b>{PRIX_MOIS}&nbsp;€</b><span>par mois · {OFFRES.solo.nom}</span></div>
-                <div className="av-montant" data-prix-pro="" data-offre="pro"><b>{PRIX_PRO_MOIS}&nbsp;€</b><span>par mois · {OFFRES.pro.nom}{PRO_OUVERT ? '' : ' · bientôt'}</span></div>
+                <h2 className="av-h2">{tr('accueil.offres.titre')}</h2>
+                {ACCES_OFFERT && <span className="av-offert" data-acces-offert="">{tr('accueil.gratuit')}</span>}
+                <div className="av-montant" data-prix="" data-offre="solo"><b>{PRIX_MOIS}&nbsp;€</b><span>{tr('accueil.prix.parMois')} · {OFFRES.solo.nom}</span></div>
+                <div className="av-montant" data-prix-pro="" data-offre="pro"><b>{PRIX_PRO_MOIS}&nbsp;€</b><span>{tr('accueil.prix.parMois')} · {OFFRES.pro.nom}{PRO_OUVERT ? '' : tr('accueil.offres.bientot')}</span></div>
               </div>
               <div>
-                <p data-offre-phrase="solo"><b>{OFFRES.solo.nom}</b> : {OFFRES.solo.phrase}</p>
-                <p data-offre-phrase="pro"><b>{OFFRES.pro.nom}</b> : {OFFRES.pro.phrase}{PRO_OUVERT ? '' : ' Ouverture prochaine.'}</p>
-                <p>Toutes les fonctions, l’extension et l’app sur ton iPhone, dans les deux offres.</p>
-                <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>, une fois par e-mail et par compte Vinted. Sans engagement : tu résilies depuis l’app.</p>
+                {/* La phrase de chaque offre : en français, CELLE du serveur (OFFRES, api/_lib/plan-regle.js) ;
+                    ailleurs sa traduction (audit-traduction : la clé française = la phrase du serveur). */}
+                <p data-offre-phrase="solo"><b>{OFFRES.solo.nom}</b> : {langue === 'fr' ? OFFRES.solo.phrase : tr('accueil.offre.solo.phrase')}</p>
+                <p data-offre-phrase="pro"><b>{OFFRES.pro.nom}</b> : {langue === 'fr' ? OFFRES.pro.phrase : tr('accueil.offre.pro.phrase')}{PRO_OUVERT ? '' : tr('accueil.offres.ouverture')}</p>
+                <p>{tr('accueil.offres.toutes')}</p>
+                <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>{tr('accueil.offres.essai')}</p>
                 <p className="petit">
-                  {ACCES_OFFERT && 'Tant que l’abonnement n’est pas exigé, VRM reste gratuit. '}
-                  Aucun paiement sans que tu aies vu le prix et accepté les <a href="/legal/cgv.html">conditions générales de vente</a>.
+                  {ACCES_OFFERT && tr('accueil.offres.gratuit')}
+                  {tr('accueil.offres.paiement')}<a href="/legal/cgv.html">{tr('accueil.offres.cgv')}</a>.
                 </p>
                 {creer()}
               </div>
@@ -480,24 +471,24 @@ export default function Accueil({ onEntrer }) {
 
         <section className="av-faq" id="faq" data-section="faq" data-faq="">
           <div className="av-in av-faq-grille">
-            <h2 className="av-h2">Questions fréquentes</h2>
+            <h2 className="av-h2">{tr('accueil.faq.titre')}</h2>
             <div className="av-faq-texte">
-              <div className="av-faq-q"><b>Pourquoi une extension ?</b><p>Elle lit Vinted là où tu es connecté. Aucun mot de passe demandé. <a href="/aide/extension">L’installer</a>.</p></div>
-              <div className="av-faq-q"><b>Vinted peut-il bloquer mon compte à cause de VRM ?</b><p>Personne ne peut le garantir. VRM agit comme toi : une requête à la fois.</p><p>50 actions par heure au plus, pause si Vinted ralentit.</p></div>
-              <div className="av-faq-q"><b>Mes données sont-elles en sécurité ?</b><p>Aucun autre vendeur ne voit ta boutique. Double vérification possible.</p><p><a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p></div>
-              <div className="av-faq-q"><b>Comment j’arrête ?</b><p>Tu résilies depuis l’app : fin à la période payée, rien à payer pendant l’essai.</p><p>« Fermer mon compte » efface tes données.</p></div>
-              <div className="av-faq-q"><b>Et sur mon téléphone ?</b><p>Tout se consulte, codes de retrait même sans réseau, une notification par vente.</p><p>Les actions passent par ton ordinateur.</p></div>
-              <div className="av-faq-q"><b>J’ai plusieurs comptes Vinted.</b><p>C’est fait pour, chiffres séparés.</p><p>Solo : un compte vend par plateforme, les autres achètent.</p><p>Et avec Pro, tous tes comptes vendent, sans limite.</p></div>
-              <p><b>C’est seulement pour les baskets ?</b> Non : tout article (vêtements, sacs, livres…).</p>
-              {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> En cours : ses ventes n’entrent encore dans aucun total.</p>}
-              <p><b>Une autre question ?</b> <a href="/aide">L’aide</a> ; <a href="/statut">l’état du service</a>.</p>
+              <div className="av-faq-q"><b>{tr('accueil.faq.extension.q')}</b><p>{tr('accueil.faq.extension.r')}<a href="/aide/extension">{tr('accueil.faq.extension.lien')}</a>.</p></div>
+              <div className="av-faq-q"><b>{tr('accueil.faq.blocage.q')}</b><p>{tr('accueil.faq.blocage.r1')}</p><p>{tr('accueil.faq.blocage.r2')}</p></div>
+              <div className="av-faq-q"><b>{tr('accueil.faq.securite.q')}</b><p>{tr('accueil.faq.securite.r1')}</p><p><a href="/legal/confidentialite.html">{tr('accueil.faq.securite.lien')}</a>.</p></div>
+              <div className="av-faq-q"><b>{tr('accueil.faq.arret.q')}</b><p>{tr('accueil.faq.arret.r1')}</p><p>{tr('accueil.faq.arret.r2')}</p></div>
+              <div className="av-faq-q"><b>{tr('accueil.faq.telephone.q')}</b><p>{tr('accueil.faq.telephone.r1')}</p><p>{tr('accueil.faq.telephone.r2')}</p></div>
+              <div className="av-faq-q"><b>{tr('accueil.faq.comptes.q')}</b><p>{tr('accueil.faq.comptes.r1')}</p><p>{tr('accueil.faq.comptes.r2')}</p><p>{tr('accueil.faq.comptes.r3')}</p></div>
+              <p><b>{tr('accueil.faq.baskets.q')}</b> {tr('accueil.faq.baskets.r')}</p>
+              {!VESTIAIRE_BRANCHE && <p><b>{tr('accueil.faq.vestiaire.q')}</b> {tr('accueil.faq.vestiaire.r')}</p>}
+              <p><b>{tr('accueil.faq.autre.q')}</b> <a href="/aide">{tr('accueil.faq.autre.aide')}</a> ; <a href="/statut">{tr('accueil.faq.autre.statut')}</a>.</p>
             </div>
           </div>
         </section>
 
         <section className="av-fin" data-section="fin">
           <div className="av-in" data-reveil="">
-            <p>Demain matin, tu sauras quoi poster, quoi retirer et quoi déclarer.</p>
+            <p>{tr('accueil.fin')}</p>
             <div className="av-actions">
               {creer()}
               {connexion()}
@@ -510,17 +501,19 @@ export default function Accueil({ onEntrer }) {
         <div className="av-in">
           <div>
             <span className="marque">VRM</span>
-            <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
+            <span>© {new Date().getFullYear()} VRM · {tr('accueil.pied.affiliation')}</span>
           </div>
-          <nav aria-label="Informations">
-            <a href="/aide">Aide</a>
-            <a href="/statut" data-statut="">État du service</a>
-            {LEGAL.map(([l, h]) => <a key={h} href={h}>{l}</a>)}
+          <nav aria-label={tr('accueil.pied.informations')}>
+            <a href="/aide">{tr('accueil.nav.aide')}</a>
+            <a href="/statut" data-statut="">{tr('accueil.pied.statut')}</a>
+            {LEGAL.map(([l, h]) => <a key={h} href={h}>{tr(l)}</a>)}
             {/* CONTACT — une seule source (src/contact.js) ; vide ⇒ on le DIT (§2.3). */}
             {contactEmail()
-              ? <a data-contact="" href={`mailto:${contactEmail()}`}>Contact</a>
-              : <span data-contact="" data-contact-absent="">Contact : {CONTACT_A_VENIR}</span>}
+              ? <a data-contact="" href={`mailto:${contactEmail()}`}>{tr('accueil.pied.contact')}</a>
+              : <span data-contact="" data-contact-absent="">{tr('accueil.pied.contact')} : {CONTACT_A_VENIR}</span>}
           </nav>
+          {/* (11 nov., lot traduction) La langue de la page : celle du navigateur par défaut, ou choisie ici. */}
+          <ChoixLangue className="av-langue" />
         </div>
       </footer>
     </div>

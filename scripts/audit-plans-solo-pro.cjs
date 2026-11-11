@@ -519,7 +519,7 @@ const MUTATIONS = [
     const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
     dit(/un compte vendeur par plateforme<\/b> \(un compte Vinted, un compte Leboncoin, un compte eBay et un compte Vestiaire Collective\)/.test(cgv) && /plateforme par plateforme/.test(cgv) && /colis à envoyer restent affichés/.test(cgv),
       'CGV : « un compte vendeur par plateforme » (Vinted, Leboncoin, eBay, Vestiaire), 30 jours par plateforme, colis gardés');
-    dit(/^Un compte vendeur par plateforme \(un Vinted, un Leboncoin, un eBay, un Vestiaire\)/.test(R.OFFRES.solo.phrase) && /un compte vend (?:sur chaque|par) plateforme/.test(lire('src/Accueil.jsx')),
+    dit(/^Un compte vendeur par plateforme \(un Vinted, un Leboncoin, un eBay, un Vestiaire\)/.test(R.OFFRES.solo.phrase) && /un compte vend (?:sur chaque|par) plateforme/.test(lire('src/Accueil.jsx') + lire('src/i18n/langues/fr.js')),
       'l’offre Solo dit la même chose dans l’app, sur l’accueil et dans Paramètres (une phrase, `OFFRES.solo`)');
   });
 
@@ -559,7 +559,8 @@ const MUTATIONS = [
     const hors = Array.from({ length: 50 }, (_, i) => String(2000 + i)).filter((u) => P.venteHorsPlanUid(u)).length;
     dit(P.signaturePlan() === 'libre' && hors === 0 && !mem['vrm_plan_regle_uid-banc-pro'], 'app : Pro (même avec une liste reçue) ⇒ 50 comptes Vinted, aucun écarté, rien gardé sur l’appareil', `${P.signaturePlan()} · ${hors}`);
     const plans = sansCommentaires(lire('src/abonnement/PlansSoloPro.jsx')), reg = sansCommentaires(lire('src/ecrans/Reglages.jsx')), app = sansCommentaires(lire('src/App.jsx'));
-    const acc = lire('src/Accueil.jsx'), cgv = lire('public/legal/cgv.html');
+    // (11 nov., lot traduction) Les phrases de l'accueil vivent aussi dans le dictionnaire français.
+    const acc = lire('src/Accueil.jsx') + lire('src/i18n/langues/fr.js'), cgv = lire('public/legal/cgv.html');
     const traces = [[/QuelsComptesPro|data-quels-comptes-pro|Quels 10 comptes/, plans + app], [/comptes vendeurs`|data-comptes-pro|proLimite|MAX_VENDEURS_PRO/, reg + app], [/10 comptes vendeurs|10 comptes vendent|hors de tes 10/, plans + reg + app + acc]]
       .filter(([re, t]) => re.test(t)).map(([re]) => String(re));
     dit(traces.length === 0, 'écrans : ni feuille « Quels 10 comptes vendent ? », ni rangée « Tes 10 comptes vendeurs », ni « hors de tes 10 »', traces.join(' · '));

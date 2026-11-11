@@ -29,17 +29,19 @@ const R = path.join(__dirname, '..');
 
 if (process.argv.includes('--prouve')) {
   const NAV = path.join(R, 'src', 'navigateursServis.js');   // la règle (ré-exportée par navigateurExtension.js)
-  const ACC = path.join(R, 'src', 'Accueil.jsx');
+  const ACC = path.join(R, 'src', 'Accueil.jsx');   // eslint-disable-line no-unused-vars
+  const FR = path.join(R, 'src', 'i18n', 'langues', 'fr.js');
   const MUTS = [
     ['Orion promis comme Chrome', NAV, "ordinateur: [...NAVIGATEURS_CHROMIUM, ...(firefox ? ['Firefox'] : [])],", "ordinateur: [...NAVIGATEURS_CHROMIUM, 'Orion', ...(firefox ? ['Firefox'] : [])],"],
     ['Firefox promis sans fiche', NAV, "...(firefox ? ['Firefox'] : [])],", "'Firefox'],"],
     ['téléphone promis', NAV, 'lectureTelephone: false,', 'lectureTelephone: true,'],
     ['Edge oublié', NAV, "['Chrome', 'Edge', 'Brave', 'Opera', 'Vivaldi'];", "['Chrome', 'Brave', 'Opera', 'Vivaldi'];"],
-    ['« dans Chrome » remis (à la souris)', ACC, '`S’installe une fois sur ton ordinateur, dans ${NAVS_ORDI} — il reste', '`S’installe une fois dans Chrome, sur ton ordinateur — il reste'],
-    ['« dans Chrome » remis (au doigt)', ACC, 'installe l’extension une fois sur ton ordinateur : ${NAVS_ORDI}.`', 'installe l’extension une fois dans Chrome sur ordinateur.`'],
-    ['« ordinateur nécessaire » retiré', ACC, 'Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. ', ''],
-    ['Orion sans « en essai »', ACC, ': en essai, lecture de Vinted pas encore confirmée.', ': il marche aussi.'],
-    ['« Chrome ouvert » remis', ACC, 'allumé, navigateur ouvert.</p>', 'allumé, Chrome ouvert.</p>'],
+    // (11 nov., lot traduction) Les phrases de la page vivent dans le dictionnaire français.
+    ['« dans Chrome » remis (à la souris)', FR, 'L’extension s’installe une fois sur ton ordinateur, dans {navigateurs} — il reste', 'L’extension s’installe une fois dans Chrome, sur ton ordinateur — il reste'],
+    ['« dans Chrome » remis (au doigt)', FR, 'installe l’extension une fois sur ton ordinateur : {navigateurs}.', 'installe l’extension une fois dans Chrome sur ordinateur.'],
+    ['« ordinateur nécessaire » retiré', FR, 'Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. ', ''],
+    ['Orion sans « en essai »', FR, ': en essai, lecture de Vinted pas encore confirmée.', ': il marche aussi.'],
+    ['« Chrome ouvert » remis', FR, 'allumé, navigateur ouvert.', 'allumé, Chrome ouvert.'],
   ];
   let rouges = 0;
   const origines = new Map();
