@@ -54,7 +54,7 @@
 .vrm-oa-seuil { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-oa-seuil-mot { font-size: 12px; font-weight: 600; color: var(--w-gris, var(--vrm-muted)); }
 .vrm-oa-seuil-champ { display: flex; align-items: center; gap: 4px; min-height: 44px; border-radius: 12px; padding: 0 10px; background: var(--w-remplir, var(--vrm-card2)); box-sizing: border-box; }
-html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; width: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--w-encre, var(--vrm-ink)); outline: none; min-height: 40px !important; height: 40px; padding: 0 !important; margin: 0; }
+html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; width: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--w-encre, var(--vrm-ink)); outline: none; min-height: 44px !important; height: 44px; padding: 0 !important; margin: 0; }
 .vrm-oa-seuil-champ span { color: var(--w-gris, var(--vrm-muted)); font-size: 14px; }
 .vrm-oa-seuil-champ:focus-within { box-shadow: 0 0 0 2px var(--w-accent, var(--vrm-accent)); }
 .vrm-oa-paire[data-oa-incoherent] .vrm-oa-paire-nom .vrm-oa-muet { color: var(--vrm-warn, #B25E09); }
@@ -77,5 +77,5 @@ html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; widt
 /* Dans la couche de la direction artistique : un `!important` posé en couche y gagne contre
    celui d'un fichier hors couche — le champ du seuil reste UN champ (pas un champ dans un champ). */
 @layer vrm-premium {
-  :root:root body .vrm-app-shell .vrm-oa .vrm-oa-seuil-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 40px !important; }
+  :root:root body .vrm-app-shell .vrm-oa .vrm-oa-seuil-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 44px !important; height: 44px; }
 }
