@@ -362,6 +362,7 @@
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
       if (!listeConnue(obj, arr)) { post({ kind: 'vcannonces', items: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
       post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme, complet: lotComplet('annonces', u, total, items.map((x) => x.id)), moi: moiId });
+      retenirPrixVus(url, items);
     } catch (_) {}
   }
   // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie
@@ -1356,6 +1357,184 @@
     } finally { offreEnCours = false; }
   }); } catch (_) {}
 
+  // ── 5.364 (11 nov., Julien : « baisser le prix en série sur Vestiaire, sur mon
+  //    clic ») — LE PRIX D'UNE ANNONCE. La requête qui change un prix n'a JAMAIS été
+  //    vue chez lui (mesuré le 11 nov. : `vc_recon.chemins` ne porte aucune
+  //    écriture sur un article publié). Elle s'APPREND, comme les offres, de SON
+  //    geste fait à la main sur vestiairecollective.com : une écriture 2xx dont le
+  //    chemin ou le corps porte un article que CETTE page a montré dans « Mes
+  //    articles », et dont le corps porte UN prix différent de celui lu. La recette
+  //    n'est « apprise » qu'une fois le NOUVEAU prix RELU (dans la réponse, ou dans
+  //    « Mes articles » relu ensuite) : un prix mal compris (euros pris pour des
+  //    centimes) ne devient jamais rejouable. Jamais une valeur d'en-tête.
+  const annoncesVuesPrix = new Map();   // productId → { cents, url } — mémoire de la page
+  const prixEnAttente = new Map();      // productId → { cents, recette, at }
+  const PAS_PRIX = /negotiation|deposit|draft|like|favorite|favourite|notification|chat|search|recommend|cart|basket|order|session|reconciliation|photo|picture|message|conversation|follow|report/i;
+  const CLE_PRIX_ECRIT = /price|prix|amount|cents/i;
+  const centsFiche = (fi) => (fi && fi.prix && typeof fi.prix.valeur === 'number' && isFinite(fi.prix.valeur) && /price/i.test(String(fi.prix.cle || '')) && (!fi.prix.devise || fi.prix.devise === 'EUR') ? Math.round(fi.prix.valeur * 100) : null);
+  function retenirPrixVus(url, items) {
+    for (const x of items) {
+      if (!x || !/^\d{3,15}$/.test(String(x.id || ''))) continue;
+      const c = centsFiche({ prix: x.prix });
+      if (c == null) continue;
+      annoncesVuesPrix.set(String(x.id), { cents: c, url: String(url).slice(0, 600) });
+      if (annoncesVuesPrix.size > 600) annoncesVuesPrix.delete(annoncesVuesPrix.keys().next().value);
+      // Le nouveau prix RELU dans « Mes articles » ⇒ la recette en attente est apprise.
+      const att = prixEnAttente.get(String(x.id));
+      if (att && att.cents === c && Date.now() - att.at < 15 * 60000) { prixEnAttente.delete(String(x.id)); post({ kind: 'vcprixappris', recette: Object.assign({}, att.recette, { relu: 'liste' }) }); }
+    }
+  }
+  // Le prix d'un article dans une réponse (l'article lui-même, ou une liste qui le porte).
+  function centsDansReponse(obj, pid) {
+    try {
+      const cand = [];
+      const d = obj && obj.data !== undefined ? obj.data : obj;
+      if (Array.isArray(d)) cand.push(...d.map(deplier)); else if (d && typeof d === 'object') cand.push(deplier(d));
+      for (const e of cand) {
+        if (!e || typeof e !== 'object') continue;
+        const id = String(e.id != null ? e.id : (e.productId != null ? e.productId : (e.product && e.product.id != null ? e.product.id : '')));
+        if (id !== pid) continue;
+        const c = centsFiche(ficheAnnonce(e));
+        if (c != null) return c;
+      }
+    } catch (_) {}
+    return null;
+  }
+  function recettePrix(url, methode, corps, entetes) {
+    let u; try { u = new URL(url, location.origin); } catch (_) { return null; }
+    if (!DE_VC(url) || !/^(POST|PUT|PATCH)$/i.test(String(methode || '')) || PAS_PRIX.test(u.pathname)) return null;
+    if (typeof corps !== 'string' || !corps) return null;
+    let c; try { c = JSON.parse(corps); } catch (_) { return null; }
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
+    // L'article : un segment du chemin, sinon une valeur du corps, que CETTE page a montré.
+    const segs = u.pathname.split('/');
+    let pid = segs.find((s) => /^\d{3,15}$/.test(s) && annoncesVuesPrix.has(s)) || '';
+    const feuilles = []; let tableau = false;
+    const marche = (v, ch) => {
+      if (ch.length > 4 || Array.isArray(v)) { tableau = true; return; }
+      if (v && typeof v === 'object') { for (const k of Object.keys(v).slice(0, 30)) marche(v[k], ch.concat(k)); return; }
+      feuilles.push([ch, v]);
+    };
+    marche(c, []);
+    if (!pid) { const f = feuilles.find(([, v]) => (typeof v === 'string' || typeof v === 'number') && annoncesVuesPrix.has(String(v))); if (f) pid = String(f[1]); }
+    if (!pid) return null;                               // pas une annonce que la page a montrée : rien à apprendre
+    const avant = annoncesVuesPrix.get(pid).cents;
+    const base = { methode: String(methode).toUpperCase(), hote: u.hostname, chemin: normChemin(sansId(u.pathname)) };
+    const non = (raison) => ({ recette: { ...base, rejouable: false, raison }, pid, cents: null });
+    if (tableau) return non('corps-tableau');
+    const modeleSegs = [];
+    for (const s of segs) {
+      if (s === pid) { modeleSegs.push('{produit}'); continue; }
+      if (/\d{3,}/.test(s)) return non('chemin-ambigu');
+      modeleSegs.push(s);
+    }
+    if (u.search && /\d{3,}|@/.test(u.search)) return non('adresse-a-parametres');
+    const fixes = []; let cents = null, nPrix = 0;
+    for (const [ch, v] of feuilles) {
+      const cles = ch.map((k) => cleSure(k));
+      if (cles.includes('{k}')) return non('cle-illisible');
+      if ((typeof v === 'string' || typeof v === 'number') && String(v) === pid) { fixes.push([cles, '{produit}', typeof v]); continue; }
+      const chemin = ch.join('.');
+      const nombre = typeof v === 'number' ? v : (typeof v === 'string' && /^\d{1,7}([.,]\d{1,2})?$/.test(v) ? Number(v.replace(',', '.')) : null);
+      if (nombre != null && isFinite(nombre) && CLE_PRIX_ECRIT.test(chemin)) {
+        const enCents = /cents/i.test(chemin) ? (Number.isInteger(nombre) ? nombre : null) : Math.round(nombre * 100);
+        if (enCents == null || !(enCents > 0)) return non('prix-illisible');
+        nPrix++; cents = enCents;
+        fixes.push([cles, /cents/i.test(chemin) ? '{prixCents}' : '{prix}', typeof v]);
+        continue;
+      }
+      if (typeof v === 'boolean' || v === null) { fixes.push([cles, v, typeof v]); continue; }
+      if (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)) { fixes.push([cles, v, 'string']); continue; }
+      return non('valeur-inconnue');
+    }
+    if (nPrix !== 1) return nPrix ? non('plusieurs-prix') : null;
+    if (cents === avant) return null;                     // pas un changement de prix
+    const noms = Object.keys(nomsEntetes(entetes)).filter((k) => !ENTETES_INTERDITS.test(k)).slice(0, 20);
+    return { recette: { ...base, rejouable: true, raison: '', modele: modeleSegs.join('/'), recherche: u.search || '', fixes, entetes: noms }, pid, cents };
+  }
+  function notePrixManuel(url, methode, statut, corps, entetes, texte) {
+    try {
+      if (!(statut >= 200 && statut < 300) || prixVcEnCours) return;
+      const r = recettePrix(url, methode, corps, entetes);
+      if (!r) return;
+      if (!r.recette.rejouable) { post({ kind: 'vcprixappris', recette: r.recette }); return; }
+      // Le nouveau prix relu dans la RÉPONSE ⇒ appris tout de suite ; sinon en attente de « Mes articles ».
+      let lu = null; try { lu = texte ? centsDansReponse(JSON.parse(texte), r.pid) : null; } catch (_) { lu = null; }
+      if (lu === r.cents) { post({ kind: 'vcprixappris', recette: Object.assign({}, r.recette, { relu: 'reponse' }) }); return; }
+      prixEnAttente.set(r.pid, { cents: r.cents, recette: r.recette, at: Date.now() });
+      post({ kind: 'vcprixappris', recette: Object.assign({}, r.recette, { rejouable: false, raison: 'pas-encore-relu' }) });
+    } catch (_) {}
+  }
+  // ── BAISSER UN PRIX, SUR SON CLIC (l'ordre vient du fond par vc.js) ──
+  let prixVcEnCours = false;
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'prix') return;
+    const jeton = String(d.jeton || ''), produit = String(d.produit || '');
+    const r = d.recette;
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'vcprixresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
+    const avant = Number(d.avantCents), apres = Number(d.apresCents);
+    if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(apres) || !(apres >= 100) || !(apres < avant)) return fin({ statut: 0, erreur: 'invalide' });
+    if (!r || r.rejouable !== true || !/^(POST|PUT|PATCH)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
+      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
+    if (prixVcEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
+    // Le prix LU AVANT, dans cette page : celui que tu as vu dans l'aperçu, sinon rien ne part.
+    const vu = annoncesVuesPrix.get(produit);
+    if (!vu) return fin({ statut: 0, erreur: 'annonce-non-vue' });
+    if (vu.cents !== avant) return fin({ statut: 0, erreur: 'prix-change', prixVuCents: vu.cents });
+    const h = {};
+    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
+      const k = String(n).toLowerCase();
+      if (ENTETES_INTERDITS.test(k)) continue;
+      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
+      h[k] = entetesApi[k];
+    }
+    h.accept = h.accept || 'application/json';
+    const corps = {};
+    try {
+      for (const [ch, v, t] of r.fixes) {
+        let x = v;
+        if (v === '{prixCents}') x = t === 'string' ? String(apres) : apres;
+        else if (v === '{prix}') x = t === 'number' ? apres / 100 : (apres % 100 ? (apres / 100).toFixed(2) : String(apres / 100));
+        else if (v === '{produit}') x = t === 'number' ? Number(produit) : produit;
+        poser(corps, ch.map(String), x);
+      }
+    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
+    h['content-type'] = 'application/json';
+    const adresse = 'https://' + r.hote + r.modele.split('{produit}').join(encodeURIComponent(produit)) + (/^\?[\w=&.%:-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
+    prixVcEnCours = true;
+    try {
+      let statut = 0, rep = '', erreur = '';
+      try {
+        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
+        statut = Number(res.status) || 0;
+        try { rep = String(await res.text()).slice(0, 400000); } catch (_) {}
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      // RELIRE APRÈS : la réponse si elle porte l'article, sinon « Mes articles » relu (la même adresse que la page).
+      let prixVuCents = null, relu = '';
+      if (statut >= 200 && statut < 300) {
+        try { prixVuCents = rep ? centsDansReponse(JSON.parse(rep), produit) : null; if (prixVuCents != null) relu = 'reponse'; } catch (_) {}
+        if (prixVuCents == null && vu.url) {
+          try {
+            const hl = Object.assign({}, h); delete hl['content-type'];
+            const res2 = await origFetch.call(window, vu.url, { method: 'GET', credentials: 'include', headers: hl });
+            if (res2.status >= 200 && res2.status < 300) {
+              const t2 = String(await res2.text());
+              noteAnnonces(vu.url, t2);
+              prixVuCents = centsDansReponse(JSON.parse(t2), produit);
+              if (prixVuCents != null) relu = 'liste';
+            }
+          } catch (_) {}
+        }
+        if (prixVuCents != null) annoncesVuesPrix.set(produit, { cents: prixVuCents, url: vu.url });
+      }
+      fin({ statut, prixVuCents, relu, erreur });
+    } finally { prixVcEnCours = false; }
+  }); } catch (_) {}
+
   // ⛔ 5.323 (6 nov., Julien : « coupe la capture Vestiaire ») — LA CAPTURE BRUTE
   //    DE LA 5.315 EST RETIRÉE. Elle envoyait au fond la réponse JSON ENTIÈRE de
   //    chaque appel Vestiaire, les données de page (`__NEXT_DATA__`) et tout PDF
@@ -1383,7 +1562,9 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
             if (DE_STREAM(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => noteStream(url, meth, res.status, t)).catch(() => {});
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            // 5.364 : TON changement de prix à la main (réponse JSON ou non) ⇒ la recette du prix.
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(meth)) && !/json/i.test(String(ct || ''))) notePrixManuel(url, meth, res.status, corpsEnvoye, ent, '');
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1408,6 +1589,7 @@
             try { t = this.responseType === 'json' ? (this.response == null ? null : JSON.stringify(this.response)) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null; } catch (_) { t = null; }
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
+            if (DE_VC(url) && this.status >= 200 && this.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) notePrixManuel(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t && /json/i.test(String(ct || '')) ? t : '');
             if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });

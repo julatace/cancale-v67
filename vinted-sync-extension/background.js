@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.344.0';
+const CODE_VERSION = '5.364.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3800,13 +3800,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.319 : tes OFFRES Vestiaire et la recette d'une réponse faite par toi sur la page.
-    if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcOffres' || msg.action === 'vcOffreAppris')) {
+    if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcOffres' || msg.action === 'vcOffreAppris' || msg.action === 'vcPrixAppris')) {
       (async () => {
         try {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           let ok = false;
           if (msg.action === 'vcOffres') { ok = await rangerVcOffres(msg, await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi)); await noterVcCapte('offres', ok === true, Array.isArray(msg.offres) ? msg.offres.length : 0, Array.isArray(msg.inconnu) ? { inconnu: true } : null); }
+          else if (msg.action === 'vcPrixAppris') ok = await noterRecettePrixVc(msg.recette);
           else ok = await noterRecetteOffreVc(msg.recette);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -13939,7 +13940,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, vcPrix: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
@@ -14291,6 +14292,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
   // 4 nov. (5.319) : répondre à UNE offre Vestiaire, sur son clic (voir `repondreOffreVestiaire`).
   if (msg && msg.cmd === 'vcOffre') return await repondreOffreVestiaire(msg);
+  // 11 nov. (5.364) : baisser UN prix Vestiaire, sur son clic (voir `baisserPrixVestiaire`).
+  if (msg && msg.cmd === 'vcPrix') return await baisserPrixVestiaire(msg);
   // 3 nov. (5.318) : répondre dans UNE conversation Leboncoin, sur son clic (voir `repondreLeboncoin`).
   if (msg && msg.cmd === 'lbcRepondre') return await repondreLeboncoin(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
@@ -18492,6 +18495,123 @@ async function repondreOffreVestiaire(msg) {
       return { accepte: true, etape: 'fait', statut };
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — ta réponse n'est pas partie` };
+  } finally { VC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VESTIAIRE : BAISSER UN PRIX, SUR SON CLIC (11 novembre, 5.364)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « baisser le prix en série sur Vestiaire, sur mon clic, prix lu avant
+// et relu après, compte de l'onglet, plafonds — seulement si la recette est
+// APPRISE de mon propre geste ». La requête qui change un prix n'a jamais été vue
+// chez lui (vc_recon, 11 nov.) : vc-inject.js l'apprend de SON changement de prix
+// fait à la main (`recettePrix`), et ne la dit « apprise » qu'une fois le nouveau
+// prix RELU par Vestiaire. Ici :
+//  · `vrmVcRecettePrix` + `vc_prix_recette` (appris / raison / dernier essai —
+//    jamais une valeur d'en-tête) ;
+//  · `baisserPrixVestiaire` : une action Vestiaire à la fois (`VC_REPONSE_EN_VOL`),
+//    pause 429/403 (`vrmPauseVc`), recette apprise, annonce LUE (vc_listings) au
+//    prix vu dans l'aperçu (sinon rien), compte de l'annonce connu et ouvert dans
+//    l'onglet, 45/h (`RESERVE_GESTES` gardée pour les gestes sur clic ailleurs),
+//    place rendue si rien n'est parti, « fait » seulement au prix RELU.
+const VC_RECETTE_PRIX = 'vrmVcRecettePrix';
+function nettoyerRecettePrixVc(r) {
+  if (!r || typeof r !== 'object') return null;
+  const base = { methode: /^(POST|PUT|PATCH)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*vestiairecollective\.com$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
+  if (!base.methode || !base.hote) return null;
+  if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
+  const cleOk = (k) => /^[A-Za-z_][\w-]{0,40}$/.test(String(k));
+  const TROUS = ['{produit}', '{prixCents}', '{prix}'];
+  const modele = String(r.modele || '');
+  const sansTrous = TROUS.reduce((t, k) => t.split(k).join(''), modele);
+  if (!/^\/[\w\-/{}.]*$/.test(modele) || /\d{3,}|[{}]/.test(sansTrous) || /\{prix/.test(modele)) return { ...base, rejouable: false, raison: 'modele' };
+  const fixes = [];
+  for (const f of (Array.isArray(r.fixes) ? r.fixes.slice(0, 20) : [])) {
+    if (!Array.isArray(f) || !Array.isArray(f[0]) || !f[0].length || f[0].length > 5 || !f[0].every(cleOk)) return { ...base, rejouable: false, raison: 'fixes' };
+    const v = f[1];
+    if (!(TROUS.includes(v) || v === null || typeof v === 'boolean' || (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)))) return { ...base, rejouable: false, raison: 'fixes' };
+    fixes.push([f[0].map(String), v, ['string', 'number', 'boolean', 'object'].includes(f[2]) ? f[2] : 'string']);
+  }
+  const vise = (k) => modele.includes(k) || fixes.some((x) => x[1] === k);
+  if (!vise('{produit}')) return { ...base, rejouable: false, raison: 'article-introuvable' };
+  if (fixes.filter((x) => x[1] === '{prixCents}' || x[1] === '{prix}').length !== 1) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+  const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
+  const recherche = /^\?[\w=&.%:-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
+  return { ...base, rejouable: true, raison: '', modele, recherche, fixes, entetes, relu: /^(reponse|liste)$/.test(String(r.relu || '')) ? String(r.relu) : '' };
+}
+async function noterRecettePrixVc(brute) {
+  const r = nettoyerRecettePrixVc(brute);
+  if (!r) return false;
+  const at = new Date().toISOString();
+  let avant = null;
+  try { avant = (await chrome.storage.local.get(VC_RECETTE_PRIX))[VC_RECETTE_PRIX] || null; } catch (_) { return false; }
+  // Une recette rejouable n'est jamais remplacée par un essai qui ne l'est pas : il est NOTÉ à côté.
+  const garde = r.rejouable ? r : (avant && avant.recette && avant.recette.rejouable ? avant.recette : r);
+  const e = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '' } };
+  try { await chrome.storage.local.set({ [VC_RECETTE_PRIX]: e }); } catch (_) { return false; }
+  const pourApp = { appris: garde.rejouable === true, raison: garde.rejouable ? '' : String(garde.raison || ''), at: e.at, dernierEssai: e.dernierEssai, ver: CODE_VERSION };
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_prix_recette', data: pourApp }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+const centsPrixVc = (p) => (p && typeof p.valeur === 'number' && isFinite(p.valeur) && /price/i.test(String(p.cle || '')) && (!p.devise || p.devise === 'EUR') ? Math.round(p.valeur * 100) : null);
+async function baisserPrixVestiaire(msg) {
+  const produit = String((msg && msg.produit) || '');
+  const avant = Number(msg && msg.avantCents), apres = Number(msg && msg.apresCents);
+  if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(apres) || !(apres >= 100) || !(apres < avant) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou prix invalide (le nouveau prix doit être sous l’ancien, 1 € au moins)' };
+  if (VC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action Vestiaire part en ce moment — une à la fois' };
+  VC_REPONSE_EN_VOL = true;
+  try {
+    const pause = await pauseVc();
+    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let e;
+    try { e = (await chrome.storage.local.get(VC_RECETTE_PRIX))[VC_RECETTE_PRIX] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = e && e.recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu un changement de prix sur Vestiaire — change UNE fois un prix toi-même sur vestiairecollective.com, dans ce Chrome : VRM apprendra" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Vestiaire change un prix n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — change-le sur Vestiaire, rien n'est parti` };
+    const rows = await sbGet('app_data?id=eq.vc_listings&select=items:data->items');
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+    const items = rows && rows[0] && rows[0].items && typeof rows[0].items === 'object' ? rows[0].items : {};
+    const it = items[produit];
+    if (!it || typeof it !== 'object') return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cette annonce — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    const lu = centsPrixVc(it.prix);
+    if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cette annonce n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
+    const compte = String(it.compte || '');
+    if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette annonce — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    const ot = await ongletVestiaire(compte);
+    if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
+    const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+    if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    const depuis = Number(cpt.at) || (Date.now() - 5);
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcPrix', produit, avantCents: avant, apresCents: apres, recette, compte: ot.compte }, { frameId: 0 }), 30000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    if (!rep || rep.ok !== true) {
+      if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'baisse refusée par la page — rien n’est parti' }; }
+      noterDiag('vc_prix_muet');
+      return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le prix a changé : regarde l'annonce sur Vestiaire avant de recommencer" };
+    }
+    if (!statut) {
+      await rendreActions('vc:' + ot.compte, depuis, 1);
+      const er = String(rep.erreur || '');
+      if (er === 'autre-compte' || er === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Vestiaire n'est plus (ou pas encore) sur le compte de cette annonce — recharge Vestiaire sur le bon compte, puis réessaie (rien n'est parti)" };
+      if (er === 'annonce-non-vue') return { accepte: false, code: 'annonce-non-vue', raison: "l'onglet Vestiaire n'a pas encore affiché cette annonce — ouvre « Mes articles » dans cet onglet, puis réessaie (rien n'est parti)" };
+      if (er === 'prix-change') return { accepte: false, code: 'prix-change', prixVu: rep.prixVuCents != null ? rep.prixVuCents / 100 : null, raison: "sur Vestiaire, le prix n'est plus celui de l'aperçu — rien n'est parti" };
+      if (er === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Vestiaire n'a pas encore parlé à son serveur depuis son ouverture — recharge « Mes articles », puis réessaie (rien n'est parti)" };
+      if (er && er !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${er})` };
+      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde l'annonce sur Vestiaire avant de recommencer" };
+    }
+    noterDiag('vc_prix_' + statut);
+    if (statut === 429 || statut === 403) { await poserPauseVc(statut); return { accepte: true, etape: 'echec', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
+    if (statut >= 200 && statut < 300) {
+      const vu = rep.prixVuCents;
+      if (vu == null) return { accepte: true, etape: 'incertain', statut, ancien: avant / 100, raison: "Vestiaire a répondu sans que VRM puisse relire le prix — regarde l'annonce sur Vestiaire" };
+      if (vu === apres) return { accepte: true, etape: 'fait', statut, ancien: avant / 100, prixVu: vu / 100, relu: rep.relu || '' };
+      return { accepte: true, etape: 'ecart', statut, ancien: avant / 100, prixVu: vu / 100, raison: `Vestiaire montre ${(vu / 100).toFixed(2).replace('.', ',')} €` };
+    }
+    return { accepte: true, etape: 'echec', statut, raison: `Vestiaire a répondu ${statut} — le prix n'a pas changé` };
   } finally { VC_REPONSE_EN_VOL = false; }
 }
 

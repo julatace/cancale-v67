@@ -142,6 +142,19 @@
         if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, confirme: d.confirme === true ? true : d.confirme === false ? false : null, erreur: String(d.erreur || '').slice(0, 80) }); }
         return;
       }
+      // 5.364 : la recette d'un changement de PRIX fait par toi, et le résultat d'une baisse demandée par VRM.
+      if (d.kind === 'vcprixappris') {
+        const r = d.recette;
+        if (!r || typeof r !== 'object') return;
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcPrixAppris', recette: r }, () => { void chrome.runtime.lastError; });
+        return;
+      }
+      if (d.kind === 'vcprixresultat' && typeof d.jeton === 'string') {
+        const f = envoisEnAttente.get(d.jeton);
+        const c = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 1e9 ? Math.round(x) : null);
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, prixVuCents: c(d.prixVuCents), relu: /^(reponse|liste)$/.test(String(d.relu || '')) ? String(d.relu) : '', erreur: String(d.erreur || '').slice(0, 80) }); }
+        return;
+      }
       // 5.239 : tes ACHATS Vestiaire — scalaires seulement, jamais le vendeur ni ton adresse.
       if (d.kind === 'vcachats') {
         const achats = (Array.isArray(d.achats) ? d.achats : []).slice(0, 200).map((x) => ({
@@ -192,6 +205,20 @@
       envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
       // 5.299 : le compte au nom duquel le fond veut parler — la page refuse si ce n'est pas le sien.
       window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
+      return true;
+    });
+  } catch (_) {}
+  // ── 5.364 : BAISSER UN PRIX, SUR SON CLIC — même chemin que `vcOffre`.
+  try {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg || msg.from !== 'vrm-fond' || msg.action !== 'vcPrix') return;
+      if (!sender || sender.id !== chrome.runtime.id || window.top !== window) return;
+      const produit = String(msg.produit || ''), avant = Number(msg.avantCents), apres = Number(msg.apresCents);
+      if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(apres) || !(apres < avant)) { sendResponse({ ok: false, code: 'invalide' }); return; }
+      const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+      const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 25000);
+      envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
+      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'prix', jeton, produit, avantCents: avant, apresCents: apres, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
       return true;
     });
   } catch (_) {}
