@@ -142,7 +142,11 @@ async function signaux(pg) {
     const { ctx, pg, erreurs, lectures } = await page(b);
     await pg.goto(`http://localhost:${PORT}/?tab=settings`); await ecranPret(pg, 'settings'); await calme(lectures, 3000);
     await signaux(pg); await calme(lectures, 2500);                 // un premier passage : ce que la coque relit une fois
-    const n0 = lectures.length; await signaux(pg); await calme(lectures, 2500);
+    // (11 nov., revue colis) Le passage « caché » plus bas rejoue aussi un `visibilitychange` : la coque (la
+    // cloche `CentreNotifsCoque`, le relais `demarrerRelais`) relit alors ses lignes. La référence rejoue le
+    // MÊME geste, sinon ces lectures de la COQUE passaient pour celles d'un écran caché (rouge selon l'instant).
+    await pg.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); }); await calme(lectures, 2500);
+    const n0 = lectures.length; await signaux(pg); await pg.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); }); await calme(lectures, 2500);
     const lecturesReference = lectures.slice(n0).sort();
     await pg.evaluate(() => { window.__suivre = true; });
     // Premier passage sur chaque écran (calculé), puis retour sur chacun (gardé).
