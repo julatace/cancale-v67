@@ -133,3 +133,5 @@ html body .vrm-pmm .vrm-pmm-champ input { flex: 1 1 auto; min-width: 0; width: 1
 @layer vrm-premium {
   :root:root body .vrm-app-shell .vrm-pmm .vrm-pmm-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 44px !important; height: 44px; }
 }
+/* Rien de tapé : le pied reste à sa place (pas de barre flottante pour rien). */
+.vrm-pmm-pied[data-pmm-pied="0"] { position: static; box-shadow: none; margin: 4px 0 0; padding: 6px 0 0; border-radius: 0; background: transparent; border-top: .5px solid var(--w-filet, var(--vrm-line)); }
