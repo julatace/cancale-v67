@@ -124,3 +124,114 @@ désormais à Achats par `vrm:aller` (`?tab=retraits`) et attendent `[data-colis
 - Bancs qui lisent encore le nombre de l'onglet « À retirer » (`data-colis-onglet-n`) : à porter sur
   `vrm_colis_retirer` / la pastille d'Achats s'ils rougissent.
 - Julien : regarder Ventes (« À expédier ») et Achats (« À retirer »). Aucun geste technique.
+
+---
+
+# Reprise (11 nov., 2e session) — vérification, puis les nouvelles demandes de Julien
+
+L'agent précédent s'est arrêté (limite d'usage). Repris, vérifié, `origin/main` amené par un vrai merge
+(conflit CLAUDE.md §9 : les deux côtés gardés ; deux lignes les plus anciennes déplacées telles quelles
+dans `historique-divers.md`, CLAUDE.md < 59 000 octets).
+
+## A. Vérification de ce qui était fait
+
+- **Rien de perdu** : chaque fonction de l'ancien Colis existe (inventaire ci-dessus) ; le banc le juge :
+  Ventes porte « Tout imprimer », « Je dépose », Scanner (envoi), Préparer, À envoyer · Envoyés ; Achats
+  porte la liste « À retirer », Scanner (retrait), Mode relais, les outils (à confirmer, à vérifier, e-mails,
+  argent à vérifier, point relais changé) ; hors ligne : `ONGLETS_COLIS_HL` contient Ventes et Achats.
+- **Rien en double** : une section de colis par écran, « Scanner » et « Mode relais » une fois, aucun colis à
+  envoyer dans Achats, aucun colis à retirer dans Ventes (banc, 4 vues).
+- **§4.11 (origin/main ⇒ branche)** : `tab===` distincts 28 ⇒ 27 ; `<GardeEcran` 45 ⇒ 46 ; `<Comptabilite` 5 ⇒ 7 ;
+  `<SelecteurSites` 3 ⇒ 2 ; `<CaptureColis` 1 ⇒ 0 ; `<LeboncoinColis`, `<ModeDepot` (2), `<ColonneRetirer` inchangés.
+- **Codes des e-mails dans Achats** : chaque colis porte le code de SON e-mail (banc : 012345 / 654321 par n°).
+
+## B. Colis DISPARAÎT de la navigation (précision de Julien)
+
+Barre, colonne, « Plus » : plus d'entrée Colis (déjà fait). En plus : **« g c » retiré** (« g v » = Ventes,
+« À expédier » en tête ; « g h » = Achats) ; **`?tab=colis`** (le nom de l'ancien onglet) ⇒ Ventes « À expédier »,
+`&sub=retirer` / `onglet=retirer` / `section=retirer` ⇒ Achats (jamais un écran vide, banc L) ; écrans gardés :
+`journee · achats · ventes` (Achats prend la place de Colis). Ma journée, À trancher, recherche, notifications,
+widgets passent tous par `setTab` ⇒ `placeDesColis`.
+
+## C. BUG « Tout imprimer » : une paire DÉJÀ DÉPOSÉE restait proposée
+
+Mesuré (lecture seule) : **134 bordereaux e-mail sur 237 n'ont aucun n° de suivi** ; certaines ventes n'ont
+même **aucun e-mail de bordereau** (étiquette captée par l'extension seule, ex. une vente « Bordereau envoyé au
+vendeur » dont le n° n'existe que sur l'étiquette). Le n° est écrit sur l'étiquette, lu au cron
+(`vrm_bord_transporteurs.pdf[tx].s`). La règle du départ (`api/_lib/depart-vente.js`) ne lisait QUE le n° de
+l'e-mail : l'e-mail de dépôt de CE n° (« Preuve de dépôt », « entre de bonnes mains ») ne prouvait rien ;
+la vente, figée « à expédier » chez Vinted, restait dans « Tout imprimer » et dans le compteur. Et les
+étiquettes Mondial Relay rangées « inpost » (19) ou « plusieurs » (8, Mondial Relay + InPost) n'avaient
+**aucun n°** (la règle d'avant ne savait pas lire le n° d'une clé « inpost »).
+Correction (identité seule, jamais une ressemblance) :
+- `suiviDuBord` (n° de l'e-mail, sinon celui de SON étiquette) et `bordsAvecEtiquettes` (une étiquette captée
+  sans e-mail devient le bordereau de sa transaction) dans la règle unique ⇒ l'app, le widget, les rappels et
+  le bilan (`lirePreuvesDepart` lit la ligne légère, `etiquettes`) ; n° partagé par deux ventes ⇒ rien ;
+- `expeditions()` / `toShip` sortent la vente prouvée même sans bordereau e-mail (« Colis fait » garde sa carte) ;
+- **pas su ⇒ dit** : déjà imprimé et AUCUN n° connu ⇒ la ligne reste, décochée, « déposé ? à vérifier » ;
+- le cron **relit une fois** les étiquettes « inpost » et « plusieurs » (`decisionARelire`, marque `g: 2`).
+Preuves : `audit-a-envoyer-preuves` (+5 contrôles, widget/rappels/bilan avec une étiquette sans e-mail ; 7 rouges
+sur origin/main ; 15/15 mutations attrapées, dont 3 ancres qui ne s'appliquaient plus — rendues uniques) ;
+`audit-transporteur-anciens` T9 (3 rouges sur origin/main) ; banc : la vente déposée n'est ni une carte ni
+dans « Tout imprimer (2) » (rouge sur origin/main : 3). Le contrôle « e-mail du 7 nov. » du même audit
+rougissait seul depuis le 9 nov. (horloge du jour) : date du bordereau fixée, même règle.
+
+## D. « Tout imprimer » refait, en trois temps
+
+Une feuille (`SheetShell` : portail, `FermeAuRetour`), un bouton « Tout imprimer (N) » en tête d'« À expédier » :
+1. **Choisir** — « Ce qui part » (photo, titre entier, N°, logo du bordereau, date limite ; cochés) ; « À vérifier »
+   à part, décochés (déjà imprimé, vendue il y a plus de 14 j, déposé ? à vérifier, sans bordereau) ; eBay grisé.
+   **Aperçu** : une page A4 par colis coché (l'étiquette du transporteur, le tampon N° + titre en bas).
+2. **Imprimer (N)** — UN PDF tamponné (le moteur d'avant, inchangé ; « Placer le tampon » reste en lien) ;
+   plus de question « Préparer quand même » ni de case « Contrôlé » (l'aperçu A4 est le contrôle — tranché).
+3. **« C'est imprimé ? »** — le lien du PDF ; « Oui, imprimé » ⇒ prêts à déposer (`vinted_bords_printed`,
+   geste annulable « Annuler ») ; « Pas encore » revient au choix ; puis **« Je dépose »** ouvre le mode dépôt.
+Gestes (N colis, tous bons) : **avant** Tout imprimer · Imprimer · « Préparer quand même » (+ N cases « Contrôlé »
+pour l'éviter) puis fermer et chercher « Je dépose » (≈ 5) ; **après** Tout imprimer · Imprimer · Oui · Je dépose (4,
+dans la même feuille). Rien de perdu : impression d'un seul colis (carte), réimpression (« À vérifier », cochable),
+`confirmerNumerosAVerifier` (dans le moteur), échecs repris (« Réessayer »). Animations : entrée 240 ms
+(opacité + 6 px), coupées en mouvement réduit ; cibles 44 px (lignes 74 px mesurées).
+
+## E. Logos des bordereaux (photos de VRAIS bordereaux de Julien)
+
+Réseau refusé (Wikimedia : 403 du proxy) ⇒ redessinés d'après les photos (planche de comparaison dans le
+scratchpad, jamais dans le dépôt : photos avec noms et adresses réels) :
+- **Mondial Relay** (= InPost) : carré framboise, point blanc, « r » blanc finissant sur un carré rose pâle ;
+- **Chronopost** : le cube (hexagone encre, arête blanche gauche jusqu'au centre puis vers le bas, courte à
+  droite) ; **Shop2Shop** ⇒ le même cube, nom « Chronopost Shop2Shop » ; « InPost » s'appelle Mondial Relay.
+`audit-logos-bordereaux` : 41 verts (14 rouges sur origin/main).
+
+## F. Titres entiers
+
+Le titre d'un colis (cartes « À expédier », rangées « À retirer », feuille « Tout imprimer ») passe à la ligne,
+**sans aucune coupe** (tranché : un vrai titre de 75 signes prend 4 lignes à côté des gestes à 390 px ; le
+couper à 3 redonnait « … »). Règle posée DANS la couche `vrm-premium` (hors couche, un `!important` perdait —
+mesuré au banc). Banc : scrollWidth/scrollHeight/ellipsis sur le rendu, 390 et 1512.
+
+## Preuves de cette session
+
+| contrôle | branche | origin/main |
+|---|---|---|
+| banc `colis-a-leur-place` (390 tactile + 1512, clair + sombre ; + déposée, titres, parcours complet, `?tab=colis`) | **184 verts** | 22 rouges / 37 (une vue) |
+| `audit-a-envoyer-preuves` | vert, 15/15 mutations | 7 rouges |
+| `audit-transporteur-anciens` | 34 verts | 3 rouges (T9) |
+| `audit-logos-bordereaux` | 41 verts | 14 rouges |
+| `audit-raccourcis-clavier` (+ `--prouve`) | vert | — |
+| audits communs (variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets) | verts | — |
+
+Rouges identiques sur origin/main (pas de ce lot) : `audit-violet` (3, FedEx/Relais Colis), `audit-garde-ecrans`
+(Capture*), `audit-reprise-ecran` (balayage du bord), `audit-colis-envoi` (1), `audit-achats-export`,
+`audit-facture-achat`, `audit-donnees-ecrans`, `audit-journee-hors-ligne` ; banc `ecrans-gardes` : 1 défaut
+(lectures de la coque push_journal/relais_ext), identique sur origin/main.
+
+Captures regardées : Ventes 390 clair et 1512 clair (À expédier en tête, « Tout imprimer (2) »), Achats 1512
+sombre (logos framboise et cube), feuille « Tout imprimer » 390 clair et 1512 sombre, étape 3 390 sombre.
+Remarque vue (pas de ce lot) : sur la carte d'un colis, le bouton « Relier » déborde du bas de la carte à 1512.
+
+## Ce qui reste
+
+- L'extension écrit encore « InPost » ⇒ aucun transporteur dans une conversation « Mondial Relay by InPost »
+  (`background.js`) : au prochain lot extension.
+- Un dépôt dont l'e-mail n'a AUCUN n° (mesuré : un « Preuve de dépôt » Chronopost sans n°) ne peut rien prouver
+  (identité absente) : la ligne dit « déposé ? à vérifier » si elle a déjà été imprimée.
+- Julien : regarder « Tout imprimer » sur son iPhone ; aucun geste technique.

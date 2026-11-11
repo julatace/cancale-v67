@@ -91,7 +91,7 @@ const ARTICLES = [
         'Deux paires sous le même numéro (un doublon) : VRM le règle seul et liste les **nouveaux numéros à écrire**, jusqu’à ce que tu touches **C’est écrit**.',
         'Une paire republiée garde le numéro de l’ancienne annonce.',
       ] },
-      { note: 'Deux paires présentes sous le même numéro, c’est le seul risque d’envoyer la mauvaise chaussure. C’est le seul endroit où VRM met du rouge : vérifie les deux, là où elles sont rangées.', titreNote: 'Le rouge.' },
+      { note: 'Deux paires présentes sous le même numéro, c’est le seul risque d’envoyer le mauvais article. C’est le seul endroit où VRM met du rouge : vérifie les deux, là où elles sont rangées.', titreNote: 'Le rouge.' },
       { titre: 'Retrouver une paire', id: 'stock' },
       'Dans **Stock**, cherche un numéro : VRM te dit le meuble et la case.',
       { titre: '« Je numérote moi-même »', id: 'moi-meme' },
@@ -250,7 +250,7 @@ const ETAPES_ECRANS = {
   ],
   annonces: [
     'Passe sur Vinted avec l’extension : tes annonces arrivent ici.',
-    'Écris le N° de chaque paire sur son carton.',
+    'Écris le N° là où tu ranges l’article.',
     'Saisis le prix d’achat sur la carte de l’annonce.',
     'Touche une photo pour la voir en grand.',
   ],

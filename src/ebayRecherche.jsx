@@ -167,7 +167,10 @@ function Liste({ r, nouveaux, repere, C, max = 8, cle }) {
   </div>;
 }
 
-export default function RechercheEbay({ headers, theme: C, owner, repere, session }) {
+export default function RechercheEbay({ headers, theme: C, owner, repere, session, vend = 'sneakers', exemple = '' }) {
+  // (11 nov., lot DJ2) « Pointure » et l'exemple de basket : seulement pour Sneakers.
+  // Hors Sneakers, la taille s'écrit dans les mots (la règle `pointure` attend 2 chiffres).
+  const sn = vend !== 'autre';
   const S = { input: { width: '100%', minHeight: 44, padding: '9px 10px', border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 17, boxSizing: 'border-box' }, bouton: { minHeight: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }, label: { display: 'grid', gap: 5, fontSize: 12, color: C.muted } };
   const [f, setF] = useState({ mots: '', pointure: '', maximum: '', etat: 'tous', achatImmediat: true, livraisonFR: true });
   const [manuel, setManuel] = useState(undefined);   // undefined rien · 'encours' · {r} · {erreur}
@@ -341,11 +344,11 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
 
   return <section data-ebay-recherche="" style={{ display: 'grid', gap: 18, marginBottom: 18 }}>
     <div>
-      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>Chercher des paires sur eBay</h3>
+      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>{sn ? 'Chercher des paires sur eBay' : 'Chercher des articles sur eBay'}</h3>
       <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Les plus récentes d’abord. Pour acheter, ouvre l’annonce sur eBay.</p>
       <form onSubmit={chercher} data-ebay-form-recherche="" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', alignItems: 'end' }}>
-        <label style={{ ...S.label, gridColumn: '1 / -1' }}>Modèle, marque…<input aria-label="Mots à chercher" value={f.mots} onChange={(e) => setF({ ...f, mots: e.target.value })} placeholder="ex. salomon xt-6" style={S.input} /></label>
-        <label style={S.label}>Pointure<input aria-label="Pointure" inputMode="decimal" value={f.pointure} onChange={(e) => setF({ ...f, pointure: e.target.value })} placeholder="42 ou 42,5" style={S.input} /></label>
+        <label style={{ ...S.label, gridColumn: '1 / -1' }}>Modèle, marque…<input aria-label="Mots à chercher" value={f.mots} onChange={(e) => setF({ ...f, mots: e.target.value })} placeholder={sn ? 'ex. salomon xt-6' : (exemple || 'ex. lampe vintage').replace(/^ex : /, 'ex. ')} style={S.input} /></label>
+        {sn && <label style={S.label}>Pointure<input aria-label="Pointure" inputMode="decimal" value={f.pointure} onChange={(e) => setF({ ...f, pointure: e.target.value })} placeholder="42 ou 42,5" style={S.input} /></label>}
         <label style={S.label}>Prix max, port compris (€)<input aria-label="Prix maximum" inputMode="decimal" value={f.maximum} onChange={(e) => setF({ ...f, maximum: e.target.value })} placeholder="ex. 80" style={S.input} /></label>
         <label style={S.label}>État<select aria-label="État" value={f.etat} onChange={(e) => setF({ ...f, etat: e.target.value })} style={S.input}><option value="tous">Tous</option><option value="neuf">Neuf</option><option value="occasion">Occasion</option></select></label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 13, color: C.text }}><input type="checkbox" checked={f.achatImmediat} onChange={(e) => setF({ ...f, achatImmediat: e.target.checked })} style={{ width: 20, height: 20 }} />Achat immédiat</label>

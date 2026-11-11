@@ -26,6 +26,7 @@ const fs = require('fs'), http = require('http'), os = require('os');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4467;
 const CAP = process.env.BANC_CAPTURES || os.tmpdir();
+const SHOTS_C10 = true;
 
 const maintenant = new Date(2026, 10, 10, 15, 30, 0);
 const iso = (h) => new Date(maintenant.getTime() - h * 3600e3).toISOString();
@@ -121,7 +122,17 @@ async function annonces(b, tel, sombre) {
     await bouton.waitFor({ timeout: 30000 });
     await r.pg.waitForTimeout(800);
     dit(await bouton.getAttribute('data-vue-a-completer') === '4', `${T} la vue « À compléter » compte 4 annonces`, await bouton.getAttribute('data-vue-a-completer'));
-    await toucher(r.pg, tel, bouton);
+    // (11 nov., décision C10) Outils : l'ancien bloc « Annonces à compléter » est FONDU — une ligne
+    // (le même nombre) mène à la vue ; plus aucun second bloc au même nom.
+    await toucher(r.pg, tel, r.pg.locator('button[aria-label="Outils des annonces"]').first());
+    const ligneOutils = r.pg.locator('[data-outils-a-completer]').first();
+    await ligneOutils.waitFor({ timeout: 8000 });
+    const hO = await ligneOutils.evaluate((e) => Math.round(e.getBoundingClientRect().height));
+    dit(await ligneOutils.getAttribute('data-outils-a-completer') === '4' && await r.pg.locator('[data-annonces-completer]').count() === 0 && hO >= 44, `${T} (C10) Outils : une ligne « À compléter · 4 » (44 px), plus l’ancien bloc`, String(hO));
+    if (SHOTS_C10) await r.pg.screenshot({ path: path.join(CAP, `annonces-outils-c10-${T}.png`) });
+    await toucher(r.pg, tel, ligneOutils);
+    await r.pg.waitForSelector('[data-a-completer="lu"]', { timeout: 15000 });
+    dit(await r.pg.locator('[data-vue-a-completer][aria-pressed="true"]').count() >= 1, `${T} (C10) la ligne ouvre la vue « À compléter » (un seul endroit)`);
     await r.pg.waitForSelector('[data-a-completer="lu"]', { timeout: 15000 });
     await r.pg.waitForTimeout(400);
     const v = await r.pg.evaluate(() => {

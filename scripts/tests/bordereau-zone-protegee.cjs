@@ -4,7 +4,7 @@ require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lec
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const source=fs.readFileSync(path.join(__dirname,'../../src/App.jsx'),'utf8');
 const region=source.slice(source.indexOf('// ── LE TAMPON DU BORDEREAU'),source.indexOf('// ── IMPRIMANTE NORMALE OU THERMIQUE'));
-const {trouverZoneBlanche:chercher}=new Function(region+';return {trouverZoneBlanche};')();
+const {trouverZoneBlanche:chercher,placeMentionVrm,MENTION}=new Function(region+';return {trouverZoneBlanche,placeMentionVrm:typeof placeMentionVrm==="function"?placeMentionVrm:null,MENTION:typeof MENTION==="object"?MENTION:null};')();
 const W=500,H=300,carte=(v)=>new Uint8ClampedArray(W*H*4).fill(v);
 const peindre=(px,x0,y0,x1,y1,v)=>{for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*W+x)*4;px[i]=px[i+1]=px[i+2]=v;}};
 // Un faux QR au centre : seule la marge autour est libre, et elle est respectée.
@@ -25,3 +25,27 @@ assert.equal(chercher(traits,W,H,100,30,18),null,'des traits tous les 20 px : au
 const barre=carte(255);peindre(barre,0,0,200,H,0);
 const zb=chercher(barre,W,H,100,30,{mx:21,my:15});assert.ok(zb&&zb.x>=221,'au moins mx à droite du code-barres');
 console.log('OK : zone libre et marges respectées, gris clair libre, bruit isolé ignoré, traits et page pleine refusés.');
+// (11 nov.) LA MENTION « Créé par VRM » : la même recherche, partie du coin
+// bas-droit, hors de l'encre + marges, des zones interdites et d'une bordure.
+assert.ok(placeMentionVrm&&MENTION,'placeMentionVrm existe');
+assert.equal(MENTION.texte,'Créé par VRM');assert.ok(MENTION.taille>=6&&MENTION.taille<=7,'6–7 pt');
+{
+ const W2=600,H2=800,page=new Uint8ClampedArray(W2*H2*4).fill(255),bw=40,bh=9;
+ const encre=(x0,y0,x1,y1)=>{for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*W2+x)*4;page[i]=page[i+1]=page[i+2]=0;}};
+ encre(420,600,560,760);                                  // un QR dans le coin bas-droit
+ const tampon={x:30,y:30,w:180,h:44},interdit={x:0,y:300,w:W2,h:150}; // le N° en haut, une étiquette au milieu
+ const r={pixels:page,w:W2,h:H2,s:1},p=placeMentionVrm(r,bw,bh,[tampon,interdit]);
+ assert.ok(p,'une place existe');
+ const B=MENTION.bord,inter=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y,boite={x:p.x,y:p.y,w:bw,h:bh};
+ assert.ok(!inter(boite,{x:420-14,y:600-10,w:140+28,h:160+20}),'jamais sur le QR ni dans sa marge');
+ assert.ok(!inter(boite,tampon)&&!inter(boite,interdit),'jamais dans une zone interdite');
+ assert.ok(p.x>=B&&p.y>=B&&p.x+bw<=W2-B&&p.y+bh<=H2-B,'hors de la bordure non imprimable');
+ assert.ok(p.y>H2-B-10-bh-6,'au plus bas possible (coin bas) : '+JSON.stringify(p));
+ for(let y=p.y-10;y<p.y+bh+10;y++)for(let x=p.x-14;x<p.x+bw+14;x++)assert.equal(page[(y*W2+x)*4],255,'la mention et sa marge sont sur du papier');
+ // Plus aucune place sûre ⇒ null (aucune mention).
+ assert.equal(placeMentionVrm(r,bw,bh,[{x:0,y:0,w:W2,h:H2}]),null,'tout est interdit : rien');
+ assert.equal(placeMentionVrm({pixels:new Uint8ClampedArray(W2*H2*4).fill(0),w:W2,h:H2,s:1},bw,bh,[]),null,'page pleine : rien');
+ // MUTATION : sans les interdits, la mention tomberait dans l'étiquette ⇒ ce test le voit.
+ const sans=placeMentionVrm(r,bw,bh,[{x:0,y:0,w:W2,h:449}]);assert.ok(sans&&!inter({x:sans.x,y:sans.y,w:bw,h:bh},{x:0,y:0,w:W2,h:449}),'les interdits sont bien respectés');
+}
+console.log('OK : mention « Créé par VRM » hors encre, QR, zones interdites et bordure ; rien sans place sûre.');

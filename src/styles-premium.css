@@ -1061,3 +1061,18 @@ html body .vrm-fs button.vrm-fs-croix:disabled { cursor: not-allowed !important;
 }
 
 } /* fin @layer vrm-premium */
+
+/* (Placé ICI, DANS la couche `vrm-premium` : un `!important` hors couche perd contre celui d'une couche — posé
+   dans fusion.css, il perdait, mesuré au banc.) */
+@layer vrm-premium {
+/* (11 nov., lot DJ3 — Julien : « on ne voit pas tout le titre de la paire ») Dans « À expédier » (Ventes),
+   « À retirer » (Achats) et l'écran Colis : le titre d'un colis se lit EN ENTIER — il passe à la ligne,
+   sans aucune coupe (tranché le 11 nov. : un vrai titre de 75 signes prend 4 lignes à côté des gestes à 390 px ;
+   le couper à 3 redonnait « … », exactement la plainte). Jamais « … ». */
+/* Spécificité au-dessus des règles « une ligne » / « deux lignes » d'avant (premium, design-2026 : :root:root…). */
+:root:root:root body .vrm-app-shell :is(.vrm-main .vrm-colis-section, .vrm-main:has(.vrm-fu-colis), .vrm-main[data-ecran="cat_bord"], .vrm-main[data-ecran="ventes"], .vrm-main[data-ecran="achats"]) :is(.vrm-colis-carte .vrm-colis-titre, .vrm-rpf-quoi .vrm-rpf-titre, .vrm-colis-section .vrm-colis-titre) {
+  display: block !important; -webkit-line-clamp: unset !important; line-clamp: none !important; max-height: none !important;
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere !important; max-width: 100% !important;
+}
+html body .vrm-app-shell .vrm-titre-entier { display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: normal !important; overflow: hidden; overflow-wrap: anywhere; }
+} /* fin @layer vrm-premium (titres entiers) */

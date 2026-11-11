@@ -64,6 +64,12 @@ export function lireReponseEntreprise(json, saisi) {
     ei: r.complements && typeof r.complements.est_entrepreneur_individuel === 'boolean' ? r.complements.est_entrepreneur_individuel : null,
     tva: Array.isArray(r.tva) ? r.tva.filter((x) => typeof x === 'string').map((x) => x.replace(/\s/g, '').toUpperCase()) : null,
     rm: etab && Object.prototype.hasOwnProperty.call(etab, 'activite_principale_registre_metier') ? !!etab.activite_principale_registre_metier : null,
+    // (11 nov., lot DJ1 — la carte « C'est bien toi ? ») Pour VÉRIFIER, tels que le registre
+    // les dit (forme documentée, open-api.yml : etablissement.nom_commercial,
+    // etablissement.liste_enseignes[], etablissement.activite_principale = code APE/NAF,
+    // result.activite_principale) ; absent ⇒ '' (rien montré, rien deviné).
+    nomCommercial: etab ? (propre(etab.nom_commercial) || (Array.isArray(etab.liste_enseignes) ? propre(etab.liste_enseignes.find((x) => propre(x)) || '') : '')) : '',
+    ape: propre((etab && etab.activite_principale) || r.activite_principale || ''),
   };
 }
 
