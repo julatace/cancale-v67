@@ -97,10 +97,10 @@ export function ajusterChiffre(el, plancher = 22) {
 }
 
 // Le même ajustement pour un grand chiffre posé hors de `CarteMois` (Ma journée).
-export function GrandChiffre({ className = 'vrm-fu-grand', children, ...attrs }) {
+export function GrandChiffre({ className = 'vrm-fu-grand', plancher = 22, children, ...attrs }) {
   const ref = useRef(null);
   const texte = texteDe(children);
-  useLayoutEffect(() => (ref.current ? ajusterChiffre(ref.current) : undefined), [texte]);
+  useLayoutEffect(() => (ref.current ? ajusterChiffre(ref.current, plancher) : undefined), [texte, plancher]);
   return <div ref={ref} className={className} {...attrs}>{children}</div>;
 }
 

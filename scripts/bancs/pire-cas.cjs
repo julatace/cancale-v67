@@ -52,6 +52,7 @@ const EMOJI = '👟🔥✨🧡 Jordan 1 🏀 Chicago 🇫🇷 💯';
 const TITRES = [TITRE_200, ALLEMAND, EMOJI, 'A', 'Supercalifragilisticexpialidocious'.repeat(5)];
 const PRIX = ['0.01', '99999.99', '49.0', '1234.5'];
 const NUMS = ['B12345', '123456', 'B99999', '7', 'B1'];
+// Chaque photo est une identité (§5) : une annonce, une vente, un achat n'en partagent jamais.
 const photo = (n) => `https://images1.vinted.net/t/01_pc${n}/f800/17${n}.jpeg`;
 
 function jeu(nom) {
@@ -69,12 +70,12 @@ function jeu(nom) {
     numeros[String(id)] = { numero: num, auto: i % 3 !== 0, numberedAt: ilYa(i + 1), ...(i % 4 === 0 ? {} : { buyPrice: i % 4 === 1 ? '0.01' : i % 4 === 2 ? '99999.99' : '35' }) };
     if (/^\d+$/.test(num)) used.push(Number(num));
     const tx = 90000000 + i;
-    ventes.push({ transaction_id: tx, item_id: id, title: TITRES[(i + 1) % TITRES.length], price: sansPrix ? null : { amount: PRIX[(i + 1) % PRIX.length], currency_code: 'EUR' },
+    ventes.push({ transaction_id: tx, item_id: 71000000 + i, title: TITRES[(i + 1) % TITRES.length], price: sansPrix ? null : { amount: PRIX[(i + 1) % PRIX.length], currency_code: 'EUR' },
       status: i % 3 ? 'Commande finalisée' : "Commande finalisée - l'acheteur a validé la commande", transaction_user_status: 'completed',
-      date: sansDate ? undefined : ilYa(24 + i * 3), photo: sansPhoto ? null : { url: photo(i) }, opposite_user: { login: ACHETEUR(i) } });
+      date: sansDate ? undefined : ilYa(24 + i * 3), photo: sansPhoto ? null : { url: photo(100000 + i) }, opposite_user: { login: ACHETEUR(i) } });
     achats.push({ transaction_id: 95000000 + i, title: TITRES[(i + 2) % TITRES.length], price: sansPrix ? null : { amount: PRIX[(i + 2) % PRIX.length], currency_code: 'EUR' },
       status: "Commande finalisée - l'acheteur a validé la commande", transaction_user_status: 'completed', date: sansDate ? undefined : ilYa(30 + i * 3),
-      photo: sansPhoto ? null : { url: photo(i + 1) }, opposite_user: { login: ACHETEUR(i) } });
+      photo: sansPhoto ? null : { url: photo(200000 + i) }, opposite_user: { login: ACHETEUR(i) } });
     convs.push({ id: 80000000 + i, unread: i < 40, updated_at: sansDate ? undefined : ilYa(i), opposite_user: { id: 9000 + i, login: ACHETEUR(i), photo: null },
       item_count: 1, description: i % 2 ? TITRE_200 : ALLEMAND + ' ' + EMOJI });
   }
@@ -193,7 +194,9 @@ function mesurer(racineSel) {
     if (!rs.length) continue;
     for (const r of rs) {
       if (r.bottom < 0 || r.top > H) continue;
-      if (el.closest('.vrm-sr,.sr-only,.visually-hidden')) continue;
+      if (el.closest('.vrm-sr,.sr-only,.visually-hidden,.vrm-sr-seul')) continue;
+      // Caché AU REGARD exprès (lu par le lecteur d'écran) : `clip-path: inset(50%)`, 1 px.
+      { let cache2 = false; for (let a = el, d = 0; a && d < 3; a = a.parentElement, d++) { const s2 = getComputedStyle(a); if ((s2.clipPath && s2.clipPath !== 'none' && /inset\(50%/.test(s2.clipPath)) || (s2.position === 'absolute' && a.offsetWidth <= 1 && a.offsetHeight <= 1)) cache2 = true; } if (cache2) continue; }
       const c = clip(el, r);
       // Rogné ENTIER à l'horizontale (la hauteur, elle, est visible) : un texte coupé, pas un repli.
       if (c.w <= 1 && c.h > 1 && r.left < W && r.right > 0) { textes.push({ el, n, c: { ...c, x2: Math.max(c.x1, c.x2), w: 0 }, r, entier: true }); continue; }
@@ -241,7 +244,9 @@ function mesurer(racineSel) {
       const nom = lisible && (lisible.getAttribute('title') || lisible.getAttribute('aria-label') || '');
       const plein = (el.textContent || '').replace(/\s+/g, ' ').trim();
       // Un `title`/`aria-label` qui ne contient pas le texte ne le rend pas lisible ; un bouton (il ouvre la fiche) oui.
-      const ok = lisible && (/^(BUTTON|A|SUMMARY|LABEL)$/.test(lisible.tagName) || lisible.getAttribute('role') === 'button' || (nom && nom.replace(/\s+/g, ' ').includes(plein.slice(0, 40))));
+      // Une carte qui s'ouvre au toucher (vignette d'annonce repliée : `cursor: pointer`) le rend lisible aussi.
+      let touche = false; for (let a = el; a && a !== document.body; a = a.parentElement) if (getComputedStyle(a).cursor === 'pointer') { touche = true; break; }
+      const ok = touche || lisible && (/^(BUTTON|A|SUMMARY|LABEL)$/.test(lisible.tagName) || lisible.getAttribute('role') === 'button' || (nom && nom.replace(/\s+/g, ' ').includes(plein.slice(0, 40))));
       if (!ok) out.coupe.push(desc(el));
       break;
     }

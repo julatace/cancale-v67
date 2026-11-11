@@ -33652,7 +33652,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (11 nov., pire cas) La grille ne DESSINE que les `annMax` premières vignettes (comme Ventes) :
   // 2 000 annonces montaient 137 000 nœuds d'un coup, 2 s de gel au défilement du téléphone.
   // Les comptes, les totaux et l'en-tête de chaque compte portent TOUJOURS sur l'ensemble.
-  const [annMax, setAnnMax] = useVueSession('annonces-limite', 120);
+  const [annMax, setAnnMax] = useVueSession('annonces-limite', 60);
   const annGroupesVus = useMemo(() => { let reste = annMax; return annGroupes.map((g) => { const items = g.items.slice(0, Math.max(0, reste)); reste -= items.length; return { ...g, tous: g.items.length, items }; }).filter((g) => g.items.length); }, [annGroupes, annMax]);
   // Les annonces que l'alerte « même paire en ligne deux fois » nomme (lot AF, mêmes groupes, §11) : une marque sur leur vignette.
   const annEnDouble = useMemo(() => new Set(groupesDeuxFois.filter((g) => g.length > 1).flat()), [groupesDeuxFois]);
@@ -50061,7 +50061,8 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
         ? <PhotoVinted src={it.photo} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
         : <div style={{ width: 48, height: 48, borderRadius: 12, background: C.card2, flexShrink: 0 }}/>}
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+        {/* (11 nov., pire cas) Le titre ENTIER : c'est lui qu'on compare au carton (coupé, « Größe 42 Sportschuh… » ne disait plus quelle paire). */}
+        <div data-verif-titre="" style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{it.title}</div>
         <div style={{ fontSize: 12, color: C.muted }}>
           VRM dit <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
           {it._vrmMasquee ? <> · <span data-verif-masquee>masquée par Vinted</span></> : null}
