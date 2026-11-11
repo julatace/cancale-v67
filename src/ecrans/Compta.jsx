@@ -4033,7 +4033,9 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       let essais = 0;
       const viser = () => {
         const c = document.querySelector('[data-export-comptable]');
-        if (!c) { if (++essais < 100) setTimeout(viser, 100); return; }
+        // (11 nov., rouges A) La carte existe déjà dans le segment Déclarer encore CACHÉ (`hidden`) :
+        // un focus posé là se perd. On attend que le segment soit montré.
+        if (!c || (c.closest('[hidden]') && essais < 99)) { if (++essais < 100) setTimeout(viser, 100); return; }
         // Rangée dans « Documents et réglages » (replié) : le repli s'ouvre (son `onToggle` suit).
         const d = c.closest('details'); if (d && !d.open && ++essais < 100) { d.open = true; setTimeout(viser, 60); return; }
         DEMANDE_COMMANDE.export = 0;
