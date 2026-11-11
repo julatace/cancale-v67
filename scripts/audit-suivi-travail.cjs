@@ -41,6 +41,23 @@ async function principal() {
   p = S.progression(s, T0 + 60_000);
   dit(p.nFinis === 1 && p.nOk === 1 && Math.round(p.restant) === 120, 'P4 rythme réel : 60 s pour 1 ⇒ environ 120 s pour les 2 restantes', p.restant);
   dit(p.rang === 2 && !p.enCours, 'P5 la suivante est la 2 sur 3', p.rang);
+  // (11 nov., intégration) La barre d'un travail qui ne tourne plus dit EXACTEMENT fait/total :
+  // « 1 sur 1 » ⇒ pleine ; une annonce restée « en cours » à la fin ne la laisse plus à moitié.
+  {
+    const E3 = [['a', 'A'], ['b', 'B'], ['c', 'C']];
+    let u = S.creer({ sorte: 'x', titre: 'Un', etapes: E3, articles: [{ id: '1' }] }, T0);
+    u = S.etapeArticle(u, '1', 'b', T0 + 1000);
+    const enCoursFini = S.progression(S.terminer(u, 'fini', T0 + 2000), T0 + 2000);
+    dit(enCoursFini.part === enCoursFini.nFinis / enCoursFini.total, 'P6 travail terminé, annonce restée en cours : barre = fait/total (pas une moitié estimée)', enCoursFini.part);
+    const unSurUn = S.progression(S.terminer(S.finArticle(u, '1', { etat: 'ok' }, T0 + 1500), 'fini', T0 + 2000), T0 + 2000);
+    dit(unSurUn.nFinis === 1 && unSurUn.total === 1 && unSurUn.part === 1, 'P7 « 1 sur 1 » terminé : barre pleine', unSurUn);
+    let d = S.creer({ sorte: 'x', titre: 'Deux', etapes: E3, articles: [{ id: '1' }, { id: '2' }] }, T0);
+    d = S.finArticle(d, '1', { etat: 'ok' }, T0 + 1000); d = S.etapeArticle(d, '2', 'c', T0 + 1100);
+    const arr = S.progression(S.terminer(d, 'arrete', T0 + 2000), T0 + 2000);
+    dit(arr.part === 0.5, 'P8 arrêté à « 1 sur 2 » : barre à 1/2 exactement', arr.part);
+    const vivant = S.progression(d, T0 + 1200);
+    dit(vivant.part > 0.5 && vivant.part < 1, 'P9 pendant le travail, l\'étape en cours avance encore la barre', vivant.part);
+  }
 
   // ── J
   const sale = S.nettoyer('Refus pour jean.dupont@mail.fr, @vanessa5723, 06 12 34 56 78, https://www.vinted.fr/member/123-x');
@@ -184,6 +201,7 @@ function prouver() {
     ['Republier : double compté réussi', 'src/ecrans/Republier.jsx', "case 'double': return { etat: 'main'", "case 'double': return { etat: 'ok'"],
     ['action rapide avec un refus jamais montrée', 'src/suiviTravail.js', "&& toutBon && statut === 'fini') suivi.oublier();", "&& statut === 'fini') suivi.oublier();"],
     ['la suite part après un refus « pour tout »', 'src/suiviTravail.js', "if (iss.arreterTout) {", "if (false) {"],
+    ['barre d’un travail fini estimée (moitié sur « Terminé »)', 'src/suiviTravail.js', ": finis.length / total;", ": Math.min(1, (finis.length + Math.min(0.95, partEnCours)) / total);"],
     ['feuille au-dessus des confirmations', 'src/composants/SuiviTravail.jsx', 'Z_SUIVI = 15000', 'Z_SUIVI = 25000'],
   ];
   let rouges = 0;

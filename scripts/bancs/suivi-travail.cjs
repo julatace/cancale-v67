@@ -108,6 +108,21 @@ function batir() {
     await p.click('[data-suivi-fermer]');
     await p.waitForFunction(() => !document.querySelector('[data-suivi-travail]'));
     dit(await p.evaluate(() => !document.getElementById('app').hasAttribute('inert') && JSON.parse(localStorage.getItem('vrm_suivi_travaux') || '[]').length === 1), `${tag} 7b « Fermer » dégèle VRM et garde le travail (Ce que VRM a fait)`);
+    // 7c (11 nov., intégration) La barre d'un travail terminé = fait/total, MESURÉE à l'écran :
+    // « 1 sur 1 » pleine ; une annonce restée « en cours » à la fin ne laisse pas une moitié.
+    for (const [sc, attendu] of [['en-cours', 0], ['un-sur-un', 1]]) {
+      const b = await p.evaluate(async (sc) => {
+        const S = window.__suivi;
+        const t = S.demarrer({ sorte: 'banc-barre', titre: 'Une annonce', etapes: [['a', 'A'], ['b', 'B'], ['c', 'C']], articles: [{ id: '9', num: '9', titre: 'Paire' }] });
+        t.etape('9', 'b'); if (sc === 'un-sur-un') t.fin('9', { etat: 'ok' });
+        S._poser({ ...S.lire(), statut: 'fini', finAt: Date.now() });
+        await new Promise((r) => setTimeout(r, 700));
+        const f = document.querySelector('[data-suivi-travail]'); const bar = f.querySelector('.vrm-st-barre'); const i = bar.querySelector('i');
+        const res = { n: f.getAttribute('data-suivi-n'), ratio: Math.round((i.getBoundingClientRect().width / bar.getBoundingClientRect().width) * 100) / 100 };
+        S.fermer(); return res;
+      }, sc);
+      dit(b.ratio === attendu, `${tag} 7c barre d'un travail terminé (${sc}, ${b.n}) : ${attendu ? 'pleine' : 'fait/total'}`, b);
+    }
     // 8
     await p.evaluate(() => { window.__lancer(); });
     await p.reload(); await p.waitForSelector('[data-suivi-statut="interrompu"]');

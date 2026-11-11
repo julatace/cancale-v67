@@ -174,7 +174,12 @@ export function progression(s, now = Date.now()) {
   const nEnCours = s.articles.filter((a) => a.etat === 'encours').length;
   const iEtape = enCours && s.etapes.length ? s.etapes.findIndex((e) => e[0] === enCours.etape) : -1;
   const partEnCours = enCours && s.etapes.length ? Math.max(0, iEtape + 0.5) / s.etapes.length : (enCours ? 0.1 : 0);
-  const part = total ? Math.min(1, (finis.length + Math.min(0.95, partEnCours)) / total) : 0;
+  // (11 nov., intégration) Un travail qui ne tourne plus (fini, arrêté, interrompu) : la barre dit
+  // EXACTEMENT fait/total — plus d'estimation de l'étape en cours (une annonce restée « en cours »
+  // au moment de la fin laissait la barre à moitié sur « Terminé »). Tout fini ⇒ pleine.
+  const vivant = s.statut === 'cours' || s.statut === 'pause';
+  const part = !total ? 0 : finis.length >= total ? 1
+    : vivant ? Math.min(1, (finis.length + Math.min(0.95, partEnCours)) / total) : finis.length / total;
   const fin = s.finAt || now;
   const ecoule = Math.max(0, (fin - s.debut) / 1000);
   const restants = total - finis.length;
