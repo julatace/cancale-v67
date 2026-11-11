@@ -69,7 +69,16 @@ seconde a vérifié, corrigé, refait deux bancs et intégré `main`.
 - `scripts/bancs/stock-journee.mjs` : 9 contrôles ; la mutation « identité par N° retirée » rougit.
 - Captures regardées (390 clair, 1512 sombre) : question → pilule « N°12 sortie du stock ·
   Annuler » → carte revenue → plus de pilule ; Stock « 5 paires en ligne », pastilles par site.
-- Les autres bancs du Stock et de l'inventaire : voir la fin de ce récit (tournés après la fusion).
+- Les bancs du Stock, de l'inventaire et des gestes, tournés après la fusion (branche) puis sur
+  `main` 23f71d6b (git archive, rebâti) :
+  - **verts** : stock-annonces, a-trancher (92), stock-2d, stock-2d-revue, stock-planches,
+    stock-retrouver, inventaire-annuel (72), **cycle-supprime (18)** et **stock-plateformes**
+    (tous deux refaits pour DJ4 : la question dans la carte À trancher, trois réponses — la
+    mutation `CYCLE_MUTATION=1` rougit — ; Leboncoin avec sa lecture complète) ;
+  - **rouges, les MÊMES sur `main`** (hors lot, bancs de l'ancien Stock 3D / de Colis d'avant DJ3) :
+    stock-assistant 7, stock-gestes 6, stock-partis 12, stock-piece 13, stock-finitions (3D,
+    coupé à 600-900 s), inventaire (≈ 42, coupé), gestes-annuler 4 (« Colis → À retirer », déplacé
+    par le lot DJ3).
 
 ## Ce qui reste / limites
 
@@ -87,3 +96,11 @@ seconde a vérifié, corrigé, refait deux bancs et intégré `main`.
 
 Aucun obligatoire. Deux choix possibles : la valeur du stock « en ligne » plutôt que « chez toi » ;
 retirer aussi « Faire l'inventaire » du Stock.
+
+## Note d'intégration (fin de journée)
+
+Une session parallèle a poussé sur la même branche pendant la reprise (1a59292e → f1523f93 :
+« Annulation… »/« Annulé » jamais en pause, banc `scripts/bancs/stock-juste.cjs`, carte de Ma
+journée sans résumé redit, un seul chevron par repli). Fusion réelle (109db29d), rien perdu ;
+après fusion : build vert, audits verts (`audit-stock-juste --prouve` : 7 mutations rougissent),
+bancs `a-trancher` et `stock-juste` verts.
