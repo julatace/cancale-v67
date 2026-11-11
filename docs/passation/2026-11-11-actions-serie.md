@@ -92,8 +92,8 @@ pour la prochaine action Vinted en série : jamais plus que le plafond restant, 
   les 3 colis au relais et PAS la finalisée, résumé « 3 retirés · 1 pas fait : … » ; la pilule
   « Annuler » défait les 3 d'un coup ; Je dépose écrit les 3 ventes à envoyer et pas la
   finalisée ; Exporter télécharge un CSV des N lignes ; ni débord, cibles 44 px, la barre
-  au-dessus de la navigation du bas ; aucune erreur JS. **Sur le dist de `origin/main` : rouge**
-  (voir le chiffre dans le rapport de session). Captures regardées (hors dépôt) :
+  au-dessus de la navigation du bas ; aucune erreur JS. **Sur le dist de `origin/main` : 26 verts, 44 rouges**
+  (A 10/34, V 0/20 ; G 16/16 — la barre absente ne déborde pas). Captures regardées (hors dépôt) :
   `scratchpad/shots/serie-{390,1512}-{clair,sombre}-{achats,ventes}-{selection,resume}.png`.
 - Audits demandés verts : `variables`, `tdz`, `coherence`, `identite`, `icones`,
   `textes-courts`, `fonctions-api`, `secrets`. Les 18 audits qui lisent les fichiers touchés :
