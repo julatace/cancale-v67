@@ -266,7 +266,8 @@ export const suivi = {
   demarrer: (o, now = Date.now()) => {
     if (courant && (courant.statut === 'cours' || courant.statut === 'pause')) return null;
     courant = creer(o, now);
-    if (o && typeof o.surGeste === 'function') rappels.set(courant.id, o.surGeste);
+    // Un écran monté pilote ce travail (même sans rappel : sa boucle attend `continuer()`).
+    rappels.set(courant.id, o && typeof o.surGeste === 'function' ? o.surGeste : () => {});
     annoncer();
     return pilote(courant.id);
   },

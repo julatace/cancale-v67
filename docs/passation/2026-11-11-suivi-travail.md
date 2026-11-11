@@ -1,39 +1,63 @@
 # Suivi d'un travail long — VRM figé, détail, barre de progression (11 nov.)
 
 Demande de Julien : « quand l'app republie, publie de Vinted à Leboncoin, je veux que VRM reste FIGÉ et qu'il y ait un DÉTAIL de toutes les infos que VRM fait, avec une BARRE DE PROGRESSION. »
-Branche `claude/suivi-travail` (partie d'`origin/main` f04d4a5). Aucune PR, aucune fusion.
+Branche `claude/suivi-travail`. Aucune PR, aucune fusion sur `main`. **Aucun changement d'extension** (elle annonce déjà ses étapes fines ; la 5.360 réservée n'est pas prise).
 
-## ÉTAT À LA REPRISE (arrêt demandé par Julien via la session principale)
+## Ce qui est livré
 
-### Fait (poussé, WIP)
-- `src/suiviTravail.js` — règle PURE + magasin `suivi` :
-  `creer`, `debutArticle`, `etapeArticle`, `finArticle` (ok · main · refus · saute), `noter` (journal horodaté, ≤ 400 lignes),
-  `poserPause`/`leverPause` (pause de sécurité avec échéance), `demander` ('pause' | 'arret'), `doitSArreter`, `terminer`
-  (pause · arrete · fini · interrompu), `reprendre`, `progression` (N sur M, part, étape en cours, écoulé, restant ESTIMÉ au
-  rythme réel = écoulé ÷ finis × restants, `null` tant qu'aucun fini ⇒ « — »), `recap`, `texteJournal` (copiable),
-  `nettoyer` (retire e-mail, @pseudo, téléphone, liens de profil/messages), `repriseApresChargement` + `repriseDepuisExtension`
-  (lit les `cmds` de l'extension, jamais deviné), `archiver` (≤ 20 travaux, `vrm_suivi_travaux`).
-  Magasin : `suivi.demarrer({ sorte, titre, etapes, articles, uid, surGeste })` rend un pilote
-  (`debut`, `etape`, `noter`, `fin`, `pause`, `finPause`, `plafond`, `doitSArreter`, `demande`, `terminer`, `enPause`) ;
-  `suivi.demander`, `reprendre`, `arreterEnPause`, `fermer`, `relire(jobs)`, `pilote()`. Gardé sur l'appareil (`vrm_suivi_travail`) à chaque pas.
-  Vérifié à la main par `node -e` (progression, journal, nettoyage) — **aucun audit écrit encore**.
-- `src/composants/SuiviTravail.jsx` — `SuiviTravailFeuille` (portail body, z 15000 < confirmations 20000, tout le reste de
-  `<body>` en `inert`, Échap neutralisé, retour du navigateur reposé, `beforeunload`, « Mettre en pause » / « Arrêter » confirmé
-  dans la feuille, barre `role=progressbar`, étapes de l'annonce, écoulé / « environ », pause avec compte à rebours,
-  `JaugeActions`, journal copiable, récapitulatif, « Fermer » ⇒ archivé), `SuiviTravailHote({ lireJobs, abonnerExt })`,
-  `TravauxPasses` (pour « Ce que VRM a fait »), `useSuivi`.
+- **Règle** `src/suiviTravail.js` (pure + petit magasin `suivi`) et **feuille** `src/composants/SuiviTravail.jsx` (+ `suivi-travail.css`).
+- **Feuille plein écran** (portail `<body>`, z 15000 — SOUS les confirmations 20000 : une question posée pendant le travail, couleur d'un brouillon, champ manquant, reste répondable) ; tout le reste de `<body>` passe en `inert` ; Échap neutralisé ; le retour du navigateur reposé ; `beforeunload` tant que ça tourne. Impossible à fermer par erreur : deux gestes seulement, **« Mettre en pause »** (l'étape en cours finit, puis VRM s'arrête entre deux annonces) et **« Arrêter »** (confirmé dans la feuille, « Continuer » ne change rien). En pause : « Reprendre » / « Arrêter ».
+- **Progression réelle** : « N sur M », barre (`role=progressbar`) = annonces finies + part de l'étape en cours ; l'annonce en cours et ses étapes (✓ faites, celle en cours, à venir) ; écoulé ; **temps restant « environ »** mesuré au rythme réel (écoulé ÷ finies × restantes), **« — » tant qu'aucune n'est finie** ; pause de sécurité avec compte à rebours (entre deux annonces, pause au hasard de l'extension, « Vinted demande d'attendre ») ; jauge 50/h du compte (`JaugeActions`).
+- **Journal** horodaté, en français simple, une ligne par geste, désigné par le N° ; **rien de personnel** (les écrans ne passent jamais de pseudo ; `nettoyer` retire en filet adresses, @pseudos, téléphones, liens de profil) ; refus en clair avec le geste ; **copiable** ; gardé (≤ 20 travaux, `vrm_suivi_travaux`, sur cet appareil) dans **Paramètres → Ce que VRM a fait** (`TravauxPasses`). Le journal reste en français (c'est une trace copiable, comme une donnée) ; tout le reste de la feuille passe par `tr()` (41 clés `suivi.*`, 5 langues).
+- **Récapitulatif** à la fin : réussies · à finir à la main (raison + geste + lien) · refusées (raison + geste) · pas faites ; « Fermer » dégèle VRM.
+- **Reprise après rechargement** : l'état est écrit à chaque pas (`vrm_suivi_travail`) ; au démarrage (`SuiviTravailCoque` dans `AppCoeur`) le travail revient **« Interrompu »** (la boucle de l'écran est morte) ; l'annonce qui était en cours n'est **jamais déclarée faite ni ratée** : « à vérifier », sauf si l'extension (ses `cmds`, `__vmrJobs`) dit elle-même son étape pour CETTE annonce.
 
-### PAS fait (reste, dans l'ordre)
-1. `src/composants/suivi-travail.css` (importé par le composant, **absent ⇒ le build casse tant qu'il n'existe pas**) — classes `vrm-st-*` ; jetons `--vrm-bg/--vrm-ink/--vrm-muted/--vrm-line/--vrm-accent/--vrm-warn` ; fond opaque plein écran ; 44 px ; ambre pour pause/refus, jamais rouge (§7).
-2. Clés `suivi.*` dans `src/i18n/langues/fr.js` puis en/es/it/de (liste : grep `tr('suivi.` dans le composant ; pluriels `{ one, other }` pour `suivi.nReussies`, `nMain`, `nRefus`, `recap.*`) ; ajouter `src/composants/SuiviTravail.jsx` à `MIGRES` de `scripts/audit-traduction.cjs`.
-3. Monter `<SuiviTravailHote lireJobs={() => __vmrJobs} abonnerExt={onVmrExt}/>` UNE fois dans `AppCoeur` (src/App.jsx ~53318).
-4. Brancher : Republier (`src/ecrans/Republier.jsx` : démarrer dans `lancerFile`, alimenter depuis les effets `st`/`prog` (événements `vrm:ext` `{type:'maj',quoi:'repub',id,etape,pause,jusqua}`)/`prochaine` ; `surGeste('pause'|'arret')` ⇒ `setMode('pause'|'fini')`, `'reprendre'` ⇒ `setMode('run')`) ; `BaissePrixSerie.jsx` (`lancer` : `arret.current` ⇐ `doitSArreter`) ; « Retirer des autres sites » (App.jsx ~41665, envelopper les rappels `lbc`/`ebay` d'`executerRetraits`) ; `ModeVacances.jsx` (`lancer`) ; Leboncoin (`src/ecrans/Leboncoin.jsx` ~955 `lbcPublier`), eBay, Vestiaire.
-5. `TravauxPasses` dans `JournalVrm` (src/ecrans/Reglages.jsx ~2589, après `HistoriqueModifications`).
-6. Preuves §6 : `scripts/audit-suivi-travail.cjs` (règle + mutations : estimation inventée, pseudo laissé, arrêt au milieu d'une annonce), banc `scripts/bancs/suivi-travail.cjs` 390/1512 (inert, retour, beforeunload, pause, reprise après rechargement), captures regardées ; build ; `audit-traduction`, `audit-quoi-de-neuf`.
-7. « Quoi de neuf » (`src/nouveautes.js`), ligne §9 de CLAUDE.md, API dans `COORDINATION-AGENTS.md` (branche `claude/coordination`) pour « Publier partout », vrai `git merge origin/main`.
+## Branchements
 
-### Pièges
-- Extension : AUCUN changement nécessaire (elle émet déjà les étapes fines) ⇒ la 5.360 réservée n'a pas été prise.
-- Les questions posées pendant le travail (couleur d'un brouillon, champ manquant) passent par `askConfirm`/`askChoix` (z 20000, portail créé APRÈS le gel) : elles restent répondables — ne pas monter la feuille au-dessus de 20000, ne pas figer les nœuds ajoutés après.
-- La boucle Republier vit dans l'écran : après rechargement le travail est « interrompu » ; l'annonce en cours est « à vérifier », sauf si l'extension dit son étape. Ne jamais la déclarer faite.
-- `TravauxPasses` utilise `toLocaleString('fr-FR')` : passer à `date()` d'`src/i18n`.
+| travail | où | étapes suivies |
+|---|---|---|
+| Republier (recréer, modifier, brouillon, mettre en ligne) | `src/ecrans/Republier.jsx` (`lancerFile`, effet miroir de `st`/`prog`/`prochaine`/`arretJusqua`) | celles de l'extension (`ETAPES_REPUB`) + « Acceptée par Vinted ✓ » cochée seulement sur le « fait » rendu ; mise en ligne programmée ⇒ étape « attente » « programmée vers hh:mm » ; double / incertain ⇒ « à finir à la main » ; a-refaire / échec ⇒ refus avec le geste. Pause / Arrêter ⇒ `setMode('pause'|'fini')` ; Reprendre ⇒ `setMode('run')` (refusé, dit, si Vinted demande encore d'attendre) |
+| Republier sur Leboncoin (série) | `RepublierLeboncoin` (`src/ecrans/Leboncoin.jsx`) | suppression · remise dans la file · dépôt · `progres.etape` de l'extension · publiée ✓ |
+| Publier sur Leboncoin (fiche, bouton) / Préparer sur eBay (bouton) | `suivrePublicationSite` (Leboncoin.jsx) | jusqu'au « fait » dit APRÈS le départ ; geste attendu / abandon / 15 min ⇒ « à la main » ; eBay préparé ⇒ « relis et mets en vente » |
+| Publier sur eBay (API) | `publier` (`src/ecrans/Ebay.jsx`) | envoi · acceptée par eBay ✓ ; pas de réponse ⇒ « à la main » |
+| Vestiaire (préparer / publier) | `preparer` (`src/ecrans/Vestiaire.jsx`) | formulaire ouvert · publiée ✓ (auto) |
+| Baisser le prix en série | `src/BaissePrixSerie.jsx` (`lancer` : `t.continuer()` entre deux annonces) | envoi (ancien → nouveau) · prix relu |
+| Retirer des autres sites | `retirerDesAutresSites` (`src/App.jsx`) — voies enveloppées | demande au site · retrait accepté |
+| Mode vacances | `src/ModeVacances.jsx` (`lancer`) | envoi · état relu (le compte n'est jamais nommé) |
+
+## API (pour le lot « Publier partout »)
+
+```js
+import { suivi, suivreJob } from '../suiviTravail.js';
+const t = suivi.demarrer({
+  sorte: 'publier-partout',            // libre, sert de data-suivi-travail
+  titre: 'Publier partout',            // en tête de la feuille (jamais un pseudo)
+  etapes: [['envoi', 'Envoi'], ['accepte', 'Accepté ✓']],   // les étapes d'UN article
+  articles: [{ id, num, titre }],      // la file, figée au lancement ; ids uniques
+  uid,                                 // facultatif : compte Vinted de la jauge 50/h
+  surGeste: (quoi) => {},              // facultatif : 'pause' | 'arret' | 'reprendre' (boucle pilotée par état React)
+});                                    // null si un autre travail tourne (un seul à la fois)
+t.etape(id, cle, detail?)   // l'étape en cours (commence l'article) ; même étape + même détail = rien de neuf
+t.noter(texte, id?, ton?)   // une ligne au journal (ton : info · ok · refus · pause)
+t.pause({ ms | jusqua, raison }) · t.finPause()      // pause de sécurité, compte à rebours
+t.fin(id, { etat: 'ok'|'main'|'refus'|'saute', raison, geste, lien })   // une seule fois par article
+await t.continuer()         // ENTRE deux articles : true = continuer ; sur « pause » attend Reprendre/Arrêter
+t.doitSArreter()            // pour couper une attente (pause entre deux) dès la demande
+t.terminer(raison?, 'pause'|'arrete'?)   // fin de boucle : statut décidé par la demande et ce qui reste
+await suivreJob(t, id, { jobId, lireJobs: () => __vmrJobs, depuis, delaiMs })   // une commande de l'extension
+//  → { fin: 'fait'|'abandonne'|'geste'|'delai'|'arret' } ; « fait » seulement si daté APRÈS `depuis`
+```
+La feuille se monte seule (`SuiviTravailCoque` dans `AppCoeur`) : rien à monter dans l'écran.
+
+## Preuves
+
+- `node scripts/audit-suivi-travail.cjs --prouve` : **56 ✅ · 0 ❌**, dont 8 mutations toutes rouges (temps restant inventé, pseudo laissé, annonce en cours déclarée faite au rechargement, « fait » d'avant le départ accepté, pause sans fin, issue inconnue = réussie, Republier « double » compté réussi, feuille au-dessus des confirmations). Sur la tête d'avant (9d7d1b7a) l'audit n'existe pas et ses contrôles B (branchements, montage) y seraient tous rouges.
+- Banc `scripts/bancs/suivi-travail.cjs` (vraie feuille + vrai magasin, harnais esbuild, 390 tactile / 1512, clair / sombre) : voir la section « État » ci-dessous.
+- Audits communs : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction — verts.
+
+## Pièges
+
+- `inert` est posé sur les enfants de `<body>` présents au gel ; une confirmation créée APRÈS (portail `askConfirm`) reste vivante et au-dessus (20000 > 15000). Ne pas monter la feuille au-dessus de 20000.
+- Republier : plusieurs annonces peuvent être « en cours » (une mise en ligne programmée attend pendant que la suivante commence) ; la feuille montre la dernière touchée (`vuAt`).
+- La boucle de Republier vit dans l'écran : après un rechargement, le travail est « interrompu » ; ne jamais le reprendre seul.
+- `t.terminer` ne fait rien sur un travail déjà arrêté / fini (un « Arrêter » en pause ne redevient pas « terminé »).
