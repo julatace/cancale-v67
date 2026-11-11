@@ -372,7 +372,8 @@ function SiretConfiguration({ entreprise, statut, poser }) {
       <label className="vrm-cfg-libre">
         <span>VRM cherche ton entreprise au registre public. Rien écrit sans ton accord.</span>
         <input type="text" inputMode="numeric" autoComplete="off" placeholder="14 chiffres" value={saisie} data-configuration-siret-champ=""
-          onChange={(e) => { touche.current = true; setSaisie(e.target.value); }} />
+          onChange={(e) => { touche.current = true; setSaisie(e.target.value); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); recherche.lancer(); } }} onBlur={() => recherche.lancerUneFois()} />
       </label>
       {fiche === null ? <p className="vrm-cfg-note" style={{ textAlign: 'left' }}>Fiche de facture pas lue : rien écrit. Elle est dans Argent → Factures → Ma facture.</p> : null}
       <CarteVerifEntreprise recherche={recherche} actuel={fiche || {}} avecSiret enTete={enTete}

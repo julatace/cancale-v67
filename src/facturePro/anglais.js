@@ -105,7 +105,8 @@ export const paiementAnglais = (c) => (!c || !c.anglais ? '' : c.type === 'avoir
 // Le message par défaut, anglais puis français (le vendeur qui a écrit SON
 // message le garde tel quel : on ne le traduit pas).
 export const MESSAGE_DEFAUT_EN = 'Hello {acheteur},\n\nPlease find attached invoice {numero} for your purchase "{article}".\n\nThank you for your trust,\n{boutique}';
-export const PIED_VRM_EN = (nom) => `This invoice is sent to you by VRM on behalf of ${nom}. If you have any question, simply reply to this e-mail: your reply goes to ${nom}.`;
+// (11 nov., lot DJ1) L'ancien pied « This invoice is sent to you by VRM on behalf of … » est RETIRÉ
+// (Julien : « je veux pas de ce message ») : l'e-mail ne porte que le texte du vendeur.
 
 // Un indice, jamais une décision : l'adresse PROUVÉE de l'acheteur (remise en
 // lignes par `adresseVintedLisible`, qui n'ajoute le pays que s'il n'est pas la
