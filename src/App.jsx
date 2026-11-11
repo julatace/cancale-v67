@@ -168,6 +168,8 @@ import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
 import { requeteDeLaVoix, ficheDeLaVoix } from "./rechercheVocale.js";
 import { ventesMainPropre, opsVenduAilleurs } from "./venteAilleurs.js";   // (11 nov., saisie rapide) « Vendu ailleurs »
+import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
+import { VenduAilleurs, FeuillePrixAchat, poserDemandesPrix, abonnerDemandesPrix, lireDemandesPrix } from "./SaisieRapide.jsx";
 import { VOIX, PHRASES_VOIX, ecouter, annulerVoix, arreterVoix, ecouteEnCours } from "./dicteeNavigateur.js";
 import { useEtatVoix, LigneVoix } from "./composants/voix.jsx";
 import { lireDemandeAchat, lireRechercheLien, poserDemandeAchat } from "./raccourcisSiri.js";
@@ -4022,6 +4024,15 @@ function gesteChezToi(carte, reponse, raison, apres = null) {
     if (typeof apres === 'function') apres(sens);
   });
   return true;
+}
+// (11 nov., saisie rapide) La feuille « Combien tu l'avais payée ? » : les ventes publiées
+// par la coque (`poserDemandesPrix`), celles de la notification d'abord (`txs`, vide = toutes).
+function PrixAchatCoque({ txs, onPoser, onFermer }) {
+  const l = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
+  if (l === undefined) return null;
+  const voulu = Array.isArray(txs) && txs.length ? new Set(txs.map(String)) : null;
+  const ventes = (Array.isArray(l) ? l : []).filter((v) => !voulu || voulu.has(String(v.tx)));
+  return <FeuillePrixAchat ventes={ventes} onEnregistrer={onPoser} onFermer={onFermer} Feuille={SheetShell} Bouton={Bouton}/>;
 }
 function PiluleAnnulerCoque() {
   const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
@@ -29441,6 +29452,8 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false }) {
+  // (11 nov., saisie rapide) Les ventes prouvées sans prix d'achat (publiées par la coque) : Ma journée.
+  const prixAFaire = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
@@ -41704,6 +41717,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // identité, publiées par leurs écrans) en pile, et les types — plus de phrase.
           const ph = photosATrancher(aTrancher);
           jobs.push({ id: 'a-trancher', n: aTrancher.total, icon: 'help', color: C.text, court: t, detail: typesATrancher(aTrancher), title: t, prio: 1.9, photos: ph.length ? ph : null, action: 'Trancher' });
+        }
+        // (11 nov., saisie rapide) VENDUE SANS PRIX D'ACHAT (vente PROUVÉE de moins de 3 jours,
+        // src/prixAchatVente.js) : ambre, un geste — « Saisir » ouvre la petite feuille du prix.
+        // La carte reste tant que le prix est vide ; elle part dès qu'il est enregistré.
+        if (Array.isArray(prixAFaire) && prixAFaire.length) {
+          const tP = texteDemande(prixAFaire);
+          jobs.push({ id: 'prix-achat-vente', n: prixAFaire.length, icon: 'euro', color: C.warn, court: tP.title, detail: tP.body, title: tP.title, tab: 'journee', prio: 1.7, action: 'Saisir',
+            avant: () => { try { window.dispatchEvent(new CustomEvent('vrm:prix-achat-ouvrir', { detail: [] })); } catch (_) {} } });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -55460,6 +55481,67 @@ function AppCoeur() {
   // une rubrique d'E-mails (`ouvrirEmailsRelier`), un panneau de Paramètres (« Tout va bien ? »).
   // Il OUVRE seulement : aucune correction n'est faite sans son clic là-bas (§2.4, §2.5).
   // ⚠️ Posé AVANT les retours anticipés (règle des hooks) : `allerTrancher` est défini plus bas, l'effet le lit par sa référence.
+  // ── (11 nov., saisie rapide) LE PRIX D'ACHAT DEMANDÉ LE JOUR DE LA VENTE (src/prixAchatVente.js) ──
+  // Les ventes PROUVÉES (`lirePreuvesVenteVinted().paires`, §5) de moins de 3 jours dont la
+  // paire n'a pas de prix d'achat : publiées pour Ma journée (`poserDemandesPrix`), et
+  // nommées au serveur (`/api/push`, action `prixachat`) qui relit chaque transaction,
+  // réserve « une fois par vente » et envoie (jamais la nuit, réglages de notifications).
+  // Ici rien n'est écrit : le prix n'est posé que sur SON « Enregistrer » (§2.5).
+  const [prixFeuille,setPrixFeuille]=useState(()=>{ try { return txsDuLien(window.location.search); } catch (_) { return null; } });
+  const [prixTick,setPrixTick]=useState(0);
+  const [prixQuart,setPrixQuart]=useState(0);
+  const [prixPreuves,setPrixPreuves]=useState(undefined);
+  const prixEnvoyes=useRef(new Set());
+  useEffect(()=>{
+    const f=(e)=>{ const k=e&&e.detail&&e.detail.k; if(k==='vinted_annonce_numeros'||k==='vinted_buyprice_by_num') setPrixTick(t=>t+1); };
+    const g=(e)=>{ const t=e&&e.detail; setPrixFeuille(Array.isArray(t)?t:[]); };
+    const h=(e)=>{ if(e&&e.data&&e.data.type==='open-url'&&e.data.url){ try{ const t=txsDuLien(new URL(e.data.url,window.location.origin).search); if(t) setPrixFeuille(t); }catch(_){} } };
+    const quart=setInterval(()=>setPrixQuart(t=>t+1),15*60000);
+    window.addEventListener('vrm:save',f); window.addEventListener('vrm:prix-achat-ouvrir',g);
+    try{ if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',h); }catch(_){}
+    return ()=>{ clearInterval(quart); window.removeEventListener('vrm:save',f); window.removeEventListener('vrm:prix-achat-ouvrir',g); try{ if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',h); }catch(_){} };
+  },[]);
+  // Les preuves : relues quand les ventes changent, et tous les quarts d'heure — jamais à
+  // chaque fiche touchée (la lecture des transactions est la plus lourde).
+  useEffect(()=>{
+    if(!AUTH.user||!Array.isArray(ventesCoque)) return undefined;
+    let mort=false;
+    lirePreuvesVenteVinted().then((pv)=>{ if(!mort) setPrixPreuves(pv&&Array.isArray(pv.paires)?pv:null); }).catch(()=>{ if(!mort) setPrixPreuves(null); });
+    return ()=>{ mort=true; };
+  },[ventesCoque,prixQuart]);
+  useEffect(()=>{
+    if(prixPreuves===undefined||!Array.isArray(ventesCoque)) return;
+    { const pv=prixPreuves;
+      if(!pv){ poserDemandesPrix(null); return; }
+      const buy=load('vinted_buyprice_by_num',{})||{};
+      const l=ventesSansPrix({ paires:pv.paires, ventes:ventesCoque, fiches:load('vinted_annonce_numeros',{})||{}, prixDe:(f)=>prixAchatDe(f,buy),
+        annulee:(o)=>classifyOrderStatus(o&&o.status)==='cancelled', montant:montantCommandeLu });
+      poserDemandesPrix(l);
+      const neufs=l.filter((v)=>!prixEnvoyes.current.has(v.tx));
+      if(!neufs.length||estNuitParis()) return;
+      for(const v of neufs) prixEnvoyes.current.add(v.tx);
+      fetch('/api/push',{ method:'POST', headers:{ 'Content-Type':'application/json', ...enTeteSession() }, body:JSON.stringify(corpsDemande(neufs)) })
+        .then((r)=>r.ok?r.json():null).then((j)=>{ if(!j||j.raison==='nuit') for(const v of neufs) prixEnvoyes.current.delete(v.tx); })
+        .catch(()=>{ for(const v of neufs) prixEnvoyes.current.delete(v.tx); });
+    }
+  },[prixPreuves,ventesCoque,prixTick]);
+  // « Enregistrer » : le prix sur la fiche de l'annonce VENDUE (identité : son annonce, §5)
+  // et le miroir par N° — un geste annulable 5 s (src/gesteAnnulable.js).
+  const poserPrixAchatVente=(v,montant)=>{
+    const fiches=load('vinted_annonce_numeros',{})||{}; const f=fiches[String(v.item)];
+    if(!f){ toast('Fiche introuvable — rien n’a été noté.','err'); return; }
+    const w=ecriturePrixSaisi(String(montant)); if(w.etat!=='ok') return;
+    const buy=load('vinted_buyprice_by_num',{})||{}; const num=String(f.numero||'').trim();
+    const ops=[{ k:'vinted_annonce_numeros', type:'champs', id:String(v.item), apres:w.patch, avant:{ buyPrice:f.buyPrice, buyFromId:f.buyFromId, buyFrom:f.buyFrom } }];
+    if(num) ops.push({ k:'vinted_buyprice_by_num', type:'cle', id:num, apres:String(w.patch.buyPrice), avant:buy[num] });
+    gesteVrm(`N°${num||v.num} : acheté ${String(w.patch.buyPrice).replace('.',',')} €`, ops, {}, ()=>{ setTimeout(()=>{ emettreClesRelues(['vinted_annonce_numeros','vinted_buyprice_by_num']); setPrixTick(t=>t+1); },700); });
+  };
+  // « Vendu ailleurs » (fiche d'une paire du stock, src/venteAilleurs.js) : un geste annulable 5 s.
+  const venduAilleursGeste=(carte,{ montant, date })=>{
+    const r=opsVenduAilleurs({ carte, montant, date, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], slots:lireObjet('vrm_slots'), cle:cleNum });
+    if(!r){ toast('Pas compris — rien n’a été noté.','err'); return; }
+    gesteVrm(r.texte, r.ops, {}, ()=>{ setTimeout(()=>{ try{ window.dispatchEvent(new Event('vrm:stock-slots')); }catch(_){} emettreClesRelues(['vinted_annonces_vendues','vrm_cycle_decisions']); },700); });
+  };
   const allerTrancherRef=useRef(null);
   useEffect(()=>{
     const f=(e)=>{ const g=e&&e.detail; if(!g||typeof g!=='object') return;
@@ -55541,6 +55623,21 @@ function AppCoeur() {
   // annulable (`gesteChezToi`) : aucune confirmation, ni Vinted, ni vente inventée.
   // (11 nov., lot DJ4) La même question sur la fiche de la paire (« Tout sur le N° ») : la chose
   // publiée par la coque pour ce N° (identité : son annonce), les mêmes trois réponses.
+  // (11 nov., saisie rapide) « Vendu ailleurs » sur la fiche d'une paire du stock : seulement
+  // quand la vente est SUE et qu'il n'y en a pas, et qu'UNE annonce porte ce N° (identité ;
+  // deux ⇒ rien, mieux vaut un blanc qu'un faux, §5).
+  const blocVenduAilleurs=(p,rn,etat)=>{
+    if(!p||!p.num||p.ancienNumero||!rn||!Array.isArray(rn.annonces)||!etat) return null;
+    const eV=Array.isArray(p.etapes)?p.etapes.find((e)=>e.cle==='vente'):null;
+    const dec=lireObjet(CYCLE_DECISIONS);
+    const presentes=rn.annonces.filter((a)=>a&&(a.etat==='en-ligne'||a.etat==='a-confirmer'||a.etat==='masquee'));
+    const l=presentes.length?presentes:rn.annonces;
+    if(l.length!==1) return null;
+    const a=l[0]; const d=dec[String(a.id)];
+    if(d&&d.choix==='vendu-main') return <VenduAilleurs carte={{ id:a.id, numero:p.num }} deja={d} Bouton={Bouton}/>;
+    if(!eV||eV.etat==='passu'||etat.vendue) return null;
+    return <VenduAilleurs key={a.id} carte={{ id:a.id, numero:p.num }} Bouton={Bouton} onValider={(x)=>venduAilleursGeste({ id:a.id, numero:p.num, title:a.title||'' },x)}/>;
+  };
   const questionChezToiFiche=(num)=>{
     const l=aTrancherEtat&&Array.isArray(aTrancherEtat.lignes)?aTrancherEtat.lignes.find((x)=>x.cle==='supprimes-vinted'):null;
     const k=cleNum(num); const x=l&&Array.isArray(l.ex)&&k?l.ex.find((e)=>e&&e.id&&cleNum(e.num)===k):null;
@@ -56256,7 +56353,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = () => setFicheNum(null);
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}<NotePaireCoque numero={p.num} variante="bloc" ajout/></> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={ficheNum} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<NotePaireCoque numero={p.num} variante="bloc" ajout/></> : null} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
@@ -56270,6 +56367,7 @@ function AppCoeur() {
             onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
         }}/></GardeEcran>}
+        {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}
         <GardeEcran nom="lienvc" feuille><HoteLienVc comptes={vintedAccounts}/></GardeEcran>
         {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><Differe rendre={()=>{
           // (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), un clic.
