@@ -16,6 +16,7 @@ import React from 'react';
 import { tr, date as dateLoc, heure as heureLoc } from './i18n/index.js';
 import { AUTH, CLOISONNE, SUPABASE_URL, sbAuth, withOwner, lireTout, extSait, vintedDeChrome, __vmrEtat, onVmrExt, askConfirm, toast, pushNotif, EXT_CAPACITES } from './App.jsx';
 import { suivi } from './suiviTravail.js';
+import { finDemarrage } from './demarrage.js';
 import { jaugeDuCompte } from './jaugeActions.js';
 import { lireLignesActions } from './JaugeActions.jsx';
 import { lireProgrammes, modifierProgrammes, creerProgramme, poserProgramme, annulerProgramme, prendreDepart, marquerPasPartie, marquerVu,
@@ -226,6 +227,9 @@ export function ProgrammeRepubVeille() {
           const r = await modifierProgrammes((dd) => prendreDepart(dd, p.uid, p.id, appareilId), ctxLigne());
           const pr = r && r.progs && r.progs[p.uid];
           if (!r || !r.ok || !pr || pr.etat !== 'partie' || pr.appareil !== appareilId) { signaler(); return; }
+          // L'écran d'ouverture (#vrm-demarrage, au-dessus de tout) ne doit jamais cacher la feuille « VRM travaille » :
+          // un départ à l'ouverture de VRM le retire (mesuré au banc : il restait par-dessus la feuille).
+          finDemarrage('depart-programme');
           DEMANDE_PROGRAMME.prog = pr; DEMANDE_PROGRAMME.mode = 'depart'; DEMANDE_PROGRAMME.at = Date.now();
           try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=annonces&vue=republier' })); } catch (_) {}
           try { window.dispatchEvent(new CustomEvent('vrm:repub-programme')); } catch (_) {}

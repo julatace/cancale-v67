@@ -22,6 +22,7 @@ const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4391;
 const SHOTS = process.env.SHOTS || '';
 const THEMES = (process.env.THEMES || 'clair').split(',');
 const LARGEURS = (process.env.LARGEURS || '390,1512').split(',').map(Number);
+const SCENES = process.env.SCENES || 'ABCDE';
 const auj = new Date();
 const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 10, favourite_count: 1 }, o);
 const ITEMS = [
@@ -149,7 +150,7 @@ async function moteur(pg) {
       const tag = `${w}-${theme}`;
       console.log(`── ${tag}`);
       // ── A + B
-      { const { ctx, pg, rows, ecrits, errs } = await page(b, vp, theme, {});
+      if (/[AB]/.test(SCENES)) { const { ctx, pg, rows, ecrits, errs } = await page(b, vp, theme, {});
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
         await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await moteur(pg);
@@ -193,7 +194,7 @@ async function moteur(pg) {
         await ctx.close();
       }
       // ── C départ
-      { const { ctx, pg, rows } = await page(b, vp, theme, { prog: prog() }); let verifVue = false;
+      if (SCENES.includes('C')) { const { ctx, pg, rows } = await page(b, vp, theme, { prog: prog() }); let verifVue = false;
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         const parti = await attendre(async () => (ligneProg(rows) || {}).etat === 'partie', 20000);
         dit(parti && (ligneProg(rows) || {}).appareil, 'C1 c’est l’heure, tout est là : le départ est PRIS par cet appareil', (ligneProg(rows) || {}).etat);
@@ -202,11 +203,12 @@ async function moteur(pg) {
         const ids = await pg.evaluate(() => window.__repub.map((x) => x.id).join(','));
         dit(env && ids === '9104,9102', 'C2 l’atelier part avec SES paires seulement, dans SON ordre', ids);
         dit(await pg.locator('[data-suivi-travail]').count() > 0, 'C3 la feuille « VRM travaille » s’ouvre (VRM figé)');
+        if (process.env.DEBUG_RP) console.log(await pg.evaluate(() => { const e = document.elementFromPoint(195, 400); const ch = []; let x = e; while (x && ch.length < 8) { ch.push((x.tagName || '') + '#' + (x.id || '') + '.' + String(x.className || '').slice(0, 40) + '[z' + getComputedStyle(x).zIndex + ']'); x = x.parentElement; } return { url: location.href, chaine: ch }; }));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `rp-depart-${tag}.png`) });
         await ctx.close();
       }
       // ── D pas d'onglet
-      { const { ctx, pg, rows } = await page(b, vp, theme, { prog: prog(), repub: { onglet: false, frein: null } });
+      if (SCENES.includes('D')) { const { ctx, pg, rows } = await page(b, vp, theme, { prog: prog(), repub: { onglet: false, frein: null } });
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
         await attendre(async () => (ligneProg(rows) || {}).etat === 'pas-partie', 20000);
         const p = ligneProg(rows) || {};
@@ -219,7 +221,7 @@ async function moteur(pg) {
         await ctx.close();
       }
       // ── E heure passée
-      { const { ctx, pg, rows } = await page(b, vp, theme, { prog: prog({ at: Date.now() - 20 * 60000 }) });
+      if (SCENES.includes('E')) { const { ctx, pg, rows } = await page(b, vp, theme, { prog: prog({ at: Date.now() - 20 * 60000 }) });
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await attendre(async () => (ligneProg(rows) || {}).etat === 'pas-partie', 20000);
         const p = ligneProg(rows) || {};
