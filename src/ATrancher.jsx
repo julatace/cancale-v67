@@ -24,7 +24,7 @@ const Chevron = () => (
 
 // La vignette : la photo de L'ANNONCE (identité) ; sinon son N° ; sinon le nombre de la source.
 function Vignette({ carte, ton, Photo }) {
-  const P = Photo || ((p) => <img {...p} alt=""/>);
+  const P = Photo || (() => null);   // (11 nov.) sans la règle des photos (PhotoVinted), aucune <img> brute
   const tuile = (contenu, attrs = {}) => <span className="vrm-at-tuile" data-ton={ton} {...attrs}>{contenu}</span>;
   // Une chose sans photo (ou dont la photo ne vient pas) : une tuile neutre — le N° est
   // déjà écrit à côté, une fois.

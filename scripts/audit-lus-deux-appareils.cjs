@@ -18,7 +18,10 @@ const fonction = (nom) => {
   for (const n of ast.program.body) if (n.type === 'VariableDeclaration') for (const d of n.declarations) if (d.id.name === nom) return src.slice(n.start, n.end);
   throw new Error('fonction introuvable : ' + nom);
 };
-const jn = fs.readFileSync(path.join(R, 'src/journalNotifs.js'), 'utf8').replace(/export (const|function) /g, '$1 ');
+// (11 nov.) journalNotifs.js importe api/_lib/notif-belle.js (même texte que le téléphone) :
+// le module est empaqueté avec ses imports (esbuild), puis ses déclarations posées à plat.
+const jn = require('esbuild').buildSync({ entryPoints: [path.join(R, 'src/journalNotifs.js')], bundle: true, format: 'esm', write: false, logLevel: 'silent' })
+  .outputFiles[0].text.replace(/\nexport \{[^}]*\};?\s*$/, '\n');
 let ok = 0, ko = 0;
 const dit = (c, m, d = '') => { if (c) { ok++; console.log('✅ ' + m); } else { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); } };
 
