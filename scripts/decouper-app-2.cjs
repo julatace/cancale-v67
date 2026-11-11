@@ -619,7 +619,10 @@ function decouper(src, mod, appFile) {
     else {
       const m1 = '// ⟦démarrage léger⟧ racines paresseuses';
       if (!out.includes(m1)) throw new Error('ancre « ⟦démarrage léger⟧ racines paresseuses » absente d’App.jsx');
-      out = out.replace(m1, marque + '\n' + (out.includes('const prechargerAuRepos = ') ? '' : aide + '\n') + lignes + '\n' + m1);
+      // ⚠️ (11 nov., reprise) l'aide AVANT la marque : les modules suivants posent leurs lignes juste APRÈS la
+      // marque ; posée après elle, `prechargerAuRepos(…)` d'un module suivant tournait avant sa déclaration
+      // (« Cannot access … before initialization » au démarrage, vu par les bancs, pas par le build).
+      out = out.replace(m1, (out.includes('const prechargerAuRepos = ') ? '' : aide + '\n') + marque + '\n' + lignes + '\n' + m1);
     }
     const marqueExp = '// ⟦démarrage léger⟧ emprunts des écrans à la demande';
     const re = /\/\/ ⟦démarrage léger⟧ emprunts des écrans à la demande\nexport \{ ([^}]*) \};\n/;

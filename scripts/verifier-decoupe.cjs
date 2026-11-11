@@ -87,7 +87,33 @@ function structure(R) {
   }
   return { rendus, tab, curSub, branches, paresseux };
 }
+// (11 nov., reprise) ZONE MORTE AU CHARGEMENT D'UN MODULE : ce qui tourne quand le module s'évalue (hors de
+// toute fonction) ne doit lire aucune liaison de tête let/const/class déclarée PLUS BAS (sinon « Cannot access
+// … before initialization » au démarrage : le build passe, l'app ne s'ouvre pas — vu le 11 nov. sur
+// `prechargerAuRepos`). Compté avant et après : un défaut NEUF = rouge.
+function zonesMortes(R) {
+  const out = [];
+  for (const f of S.fichiersApp(R)) {
+    let ast; try { ast = parser.parse(fs.readFileSync(f, 'utf8'), { sourceType: 'module', plugins: ['jsx'] }); } catch (_) { continue; }
+    let prog; traverse(ast, { Program(p) { prog = p; p.stop(); } });
+    const pos = new Map(); for (const [nom, b] of Object.entries(prog.scope.bindings)) if (/^(let|const)$/.test(b.kind) || b.path.isClassDeclaration()) pos.set(nom, b.path.node.end);
+    prog.get('body').forEach((st) => {
+      st.traverse({
+        ReferencedIdentifier(q) {
+          if (q.getFunctionParent()) return;
+          const b = prog.scope.bindings[q.node.name]; if (!b || q.scope.getBinding(q.node.name) !== b || !pos.has(q.node.name)) return;
+          if (q.node.start < pos.get(q.node.name) && !(q.node.start >= b.path.node.start && q.node.end <= b.path.node.end)) out.push(`${path.relative(R, f)} : ${q.node.name} lu ligne ${q.node.loc.start.line} avant sa déclaration`);
+        },
+      });
+    });
+  }
+  return out;
+}
 function etapeStructure() {
+  const za = new Set(zonesMortes(AVANT).map((x) => x.replace(/ ligne \d+/, ''))), zb = zonesMortes(APRES);
+  const zNeufs = zb.filter((x) => !za.has(x.replace(/ ligne \d+/, '')));
+  if (zNeufs.length) KO(`zone morte au chargement d'un module (NEUVE) : ${zNeufs.slice(0, 8).join(' ; ')}`);
+  else OK(`aucune lecture avant déclaration au chargement des modules (${zb.length} déjà là avant : ${za.size})`);
   const a = structure(AVANT), b = structure(APRES);
   const neufs = [...b.paresseux].filter((x) => !a.paresseux.has(x));
   rapport.structure = { avant: { tab: a.tab, curSub: a.curSub, branches: a.branches, composants: a.rendus.size }, apres: { tab: b.tab, curSub: b.curSub, branches: b.branches, composants: b.rendus.size }, paresseuxNeufs: neufs };
