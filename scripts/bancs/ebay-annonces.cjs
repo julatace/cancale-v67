@@ -221,7 +221,7 @@ async function ouvrir(b, vp, panne, opts = {}) {
   // `opts.session` : une vraie session VRM (le compte de l'app est alors CONNU —
   // sans elle, « l'extension écrit dans un autre compte » ne peut pas se juger).
   if (opts.session) await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); } catch (_) {} }, SESSION);
-  else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); } catch (_) {} });
   if (opts.pont) await pg.addInitScript(PONT, Object.assign({}, opts.pont, { etatCode: opts.pont.etatCode !== undefined ? opts.pont.etatCode : codeEtat(opts.pont.version) }));
   if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
   // (9 nov.) Vendeur déjà configuré : l'écran plein « Ma configuration » ne couvre pas la page.
