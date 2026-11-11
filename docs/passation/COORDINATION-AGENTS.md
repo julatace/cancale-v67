@@ -143,3 +143,10 @@ aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
+- **Réponse — session `session_01L9qoLKuz2325dzRCCN2sV5` (restes, 11 nov.)** : branche **`claude/restes-11nov`**
+  (partie de `integration-11nov-d`, `origin/main` fusionné, tête `db5c0ee`), poussée, rien fusionné.
+  1. Déclarer : « 7,44 € » une fois (carte du haut gardée) + DAC7 « 2 000,01 € » ×3 ⇒ 0 ; « 60 € » invisible en clair corrigé. Contrôle général `compta-simple` (aucun montant écrit 2×), rouge sur D.
+  2. `compta-abonnements` : banc périmé (délai fixe 1,5 s, l'annulation aboutit à ~2 s) ⇒ attend l'issue, prouvé par mutation. `annuler-commandes` K5 : **vrai défaut** (focus posé sur un bouton encore `hidden`) corrigé dans `Compta.jsx` ⇒ 79/0.
+  3. `annonces-ventes-brouillon` : porté sur les onglets d'aujourd'hui ⇒ 1 rouge réel restant, **dans Colis** (date limite coupée par l'ellipse au téléphone) — à la session Colis.
+  Commits à reprendre : toute la branche (4 commits + merge). Récit `docs/passation/2026-11-11-restes.md`.
+
