@@ -382,6 +382,7 @@ export default {
   "antiArnaque.signaler": "Report it on {site}.",
   "antiArnaque.autres": {one: "+ {n} other sign", other: "+ {n} other signs"},
   "antiArnaque.compteur": {one: "{n} conversation to watch", other: "{n} conversations to watch"},
+  "antiArnaque.separateur": ": ",
   "antiArnaque.ligne": "Possible scam",
   "antiArnaque.rienFait": "Spotted without AI, in received messages only. Nothing is reported or blocked for you.",
 };

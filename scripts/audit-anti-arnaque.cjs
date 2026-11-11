@@ -124,7 +124,7 @@ async function verifier(F, { silence = false } = {}) {
   for (const l of ['fr', 'en', 'es', 'it', 'de']) langues[l] = (await import(path.join(__dirname, '..', 'src', 'i18n', 'langues', l + '.js'))).default;
   const cles = new Set();
   for (const m of F.MOTIFS_ARNAQUE) { cles.add(m.raison); cles.add(m.geste); }
-  for (const c of ['antiArnaque.titre', 'antiArnaque.signaler', 'antiArnaque.autres', 'antiArnaque.compteur', 'antiArnaque.ligne', 'antiArnaque.rienFait']) cles.add(c);
+  for (const c of ['antiArnaque.titre', 'antiArnaque.signaler', 'antiArnaque.autres', 'antiArnaque.compteur', 'antiArnaque.ligne', 'antiArnaque.rienFait', 'antiArnaque.separateur']) cles.add(c);
   const manquent = [];
   for (const c of cles) for (const l of Object.keys(langues)) if (langues[l][c] == null) manquent.push(l + ':' + c);
   dit(!manquent.length, 'T · raisons, gestes et libellés présents en fr, en, es, it, de', manquent.join(' '));

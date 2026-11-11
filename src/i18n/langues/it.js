@@ -382,6 +382,7 @@ export default {
   "antiArnaque.signaler": "Segnalalo su {site}.",
   "antiArnaque.autres": {one: "+ {n} altro segnale", other: "+ {n} altri segnali"},
   "antiArnaque.compteur": {one: "{n} conversazione da tenere d’occhio", other: "{n} conversazioni da tenere d’occhio"},
+  "antiArnaque.separateur": ": ",
   "antiArnaque.ligne": "Possibile truffa",
   "antiArnaque.rienFait": "Rilevato senza IA, solo nei messaggi ricevuti. Niente viene segnalato o bloccato al posto tuo.",
 };

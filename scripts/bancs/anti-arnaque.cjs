@@ -6,7 +6,7 @@
 //   B. 301 ouverte : bannière ambre « Attention · arnaque possible », motif codeSms en
 //      tête, horsPlateforme gardé, le geste et « Signale-le sur Vinted » ;
 //   C. 302 et 303 ouvertes : AUCUNE bannière (ses messages, messages normaux) ;
-//   D. Messages · Tous : compteur 2 (Vinted 301 + Leboncoin), le fil Leboncoin ouvert
+//   D. Messages · Tous : compteur 1 (Leboncoin ; l'aperçu Vinted de la boîte n'a pas d'auteur ⇒ pas compté), le fil Leboncoin ouvert
 //      porte la bannière paiementHors ;
 //   E. aucune commande ni écriture (jamais d'action automatique) ;
 //   F. 390 px tactile et 1512 px, clair ET sombre : rien ne déborde ; captures.
@@ -163,7 +163,8 @@ const attendre = async (pg, sel, ms = 15000) => pg.waitForSelector(sel, { timeou
       await t.pg.waitForFunction(() => { const e = document.querySelector('[data-fils-tous]'); return e && e.getAttribute('data-fils-tous') !== 'charge' && document.querySelectorAll('[data-fil]').length >= 4; }, null, { timeout: 20000 }).catch(() => {});
       await t.pg.waitForTimeout(600);
       const ct = await t.pg.$eval('[data-fils-tous] [data-arnaque-compteur]', (x) => x.getAttribute('data-arnaque-compteur')).catch(() => null);
-      dit(ct === '2', `D · ${nom} : Tous ⇒ « 2 conversations à surveiller » (Vinted 301 + Leboncoin)`, String(ct));
+      // La ligne Vinted de « Tous » porte l'aperçu de la BOÎTE (auteur pas su, filUnique `deMoi: null`) : jamais comptée.
+      dit(ct === '1', `D · ${nom} : Tous ⇒ « 1 conversation à surveiller » (Leboncoin, auteur prouvé ; l'aperçu Vinted de la boîte n'a pas d'auteur)`, String(ct));
       await t.pg.screenshot({ path: path.join(CAP, 'anti-arnaque-tous-' + nom + '.png') });
       const lb = await t.pg.$('[data-fil][data-fil-sites="leboncoin"]');
       if (lb) await lb.click();

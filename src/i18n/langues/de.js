@@ -382,6 +382,7 @@ export default {
   "antiArnaque.signaler": "Melde es auf {site}.",
   "antiArnaque.autres": {one: "+ {n} weiteres Zeichen", other: "+ {n} weitere Zeichen"},
   "antiArnaque.compteur": {one: "{n} Unterhaltung im Auge behalten", other: "{n} Unterhaltungen im Auge behalten"},
+  "antiArnaque.separateur": ": ",
   "antiArnaque.ligne": "Möglicher Betrug",
   "antiArnaque.rienFait": "Ohne KI erkannt, nur in empfangenen Nachrichten. Nichts wird für dich gemeldet oder blockiert.",
 };

@@ -387,6 +387,7 @@ export default {
   "antiArnaque.signaler": "Signale-le sur {site}.",
   "antiArnaque.autres": {one: "+ {n} autre signe", other: "+ {n} autres signes"},
   "antiArnaque.compteur": {one: "{n} conversation à surveiller", other: "{n} conversations à surveiller"},
+  "antiArnaque.separateur": " : ",
   "antiArnaque.ligne": "Arnaque possible",
   "antiArnaque.rienFait": "Repéré sans IA, dans les messages reçus seulement. Rien n’est signalé ni bloqué à ta place.",
 };

@@ -382,6 +382,7 @@ export default {
   "antiArnaque.signaler": "Denúncialo en {site}.",
   "antiArnaque.autres": {one: "+ {n} señal más", other: "+ {n} señales más"},
   "antiArnaque.compteur": {one: "{n} conversación a vigilar", other: "{n} conversaciones a vigilar"},
+  "antiArnaque.separateur": ": ",
   "antiArnaque.ligne": "Posible estafa",
   "antiArnaque.rienFait": "Detectado sin IA, solo en los mensajes recibidos. Nada se denuncia ni se bloquea por ti.",
 };
