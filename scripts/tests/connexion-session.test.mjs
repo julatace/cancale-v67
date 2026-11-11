@@ -4,6 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import { messageErreurOAuth } from "../../src/auth/erreursOAuth.js";
 import { prendreEssais, oterEssai, candidatsVerificateur, ESSAIS_MAX } from "../../src/auth/essaisPkce.js";
+import { lireReconnexion, reconnexionPermise } from "../../src/auth/reconnexion.js";
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source = fs.readFileSync(
@@ -173,6 +174,9 @@ function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
     ESSAIS_MAX,
     toast() {},
     setTimeout,
+    // (relecture du 11 nov., lot suppression-oauth) les vraies règles de la reconnexion.
+    lireReconnexion,
+    reconnexionPermise,
     cleanAuthUrl: () => {
       nettoyee = true;
     },
