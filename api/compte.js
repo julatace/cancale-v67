@@ -91,7 +91,8 @@ import { effacerCompte } from './_lib/effacer-compte.js';
 import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov., lot DJ6)
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
-import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
+import { envoyerSignalement, listerSignalements, marquerTraite, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+import { routeAlertes } from './_lib/alertes-production.js';
 import { routePilotage } from './_lib/pilotage.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
@@ -1810,6 +1811,16 @@ export default async function handler(req, res) {
     return repondre(res, r.code, r.corps);
   }
   if (mode === 'mesures') return (m === 'GET' || m === 'POST') ? mesures(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  // (11 nov.) Les alertes de production (api/_lib/alertes-production.js) : PROPRIÉTAIRE
+  // seul (403 sinon). GET : les dernières et les interrupteurs ; POST { type, actif }.
+  if (mode === 'alertes') {
+    if (m !== 'GET' && m !== 'POST') return repondre(res, 405, { erreur: 'GET ou POST' });
+    const utilisateur = await vendeurExige(req, res);
+    if (!utilisateur) return;
+    const corps = m === 'POST' ? await lireCorpsJson(req) : null;
+    const r = await routeAlertes({ methode: m, utilisateur, corps, proprio: await proprioAlertes() });
+    return repondre(res, r.code, r.corps);
+  }
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'agenda') return (m === 'GET' || m === 'POST') ? agenda(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

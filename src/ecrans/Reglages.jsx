@@ -49,6 +49,7 @@ import { VerifierInstallationApp } from '../App.jsx';
 import SuiviComptes from '../SuiviComptes.jsx';
 // (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
 import { ToutVaBien } from '../ToutVaBien.jsx';
+import HistoriqueVinted from '../ImportDepart.jsx';   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
@@ -1719,7 +1720,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
   React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
   // (6 nov.) Un conseil ouvre un panneau (« Voir comment ») : `DEMANDE_REGLAGE_SOUS`.
-  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; setVueBrute(id==='appareils'?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
+  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; /* (11 nov., centre d'aide) l'abonnement est une vue ; appareils, double vérification, équipe vivent sous « Compte ». */ if(id==='abonnement'){ setVueBrute('abonnement'); setSous(null); return; } setVueBrute(['appareils','double','equipe'].includes(id)?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
   // (6 nov.) La notification « problème signalé » ouvre la liste (propriétaire seul).
   React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setVueBrute('reglages'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
@@ -1830,7 +1831,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const profilV = useProfilVendeur();
   // (9 nov.) L'objectif du mois, dit à droite de sa ligne (Réglages → Affichage).
   const [objectifR] = useObjectifMois();
-  const valObjectif = objectifR ? (objectifR.type === 'ca' ? `${objectifR.valeur.toLocaleString('fr-FR')} €` : `${objectifR.valeur} ventes`) : 'Aucun';
+  const valObjectif = objectifR ? (objectifR.type !== 'ventes' ? `${objectifR.valeur.toLocaleString('fr-FR')} €${objectifR.type === 'benefice' ? ' de bénéfice' : ''}` : `${objectifR.valeur} ventes`) : 'Aucun';
   const GROUPES_REGLAGES = [
     // (1er nov.) Le groupe portait « Comptes Vinted » mais rangeait aussi eBay, les
     // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
@@ -1846,6 +1847,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'toutvabien', type:'panneau', ic:'heart', lib:'Tout va bien ?', desc:'Chaque compte, sa dernière relecture et l’extension de chaque appareil.', data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
+      // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
+      { id:'historique', type:'panneau', ic:'box', lib:'Mon historique Vinted', desc:'Tes anciennes ventes et achats, récupérés une fois.', data:{ 'data-reglage-historique':'' }, el:<HistoriqueVinted comptes={comptes||[]} variante="reglages"/> },
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       { id:'vacances', type:'panneau', ic:'sun', lib:'Mode vacances', desc:'Mettre tes comptes en pause pendant ton absence, puis rouvrir.', data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
@@ -1871,7 +1874,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
-      AUTH.user && { id:'agenda', type:'panneau', ic:'calendar', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
+      AUTH.user && { id:'agenda', type:'panneau', ic:'clock', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
@@ -1930,11 +1933,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream-on', type:'switch', ic:'stream', lib:'Mode stream', desc:'Cache tes montants, pseudos et adresses quand tu filmes ton écran.', on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', desc:'Choisir les mots, marques et comptes à cacher.', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", desc:'Agrandir ou réduire les textes de VRM.', val:valZoom, el:<ZoomSetting nu/> },
-      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
+      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:'Siri et Raccourcis', desc:'Ajouter un achat ou trouver un N° en parlant à Siri.', data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
       // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
-      { id:'raccourcis-clavier', type:'action', ic:'grid', lib:'Raccourcis clavier', desc:'Sur ordinateur : « g » puis une lettre, « ? » pour la liste.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
+      { id:'raccourcis-clavier', type:'action', ic:'key', lib:'Raccourcis clavier', desc:'Sur ordinateur : « g » puis une lettre, « ? » pour la liste.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
     { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
@@ -1965,7 +1968,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'centre-aide', type:'action', ic:'search', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
       { id:'statut', type:'nav', ic:'cloud', lib:'État de VRM', desc:'La base, les e-mails et les notifications fonctionnent-ils ?', onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
-      { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      { id:'signaler', type:'action', ic:'chat', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
@@ -3358,24 +3361,27 @@ function AffichageSetting() {
 // « Retirer ». Rien n'est écrit tant qu'il n'a pas touché « Enregistrer » ; une saisie illisible
 // (« 2k ») n'enregistre rien (`lireSaisieObjectif`). Le même réglage que « Modifier » de la carte.
 function ObjectifMoisSetting() {
-  const [obj, poser] = useObjectifMois();
-  const [saisie, setSaisie] = React.useState(() => (obj && obj.type === 'ca' ? String(obj.valeur).replace('.', ',') : ''));
-  const lu = lireSaisieObjectif('ca', saisie);
-  const actuel = obj ? (obj.type === 'ca' ? `${obj.valeur.toLocaleString('fr-FR')} € de vendu par mois` : `${obj.valeur} ventes par mois`) : 'Aucun objectif';
-  const enregistrer = () => { if (lu == null) return; const n = objectifAEnregistrer(obj, { type: 'ca', valeur: lu }); if (n) { poser(n); toast('Objectif du mois enregistré.'); } };
+  // (11 nov.) Le type rangé est gardé (vendu, bénéfice ou ventes) ; l'histoire aussi (`brut`).
+  const [obj, poser, brut] = useObjectifMois();
+  const type = obj ? obj.type : 'ca';
+  const eur = type !== 'ventes';
+  const [saisie, setSaisie] = React.useState(() => (obj ? String(obj.valeur).replace('.', ',') : ''));
+  const lu = lireSaisieObjectif(type, saisie);
+  const actuel = obj ? (type === 'ventes' ? `${obj.valeur} ventes par mois` : `${obj.valeur.toLocaleString('fr-FR')} € ${type === 'benefice' ? 'de bénéfice' : 'de vendu'} par mois`) : 'Aucun objectif';
+  const enregistrer = () => { if (lu == null) return; const n = objectifAEnregistrer(brut, { type, valeur: lu }); if (n) { poser(n); toast('Objectif du mois enregistré.'); } };
   return (
     <div data-reglage-objectif-mois={obj ? obj.type : ''}>
       <div className="vrm-setting-applique" role="status" style={{ color: C.text }} data-objectif-actuel="">{actuel}</div>
-      <label style={{ display: 'block', fontSize: 13, color: C.muted, margin: '12px 0 6px' }} htmlFor="vrm-objectif-mois-saisie">Vendu à viser ce mois-ci, en euros</label>
+      <label style={{ display: 'block', fontSize: 13, color: C.muted, margin: '12px 0 6px' }} htmlFor="vrm-objectif-mois-saisie">{type === 'ventes' ? 'Ventes à viser ce mois-ci' : type === 'benefice' ? 'Bénéfice à viser ce mois-ci, en euros' : 'Vendu à viser ce mois-ci, en euros'}</label>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input id="vrm-objectif-mois-saisie" type="text" inputMode="decimal" placeholder="2 000" value={saisie} data-reglage-objectif-saisie=""
+        <input id="vrm-objectif-mois-saisie" type="text" inputMode={eur ? 'decimal' : 'numeric'} placeholder={eur ? '2 000' : '40'} value={saisie} data-reglage-objectif-saisie=""
           onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enregistrer(); }}
           style={{ flex: '1 1 auto', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, font: 'inherit', fontSize: 16, fontVariantNumeric: 'tabular-nums' }}/>
-        <span aria-hidden="true" style={{ color: C.muted }}>€</span>
+        <span aria-hidden="true" style={{ color: C.muted }}>{eur ? '€' : 'ventes'}</span>
         <Bouton variante="principal" disabled={lu == null} onClick={enregistrer} data-reglage-objectif-ok="">Enregistrer</Bouton>
       </div>
-      {obj ? <div style={{ marginTop: 10 }}><Bouton variante="discret" onClick={() => { poser(objectifAEnregistrer(obj, null)); setSaisie(''); toast('Objectif du mois retiré.'); }} data-reglage-objectif-retirer="">Retirer l’objectif</Bouton></div> : null}
-      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Compté sur « Vendu · mois » de Ma journée.</div>
+      {obj ? <div style={{ marginTop: 10 }}><Bouton variante="discret" onClick={() => { poser(objectifAEnregistrer(brut, null)); setSaisie(''); toast('Objectif du mois retiré.'); }} data-reglage-objectif-retirer="">Retirer l’objectif</Bouton></div> : null}
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Vendu, bénéfice ou ventes : choisis-le dans la carte de Ma journée.</div>
     </div>
   );
 }

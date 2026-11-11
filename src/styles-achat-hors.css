@@ -39,6 +39,35 @@
      une déclaration !important DANS la couche — c'est la règle des couches CSS. */
   [data-achat-hors-form] .vrm-ahp-prix input { font-size: 28px !important; height: 58px !important; font-weight: 700 !important; font-variant-numeric: tabular-nums; }
   [data-achat-hors-form] .vrm-ahp-gestes [data-achat-hors-enregistrer] { min-height: 54px !important; font-size: 17px !important; }
+  /* (11 nov., lot achat-photo) « Photo du ticket » : une rangée à la iOS, 60 px, au-dessus de la photo. */
+  .vrm-ahp-ticket {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; min-height: 60px; padding: 8px 14px 8px 10px;
+    border: 1px solid var(--vrm-line, rgba(127, 127, 127, .3));
+    border-radius: 16px; cursor: pointer; font-family: inherit; text-align: left;
+  }
+  .vrm-ahp-ticket:disabled { cursor: progress; opacity: .85; }
+  .vrm-ahp-ticket-icone {
+    width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .vrm-ahp-ticket-roue {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--vrm-line, rgba(127, 127, 127, .35));
+    border-top-color: var(--vrm-ink, currentColor);
+    animation: vrm-ahp-roue .8s linear infinite;
+  }
+  @keyframes vrm-ahp-roue { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .vrm-ahp-ticket-roue { animation-duration: 2.4s; } }
+  /* Un champ qui porte encore la valeur LUE : ambre (un geste à faire : vérifier). */
+  [data-achat-hors-form] input[data-champ-lu="1"] {
+    border-color: var(--vrm-warn, #B25000) !important;
+    background: var(--vrm-warn-soft, transparent) !important;
+  }
+  [data-achat-hors-form] input[data-prix-lu="1"] {
+    border-color: var(--vrm-warn, #B25000) !important;
+    background: var(--vrm-warn-soft, transparent) !important;
+  }
   .vrm-ahp-lieux { scrollbar-width: none; }
   .vrm-ahp-lieux::-webkit-scrollbar { display: none; }
   @media (min-width: 700px) {
