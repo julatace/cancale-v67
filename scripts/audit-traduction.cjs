@@ -41,6 +41,11 @@ const MIGRES = [
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
   ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes']],
+  // (11 nov., lot vestiaire-plus) Vestiaire : le parcours, les photos exigées, la baisse de prix, les offres.
+  ['src/ParcoursVestiaire.jsx', ['*']],
+  ['src/PhotosVestiaire.jsx', ['*']],
+  ['src/BaissePrixVestiaire.jsx', ['*']],
+  ['src/OffresVestiaire.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;
