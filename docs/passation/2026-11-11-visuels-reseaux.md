@@ -60,3 +60,16 @@ Actions, écouteur `vrm:visuels`, SYNC_KEYS) · `src/annoncesActions.js` (action
 ## ÉTAT À LA REPRISE
 
 Voir la fin du fichier (mis à jour à chaque étape).
+
+### ÉTAT À LA REPRISE (11 nov., fin du lot)
+
+- Branche `claude/visuels-reseaux`, poussée ; `origin/main` fusionné (vrai merge).
+- Build vert ; `audit-visuels-reseaux` 26/26 et `--prouve` 6/6 rouges ;
+  `audit-annonces-actions` vert (B18 et B24 mis à jour) ; audits du brief verts.
+- Banc `visuels-reseaux` : 45/45 à 390 tactile et 1512, PNG regardés ; sur le build
+  d'avant (sans le lot), rouge (pas de « Visuel réseaux »).
+- Lot `partage-fiche` (pas encore sur `main`) : il ajoute « Partager » dans le même menu
+  « … » de la fiche, juste au-dessus de « Relier un achat » ; une fusion des deux garde
+  les deux boutons (conflit de texte trivial).
+- Reste : rien de rouge. Pas fait : l'entrée depuis le Stock (la fiche d'une paire) — la
+  demande nommait Annonces ; l'événement `vrm:visuels` ({ items }) suffit pour l'ajouter.
