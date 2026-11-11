@@ -21,6 +21,7 @@
 //      `numeroExterne`, formulaire de partage.
 // `--prouve` : chaque règle réaffaiblie ⇒ ROUGE exigé. Données inventées.
 'use strict';
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 const path = require('path'), fs = require('fs'), zlib = require('zlib'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');

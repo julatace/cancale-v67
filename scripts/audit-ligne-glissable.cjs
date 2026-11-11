@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ═══════════════════════════════════════════════════════════════════════════
 //  AUDIT : GLISSER POUR AGIR (src/glisserRegle.js + src/LigneGlissable.jsx) — EXÉCUTÉ
 //  (11 nov., lot « gestes-glisser »)          node scripts/audit-ligne-glissable.cjs

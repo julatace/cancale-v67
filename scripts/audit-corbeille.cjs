@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT : LOT Y (10 nov.) — LA CORBEILLE 30 JOURS (src/corbeille.js)
 //  Exécute le VRAI module et lit le code des écrans.

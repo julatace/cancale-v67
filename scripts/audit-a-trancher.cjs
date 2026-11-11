@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : « À TRANCHER » (9 nov., lot AC) — EXÉCUTE src/aTrancher.js
 //        node scripts/audit-a-trancher.cjs

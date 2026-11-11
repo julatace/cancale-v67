@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris)
 // ═══════════════════════════════════════════════════════════════════════════
 // LOT DJ6 (11 nov.) — PROFIL ET CONNEXION DISCORD/GOOGLE, EXÉCUTÉS (§4.10)

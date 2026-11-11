@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : NOTE PRIVÉE D'UNE PAIRE (lot BD) + ACHAT SAISI DEUX FOIS (lot BH)
 //        node scripts/audit-note-achat-double.cjs

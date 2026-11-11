@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : ACHATS (lot DJ5, 11 nov.) — CHOISIR UN AUTRE ACHAT, REÇU OUVERT,
 //         « NOUVEL ACHAT » HORS PLATEFORME, ICÔNES ANNONCES ET MA JOURNÉE
@@ -62,7 +63,8 @@ async function auditer() {
   const ach = sansCommentaires(lire('src/ecrans/Achats.jsx'));
   const ar = (/function AchatsARelier\([\s\S]*?\n}\n/.exec(appS) || [''])[0];
   dit(/data-ar-autre=/.test(ar) && /onChoisir\(it, l\.sugg\.achat\)/.test(ar), '3 · « Sans achat relié » : « Autre achat » à côté de la suggestion');
-  const cv = (/function CoutAchatVente\([\s\S]*?\n}\n/.exec(appS) || [''])[0];
+  // (11 nov., découpe 2) extraite AVANT de retirer les commentaires : sur l'app recollée, un « /* » d'un autre fichier avalait la fonction
+  const cv = sansCommentaires((/function CoutAchatVente\([\s\S]*?\n}\n/.exec(app) || [''])[0]);
   dit(/data-cout-vente-autre/.test(cv) && /Choisir un autre achat/.test(cv), '3 · coût d’une vente : avec une proposition, « Choisir un autre achat »');
   dit(/data-num-neuf-autre=/.test(appS) && /data-ask-autre=/.test(appS) && /rep\.autre && sugg/.test(appS), '3 · numérotage : « Autre achat » (bloc des nouveaux et question du prix)');
   dit(/data-prix-autre-achat=/.test(appS), '3 · saisie en série : « Choisir un autre achat » à côté du prix proposé');

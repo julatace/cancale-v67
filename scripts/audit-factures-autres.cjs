@@ -22,6 +22,7 @@
 //   S7     la règle d'annulation Leboncoin est celle de l'app, au caractère près ;
 //   S8     rien ne part par e-mail ; l'app ne montre la facture que sur une VENTE prouvée.
 'use strict';
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 const path = require('path');
 const fs = require('fs');
 const racine = path.resolve(process.argv[2] || path.join(__dirname, '..'));

@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // Audit : L'ORDRE DES LISTES — LE PLUS RÉCENT EN HAUT, TOUS COMPTES MÉLANGÉS (lot AJ, 9 nov. soir).
 // Julien : « Les ventes, achats, colis à expédier, à préparer ne sont pas rangés dans l'ordre, du plus
 // récent en haut au plus vieux en bas, peu importe le compte, ça doit être parfait. »

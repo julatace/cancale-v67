@@ -252,6 +252,17 @@ async function etapeAudits() {
   spawnSync('git', ['checkout', '--', 'public/'], { cwd: APRES });
   const rougesAvant = Object.keys(res.avant).filter((a) => !vert(res.avant[a]));
   rapport.audits = { total: Object.keys(res.apres).length, rougesAvant, rougesNeufs: vraiment, rougesNeufsEnParallele: nouveaux };
+  // (11 nov., reprise) Un rouge neuf qui repasse au vert quand ses lectures de src/App.jsx rendent l'app
+  // RECOLLÉE ne voit qu'un déménagement : le remède est `node scripts/brancher-audits.cjs <audits>`.
+  const brut = [];
+  if (vraiment.length) {
+    const pre = path.join(os.tmpdir(), `vrm-brancher-${process.pid}.cjs`);
+    fs.writeFileSync(pre, `require(${JSON.stringify(path.join(APRES, 'scripts', '_source-app.cjs'))}).brancher();\n`);
+    for (const a of vraiment) { const r = await lancer(process.execPath, [path.join(APRES, 'scripts', a)], APRES, { NODE_OPTIONS: `--require ${pre}` }, 900e3); if (r.code === 0) brut.push(a); }
+    spawnSync('git', ['checkout', '--', 'public/'], { cwd: APRES });
+  }
+  rapport.audits.lisentAppBrut = brut;
+  if (brut.length) console.log(`   dont ${brut.length} vert(s) sur l'app recollée (ils lisent src/App.jsx brut) : node scripts/brancher-audits.cjs ${brut.join(' ')}`);
   if (vraiment.length) KO(`audits rouges NEUFS : ${vraiment.join(', ')}`);
   else OK(`audits : ${Object.keys(res.apres).length} lancés, aucun rouge neuf (rouges déjà rouges avant : ${rougesAvant.length}${rougesAvant.length ? ' — ' + rougesAvant.join(', ') : ''})`);
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT : REVENIR EN ARRIÈRE (11 nov.) — src/restauration.js
 //  Exécute le VRAI module (ou une copie mutée, `--prouve`) et lit le branchement.
