@@ -212,7 +212,7 @@ const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 
   const app = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
   dit(/const urssafConcerne = \(r = regimeFiscal\(\)\) => cotisationsUrssaf\(r\);/.test(app), 'F8 `urssafConcerne` de l’app appelle LA règle (`cotisationsUrssaf`)');
   dit(/configurationAOuvrir\(\{ pret:true, baseKO, exemple:exempleActif\(\), bienvenue, proprietaire:proprio, configuration:load\(CLE_CONFIGURATION,null\), plateformes:load\(CLE_PLATEFORMES,null\) \}\)/.test(app), 'F8 l’ouverture passe les LECTURES (propriétaire lu, configuration, plateformes)');
-  dit(/visite && !bienvenue && !configOuverte/.test(app) && /silence=\{!!\(bienvenue \|\| visite \|\| configOuverte\)\}/.test(app), 'F8 la visite et la feuille « compte relié » attendent la configuration');
+  dit(/visite && !bienvenue && !configOuverte/.test(app) && /silence=\{!!\(bienvenue \|\| visite \|\| configOuverte( \|\| parcoursOuvert)?\)\}/.test(app), 'F8 la visite et la feuille « compte relié » attendent la configuration');
   dit(/CLE_CONFIGURATION, CLE_SOCIETE_TVA,/.test(app) && /'vrm_numero_ecrit',/.test(app), 'F8 les clés sont synchronisées (SYNC_KEYS), la méthode d’étiquetage est `vrm_numero_ecrit`');
   dit(/rappelDac7Journee\(profilFiscalLu\(\), dac7ParPlateforme\(/.test(app), 'F8 Ma journée : le rappel DAC7 lit la règle de Comptabilité');
   dit(/jaugeSeuils\(\{ ligne, now, activite \}\)/.test(compta) && /exportDevant/.test(compta) && /<AideStatutNeutre \/>/.test(compta), 'F8 Comptabilité : jauge de SON activité, export devant en société, aide neutre');
