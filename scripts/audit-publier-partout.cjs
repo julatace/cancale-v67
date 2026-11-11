@@ -28,6 +28,7 @@ const F = {
   app: path.join(RACINE, 'src', 'App.jsx'),
   ebay: path.join(RACINE, 'src', 'ecrans', 'Ebay.jsx'),
   actions: path.join(RACINE, 'src', 'annoncesActions.js'),
+  suivi: path.join(RACINE, 'src', 'publierPartoutSuivi.js'),
 };
 const MUTATIONS = {
   'prix-pas-bloque': ['regle', "m.code === 'prix-absent' ? { ...m, bloque: true", "m.code === 'prix-absent' ? { ...m, bloque: false"],
@@ -43,6 +44,16 @@ const MUTATIONS = {
   'serie-absente': ['actions', "{ k: 'partout',", "{ k: 'partout-retire',"],
   'ebay-publie-app': ['ebay', "origine: 'partout' };", "origine: 'partout' }; await appelEbay({ action: 'publish', item: itemDeBrouillon(b).item, confirme: true });"],
   'sync-oublie': ['app', "  'vrm_partout_prix',\n", ''],
+  // (11 nov. soir) tous les paramètres, par défaut puis par annonce
+  'parametre-pas-bloque': ['regle', "if (horsVoie && auto != null && auto !== PROFIL) effet = 'bloque';", "if (false) effet = 'bloque';"],
+  'annonce-ignoree': ['regle', "const source = va ? 'annonce' : vd ? 'defaut'", "const source = vd ? 'defaut' : va ? 'annonce'"],
+  'valeur-hors-liste': ['regle', "if (liste && !liste.includes(s)) return '';", ''],
+  'vc-publie-quand-meme': ['regle', "if (e.site === 'vestiaire' && finir.length) {", 'if (false) {'],
+  'arret-ignore': ['regle', "if (!stop && typeof doitSArreter === 'function')", 'if (false)'],
+  'requis-invente': ['regle', "if (!sous || !categorieLbcDeSous(sous)) return null;", "if (!sous || !categorieLbcDeSous(sous)) return 'Chaussures';"],
+  'suivi-main-ok': ['suivi', "'a-finir': 'main'", "'a-finir': 'ok'"],
+  'vc-publier-app': ['app', "publier: !finir && extSait('vcauto') === 'ok'", "publier: extSait('vcauto') === 'ok'"],
+  'params-sync-oublie': ['app', "  'vrm_partout_params',\n", ''],
 };
 const arg = process.argv.slice(2);
 const mut = (arg.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
@@ -71,14 +82,16 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   const dit = (c, m, d) => { n++; if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d != null && !c ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 400) : '')); };
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : ' + e.message); } };
 
-  let P = null;
+  let P = null, S = null;
   if (src.regle != null) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-publier-partout-'));
     fs.mkdirSync(path.join(dir, 'src'));
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'src', 'publierPartout.js'), src.regle);
     for (const f of ['publierAilleurs.js', 'verifAnnonce.js']) fs.copyFileSync(path.join(RACINE, 'src', f), path.join(dir, 'src', f));
+    if (src.suivi != null) fs.writeFileSync(path.join(dir, 'src', 'publierPartoutSuivi.js'), src.suivi);
     try { P = await import(pathToFileURL(path.join(dir, 'src', 'publierPartout.js')).href); } catch (e) { dit(false, 'la règle ne se charge pas : ' + e.message); }
+    try { if (src.suivi != null) S = await import(pathToFileURL(path.join(dir, 'src', 'publierPartoutSuivi.js')).href); } catch (e) { dit(false, 'le branchement du suivi ne se charge pas : ' + e.message); }
   } else dit(false, 'src/publierPartout.js absent : aucun « Publier partout »');
 
   const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
@@ -176,6 +189,61 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     });
   }
 
+  if (P) {
+    await essaie('H', () => {
+      console.log('── H. tous les paramètres : défaut, puis par annonce ; rien d\'inventé');
+      const r = { ...regles, ville: 'Vannes' };
+      const ch = (l, s, c) => site(l, s).champs.find((x) => x.champ === c);
+      const l0 = P.lignePartout(paire(1, { couleur: 'Blanc' }), ctx({ regles: r }));
+      dit(['categorie', 'sousCategorie', 'marque', 'taille', 'couleur', 'etat', 'matiere', 'livraison', 'mainPropre', 'lieu', 'options'].every((c) => ch(l0, 'leboncoin', c)), 'H1 Leboncoin : catégorie, sous-catégorie, marque, taille, couleur, état, matière, livraison, main propre, lieu, options');
+      dit(['univers', 'categorie', 'marque', 'taille', 'etat', 'couleur', 'matiere', 'authenticite'].every((c) => ch(l0, 'vestiaire', c)), 'H2 Vestiaire : univers, catégorie, marque, taille, état, couleur, matière, authenticité');
+      dit(ch(l0, 'leboncoin', 'sousCategorie').valeur === 'Chaussures' && ch(l0, 'leboncoin', 'categorie').valeur === 'Mode' && ch(l0, 'leboncoin', 'lieu').valeur === 'Vannes' && ch(l0, 'leboncoin', 'couleur').source === 'auto', 'H3 auto : ce que la voie pose d\'elle-même (catégorie de l\'app, ville des Réglages, couleur Vinted)');
+      dit(site(l0, 'leboncoin').cochable && !site(l0, 'leboncoin').finir.length && !site(l0, 'vestiaire').finir.length, 'H4 rien de changé ⇒ rien de bloqué, rien à finir', [site(l0, 'leboncoin').manques, site(l0, 'vestiaire').finir]);
+      const l1 = P.lignePartout(paire(1), ctx({ regles: r, params: { leboncoin: { livraison: 'non' } } }));
+      dit(!site(l1, 'leboncoin').cochable && site(l1, 'leboncoin').manques.some((m) => m.code === 'hors-voie-livraison' && m.bloque), 'H5 un défaut que la voie Leboncoin contredirait (livraison non) ⇒ bloqué et dit');
+      const l2 = P.lignePartout(paire(1), ctx({ regles: r, params: { leboncoin: { livraison: 'non' } }, saisie: { params: { leboncoin: { livraison: 'oui' } } } }));
+      dit(site(l2, 'leboncoin').cochable && ch(l2, 'leboncoin', 'livraison').source === 'annonce', 'H6 l\'annonce passe avant le défaut', ch(l2, 'leboncoin', 'livraison'));
+      const l3 = P.lignePartout(paire(1), ctx({ regles: r, params: { leboncoin: { livraison: 'peut-être', etat: 'Comme neuf' } } }));
+      dit(ch(l3, 'leboncoin', 'livraison').source === 'auto' && ch(l3, 'leboncoin', 'etat').source === 'auto', 'H7 une valeur hors de la liste du site n\'est jamais rangée');
+      const l4 = P.lignePartout(paire(1, { title: 'Objet bizarre', taille: '' }), ctx({ regles: { ...r, categorieLbc: () => '' } }));
+      dit(ch(l4, 'leboncoin', 'sousCategorie').valeur === null && ch(l4, 'leboncoin', 'sousCategorie').demande && ch(l4, 'leboncoin', 'sousCategorie').effet === 'sur-site', 'H8 catégorie introuvable ⇒ DEMANDÉE (jamais inventée), à choisir pendant le dépôt');
+      dit(site(l4, 'leboncoin').demandes.includes('champ:sousCategorie') && site(l4, 'leboncoin').demandes.includes('champ:taille'), 'H9 la taille introuvable est demandée aussi', site(l4, 'leboncoin').demandes);
+      const l5 = P.lignePartout(paire(1), ctx({ regles: r, params: { vestiaire: { matiere: 'Cuir', univers: 'Mode homme' } } }));
+      dit(site(l5, 'vestiaire').cochable && site(l5, 'vestiaire').finir.join('|') === 'Univers « Mode homme »|Matière « Cuir »', 'H10 Vestiaire : ses choix que la voie ne porte pas ⇒ « à finir sur Vestiaire » nommés', site(l5, 'vestiaire').finir);
+      const l6 = P.lignePartout(paire(1), ctx({ regles: r, saisie: { params: { leboncoin: { matiere: 'Cuir' } } } }));
+      dit(site(l6, 'leboncoin').cochable && site(l6, 'leboncoin').manques.some((m) => m.code === 'perdu-matiere' && !m.bloque), 'H11 Leboncoin : une matière que la voie ne pose pas ⇒ « ne partira pas », dit avant');
+      const l7 = P.lignePartout(paire(1), ctx({ regles: r, saisie: { prixSite: { leboncoin: '55', vestiaire: '99' } } }));
+      dit(site(l7, 'leboncoin').apercu.prix === 55 && site(l7, 'vestiaire').apercu.prix === 60, 'H12 prix de CETTE annonce sur Leboncoin ; Vestiaire reste le prix Vinted');
+      const d = P.reglageParams({ leboncoin: { options: 'boost', couleur: 'Noir' }, vestiaire: { authenticite: 'oui' } }, r);
+      dit(!d.leboncoin.options && d.leboncoin.couleur === 'Noir' && d.vestiaire.authenticite === 'oui', 'H13 aucune option payante ne se règle (jamais de boost)', d);
+    });
+    await essaie('I', async () => {
+      console.log('── I. l\'envoi : Vestiaire à finir, arrêt entre deux, suivi commun');
+      const r = { ...regles, ville: 'Vannes' };
+      const lignes = [1, 2].map((i) => P.lignePartout(paire(i), ctx({ regles: r, params: { vestiaire: { matiere: 'Cuir' } } })));
+      const plan = P.planPartout(lignes, new Set(lignes.flatMap((l) => l.sites.map((x) => P.cleCase(l.id, x.site)))));
+      let attentesVc = 0;
+      const res = await P.executerPartout({ plan, envoyer: { leboncoin: async (e) => ({ accepte: true, etape: 'depot', jobId: 'lbc:' + e.id }), vestiaire: async (e) => ({ accepte: true, etape: 'depot', jobId: 'vc:' + e.id }), ebay: async () => ({ accepte: true, complet: true }) },
+        attendre: async (j) => { if (/^vc/.test(j)) attentesVc++; return { etape: 'fait' }; } });
+      dit(res['9001:vestiaire'].etat === 'a-finir' && /Matière « Cuir »/.test(res['9001:vestiaire'].raison) && res['9002:vestiaire'].etat === 'pas-envoye' && attentesVc === 0, 'I1 Vestiaire à finir : jamais « publié », le suivant ne l\'écrase pas', [res['9001:vestiaire'], res['9002:vestiaire']]);
+      let n = 0;
+      const res2 = await P.executerPartout({ plan, envoyer: { leboncoin: async () => ({ accepte: true, etape: 'fait' }), vestiaire: async () => ({ accepte: true, etape: 'fait' }), ebay: async () => ({ accepte: true }) }, doitSArreter: () => ++n > 2 });
+      dit(res2['9001:leboncoin'].etat === 'publie' && res2['9002:leboncoin'].etat === 'publie' && Object.keys(res2).filter((k) => res2[k].etat === 'pas-envoye' && /arrêté/.test(res2[k].raison)).length === plan.length - 2, 'I2 « Arrêter » entre deux envois : le reste n\'est PAS envoyé, et le dit');
+      if (!S) { dit(false, 'I3 src/publierPartoutSuivi.js absent'); return; }
+      dit(S.suiviPourPartout(null, plan) === null && S.suiviPourPartout({}, plan) === null, 'I3 sans suivi commun : rien (la feuille garde son état par case)');
+      const gestes = [];
+      const faux = { demarrer: (o) => { gestes.push(['demarrer', o.articles.length]); return { debut: (id) => gestes.push(['debut', id]), etape: (id, c) => gestes.push(['etape', id, c]), fin: (id, x) => gestes.push(['fin', id, x.etat]), doitSArreter: () => false, terminer: () => gestes.push(['terminer']) }; } };
+      const sv = S.suiviPourPartout(faux, plan);
+      await P.executerPartout({ plan: plan.slice(0, 3), envoyer: { leboncoin: async (e) => ({ accepte: true, etape: 'depot', jobId: 'lbc:' + e.id }) }, attendre: async () => ({ etape: 'fait' }), surEtat: sv.surEtat });
+      sv.terminer();
+      const fins = gestes.filter((g) => g[0] === 'fin').map((g) => g[2]);
+      dit(gestes[0][1] === plan.length && fins[0] === 'ok' && gestes.some((g) => g[0] === 'etape' && g[2] === 'depot') && gestes[gestes.length - 1][0] === 'terminer', 'I4 le suivi commun reçoit chaque étape (envoi, dépôt, fin), puis terminer', gestes.slice(0, 6));
+      const g2 = []; const sv2 = S.suiviPourPartout({ demarrer: () => ({ debut: () => {}, etape: () => {}, fin: (id, x) => g2.push(x.etat), doitSArreter: () => false, terminer: () => {} }) }, plan);
+      sv2.surEtat('x', { etat: 'a-finir', raison: 'à finir' });
+      dit(g2[0] === 'main', 'I5 « à finir sur le site » ⇒ « à la main » dans le suivi, jamais « fait »', g2);
+    });
+  }
+
   console.log('── G. le câblage de l\'app');
   const app = src.app ? sansCommentaires(src.app) : '';
   const i = app.indexOf('function HotePublierPartout(');
@@ -195,6 +263,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   dit(/data-fiche-partout=/.test(app) && /'vrm:publier-partout'/.test(app), 'G10 l\'entrée sur la fiche d\'une annonce Vinted');
   dit(/\{ k: 'partout',/.test(src.actions || '') && /k==='partout'/.test(app), 'G11 en série : Annonces → Actions → « Publier partout… »');
   dit(/aussiSur\(\{ lbc:/.test(app) && /vcNumsAnn\.has\(cleNum\(num\)\)/.test(app), 'G12 pastilles « aussi sur » Leboncoin · eBay · Vestiaire sur l\'annonce');
+  dit(/'vrm_partout_params',/.test(src.app || '') && /onParamAnnonce=/.test(hote) && /reglageParams\(/.test(hote), 'G13 les paramètres par défaut synchronisés, et par annonce');
+  dit(/publier: !finir && extSait\('vcauto'\) === 'ok'/.test(hote), 'G14 Vestiaire à finir ⇒ le dépôt s\'ouvre sans publier tout seul');
+  dit(/suiviPourPartout\(await chargerSuivi\(\)/.test(hote) && /doitSArreter: sv \? sv\.doitSArreter/.test(hote), 'G15 le suivi commun (SuiviTravail) branché, avec Pause / Arrêter');
 
   console.log(`\n${n - ko}/${n} vérifications vertes.`);
   process.exit(ko ? 1 : 0);

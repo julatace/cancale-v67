@@ -631,7 +631,9 @@ import {prixAnnoncePourOffre} from "./actionsClaires.js";
 // ⟦→ ecrans/Ebay.jsx #6⟧
 import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // (6 nov., v36-visuel-2) les dessins des états vides
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires, enLigneSur } from "./publierAilleurs.js";
-import { CLE_PRIX_PARTOUT, reglagePrix, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
+import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
+import { suiviPourPartout } from "./publierPartoutSuivi.js";
+import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
@@ -2620,6 +2622,8 @@ const SYNC_KEYS = [
   'vrm_langue',
   // (11 nov.) « Publier partout » : l'écart de prix par site (égal par défaut, src/publierPartout.js).
   'vrm_partout_prix',
+  // (11 nov. soir) … et TOUS les paramètres de publication par défaut, par site (src/publierPartout.js).
+  'vrm_partout_params',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -23313,6 +23317,8 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const sansSouris = useSansSouris();
   const [reglage, setReglage] = React.useState(() => reglagePrix(load(CLE_PRIX_PARTOUT, null)));
   const [saisies, setSaisies] = React.useState({});
+  // (11 nov. soir) Les paramètres de publication par défaut (Leboncoin, Vestiaire) : '' = auto.
+  const [params, setParams] = React.useState(() => reglageParams(load(CLE_PARAMS_PARTOUT, null), { etatsLbc: LBC_ETATS }));
   // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
   const [autres, setAutres] = React.useState(undefined);
   const relire = React.useCallback(async () => {
@@ -23329,7 +23335,9 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const lecture = !numData || autres === undefined;
   const regles = { titreLbc: (m, t, ta) => lbcTitre(m, t, ta), titreVc: (m, t, ta) => lbcTitre(m, t, ta, 80), titreEbay: (t, ta) => ebayTitre(t || '', ta || ''),
     descriptionLbc: (o) => descriptionLbcDe(o), descriptionEbay: (pp) => (pp && pp.desc) || descriptionDeFaits(pp || {}),
-    etatsLbc: LBC_ETATS, categorieLbc: (t, d, ta, m) => categorieLbcDe(t, d, ta, '', m) };
+    etatsLbc: LBC_ETATS, categorieLbc: (t, d, ta, m) => categorieLbcDe(t, d, ta, '', m),
+    // La ville que la voie Leboncoin tape (Réglages de VRM) ; vide ⇒ celle de son profil Leboncoin.
+    ville: String(load('vrm_ville', '') || '').trim() };
   const ext = {
     leboncoin: (raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' }) || {}).texte || '',
     vestiaire: (raisonExtGlobale(sansSouris, { cap: 'vcpublier', role: 'prépare tes annonces Vestiaire' }) || {}).texte || '',
@@ -23345,7 +23353,7 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const lignes = choisies === undefined ? undefined : choisies.map((p) => {
     const fiche = fiches[String(p.id)] || {};
     let achat = null; try { achat = prixAchatDe(fiche, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
-    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, saisie: saisies[String(p.id)], regles, achat,
+    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat,
       famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, mpLbc: mpChoisi(fiche, 'lbc'), facultatifs: champsFacultatifs(vendActuel()) });
   });
   const vus = {};
@@ -23367,7 +23375,10 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
       return r;
     },
     vestiaire: async (e) => {
-      let r = null; try { r = await vmrCmd({ cmd: 'vcPreparer', id: String(e.id), publier: extSait('vcauto') === 'ok' }, 30000); } catch (_) { r = null; }
+      // Un champ à finir sur Vestiaire (son choix que la voie ne porte pas, ou un requis introuvable) :
+      // le dépôt s'ouvre SANS publier tout seul — il le finit là-bas (jamais publié avec un autre choix).
+      const finir = Array.isArray(e.finir) && e.finir.length > 0;
+      let r = null; try { r = await vmrCmd({ cmd: 'vcPreparer', id: String(e.id), publier: !finir && extSait('vcauto') === 'ok' }, 30000); } catch (_) { r = null; }
       if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); }
       return r;
     },
@@ -23377,11 +23388,36 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
       catch (_) { return { accepte: false, code: 'charge', raison: 'l’écran eBay n’a pas pu se charger — réessaie' }; }
     },
   };
-  return <PublierPartout lignes={lignes} lecture={lecture} reglage={reglage} etatsLbc={LBC_ETATS} saisies={saisies} vus={vus}
+  // Le lancement : le plan, le suivi commun s'il est là (VRM figé, détail, barre —
+  // src/publierPartoutSuivi.js), puis l'envoi l'un après l'autre. « Reprendre » après
+  // une pause relance ce qui n'est pas parti (rien deux fois : seulement « pas envoyé »).
+  const lancer = async ({ coches, surEtat, surTotal }) => {
+    const planTout = planPartout(lignes || [], coches);
+    const courir = async (plan) => {
+      if (typeof surTotal === 'function') surTotal(plan.length);
+      const sv = suiviPourPartout(await chargerSuivi(), plan, { uid: String(vendActuel() || ''), surGeste: (g) => {
+        if (g !== 'reprendre') return;
+        const reste = plan.filter((e) => res[e.cle] && res[e.cle].etat === 'pas-envoye');
+        if (reste.length) courir(reste);
+      } });
+      const res = await executerPartout({ plan, envoyer, attendre: (j) => attendreFinJob(j),
+        surEtat: (cle, e) => { surEtat(cle, e); if (sv) sv.surEtat(cle, e); }, doitSArreter: sv ? sv.doitSArreter : undefined });
+      if (sv) sv.terminer();
+      return res;
+    };
+    return courir(planTout);
+  };
+  return <PublierPartout lignes={lignes} lecture={lecture} reglage={reglage} params={params} etatsLbc={LBC_ETATS} saisies={saisies} vus={vus}
     exclues={choisies === undefined ? 0 : voulus.length - choisies.length}
     onReglage={(site, r) => setReglage((x) => { const n = reglagePrix({ ...x, [site]: r }); save(CLE_PRIX_PARTOUT, n); return n; })}
-    onSaisie={(id, champ, val) => setSaisies((x) => ({ ...x, [id]: { ...(x[id] || {}), [champ]: val } }))}
-    onLancer={async ({ coches, surEtat }) => executerPartout({ plan: planPartout(lignes || [], coches), envoyer, attendre: (j) => attendreFinJob(j), surEtat })}
+    onParam={(site, champ, val) => setParams((x) => { const n = reglageParams({ ...x, [site]: { ...((x && x[site]) || {}), [champ]: val } }, { etatsLbc: LBC_ETATS }); save(CLE_PARAMS_PARTOUT, n); return n; })}
+    onParamAnnonce={(id, site, champ, val) => setSaisies((x) => { const a = x[id] || {}; const pr = a.params || {}; return { ...x, [id]: { ...a, params: { ...pr, [site]: { ...(pr[site] || {}), [champ]: val } } } }; })}
+    onSaisie={(id, champ, val) => setSaisies((x) => {
+      const a = x[id] || {};
+      if (champ === 'prixSite' && val && typeof val === 'object') return { ...x, [id]: { ...a, prixSite: { ...(a.prixSite || {}), [val.site]: val.valeur } } };
+      return { ...x, [id]: { ...a, [champ]: val } };
+    })}
+    onLancer={lancer}
     onRelire={relire} onFermer={onFermer} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Retour={FermeAuRetour}/>;
 }
 // ⟦→ ecrans/Vestiaire.jsx #9⟧

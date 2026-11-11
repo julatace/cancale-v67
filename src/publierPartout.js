@@ -139,6 +139,169 @@ export function vocabulaire(site, paire, saisie = {}, r = {}) {
   return null;
 }
 
+// ── TOUS LES PARAMÈTRES DE PUBLICATION, PAR SITE (précisions de Julien, 11 nov. soir) ──
+// « Proposer TOUS les paramètres de publication de chaque site, un réglage PAR
+// DÉFAUT pour tous, puis modifiable PAR ANNONCE ; ce que VRM ne trouve pas, il le
+// DEMANDE. » Chaque champ dit COMMENT la voie d'aujourd'hui le pose (`porte`) — la
+// feuille ne promet que ce qui partira vraiment :
+//   'fiche'    la fiche de VRM le porte (Leboncoin : l'état, le prix) ;
+//   'vinted'   la voie le recopie ELLE-MÊME de l'annonce Vinted (catégorie, marque,
+//              taille, couleur) : une autre valeur ne partirait pas ;
+//   'reglages' la voie prend le réglage de VRM (Leboncoin : ta ville, Réglages) ;
+//   'fixe'     la voie fait toujours la même chose (livraison activée ; aucune
+//              option payante — le boost est impossible par construction, 17 oct.) ;
+//   'site'     la voie ne le pose pas : il se choisit sur le site.
+// La valeur d'un champ : celle de CETTE annonce, sinon le défaut du site, sinon ce
+// que la voie posera d'elle-même (« auto »), sinon RIEN (demandé). Jamais devinée.
+// Une valeur choisie que la voie ne peut pas porter :
+//   · Leboncoin (la voie publie toute seule) : si la voie poserait une AUTRE valeur
+//     ⇒ la case est bloquée et le dit (jamais une annonce publiée avec un autre
+//     choix que le sien) ; si elle ne poserait rien ⇒ requis : « à choisir sur
+//     Leboncoin » (le dépôt l'attend), facultatif : « ne partira pas » (dit avant) ;
+//   · Vestiaire : le dépôt s'ouvre SANS publier tout seul, et la feuille dit quoi
+//     choisir là-bas (« à finir sur Vestiaire : Matière « Cuir » »).
+// ⚠️ Une extension qui saura recevoir ces champs (une version à réserver) n'aura
+//    qu'à passer leur `porte` à 'fiche' : la règle et la feuille n'ont rien d'autre à changer.
+export const CLE_PARAMS_PARTOUT = 'vrm_partout_params';
+export const LBC_CATEGORIES = Object.freeze({
+  Mode: ['Chaussures', 'Vêtements', 'Accessoires & Bagagerie', 'Montres & Bijoux'],
+  Famille: ['Chaussures enfants', 'Vêtements enfants', 'Accessoires & bagagerie enfants', 'Montres & bijoux enfants'],
+  Loisirs: ['Livres'],
+});
+export const VC_UNIVERS = Object.freeze(['Mode femme', 'Mode homme']);
+const OUI_NON = Object.freeze(['oui', 'non']);
+export const CHAMPS_PARTOUT = Object.freeze({
+  leboncoin: Object.freeze([
+    { champ: 'categorie', requis: true, porte: 'vinted', choix: Object.keys(LBC_CATEGORIES) },
+    { champ: 'sousCategorie', requis: true, porte: 'vinted', choix: 'lbcSous' },
+    { champ: 'marque', requis: false, porte: 'vinted' },
+    { champ: 'taille', requis: true, porte: 'vinted' },
+    { champ: 'couleur', requis: false, porte: 'vinted' },
+    { champ: 'etat', requis: true, porte: 'fiche', choix: 'etatsLbc' },
+    { champ: 'matiere', requis: false, porte: 'site' },
+    { champ: 'livraison', requis: true, porte: 'fixe', choix: OUI_NON, fixe: 'oui' },
+    { champ: 'mainPropre', requis: false, porte: 'site', choix: OUI_NON },
+    { champ: 'lieu', requis: true, porte: 'reglages' },
+    { champ: 'options', requis: false, porte: 'fixe', choix: ['aucune'], fixe: 'aucune', lecture: true },
+  ]),
+  vestiaire: Object.freeze([
+    { champ: 'univers', requis: true, porte: 'vinted', choix: VC_UNIVERS },
+    { champ: 'categorie', requis: true, porte: 'vinted' },
+    { champ: 'marque', requis: true, porte: 'vinted' },
+    { champ: 'taille', requis: true, porte: 'vinted' },
+    { champ: 'etat', requis: true, porte: 'vinted' },
+    { champ: 'couleur', requis: false, porte: 'vinted' },
+    { champ: 'matiere', requis: false, porte: 'site' },
+    { champ: 'authenticite', requis: false, porte: 'site', choix: OUI_NON },
+  ]),
+});
+// Ce que la voie posera D'ELLE-MÊME (null = rien : demandé). `AU_DEPOT` = la voie
+// le retrouve au dépôt (Vestiaire : la catégorie de Vinted sur SON catalogue) —
+// ni une valeur inventée ni un manque.
+export const AU_DEPOT = 'au-depot';
+export const PROFIL = 'profil';
+export function sousCategoriesLbc(categorie) { return categorie && LBC_CATEGORIES[categorie] ? LBC_CATEGORIES[categorie].slice() : Object.values(LBC_CATEGORIES).flat(); }
+export function categorieLbcDeSous(sous) {
+  for (const [c, l] of Object.entries(LBC_CATEGORIES)) if (l.includes(str(sous))) return c;
+  return null;
+}
+export function autoChamp(site, champ, paire, r = {}) {
+  const p = paire || {};
+  if (site === 'leboncoin') {
+    if (champ === 'sousCategorie' || champ === 'categorie') {
+      let sous = '';
+      try { sous = typeof r.categorieLbc === 'function' ? str(r.categorieLbc(p.title, p.desc, p.taille, p.marque)) : ''; } catch (_) { sous = ''; }
+      if (!sous || !categorieLbcDeSous(sous)) return null;          // hors vocabulaire mesuré ⇒ demandé
+      return champ === 'sousCategorie' ? sous : categorieLbcDeSous(sous);
+    }
+    if (champ === 'marque') return str(p.marque) || null;
+    if (champ === 'taille') return str(p.taille) || null;
+    if (champ === 'couleur') return str(p.couleur) || null;
+    if (champ === 'etat') return etatPourLbc(p.etat, r.etatsLbc);
+    if (champ === 'lieu') return str(r.ville) || PROFIL;               // vide ⇒ celle de son profil Leboncoin (lbc.js n'y touche pas)
+    if (champ === 'livraison') return 'oui';
+    if (champ === 'options') return 'aucune';
+    return null;
+  }
+  if (site === 'vestiaire') {
+    if (champ === 'univers' || champ === 'categorie') return AU_DEPOT;
+    if (champ === 'marque') return str(p.marque) || null;
+    if (champ === 'taille') return str(p.taille) || null;
+    if (champ === 'etat') return str(p.etat) || null;
+    if (champ === 'couleur') return str(p.couleur) || null;
+    return null;
+  }
+  return null;
+}
+const normVal = (v) => str(v).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
+// Une valeur rangée : texte court, ou une valeur de la liste du champ. Rien d'autre.
+function valeurPermise(site, d, v, r = {}) {
+  const s = str(v).replace(/\s+/g, ' ').slice(0, 60);
+  if (!s) return '';
+  if (d.lecture) return '';
+  const liste = d.choix === 'etatsLbc' ? arr(r.etatsLbc) : d.choix === 'lbcSous' ? sousCategoriesLbc('') : Array.isArray(d.choix) ? d.choix : null;
+  if (liste && !liste.includes(s)) return '';
+  return s;
+}
+// Le réglage par défaut, rangé dans `vrm_partout_params` (SYNC_KEYS) :
+// { leboncoin: { [champ]: valeur }, vestiaire: { … } } ; '' = auto.
+export function reglageParams(brut, r = {}) {
+  const b = brut && typeof brut === 'object' ? brut : {};
+  const out = {};
+  for (const [site, champs] of Object.entries(CHAMPS_PARTOUT)) {
+    const x = b[site] && typeof b[site] === 'object' ? b[site] : {};
+    out[site] = {};
+    for (const d of champs) { const v = valeurPermise(site, d, x[d.champ], r); if (v) out[site][d.champ] = v; }
+  }
+  return out;
+}
+// Les champs d'un site pour UNE annonce.
+//   defaut : sortie `reglageParams` ; annonce : { [champ]: valeur } de CETTE annonce.
+// Rend [{ champ, requis, porte, valeur, auto, source, demande, horsVoie, effet }] :
+//   source : 'annonce' · 'defaut' · 'auto' · null (rien) ;
+//   effet (Leboncoin) : '' · 'bloque' (la voie poserait autre chose) ·
+//                       'sur-site' (requis, rien posé : à choisir pendant le dépôt) ·
+//                       'perdu' (facultatif, la voie ne le pose pas : ne partira pas) ;
+//          (Vestiaire) : '' · 'sur-site' (le dépôt s'ouvre sans publier tout seul).
+export function champsSite(site, paire, { defaut = {}, annonce = {}, regles = {} } = {}) {
+  const champs = CHAMPS_PARTOUT[site];
+  if (!champs) return [];
+  const def = (defaut && defaut[site]) || {};
+  const ann = annonce && typeof annonce === 'object' ? annonce : {};
+  const out = [];
+  for (const d of champs) {
+    const auto = autoChamp(site, d.champ, paire, regles);
+    const va = valeurPermise(site, d, ann[d.champ], regles);
+    const vd = valeurPermise(site, d, def[d.champ], regles);
+    const choisi = va || vd;
+    const source = va ? 'annonce' : vd ? 'defaut' : auto != null ? 'auto' : null;
+    const valeur = choisi || auto;
+    // Choisi ET différent de ce que la voie poserait d'elle-même : la voie ne le porte pas.
+    const horsVoie = !!choisi && d.porte !== 'fiche' && (auto == null || auto === AU_DEPOT || auto === PROFIL || normVal(choisi) !== normVal(auto));
+    let effet = '';
+    if (site === 'leboncoin') {
+      if (horsVoie && auto != null && auto !== PROFIL) effet = 'bloque';
+      else if (horsVoie && auto === PROFIL) effet = 'bloque';                       // lbc.js garde la ville de son profil
+      else if ((horsVoie || valeur == null) && d.requis && d.porte !== 'fiche') effet = 'sur-site';
+      else if (horsVoie) effet = 'perdu';
+    } else if (site === 'vestiaire') {
+      if (horsVoie || (valeur == null && d.requis)) effet = 'sur-site';
+    }
+    // Demandé : un champ requis que rien ne donne (ni lui, ni le défaut, ni la voie).
+    // Bloquant seulement là où la voie publierait sans (l'état Leboncoin, porté par
+    // la fiche : `etat-lbc` dans `lignePartout`) ; ailleurs, le site l'attend au dépôt.
+    const demande = valeur == null && !!d.requis;
+    out.push({ champ: d.champ, requis: !!d.requis, porte: d.porte, choix: d.choix || null, lecture: !!d.lecture, valeur: valeur == null ? null : valeur, auto, source, demande, horsVoie, effet });
+  }
+  return out;
+}
+// Ce qui reste à faire sur le site, champ par champ (pour le dépôt et le bilan).
+export const NOM_CHAMP = Object.freeze({ categorie: 'Catégorie', sousCategorie: 'Sous-catégorie', marque: 'Marque', taille: 'Taille', couleur: 'Couleur', etat: 'État',
+  matiere: 'Matière', livraison: 'Livraison', mainPropre: 'Remise en main propre', lieu: 'Lieu', options: 'Options', univers: 'Univers', authenticite: 'Preuve d’authenticité', prix: 'Prix' });
+export function aFinirSurSite(champs) {
+  return arr(champs).filter((c) => c.effet === 'sur-site').map((c) => (c.valeur && c.valeur !== AU_DEPOT && c.valeur !== PROFIL && c.horsVoie ? `${NOM_CHAMP[c.champ] || c.champ} « ${c.valeur} »` : (NOM_CHAMP[c.champ] || c.champ)));
+}
+
 // ── UNE LIGNE : CE QUI PART, SITE PAR SITE ─────────────────────────────────
 // paire : la source partagée (`useEbayPaires`) { id, num, title, taille, marque,
 //   etat, couleur, photos, desc, prix, uid, cover, chezMoi }.
@@ -157,10 +320,19 @@ export function lignePartout(paire, ctx = {}) {
   const prixTape = Number(String(s.prix == null ? '' : s.prix).replace(',', '.').replace(/[\s€]/g, ''));
   const prixSource = p.prix != null && p.prix !== '' && Number(p.prix) > 0 ? Number(p.prix) : (Number.isFinite(prixTape) && prixTape > 0 ? cents(prixTape) : null);
   const reg = reglagePrix(ctx.reglage);
+  const defParams = reglageParams(ctx.params, ctx.regles || {});
   const sites = SITES_PARTOUT.map((site) => {
-    const prix = prixPourSite(prixSource, reg[site]);
+    // Le prix de CETTE annonce sur CE site (tapé dans la feuille) passe avant le réglage.
+    const pa = s.prixSite && typeof s.prixSite === 'object' ? Number(String(s.prixSite[site] == null ? '' : s.prixSite[site]).replace(',', '.').replace(/[\s€]/g, '')) : NaN;
+    const prixAnnonce = PRIX_REGLABLE[site] && Number.isFinite(pa) && pa > 0 ? cents(pa) : null;
+    const prix = prixAnnonce != null && prixSource != null ? prixAnnonce : prixPourSite(prixSource, reg[site]);
     const ap = apercuEnvoi(site, { ...p, prix }, ctx.regles || {});
-    const vocab = vocabulaire(site, p, s, ctx.regles || {});
+    // Les paramètres du site : CETTE annonce, sinon le défaut, sinon ce que la voie pose.
+    const annSite = { ...((s.params && s.params[site]) || {}) };
+    if (site === 'leboncoin' && !annSite.etat && str(s.etatLbc)) annSite.etat = str(s.etatLbc);   // la demande d'état d'avant
+    const champs = champsSite(site, p, { defaut: defParams, annonce: annSite, regles: ctx.regles || {} });
+    const vocab = vocabulaire(site, p, { ...s, etatLbc: annSite.etat || s.etatLbc }, ctx.regles || {});
+    if (site === 'leboncoin') { const sc = champs.find((c) => c.champ === 'sousCategorie'); if (sc && sc.valeur) vocab.categorie = sc.valeur; }
     // Les manques de la vérification de l'app (la même que celle des moteurs).
     let manques = manquesEnvoi(site, ap, { achat: ctx.achat == null ? null : ctx.achat, famille: ctx.famille || '', mpLbc: ctx.mpLbc !== false, horsVinted: p.chezMoi === true, facultatifs: ctx.facultatifs === true });
     // « Prix pas lu » se DEMANDE ici : le geste de la feuille, pas « ouvre Vinted ».
@@ -170,9 +342,17 @@ export function lignePartout(paire, ctx = {}) {
     if (prixSource != null && prix == null) manques.push({ code: 'prix-regle', texte: 'Prix ajusté impossible', geste: 'Ton réglage de prix pour ce site donne 0 € ou moins : change-le', bloque: true });
     if (ap && ap.titre && TITRE_MAX_PARTOUT[site] && ap.titre.length > TITRE_MAX_PARTOUT[site] && !manques.some((m) => m.code === 'titre')) manques.push({ code: 'titre-long', texte: `Titre trop long (${ap.titre.length}/${TITRE_MAX_PARTOUT[site]})`, geste: 'Raccourcis le titre de l’annonce Vinted', bloque: true });
     if (vocab && vocab.etatDemande) manques.push({ code: 'etat-lbc', texte: p.etat ? `État « ${str(p.etat)} » inconnu de Leboncoin` : 'État pas lu', geste: 'Choisis l’état Leboncoin ci-dessous', bloque: true });
+    // Un choix que la voie ne porte pas encore : dit AVANT (jamais une annonce publiée autrement).
+    for (const c of champs) {
+      const nom = NOM_CHAMP[c.champ] || c.champ;
+      if (c.effet === 'bloque') manques.push({ code: 'hors-voie-' + c.champ, texte: `${nom} « ${c.valeur} » ne partirait pas`, geste: c.champ === 'lieu' ? 'Ton extension pose la ville de tes Réglages : change-la là, ou remets « auto »' : 'Ton extension pose encore celle de Vinted : remets « auto » ou change-la sur Leboncoin après', bloque: true });
+      else if (c.effet === 'perdu') manques.push({ code: 'perdu-' + c.champ, texte: `${nom} : ne partira pas`, geste: 'Ton extension ne sait pas encore le poser : règle-le sur Leboncoin après', bloque: false });
+    }
+    const finir = aFinirSurSite(champs);
     const demandes = [];
     if (prixSource == null) demandes.push('prix');
     if (vocab && vocab.etatDemande) demandes.push('etat-lbc');
+    for (const c of champs) if (c.demande && !(site === 'leboncoin' && c.champ === 'etat')) demandes.push('champ:' + c.champ);
     const extRaison = str(ctx.ext && ctx.ext[site]);
     const vu = ctx.enLigne ? ctx.enLigne[site] : null;
     const deja = vu === true ? true : vu === false ? false : null;
@@ -182,7 +362,7 @@ export function lignePartout(paire, ctx = {}) {
     else if (extRaison) raison = 'ext';
     else if (manques.some((m) => m.bloque)) raison = 'manque';
     const cochable = !raison;
-    return { site, apercu: ap, vocab, manques, demandes, deja, cochable, cocheDefaut: cochable && deja === false, raison, extRaison };
+    return { site, apercu: ap, vocab, champs, finir, prixAnnonce, manques, demandes, deja, cochable, cocheDefaut: cochable && deja === false, raison, extRaison };
   });
   return { id: str(p.id), num: str(p.num), ref: refVrm(p.num), titre: str(p.title), cover: p.cover || null, prixSource, sites };
 }
@@ -199,7 +379,7 @@ export function planPartout(lignes, coches) {
       const x = arr(l && l.sites).find((y) => y.site === site);
       if (!x || !x.cochable || !c.has(cleCase(l.id, site))) continue;
       if (!x.apercu || !x.apercu.num || !x.apercu.ref) continue;   // aucune identité ⇒ rien ne part
-      out.push({ cle: cleCase(l.id, site), id: l.id, num: l.num, site, apercu: x.apercu, vocab: x.vocab });
+      out.push({ cle: cleCase(l.id, site), id: l.id, num: l.num, titre: l.titre, site, apercu: x.apercu, vocab: x.vocab, champs: arr(x.champs), finir: arr(x.finir) });
     }
   }
   return out;
@@ -216,11 +396,19 @@ export function planPartout(lignes, coches) {
 // Un refus qui dit « plafond », « pause », 429 ou « en cours » ARRÊTE ce site
 // pour le reste de la série (jamais insister) ; les autres sites continuent.
 const ARRET_SITE = /^(plafond|quota|pause|limite|429|403|frein|en-cours|compte|onglet|delai)$/;
-export async function executerPartout({ plan, envoyer = {}, attendre, surEtat } = {}) {
+// doitSArreter() : lu ENTRE deux envois (jamais au milieu d'un dépôt) — « Pause » /
+//   « Arrêter » du suivi (SuiviTravail) : ce qui reste n'est PAS envoyé, et le dit.
+// Vestiaire avec des champs « à finir sur le site » (`e.finir`) : le dépôt s'ouvre
+//   sans publier tout seul ⇒ « à finir sur Vestiaire : … » tout de suite, et ce site
+//   s'arrête (un seul dépôt en attente : le suivant écraserait celui-ci).
+export async function executerPartout({ plan, envoyer = {}, attendre, surEtat, doitSArreter } = {}) {
   const res = {};
   const arrete = {};
+  let stop = '';
   const dire = (cle, e) => { res[cle] = e; if (typeof surEtat === 'function') { try { surEtat(cle, e); } catch (_) {} } };
   for (const e of arr(plan)) {
+    if (!stop && typeof doitSArreter === 'function') { let v = false; try { v = !!doitSArreter(); } catch (_) { v = true; } if (v) stop = 'pas envoyé : arrêté par toi'; }
+    if (stop) { if (e && e.cle) dire(e.cle, { etat: 'pas-envoye', raison: stop }); continue; }
     if (!e || !e.num || !e.apercu || !e.apercu.ref) { if (e && e.cle) dire(e.cle, { etat: 'pas-envoye', raison: 'pas de N° : aucune identité, rien ne part' }); continue; }
     if (arrete[e.site]) { dire(e.cle, { etat: 'pas-envoye', raison: arrete[e.site] }); continue; }
     const f = envoyer[e.site];
@@ -241,8 +429,14 @@ export async function executerPartout({ plan, envoyer = {}, attendre, surEtat } 
       continue;
     }
     if (str(r.etape) === 'fait') { dire(e.cle, { etat: 'publie' }); continue; }
+    const finir = arr(e.finir);
+    if (e.site === 'vestiaire' && finir.length) {
+      dire(e.cle, { etat: 'a-finir', raison: 'à finir sur Vestiaire : ' + finir.join(', '), finir });
+      arrete[e.site] = 'pas envoyé : le dépôt précédent est à finir sur Vestiaire';
+      continue;
+    }
     // Un dépôt ouvert : on attend SA fin avant le suivant (un seul dépôt par site).
-    dire(e.cle, { etat: 'attente', jobId: r.jobId || null });
+    dire(e.cle, { etat: 'attente', jobId: r.jobId || null, ...(finir.length ? { raison: 'à choisir sur ' + (NOM_PARTOUT[e.site] || e.site) + ' : ' + finir.join(', '), finir } : {}) });
     let fin = null;
     try { fin = typeof attendre === 'function' && r.jobId ? await attendre(r.jobId) : { etape: 'delai' }; } catch (_) { fin = { etape: 'delai' }; }
     const et = str(fin && fin.etape);
