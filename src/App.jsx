@@ -4129,7 +4129,7 @@ const RAISONS_LIGNE = {
   'fiche-absente': 'la fiche n’existe plus (voir la Corbeille)', 'pose-depuis': 'posé depuis : il reste', 'trop-gros': 'trop gros pour un point : il reste',
   'numero-garde': 'seul le N° diffère : il reste', 'rendu': 'N° rendu (porté par aucune autre)',
 };
-const MOTS_ECHEC = { point: 'Le point de restauration n’a pas pu être posé : rien n’a changé.', lecture: 'Une donnée n’a pas pu être lue : rien n’a changé.', conflits: 'Réponds d’abord pour les valeurs plus récentes.' };
+const MOTS_ECHEC = { point: 'Le point de restauration n’a pas pu être posé (la base n’a pas répondu) : rien n’a changé. Réessaie dans un instant.', lecture: 'Une donnée n’a pas pu être lue : rien n’a changé. Réessaie dans un instant.', conflits: 'Réponds d’abord pour les valeurs plus récentes.' };
 const issueTexte = (r) => (r.ok === true ? 'Enregistré.' : r.ok === null ? 'Gardé sur cet appareil : l’envoi au nuage part dès que la base répond.' : MOTS_ECHEC[r.raison] || 'La base a refusé : réessaie.');
 
 function RevenirEnArriere() {
@@ -4206,6 +4206,7 @@ function RevenirEnArriere() {
           <p className="vrm-retour-tete">{issueTexte(fait)}{fait.ignores ? ` ${fait.ignores} valeur${fait.ignores > 1 ? 's' : ''} changée${fait.ignores > 1 ? 's' : ''} entre-temps : gardée${fait.ignores > 1 ? 's' : ''}.` : ''}</p>
           <div className="vrm-retour-actions">
             {fait.ok !== false && pFait && <Bouton variante="secondaire" icone="restore" data-retour-annuler-fait="" disabled={etat === 'envoi'} onClick={() => annuler(pFait)}>Annuler la restauration</Bouton>}
+            {fait.ok === false && <Bouton variante="secondaire" data-retour-reessayer="" onClick={() => setFait(null)}>Réessayer</Bouton>}
             <Bouton variante="discret" onClick={fermer}>Terminé</Bouton>
           </div>
         </div>);

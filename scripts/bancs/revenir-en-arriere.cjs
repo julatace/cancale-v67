@@ -232,6 +232,7 @@ async function main() {
         dit(!ecrits.slice(n0).some((e) => e.id === 'main'), `${T} 5. le point n’a pas pu être posé (503) ⇒ RIEN écrit dans main`);
         dit((await pg.locator('[data-retour-fait]').first().getAttribute('data-retour-fait')) === 'echec' && /Rien n’a changé/.test(await pg.locator('[data-retour-fait]').first().innerText()), `${T} 5. l’écran dit « Rien n’a changé »`);
         await capture(pg, `retour-echec-${vp.width}`);
+        dit((await pg.locator('[data-retour-reessayer]').count()) === 1 && /Réessaie/.test(await pg.locator('[data-retour-fait]').first().innerText()), `${T} 5. l’échec dit le geste (« Réessaie », bouton « Réessayer »)`);
         dit(errs.length === 0, `${T} aucune erreur de page`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
