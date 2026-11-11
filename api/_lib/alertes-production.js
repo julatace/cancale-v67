@@ -42,6 +42,9 @@ export const ECHECS_COLIS = 2;
 export const SERIE_503 = 3;
 export const FENETRE_503_MS = 3600e3;
 const ESSAIS = 4;
+// Le banc navigateur (scripts/bancs/alertes-production.cjs) compte les envois ici ;
+// jamais posé en production.
+export const _bancAlertes = { pousser: null };
 
 const ms = (v) => { const t = typeof v === 'number' ? v : Date.parse(String(v || '')); return Number.isFinite(t) && t > 0 ? t : null; };
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -200,9 +203,10 @@ export async function passerAlertes({ proprio, operation, env = process.env, fet
     if (ecrit === undefined) return { fait: false, raison: 'base' };
     if (!ecrit) continue;
     let notifiees = 0;
+    const envoyer = _bancAlertes.pousser || pousser;
     for (const n of r.dues) {
-      if (typeof pousser !== 'function') break;
-      try { const x = await pousser(n); if (x && x.sent > 0) notifiees++; } catch (_) {}
+      if (typeof envoyer !== 'function') break;
+      try { const x = await envoyer(n, p); if (x && x.sent > 0) notifiees++; } catch (_) {}
     }
     return { fait: true, ecrit: true, dues: r.dues.length, notifiees, data };
   }

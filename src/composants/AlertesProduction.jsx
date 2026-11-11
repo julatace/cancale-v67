@@ -23,6 +23,8 @@ const quand = (iso) => {
   try { return auj ? `à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : `le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`; } catch (_) { return ''; }
 };
 
+const ESPACE = { display: 'grid', gap: 20, marginTop: 20 };
+
 export function AlertesProduction({ entetes, fetcher = (typeof fetch === 'function' ? fetch.bind(globalThis) : null) }) {
   const [etat, setEtat] = React.useState(undefined);   // undefined · null (pas su) · 'refuse' · objet
   const [envoi, setEnvoi] = React.useState('');
@@ -49,9 +51,9 @@ export function AlertesProduction({ entetes, fetcher = (typeof fetch === 'functi
     setEnvoi('');
   };
   if (etat === 'refuse') return null;
-  if (etat === undefined) return <div data-alertes-prod="lecture"><GroupeIos titre="Alertes sur ton iPhone"><RangeeIos titre="Lecture…"/></GroupeIos></div>;
+  if (etat === undefined) return <div data-alertes-prod="lecture" style={ESPACE}><GroupeIos titre="Alertes sur ton iPhone"><RangeeIos titre="Lecture…"/></GroupeIos></div>;
   if (etat === null) return (
-    <div data-alertes-prod="pas-su">
+    <div data-alertes-prod="pas-su" style={ESPACE}>
       <GroupeIos titre="Alertes sur ton iPhone" pied="Pas su : le serveur n’a pas répondu.">
         <RangeeIos titre="Réessayer" onClick={lire} data-alertes-reessayer=""/>
       </GroupeIos>
@@ -59,7 +61,7 @@ export function AlertesProduction({ entetes, fetcher = (typeof fetch === 'functi
   );
   const { reglages = {}, alertes = [] } = etat;
   return (
-    <div data-alertes-prod={alertes.length}>
+    <div data-alertes-prod={alertes.length} style={ESPACE}>
       <GroupeIos titre="Alertes sur ton iPhone" pied="Une alerte par heure au plus, sans rien d’un vendeur.">
         {TYPES_ALERTES.map(([t, titre, detail]) => (
           <RangeeIos key={t} titre={titre} detail={detail} data-alerte-type={t}
