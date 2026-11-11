@@ -67,7 +67,11 @@ const INVENTAIRE = { ok: true, proprietaire: false, nombres: { donnees: 128, fac
       if (tel) dit(r && r.petit >= 43.5, `${tag} : 44 px au doigt`, r && r.petit);
       dit(r && !r.deborde, `${tag} : rien ne déborde`);
       await pg.locator('[data-fermer-confirmation]:visible').first().fill('SUPPRIMER'); await attendre(250);
-      dit(!(await pg.locator('[data-fermer-bouton]:visible').first().isDisabled()), `${tag} : « SUPPRIMER » tapé ⇒ le bouton s’allume`);
+      // (11 nov., lot suppression-oauth) Connexion pas récente, compte à mot de passe (jeton
+      // du jeu illisible ⇒ « pas su ») : il faut AUSSI le mot de passe — le serveur refuserait sinon.
+      dit(await pg.locator('[data-fermer-bouton]:visible').first().isDisabled(), `${tag} : « SUPPRIMER » seul, sans connexion récente ⇒ encore éteint`);
+      await pg.locator('[data-supprimer-mdp]:visible').first().fill('motdepasse-du-banc'); await attendre(250);
+      dit(!(await pg.locator('[data-fermer-bouton]:visible').first().isDisabled()), `${tag} : « SUPPRIMER » + mot de passe ⇒ le bouton s’allume`);
       const haut = await pg.evaluate(() => { const h = [...document.querySelectorAll('[data-fermer-compte]')].find((e) => e.getClientRects().length); return h ? Math.ceil(h.getBoundingClientRect().bottom + 120) : 0; });
       const vp = pg.viewportSize();
       if (haut > vp.height) { await pg.setViewportSize({ width: vp.width, height: haut }); await attendre(400); }
