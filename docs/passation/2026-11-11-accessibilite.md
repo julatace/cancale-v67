@@ -75,13 +75,86 @@ icônes (`BoutonBase`), les images d'annonce (aucune violation `image-alt`).
 - `audit-coherence` exige l'historique complet de `main` (clone superficiel ⇒ « rien n'est
   conclu ») : `git fetch --unshallow origin main`, puis vert.
 
+## Suite (même jour) — contrôle complet demandé par Julien
+
+Demande : couvrir les écrans et feuilles restants, ajouter zoom 200 % et clavier seul, corriger,
+mêmes preuves. Les deux bancs partagent un socle **`scripts/bancs/_a11y.cjs`** (données inventées,
+serveur de `dist/`, ouverture d'un écran avec largeur/thème/zoom/lien, axe, cibles au doigt).
+
+### Ce qui est couvert maintenant
+
+- **`accessibilite.cjs`** (CI part 2, ≈ 10 min ici) : **17 écrans** — les 11 d'avant + Statistiques,
+  Communauté, Leboncoin (`?tab=leboncoin`), eBay (`?tab=ebay_annonces`), Vestiaire
+  (`?tab=annonces&site=vestiaire`), Organisation — et **5 feuilles** : fiche d'une paire (« Tout sur
+  le N° », `vrm:fiche-paire`), fiche d'une vente (tiroir de Ventes → Vinted), Nouvel achat
+  (`?tab=achats&achat=1`), « Tout imprimer », la confirmation avant impression ; 390/1512, clair
+  et sombre ; axe passé DANS la feuille ouverte. Le socle sert en plus une annonce Leboncoin, eBay
+  et Vestiaire et une vente à expédier avec son bordereau (sans elles, ces écrans retombent sur
+  Vinted et « Tout imprimer » n'existe pas). Deux règles axe « bonnes pratiques » sont tenues
+  ROUGES quel que soit leur impact : `aria-allowed-role` (rôle ARIA interdit) et
+  `aria-dialog-name` (feuille sans nom). 225 contrôles.
+- **`accessibilite-clavier.cjs`** (CI part 3, ≈ 6 min ici) :
+  - **Zoom 200 %** (1512 px zoomé = 756 px CSS, 2 px par pixel CSS), 17 écrans : Z1 la page ne
+    défile pas en largeur ET rien ne sort par la droite (un parent qui rogne cache le défilement
+    mais perd le contenu) ; Z2 aucun texte rogné (overflow hidden/clip, ellipse) sans `title` ni
+    nom qui le contienne — une rangée qui défile se lit en la faisant défiler.
+  - **Clavier seul** : K1 depuis le haut de la page, Tab atteint chaque entrée de la colonne et
+    Entrée l'ouvre (11 écrans) ; K2 sur les 17 écrans, clair et sombre, les 40 premiers arrêts de
+    Tab : jamais un élément invisible ou caché au lecteur, Tab entre dans `<main>`, et un
+    indicateur qui APPARAÎT au focus (outline, ombre, bordure ou fond — sur l'élément, ses
+    pseudo-éléments, un parent proche ou un enfant direct) avec un contraste ≥ 3:1 contre ce qui
+    l'entoure (2.4.7 ; 2.4.11 de WCAG 2.2). Un `<select>` transparent posé sur son habillage
+    compte comme visible si l'habillage le couvre. 207 contrôles.
+  - `BANC_MUTATION=focus|largeur|coupe` sabote la page (aucun contour ; un bloc de 2000 px ; un
+    texte rogné sans `title`) : K2, Z1, Z2 sortent rouges. La mutation « largeur » a montré que Z1
+    (défilement de la page) seul ne voyait rien (`<main>` rogne) : d'où le contrôle « rien ne sort
+    par la droite ».
+
+### Ce qui a été trouvé et corrigé
+
+| règle | où | correction |
+|---|---|---|
+| `aria-allowed-role` | Ventes → Tous : chaque vente était un `<button role="listitem">` (plus annoncé comme un bouton) | rôles `list`/`listitem` retirés, la liste reste une suite de boutons |
+| `label-content-name-mismatch` | Ventes → Tous : `aria-label` sans le texte affiché (tout le dessin `aria-hidden`) | le nom est LU dans un `vrm-sr-seul` (titre, site, compte, jour, état, prix, N° — le N° manquait) |
+| idem | eBay : `aria-label` « titre — N° — ouvrir la fiche » sans l'état affiché | plus d'`aria-label` : nommé par ce qu'il montre ; ouvert/fermé par `aria-expanded` |
+| idem | Nouvel achat : « Ajouter une photo » contre « Photo de l'article » affiché | « Photo de l'article : ajouter une photo » / « Changer la photo de l'article » |
+| idem | fiche d'une vente : « Fiche N°21 » contre « Fiche de la paire » | « Fiche de la paire N°21 » (et « Fiche de l'article N°… » sur Vestiaire) |
+| `aria-dialog-name` | les quatre confirmations (`vrm-confirmation`) sans nom | `aria-label` = leur titre affiché |
+| `role-img-alt` | fiche d'une vente : barre de coût `role="img"` au nom vide (aucun segment) | sans segment, la barre est décorative (`aria-hidden`) |
+| `color-contrast` | « Ajouter une note » sur le remplissage gris (3,96:1) | en clair #5E5E63 (5,0:1) |
+| idem | « Vendus ailleurs » → « Voir le détail » à opacité 0,7 (2,8:1) | le gris secondaire du thème au lieu de l'opacité |
+| Z2 (texte coupé, toutes tailles) | Stock : « N°12 » coupé en « N°1… » dans les vignettes de 44 px | pastille resserrée en vignette mini (3 chiffres tiennent), N° entier en `title`, `aria-hidden` (la ligne l'écrit en clair) |
+
+Rien d'autre au zoom 200 % ni au clavier : aucune page ne défile en largeur, chaque écran est
+atteint au clavier, et chaque arrêt de Tab montre un contour ≥ 3:1 (le « ? » d'aide porte le sien
+sur sa pastille, le tri d'Annonces sur son habillage).
+
+### Preuves (suite)
+
+- Branche (après `git merge origin/main`) : **`accessibilite` 225 ✅ · 0 ❌**, **`accessibilite-clavier`
+  207 ✅ · 0 ❌**.
+- **`origin/main` (2084be1b, `git archive`, les trois fichiers de banc copiés dedans, build de cet
+  arbre) : `accessibilite` 141 ✅ · 84 ❌ ; `accessibilite-clavier` 206 ✅ · 1 ❌** (le N° coupé du
+  Stock).
+- Mutations : `focus` ⇒ K2 rouge (31 arrêts « aucun contour ») ; `largeur` ⇒ Z1 rouge ; `coupe` ⇒
+  Z2 rouge.
+- Bancs voisins (noms et structures touchés) : `ventes-e2`, `stock-2d`, `achats-hors-plateforme`,
+  `ebay-lbc-visuel`, `journee-coherence` **verts** ; `tout-imprimer` rouge (B « groupes de l'écran »
+  vides) **à l'identique sur `origin/main`** — pas ce lot.
+- `npm run build` ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`, `textes-courts`,
+  `fonctions-api`, `secrets`, `csp` verts (sur l'arbre fusionné).
+- Captures regardées : zoom 200 % (Stock), confirmation 390 sombre, fiches.
+- `CLAUDE.md` au-dessus de 59 000 octets après la fusion : la ligne la plus ancienne du §9
+  (« VRM installable ») est déplacée telle quelle dans `historique-divers.md`.
+
 ## Ce qui reste
 
 - axe ne couvre qu'une partie de WCAG (≈ 30-40 %) : l'ordre du focus « logique », la
   pertinence des noms et VoiceOver sur iPhone restent à relire à la main (Safari calcule
   presque toujours les mêmes noms que Chrome, pas toujours).
-- Les écrans hors des 11 (Statistiques, Communauté, plateformes Leboncoin/eBay/Vestiaire,
-  feuilles autres que « ? ») ne sont pas passés au banc ; ajouter un écran = une ligne dans
-  `ECRANS`.
+- Ajouter un écran = une ligne dans `ECRANS` (`_a11y.cjs`) ; une feuille = une entrée de `FEUILLES`.
+  Pas encore couverts : Republier, Publier ailleurs, les feuilles de Paramètres, le centre d'aide.
+- Durées : ~10 min (`accessibilite`) et ~6 min (`accessibilite-clavier`) sur la machine chargée ;
+  si une part de la CI dépasse 20 min, déplacer un banc vers la part la moins chargée.
 - Les données inventées sont petites : un état rare (bandeau d'erreur, liste longue) peut
   porter un contraste que le banc ne voit pas.
