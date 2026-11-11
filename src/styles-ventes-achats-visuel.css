@@ -98,7 +98,10 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
 
 /* La carte d'un colis (« À expédier ») : l'action garde sa place en haut à droite, grise ; icône seule au doigt. */
 @media (max-width: 1023px) {
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) { width: 44px !important; padding: 0 !important; border-radius: 50% !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a):not([data-bord-vinted]) { width: 44px !important; padding: 0 !important; border-radius: 50% !important; }
+  /* (intégration) Le lien texte « sur Vinted ↗ » (repli quand l'extension ne génère pas) n'est pas une icône : il garde sa
+     largeur, sur une ligne (banc colis-colonnes : il était écrasé dans un rond de 44 px, une lettre par ligne). */
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord a[data-bord-vinted] { width: auto !important; white-space: nowrap !important; min-height: 44px !important; display: inline-flex !important; align-items: center !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) :is(.vrm-lib-long, .vrm-lib-court) { display: none !important; }
 }
 @media (min-width: 1024px) {
