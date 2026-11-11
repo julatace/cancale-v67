@@ -92,9 +92,10 @@ async function auditer(sources) {
     // (6 nov., vague 2) « Prix mini… » (`multiComptes`) n'agit pas au nom d'un compte : une écriture
     // dans ses fiches. Toutes les AUTRES actions restent bloquées par le mélange des comptes.
     // (6 nov.) « à la main » non plus : rien ne part chez Vinted, chaque paire dit son compte.
-    const parCompte = Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'main' && x.k !== 'baisser' && x.k !== 'partout');   // (11 nov.) « Publier partout… » : rien ne part chez Vinted (Leboncoin, Vestiaire, eBay)   // (10 nov.) « Baisser le prix… » : chaque annonce SON compte, la feuille dit « ouvre ce compte »
+    const parCompte = Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'main' && x.k !== 'baisser' && x.k !== 'partout' && x.k !== 'visuels');   // (11 nov.) « Publier partout… » : rien ne part chez Vinted (Leboncoin, Vestiaire, eBay) ; (11 nov., lot visuels-reseaux) un visuel n'agit au nom d'aucun compte   // (10 nov.) « Baisser le prix… » : chaque annonce SON compte, la feuille dit « ouvre ce compte »
     dit(parCompte.length >= 4 && parCompte.every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action qui agit au nom d’un compte, les comptes nommés', a.recreer.raison);
     dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison);
+    dit(a.visuels && a.visuels.ok && a.visuels.robot === false, 'B24 « Nouveautés de la semaine » sur deux comptes ⇒ possible (un visuel dessiné dans le navigateur, rien ne part chez Vinted)', a.visuels && a.visuels.raison);
     dit(a.main && a.main.ok && a.main.robot === false, 'B19 « à la main » sur deux comptes ⇒ possible, une paire à la fois dans la feuille (rien ne part d’ici)', a.main && a.main.raison); }
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '', etat: 'en-ligne' }]);
     dit(a.main && !a.main.ok && /compte/.test(a.main.raison), 'B20 « à la main » : une annonce au compte inconnu ⇒ grisé, raison dite (on ne relie pas sans compte)', a.main && a.main.raison); }
@@ -107,8 +108,8 @@ async function auditer(sources) {
   { const a = L([{ id: '5', uid: '111', etat: 'brouillon' }]);
     dit(a.mini && !a.mini.ok && /en ligne/.test(a.mini.raison), 'B17 « Prix mini… » sur un brouillon ⇒ grisé (une offre n’arrive que sur une annonce en ligne), raison dite', a.mini && a.mini.raison);
     const sel = R.ACTIONS_SELECTION.filter((A) => A.multiComptes);
-    // (11 nov.) « Publier partout… » ignore aussi le compte Vinted : il ne part que vers les AUTRES sites.
-    dit(sel.map((A) => A.k).sort().join() === 'mini,partout' && sel.every((A) => A.robot === false && A.lien === true && !R.ACTIONS_TUILES.includes(A.k)), 'B18 seuls « Prix mini… » et « Publier partout… » ignorent le compte Vinted : non robot, des liens sous les tuiles', JSON.stringify(sel.map((A) => A.k))); }
+    // (11 nov.) « Publier partout… » et « Nouveautés de la semaine » ignorent aussi le compte Vinted.
+    dit(sel.map((A) => A.k).sort().join() === 'mini,partout,visuels' && sel.every((A) => A.robot === false && A.lien === true && !R.ACTIONS_TUILES.includes(A.k)), 'B18 seuls « Prix mini… », « Publier partout… » et « Nouveautés de la semaine » ignorent le compte Vinted : non robot, des liens sous les tuiles', JSON.stringify(sel.map((A) => A.k))); }
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '3', uid: '111', etat: 'en-ligne' }]);
     dit(a.recreer.ok && a.modifier.ok && a.versBrouillon.ok, 'B3 en ligne, compte de Chrome ⇒ republier, modifier, en ligne → brouillon possibles');
     dit(!a.enLigne.ok && /en ligne/.test(a.enLigne.raison), 'B4 « brouillon → en ligne » grisé sur des annonces en ligne, raison dite', a.enLigne.raison);
@@ -129,7 +130,7 @@ async function auditer(sources) {
     dit(!b.recreer.ok && /Aucun compte/.test(b.recreer.raison), 'B13 aucun compte ouvert dans Chrome ⇒ le geste est dit', b.recreer.raison); }
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }], '111', (c) => c !== 'recreer');
     dit(!a.recreer.ok && /extension/.test(a.recreer.raison) && a.modifier.ok, 'B14 extension trop ancienne pour une action ⇒ elle seule est grisée'); }
-  { const a = L([{ id: '1', uid: '', etat: 'en-ligne' }]); dit(Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'partout').every((x) => !x.ok), 'B15 compte inconnu ⇒ rien qui agisse au nom d’un compte Vinted'); }
+  { const a = L([{ id: '1', uid: '', etat: 'en-ligne' }]); dit(Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'partout' && x.k !== 'visuels').every((x) => !x.ok), 'B15 compte inconnu ⇒ rien qui agisse au nom d’un compte Vinted'); }
   // (10 nov., lot C) « Baisser le prix… » : comptes mélangés permis (la feuille dit « ouvre ce compte »
   // pour ceux qui ne sont pas dans l'onglet), extension 5.336 exigée, seulement des annonces en ligne.
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '222', etat: 'en-ligne' }]);

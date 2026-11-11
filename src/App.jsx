@@ -272,6 +272,8 @@ const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
 const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 // (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
 const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
+// (11 nov., lot visuels-reseaux) Les visuels réseaux (carré, story), dessinés dans le navigateur.
+const VisuelsReseaux = aLaDemande(() => import('./composants/VisuelsReseaux.jsx'), true);
 const JaugeActions = aLaDemande(() => import('./JaugeActions.jsx'));
 // (11 nov., lot suivi-travail) La feuille « VRM travaille » (src/composants/SuiviTravail.jsx) : chargée
 // seulement quand un travail existe (en cours, ou laissé par un rechargement). La règle reste ici (petite).
@@ -692,6 +694,7 @@ import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hor
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
 import "./styles-pire-cas.css";   // (11 nov.) pire cas : chiffres et titres extrêmes tenus dans leur place
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
+import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
@@ -2697,6 +2700,9 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
+  // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
+  'vrm_visuels_reglages',
   // (11 nov., reprise-ecrans) Chaque écran se rouvre comme on l'a laissé, sur tous ses appareils :
   // filtres, tri, recherche (10 min), compte par site, dernier écran (30 min) — src/repriseSynchro.js.
   CLE_REPRISE_ECRANS,
@@ -10799,6 +10805,28 @@ if (typeof window !== 'undefined') {
     setTimeout(() => photosVinted.secoursChange(), PHOTOS_GRACE_EXT_MS + 200);
   } catch (_) {}
 }
+// (11 nov., lot visuels-reseaux) UNE photo LUE pour un <canvas> (src/composants/VisuelsReseaux.jsx) :
+// le chemin des photos de l'app — la route photo de VRM (`photoViaServeur`, data:), sinon la copie
+// déjà rapatriée par l'extension (`blobDe`, blob: de CETTE page), sinon l'extension elle-même. Une
+// photo Vinted n'est JAMAIS dessinée depuis son <img> natif (sans CORS, elle souillerait le canvas).
+// Une autre photo : lue en CORS, sinon `null` (« pas lisible », dit à l'écran). `null` = pas lisible.
+async function lirePhotoVisuel(u) {
+  if (typeof u !== 'string' || !u) return null;
+  if (/^(data:image\/|blob:)/.test(u)) return u;
+  if (photosVinted.estPhotoVinted(u)) {
+    const d = await photoViaServeur(u); if (d) return d;
+    const b = photosVinted.blobDe(u); if (b) return b;
+    if (__vmrExtReady) { try { const r = await vmrPhotoIssue(u, 20000); if (r && r.dataUrl) return r.dataUrl; } catch (_) {} }
+    return null;
+  }
+  if (!/^https:\/\//.test(u)) return null;
+  try {
+    const r = await fetch(u, { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+    if (!r.ok) return null;
+    const bl = await r.blob();
+    return /^image\//.test(bl.type) && bl.size < 8 * 1024 * 1024 ? URL.createObjectURL(bl) : null;
+  } catch (_) { return null; }
+}
 // Le cadre du pictogramme reprend la PLACE de l'image (jamais un trou, jamais
 // l'icône « image cassée » du navigateur) : mêmes dimensions, mêmes arrondis.
 const CLES_CADRE_PHOTO = ['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'borderRadius', 'flexShrink', 'flex', 'margin', 'marginLeft', 'marginRight', 'marginTop', 'marginBottom', 'border', 'boxShadow', 'position', 'top', 'left', 'right', 'bottom', 'aspectRatio', 'background'];
@@ -14996,6 +15024,8 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
   const baisser = actions.find((x) => x.k === 'baisser');
   // (11 nov.) « Publier partout… » : un lien discret de plus (la feuille de src/PublierPartout.jsx).
   const partout = actions.find((x) => x.k === 'partout');
+  // (11 nov., lot visuels-reseaux) « Nouveautés de la semaine » : un visuel des annonces cochées (rien ne part chez Vinted).
+  const visuels = actions.find((x) => x.k === 'visuels');
   const { tete, parTuile } = raisonCommune(actions);
   // Ce que VRM n'a pas lu : la MÊME phrase sur chaque paire ⇒ une fois, sous la liste.
   const cleNL = (l) => l.join(', ');
@@ -15038,6 +15068,12 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
           <div className="vrm-act-main" data-action-sel="partout" data-action-sel-ok={partout.ok ? 'oui' : 'non'}>
             <Bouton variante="discret" disabled={!partout.ok} title={partout.ok ? partout.desc : partout.raison} onClick={() => { if (partout.ok) onLancer('partout'); }}>{partout.titre}</Bouton>
             <span>{partout.ok ? 'Leboncoin, Vestiaire, eBay : une case par site, depuis l’annonce Vinted.' : partout.raison}</span>
+          </div>
+        ) : null}
+        {visuels ? (
+          <div className="vrm-act-main" data-action-sel="visuels" data-action-sel-ok={visuels.ok ? 'oui' : 'non'}>
+            <Bouton variante="discret" disabled={!visuels.ok} title={visuels.ok ? visuels.desc : visuels.raison} onClick={() => { if (visuels.ok) onLancer('visuels'); }}>{tr('visuels.titreLot')}</Bouton>
+            <span>{visuels.ok ? tr('visuels.actionDesc') : visuels.raison}</span>
           </div>
         ) : null}
         <div className="vrm-act-verif" data-avant-lancer={nManque}>
@@ -46927,6 +46963,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     })}
                     {/* (11 nov.) « Publier partout » : depuis CETTE annonce Vinted, Leboncoin · Vestiaire · eBay (src/publierPartout.js). */}
                     {num && <button type="button" className="vrm-fiche-geste" data-fiche-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:publier-partout',{detail:{nums:[String(num)]}})); } catch (_) {} }} style={geste}>{tr('partout.entree')}</button>}
+                    {/* (11 nov., lot visuels-reseaux) Un visuel carré / story de CETTE annonce (src/composants/VisuelsReseaux.jsx). */}
+                    <button type="button" className="vrm-fiche-geste" data-fiche-visuels={String(it.id)} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:visuels',{detail:{ items:[it] }})); } catch (_) {} }} style={geste}>{tr('visuels.titre')}</button>
                     <button type="button" className="vrm-fiche-geste" data-fiche-relier-achat="" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
                     <button type="button" className="vrm-fiche-geste" data-fiche-passeport="" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
@@ -50872,6 +50910,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (k==='mini') { setMiniSel(choisies); return; }
             // (11 nov.) « Publier partout » sur les annonces cochées : la même feuille, par leur N°.
             if (k==='partout') { const l=choisies.filter(a=>a.etat==='en-ligne'&&a.numero).map(a=>String(a.numero)); if (l.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout',{detail:{nums:l}})); } catch (_) {} } else toast('Aucune annonce en ligne avec un N° dans ta sélection.'); return; }
+            // (11 nov., lot visuels-reseaux) « Nouveautés de la semaine » : les annonces cochées, PAR IDENTITÉ (compte + id).
+            if (k==='visuels') { const idx3 = new Map((listings.items||[]).map((it)=>[String((it._acc&&it._acc.vinted_user_id)||'')+':'+String(it.id), it])); const its = choisies.map(a=>idx3.get(a.uid+':'+a.id)).filter(Boolean); try { window.dispatchEvent(new CustomEvent('vrm:visuels',{detail:{ items:its, lot:true }})); } catch (_) {} return; }
             // (10 nov., lot C) « Baisser le prix… » : la feuille de baisse en série (rien ne part avant SON clic).
             if (k==='baisser') { const idx2 = new Map((listings.items||[]).map((it)=>[String((it._acc&&it._acc.vinted_user_id)||'')+':'+String(it.id), it])); setBaisseSel(choisies.filter(a=>a.etat==='en-ligne').map(a=>{ const it=idx2.get(a.uid+':'+a.id); return it ? annonceBaisse(it) : { id:a.id, uid:a.uid, compte:a.compte, numero:a.numero, titre:a.titre, photo:a.photo, prix:null }; })); return; }
             setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
@@ -54761,6 +54801,11 @@ function AppCoeur() {
   // existante, sur CETTE annonce ; rien ne part avant SON clic là-bas (src/BaissePrixSerie.jsx).
   const [baisseCoque,setBaisseCoque]=useState(null);
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const l=(Array.isArray(d.nums)?d.nums:[]).map(x=>String(x==null?'':x).trim()).filter(x=>x&&x.length<=64).slice(0,200); if(l.length) setPubPartout({nums:l,at:Date.now()});};window.addEventListener('vrm:publier-partout',ouvrir);return()=>window.removeEventListener('vrm:publier-partout',ouvrir);},[]);
+  // (11 nov., lot visuels-reseaux) « VISUEL RÉSEAUX » : { items (annonces Vinted de l'app, par identité), lot }.
+  const [visuels,setVisuels]=useState(null);
+  useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const its=Array.isArray(d.items)?d.items.filter(x=>x&&x.id!=null):[]; if(!its.length) return;
+    setVisuels({ lot: !!d.lot || its.length>1, articles: its.map(it=>articleVisuel(it, galerieDe(typeof it.photo==='string'?it.photo:(it.photo&&it.photo.url)||'').photos)).filter(Boolean) });};
+    window.addEventListener('vrm:visuels',ouvrir);return()=>window.removeEventListener('vrm:visuels',ouvrir);},[]);
   const besoinNumData=gsOpen||!!ficheNum||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout;
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
   const [ficheExtra,setFicheExtra]=useState(null);
@@ -57728,6 +57773,11 @@ function AppCoeur() {
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
         }}/></GardeEcran>}
         <GardeEcran nom="lienvc" feuille><HoteLienVc comptes={vintedAccounts}/></GardeEcran>
+        {visuels && <GardeEcran nom="visuels" feuille onFermer={()=>setVisuels(null)}>
+          {/* (11 nov., lot visuels-reseaux) Carré 1080 et story 1080 × 1920, dessinés dans le navigateur ; rien n'est publié. */}
+          <VisuelsReseaux articles={visuels.articles} lot={visuels.lot} lirePhoto={lirePhotoVisuel} reglages={load(CLE_VISUELS,null)} onReglages={(r)=>save(CLE_VISUELS,r)}
+            Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente} toast={toast} onFermer={()=>setVisuels(null)}/>
+        </GardeEcran>}
         {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><Differe rendre={()=>{
           // (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), un clic.
           const { rn } = rechercheParNumero(prixNum, numData, vintedAccounts);
