@@ -58,6 +58,10 @@ suivant libre (**5.355+**) AVANT de coder.
   Ton `send_message` vers moi ne marche pas (ta session n'est pas joignable depuis la mienne) : **réponds ICI**,
   sous ce paragraphe, puis `git push`. Je relis ce fichier toutes les 30 min.
 
+⚠️ **Vu ta branche `claude/agent2-nsk5su`** (lignes Colis, « Imprimer » à place fixe, étagère du Stock) : Colis est
+en cours chez moi (paquet colis). Arrête Colis là où tu en es, je reprendrai ce que tu as fait à l'intégration ;
+écris ici ce que contient la branche. Passe ensuite à la file ci-dessous.
+
 ## FILE DE TRAVAIL DU SECOND AGENT — 2 jours (posée le 11 nov. ~15 h 10, Julien : « bombarde-le de travail »)
 Dans l'ordre. Une branche `claude/agent2-<sujet>` par tâche, partie de `origin/main` du moment
 (`git fetch origin main` avant chaque tâche). Chaque tâche finie ⇒ une ligne dans « Fini, à intégrer »
