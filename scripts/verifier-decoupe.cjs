@@ -24,6 +24,10 @@
 //  7. bancs      : scripts/lancer-bancs.cjs (le lot de la CI) sur le dist/ de chaque arbre ; un banc
 //                  vert avant et rouge après = rouge (relancé une fois avant d'être compté).
 //  Sortie : 0 si aucune régression ; 1 sinon. Rien n'est écrit dans les arbres hors dist/.
+//  (11 nov., reprise) Machine partagée : audits 2 à la fois (AUDITS_PARALLELE ≤ 2), tests 2 à la fois,
+//  ports des bancs tirés au hasard. `--audits-avant f.json` / `--bancs-avant f.json` reprennent une
+//  mesure de l'AVANT déjà faite (même commit : le rapport le vérifie) au lieu de la refaire ;
+//  `--garder-avant d/` écrit les mesures de l'avant dans d/ pour la fois suivante.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), os = require('os');
@@ -34,6 +38,9 @@ const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 && args[i + 1] 
 const AVANT = path.resolve(opt('--avant', ''));
 const APRES = path.resolve(opt('--apres', path.join(__dirname, '..')));
 const RAPPORT = opt('--rapport', null);
+const AUDITS_AVANT = opt('--audits-avant', null), BANCS_AVANT = opt('--bancs-avant', null), GARDER = opt('--garder-avant', null);
+const teteDe = (R) => { const r = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: R, encoding: 'utf8' }); return (r.stdout || '').trim(); };
+const PORT0 = 20000 + Math.floor(Math.random() * 30000);
 const TOUTES = ['texte', 'structure', 'imports', 'poids', 'audits', 'tests', 'bancs'];
 const ETAPES = args.filter((a) => TOUTES.includes(a));
 const etapes = ETAPES.length ? ETAPES : TOUTES;
@@ -207,8 +214,10 @@ function lancer(cmd, argv, R, env, ms) {
 async function etapeAudits() {
   const res = {};
   for (const [nom, R] of [['avant', AVANT], ['apres', APRES]]) {
-    const j = path.join(os.tmpdir(), `vrm-decoupe-audits-${nom}-${process.pid}.json`);
-    await lancer(process.execPath, [path.join(R, 'scripts', 'lancer-audits.cjs')], R, { AUDITS_JSON: j }, 4 * 3600e3);
+    let j = path.join(os.tmpdir(), `vrm-decoupe-audits-${nom}-${process.pid}.json`);
+    if (nom === 'avant' && AUDITS_AVANT) { j = AUDITS_AVANT; console.log(`   avant : repris de ${j}`); }
+    else await lancer(process.execPath, [path.join(R, 'scripts', 'lancer-audits.cjs')], R, { AUDITS_JSON: j, AUDITS_PARALLELE: '2' }, 4 * 3600e3);
+    if (nom === 'avant' && GARDER && !AUDITS_AVANT) { fs.mkdirSync(GARDER, { recursive: true }); fs.copyFileSync(j, path.join(GARDER, `audits-avant-${teteDe(AVANT).slice(0, 9)}.json`)); }
     try { res[nom] = Object.fromEntries(JSON.parse(fs.readFileSync(j, 'utf8')).map((x) => [x.audit, x.etat])); } catch (_) { KO(`audits ${nom} : pas de rapport`); return; }
     spawnSync('git', ['checkout', '--', 'public/'], { cwd: R });
   }
@@ -227,9 +236,9 @@ async function etapeTests() {
   const liste = fs.readdirSync(path.join(APRES, 'scripts', 'tests')).filter((f) => f.endsWith('.test.mjs')).sort();
   const res = { avant: {}, apres: {} };
   for (const [nom, R] of [['avant', AVANT], ['apres', APRES]]) {
-    // quatre à la fois
+    // deux à la fois (machine partagée)
     let k = 0; const file = liste.slice();
-    await Promise.all([0, 1, 2, 3].map(async () => { while (file.length) { const t = file.shift(); const p = path.join(R, 'scripts', 'tests', t); if (!fs.existsSync(p)) { res[nom][t] = 'absent'; continue; } const r = await lancer(process.execPath, ['--test', p], R, {}, 600e3); res[nom][t] = r.code === 0 ? 'vert' : 'rouge'; k++; } }));
+    await Promise.all([0, 1].map(async () => { while (file.length) { const t = file.shift(); const p = path.join(R, 'scripts', 'tests', t); if (!fs.existsSync(p)) { res[nom][t] = 'absent'; continue; } const r = await lancer(process.execPath, ['--test', p], R, {}, 600e3); res[nom][t] = r.code === 0 ? 'vert' : 'rouge'; k++; } }));
   }
   let neufs = liste.filter((t) => res.apres[t] === 'rouge' && res.avant[t] !== 'rouge');
   const vraiment = [];
@@ -243,16 +252,18 @@ async function etapeTests() {
 async function etapeBancs() {
   const res = {};
   for (const [nom, R] of [['avant', AVANT], ['apres', APRES]]) {
+    if (nom === 'avant' && BANCS_AVANT) { res.avant = JSON.parse(fs.readFileSync(BANCS_AVANT, 'utf8')); console.log(`   avant : repris de ${BANCS_AVANT}`); continue; }
     const b = construire(R, path.join(R, 'dist'));
     if (b.erreur) { KO(`build ${nom} (dist/) : ${b.erreur}`); return; }
-    const r = await lancer(process.execPath, [path.join(R, 'scripts', 'lancer-bancs.cjs')], R, { BANCS_PORT_BASE: nom === 'avant' ? '11000' : '12000' }, 6 * 3600e3);
+    const r = await lancer(process.execPath, [path.join(R, 'scripts', 'lancer-bancs.cjs')], R, { BANCS_PORT_BASE: String(PORT0 + (nom === 'avant' ? 0 : 1000)) }, 6 * 3600e3);
     res[nom] = {};
     for (const l of r.sortie.split('\n')) { const m = l.match(/^(OK |KO\*|KO ) (\S+)/); if (m) res[nom][m[2]] = m[1].trim(); }
     fs.writeFileSync(path.join(os.tmpdir(), `vrm-decoupe-bancs-${nom}.log`), r.sortie);
+    if (nom === 'avant' && GARDER) { fs.mkdirSync(GARDER, { recursive: true }); fs.writeFileSync(path.join(GARDER, `bancs-avant-${teteDe(AVANT).slice(0, 9)}.json`), JSON.stringify(res.avant)); }
   }
   const nouveaux = Object.keys(res.apres).filter((b) => res.apres[b] === 'KO' && res.avant[b] !== 'KO');
   const vraiment = [];
-  for (const b of nouveaux) { const r = await lancer(process.execPath, [path.join(APRES, 'scripts', 'lancer-bancs.cjs'), b], APRES, { BANCS_PORT_BASE: '12500' }, 3600e3); if (r.code !== 0) vraiment.push(b); }
+  for (const b of nouveaux) { const r = await lancer(process.execPath, [path.join(APRES, 'scripts', 'lancer-bancs.cjs'), b], APRES, { BANCS_PORT_BASE: String(PORT0 + 2000) }, 3600e3); if (r.code !== 0) vraiment.push(b); }
   const rougesAvant = Object.keys(res.avant).filter((b) => res.avant[b] === 'KO');
   rapport.bancs = { avant: res.avant, apres: res.apres, rougesNeufs: vraiment };
   if (vraiment.length) KO(`bancs rouges NEUFS : ${vraiment.join(', ')} (journaux : ${os.tmpdir()}/vrm-decoupe-bancs-*.log)`);
