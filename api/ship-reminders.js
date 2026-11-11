@@ -24,7 +24,7 @@ import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif, instantCalme } from './_lib/push.js';
 import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRappel, texteRappels, lienRappel, TAG_RAPPEL } from './_lib/rappels-perso.js';
-import { CLE_REMISES, CLE_REMISE_FIN, MEMO_REMISES, lireRemises, remisesDues, memoRemisesApres, texteRappelRemise, texteRappelsRemise, TAG_REMISE, instantRemise } from './_lib/remises-main-propre.js';
+import { CLE_REMISES, MEMO_REMISES, lireRemises, remisesDues, memoRemisesApres, texteRappelRemise, texteRappelsRemise, TAG_REMISE, instantRemise } from './_lib/remises-main-propre.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme, reglageSoir, soirALHeure, reglageJours, dansHeuresCalmes } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
@@ -1332,7 +1332,7 @@ async function rappelsRemisesSur(maintenant = instantNotif()) {
 async function passageRemises(maintenant = instantNotif()) {
   const debut = Date.now();
   const iso = new Date(maintenant).toISOString();
-  const lignes = await fetchPaginated(`app_data?id=eq.main&data->>${CLE_REMISE_FIN}=gte.${encodeURIComponent(iso)}&select=owner`);
+  const lignes = await fetchPaginated(`app_data?id=eq.main&data->>vrm_remise_fin=gte.${encodeURIComponent(iso)}&select=owner`);
   if (!lignes) return { fait: false, raison: 'pas su' };
   const owners = [...new Set(lignes.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
   let envoyees = 0, echecs = 0, budgetAtteint = false;
