@@ -29,7 +29,7 @@ stats-plus · rapport-mois · meilleurs-fournisseurs · extension-resume · **re
 Reportés en fin de journée : cohérence visuelle, nettoyage du code mort, découpe d'App.jsx.
 
 ## Numéros d'extension réservés
-5.345 → 5.354 sont pris. Un nouvel agent qui touche `vinted-sync-extension/` réserve ici le
+5.345 → 5.354 sont pris ; **5.355 = second agent** (extension-mondial). Un nouvel agent qui touche `vinted-sync-extension/` réserve ici le
 suivant libre (**5.355+**) AVANT de coder.
 
 ## Réservations du second agent
@@ -57,6 +57,44 @@ suivant libre (**5.355+**) AVANT de coder.
   Règles : `CLAUDE.md` entier, pousse à chaque commit, rouge prouvé sur l'avant, pas de PR, pas de fusion.
   Ton `send_message` vers moi ne marche pas (ta session n'est pas joignable depuis la mienne) : **réponds ICI**,
   sous ce paragraphe, puis `git push`. Je relis ce fichier toutes les 30 min.
+
+## FILE DE TRAVAIL DU SECOND AGENT — 2 jours (posée le 11 nov. ~15 h 10, Julien : « bombarde-le de travail »)
+Dans l'ordre. Une branche `claude/agent2-<sujet>` par tâche, partie de `origin/main` du moment
+(`git fetch origin main` avant chaque tâche). Chaque tâche finie ⇒ une ligne dans « Fini, à intégrer »
+(branche, commit, preuves, ce qui reste). Ne JAMAIS attendre une réponse : passe à la suivante.
+Avant chaque tâche, relis « Sujets DÉJÀ en cours » et ce paragraphe (je peux le changer).
+
+**Jour 1**
+1. `agent2-restes` — les 3 points du message ci-dessus (7,44 € ×3 ; 2 bancs de stock-juste ; annonces-ventes-brouillon).
+2. `agent2-ci-vert` — rendre `main` VERT sur GitHub : lancer le workflow `verifier.yml` sur `main` (ou lire le dernier
+   run), lister chaque audit/banc rouge, corriger chacun (vrai défaut ⇒ corriger l'app ; contrôle périmé ⇒ le remettre à
+   la règle ACTUELLE, prouvé par mutation). Base connue à 11 h : ~34 rouges (`annonces-actions`, `argent-mois`,
+   `audit-pagination-ordre`, `audit-rouge-doublon`, `audit-violet`, `iphone-reprise`, `navigation-tache`,
+   `nouveau-vendeur`…). Une partie a été corrigée depuis : MESURE d'abord. ⛔ ne pas toucher Colis/retraits (paquet colis
+   en cours) : note-les seulement.
+3. `agent2-pire-cas` — données « pire cas » sur les 11 écrans principaux (titre de 200 caractères, pseudo sans espace,
+   0 / 1 / 2 000 lignes, prix 0,01 € et 99 999 €, champs manquants, emoji, texte allemand +30 %) : banc
+   `scripts/bancs/pire-cas.cjs` (390 et 1512 px, clair/sombre, captures REGARDÉES), corriger chaque débordement,
+   chevauchement ou texte coupé illisible. Données inventées seulement.
+4. `agent2-vides-erreurs` — chaque écran et chaque feuille : état VIDE (une phrase + le geste), état « pas su »
+   (« — » + raison, §5), état base injoignable, état hors ligne. Banc qui les sert tous ; corriger les trous.
+
+**Jour 2** (après que j'aie fusionné les paquets du jour 1 ; vérifie dans `git log origin/main`)
+5. `agent2-coherence-visuelle` — la spec `docs/passation/2026-11-11-spec-coherence-visuelle.md` (jetons, une carte,
+   un badge, 119 `inline-flex`, 170 couleurs en dur). Lire d'abord `docs/passation/2026-11-11-revue-design.md`
+   (revue en cours chez moi) et en prendre les points P1. Captures avant/après des 11 écrans.
+6. `agent2-code-mort` — fonctions, composants, CSS et clés jamais lus (`grep -c '<Nom'`, §4.11) : retirer ce qui
+   est mort À COUP SÛR, compter les écrans montés (`tab===`) avant/après, build + audits + bancs.
+7. `agent2-vitesse-mesuree` — mesurer (Lighthouse/Playwright, 390 px réseau 4G lent) le premier affichage de
+   Ma journée, Ventes, Annonces ; viser < 2 s ; corriger le plus lourd (images, morceaux chargés trop tôt). Ne pas
+   toucher le cache (`src/copieLignes.js`, lot K).
+8. `agent2-extension-mondial` — extension : lire « Mondial Relay by InPost » comme Mondial Relay. **Version 5.355.0
+   réservée pour toi** (CODE_VERSION, manifeste, EXT_ATTENDUE, zips Chrome + Orion, `audit-extension-zip`).
+9. S'il reste du temps : relire `docs/passation/2026-11-10-passation-finale.md` « ce qui reste » et prendre ce qui
+   n'est PAS dans « Sujets DÉJÀ en cours », en l'écrivant d'abord dans « Réservations du second agent ».
+
+⛔ Jamais : écrire dans la base de production, données réelles dans le dépôt, fusion sur `main`, PR, toucher
+aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
 
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
