@@ -24,3 +24,11 @@
 .vrm-qr-ligne[aria-pressed="true"] .vrm-qr-marque { background: var(--fu-bleu); color: #fff; }
 .vrm-qr-vide, .vrm-qr-note { font-size: 13px; color: var(--fu-gris); margin: 0; padding: 2px 0 6px; }
 .vrm-qr-verifier > summary { font-size: 13px; min-height: 44px; align-items: center; }
+/* La carte vit aussi hors de `.vrm-main` (feuille « Republier sur Leboncoin ») : ses replis et son lien portent leur propre forme. */
+.vrm-qr details > summary { list-style: none; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.vrm-qr details > summary::-webkit-details-marker { display: none; }
+.vrm-qr details > summary::marker { content: ''; }
+.vrm-qr details > summary::after { content: ''; width: 7px; height: 7px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg) translateY(-2px); opacity: .6; flex: none; }
+.vrm-qr details[open] > summary::after { transform: rotate(225deg) translateY(-2px); }
+.vrm-qr .vrm-qr-tout, .vrm-qr .vrm-qr-plus { all: unset; box-sizing: border-box; min-height: 44px; display: flex; align-items: center; padding: 0 2px; color: var(--fu-bleu); font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-qr .vrm-qr-tout:focus-visible, .vrm-qr .vrm-qr-plus:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; border-radius: 8px; }

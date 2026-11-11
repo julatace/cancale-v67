@@ -106,11 +106,11 @@ const PONT = () => {
   post({ __vmr: 'ready', version, id: 'ext-banc' });
 };
 async function page(b, T, opts = {}) {
-  const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: opts.sombre ? 'dark' : 'light' });
+  const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, locale: 'fr-FR', colorScheme: opts.sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   await pg.clock.setFixedTime(MAINTENANT);
   const errs = [], posts = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!opts.sombre);
+  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_langue', JSON.stringify('fr')); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!opts.sombre);
   if (opts.pont) await pg.addInitScript(PONT);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
