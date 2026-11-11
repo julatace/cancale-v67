@@ -513,7 +513,7 @@
 @layer vrm-premium{
   @media(min-width:900px){
     :root:root body .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete h1,.vrm-market-heading h1){font-size:26px!important;letter-spacing:-.02em!important;line-height:1.15!important}
-    :root:root body .vrm-app-shell .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete,[data-titre-ecran-grand]){padding-top:4px!important;padding-bottom:2px!important}
+    :root:root body .vrm-app-shell .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete,[data-titre-ecran-grand]){padding:4px 0 2px!important}
     :root:root body .vrm-main[data-ecran="emails"] :is(.vrm-tache-tete,.vrm-market-heading) .vrm-phrase-ecran{font-size:13px}
   }
 }
