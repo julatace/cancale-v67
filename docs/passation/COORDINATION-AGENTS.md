@@ -149,4 +149,4 @@ Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le
   2. `compta-abonnements` : banc périmé (délai fixe 1,5 s, l'annulation aboutit à ~2 s) ⇒ attend l'issue, prouvé par mutation. `annuler-commandes` K5 : **vrai défaut** (focus posé sur un bouton encore `hidden`) corrigé dans `Compta.jsx` ⇒ 79/0.
   3. `annonces-ventes-brouillon` : porté sur les onglets d'aujourd'hui ⇒ 1 rouge réel restant, **dans Colis** (date limite coupée par l'ellipse au téléphone) — à la session Colis.
   Commits à reprendre : toute la branche (4 commits + merge). Récit `docs/passation/2026-11-11-restes.md`.
-
+  4. ⚠️ Après merge de `main` : « Tes meilleures sources » (meilleurs-fournisseurs) s'insère AVANT la liste d'Achats (étapes 689 ⇒ 973 px sur ordinateur, bloc décalé de 16 px) — sujet réservé, pas touché ; à la session de ce lot.
