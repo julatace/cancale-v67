@@ -43881,7 +43881,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
         {/* (1er nov.) Dans Colis, la colonne « À retirer » (`ColonneRetirer`) porte les
             points relais et leur carte : le détail ne la redessine pas (une carte, §7). */}
-        {aFilter==='attente' && !modeRetraits && <CarteRelaisColis donnees={groupesRelais} C={C}/>}
+        {/* (11 nov., Julien : « enlève la carte pour les points relais, ça sert à rien ») Plus de carte ici. */}
         {/* (31 oct., soir) « Colis à retirer » sans rien à aller chercher le DIT —
             seulement quand tout est lu (e-mails de suivi, achats) : pas su ≠ rien. */}
         {modeRetraits && !retraitsOutils && !baseKO && tracking!==null && !trackingKO && Array.isArray(buys.items) && !buys.error && pickupUnion.total===0
@@ -46594,16 +46594,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (5 nov.) Un QR qu'on n'a pas se DIT, avec où le trouver (src/retraitQr.js) — jamais un QR fabriqué.
                   Mondial Relay : la vérité, courte — « QR dans l'app Mondial Relay » (ni e-mail ni site ne le
                   portent) — et « Ajouter le QR » : SA capture de l'app, posée sur CE colis (src/qrCapture.js). */}
-              {!qi && (t || (relV && codeRetrait(relV.code))) && !(relV && relV.qr) ? (() => { const tr = (t && t.carrier) || (relV && relV.transporteur) || ''; const ou = ouTrouverQr(carrierKey(tr) || tr);
-                return <span className="vrm-rp-qr-absent" data-colis-qr-absent={tr}><strong>{titreQrAbsent(carrierKey(tr))}</strong>{ou ? <> · {ou}</> : null}</span>; })() : null}
+              {/* (11 nov., Julien : « des QR codes dans tous les sens ») Plus de phrase « QR dans l'app… / QR pas reçu » :
+                  un QR qu'on a se montre (« En grand »), un QR qu'on n'a pas ne se commente plus. */}
               {!qi && t && qrParCapture(carrierKey(t.carrier)) && suiviDeLigne(t) ? <button type="button" className="vrm-rp-plein" data-colis-qr-ajouter="" onClick={() => choisirCaptureQr(t)}
                 aria-label="Ajouter le QR (capture de l’app Mondial Relay)">Ajouter le QR (capture)</button> : null}
               {t && qrAjout && qrAjout.suivi && qrAjout.suivi === suiviDeLigne(t) ? <span className={'vrm-rp-sous' + (['pose', 'lecture', 'retire'].includes(qrAjout.etat) ? '' : ' is-ambre')} role="status" data-colis-qr-ajout={qrAjout.etat}>{qrAjout.msg}</span> : null}
-              {!x.code && !qi && !(Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1) ? (!t && relV && relV.lieu && !relV.qr
-                // La conversation a été LUE (le lieu en vient) et ne porte aucun code :
-                // il arrive par l'e-mail du transporteur (même phrase que l'ancien détail).
-                ? <span className="vrm-rp-sans-code" data-colis-sans-code="" data-colis-sans-code-conv="">Code par l’e-mail du transporteur</span>
-                : <span className="vrm-rp-sans-code" data-colis-sans-code="" data-colis-code-pas-lu={t && t.viaTransporteur ? 'transporteur' : ''}>{t ? (t.viaTransporteur ? 'Code de retrait : dans l’e-mail du transporteur ou la conversation Vinted' : 'Code pas lu — ouvre l’e-mail du transporteur') : 'Code pas encore lu'}</span>) : null}
+              {/* (11 nov.) « Code à venir » est dit sur la ligne : plus de phrase « Code pas lu — ouvre l'e-mail… » ici. */}
               {hrefV ? <Bouton variante="discret" href={hrefV} target="_blank" rel="noreferrer" data-colis-conv="">{relV && relV.qr ? 'Voir le QR ↗' : 'Conversation ↗'}</Bouton> : null}
               {suivre}
               {(t || o) ? <button className="vrm-pickup-collect" type="button" data-colis-retire="" onClick={() => (t ? markCollected(t) : markPickupDone(o))} aria-label="J’ai retiré ce colis"><span className="vrm-rp-retire-label">J’ai retiré</span></button> : null}
@@ -46641,7 +46637,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const est = limiteEstimee({ arriveeMs: arr && arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' });
                     return est ? <span className="vrm-rp-sous" data-colis-limite="estimee" data-colis-limite-estimee={est.jour}>{`Vers le ${est.jour.slice(8, 10)}/${est.jour.slice(5, 7)} (estimé : ${nomTransporteur(carrierKey(t ? t.carrier : ev.carrier))} garde un colis ${est.garde} jours)`}</span>
                       : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>; })())}
-              {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
+              {/* (11 nov.) Le n° de suivi est sur la ligne (une fois, §7) : ici le compte seul. */}
+              {(plusieursComptesRet && cpt) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{`compte ${cpt}`}</span> : (su ? <span hidden data-rp-suivi={su}/> : null)}
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
                   quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
               {x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">Transporteur pas encore connu : le suivi Vinted ne le nomme pas</span> : null}
@@ -46688,6 +46685,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return tl ? <LigneTransporteur transp={transpMap} suivi={su2} carrier={car} court limiteCarte={(ev && (ev.limite || ev.limiteVers)) || ''}/> : null; })()}
                 </>; })() : null}
             </>); };
+          // (11 nov., Julien : « le n° de suivi est une clé ») Le n° de CE colis, écrit sur sa ligne : celui de son
+          // e-mail (la même identité que les fusions), sinon celui de son achat.
+          const suiviRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
+            if (t) return suiviDeLigne(t) || String(t.suivi || '');
+            return o ? (suivisAchat(o, indexSuivisAchats)[0] || '') : ''; };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
           // (3 nov., Julien : « beaucoup trop brouillon ») La ligne d'un colis à retirer : l'échéance en UNE puce
           // (la date limite de CE colis, la même source que son détail — e-mail ou transporteur ; inconnue ⇒ rien),
@@ -46885,8 +46887,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <p className="vrm-colis-note" data-pickup-sans-compte={n}>{n>1?`${n} colis arrivés`:'1 colis arrivé'} sur une adresse reliée à aucun compte : relie-la.{' '}
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
-                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}/>
+                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
                     caché est un colis perdu). Le transporteur, l'e-mail ou la commande Vinted ont dit retiré, livré ou
