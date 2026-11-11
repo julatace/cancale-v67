@@ -1,6 +1,7 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 export default {
   // ── commun
+  "commun.deuxPoints": ": ",
   "commun.afficher": "Anzeigen",
   "commun.aucun": "Keine",
   "commun.aujourdhui": "heute",

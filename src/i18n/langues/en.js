@@ -1,6 +1,7 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 export default {
   // ── commun
+  "commun.deuxPoints": ": ",
   "commun.afficher": "Show",
   "commun.aucun": "None",
   "commun.aujourdhui": "today",

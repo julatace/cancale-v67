@@ -6,6 +6,7 @@
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 export default {
   // ── commun
+  "commun.deuxPoints": " : ",
   "commun.afficher": "Afficher",
   "commun.aucun": "Aucun",
   "commun.aujourdhui": "aujourd'hui",

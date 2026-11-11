@@ -138,7 +138,7 @@ async function avecSession(nav, l, W, D, cles) {
   dit(await ligne.count() > 0, `${T} Paramètres : la ligne Langue existe`);
   if (await ligne.count()) {
     await ligne.scrollIntoViewIfNeeded().catch(() => {});
-    if (o.tel) { await ligne.click().catch(() => {}); await attendre(700); }
+    if (!(await pg.locator('[data-langue-choix] [data-langue]:visible').count())) { await ligne.click().catch(() => {}); await attendre(700); }
     const choix = await pg.evaluate(() => { const g = [...document.querySelectorAll('[data-langue-choix]')].find((e) => e.getBoundingClientRect().height > 0) || document.querySelector('[data-langue-choix]'); return g ? { val: g.getAttribute('data-langue-choix'), coche: (g.querySelector('[aria-checked="true"]') || {}).getAttribute && g.querySelector('[aria-checked="true"]').getAttribute('data-langue'), n: g.querySelectorAll('[data-langue]').length } : null; });
     dit(choix && choix.val === l && choix.coche === l && choix.n === 5, `${T} Langue : cinq choix, « ${l} » coché`, JSON.stringify(choix));
     await capture(pg, `trad-${l}-${W}-langue`);
@@ -146,7 +146,7 @@ async function avecSession(nav, l, W, D, cles) {
     const cible = l === 'en' ? 'fr' : 'en';
     const Dc = await charger(cible);
     await pg.evaluate(() => { window.__bancPasRecharge = 1; });
-    await pg.locator(`[data-langue-choix] [data-langue="${cible}"]`).first().click().catch(() => {});
+    await pg.locator(`[data-langue-choix] [data-langue="${cible}"]:visible`).first().click().catch(() => {});
     await attendre(1500);
     const apres = await pg.evaluate(() => ({ lang: document.documentElement.lang, garde: window.__bancPasRecharge === 1, range: localStorage.getItem('vrm_langue'), h: (document.querySelector('.vrm-set-h1, .vrm-set-sous-h') || {}).innerText || '' }));
     dit(apres.lang === cible && apres.garde && apres.range === JSON.stringify(cible), `${T} Langue → ${cible} : l'écran change sans rechargement, le choix est rangé`, JSON.stringify(apres));

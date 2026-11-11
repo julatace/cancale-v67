@@ -73,7 +73,8 @@ async function principal() {
     dit(!varsKo.length, `D5 ${l} : les mêmes variables {x} que le français`, varsKo.map((k) => `${k} fr[${vars(typeof fr[k] === 'object' ? fr[k].other : fr[k])}] ${l}[${formes(d[k]).map(vars).join('|')}]`));
     const vides = cles.filter((k) => k in d && formes(d[k]).some((x) => typeof x !== 'string' || (!x.trim() && formes(fr[k]).some((y) => String(y).trim()))));
     dit(!vides.length, `D6 ${l} : aucune valeur vide`, vides);
-    const longs = cles.filter((k) => k in d).filter((k) => { const a = formes(fr[k]).map((x) => String(x).length), b = formes(d[k]).map((x) => String(x).length); return Math.max(...b) > Math.max(...a) * 1.6 + 12; });
+    const longs = cles.filter((k) => k in d).filter((k) => { const a = formes(fr[k]).map((x) => String(x).length), b = formes(d[k]).map((x) => String(x).length); if (formes(fr[k]).every((x) => /^[A-Z]{2,4}$/.test(String(x)))) return Math.max(...b) > 24;   // une abréviation française (CGV, CGU) se déplie ailleurs
+      return Math.max(...b) > Math.max(...a) * 1.6 + 12; });
     dit(!longs.length, `D7 ${l} : longueur raisonnable (≤ 160 % du français + 12)`, longs.map((k) => `${k} (${String(formes(fr[k])[0]).length} → ${String(formes(d[k])[0]).length})`));
     const barre = Object.keys(fr).filter((k) => /^nav\.(journee\.court|annonces|ventes|cat_bord|plus)$/.test(k)).filter((k) => String(d[k] || '').length > 12);
     dit(!barre.length, `D8 ${l} : les libellés de la barre du bas tiennent (≤ 12 caractères)`, barre.map((k) => `${k} « ${d[k]} »`));
@@ -141,6 +142,8 @@ async function principal() {
         const v = n.value.type === 'StringLiteral' ? n.value.value : n.value.quasis.map((q) => q.value.cooked).join('');
         if (estTexte(v)) durs.push(`${rel}:${ligne} ${n.key.name}:'${v.slice(0, 60)}'`);
       }
+      // Une phrase passée en argument (« ligne('deconnexion','door','Se déconnecter',…) ») : majuscule et espace.
+      if (n.type === 'CallExpression') for (const a of n.arguments || []) if (a.type === 'StringLiteral' && /^[A-ZÀ-Ü]/.test(a.value) && /\s/.test(a.value) && estTexte(a.value)) durs.push(`${rel}:${ligne} argument '${a.value.slice(0, 60)}'`);
       if (n.type === 'CallExpression' && n.callee && APPELS.has(n.callee.name) && n.arguments[0] && (n.arguments[0].type === 'StringLiteral' || n.arguments[0].type === 'TemplateLiteral')) {
         const a = n.arguments[0]; const v = a.type === 'StringLiteral' ? a.value : a.quasis.map((q) => q.value.cooked).join('');
         if (estTexte(v)) durs.push(`${rel}:${ligne} ${n.callee.name}('${v.slice(0, 60)}')`);
@@ -173,6 +176,9 @@ async function principal() {
     dit(ok1 && I.langueCourante() === 'de' && I.t('nav.ventes') === D.de['nav.ventes'], 'R5 une langue chargée à la demande remplace le texte');
     dit(I.t('reglages.recherche.trouves', { n: 1 }) === D.de['reglages.recherche.trouves'].one.replace('{n}', '1') && I.t('reglages.recherche.trouves', { n: 3 }) === D.de['reglages.recherche.trouves'].other.replace('{n}', '3'), 'R6 pluriel par Intl.PluralRules (1 ⇒ one, 3 ⇒ other)');
     dit(/1\.234,5/.test(I.nombre(1234.5)) && /€/.test(I.monnaie(12.4)) && I.monnaie(null) === '—', 'R7 formats dans la langue (de : 1.234,5) ; un montant inconnu ⇒ « — », jamais 0');
+    const dDe = await I.chargerLangue('de'); const garde = dDe['nav.ventes']; delete dDe['nav.ventes'];
+    dit(I.t('nav.ventes') === fr['nav.ventes'], 'R5b une clé absente de la langue retombe sur le français');
+    dDe['nav.ventes'] = garde;
     await I.appliquerLangue('en');
     dit(/12\.40/.test(I.monnaie(12.4)) && I.t('auth.renvoyerDans', { s: 7 }).includes('7'), 'R8 anglais : €12.40, variables remplies');
     await I.appliquerLangue('fr');

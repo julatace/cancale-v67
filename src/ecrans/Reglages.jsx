@@ -1794,7 +1794,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── TES DONNÉES ET LES CONDITIONS
   const donnees = (
     <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
-      <b style={{color:C.text}}>{tr('reglages.donnees.exporter')}</b> : {tr(ongletsCompte ? 'reglages.donnees.exporterOu.reglages' : 'reglages.donnees.exporterOu.dessous')}{AUTH.user ? <> · <b style={{color:C.text}}>{tr('reglages.donnees.supprimer')}</b> : {tr('reglages.donnees.supprimerOu')}</> : null}. {tr('reglages.donnees.droits')} <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('reglages.donnees.confidentialite')}</a>.
+      <b style={{color:C.text}}>{tr('reglages.donnees.exporter')}</b>{tr('commun.deuxPoints')}{tr(ongletsCompte ? 'reglages.donnees.exporterOu.reglages' : 'reglages.donnees.exporterOu.dessous')}{AUTH.user ? <> · <b style={{color:C.text}}>{tr('reglages.donnees.supprimer')}</b>{tr('commun.deuxPoints')}{tr('reglages.donnees.supprimerOu')}</> : null}. {tr('reglages.donnees.droits')} <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('reglages.donnees.confidentialite')}</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
         {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accentTexte,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}

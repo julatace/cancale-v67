@@ -458,8 +458,8 @@ export default function Accueil({ onEntrer }) {
               <div>
                 {/* La phrase de chaque offre : en français, CELLE du serveur (OFFRES, api/_lib/plan-regle.js) ;
                     ailleurs sa traduction (audit-traduction : la clé française = la phrase du serveur). */}
-                <p data-offre-phrase="solo"><b>{OFFRES.solo.nom}</b> : {langue === 'fr' ? OFFRES.solo.phrase : tr('accueil.offre.solo.phrase')}</p>
-                <p data-offre-phrase="pro"><b>{OFFRES.pro.nom}</b> : {langue === 'fr' ? OFFRES.pro.phrase : tr('accueil.offre.pro.phrase')}{PRO_OUVERT ? '' : tr('accueil.offres.ouverture')}</p>
+                <p data-offre-phrase="solo"><b>{OFFRES.solo.nom}</b>{tr('commun.deuxPoints')}{langue === 'fr' ? OFFRES.solo.phrase : tr('accueil.offre.solo.phrase')}</p>
+                <p data-offre-phrase="pro"><b>{OFFRES.pro.nom}</b>{tr('commun.deuxPoints')}{langue === 'fr' ? OFFRES.pro.phrase : tr('accueil.offre.pro.phrase')}{PRO_OUVERT ? '' : tr('accueil.offres.ouverture')}</p>
                 <p>{tr('accueil.offres.toutes')}</p>
                 <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>{tr('accueil.offres.essai')}</p>
                 <p className="petit">
@@ -513,7 +513,7 @@ export default function Accueil({ onEntrer }) {
             {/* CONTACT — une seule source (src/contact.js) ; vide ⇒ on le DIT (§2.3). */}
             {contactEmail()
               ? <a data-contact="" href={`mailto:${contactEmail()}`}>{tr('accueil.pied.contact')}</a>
-              : <span data-contact="" data-contact-absent="">{tr('accueil.pied.contact')} : {CONTACT_A_VENIR}</span>}
+              : <span data-contact="" data-contact-absent="">{tr('accueil.pied.contact')}{tr('commun.deuxPoints')}{CONTACT_A_VENIR}</span>}
           </nav>
           {/* (11 nov., lot traduction) La langue de la page : celle du navigateur par défaut, ou choisie ici. */}
           <ChoixLangue className="av-langue" />
