@@ -31686,7 +31686,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // doubler : la moitié est « sans doute le même colis, fini » (api/_lib/achat-arrive-relais.js).
       const temoinFini = (w) => !!w && (finis.has('e:' + suiviDeLigne(w)) || w.status === 'delivered' || w.status === 'retour' || !!(collected && collected.has(colisKey(w))));
       const commandeDe = (t) => cmdParColis.get(colisKey(t)) || commandeDuColis(t) || null;
-      const r = regrouperArrivees(emailList, { commandeDe, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi, temoins, sansIdentite, temoinActif: (w) => !temoinFini(w) });
+      // (11 nov.) Un achat que SA commande Vinted dit encore au point relais n'est jamais « fini » avec un autre colis.
+      const attendEncore = (c) => !!c && isAtRelayStatus(c.status);
+      const r = regrouperArrivees(emailList, { commandeDe, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi, temoins, sansIdentite, temoinActif: (w) => !temoinFini(w), attendEncore });
       r.liste.forEach((t, i) => { if (r.commandes[i]) cmdParColis.set(colisKey(t), r.commandes[i]); });
       // (9 nov., 17 h 24) « Compté avec » : la moitié et SON témoin (le colis compté) — une ligne tranchée.
       r.doutes.forEach((t, i) => { const w = r.doutesTemoins && r.doutesTemoins[i]; aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais', avecSuivi: w ? suiviDeLigne(w) : '', avecCarrier: (w && w.carrier) || '' }, o: (r.doutesCommandes && r.doutesCommandes[i]) || null }); });
@@ -31699,7 +31701,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const t = x.kind === 'email' ? x.t : null;
         if (t && t.source === 'vinted-commande' && x.e && estAVerifier(x.e) && sansIdentite(t, x.o || null) && true) {
           const ws = temoinsDe(t, x.o || null, temoins, { commandeDe });
-          if (ws.length && ws.every(temoinFini)) { noterProbable(t, x.o || null, ws[0]); continue; }
+          if (ws.length && ws.every(temoinFini) && !attendEncore(x.o || null)) { noterProbable(t, x.o || null, ws[0]); continue; }
         }
         garderV.push(x);
       }
