@@ -176,13 +176,32 @@ async function main() {
       const A = await appareil(nav, base, vp, 'A');
       let pg = await A.page();
       await ouvrirAnnonces(pg);
-      dit(await ouvrirSaisie(pg), `${T} : en ligne, Annonces → « Compléter les prix d'achat » s'ouvre`);
+      // Le service worker range les morceaux de l'app (liste du build) : un écran jamais ouvert s'ouvre hors ligne.
+      const rang = async () => pg.evaluate(async () => { try { const c = await caches.open('vrm-shell-v6'); const r = await c.match('/hors-ligne-assets.json'); if (!r) return { n: 0, sur: -1 }; const l = (await r.json()).fichiers || []; let n = 0; for (const f of l) if (await c.match(f)) n++; return { n, sur: l.length }; } catch (e) { return { n: 0, sur: -1 }; } }).catch(() => ({ n: 0, sur: -1 }));
+      await attendre(async () => { const r = await rang(); return r.sur > 0 && r.n === r.sur; }, 30000, 500);
+      const rr = await rang();
+      dit(rr.sur > 10 && rr.n === rr.sur, `${T} : en ligne, les morceaux de l'app sont rangés pour le hors ligne`, `${rr.n}/${rr.sur}`);
+      const saisieOk = await ouvrirSaisie(pg);
+      await pg.screenshot({ path: path.join(CAPT, `en-ligne-${T}.png`) });
+      dit(saisieOk, `${T} : en ligne, Annonces → « Compléter les prix d'achat » s'ouvre`);
+      if (!saisieOk && process.env.BANC_ARRET !== '0') { console.log('    (arrêt : la saisie ne s’ouvre pas en ligne — voir la capture)'); erreurs.push(...A.erreurs); await A.ctx.close(); break; }
       await calme(pg);
 
       // ── A. fermeture / réouverture hors ligne ──────────────────────────────
       if (joue('A')) await essaie(`${T} A`, async () => {
         console.log(`\n── ${T} · A. fermeture et réouverture hors ligne`);
         await A.couper();
+        // Un écran JAMAIS ouvert en ligne (Réglages, Argent) : ses morceaux viennent du cache, aucun ne manque.
+        for (const tab of ['settings', 'compta']) {
+          const rates = []; const f = (q) => { if (/\/assets\//.test(q.url())) rates.push(q.url().split('/').pop()); };
+          pg.on('requestfailed', f);
+          await pg.goto(URL0() + '/?tab=' + tab, { waitUntil: 'domcontentloaded' }).catch(() => {});
+          await pg.waitForTimeout(3500);
+          pg.off('requestfailed', f);
+          const repli = await pg.getByText(/n'a pas pu se charger/).count();
+          dit(!rates.length && !repli, `${T} A : hors ligne, « ${tab} » (jamais ouvert) s'ouvre sans morceau manquant`, rates.slice(0, 3).join(', ') + (repli ? ' · page de secours' : ''));
+          await pg.screenshot({ path: path.join(CAPT, `A-${tab}-hors-ligne-${T}.png`) });
+        }
         await pg.goto(URL0() + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' }).catch(() => {});
         await pg.waitForTimeout(2500);
         const journee = await pg.locator('[data-hors-ligne="journee"], [data-journee-hors-ligne]').count();

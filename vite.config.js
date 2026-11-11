@@ -44,6 +44,20 @@ const versionEtat = () => ({
 // `modulepreload` / `preload`. Ici on lui donne les VRAIS noms du build (empreintes),
 // dans les attributs de sa balise — index.html n'est jamais mis en cache, il vise
 // donc toujours les fichiers du déploiement en cours.
+// (11 nov., lot hors-ligne) TOUTE L'APP HORS LIGNE : la liste des morceaux de CE build
+// (`/hors-ligne-assets.json`). Le service worker (public/sw.js, `rechaufferMorceaux`) les
+// range en ligne, une fois par déploiement : un écran jamais ouvert s'ouvre ensuite sans
+// réseau. Ni la carte (maplibre : ses tuiles viennent du réseau), ni la 3D, ni le film
+// d'accueil : lourds et inutiles hors ligne (≈ 3,5 Mo gardés au lieu de 6).
+const EXCLU_HORS_LIGNE = /maplibre|three\.module|Room3D|OrbitControls|AccueilFilm/;
+const listeHorsLigne = () => ({
+  name: 'vrm-liste-hors-ligne',
+  apply: 'build',
+  generateBundle(_o, bundle) {
+    const fichiers = Object.keys(bundle).filter((f) => /^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) && !EXCLU_HORS_LIGNE.test(f)).map((f) => '/' + f).sort();
+    this.emitFile({ type: 'asset', fileName: 'hors-ligne-assets.json', source: JSON.stringify({ v: 1, fichiers }) });
+  },
+});
 const prechargerApp = () => ({
   name: 'vrm-precharger-app',
   apply: 'build',
@@ -80,7 +94,7 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [react(), allegerIndex(), versionEtat(), prechargerApp()],
+  plugins: [react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne()],
   define: { __BUILD__: JSON.stringify(BUILD) },
   build: {
     // Cible moderne : moins de transformations/polyfills → bundle plus léger et

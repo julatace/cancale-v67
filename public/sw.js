@@ -54,7 +54,7 @@ async function purgerAncienneVersion(res) {
   const cache = await caches.open(CACHE);
   const avant = await cache.match(REPERE);
   if (avant && (await avant.text()) === principal) return;
-  const garder = new Set(noms);
+  const garder = new Set([...noms, ...(await nomsGardesHorsLigne(cache))]);
   for (const r of await cache.keys()) {
     const p = new URL(r.url).pathname;
     if (p.startsWith('/assets/') && !garder.has(p)) await cache.delete(r);
@@ -96,6 +96,37 @@ async function relireCoquille(req, cache) {
     await cache.put(n, r);
   }
   await cache.put('/', fresh);
+}
+
+// ── (11 nov., lot hors-ligne) TOUTE L'APP HORS LIGNE ────────────────────────
+// Un écran à la demande (`src/ecrans/*`) jamais ouvert en ligne n'était pas en cache :
+// hors ligne il restait sur « La page n'a pas pu se charger ». Le build publie la liste de
+// SES morceaux (`/hors-ligne-assets.json`, vite.config.js) ; en ligne, une fois la
+// coquille rangée, on range ceux qui manquent, UN PAR UN (jamais une rafale), 160 au plus.
+// Un échec arrête là (la prochaine ouverture reprend). La liste rangée dit aussi à la purge
+// ce qu'elle doit garder (sinon elle jetterait ces morceaux au déploiement suivant).
+const LISTE_HL = '/hors-ligne-assets.json';
+let _rechauffe = null;
+function rechaufferMorceaux(cache) {
+  if (_rechauffe) return _rechauffe;
+  _rechauffe = (async () => {
+    const r = await fetch(LISTE_HL, { cache: 'no-store', credentials: 'same-origin' });
+    if (!r || !r.ok || r.type !== 'basic') return;
+    const j = await r.clone().json().catch(() => null);
+    const l = j && Array.isArray(j.fichiers) ? j.fichiers.filter((n) => typeof n === 'string' && /^\/assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(n)).slice(0, 160) : null;
+    if (!l) return;
+    await cache.put(LISTE_HL, r);
+    for (const n of l) {
+      if (await cache.match(n)) continue;
+      const x = await fetch(n, { credentials: 'same-origin' });
+      if (!x || x.status !== 200 || x.type !== 'basic') return;
+      await cache.put(n, x);
+    }
+  })().catch(() => {}).finally(() => { _rechauffe = null; });
+  return _rechauffe;
+}
+async function nomsGardesHorsLigne(cache) {
+  try { const r = await cache.match(LISTE_HL); const j = r ? await r.json() : null; return j && Array.isArray(j.fichiers) ? j.fichiers : []; } catch (_) { return []; }
 }
 
 // ── Notifications push (ventes en temps réel, même app fermée) ──
@@ -334,7 +365,7 @@ self.addEventListener('fetch', event => {
       const voulueFraiche = req.cache === 'reload' || req.cache === 'no-cache' || req.cache === 'no-store';
       const gardee = voulueFraiche ? null : await coquilleComplete(cache);
       if (gardee) {
-        event.waitUntil(relireCoquille(req, cache).catch(() => {}));
+        event.waitUntil(relireCoquille(req, cache).then(() => rechaufferMorceaux(cache)).catch(() => {}));
         event.waitUntil(purgerAncienneVersion(gardee.clone()).catch(() => {}));
         return gardee;
       }
@@ -342,7 +373,7 @@ self.addEventListener('fetch', event => {
         const fresh = await fetch(req);
         if (fresh.ok) {
           cache.put('/', fresh.clone()).catch(() => {});
-          event.waitUntil(purgerAncienneVersion(fresh.clone()).catch(() => {}));
+          event.waitUntil(purgerAncienneVersion(fresh.clone()).then(() => rechaufferMorceaux(cache)).catch(() => {}));
         }
         return fresh;
       } catch (_) {
