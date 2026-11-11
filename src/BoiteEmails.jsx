@@ -616,10 +616,12 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     // rognée par le <main> et la suite ne venait jamais à 1512 px — mesuré au banc).
     let racine = null;
     for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (o === 'auto' || o === 'scroll') { racine = p; break; } }
-    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { root: racine, rootMargin: '900px 0px' });
+    // (11 nov.) Sur ordinateur, la colonne de la liste défile seule et ses lignes sont plus
+    // basses : 900 px d'avance y chargeaient la page suivante d'emblée ; 400 suffisent.
+    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { root: racine, rootMargin: large ? '400px 0px' : '900px 0px' });
     io.observe(n);
     return () => io.disconnect();
-  }, [pages, lecture]);
+  }, [pages, lecture, large]);
   const photoLigne = useCallback((e) => (photoDe ? photoDe(e) : null), [photoDe]);
   // (11 nov., « tout fait trop gros, surtout sur ordi ») Sur ordinateur, la boîte est UN
   // panneau à deux colonnes qui remplit la fenêtre, comme Mail : la liste et la lecture
