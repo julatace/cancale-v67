@@ -1,0 +1,51 @@
+/* ── SIMULER UNE CRÉATION DE COMPTE (11 nov., propriétaire seul) ─────────────
+   Une carte par scénario, ses six étapes en miniatures (le vrai écran du
+   parcours, réduit). Neutre ; ✓ à l'encre, ✗ en ambre (un geste à regarder) ;
+   jamais de rouge (réservé à deux paires sous un N°). Jetons `--d-*` avec repli. */
+.vrm-sim {
+  --s-carte: var(--d-carte, var(--vrm-surface, #fff));
+  --s-encre: var(--d-encre, var(--vrm-ink, #1D1D1F));
+  --s-gris: var(--d-gris, var(--vrm-muted, #6E6E73));
+  --s-filet: var(--d-filet, rgba(60,60,67,.18));
+  --s-remplir: var(--d-remplir, rgba(118,118,128,.12));
+  --s-ambre: var(--d-ambre, #B25E00);
+  display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; color: var(--s-encre);
+}
+:root[data-theme="dark"] .vrm-sim { --s-ambre: var(--d-ambre, #FFB340); }
+.vrm-sim-intro { margin: 0; font-size: 14px; color: var(--s-gris); }
+.vrm-sim-lancer { align-self: flex-start; min-height: 44px; }
+.vrm-sim-bilan { margin: 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-sim-erreur { margin: 0; color: var(--s-ambre); font-size: 14px; }
+.vrm-sim-carte { background: var(--s-carte); border: 1px solid var(--s-filet); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.vrm-sim-tete { display: flex; gap: 10px; align-items: flex-start; }
+.vrm-sim-verdict { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--s-remplir); }
+.vrm-sim-verdict[data-ok="0"] { color: var(--s-ambre); }
+.vrm-sim-titres { min-width: 0; }
+.vrm-sim-nom { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; }
+.vrm-sim-choix { margin: 2px 0 0; font-size: 13px; color: var(--s-gris); line-height: 1.35; }
+.vrm-sim-etapes { list-style: none; margin: 0; padding: 0 0 4px; display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
+.vrm-sim-etape { display: flex; flex-direction: column; gap: 4px; min-width: 0; scroll-snap-align: start; }
+button.vrm-sim-vignette { appearance: none; border: 1px solid var(--s-filet); background: var(--d-fond, var(--vrm-bg, #F5F5F7)); border-radius: 12px; padding: 0; width: 104px; height: 186px; min-height: 44px; overflow: hidden; cursor: zoom-in; display: block; }
+.vrm-sim-etape[data-sim-ok="0"] button.vrm-sim-vignette { border-color: color-mix(in srgb, var(--s-ambre) 55%, transparent); }
+button.vrm-sim-vignette:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
+.vrm-sim-etape-nom { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.vrm-sim-etape-nom b[data-ok="0"], .vrm-sim-loupe-haut b[data-ok="0"] { color: var(--s-ambre); }
+.vrm-sim-etape-quoi { font-size: 12px; color: var(--s-gris); line-height: 1.3; overflow-wrap: anywhere; }
+.vrm-sim-pied { margin: 0; font-size: 12px; color: var(--s-gris); }
+
+/* La miniature : le vrai écran plein du parcours (390 × 696), réduit. `transform`
+   fait de ce cadre le bloc conteneur de l'écran `position: fixed`. */
+.vrm-sim-ecran { width: 104px; height: 186px; overflow: hidden; position: relative; pointer-events: none; }
+.vrm-sim-ecran-dedans { width: 390px; height: 696px; transform: scale(.2667); transform-origin: 0 0; position: absolute; inset: 0 auto auto 0; contain: layout paint; }
+.vrm-sim-ecran-dedans .vrm-pa { position: absolute; z-index: auto; }
+.vrm-sim-ecran-dedans .vrm-pa-corps { animation: none; }
+.vrm-sim-ecran-grand { width: 312px; height: 557px; }
+.vrm-sim-ecran-grand .vrm-sim-ecran-dedans { transform: scale(.8); }
+@media (max-width: 380px) { .vrm-sim-ecran-grand { width: 273px; height: 487px; } .vrm-sim-ecran-grand .vrm-sim-ecran-dedans { transform: scale(.7); } }
+
+.vrm-sim-loupe { position: fixed; inset: 0; z-index: 19000; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
+.vrm-sim-loupe-cadre { background: var(--s-carte); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px; max-width: 100%; }
+.vrm-sim-loupe-haut { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; max-width: 312px; }
+button.vrm-sim-loupe-fermer { appearance: none; border: 0; background: var(--s-remplir); color: var(--s-gris); width: 44px; height: 44px; min-height: 44px; border-radius: 50%; cursor: pointer; flex: none; }
+.vrm-sim-loupe .vrm-sim-ecran { border-radius: 12px; border: 1px solid var(--s-filet); }
+@media (prefers-reduced-motion: reduce) { .vrm-sim-etapes { scroll-behavior: auto; } }

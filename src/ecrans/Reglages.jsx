@@ -90,6 +90,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
 import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
+import { SimulationCompte } from "../SimulationCompte.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -1968,6 +1969,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // voit l'entrée, et la route refuse tout autre compte (403).
       proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
+      proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'spark', lib:'Simuler une création de compte', desc:'Le parcours d’un nouveau vendeur, sur des comptes fictifs.', data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>VRM semble en panne</summary><p>Regarde la page d’état. Tout y marche ? Recharge cette page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
       <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse du compte Vinted, sa confirmation, puis le transfert.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
