@@ -22,6 +22,9 @@ import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
 import VendusAilleurs, { useVerifVendusAilleurs, VendusAilleursDetail } from './VendusAilleurs.jsx';
+// (11 nov., anti double vente) « Retirer des autres sites » en un toucher (src/retirerAilleurs.js).
+import { RetirerAilleursBloc } from './RetirerAilleurs.jsx';
+import { planRetirerAilleurs, texteConfirmation, executerRetraits, avecRelecture, issueLbc, issueEbay, enListe } from './retirerAilleurs.js';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres } from './offresGarde.js';
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
@@ -41605,7 +41608,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (avant, la lecture dirait « ventes Vinted incomplètes »). Une fois par session.
   const vendusAilleurs = useVerifVendusAilleurs({ owner: AUTH.user?.id || '', ownerActuel: () => AUTH.user?.id || '', charger: chargerRetraitsMulti });
   React.useEffect(() => {
-    if (only !== 'journee' || baseKO) return;
+    if ((only !== 'journee' && only !== 'ventes') || baseKO) return;
     if (!Array.isArray(sales.items) || sales.loading || !Array.isArray(listings.items) || listings.loading || !txnPret) return;
     const v = vendusAilleurs.v;
     if (v.at || v.charge || v.erreur) return;
@@ -41614,6 +41617,64 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, baseKO, sales.items, sales.loading, listings.items, listings.loading, txnPret, vendusAilleurs.v.at, vendusAilleurs.v.charge]);
   const [feuilleAilleurs, setFeuilleAilleurs] = useState(false);
   const [feuilleDeux, setFeuilleDeux] = useState(false);   // (6 nov.) « en ligne deux fois »
+  // ── (11 nov., anti double vente) VENDU SUR UN SITE ⇒ RETIRÉ DES AUTRES EN UN TOUCHER ──
+  // Le plan (src/retirerAilleurs.js) range chaque annonce encore en ligne ailleurs : ce que
+  // VRM retire sur SON clic (Leboncoin par l'extension `lbcsupprime`, eBay par la route
+  // `retirer` — les voies existantes, leurs plafonds et la garde du compte de l'onglet),
+  // ce qui reste à faire sur le site (Vinted : JAMAIS automatique, §3 ; Vestiaire), et ce
+  // qui n'est pas sûr (« peut-être encore en ligne · vérifier » : rien n'y part).
+  // Après : la vérification se RELIT ; « retiré ✓ relu » seulement si l'annonce a disparu
+  // d'une lecture faite APRÈS le retrait.
+  const lbcSaitSuppr = extSait('lbcsupprime');
+  const planAilleurs = planRetirerAilleurs(vendusAilleurs.v, {
+    lbcOk: lbcSaitSuppr === 'ok',
+    lbcPourquoi: lbcSaitSuppr === 'absente' ? 'à faire sur Leboncoin — ici, pas d’extension VRM (ouvre VRM dans ton Chrome pour que VRM la supprime)' : 'à faire sur Leboncoin — ton extension est trop ancienne pour supprimer depuis VRM (mets-la à jour)',
+    ebayOk: !!(AUTH.session && AUTH.session.access_token),
+  });
+  const [retraitsAilleurs, setRetraitsAilleurs] = useState(null);   // { plan, res } : le plan tel qu'exécuté, les issues
+  const [retraitAilleursEnVol, setRetraitAilleursEnVol] = useState(false);
+  const retirerDesAutresSites = async () => {
+    const plan = planAilleurs;
+    if (retraitAilleursEnVol || !plan.nAuto) return;
+    const t = texteConfirmation(plan);
+    const ok = await askConfirm({ title: t.titre, desc: t.desc, ok: 'Oui, retirer', cancel: 'Annuler', danger: true, irreversible: true });
+    if (!ok) return;
+    const owner = AUTH.user?.id || '';
+    setRetraitAilleursEnVol(true);
+    try {
+      const res = await executerRetraits(plan, {
+        lbc: async (site) => { let rep = null; try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(site.id), confirme: true }, 70000); } catch (_) { rep = null; } return issueLbc(rep); },
+        ebay: async (site) => {
+          // Le retrait automatique (allumé chez lui) a peut-être déjà pris cette annonce : on ne la double pas.
+          if (__retraitEbayAutoTentes.has(String(site.id))) return { statut: 'incertain', texte: 'le retrait automatique d’eBay s’en occupe déjà — regarde sur eBay' };
+          let code = 0, j = null;
+          try {
+            const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'retirer', itemId: String(site.id), confirme: true, ...corpsCompteEbay(site.compte) }) });
+            code = r && Number.isFinite(r.status) ? r.status : 0; j = await r.json().catch(() => null);
+          } catch (_) { code = 0; j = null; }
+          return issueEbay(code, j);
+        },
+      }, () => (AUTH.user?.id || '') === owner);
+      setRetraitsAilleurs({ plan, res });
+      if (only === 'journee') setFeuilleAilleurs(true);   // le résultat par site se lit dans la feuille
+      const nOk = Object.values(res).filter((r) => r.statut === 'retire').length, nKo = Object.values(res).length - nOk;
+      toast(nKo ? `${nOk} retirée${nOk > 1 ? 's' : ''} · ${nKo} pas faite${nKo > 1 ? 's' : ''} — le détail est sur la carte` : `${nOk} annonce${nOk > 1 ? 's' : ''} retirée${nOk > 1 ? 's' : ''} des autres sites`, nKo ? 'err' : 'ok');
+      if (nOk && onCycle) onCycle();
+      // La relecture : eBay se relit chez eBay (la synchro, une lecture — sur SON clic), compte par
+      // compte retiré ; puis la même vérification, refaite APRÈS les retraits. Leboncoin se relit à sa
+      // prochaine lecture complète de « Mes annonces » (l'extension) : d'ici là, « pas encore relu ».
+      for (const ref of [...new Set(Object.values(res).filter((r) => r.statut === 'retire' && r.plateforme === 'eBay').map((r) => r.compte || 'principal'))]) {
+        try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'relire', ...corpsCompteEbay(ref) }) }); } catch (_) { /* pas relu : dit */ }
+      }
+      try { await vendusAilleurs.lire(); } catch (_) { /* « pas encore relu » reste dit */ }
+    } finally { setRetraitAilleursEnVol(false); }
+  };
+  const blocRetirerAilleurs = (compact) => {
+    const affiche = retraitsAilleurs ? retraitsAilleurs.plan : planAilleurs;
+    if (!affiche.articles.length) return null;
+    return <RetirerAilleursBloc plan={affiche} resultats={retraitsAilleurs ? avecRelecture(retraitsAilleurs.res, vendusAilleurs.v) : null} enVol={retraitAilleursEnVol}
+      onRetirer={retirerDesAutresSites} onFini={() => setRetraitsAilleurs(null)} PhotoVinted={PhotoVinted} compact={compact}/>;
+  };
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
@@ -42880,6 +42941,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const court = carteAilleurs.erreur && !carteAilleurs.n ? 'Vendus ailleurs : pas vérifié' : `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} vendue${carteAilleurs.n > 1 ? 's' : ''} ailleurs`;
                 const detail = carteAilleurs.erreur && !carteAilleurs.n ? 'La lecture n’a pas répondu' : `Encore en ligne sur ${plats.join(', ')}`;
                 const reessayer = carteAilleurs.erreur && !carteAilleurs.n;
+                // (11 nov., anti double vente) Quelque chose que VRM peut retirer : la carte porte le
+                // geste lui-même, « Retirer des autres sites » (confirmation, puis site par site).
+                if (planAilleurs.nAuto > 0 && !reessayer && !retraitsAilleurs) {
+                  const un = planAilleurs.articles.length === 1 ? planAilleurs.articles[0] : null;
+                  const titreR = un ? `N°${un.numero} vendu sur ${enListe(un.venduSur)}` : `${planAilleurs.articles.length} articles vendus ailleurs`;
+                  const encore = [...new Set(planAilleurs.articles.flatMap((a) => a.sites.filter((s) => s.voie !== 'verifier').map((s) => s.plateforme)))];
+                  const detailR = encore.length ? `Encore en ligne sur ${enListe(encore)}` : detail;
+                  return (
+                    <div key="vendus-ailleurs" className="vrm-day-task vrm-fu-tache vrm-va-carte" data-vendus-ailleurs="" data-n={String(carteAilleurs.n)} data-ra-carte={String(planAilleurs.nAuto)}>
+                      <button type="button" className="vrm-va-voir" title={`${titreR}\n${detailR}`} aria-label={`${titreR} — ${detailR}`} onClick={() => setFeuilleAilleurs(true)}>
+                        <PileVignettes srcs={lignesA.map((a) => a.photo)} n={carteAilleurs.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="sync" size={20}/>}/>
+                        <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titreR}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="vendus-ailleurs">{detailR}</span></span>
+                      </button>
+                      <Bouton variante="danger" className="vrm-b-petit vrm-ra-bouton" data-retirer-ailleurs="" occupe={retraitAilleursEnVol} onClick={retirerDesAutresSites}>Retirer des autres sites</Bouton>
+                    </div>
+                  );
+                }
                 return (
                   <button key="vendus-ailleurs" type="button" className="vrm-day-task vrm-fu-tache" data-vendus-ailleurs="" data-n={String(carteAilleurs.n)} data-va-erreur={carteAilleurs.erreur ? '1' : undefined}
                     title={`${court}\n${detail}`} aria-label={`${court} — ${detail}`} onClick={() => { if (reessayer) vendusAilleurs.lire(); else setFeuilleAilleurs(true); }}>
@@ -43016,6 +43094,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {feuilleAilleurs ? (
                     <SheetShell titre="Vendus ailleurs" sousTitre={carteAilleurs && carteAilleurs.n ? `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} à retirer` : undefined} onClose={() => setFeuilleAilleurs(false)} maxWidth={560} data-feuille-ailleurs="">
                       <div className="vrm-bilan-sync vrm-va-feuille">
+                        {blocRetirerAilleurs(true)}
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
                     </SheetShell>
@@ -43175,6 +43254,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
+        {/* (11 nov., anti double vente) EN TÊTE : vendu ici, encore en ligne ailleurs — un toucher. */}
+        {!baseKO && blocRetirerAilleurs(false)}
         {/* (2 nov., style « Fusion », son choix : « la première photo avec les stats
             novembre ») LA CARTE DU MOIS. Le grand chiffre est le VENDU du mois, toutes
             plateformes (`bilanVentes` sur `vendus` — la règle de « Vendu » de Ma
