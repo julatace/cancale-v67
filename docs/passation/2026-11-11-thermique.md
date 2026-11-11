@@ -4,7 +4,7 @@ Demande de Julien : « bordereaux pour imprimante thermique, PERSONNALISABLES en
 l'imprimante ; prendre en compte le tamponnage ; peut-être pas le titre du produit dessus car
 visible ». Partie de `origin/claude/revue-colis` (pas de `main`), comme demandé.
 
-## ÉTAT À LA REPRISE (arrêt demandé par Julien via la session principale)
+## ÉTAT À LA REPRISE (arrêt demandé par Julien via la session principale) — repris le 11 nov. au soir, voir « Reprise » en fin de fichier
 
 ### Fait et poussé
 - **Règles pures** `src/impression/thermique.js` : réglage `vrm_impression` (`reglageImpression` :
@@ -66,3 +66,15 @@ visible ». Partie de `origin/claude/revue-colis` (pas de `main`), comme demand�
 - Une grande étiquette a des bandes blanches en travers : ne la couper que si les morceaux sont
   identiques (taille + codes aux mêmes places).
 - Le module mesuré à 4 px/pt est approché (± 1 px) : seuil 0,25 mm prudent, l'écran le DIT.
+
+## Reprise (11 nov., soir) — ce qui a été fait
+
+- **Fusions** : `origin/claude/revue-colis` (propre) puis `origin/main` (un conflit, `historique-divers.md` : les deux côtés gardés). `audit-traduction` C2 : la barre a 9 entrées depuis revue-colis (Colis dans Ventes/Achats) — plancher descendu de 10 à 9 (il ne sert qu'à voir une lecture cassée).
+- **Paramètres → Imprimante et bordereaux → « Impression des bordereaux »** (`ImpressionBordereaux`, src/ecrans/Reglages.jsx) : en thermique papier (liste `FORMATS_THERMIQUES`, « Autre » largeur × hauteur bornées 25–300 mm), marge (vide = celle du papier, ≤ 10 mm), encre Noir pur / Tel quel + contraste, tampon (`TAMPONS`, « N° seul » proposé + la phrase « visible par le transporteur »), fiche de préparation (case) ; en A4 le tampon A4 seul. Écrit `vrm_impression` (`save`, SYNC_KEYS). Aperçu : `fabriquerBordereau(…'a4-notice')` (inventé) → `poserBordereau` avec le réglage → `ApercuPdf` par page, + ce qui a été fait (page entière, fiche, rien, code trop fin). Le choix d'imprimante, la ligne de la liste et les aperçus de ses bordereaux nomment le papier choisi.
+- **Tout imprimer** : l'aperçu dit « N pages · papier » et le tampon CHOISI (titre seulement s'il l'écrit, « sans tampon » pour Rien) ; « Changer le papier ou le tampon » ferme la feuille et ouvre le réglage (`vrm:aller` `?tab=settings&reglage=imprimante`).
+- `choisirTampon` reçoit `thermique` et montre ce que le tampon ÉCRIRA (`contenuTampon`).
+- **Textes** par `tr()` : clés `impression.*` (+ `reglages.imprimante.thermique` avec `{papier}`) dans les 5 langues ; `ImpressionBordereaux` et `nomPapier` ajoutés à MIGRES d'`audit-traduction`.
+- **audit-impression** : exécute le vrai bloc (`_code-impression.cjs`) + les règles + `typeBordereau` ; seul pdf.js est neutre ; mutation 3 bis (la page garde la taille de l'étiquette).
+- **Banc thermique** : cas « blanc collé au QR » (`fabriquerBordereau(…, { blancQr: 30 })`) — un blanc assez grand pour le tampon seulement sans la garde de 5 mm autour des codes : c'est lui qui fait rougir `sansBloques` (sans lui, la mutation restait verte : sur les autres formes le blanc cherché évite déjà les codes).
+- **Banc imprimante** : la section (N° seul par défaut, Dymo 4XL écrit, aperçu dessiné au format 104 × 159, tampon thermique réglé à part de l'A4, A4 sans papier thermique), 390 et 1512 px.
+- Quoi de neuf : `impression-thermique`.

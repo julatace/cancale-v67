@@ -176,6 +176,33 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
     res.jamais = await pg.locator('[data-apercus-jamais]').first().getAttribute('data-apercus-jamais').catch(() => null);
     res.compte = await pg.locator('[data-apercus-compte]').first().getAttribute('data-apercus-compte').catch(() => null);
   }
+  // (11 nov., lot thermique) IMPRESSION DES BORDEREAUX : le papier, le tampon, l'aperçu.
+  if (!panne && !vide && !sansLecteur) {
+    const th = {};
+    th.present = await pg.locator('[data-impression-reglage]').first().isVisible().catch(() => false);
+    th.tamponDefaut = await pg.locator('[data-impression-reglage]').first().getAttribute('data-impression-tampon').catch(() => null);
+    th.pourquoi = await pg.locator('[data-impression-pourquoi-titre]').first().innerText().catch(() => '');
+    await pg.locator('#vrm-impression-papier').selectOption('dymo4xl').catch(() => {});
+    await pg.waitForTimeout(1200);
+    th.ecrit = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_impression') || 'null'); } catch (_) { return null; } });
+    th.choixLibelle = await pg.locator('[data-imprimante-choix="thermique"]').first().innerText().catch(() => '');
+    await pg.locator('[data-impression-apercu-voir]').first().click({ timeout: 3000 }).catch(() => {});
+    await pg.waitForSelector('[data-impression-apercu] [data-apercu="ok"], [data-impression-apercu] [data-apercu="ko"]', { timeout: 60000 }).catch(() => {});
+    th.apercu = await pg.$$eval('[data-impression-apercu]', (els) => els.map((el) => ({ pages: +el.getAttribute('data-impression-apercu'), issue: el.getAttribute('data-impression-issue'),
+      figs: Array.from(el.querySelectorAll('[data-apercu]')).map((f) => { const c = f.querySelector('canvas'); let encre = 0; try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) if (d[i] < 200) encre++; } catch (_) { encre = -1; } return { etat: f.getAttribute('data-apercu'), w: c ? c.width : 0, h: c ? c.height : 0, encre }; }) }))[0] || null).catch(() => null);
+    th.deborde = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.locator('[data-impression-reglage]').first().screenshot({ path: path.join(CAPT, `impression-${nom}-thermique.png`) }).catch(() => {}); }
+    await pg.locator('[data-impression-tampon-choix="num_titre_taille"]').first().click({ timeout: 3000 }).catch(() => {});
+    await pg.waitForTimeout(1200);
+    th.ecritTampon = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_impression') || 'null'); } catch (_) { return null; } });
+    await pg.locator('[data-imprimante-choix="normale"]').first().click({ timeout: 3000 }).catch(() => {});
+    await pg.waitForTimeout(800);
+    th.a4 = await pg.locator('[data-impression-reglage]').first().getAttribute('data-impression-reglage').catch(() => null);
+    th.a4Tampon = await pg.locator('[data-impression-reglage]').first().getAttribute('data-impression-tampon').catch(() => null);
+    th.a4Papier = await pg.locator('#vrm-impression-papier').count();
+    if (CAPT) await pg.locator('[data-impression-reglage]').first().screenshot({ path: path.join(CAPT, `impression-${nom}-a4.png`) }).catch(() => {});
+    res.th = th;
+  }
   res.texte = await pg.locator('[data-imprimante-reglage]').first().innerText().catch(() => '');
   res.deborde = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   if (CAPT) {
@@ -210,11 +237,24 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
       for (const t of types) {
         const dessines = t.apercus.filter((a) => a.etat === 'ok' && a.encre > 200);
         dit(t.apercus.length >= 2 && dessines.length === t.apercus.length, `${t.type} : aperçu normal ET thermique, dessinés`, t.apercus.map((a) => `${a.label.split('·')[0].trim()}=${a.etat}/${a.encre}`).join(' · '));
-        const th = t.apercus.filter((a) => /^Thermique · 10×15/.test(a.label));
+        const th = t.apercus.filter((a) => /^Thermique · 10 × 15/.test(a.label));
         if (t.isoles > 0) dit(th.length >= 1 && th.every((a) => Math.abs(a.w / a.h - 100 / 150) < 0.02), `${t.type} : l’aperçu thermique est au format 10×15`, th.map((a) => `${a.w}×${a.h}`).join(' '));
       }
       dit(!!x.jamais && /vintedgo/.test(x.jamais), 'un type jamais reçu est dit « pas encore vu »', x.jamais || '(rien)');
       dit(x.deborde <= 1, 'aucun débordement horizontal', `${x.deborde} px`);
+      // (11 nov., lot thermique) Impression des bordereaux.
+      const T = x.th || {};
+      dit(T.present, 'thermique : « Impression des bordereaux » est sous le choix d’imprimante');
+      dit(T.tamponDefaut === 'num', 'thermique : le tampon proposé est « N° seul »', String(T.tamponDefaut));
+      dit(/transporteur/.test(T.pourquoi || ''), 'thermique : une phrase dit pourquoi le titre est caché', (T.pourquoi || '').slice(0, 80));
+      dit(T.ecrit && T.ecrit.format === 'dymo4xl', 'choisir « Dymo 4XL » écrit LE réglage `vrm_impression`', JSON.stringify(T.ecrit));
+      dit(/Dymo 4XL/.test(T.choixLibelle || ''), 'le choix d’imprimante nomme le papier choisi', T.choixLibelle);
+      const A = T.apercu, f0 = A && A.figs && A.figs[0];
+      dit(!!A && A.pages >= 1 && f0 && f0.etat === 'ok' && f0.encre > 200, 'l’aperçu imprime un bordereau inventé et le DESSINE', JSON.stringify(A).slice(0, 160));
+      dit(f0 && Math.abs(f0.w / f0.h - 104 / 159) < 0.02, 'l’aperçu est au format du papier choisi (104 × 159)', f0 ? `${f0.w}×${f0.h}` : '—');
+      dit(T.deborde <= 1, 'thermique : aucun débordement horizontal', `${T.deborde} px`);
+      dit(T.ecritTampon && T.ecritTampon.tamponTh === 'num_titre_taille' && T.ecritTampon.tamponA4 === 'num_titre', 'le tampon thermique se règle à part de l’A4', JSON.stringify(T.ecritTampon));
+      dit(T.a4 === 'a4' && T.a4Tampon === 'num_titre' && T.a4Papier === 0, 'en A4 : pas de papier thermique, tampon « N° + titre »', `${T.a4} ${T.a4Tampon} ${T.a4Papier}`);
     }
 
     console.log('\n── LES AUTRES ÉTATS (1512 px)');
