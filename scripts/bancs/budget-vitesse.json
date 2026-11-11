@@ -1,0 +1,580 @@
+{
+ "marge": 0.15,
+ "marge_js": 0.1,
+ "ecrans": {
+  "journee": {
+   "nom": "Ma journée",
+   "neuf": {
+    "lectures": 135,
+    "octets": 3112576,
+    "doublons": 22,
+    "entieres": 0,
+    "js": 1646,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 117,
+    "octets": 2706587,
+    "doublons": 21,
+    "entieres": 0,
+    "js": 1496
+   },
+   "deuxieme": {
+    "lectures": 129,
+    "octets": 890297,
+    "doublons": 21,
+    "entieres": 0,
+    "js": 1646,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 112,
+    "octets": 774171,
+    "doublons": 20,
+    "entieres": 0,
+    "js": 1496
+   }
+  },
+  "ventes": {
+   "nom": "Ventes",
+   "neuf": {
+    "lectures": 119,
+    "octets": 3067368,
+    "doublons": 23,
+    "entieres": 0,
+    "js": 1646,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=eq.vrm_bord_transporteurs&select=parTx:data->parTx,pdf:data->pdf,pdfVus:data->pdfVus&order=id.asc|0-999": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 103,
+    "octets": 2667276,
+    "doublons": 22,
+    "entieres": 0,
+    "js": 1496
+   },
+   "deuxieme": {
+    "lectures": 115,
+    "octets": 972388,
+    "doublons": 23,
+    "entieres": 0,
+    "js": 1646,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=eq.vrm_bord_transporteurs&select=parTx:data->parTx,pdf:data->pdf,pdfVus:data->pdfVus&order=id.asc|0-999": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 100,
+    "octets": 845554,
+    "doublons": 22,
+    "entieres": 0,
+    "js": 1496
+   }
+  },
+  "annonces": {
+   "nom": "Annonces",
+   "neuf": {
+    "lectures": 133,
+    "octets": 3325098,
+    "doublons": 32,
+    "entieres": 0,
+    "js": 1646,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 4,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 3,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 3,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=eq.vrm_bord_transporteurs&select=parTx:data->parTx,pdf:data->pdf,pdfVus:data->pdfVus&order=id.asc|0-999": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
+     "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
+     "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
+     "app_data?id=like.email_sale_*&select=data&order=id.asc|0-999": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 115,
+    "octets": 2891389,
+    "doublons": 31,
+    "entieres": 0,
+    "js": 1496
+   },
+   "deuxieme": {
+    "lectures": 127,
+    "octets": 1102819,
+    "doublons": 31,
+    "entieres": 0,
+    "js": 1646,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 4,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 3,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=eq.vrm_bord_transporteurs&select=parTx:data->parTx,pdf:data->pdf,pdfVus:data->pdfVus&order=id.asc|0-999": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
+     "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
+     "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
+     "app_data?id=like.email_sale_*&select=data&order=id.asc|0-999": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 110,
+    "octets": 958973,
+    "doublons": 30,
+    "entieres": 0,
+    "js": 1496
+   }
+  },
+  "achats": {
+   "nom": "Achats",
+   "neuf": {
+    "lectures": 136,
+    "octets": 3067402,
+    "doublons": 30,
+    "entieres": 0,
+    "js": 1667,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 4,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=eq.vrm_bord_transporteurs&select=parTx:data->parTx,pdf:data->pdf,pdfVus:data->pdfVus&order=id.asc|0-999": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
+     "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
+     "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
+     "app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at&order=id.asc|0-999": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
+     "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 118,
+    "octets": 2667306,
+    "doublons": 29,
+    "entieres": 0,
+    "js": 1515
+   },
+   "deuxieme": {
+    "lectures": 133,
+    "octets": 972422,
+    "doublons": 30,
+    "entieres": 0,
+    "js": 1667,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 4,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=eq.vrm_bord_transporteurs&select=parTx:data->parTx,pdf:data->pdf,pdfVus:data->pdfVus&order=id.asc|0-999": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
+     "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
+     "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
+     "app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at&order=id.asc|0-999": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
+     "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 115,
+    "octets": 845584,
+    "doublons": 29,
+    "entieres": 0,
+    "js": 1515
+   }
+  },
+  "garage": {
+   "nom": "Stock",
+   "neuf": {
+    "lectures": 109,
+    "octets": 2980650,
+    "doublons": 14,
+    "entieres": 0,
+    "js": 1689,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
+     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 94,
+    "octets": 2591869,
+    "doublons": 13,
+    "entieres": 0,
+    "js": 1535
+   },
+   "deuxieme": {
+    "lectures": 104,
+    "octets": 885667,
+    "doublons": 13,
+    "entieres": 0,
+    "js": 1689,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 90,
+    "octets": 770145,
+    "doublons": 12,
+    "entieres": 0,
+    "js": 1535
+   }
+  },
+  "messages": {
+   "nom": "Messages",
+   "neuf": {
+    "lectures": 137,
+    "octets": 3799330,
+    "doublons": 27,
+    "entieres": 0,
+    "js": 1684,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 3,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
+     "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
+     "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 119,
+    "octets": 3303765,
+    "doublons": 26,
+    "entieres": 0,
+    "js": 1530
+   },
+   "deuxieme": {
+    "lectures": 133,
+    "octets": 1577054,
+    "doublons": 27,
+    "entieres": 0,
+    "js": 1684,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 4,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 3,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
+     "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
+     "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 115,
+    "octets": 1371351,
+    "doublons": 26,
+    "entieres": 0,
+    "js": 1530
+   }
+  },
+  "compta": {
+   "nom": "Argent",
+   "neuf": {
+    "lectures": 125,
+    "octets": 3746802,
+    "doublons": 22,
+    "entieres": 0,
+    "js": 1755,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
+     "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
+     "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=cap:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes|": 2,
+     "app_data?id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
+     "app_data?id=eq.vrm_pro_facture&select=data|": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 108,
+    "octets": 3258088,
+    "doublons": 21,
+    "entieres": 0,
+    "js": 1595
+   },
+   "deuxieme": {
+    "lectures": 112,
+    "octets": 1651803,
+    "doublons": 14,
+    "entieres": 0,
+    "js": 1755,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=eq.vrm_pro_facture&select=data|": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 97,
+    "octets": 1436350,
+    "doublons": 13,
+    "entieres": 0,
+    "js": 1595
+   }
+  },
+  "emails": {
+   "nom": "E-mails",
+   "neuf": {
+    "lectures": 105,
+    "octets": 2980643,
+    "doublons": 13,
+    "entieres": 0,
+    "js": 1691,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "neuf_mesure": {
+    "lectures": 91,
+    "octets": 2591863,
+    "doublons": 12,
+    "entieres": 0,
+    "js": 1537
+   },
+   "deuxieme": {
+    "lectures": 102,
+    "octets": 885663,
+    "doublons": 13,
+    "entieres": 0,
+    "js": 1691,
+    "doublonsParAdresse": {
+     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
+     "app_data?id=eq.panel_accounts_off&select=data|": 2,
+     "app_data?id=eq.panel_num_reserves&select=data|": 3,
+     "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
+     "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
+     "app_data?id=like.harvest_%_txn_%&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title&order=id.asc|0-999": 3,
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+    }
+   },
+   "deuxieme_mesure": {
+    "lectures": 88,
+    "octets": 770141,
+    "doublons": 12,
+    "entieres": 0,
+    "js": 1537
+   }
+  }
+ },
+ "releves": [
+  {
+   "date": "2026-11-11",
+   "ecrans": [
+    "journee",
+    "ventes",
+    "annonces",
+    "achats",
+    "garage",
+    "messages",
+    "compta",
+    "emails"
+   ],
+   "raison": "budgets initiaux : main fc3883d, 4 passages (processeur ×1 ×1 ×4 ×4), le plus haut + 15 % (JS + 10 %)"
+  }
+ ]
+}
