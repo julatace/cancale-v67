@@ -80,8 +80,8 @@ export function previsionMois({ vendu, manque = [], nonComptees = [], releve = n
   const v = jours > 1 ? parJour.reduce((s, x) => s + (x - moy) * (x - moy), 0) / (jours - 1) : 0;
   const sd = Math.sqrt(Math.max(0, reste * v + (reste * reste * v) / jours));
   const centre = rond(centreBrut);
-  const bas = Math.max(rond(cumul, -1), rond(centreBrut - PREVISION_Z * sd, -1));
-  const haut = Math.max(centre, rond(centreBrut + PREVISION_Z * sd, 1));
+  const bas = Math.max(rond(cumul, -1), rond(centreBrut - PREVISION_Z * sd));
+  const haut = Math.max(centre, rond(centreBrut + PREVISION_Z * sd));
   const out = { ...P, etat: 'ok', centre, bas: Math.min(bas, centre), haut, rythmeJour: Math.round(rythme), sd: Math.round(sd) };
   out.benef = beneficePrevu(releve, de, a, { centre: centreBrut, bas: centreBrut - PREVISION_Z * sd, haut: centreBrut + PREVISION_Z * sd, cumul });
   return out;
