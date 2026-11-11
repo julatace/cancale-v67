@@ -161,6 +161,7 @@ import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 import { requeteDeLaVoix } from "./rechercheVocale.js";
 import { lireDemandeAchat, lireRechercheLien, poserDemandeAchat } from "./raccourcisSiri.js";
 import RaccourcisClavier from "./RaccourcisClavier.jsx";
+import { MQ_ORDINATEUR, MQ_TABLETTE_LARGE, MQ_TABLETTE_ETROITE, dispositionTablette } from "./coque.js";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
 import QuiDorment from "./design/QuiDorment.jsx";
 import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
@@ -610,6 +611,7 @@ import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille
 import "./styles-profil.css";   // (11 nov., lot DJ6) la photo du profil et son menu
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
+import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import { enregistrerGaleries } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
 import { fonduEntree } from "./passageOnglet.js";
@@ -15659,7 +15661,8 @@ function TopProgress() {
 // souris. La coque ordinateur se décide sur la SOURIS autant que sur la
 // largeur ; une tablette au doigt garde la coque téléphone. La même requête vit
 // dans les CSS de la coque (`MQ_ORDINATEUR`, styles-*.css) : une notion, une règle.
-const MQ_ORDINATEUR = '(min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine)';
+// (11 nov., iPad) La règle vit dans src/coque.js (MQ_ORDINATEUR, importée en tête) : une
+// tablette au doigt (≥ 744 × 600) prend désormais cette coque, avec ses règles tactiles.
 const useOrdinateur = () => {
   const [ord, setOrd] = React.useState(() => {
     try { return window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) { return false; }
@@ -15671,6 +15674,23 @@ const useOrdinateur = () => {
     return () => { try { mq.removeEventListener('change', on); } catch (_) { mq.removeListener(on); } };
   }, []);
   return ord;
+};
+
+// (11 nov., iPad) '' · 'large' · 'etroite' (src/coque.js) : posé sur la racine (`data-tablette`),
+// il allume les règles tactiles de la coque ordinateur (src/styles-tablette.css). Suit la rotation
+// SANS changer de coque : rien n'est remonté.
+const useTablette = () => {
+  const [t, setT] = React.useState(() => dispositionTablette());
+  React.useEffect(() => {
+    const mqs = []; const on = () => setT(dispositionTablette());
+    for (const q of [MQ_TABLETTE_LARGE, MQ_TABLETTE_ETROITE]) {
+      let mq; try { mq = window.matchMedia(q); } catch (_) { continue; }
+      try { mq.addEventListener('change', on); } catch (_) { mq.addListener(on); }
+      mqs.push(mq);
+    }
+    return () => { for (const mq of mqs) { try { mq.removeEventListener('change', on); } catch (_) { mq.removeListener(on); } } };
+  }, []);
+  return t;
 };
 
 const NAV_LARGEUR = 236;   // (31 oct., Vitrine) colonne blanche avec les libellés (236 px : sa maquette)
@@ -45390,7 +45410,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span></div>}</div>{rendreFicheConv()}</div>
+        </div><div className="vrm-chat-column" data-conv-ouverte={openConv?.convId!=null?String(openConv.convId):undefined}>{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span></div>}</div>{rendreFicheConv()}</div>
         {zoneMessages==='conversations'&&<details className="vrm-quick-settings"><summary>Réponses rapides</summary>
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         {/* (5 nov., chantier G) Le titre est celui du repli (plus écrit deux fois) ; « Modifier » au style des liens de pied ;
@@ -45505,7 +45525,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Ventes Vinted pas encore lues ⇒ pas de nombre (jamais un 0 inventé, §5).
           const envoyesL = listeEnvoyes();
           const nEnvoyes = (voitSite('vinted') && !Array.isArray(sales.items)) ? null : envoyesL.length; nEnvoyesVu = nEnvoyes || 0;
-          const ordiColis = (() => { try { return window.matchMedia('(min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine)').matches; } catch (_) { return false; } })();
+          const ordiColis = (() => { try { return window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) { return false; } })();
           const nPretsVue = ((vue.colonnes.find(c => c.cle === 'prets') || {}).cartes || []).length;
           // Les gestes d'UN colis à retirer, sur SA carte : son code une fois
           // (nommé, copiable), son QR, « Suivre », « J'ai retiré » — les mêmes
@@ -51586,6 +51606,7 @@ function AppCoeur() {
   const [authState,setAuthState]=useState(AUTH);
   // Ordinateur ou téléphone : décide la NAVIGATION et la largeur de lecture.
   const ordi = useOrdinateur();
+  const tablette = useTablette();
   React.useEffect(()=>onAuthChange(setAuthState),[]);
   // Discord lancé sur le téléphone : le retour arrive dans un autre navigateur ;
   // l'app reprend la preuve rangée par le serveur (src/communaute/discordAttente.js).
@@ -54874,7 +54895,7 @@ function AppCoeur() {
   );
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
-    <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div className="vrm-app-shell" data-tablette={(ordi && tablette) || undefined} style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
