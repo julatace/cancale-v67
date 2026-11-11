@@ -838,10 +838,11 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 
 /* (11 nov., lot alertes-ebay) Une annonce signalée par une alerte : photo, contenu, puis
    « Voir sur eBay ↗ » et « Retirer » — sous le contenu sur téléphone. */
-.vrm-buy-row.vrm-alerte-ebay { grid-template-columns:64px minmax(0,1fr) auto; }
+/* (le !important et la sélection longue : les grilles des listes d'Achats en posent quatre colonnes en !important) */
+:root:root body .vrm-buy-list > .vrm-buy-row.vrm-alerte-ebay { grid-template-columns:64px minmax(0,1fr) auto !important; }
 .vrm-buy-row.vrm-alerte-ebay > .vrm-alerte-act { display:flex; align-items:center; gap:2px; }
 @media(max-width:767px){
-  .vrm-buy-row.vrm-alerte-ebay { grid-template-columns:60px minmax(0,1fr); }
+  :root:root body .vrm-buy-list > .vrm-buy-row.vrm-alerte-ebay { grid-template-columns:60px minmax(0,1fr) !important; }
   .vrm-buy-row.vrm-alerte-ebay > .vrm-alerte-act { grid-column:2; }
   .vrm-buy-row.vrm-alerte-ebay > .vrm-alerte-act > a { padding-left:0 !important; }
 }

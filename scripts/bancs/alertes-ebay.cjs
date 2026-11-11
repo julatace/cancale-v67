@@ -148,6 +148,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const etats = await pg.$$eval('[data-alerte-recherche]', (l) => l.map((e) => e.getAttribute('data-alerte-recherche-etat')));
         dit(etats.join(',') === 'echec,lue', 'tes alertes : l’état de chaque recherche, la plus récente d’abord (eBay n’a pas répondu, lue)', etats.join(','));
         dit((await deborde(pg)) <= 0, 'aucun débordement horizontal', String(await deborde(pg)));
+        // Les gestes restent DANS la carte (une grille de quatre colonnes les poussait dehors à 1512 px).
+        const dehors = await pg.$$eval('[data-alerte-ebay]', (l) => l.filter((r) => { const b = r.getBoundingClientRect(); return [...r.querySelectorAll('[data-voir-ebay],[data-alerte-retirer]')].some((x) => { const c = x.getBoundingClientRect(); return c.right > b.right + 1 || c.left < b.left - 1; }); }).length);
+        dit(dehors === 0, '« Voir sur eBay » et « Retirer » dans la ligne', dehors + ' ligne(s) dehors');
         if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'alertes-ebay-' + vp.width + '.png'), fullPage: false, clip: await pg.$eval('[data-alertes-ebay]', (e) => { e.scrollIntoView(); const r = e.getBoundingClientRect(); return { x: 0, y: Math.max(0, r.top - 8), width: document.documentElement.clientWidth, height: Math.min(r.height + 16, 1400) }; }) });
       });
       await essaie('retirer', async () => {
