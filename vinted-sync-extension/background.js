@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.342.0';
+const CODE_VERSION = '5.353.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3556,6 +3556,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
+          if (msg.action === 'verifDepot') { sendResponse(await verifDepotPage(sender, msg)); return; }
           if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
           if (msg.action === 'numeros') {
             const uidOnglet = await numerosPermisDansPage(sender);
@@ -5593,6 +5594,82 @@ return { lireNumeroTexte, compacterLecture };
 function lectureNumeroDescription(texte) {
   if (typeof texte !== 'string' || !texte.trim()) return null;
   try { return VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(texte.slice(0, 20000), 'description')); } catch (_) { return null; }
+}
+
+// ── AVANT DE PUBLIER SUR VINTED : L'ENCART DU FORMULAIRE (11 nov., lot verif-publication, 5.353) ──
+// Sur vinted.fr/items/new, une courte liste discrète, JAMAIS une garde : rien n'est
+// cliqué, rien n'est envoyé à Vinted, aucune requête Vinted de plus (la base VRM
+// seulement, comme `donneesInfosPage`). La page envoie ce qu'elle VOIT (description,
+// prix tapés), le fond rend les alertes ; le texte n'est ni gardé ni écrit.
+//   · numero  : il numérote lui-même (réglage `vrm_numero_ecrit` allumé, ou
+//               l'habitude PROUVÉE : 5 descriptions lues, 4 sur 5 avec un N° à la
+//               fin — la règle `habitudeNumeroEcrit` de src/verifAnnonce.js) et la
+//               fin de la description n'a pas de N° (ou deux) ;
+//   · enligne : le N° écrit est celui d'une annonce EN LIGNE de CE compte (la règle
+//               `<enligne-regle>`, lecture complète < 24 h) — par identité ;
+//   · prix    : le prix tapé est sous SON prix d'achat saisi pour ce N°
+//               (`vinted_buyprice_by_num`), jamais deviné, aucun prix proposé.
+// Pas su (base muette, compte pas relu, champ introuvable) ⇒ rien. Les photos ne
+// sont pas jugées ici : le formulaire de Vinted n'a pas été mesuré (pas su ⇒ rien).
+const HABITUDE_MIN_EXT = 5;
+function habitudeNumeroEcritExt(lectures) {
+  const ls = (Array.isArray(lectures) ? lectures : []).map((l) => VRM_NUMERO_ECRIT.compacterLecture(l)).filter(Boolean);
+  if (ls.length < HABITUDE_MIN_EXT) return null;
+  const lus = ls.filter((l) => l.etat === 'lu').length;
+  return lus * 5 >= ls.length * 4 ? true : null;
+}
+const CODES_VERIF_EXT = ['numero', 'enligne', 'prix'];
+const nombreVerif = (v) => { if (v == null || v === '') return null; const n = Number(String(v).replace(/\s|€/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+const eurosVerif = (v) => (Number.isInteger(v) ? `${v} €` : `${v.toFixed(2).replace('.', ',')} €`);
+function alertesDepotVinted(page, d) {
+  const out = [];
+  if (!d || !page) return out;
+  const coupees = new Set(Array.isArray(d.coupees) ? d.coupees : []);
+  const desc = typeof page.description === 'string' ? page.description : null;
+  const ouDesc = !Array.isArray(d.ou) || d.ou.includes('description');
+  const lu = desc != null && desc.trim().length >= 5 ? VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(desc.slice(0, 20000), 'description')) : null;
+  if (d.ecrit === true && ouDesc && lu) {
+    if (lu.etat === 'rien') out.push({ code: 'numero', texte: 'Aucun N° à la fin de la description', pourquoi: 'Tu numérotes toi-même : sans N°, VRM ne retrouve pas la paire.' });
+    else if (lu.etat === 'ambigu') out.push({ code: 'numero', texte: 'Deux N° différents dans la description', pourquoi: 'VRM ne saura pas lequel est le bon.' });
+  }
+  const cle = lu && lu.etat === 'lu' ? lu.cle : '';
+  if (cle && d.enLigne instanceof Set && d.enLigne.has(cle)) out.push({ code: 'enligne', texte: `N°${cle} déjà en ligne sur ce compte`, pourquoi: 'Deux annonces pour une paire : risque de la vendre deux fois.' });
+  const p = nombreVerif(page.prix), ac = cle && d.buyByNum ? nombreVerif(d.buyByNum[cle]) : null;
+  if (p != null && p > 0 && ac != null && ac > 0 && p < ac) out.push({ code: 'prix', texte: `Prix ${eurosVerif(p)} sous ton prix d’achat ${eurosVerif(ac)}`, pourquoi: 'Tu vendrais moins cher que ce que tu l’as payée.' });
+  return out.filter((a) => !coupees.has(a.code));
+}
+let _verifDepot = null;
+async function donneesVerifDepot(uid) {
+  const owner = String((await loadSession())?.user_id || '');
+  const u = String(uid || '');
+  if (!owner || !u) return null;
+  if (_verifDepot && _verifDepot.owner === owner && _verifDepot.uid === u && Date.now() - _verifDepot.at < 120000) return _verifDepot;
+  const main = await lireMain(['vrm_numero_ecrit', 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_verif_coupees']);
+  if (main === null) return null;
+  const rowL = await sbGet(`app_data?id=eq.harvest_${u}_listings&select=id,data`);
+  if (rowL === null) return null;
+  const rowP = await sbGet(`app_data?id=eq.harvest_${u}_enligne&select=${SELECT_ENLIGNE}`);
+  const supp = await lireSupprimeesTous();
+  const r = enLigneDesLignes(rowL, rowP === null ? null : rowP, supp, Date.now()).parCompte.get(u);
+  const fiches = main.vinted_annonce_numeros || {};
+  const cleDe = (it) => { const f = fiches[String(it && it.id)]; const n = f && f.numero != null ? cleNum(f.numero) : ''; if (n) return n; const l = it && VRM_NUMERO_ECRIT.compacterLecture(it.numEcrit); return l && l.etat === 'lu' ? l.cle : ''; };
+  // En ligne : seulement une lecture qui fait foi (`enLigne`, < 24 h) ; sinon pas su.
+  let enLigne = null;
+  if (r && Array.isArray(r.enLigne) && !(r.aConfirmer && r.aConfirmer.length) && supp !== null) { enLigne = new Set(); for (const it of r.enLigne) { const k = cleDe(it); if (k) enLigne.add(k); } }
+  const items = (rowL && rowL[0] && rowL[0].data && rowL[0].data.payload && Array.isArray(rowL[0].data.payload.items)) ? rowL[0].data.payload.items : [];
+  const reglage = main.vrm_numero_ecrit && typeof main.vrm_numero_ecrit === 'object' ? main.vrm_numero_ecrit : null;
+  const ecrit = numeroEcritAllume(main) ? true : habitudeNumeroEcritExt(items.map((it) => it && it.numEcrit).filter(Boolean));
+  const coupees = (main.vrm_verif_coupees && Array.isArray(main.vrm_verif_coupees.codes) ? main.vrm_verif_coupees.codes : []).filter((c) => CODES_VERIF_EXT.includes(c));
+  if (String((await loadSession())?.user_id || '') !== owner) return null;
+  _verifDepot = { owner, uid: u, at: Date.now(), ecrit, ou: reglage && reglage.actif === true && Array.isArray(reglage.ou) ? reglage.ou : null, enLigne, buyByNum: main.vinted_buyprice_by_num || {}, coupees };
+  return _verifDepot;
+}
+async function verifDepotPage(sender, msg) {
+  const uid = await numerosPermisDansPage(sender);
+  if (!uid) return { ok: true, alertes: [], portee: 'hors_compte' };
+  const d = await donneesVerifDepot(uid);
+  if (!d) return { ok: false };
+  return { ok: true, alertes: alertesDepotVinted({ description: msg && msg.description, prix: msg && msg.prix }, d) };
 }
 
 function articleMaigre(it) {
