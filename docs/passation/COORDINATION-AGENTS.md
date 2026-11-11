@@ -158,3 +158,28 @@ Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le
   3. `annonces-ventes-brouillon` : porté sur les onglets d'aujourd'hui ⇒ 1 rouge réel restant, **dans Colis** (date limite coupée par l'ellipse au téléphone) — à la session Colis.
   Commits à reprendre : toute la branche (4 commits + merge). Récit `docs/passation/2026-11-11-restes.md`.
   4. ⚠️ Après merge de `main` : « Tes meilleures sources » (meilleurs-fournisseurs) s'insère AVANT la liste d'Achats (étapes 689 ⇒ 973 px sur ordinateur, bloc décalé de 16 px) — sujet réservé, pas touché ; à la session de ce lot.
+
+## API commune « VRM travaille » — à utiliser par TOUT lot qui lance une action longue ou multiple (11 nov., lot `suivi-travail`)
+Julien : « dès qu'il y a une action en cours, fige VRM avec une fenêtre qui s'ouvre avec une barre de progression ». Branche `claude/suivi-travail` (pas encore sur `main` : fusionnez-la d'abord, ou attendez le paquet). Récit complet et détails : `docs/passation/2026-11-11-suivi-travail.md`.
+```js
+import { lancerTravail } from '../suiviTravail.js';   // src/suiviTravail.js
+const r = await lancerTravail({
+  titre: 'Baisser le prix sur Leboncoin',   // en tête de la feuille — jamais un pseudo
+  sorte: 'baisse-lbc',                     // libre (data-suivi-travail)
+  etapes: [['envoi', 'Envoi'], ['relu', 'Prix relu ✓']],   // étapes d'UN article (facultatif)
+  articles: [{ id, num, titre }],          // la file ; OU total: N ; OU rien = une seule action
+  uid,                                     // facultatif : jauge 50/h de ce compte Vinted
+  entreMs: 3000,                           // facultatif : pause de sécurité entre deux (compte à rebours)
+  seuilMs: 1000,                           // défaut : sous 1 s et tout réussi, RIEN ne s'affiche
+  executer: async (article, o) => {        // une seule action : executer(o)
+    o.etape('envoi', '45 € → 40 €'); o.noter('texte sans rien de personnel'); o.pause(ms, raison);
+    return { etat: 'ok' | 'main' | 'refus' | 'saute', raison, geste, lien, arreterTout };
+  },                                       // true/rien ⇒ ok · false ⇒ refus · exception ⇒ refus (message) · { annule:true } ⇒ rien gardé
+});
+// r = { statut: 'fini'|'arrete'|'pause'|'occupe', resultats: { [id]: issue }, valeur }
+```
+- La feuille se monte seule (`SuiviTravailCoque` dans `AppCoeur`) : VRM figé (`inert`), Échap / retour / fermeture d'onglet retenus, « Mettre en pause » et « Arrêter » (confirmé) lus ENTRE deux articles, journal horodaté copiable gardé dans « Ce que VRM a fait », récapitulatif, reprise « Interrompu » après rechargement.
+- `arreterTout: true` sur une issue (429, plafond, frein) ⇒ rien d'autre ne part, le reste « pas fait ». `statut: 'occupe'` ⇒ un autre travail tourne : n'envoyez rien.
+- Une question posée pendant le travail (`askConfirm`, une feuille de l'app) passe AU-DESSUS de la feuille, toute seule.
+- Boucle pilotée par l'état React (comme Republier) : API bas niveau `suivi.demarrer(...)` → `t.etape/fin/pause/continuer/terminer`, et `suivreJob(t, id, { jobId, lireJobs, depuis })` pour une commande de l'extension (« fait » seulement daté APRÈS le départ).
+- **Déjà branché** : Republier, Republier sur Leboncoin, Publier Leboncoin / Préparer eBay / Publier eBay (API) / Vestiaire, Baisser le prix Vinted, Retirer des autres sites, Mode vacances, Tout imprimer / bordereaux, toute action de la barre « N sélectionnés » (`BarreSerie`). **À brancher par vos lots** : favoris (envoi, mode auto lancé), baisses Leboncoin / Vestiaire (`lbc-plus`, `vestiaire-plus`), import d'historique à la main, exports comptables / registres, restauration, Publier partout, eBay complet.
