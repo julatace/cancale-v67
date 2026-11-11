@@ -96,3 +96,11 @@ seconde a vérifié, corrigé, refait deux bancs et intégré `main`.
 
 Aucun obligatoire. Deux choix possibles : la valeur du stock « en ligne » plutôt que « chez toi » ;
 retirer aussi « Faire l'inventaire » du Stock.
+
+## Note d'intégration (fin de journée)
+
+Une session parallèle a poussé sur la même branche pendant la reprise (1a59292e → f1523f93 :
+« Annulation… »/« Annulé » jamais en pause, banc `scripts/bancs/stock-juste.cjs`, carte de Ma
+journée sans résumé redit, un seul chevron par repli). Fusion réelle (109db29d), rien perdu ;
+après fusion : build vert, audits verts (`audit-stock-juste --prouve` : 7 mutations rougissent),
+bancs `a-trancher` et `stock-juste` verts.
