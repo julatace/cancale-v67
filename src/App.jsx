@@ -77,8 +77,8 @@ import { souvenir, retenir } from './memoireEcrans.js';
 // ⟦→ ecrans/Reglages.jsx #3⟧
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 // (11 nov., lot suivi-commandes) Le suivi des commandes en cours : dernier statut, incohérences datées.
-import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier} from '../api/_lib/suivi-commandes.js';
-import SuiviCommande from './SuiviCommande.jsx';
+import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier,statutCourt} from '../api/_lib/suivi-commandes.js';
+import { LigneSuivi } from './SuiviCommande.jsx';
 // ⟦→ ecrans/Reglages.jsx #4⟧
 import './notif-reglages.css';
 // ⟦→ ecrans/Reglages.jsx #5⟧
@@ -39816,6 +39816,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const inc = incoherencesAchat({ transp: t, vinted: vt, maintenant: Date.now() });
     return { su: k, inc, lien: lienPublic(lienSuivi, (t && t.carrier) || carrier || '', k, codePostalLu(emailDuSuivi(k) || {})) };
   };
+  // (11 nov., soir) LA LIGNE COMPACTE D'UNE VENTE (Envoyés, À envoyer) : la même que celle d'un achat.
+  const ligneSuiviVente = (x, sv, seulesInc = null) => {
+    const sc = statutCourt(sv.statut);
+    const cleT = (x.tr && x.tr.cle) || (sv.dep && sv.dep.carrier) || null;
+    const nom = (x.tr && x.tr.nom) || (cleT ? nomTransporteur(cleT) : '');
+    const detail = sv.statut ? <>{sc.detail}{sv.dep && sv.dep.derLib ? <> · « {String(sv.dep.derLib)} »</> : null}</> : (sv.raison || null);
+    return <LigneSuivi C={C} cle={x.cle} suivi={sv.su} logo={cleT ? <LogoTransporteur cle={cleT} taille={18}/> : <LogoInconnu taille={18}/>} nom={nom} lien={sv.lien}
+      court={sc ? sc.court : 'Pas lu chez le transporteur'} quand={sc ? sc.quand : ''} source={sv.statut ? sv.statut.source : ''} etat={(sv.statut && sv.statut.etat) || ''}
+      incoherences={seulesInc || sv.inc} detail={detail} toast={toast}/>;
+  };
+  // (11 nov., soir) LA LIGNE COMPACTE D'UN ACHAT (src/SuiviCommande.jsx `LigneSuivi`) : logo 18 px · transporteur ·
+  // n° copiable ↗ · statut court · « il y a … », la phrase exacte du transporteur en dépliant. Lu ⇒ la règle
+  // `dernierStatut` (transporteur, e-mail du même n°) ; pas lu ⇒ l'état de `ligneTransporteur` en court
+  // (« VRM cherche le code postal du point relais »…), jamais un statut deviné.
+  const ligneSuiviAchat = (o, su, carrier, trA, enCours) => {
+    const k = normaliserSuivi(su); if (!k) return null;
+    const t = transpMap instanceof Map ? (transpMap.get(k) || null) : null;
+    const c = (t && t.carrier) || carrierLuDeLigne(carrier, k);
+    const em = emailDuSuivi(k);
+    const st = dernierStatut({ transporteur: t, email: em ? { status: em.status, receivedAt: em.receivedAt, lieu: em.lieu } : null, sens: 'entrant', maintenant: Date.now() });
+    const sc = statutCourt(st);
+    let court = sc ? sc.court : '', quand = sc ? sc.quand : '';
+    if (!sc) court = c ? String(ligneTransporteur(t, c, Date.now()).texte || '').replace(/^[^:«]+ : /, '') : (String(carrier || '').trim() ? '' : 'Transporteur pas encore connu');
+    const sa = enCours ? suiviAchat(o, k, carrier) : { inc: [], lien: lienPublic(lienSuivi, (t && t.carrier) || carrier || '', k, codePostalLu(em || {})) };
+    const cleT = (trA && trA.cle) || null;
+    return { su: k, court, quand, lien: sa.lien, inc: sa.inc, source: st ? st.source : '', etat: (st && st.etat) || '', nom: (trA && trA.nom) || (c ? nomTransporteur(c) : ''),
+      logo: cleT ? <LogoTransporteur cle={cleT} taille={18}/> : <LogoInconnu taille={18}/> };
+  };
   // Les commandes EN COURS qui ont une incohérence prouvée (Ma journée : « N à vérifier »). Les MÊMES
   // règles que les cartes (`suiviVente`, `suiviAchat`) : Ventes · Envoyés, et les achats en route
   // (pas encore au relais, pas annulés, pas en retour — ceux-là ont leur place).
@@ -44013,14 +44041,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(()=>{ const cf = cleFacture('tx', o.transaction_id); const fa = facturesAchat.factures && facturesAchat.factures[cf];
                     return fa ? <PastilleFacture cle={cf} f={fa} onOuvrir={facturesAchat.ouvrir} enCours={facturesAchat.enCours===cf} Icon={Icon}/> : null; })()}
                 </div>
-                {/* (24 oct.) En route : ce que dit le transporteur, par le n° de CET achat. */}
-                {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o);
-                  // (2 nov.) Le transporteur LU (logo + nom), puis ce qu'il dit.
+                {/* (24 oct.) Ce que dit le transporteur, par le n° de CET achat.
+                    (11 nov., soir — capture de Julien en production : « le logo prend toute la page, c'est moche […]
+                    mettre le numéro de suivi à côté de chaque achat ») UNE ligne compacte, sur CHAQUE achat qui a un
+                    n° PROUVÉ (Payé, en route, livré…) : logo 18 px · transporteur · n° copiable ↗ · statut court ·
+                    « il y a … » ; la phrase exacte du transporteur (`LigneTransporteur`) en dépliant. Plus de puce grise
+                    pleine largeur. L'incohérence prouvée (ambre) seulement en route (au relais ⇒ « À retirer »). */}
+                {!cancelled && (()=>{ const su = suivi || suivisAchat(o, indexSuivisAchats)[0]; if (!su) return null; const e = entreeSuiviAchat(o);
+                  const car = (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '';
                   const trA = transporteurColis((tk && tk.carrier) || (e && e.transporteur) || '', su);
-                  // (11 nov., lot suivi-commandes) + le n° copiable, « Suivre ↗ » et l'incohérence prouvée (ambre, un geste).
-                  // Le statut reste dit par `LigneTransporteur` (source, heure) : pas deux fois. Au relais ⇒ « À retirer ».
-                  const sa = su ? suiviAchat(o, su, (tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || '') : null;
-                  return su ? <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)} style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}><PastilleTransporteur t={trA} C={C}/><LigneTransporteur transp={transpMap} suivi={su} carrier={(tk && tk.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/>{sa ? <SuiviCommande C={C} cle={'a:' + o.transaction_id} suivi={sa.su} lien={sa.lien} incoherences={sa.inc} sansStatut toast={toast}/> : null}</div> : null; })()}
+                  const enCours = !st.retour && st.step>=1 && st.step<4;
+                  const ls = ligneSuiviAchat(o, su, car, trA, enCours); if (!ls) return null;
+                  return <div className="vrm-buy-transp" data-achat-transporteur={cleStatTransporteur(trA)}>
+                    <LigneSuivi C={C} cle={'a:' + o.transaction_id} suivi={ls.su} logo={ls.logo} nom={ls.nom} lien={ls.lien} court={ls.court} quand={ls.quand}
+                      source={ls.source} etat={ls.etat} incoherences={ls.inc} toast={toast}
+                      detail={<LigneTransporteur transp={transpMap} suivi={su} carrier={car} style={{marginTop:0}}/>}/>
+                  </div>; })()}
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
                     qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
@@ -46859,7 +46895,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         PROUVÉ (imprimé daté, lu chez le transporteur après, pas pris en charge, limite LUE dans l'e-mail). */}
                     {(()=>{ if (posted) return null; const sv = b && b.suivi ? suiviVente({ site: 'vinted', o, b, lim: e.lim, tr: trV }) : null;
                       const inc = sv ? sv.inc.filter((z) => z.code === 'imprime-pas-depose') : [];
-                      return inc.length ? <SuiviCommande C={C} cle={String(e.txn||e.key)} suivi={sv.su} lien={sv.lien} statut={sv.statut} incoherences={inc} raison={sv.raison} toast={toast}/> : null; })()}
+                      return inc.length ? ligneSuiviVente({ cle: String(e.txn||e.key), tr: trV }, sv, inc) : null; })()}
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
                           logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du
@@ -47110,7 +47146,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             heure) et l'incohérence prouvée (ambre, un geste) — sur chaque colis encore en cours. Un
                             colis livré ou finalisé n'en garde que l'incohérence (« livré, Vinted pas finalisé »). */}
                         {(() => { const sv = suiviVente(x);
-                          const bloc = sv && (sv.enCours || sv.inc.length) ? <SuiviCommande C={C} cle={x.cle} suivi={sv.su} lien={sv.lien} statut={sv.statut} incoherences={sv.inc} raison={sv.raison} toast={toast}/> : null;
+                          // (11 nov., soir) La MÊME ligne compacte qu'Achats (`LigneSuivi`) : logo 18 px · n° copiable ↗ ·
+                          // statut court · « il y a … » ; la phrase et sa source en dépliant.
+                          const bloc = sv && (sv.enCours || sv.inc.length) ? ligneSuiviVente(x, sv) : null;
                           const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || '';
                           const suivre = su && !bloc ? <BoutonSuivreColis transporteur={(x.tr && x.tr.cle) || ''} suivi={su} enLigne court attrs={{'data-colis-envoye-suivre': x.cle}}/> : null;
                           return <>{bloc}{(annuler || suivre) ? <div className="vrm-colis-actions" style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',marginTop:10}}>{suivre}{annuler}</div> : null}</>; })()}

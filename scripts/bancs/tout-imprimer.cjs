@@ -121,7 +121,9 @@ async function scenario(b, nom, vue, LIGNES) {
   await srvPret;
   await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
-  await pg.waitForFunction(() => document.querySelectorAll('[data-groupe-transp]').length >= 3, null, { timeout: 15000 }).catch(() => {});
+  // (11 nov., lot suivi-commandes) L'écran n'a plus de groupes par transporteur (9 nov., lot AJ : le plus récent en
+  // haut, le transporteur en pastille) : on attend les cartes.
+  await pg.waitForFunction(() => document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis]').length >= 6, null, { timeout: 15000 }).catch(() => {});
   // Les N° arrivent avec les transactions (identité tx → annonce → fiche) : on attend qu'ils soient écrits.
   // (Et le N° de la vente Vestiaire, donné à son passage : un N° qui change entre l'aperçu et l'impression
   // ARRÊTE le lot — « Un article, son numéro ou son état a changé », le garde-fou `verifierContexte`.)
@@ -135,20 +137,18 @@ async function scenario(b, nom, vue, LIGNES) {
   const vis = btn ? await btn.isVisible() : false;
   dit(vis, `${nom} : A « Tout imprimer » est VISIBLE dans À envoyer`);
   if (!vis) { await ctx.close(); return; }
-  // L'ordre des groupes de l'écran, et les colis de chaque groupe.
-  const ecran = await pg.evaluate(() => {
-    const out = []; let g = null;
-    for (const el of document.querySelectorAll('[data-groupe-transp], [data-bord-card][data-tx-colis], [data-vc-colis]')) {
-      if (el.hasAttribute('data-groupe-transp')) { g = el.getAttribute('data-groupe-transp'); if (!out.includes(g)) out.push(g); }
-    }
-    return out;
-  });
+  // (11 nov., lot suivi-commandes) L'ORDRE DE L'ÉCRAN (décision du 9 nov., lot AJ : la vente la plus récente en haut,
+  // tous transporteurs mélangés ; « Tout imprimer » garde ses groupes par transporteur, CHACUN dans cet ordre).
+  const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis]')]
+    .map((el) => (el.hasAttribute('data-vc-colis') ? 'vc:' + el.getAttribute('data-vc-colis') : el.getAttribute('data-tx-colis')))
+    .filter((k, i, a) => k && a.indexOf(k) === i));
   await btn.click();
   await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});
   const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), site: e.getAttribute('data-lot-site'), num: e.getAttribute('data-lot-num'), tr: e.getAttribute('data-lot-transp'), coche: e.getAttribute('data-coche') === '1' })));
   const grAp = ap.map((x) => x.tr).filter((x, i, a) => a.indexOf(x) === i);
   dit(ap.length === 6 && ap.some((x) => x.site === 'vestiaire'), `${nom} : B l'aperçu porte les 6 bordereaux, Vestiaire compris`, JSON.stringify(ap.map((x) => x.cle + ':' + x.site)));
-  dit(JSON.stringify(grAp) === JSON.stringify(ecran.filter((g) => grAp.includes(g))) && grAp.length === 3, `${nom} : B groupes de l'aperçu = ordre des groupes de l'écran`, JSON.stringify({ apercu: grAp, ecran }));
+  const dansOrdre = grAp.every((g) => { const l = ap.filter((x) => x.tr === g).map((x) => ecran.indexOf(x.cle)); return l.every((v) => v >= 0) && l.every((v, i) => i === 0 || v > l[i - 1]); });
+  dit(grAp.length === 3 && dansOrdre, `${nom} : B l'aperçu : trois groupes par transporteur, chacun dans l'ordre de l'écran (le plus récent d'abord)`, JSON.stringify({ apercu: ap.map((x) => x.tr + ':' + x.cle), ecran }));
   const contigu = ap.every((x, i) => i === 0 || x.tr === ap[i - 1].tr || !ap.slice(0, i - 1).some((y) => y.tr === x.tr));
   dit(contigu, `${nom} : B chaque transporteur d'un seul tenant`, JSON.stringify(ap.map((x) => x.tr)));
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-apercu.png`) });

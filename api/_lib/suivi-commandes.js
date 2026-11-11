@@ -80,6 +80,22 @@ export function villeCourte(lieu) {
   return s.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 }
 
+// (11 nov., soir) Le lieu ÉCRIT dans la phrase du transporteur (« … sur notre site logistique de HUB
+// LIEUSAINT. » ⇒ « Lieusaint ») quand la lecture ne porte pas de lieu (Mondial Relay `_mvc`). Recopié,
+// jamais deviné : rien de reconnaissable ⇒ ''.
+export function lieuDuLibelle(libelle) {
+  const m = /\b(?:site|agence|plateforme|centre|d[ée]p[ôo]t)\b[^.]{0,40}?\b(?:de|d['’]|à)\s*(?:HUB\s+|PLATEFORME\s+)?([A-ZÀ-Ý][A-ZÀ-Ý'’-]{2,}(?:[ -][A-ZÀ-Ý][A-ZÀ-Ý'’-]+){0,2})\b/.exec(String(libelle || ''));
+  return m ? villeCourte(m[1]) : '';
+}
+// ── LA LIGNE COURTE (la ligne de suivi d'une carte) ─────────────────────────
+// « Pris en charge · Lieusaint » et « il y a 47 min » (l'heure de l'ÉVÈNEMENT, sinon de la lecture).
+export function statutCourt(statut, maintenant = Date.now()) {
+  if (!statut) return null;
+  const court = [statut.mot, statut.lieu].filter(Boolean).join(' · ');
+  const ref = Number.isFinite(statut.at) ? statut.at : statut.luAt;
+  return { court, quand: Number.isFinite(ref) ? ageCourt(maintenant - ref) : '', detail: `${statut.texte} — ${statut.sourceTexte}` };
+}
+
 // ── LE MOT DE L'ÉTAT (les mots de l'app, src/libelles.js) ────────────────────
 // `sens` : 'sortant' (colis VENDU : le relais est celui de l'acheteur) ou
 // 'entrant' (ACHAT).
@@ -89,6 +105,9 @@ function motTransporteur(t, sens) {
     if (t.detail === 'prepare') return 'Étiquette créée';
     const prise = msDe(t.priseAt), der = msDe(t.derAt);
     if (prise != null && der != null && Math.abs(der - prise) < 60000) return 'Pris en charge';
+    // (11 nov., soir) La phrase du transporteur le DIT (« Prise en charge de votre colis sur notre site… ») :
+    // on la recopie en court, jamais devinée.
+    if (/\bpris[e]? en charge\b/i.test(String(t.derLib || t.libelle || '')) && t.detail !== 'retarde') return 'Pris en charge';
     return t.detail === 'retarde' ? 'En transit, retardé' : 'En transit';
   }
   if (e === 'disponible') return sens === 'sortant' ? 'Livré au relais de l’acheteur' : 'Livré au relais';
@@ -110,7 +129,7 @@ export function dernierStatut({ transporteur = null, email = null, vinted = null
   if (t && t.etat && msDe(t.lu) != null) {
     const mot = motTransporteur(t, sens);
     const at = msDe(t.derAt) ?? msDe(t.etatAt);
-    const lieu = t.etat === 'disponible' && (t.lieuNom || t.lieuVille) ? propre(t.lieuNom || t.lieuVille, 40) : villeCourte(t.derLieu || t.lieuVille || '');
+    const lieu = t.etat === 'disponible' && (t.lieuNom || t.lieuVille) ? propre(t.lieuNom || t.lieuVille, 40) : (villeCourte(t.derLieu || t.lieuVille || '') || lieuDuLibelle(t.derLib || t.libelle));
     if (mot) cands.push({ rang: 2, etat: t.etat, mot, lieu, at, source: 'transporteur', sourceTexte: `lu chez ${nomDe(t.carrier)} ${ageCourt(maintenant - msDe(t.lu))}`, luAt: msDe(t.lu) });
   }
   const e = email && typeof email === 'object' ? email : null;

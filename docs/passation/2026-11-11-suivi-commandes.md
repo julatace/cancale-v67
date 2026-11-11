@@ -8,6 +8,25 @@ statut pour voir la cohérence ; est-ce que tu regardes les infos de suivi ? ».
 
 Extension : **rien changé** (aucune version). Fonctions `api/` : aucune ajoutée (12/12).
 
+
+## ⚠️ EN TÊTE — La ligne de suivi compacte (capture de Julien en production, Achats, ordinateur)
+Julien : « c'est nul, le logo prend toute la page, c'est moche, je veux que tout soit mieux ; si tu peux mettre le
+numéro de suivi à côté de chaque achat ce serait top ». Avant : une puce grise PLEINE LARGEUR, le logo Mondial
+Relay centré, puis la phrase du transporteur sur trois lignes.
+- **Maintenant** (`LigneSuivi`, src/SuiviCommande.jsx + src/design/suivi-ligne.css) : UNE ligne de 24 px au plus,
+  13 px gris — `[logo 18 px] Mondial Relay · N° 30000201 ↗ · Pris en charge · Lieusaint · il y a 47 min ›`.
+  Le n° se copie d'un tap (cible de 44 px au doigt par un bord invisible, le dessin reste fin), « ↗ » ouvre la page
+  publique du transporteur, « › » déplie la phrase EXACTE du transporteur (et sa source). Au téléphone (colonne
+  ≈ 230 px) : deux lignes fines (le n°, puis le statut entier ; l'heure dans le détail) — jamais « P… ».
+- **Sur CHAQUE achat qui a un n° prouvé** (Payé, en route, livré, finalisé) ; aucun n° ⇒ aucune ligne. Plus de puce
+  grise ni de logo agrandi dans Achats. Même ligne dans Ventes · Envoyés (et l'incohérence d'À envoyer).
+- « Pris en charge · Lieusaint » vient de la phrase du transporteur (`lieuDuLibelle`, `statutCourt`,
+  api/_lib/suivi-commandes.js), recopiée en court — jamais devinée ; rien de lisible ⇒ rien.
+- Preuves : banc `suivi-commandes` 112 verts (390/1512, clair/sombre : ligne ≤ 24 px — deux fines ≤ 48 px au
+  téléphone —, logo ≤ 20 px, 13 px, statut ENTIER, rien ne déborde, n° présent sur l'achat livré, aucune ligne sans
+  n°, plus de puce, détail = phrase exacte, cible au doigt) ; sur la tête d'avant (5fdd506) : 28 rouges.
+  `audit-suivi-commandes` 59 verts. Captures regardées.
+
 ## Réponse à sa question : oui, et maintenant aussi pour ses ventes
 
 Avant : les ACHATS étaient lus chez le transporteur jusqu'au bout (`transp_`) ; les VENTES ne l'étaient que
@@ -101,3 +120,28 @@ deux ventes au même titre, seule celle dont le n° est lu porte le statut trans
   avant FULFILLED) — rien à lire, rien inventé.
 - Un colis vendu Mondial Relay : jamais lu chez le transporteur (code postal de l'acheteur). Une voie sûre
   future : un code postal LU pour CE colis (ex. la transaction Vinted, s'il y figure un jour — non mesuré).
+
+## Ajouts (fin de journée, demandés par la session principale)
+- **« Relier » dépassait de sa carte à 1512 px** (12 px sous la carte, vu par DJ3) : la règle 13.4 de
+  `src/styles-premium.css` (le geste prend la colonne de l'état) ne visait plus que l'ancien écran Colis
+  (`data-ecran="cat_bord"`) ; elle vise aussi `.vrm-colis-section` (Ventes, DJ3). Banc neuf
+  `scripts/bancs/colis-relier-carte.cjs` (chaque bouton DANS sa carte, 390/1512, clair/sombre) : 2 rouges avant
+  (« Relier (12 px) » à 1512 clair et sombre), 20 verts après ; captures regardées.
+- **Banc `tout-imprimer`** : le contrôle B jugeait les groupes par transporteur de l'ÉCRAN, retirés par décision
+  (9 nov., lot AJ : le plus récent en haut, transporteur en pastille). Porté sur la règle actuelle : l'aperçu a trois
+  groupes par transporteur, chacun dans l'ordre de l'écran. 26 conformes.
+- **`achats-retraits`** (« Peut-être en double · 9 » rend 3, « à vérifier » 0/3) : logique des retraits (lots
+  `retraits-fiables` / DJ3), pas celle du suivi des commandes — non touché, signalé.
+- **Mondial Relay sans extension** (demande relayée) : le SERVEUR lit déjà Mondial Relay pour les ACHATS (route
+  `_mvc`, mesurée le 24 oct., `LECTURE_SERVEUR_TRANSP.mondialrelay = true`) ; l'extension n'est qu'un secours sur
+  refus. Pour un colis VENDU, la route exige le code postal du point de l'acheteur. Piste sûre repérée, PAS
+  branchée : le code postal imprimé sur SON étiquette Mondial Relay (PDF relié par le n° de transaction, déjà lu
+  au cron pour le transporteur), vérifié par l'ÉCHO de la route. Mesure en base demandée (lecture seule, comptes
+  seulement) puis interrompue avant d'être approuvée : rien mesuré, rien branché.
+
+| transporteur | serveur | Vinted | e-mail | extension |
+|---|---|---|---|---|
+| Chronopost / Shop2Shop | oui, achats ET ventes (`cp-ws2`, n° seul) | état de la transaction | oui (même n°) | secours sur refus |
+| Vinted Go | oui, achats ET ventes (`vg-v3`, n° seul) | état de la transaction | oui | secours sur refus |
+| Mondial Relay / InPost | achats : oui (`_mvc`, CP du point lu) ; ventes : non (CP de l'acheteur inconnu) | état de la transaction | oui | secours (même route, même CP exigé) |
+| Colissimo, La Poste, UPS, DPD, GLS, Relais Colis | non (aucune route publique mesurée, aucune clé) | état de la transaction | oui | non |
