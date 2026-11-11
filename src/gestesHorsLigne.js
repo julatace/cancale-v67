@@ -252,11 +252,29 @@ export function noterGestes(stockage, uid, k, avant, apres, { maintenant = Date.
   });
 }
 
+// Une LIGNE à part (la photo d'un achat, `achat_hors_photo_{id}`) : pas dans `main`,
+// envoyée telle quelle au retour par `envoyerLigne(g)` (l'écriture d'avant, qui
+// remplace la ligne : la rejouer deux fois écrit la même chose).
+export function noterLigne(stockage, uid, { ligne, id, valeur, quoi = 'photo' }, { maintenant = Date.now() } = {}) {
+  if (!uid || !ligne || id == null) return Promise.resolve(null);
+  return sousVerrou(uid, async () => {
+    const reg = await stockage.lire(uid).catch(() => null);
+    if (!reg) return null;
+    const gestes = (Array.isArray(reg.gestes) ? reg.gestes : []).filter((g) => !(g.etat === 'attente' && g.ligne === ligne && g.chemin[0] === String(id)));
+    const seq = (Number.isSafeInteger(reg.seq) ? reg.seq : 0) + 1;
+    const g = { id: nouvelId(uid, seq, maintenant), uid, ligne, k: ligne, chemin: [String(id)], apres: valeur, sorte: 'ligne', quoi, at: maintenant, seq, etat: 'attente' };
+    gestes.push(g);
+    const ok = await stockage.ecrire(uid, { uid, seq, gestes }).catch(() => false);
+    return ok ? g : null;
+  });
+}
+
 export async function lireGestes(stockage, uid) {
   if (!uid) return null;
   const r = await stockage.lire(uid).catch(() => null);
   return r && Array.isArray(r.gestes) ? r.gestes.filter((g) => g && g.uid === uid) : null;
 }
+export const attenteSur = (gestes, k) => (gestes || []).some((g) => g && g.etat === 'attente' && g.k === k && !g.ligne);
 export const compter = (gestes) => {
   const n = { attente: 0, atrancher: 0, envoye: 0 };
   for (const g of gestes || []) if (g && n[g.etat] !== undefined) n[g.etat]++;
@@ -296,7 +314,7 @@ export function decider(g, data, { cleNum = (x) => String(x) } = {}) {
 // sur l'appareil après un conflit. Rend { envoyes, conflits, deja, arret }.
 //   arret : null (tout jugé) · 'pas-su' · 'sans-ligne' · 'occupe' · un statut HTTP.
 const _enCours = new Set();
-export async function rejouer({ stockage, uid, lire, ecrire, poserLocal = null, cleNum, maintenant = Date.now, essaisMax = 5, surGeste = null }) {
+export async function rejouer({ stockage, uid, lire, ecrire, poserLocal = null, cleNum, maintenant = Date.now, essaisMax = 5, surGeste = null, envoyerLigne = null }) {
   const bilan = { envoyes: 0, conflits: 0, deja: 0, arret: null };
   if (!uid) { bilan.arret = 'pas-su'; return bilan; }
   if (_enCours.has(uid)) { bilan.arret = 'occupe'; return bilan; }
@@ -315,6 +333,16 @@ export async function rejouer({ stockage, uid, lire, ecrire, poserLocal = null, 
       if (!actuels) { bilan.arret = 'pas-su'; return bilan; }
       const g = actuels.find((x) => x.id === g0.id);
       if (!g || g.etat !== 'attente') continue;
+      if (g.ligne) {
+        const r = typeof envoyerLigne === 'function' ? await Promise.resolve().then(() => envoyerLigne(g)).catch(() => ({ status: 0 })) : { status: 0 };
+        if (r === true || (r && r.ok)) {
+          await marquer(stockage, uid, g.id, { etat: 'envoye', envoyeAt: maintenant(), apres: null });
+          bilan.envoyes++;
+          if (typeof surGeste === 'function') { try { surGeste(g, 'envoye'); } catch (_) {} }
+          continue;
+        }
+        bilan.arret = (r && r.status) || 0; return bilan;
+      }
       let fini = false;
       for (let essai = 0; essai < essaisMax && !fini; essai++) {
         const dec = decider(g, snap.data, { cleNum });

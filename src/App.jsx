@@ -109,7 +109,7 @@ import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTrans
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
 import { REQUETE_LITIGES, requetePseudos, litigesDeLignes, pseudosDeLignes } from './vintedDejaRelie.js';
-import { installerGardeHorsLigne, horsLigneActif, etatHorsLigne, noterAbonnement, effacerLaissezPasser } from './porteHorsLigne.js';
+import { installerGardeHorsLigne, horsLigneActif, etatHorsLigne, noterAbonnement, effacerLaissezPasser, suivreHorsLigne } from './porteHorsLigne.js';
 // ⟦→ ecrans/Reglages.jsx #7⟧
 // (6 nov., vitesse 2) SuiviReceptionEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
 import './reception-emails.css';
@@ -634,6 +634,7 @@ import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, 
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
+import { noterGestes, noterLigne, lireGestes, rejouer as rejouerRegistre, trancher as trancherRegistre, compter as compterGestes, attenteSur as attenteSurGestes, stockageIdbGestes, stockageMemoireGestes, REGLES_GESTES, poserA as poserGeste, valeurA as valeurGeste, CLE_FAITS as CLE_GESTES_FAITS } from "./gestesHorsLigne.js";   // (11 nov.) hors ligne : la file des gestes
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
@@ -2453,7 +2454,7 @@ const prechargerDemarrage = () => {
           if (!memo && !Array.isArray(versMotif)) return lireTout(`id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
           const ids = memo ? idsCommandes(memo) : versMotif.map((r) => String(r && r.id)).filter((x) => x && x !== 'undefined');
           if (!ids.length) return [];
-          const r = await lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids, stockage: stockageApp(), local: localStorage,
+          const r = await lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids, stockage: stockageApp(), local: localStorage, horsLigne: horsLigneMaintenant,
             lireVersions: memo ? (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null) : async () => versMotif,
             lireLignes: lireCommandes });
           if (r.incoherent) return lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
@@ -2698,6 +2699,9 @@ const SYNC_KEYS = [
   // Retirer d'eBay, sans demander, une paire PROUVÉE vendue sur Vinted
   // (proposition 8). Éteint par défaut ; la route le relit elle-même.
   'vrm_ebay_retrait_auto',
+  // (11 nov.) Les identifiants des gestes faits hors ligne déjà appliqués (src/gestesHorsLigne.js) :
+  // écrits par le rejeu seul (400 au plus), lus pour ne jamais appliquer deux fois le même geste.
+  'vrm_gestes_faits',
   // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
   // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
   'vrm_cycle_decisions','vrm_vus_en_ligne','vrm_fiches_neuves','vrm_prix_journal','vrm_modeles_desc',
@@ -3536,6 +3540,142 @@ const lireNuageComplet = async (owner) => {
     return { existe: true, data: d, rev: revDe(d), maj: rows[0].updated_at || null };
   } catch (_) { return undefined; }
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// (11 nov.) LES GESTES FAITS HORS LIGNE (src/gestesHorsLigne.js) — rangés dans
+// IndexedDB au nom du compte VRM, rejoués UN PAR UN au retour du réseau
+// (comparer-et-échanger sur `data.rev`), un conflit revient « à trancher » avec
+// les deux versions. Tant qu'un geste attend, `cloudPush` N'ENVOIE PAS : sinon la
+// fusion à trois voies réécrirait la valeur qu'un autre appareil a changée pendant
+// la coupure (« le geste de l'appareil gagne »), et le rejeu ne pourrait plus le dire.
+// ══════════════════════════════════════════════════════════════════════════════
+const horsLigneMaintenant = () => { try { return horsLigneActif() || (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (_) { return false; } };
+let _stockGestes = null;
+const stockGestes = () => {
+  if (_stockGestes) return _stockGestes;
+  try { _stockGestes = (typeof indexedDB !== 'undefined' && indexedDB) ? stockageIdbGestes() : stockageMemoireGestes(); } catch (_) { _stockGestes = stockageMemoireGestes(); }
+  return _stockGestes;
+};
+// L'état pour la coque : `charge` = le registre de CE compte a été lu une fois.
+const _gestesHL = { owner: null, charge: false, attente: 0, atrancher: 0, enCours: false, envoyesAt: 0, envoyesN: 0, arret: null, liste: [] };
+let _pushApresGestes = false, _rejeuT = null, _rejeuEssai = 0;
+const signalerGestesHL = () => { try { window.dispatchEvent(new Event('vrm:gestes-hl')); } catch (_) {} };
+const rafraichirGestesHL = async () => {
+  const owner = AUTH.user?.id; if (!owner) return null;
+  const l = await lireGestes(stockGestes(), owner);
+  if (AUTH.user?.id !== owner) return null;
+  if (l) { const n = compterGestes(l); Object.assign(_gestesHL, { owner, charge: true, attente: n.attente, atrancher: n.atrancher, liste: l }); }
+  else Object.assign(_gestesHL, { owner, charge: true });
+  signalerGestesHL();
+  return l;
+};
+// Un registre pas encore lu bloque l'envoi 3 s au plus (jamais pour toujours).
+let _gestesChargeDemande = 0;
+const gestesBloquentEnvoi = () => {
+  const owner = AUTH.user?.id; if (!owner) return false;
+  if (_gestesHL.owner !== owner || !_gestesHL.charge) {
+    if (!_gestesChargeDemande) { _gestesChargeDemande = Date.now(); rafraichirGestesHL().finally(() => { if (_pushApresGestes && !gestesBloquentEnvoi()) { _pushApresGestes = false; cloudPush(); } else if (_gestesHL.attente) rejouerGestesBientot(0); }); }
+    if (Date.now() - _gestesChargeDemande < 3000) return true;
+    return false;
+  }
+  if (_gestesHL.arret === 'sans-ligne') return false;
+  return _gestesHL.enCours || _gestesHL.attente > 0;
+};
+// La raison d'un refus hors ligne : dite, jamais en silence. Rend true si refusé.
+let _refusHLAt = 0;
+const refusHorsLigne = (sorte) => {
+  if (!horsLigneMaintenant()) return false;
+  if (Date.now() - _refusHLAt > 1500) { _refusHLAt = Date.now(); try { toast(tr('horsligne.interdit.' + sorte)); } catch (_) {} }
+  return true;
+};
+// Noter un `save` fait hors ligne (ou qui prolonge un geste encore en attente).
+let _noteHLAt = 0;
+const noterGesteHL = (owner, k, avant, apres) => {
+  const pool = load(CLE_POOL, []) || [];
+  const extra = (g) => (g.k === 'vinted_annonce_numeros' && g.chemin[1] === 'numero' && g.apres != null ? { dejaDansPool: (Array.isArray(pool) ? pool : []).some((x) => cleNum(x) === cleNum(g.apres)) } : null);
+  noterGestes(stockGestes(), owner, k, avant, apres, { extra }).then((r) => {
+    if (!r || !r.notes) return;
+    rafraichirGestesHL();
+    if (horsLigneMaintenant() && Date.now() - _noteHLAt > 4000) { _noteHLAt = Date.now(); try { toast(tr('horsligne.note')); } catch (_) {} }
+  });
+};
+const gesteHLEnAttenteSur = (k) => _gestesHL.owner === AUTH.user?.id && attenteSurGestes(_gestesHL.liste, k);
+// La photo d'un achat saisi hors ligne : gardée dans le registre, envoyée au retour.
+const garderPhotoHorsLigne = (id, b64) => {
+  const owner = AUTH.user?.id; if (!owner || !b64) return Promise.resolve(false);
+  return noterLigne(stockGestes(), owner, { ligne: 'achat_hors_photo', id, valeur: b64, quoi: 'photo' }).then((g) => { rafraichirGestesHL(); return !!g; });
+};
+// L'écriture d'un geste : la ligne `main` entière, sur `data.rev` (la forme de `cloudPush`).
+const ecrireMainCas = async (owner, data, rev0) => {
+  try {
+    const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
+      method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
+    });
+    if (!r.ok) return { status: r.status };
+    let out = null; try { out = await r.json(); } catch (_) { out = null; }
+    if (!Array.isArray(out)) return { status: 0 };
+    return out.length >= 1 ? { ok: true } : { devance: true };
+  } catch (_) { return { status: 0 }; }
+};
+const envoyerLigneHL = async (g) => {
+  if (g.ligne !== 'achat_hors_photo' || !g.apres) return { ok: true };
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id: 'achat_hors_photo_' + String(g.chemin[0]).replace(/[^\w-]/g, ''), data: { b64: g.apres, at: new Date().toISOString() } })]),
+    });
+    return r.ok ? { ok: true } : { status: r.status };
+  } catch (_) { return { status: 0 }; }
+};
+// Remettre sur l'appareil une sous-valeur (la version de la base après un conflit,
+// la sienne quand il tranche « la mienne ») — sans noter de geste.
+const poserLocalHL = (k, chemin, v) => {
+  try { const cur = load(k, undefined); const nv = poserGeste(cur, chemin, v); localStorage.setItem(k, JSON.stringify(nv)); emettreClesRelues([k]); } catch (_) {}
+};
+const rejouerGestesBientot = (ms = 1200) => { if (_rejeuT) clearTimeout(_rejeuT); _rejeuT = setTimeout(() => { _rejeuT = null; rejouerGestes(); }, ms); };
+const rejouerGestes = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token || !CLOISONNE || horsLigneMaintenant()) return;
+  if (!isCloudReady()) { onCloudReady(() => rejouerGestesBientot(300)); return; }
+  if (_pushEnVol) { rejouerGestesBientot(800); return; }
+  const avant = await rafraichirGestesHL();
+  if (!avant || !compterGestes(avant).attente) { _gestesHL.arret = null; if (_pushApresGestes || fileNonVideHL()) { _pushApresGestes = false; cloudPush(); } return; }
+  _gestesHL.enCours = true; _gestesHL.arret = null; signalerGestesHL();
+  let b;
+  try {
+    b = await rejouerRegistre({ stockage: stockGestes(), uid: owner, cleNum, lire: () => lireNuageComplet(owner), ecrire: (data, rev) => ecrireMainCas(owner, data, rev), poserLocal: poserLocalHL, envoyerLigne: envoyerLigneHL,
+      surGeste: (g) => { if (g.ligne === 'achat_hors_photo') { const l = load('vinted_offvinted_buys', []) || []; if (Array.isArray(l) && l.some((x) => x && String(x.id) === String(g.chemin[0]) && !x.photo)) save('vinted_offvinted_buys', l.map((x) => (x && String(x.id) === String(g.chemin[0]) ? { ...x, photo: true } : x))); } } });
+  } finally { _gestesHL.enCours = false; }
+  if (AUTH.user?.id !== owner) return;
+  _gestesHL.arret = b ? b.arret : 'pas-su';
+  await rafraichirGestesHL();
+  if (b && b.envoyes) { _gestesHL.envoyesAt = Date.now(); _gestesHL.envoyesN = b.envoyes; signalerGestesHL(); }
+  if (!b || b.arret != null) {
+    if (b && b.arret === 'sans-ligne') { cloudPush(); return; }
+    _rejeuEssai = Math.min(_rejeuEssai + 1, 6);
+    if (b && (b.arret === 429 || b.arret >= 500) && _rejeuEssai === 1) { try { toast(tr('horsligne.reessai')); } catch (_) {} }
+    rejouerGestesBientot(Math.min(60000, 2000 * 2 ** (_rejeuEssai - 1)));
+    return;
+  }
+  _rejeuEssai = 0;
+  // Tout est jugé : la file d'envoi d'avant repart (ce qui n'est pas un geste : réglages, chiffres publiés).
+  _pushApresGestes = false; cloudPush();
+};
+const fileNonVideHL = () => { const f = lireFile(localStorage, AUTH.user?.id); return !!(f && f.cles && Object.keys(f.cles).length); };
+const trancherGesteHL = async (id, choix) => {
+  const owner = AUTH.user?.id; if (!owner) return;
+  const g = await trancherRegistre(stockGestes(), owner, id, choix);
+  if (g && choix === 'mien') poserLocalHL(g.k, g.chemin, g.apres);
+  await rafraichirGestesHL();
+  if (g && choix === 'mien') rejouerGestesBientot(0);
+};
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => rejouerGestesBientot(1500));
+  window.addEventListener('offline', () => signalerGestesHL());
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && _gestesHL.attente) rejouerGestesBientot(500); });
+}
+onCloudReady(() => { rafraichirGestesHL().then((l) => { if (l && compterGestes(l).attente) rejouerGestesBientot(200); }); });
 // ── LES ÉCRANS SAVENT QU'UNE CLÉ A CHANGÉ AILLEURS (`useStateCle`) ──────────
 // Un écran lit ses clés au montage ; une valeur arrivée d'un AUTRE appareil (la
 // fusion) ou d'un AUTRE onglet (évènement `storage`) le réveille, sinon son
@@ -3655,6 +3795,8 @@ const cloudPush = () => {
   if (!owner || !AUTH.session?.access_token || !CLOISONNE) return;
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
   if (_pushBloque) { _emitSync('refus'); return; }
+  // (11 nov.) Des gestes faits hors ligne attendent leur rejeu (un par un, contre la base) : rien ne part avant.
+  if (gestesBloquentEnvoi()) { _pushApresGestes = true; if (!horsLigneMaintenant()) rejouerGestesBientot(300); return; }
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
   _cloudTimer = setTimeout(async () => {
@@ -3662,6 +3804,7 @@ const cloudPush = () => {
     if (AUTH.user?.id !== owner || readSession()?.user?.id !== owner) return;
     // Un envoi à la fois : celui qui arrive pendant un aller-retour repart après.
     if (_pushEnVol) { _pushRelance = true; return; }
+    if (gestesBloquentEnvoi()) { _pushApresGestes = true; return; }
     _pushEnVol = true;
     try {
       const revision = Object.keys(_saveTimers).length || [..._failedLocalSaves.values()].some(d=>d.owner===owner) ? _settingsConfirmed : _settingsRevision;
@@ -3928,6 +4071,9 @@ const save = (k,v,quand) => {
     delete _saveTimers[k];
     _rendreQuand(k, true);
     if (k === 'vinted_annonce_numeros' && !r.conflit) noterJournalNumeros(_lireJson(avantTxt), r.v);
+    // (11 nov.) Hors ligne : le geste est noté dans la file des gestes (src/gestesHorsLigne.js),
+    // sous-valeur par sous-valeur ; en ligne aussi quand il prolonge un geste encore en attente.
+    if (owner && REGLES_GESTES[k] && !r.conflit && (horsLigneMaintenant() || gesteHLEnAttenteSur(k))) noterGesteHL(owner, k, _lireJson(avantTxt), r.v);
     // (2 nov.) LA FILE D'ENVOI (src/fileEnvoi.js) : le geste est noté avec la
     // base de sa fusion, et il y reste jusqu'à ce que le nuage l'ACCEPTE — l'app
     // fermée avant le retour du réseau, le chargement suivant le rejoue au lieu
@@ -5736,7 +5882,7 @@ const lireFamilleCopiee = async (famille, filtre, select) => {
   const uid = AUTH.user?.id || '';
   if (!uid) return lireTout(`${filtre}&select=${select}`);
   const q = (x) => `%22${encodeURIComponent(x)}%22`;
-  const r = await lireFamilleAvecCopie({ uid, famille, stockage: stockageApp(), local: localStorage,
+  const r = await lireFamilleAvecCopie({ uid, famille, stockage: stockageApp(), local: localStorage, horsLigne: horsLigneMaintenant,
     lireCompte: () => compterFamille(filtre),
     lireDepuis: (x) => lireTout(`${filtre}&or=(updated_at.gte.${q(x)},meta->>capturedAt.gte.${q(x)},meta->>purgedAt.gte.${q(x)})&select=${select}`, { voirSupprimes: true }),
     lireComplet: () => lireTout(`${filtre}&select=${select}`, { voirSupprimes: true }) });
@@ -5957,7 +6103,7 @@ const _groupeMoisson = creerLectureGroupee(async (ids, cle) => {
   const uidCopie = (famille === 'listings' || famille === 'inbox') && AUTH.user?.id && auth === (sbAuth().Authorization || '') ? AUTH.user.id : '';
   if (uidCopie) {
     const lire = async (sel, l) => { try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${l.join(',')})&select=${sel}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}), cache: 'no-store' }); if (!res.ok) return null; const j = await res.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
-    const r = await lireAvecCopie({ uid: uidCopie, famille, ids, stockage: stockageApp(), local: localStorage, lireVersions: (l) => lire(SEL_VERSION, l), lireLignes: (l) => lire(SEL_MOISSON, l) });
+    const r = await lireAvecCopie({ uid: uidCopie, famille, ids, stockage: stockageApp(), local: localStorage, horsLigne: horsLigneMaintenant, lireVersions: (l) => lire(SEL_VERSION, l), lireLignes: (l) => lire(SEL_MOISSON, l) });
     return r.ok ? { ok: true, rows: r.rows } : { ok: false, statut: r.incoherent ? 400 : 0 };
   }
   try {
@@ -9797,7 +9943,8 @@ function vmrDemandeUn(type, payload, timeoutMs) {
 const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
 // 5.183 : sur le téléphone, une commande permise part par le RELAIS (l'extension
 // de l'ordinateur l'exécute) ; ailleurs, par le pont, comme avant.
-const vmrCmd = (p, timeoutMs = 9000) => (p && RELAIS_CMDS.includes(p.cmd) && relaisVivant() ? relaisCmd(p) : vmrDemande('cmd', p, timeoutMs));
+// (11 nov.) Hors ligne : rien ne part vers Vinted, Leboncoin, eBay ou Vestiaire — refusé, raison DITE.
+const vmrCmd = (p, timeoutMs = 9000) => (refusHorsLigne('extension') ? Promise.resolve({ ok: false, error: tr('horsligne.interdit.extension'), horsLigne: true }) : p && RELAIS_CMDS.includes(p.cmd) && relaisVivant() ? relaisCmd(p) : vmrDemande('cmd', p, timeoutMs));
 // (28 oct.) Les gestes LONGS sur Vinted (recréer, passer en brouillon, refaire,
 // mettre un brouillon en ligne, modifier) : « pas de réponse à temps » n'est PAS
 // « pas fait ». L'extension a pu supprimer, créer ou publier pendant que l'app
@@ -18396,6 +18543,117 @@ function EnAttenteEnvoi() {
     </div>
   );
 }
+// ── (11 nov.) « HORS LIGNE · 3 GESTES EN ATTENTE » (src/gestesHorsLigne.js) ────
+// UNE pastille discrète sur la coque : hors ligne, l'heure du dernier état lu
+// (« vu à hh:mm », jamais « tout est à jour ») ou le nombre de gestes en attente ;
+// au retour « Envoi de 3 gestes… » puis « Envoyés ✓ » ; un conflit ⇒ « 1 geste à
+// trancher » (ambre : un geste à faire, §7), qui ouvre la feuille des deux versions.
+const CLE_VU_NUAGE = 'vrm_vu_nuage';
+onSyncChange((st) => { if (st === 'synced' && AUTH.user?.id) { try { localStorage.setItem(CLE_VU_NUAGE, JSON.stringify({ uid: AUTH.user.id, at: Date.now() })); } catch (_) {} } });
+const heureVuHorsLigne = () => {
+  const uid = AUTH.user?.id; const ts = [];
+  for (const k of [CLE_VU_NUAGE, 'vrm_copies_vu']) { try { const o = JSON.parse(localStorage.getItem(k) || 'null'); if (o && o.uid === uid && Number.isFinite(o.at)) ts.push(o.at); } catch (_) {} }
+  if (!ts.length) return null;
+  try { return new Date(Math.min(...ts)).toLocaleTimeString(langueCourante() === 'fr' ? 'fr-FR' : langueCourante(), { hour: '2-digit', minute: '2-digit' }); } catch (_) { return null; }
+};
+function useHorsLigneTout() {
+  const nav = useHorsLigne();
+  const [porte, setPorte] = React.useState(() => horsLigneActif());
+  React.useEffect(() => suivreHorsLigne(() => setPorte(horsLigneActif())), []);
+  return nav || porte;
+}
+const texteValeurHL = (g, v) => {
+  if (v === undefined || v === null || v === '' || v === false) return tr('horsligne.feuille.sansValeur');
+  if (v === true) return '✓';
+  if (typeof v === 'object') {
+    if (g.quoi === 'achat') return [v.title, v.price != null && v.price !== '' ? `${String(v.price).replace('.', ',')} €` : null, v.numero ? `N°${v.numero}` : null].filter(Boolean).join(' · ') || tr('horsligne.feuille.sansValeur');
+    return Object.entries(v).filter(([, x]) => x != null && typeof x !== 'object').map(([c, x]) => `${c} : ${x}`).join(' · ').slice(0, 120);
+  }
+  if (g.quoi === 'prix') return `${String(v).replace('.', ',')} €`;
+  if (/^\d{4}-\d\d-\d\dT/.test(String(v))) return '✓';
+  return String(v).slice(0, 140);
+};
+const sujetHL = (g) => {
+  const quoi = tr('horsligne.quoi.' + (g.quoi || 'fiche'));
+  const s0 = g.chemin && g.chemin[0];
+  const id = typeof s0 === 'string' ? s0 : s0 && s0.id != null ? '' : s0 && s0.el != null ? String(s0.el) : '';
+  if (g.quoi === 'prix' && id) return `${quoi} · N°${id}`;
+  if (g.k === 'vinted_annonce_numeros' && g.chemin[1] === 'numero') return `N° · ${quoi}`;
+  return quoi;
+};
+function FeuilleGestesHL({ onFermer }) {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { const f = () => maj(); window.addEventListener('vrm:gestes-hl', f); rafraichirGestesHL(); return () => window.removeEventListener('vrm:gestes-hl', f); }, []);
+  const liste = (_gestesHL.owner === AUTH.user?.id ? _gestesHL.liste : []) || [];
+  const atr = liste.filter((g) => g.etat === 'atrancher'), att = liste.filter((g) => g.etat === 'attente').sort((a, b) => a.seq - b.seq);
+  return (
+    <SheetShell onClose={onFermer} z={Z_CONFIRMATION}>
+      <div data-gestes-hl-feuille="" style={{ padding: '6px 4px 18px' }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: '0 0 12px' }}>{tr('horsligne.feuille.titre')}</h2>
+        {!atr.length && !att.length ? <p style={{ color: C.muted, fontSize: 14 }}>{tr('horsligne.feuille.vide')}</p> : null}
+        {atr.length ? <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: '6px 0 8px' }}>{tr('horsligne.feuille.atrancher')}</h3> : null}
+        {atr.map((g) => (
+          <div key={g.id} data-geste-atrancher={g.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 10, background: C.card }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>{sujetHL(g)}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 14, lineHeight: 1.4 }}>
+              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ici')}</span><span data-geste-mien="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{texteValeurHL(g, g.apres)}</span>
+              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ailleurs')}</span><span data-geste-autre="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{texteValeurHL(g, g.nuage)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <Bouton variante="secondaire" data-geste-garder="mien" onClick={() => trancherGesteHL(g.id, 'mien')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderMienne')}</Bouton>
+              <Bouton variante="secondaire" data-geste-garder="autre" onClick={() => trancherGesteHL(g.id, 'autre')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderAutre')}</Bouton>
+            </div>
+          </div>
+        ))}
+        {att.length ? <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: '12px 0 8px' }}>{tr('horsligne.feuille.attente')}</h3> : null}
+        {att.map((g) => (
+          <div key={g.id} data-geste-attente={g.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, borderBottom: `1px solid ${C.border}`, padding: '10px 2px', fontSize: 14 }}>
+            <span style={{ color: C.text }}>{sujetHL(g)}</span>
+            <span style={{ color: C.muted, textAlign: 'right', overflowWrap: 'anywhere' }}>{g.ligne ? '✓' : texteValeurHL(g, g.apres)}</span>
+          </div>
+        ))}
+      </div>
+    </SheetShell>
+  );
+}
+function GestesHorsLigneCoque({ tab, ongletDedie }) {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  const [ouvert, setOuvert] = React.useState(false);
+  const horsLigne = useHorsLigneTout();
+  React.useEffect(() => {
+    const f = () => maj();
+    window.addEventListener('vrm:gestes-hl', f); window.addEventListener('online', f); window.addEventListener('offline', f);
+    rafraichirGestesHL();
+    return () => { window.removeEventListener('vrm:gestes-hl', f); window.removeEventListener('online', f); window.removeEventListener('offline', f); };
+  }, []);
+  const recent = Date.now() - (_gestesHL.envoyesAt || 0) < 4000;
+  React.useEffect(() => { if (!recent) return undefined; const t = setTimeout(maj, 4100 - (Date.now() - _gestesHL.envoyesAt)); return () => clearTimeout(t); }, [recent, _gestesHL.envoyesAt]);
+  const moi = _gestesHL.owner === AUTH.user?.id;
+  const attente = moi ? _gestesHL.attente : 0, atrancher = moi ? _gestesHL.atrancher : 0;
+  let etat = '', texte = '';
+  if (horsLigne) {
+    etat = 'hors';
+    if (attente) texte = tr('horsligne.coque.attente', { n: attente });
+    else if (!ongletDedie) { const h = heureVuHorsLigne(); texte = h ? tr('horsligne.coque.vu', { heure: h }) : tr('horsligne.coque.vuInconnu'); }
+  } else if (attente && _gestesHL.enCours) { etat = 'envoi'; texte = tr('horsligne.coque.envoi', { n: attente }); }
+  else if (attente) { etat = 'attente'; texte = tr('horsligne.coque.attenteEnLigne', { n: attente }); }
+  else if (recent) { etat = 'envoyes'; texte = tr('horsligne.coque.envoyes'); }
+  if (!texte && !atrancher) return null;
+  return (
+    <>
+      <div className="vrm-gestes-hl" role="status" aria-live="polite" data-gestes-hl={etat || 'trancher'} data-gestes-attente={attente} data-gestes-atrancher={atrancher}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12, minHeight: 32 }}>
+        {texte ? <span data-gestes-hl-texte="" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: etat === 'envoyes' ? C.text : C.muted, border: `1px solid ${C.border}`, background: C.card, borderRadius: 999, padding: '6px 12px' }}>
+          <Icon name={horsLigne ? 'cloudOff' : 'sync'} size={14}/>{texte}</span> : null}
+        {atrancher ? <button type="button" data-gestes-hl-trancher={atrancher} onClick={() => setOuvert(true)}
+          style={{ minHeight: 44, fontSize: 13, fontWeight: 600, color: C.text, border: `1px solid ${C.warn || '#B26B00'}`, background: C.card, borderRadius: 999, padding: '0 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          {tr('horsligne.coque.atrancher', { n: atrancher })} · {tr('horsligne.coque.voir')}</button>
+          : attente ? <button type="button" data-gestes-hl-voir="" onClick={() => setOuvert(true)} style={{ minHeight: 44, fontSize: 13, color: C.muted, border: 'none', background: 'transparent', padding: '0 6px', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>{tr('horsligne.coque.voir')}</button> : null}
+      </div>
+      {ouvert ? <FeuilleGestesHL onFermer={() => setOuvert(false)}/> : null}
+    </>
+  );
+}
 function LigneHorsLigne({ children, date }) {
   return (
     <div role="status" data-hors-ligne-ligne="" data-hors-ligne-date={date || undefined}
@@ -18652,6 +18910,9 @@ function useRejouerInventaire(pret) {
 }
 // Les onglets qui montrent COLIS hors réseau (`cat_bord`, et ceux qui y mènent).
 const ONGLETS_COLIS_HL = ['cat_bord', 'retraits', 'cat_achats', 'cat_expedition'];
+// (11 nov.) Les onglets qui gardent leur vue hors ligne DÉDIÉE (la photo de Ma journée, les codes, le relais, le dépôt) ;
+// tous les autres écrans se lisent hors ligne depuis la copie de l'appareil.
+const ONGLETS_HL_DEDIES = ['journee', ...ONGLETS_COLIS_HL];
 function JourneeHorsLigne({ uid, tab }) {
   const [, tic] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { const t = setInterval(tic, 60000); return () => clearInterval(t); }, []);
@@ -29740,6 +30001,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false }) {
+  const horsLigneVue = useHorsLigne();   // (11 nov.) hors ligne : pas de N° proposé à un nouvel achat (serveur seul)
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
@@ -33727,6 +33989,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    vente) a déjà été écrit sur un carton : avant, on le reprenait sans un
     //    mot. On demande — c'est la même paire qui revient, ou un autre numéro.
     if (!autres.length && takenCles.has(cle) && !(porteursNum[cle] || []).some(p => String(p.id) !== moi)) {
+      // (11 nov.) Hors ligne : la réponse « non » donnerait un N° NEUF (réservé au serveur seul, §5).
+      if (!opts.memePaire && refusHorsLigne('numero')) { updatePair(item, { numero: avant }); return; }
       // (9 nov.) « C'est la même paire » déjà dit (remise en ligne) : pas redemandé.
       const meme = opts.memePaire ? true : await askConfirm({
         title: `Le N°${n} a déjà servi`,
@@ -33740,6 +34004,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
     if (!autres.length) { updatePair(item, { numero: n, manuelAt, ...changeAMain(item, avant, n, manuelAt, opts) }); recordUsed(n); await demanderPrixAchat(item, n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
+    if (presents.length && refusHorsLigne('numero')) { updatePair(item, { numero: avant }); return; }
     if (presents.length) {
       // Revue de la 5.167 : une annonce « à confirmer » n'est ni « en ligne » ni
       // « partie » — on ne sait pas. On le dit tel quel, et on ne propose JAMAIS
@@ -33763,6 +34028,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return;
     }
     const anc = numeros[autres[0]] || {};
+    if (!opts.memePaire && refusHorsLigne('numero')) { updatePair(item, { numero: avant }); return; }
     const meme = opts.memePaire ? true : await askConfirm({
       title: `Le N°${n} a déjà servi`,
       desc: `Il était sur « ${anc.title || 'un autre article'} », qui n'est plus en ligne.\n\nEst-ce bien le MÊME article qui te revient (litige, retour, annulation) ?\n\nSi oui, il reprend son prix d'achat et ses infos. Si c'est un autre article, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
@@ -34415,6 +34681,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const nomPorteur = (p) => p.type === 'garage' ? `la case ${String(p.id)} du stock` : `« ${String(p.titre || '').slice(0, 40)} » (${p.type === 'vente' ? 'à envoyer' : p.type === 'annulee' ? 'vente annulée, encore là' : p.masquee ? 'masquée par Vinted, toujours chez toi' : 'en ligne'})`;
   // Donner un numéro NEUF à une paire (jamais un numéro déjà servi) — sur SON clic.
   const donnerNumeroNeuf = async (it, pourquoi) => {
+    if (refusHorsLigne('numero')) return;
     const f = numeros[String(it.id)] || {};
     const prov = String(nextNumero);
     const ok = await askConfirm({
@@ -34446,6 +34713,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!sales.items || (Array.isArray(sales.failedUids) && sales.failedUids.length)) return;
     const a = doublonsAReattribuer(conflitsNum, numeros).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
     if (!a.length) return;
+    // (11 nov.) Hors ligne : aucun N° neuf (réservé au serveur seul) — les doublons se règlent au retour.
+    if (horsLigneMaintenant()) return;
     const pris = new Set([...takenNums, ...numsOccupes]), prisK = new Set([...takenCles, ...Object.keys(porteursNum)]);
     ajouterNumerosHorsEcran(pris, prisK);
     const tous = annoncesPresentes;      // 22 oct. : masquées comprises
@@ -34605,6 +34874,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Le N° du carton est aujourd'hui sur une AUTRE paire renumérotée pendant
       // la panne : son N° est donc probablement faux lui aussi. Elle reçoit un
       // numéro NEUF (jamais un numéro déjà servi) et reste dans la liste.
+      if (refusHorsLigne('numero')) return;
       const prov = String(nextNumero);
       const ok = await askConfirm({
         title: `Le N°${n} est sur « ${autre.title} »`,
@@ -36009,7 +36279,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // pour une vente d'après la coupure (un « 12 » d'avant désigne l'ancienne paire).
           const lec = lireNumeroEcrit({ titre: o.title || o.item_title || '' });
           if (lec.etat === 'lu' && numeroReprenable(lec.cle) && (coupureNumerotation() == null || venteApresCoupure(o))) { ovNext[tid] = { ...(cur||{}), numero: lec.cle, autoAssigned: false, ecrit: 'titre' }; changed = true; }
-        } else if (!(cur && cur.numero != null && String(cur.numero).trim() !== '')) {
+        } else if (!(cur && cur.numero != null && String(cur.numero).trim() !== '') && !horsLigneMaintenant()) {
+          // (11 nov.) Hors ligne : pas de N° neuf (serveur seul) — la vente le reçoit au retour du réseau.
           const cand = prochainLibre(dejaPris, dejaPrisK, prefNum);
           ovNext[tid] = { ...(cur||{}), numero: String(cand), autoAssigned: true, autoShip: true };
           changed = true;
@@ -36987,6 +37258,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Prochain numéro = le premier JAMAIS UTILISÉ. `taken` contient tous les
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
+      // (11 nov.) Hors ligne : jamais un N° neuf (réservé au serveur seul) — l'annonce le reçoit au retour.
+      if (!num && horsLigneMaintenant()) continue;
       if (!num) num = prochainLibre(taken, takenK, prefNum);
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       { const ep = entreePool(num); if (ep != null) nextUsed.add(ep); }
@@ -37688,6 +37961,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (10 nov., lot Y) Supprimer = à la corbeille 30 jours (pilule « Annuler » 5 s, puis Paramètres → Corbeille).
   // Sa photo (sa ligne `achat_hors_photo_{id}`) reste rangée : elle n'est vidée qu'à la purge.
   const delOffBuy = (id) => {
+    if (refusHorsLigne('suppression')) return;
     const L = load('vinted_offvinted_buys', []); const i = L.findIndex(x => x && x.id === id); const b = i >= 0 ? L[i] : null;
     if (!b) { setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; }); return; }
     gesteCorbeille({ type: 'achat', libelle: b.title || '', numero: b.numero || null, lignes: b.photo ? ['achat_hors_photo_' + String(id).replace(/[^\w-]/g, '')] : [],
@@ -45406,7 +45680,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
-          prochainNumero={nextNumero} onReserverNumero={recordUsed} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
+          prochainNumero={horsLigneVue ? null : nextNumero} onReserverNumero={recordUsed} horsLigne={horsLigneVue} garderPhotoHorsLigne={garderPhotoHorsLigne} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
           chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
           onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
@@ -45831,6 +46105,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     {/* (5 nov., chantier C) Les deux gestes du doublon : le bouton partagé (plus de bordure bleue faite main). */}
                     <Bouton variante="secondaire" taille="petit" style={{flexShrink:0}} title={`Donner le N°${nextNumero} (neuf) à cet article`} onClick={async ()=>{
+                      if (refusHorsLigne('numero')) return;
                       const libre = String(nextNumero);
                       if (!await askConfirm({ title:`Donner le N°${libre} à cet article ?`, desc:`« ${it.title} »\n\nIl quitte le N°${g.numero}, qui reste à l'autre article. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
                       setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre, manuelAt:new Date().toISOString()}; save('vinted_annonce_numeros',u); return u; });
@@ -51965,6 +52240,7 @@ function exemplesActuels() {
 function useExemplesVendeur() { useProfilVendeur(); return exemplesActuels(); }
 // Ouvre Stripe (paiement ou gestion). Rend un message à afficher si ça échoue.
 async function ouvrirStripe(mode, extra) {
+  if (refusHorsLigne('paiement')) return tr('horsligne.interdit.paiement');
   try {
     const r = await fetch(`/api/compte?mode=${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify(extra || {}) });
     const j = await r.json().catch(() => ({}));
@@ -56990,14 +57266,19 @@ function AppCoeur() {
             réussie, en lecture seule — à la place de TOUS les écrans (aucun geste
             qui envoie n'y existe). Le réseau revient : les écrans relisent. */}
         <EnAttenteEnvoi/>
-        {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
-        {baseKO && <BaseInjoignable/>}
+        {/* (11 nov.) Hors ligne, TOUS les écrans se lisent depuis la copie de l'appareil (lot K, src/copieLignes.js) ;
+            seuls Ma journée et les outils du colis (relais, dépôt, codes) gardent leur vue hors ligne dédiée.
+            La pastille dit « Hors ligne · vu à hh:mm » ou « N gestes en attente » (src/gestesHorsLigne.js). */}
+        <GestesHorsLigneCoque tab={tab} ongletDedie={horsLigne && ONGLETS_HL_DEDIES.includes(tab)}/>
+        {horsLigne && ONGLETS_HL_DEDIES.includes(tab) ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
+        {horsLigne && tab === 'garage' ? <div data-hors-ligne="stock-inventaire"><BlocInventaireHorsLigne uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></div> : null}
+        {baseKO && !horsLigne && <BaseInjoignable/>}
         {!baseKO && <MentionCopie/>}
         {/* (9 nov., lot AG) UNE ligne de fraîcheur en haut de l'app : « Tout est à jour · vérifié il y a N min »,
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
             est tenue dès le premier rendu (repli de même hauteur) : rien ne saute à l'arrivée de la réponse. */}
-        {!baseKO && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab}/></Suspense>}
+        {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab}/></Suspense>}
         <BandeauAbonnement setTab={setTab}/>
         <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
           comptes={(vintedAccounts || []).filter((a) => a && a.vinted_user_id != null).map((a) => ({ uid: String(a.vinted_user_id), nom: (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)] || a.login || ('#' + a.vinted_user_id) }))}/>

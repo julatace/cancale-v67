@@ -167,7 +167,7 @@ function noterVu(stock, uid, at) { try { stock.setItem(CLE_VU, JSON.stringify({ 
 // `lireLignes(ids)` → tableau de lignes entières (projection de l'appelant) ou `null`.
 // Rend `{ ok:true, rows, telecharges, depuisCopie }` ou `{ ok:false }` (pas su) —
 // `rows` : exactement ce que `lireLignes(ids)` aurait rendu (lignes existantes).
-export async function lireAvecCopie({ uid, famille, ids, lireVersions, lireLignes, stockage, local = null, maintenant = Date.now }) {
+export async function lireAvecCopie({ uid, famille, ids, lireVersions, lireLignes, stockage, local = null, maintenant = Date.now, horsLigne = null }) {
   const tous = [...new Set((ids || []).map(String))];
   const direct = async () => {
     const r = await lireLignes(tous).catch(() => null);
@@ -176,6 +176,17 @@ export async function lireAvecCopie({ uid, famille, ids, lireVersions, lireLigne
   if (!uid || !tous.length || !stockage) return direct();
   let copies = new Map();
   try { copies = (await stockage.lire(uid, famille, tous)) || new Map(); } catch (_) { copies = new Map(); }
+  // (11 nov.) HORS LIGNE MESURÉ (aucune requête ne peut partir) : la copie de l'appareil
+  // est rendue POUR LA LECTURE, marquée `horsLigne` et « pas relue » (l'écran et la coque
+  // disent « vu à hh:mm · hors ligne », jamais « à jour »). Aucune écriture vers le serveur
+  // ne part hors ligne (la garde, src/porteHorsLigne.js) : rien n'est écrit depuis elle.
+  // Sans aucune copie : « pas su », comme avant.
+  if (typeof horsLigne === 'function' && horsLigne()) {
+    if (!copies.size) return { ok: false, horsLigne: true };
+    noterPasRelu([...copies.keys()], local ? lireVu(local, uid) : null);
+    const rows = tous.filter((id) => copies.has(id)).map((id) => copies.get(id).row);
+    return { ok: true, rows, telecharges: [], depuisCopie: tous.filter((id) => copies.has(id)), horsLigne: true, manquent: tous.filter((id) => !copies.has(id)) };
+  }
   const vers = await Promise.resolve().then(() => lireVersions(tous)).catch(() => null);
   if (!Array.isArray(vers)) {
     // Pas su : jamais la copie. L'ancien chemin (la ligne entière) ; raté ⇒ pas su,
@@ -297,7 +308,7 @@ const noterFamille = (local, uid, famille, oui) => {
     local.setItem(CLE_FAMILLES, JSON.stringify({ uid, f }));
   } catch (_) {}
 };
-export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepuis, lireComplet, stockage, local = null, maintenant = Date.now, fenetreMs = FENETRE_FAMILLE_MS, relectureMs = RELECTURE_ENTIERE_MS }) {
+export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepuis, lireComplet, stockage, local = null, maintenant = Date.now, fenetreMs = FENETRE_FAMILLE_MS, relectureMs = RELECTURE_ENTIERE_MS, horsLigne = null }) {
   const cle = `famille:${famille}`;
   let copie = null;
   // Rien de rangé pour ce compte (marque lue sans attendre) : pas d'attente d'IndexedDB.
@@ -328,6 +339,12 @@ export async function lireFamilleAvecCopie({ uid, famille, lireCompte, lireDepui
     if (local && uid) noterVu(local, uid, maintenant());
     return { ok: true, rows: r, mode: 'entiere', recues: r.length };
   };
+  // (11 nov.) Hors ligne mesuré : la famille gardée, pour la lecture, marquée (voir `lireAvecCopie`).
+  if (typeof horsLigne === 'function' && horsLigne()) {
+    if (!copie) return { ok: false, horsLigne: true };
+    noterPasRelu([cle], local ? lireVu(local, uid) : null);
+    return { ok: true, rows: copie.rows, mode: 'hors-ligne', recues: 0, horsLigne: true };
+  }
   const t0 = maintenant();
   if (!copie || !(t0 - copie.entiere >= 0 && t0 - copie.entiere < relectureMs)) return entiere();
   const X = borneDepuis(copie, fenetreMs);
