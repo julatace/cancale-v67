@@ -501,6 +501,7 @@ import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js"
 import { bilanSources, publierMeilleures } from "./meilleuresSources.js";   // (11 nov.) tes meilleures sources   // (10 nov., lot BG) d'où viennent mes achats
 import { lignesVitesse, publierVitesse } from "./vitesseEnvoi.js";   // (10 nov., lot BM) vitesse d'envoi
 import { LigneVitesse } from "./VitesseEnvoi.jsx";
+import { lignesEnvois, publierEnvois } from "./santeComptes.js";   // (11 nov., lot sante-comptes) les envois et leur date limite lue
 import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
 import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
@@ -38951,9 +38952,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         compteDe: (o) => ({ cle: String((o._acc && o._acc.vinted_user_id) || ''), nom: (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '' }),
       });
       if (lignes) publierVitesse(lignes, { owner: AUTH.user?.id || '', partiel: !Array.isArray(tracking) });
+      // (11 nov., lot sante-comptes) Les MÊMES départs + la date limite LUE dans l'e-mail du bordereau
+      // (jamais l'estimée : elle ne prouve aucun retard) + les ventes encore à poster ⇒ `vrm_sante_envois`.
+      const limiteLue = (tx) => { const b = bordsParTxn[tx]; const lim = b ? lireDateLimite(b.dateLimite) : null; return lim && Number.isFinite(lim.at) ? lim.at : null; };
+      const aPoster = ventes.filter((o) => o && o.transaction_id != null && aExpedier(o) && classifyOrderStatus(o.status) !== 'cancelled' && !estParti(o))
+        .map((o) => ({ tx: String(o.transaction_id), compte: String((o._acc && o._acc.vinted_user_id) || ''), vente: Date.parse(String(o.date || '')) }));
+      const env = lignesEnvois({ vitesse: lignes, aPoster, limiteLue });
+      if (env) publierEnvois(env, { owner: AUTH.user?.id || '', partiel: !Array.isArray(tracking) });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, partisVinted, tracking, trackingKO, hiddenSales, hiddenAccts]);
+  }, [sales.items, sales.failedUids, partisVinted, tracking, trackingKO, hiddenSales, hiddenAccts, bordsParTxn]);
   // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
   const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
   const articlesLus = (tx) => {
