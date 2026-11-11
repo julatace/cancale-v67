@@ -13,6 +13,7 @@ import React from 'react';
 import { lireImportSites, lireSitesPresents, phraseImportSite, texteTypeSite, pctTypeSite } from './importSites.js';
 import { lireTout, onVmrExt, vmrCmd, vmrExtPresent, extSait, Bouton, enTeteSession, corpsCompteEbay } from './App.jsx';
 import { tr, nombre, heure } from './i18n/index.js';
+import { lancerTravail } from './suiviTravail.js';
 import './styles-import-depart.css';
 
 const NOM_SITE = { leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective', ebay: 'eBay' };
@@ -107,18 +108,61 @@ export default function HistoriqueSites() {
   }, [cleEbay]);
 
   const sait = extSait('importsites');
+  // « Tout récupérer » À LA MAIN : suivi dans la feuille commune (`lancerTravail`, src/suiviTravail.js) —
+  // eBay : les étapes de la route, page par page, jusqu'à « fini » (pause / arrêt lus entre deux) ;
+  // Leboncoin / Vestiaire : la commande à l'extension, puis le PREMIER passage relu dans la ligne
+  // de progression (2 min au plus) ; la suite continue en fond, onglet ouvert — c'est dit.
+  // Un refus est dit avec sa raison et le geste. Le journal ne nomme jamais un compte.
   const lancer = async (l) => {
     const cle = l.site + ':' + l.compte;
     if (occupe) return;
-    setOccupe(cle); setIssue({ cle, texte: tr('historiqueSites.issue.parti') });
-    let r = null;
-    if (l.site === 'ebay') {
-      const e = await etapeEbay(l.compte, true);
-      r = e && e.ok ? { accepte: true } : { accepte: false, raison: (e && e.corps && e.corps.error) || tr('historiqueSites.issue.muet') };
-    } else if (!vmrExtPresent()) r = { accepte: false, raison: tr('historiqueSites.issue.sansExt') };
-    else { try { r = await vmrCmd({ cmd: 'importSiteTout', site: l.site, compte: l.compte }, 20000); } catch (_) { r = null; } }
-    setIssue({ cle, ok: !!(r && r.accepte), texte: r && r.accepte ? tr('historiqueSites.issue.lance') : ((r && r.raison) || tr('historiqueSites.issue.muet')) });
-    setOccupe(''); relire();
+    setOccupe(cle); setIssue(null);
+    const r = await lancerTravail({
+      titre: tr('historiqueSites.travail.titre', { site: NOM_SITE[l.site] }), sorte: 'import-historique',
+      etapes: [['demande', tr('historiqueSites.travail.demande')], ['pages', tr('historiqueSites.travail.pages')], ['suite', tr('historiqueSites.travail.suite')]],
+      seuilMs: 0,
+      executer: async (o) => {
+        o.etape('demande');
+        if (l.site === 'ebay') {
+          for (let i = 0; i < 80; i++) {
+            if (i > 0 && o.doitSArreter()) return { etat: 'saute', raison: 'Arrêté : la suite reprendra là où elle s’est arrêtée.' };
+            const e = await etapeEbay(l.compte, i === 0);
+            if (!e) return { etat: 'refus', raison: 'Pas de réponse de VRM.', geste: 'Réessaie dans un moment.' };
+            if (!e.ok) return { etat: 'refus', raison: String((e.corps && e.corps.error) || 'eBay a refusé.').slice(0, 200), geste: 'Reconnecte ton compte eBay si besoin, puis réessaie.' };
+            const st = (e.corps && e.corps.etat) || {};
+            const v = st.ventes || {};
+            o.etape('pages', `${Number(v.lus) || 0} commandes · ${Number(v.pages) || 0} pages`);
+            if (st.cause) return { etat: 'refus', raison: st.cause === 'base' ? 'La base VRM n’a pas pris la page.' : st.cause === 'forme' ? 'eBay a répondu sous une forme inconnue : rien n’a été écrit.' : 'eBay ne répond pas.', geste: 'Réessaie plus tard : la lecture reprendra à la même page.' };
+            if (st.etat === 'fini' || e.corps.deja) { o.etape('suite'); o.noter(`${Number(v.lus) || 0} commandes eBay lues.`, 'ok'); return { etat: 'ok' }; }
+            await new Promise((ok) => setTimeout(ok, 1200));
+          }
+          return { etat: 'main', raison: 'Lecture longue : elle continue carte ouverte.', geste: 'Garde Paramètres → Mon historique ouvert.' };
+        }
+        if (!vmrExtPresent()) return { etat: 'refus', raison: 'L’extension ne répond pas ici : rien n’est parti.', geste: 'Ouvre VRM dans le Chrome où l’extension est installée.' };
+        let c = null; try { c = await vmrCmd({ cmd: 'importSiteTout', site: l.site, compte: l.compte }, 20000); } catch (_) { c = null; }
+        if (!c || !c.accepte) return { etat: 'refus', raison: (c && c.raison) || 'L’extension n’a pas répondu.', geste: l.site === 'leboncoin' ? 'Ouvre leboncoin.fr sur ce compte, puis réessaie.' : 'Ouvre Vestiaire sur ce compte, puis réessaie.' };
+        o.etape('pages', '0 page');
+        const depart = Date.now();
+        while (Date.now() - depart < 120000) {
+          if (o.doitSArreter()) break;
+          await new Promise((ok) => setTimeout(ok, 3000));
+          const ls = await lireImportSites(lireTout);
+          const x = ls && ls.find((y) => y.site === l.site && y.compte === l.compte);
+          if (!x) continue;
+          const pages = Object.values(x.types).reduce((s0, t) => s0 + (t.pages || 0), 0);
+          o.etape('pages', `${pages} page${pages > 1 ? 's' : ''}`);
+          if (x.etat === 'pause' && x.cause && x.cause !== 'rythme' && x.cause !== 'budget') return { etat: 'refus', raison: 'Le site freine : pause de 30 min.', geste: 'Rien à faire : la lecture reprendra seule.' };
+          if (x.etat === 'fini') { o.etape('suite'); return { etat: 'ok' }; }
+          if (pages > 0 && (x.at || 0) >= depart) break;
+        }
+        o.etape('suite');
+        o.noter('La suite continue toute seule, onglet du site ouvert (12 pages par heure au plus).', 'info');
+        return { etat: 'ok' };
+      },
+    });
+    setOccupe('');
+    if (r.statut === 'occupe') setIssue({ cle, ok: false, texte: tr('historiqueSites.issue.occupe') });
+    relire();
   };
 
   if (lignes === undefined || sites === undefined) return <div className="vrm-imp vrm-imp-reglages" data-import-sites="lecture"><p className="vrm-imp-note">—</p></div>;

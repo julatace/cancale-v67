@@ -363,7 +363,6 @@ export default {
   "reglages.rappels.desc": "Los que pusiste con «Recuérdamelo»: a las 9 h del día elegido.",
   "reglages.quoi-de-neuf.lib": "Novedades",
   "reglages.quoi-de-neuf.desc": "Las novedades de VRM que te afectan.",
-<<<<<<< HEAD
   "historiqueSites.titre": "Tu historial de {site}",
   "historiqueSites.passu": "Desconocido por ahora: la base no ha respondido.",
   "historiqueSites.ebayPrincipal": "Cuenta principal",
@@ -396,11 +395,6 @@ export default {
   "historiqueSites.phrase.encoursVc": "Leyendo · {d}, con Vestiaire abierto.",
   "historiqueSites.phrase.encours": "Leyendo.",
   "historiqueSites.toutRecuperer": "Recuperar todo",
-  "historiqueSites.issue.parti": "En marcha…",
-  "historiqueSites.issue.lance": "Lectura iniciada. La barra avanza aquí.",
-  "historiqueSites.issue.muet": "Sin respuesta. Reinténtalo.",
-  "historiqueSites.issue.sansExt": "La extensión no responde aquí: no se ha enviado nada.",
-=======
   // ── suivi d’un travail long (src/composants/SuiviTravail.jsx)
   "suivi.statut.cours": "VRM está trabajando",
   "suivi.statut.pauseDemandee": "Pausa pedida: termina el paso en curso",
@@ -443,5 +437,9 @@ export default {
   "suivi.garde": "El detalle queda en Ajustes → Lo que hizo VRM.",
   "suivi.passes.titre": "Trabajos seguidos en este dispositivo",
   "suivi.reprise.sansEcran": "Vuelve a abrir la pantalla del trabajo para reanudar.",
->>>>>>> origin/claude/suivi-travail
+  "historiqueSites.travail.titre": "Tu historial de {site}",
+  "historiqueSites.travail.demande": "Solicitud enviada",
+  "historiqueSites.travail.pages": "Páginas leídas",
+  "historiqueSites.travail.suite": "Guardado ✓",
+  "historiqueSites.issue.occupe": "Hay otra tarea en curso: no se ha enviado nada.",
 };

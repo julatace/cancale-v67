@@ -363,7 +363,6 @@ export default {
   "reglages.rappels.desc": "Die du mit „Erinnere mich“ gesetzt hast: um 9 Uhr am gewählten Tag.",
   "reglages.quoi-de-neuf.lib": "Neuigkeiten",
   "reglages.quoi-de-neuf.desc": "VRM-Neuigkeiten, die dich betreffen.",
-<<<<<<< HEAD
   "historiqueSites.titre": "Dein {site}-Verlauf",
   "historiqueSites.passu": "Noch unbekannt: Die Datenbank hat nicht geantwortet.",
   "historiqueSites.ebayPrincipal": "Hauptkonto",
@@ -396,11 +395,6 @@ export default {
   "historiqueSites.phrase.encoursVc": "Wird gelesen · {d}, solange Vestiaire offen ist.",
   "historiqueSites.phrase.encours": "Wird gelesen.",
   "historiqueSites.toutRecuperer": "Alles abholen",
-  "historiqueSites.issue.parti": "Los geht’s…",
-  "historiqueSites.issue.lance": "Lesen gestartet. Der Balken läuft hier.",
-  "historiqueSites.issue.muet": "Keine Antwort. Versuch es erneut.",
-  "historiqueSites.issue.sansExt": "Die Erweiterung antwortet hier nicht: Nichts wurde gesendet.",
-=======
   // ── suivi d’un travail long (src/composants/SuiviTravail.jsx)
   "suivi.statut.cours": "VRM arbeitet",
   "suivi.statut.pauseDemandee": "Pause angefragt: der laufende Schritt endet",
@@ -443,5 +437,9 @@ export default {
   "suivi.garde": "Die Details bleiben in Einstellungen → Was VRM getan hat.",
   "suivi.passes.titre": "Auf diesem Gerät verfolgte Aufgaben",
   "suivi.reprise.sansEcran": "Öffne den Bildschirm der Aufgabe erneut, um fortzusetzen.",
->>>>>>> origin/claude/suivi-travail
+  "historiqueSites.travail.titre": "Dein {site}-Verlauf",
+  "historiqueSites.travail.demande": "Anfrage gesendet",
+  "historiqueSites.travail.pages": "Gelesene Seiten",
+  "historiqueSites.travail.suite": "Gespeichert ✓",
+  "historiqueSites.issue.occupe": "Eine andere Aufgabe läuft: Nichts wurde gesendet.",
 };

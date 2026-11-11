@@ -363,7 +363,6 @@ export default {
   "reglages.rappels.desc": "The ones you set with “Remind me”: at 9 am on the chosen day.",
   "reglages.quoi-de-neuf.lib": "What’s new",
   "reglages.quoi-de-neuf.desc": "VRM updates that matter to you.",
-<<<<<<< HEAD
   "historiqueSites.titre": "Your {site} history",
   "historiqueSites.passu": "Unknown for now: the database did not answer.",
   "historiqueSites.ebayPrincipal": "Main account",
@@ -396,11 +395,6 @@ export default {
   "historiqueSites.phrase.encoursVc": "Reading · {d}, with Vestiaire open.",
   "historiqueSites.phrase.encours": "Reading.",
   "historiqueSites.toutRecuperer": "Fetch everything",
-  "historiqueSites.issue.parti": "Starting…",
-  "historiqueSites.issue.lance": "Reading started. The bar moves here.",
-  "historiqueSites.issue.muet": "No answer. Try again.",
-  "historiqueSites.issue.sansExt": "The extension is not answering here: nothing was sent.",
-=======
   // ── suivi d’un travail long (src/composants/SuiviTravail.jsx)
   "suivi.statut.cours": "VRM is working",
   "suivi.statut.pauseDemandee": "Pause requested: the current step finishes",
@@ -443,5 +437,9 @@ export default {
   "suivi.garde": "The details stay in Settings → What VRM did.",
   "suivi.passes.titre": "Tasks tracked on this device",
   "suivi.reprise.sansEcran": "Reopen the task’s screen to resume.",
->>>>>>> origin/claude/suivi-travail
+  "historiqueSites.travail.titre": "Your {site} history",
+  "historiqueSites.travail.demande": "Request sent",
+  "historiqueSites.travail.pages": "Pages read",
+  "historiqueSites.travail.suite": "Saved ✓",
+  "historiqueSites.issue.occupe": "Another task is running: nothing was sent.",
 };
