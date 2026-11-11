@@ -30,6 +30,12 @@ import {formaterMontantEbay} from '../montantsEbay.js';
 import { relanceProposable, numeroSorti } from '../ebayRelance.js';
 // ⟦← App.jsx #6⟧
 import { GroupeIos, RangeeIos } from "../composants/Ios.jsx";
+// (11 nov., lot ebay-complet) Tous les réglages de publication, les questions, les fenêtres guidées.
+import { tr } from '../i18n/index.js';
+import { CLE_DEFAUTS_EBAY, CLE_GUIDE_VU, defautsDepuis, fusionner as fusionnerReglagesEbay, parametresServeur, apresPublication, resume as resumeReglagesEbay, preRemplir, questions as questionsEbay, traduireErreur, DEFAUTS_USINE as REGLAGES_EBAY_USINE } from '../ebay/parametres.js';
+import FeuilleParametresEbay from '../ebay/FeuilleParametresEbay.jsx';
+import { FenetreGuideeEbay, QuestionsEbay, BoutonGuideEbay } from '../ebay/FenetresEbay.jsx';
+import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay/ConnexionEbayGuidee.jsx';
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
 import { DEPS_FACTURE, MicDictee } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
@@ -407,7 +413,20 @@ function itemDeBrouillon(d) {
       offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
     }
   }
-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).trim().replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
+  // (11 nov., ebay-complet) TOUS LES RÉGLAGES eBAY de ce brouillon (feuille « Tous
+  // les réglages ») : seul ce qui DIFFÈRE d'avant part (`parametresServeur`) ; un
+  // brouillon sans réglage garde EXACTEMENT l'item d'avant. Le serveur relit tout.
+  const pa = d.reglages ? parametresServeur(d.reglages, { type: d.typeCompte || '' }) : null;
+  if (pa && pa.format === 'enchere' && String(d.quantite || '1').trim() !== '1') return { err: tr('ebay.err.enchereQuantite') };
+  if (pa && pa.format === 'enchere' && offre) return { err: tr('ebay.err.enchereOffre') };
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).trim().replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}), ...(pa ? { parametres: pa } : {}) } };
+}
+// (11 nov.) La phrase d'une erreur d'eBay : ce qui ne va pas, puis le geste ; le
+// message d'eBay reste dit tel quel à côté (`traduireErreur`, src/ebay/parametres.js).
+function erreurEbay(j, repli) {
+  const t = traduireErreur(j);
+  const nom = t.nom ? ` « ${t.nom} »` : '';
+  return { cle: t.cle, phrase: tr(`ebay.err.${t.cle}`, { nom }), geste: tr(`ebay.err.${t.cle}.geste`, { nom }), brut: (j && j.error) || repli || '' };
 }
 // Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
 const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
@@ -704,6 +723,36 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const [aiBusy, setAiBusy] = React.useState(false);
   const [aiWhy, setAiWhy] = React.useState('');
   const [plusAttr, setPlusAttr] = React.useState(false);  // afficher les caractéristiques facultatives
+  // (11 nov., ebay-complet) TOUS LES RÉGLAGES eBAY de cette annonce : ses choix
+  // (`reglagesA`) par-dessus ses défauts (Paramètres → Comptes eBay).
+  const [reglagesA, setReglagesA] = React.useState({});
+  const [feuilleReglages, setFeuilleReglages] = React.useState(false);
+  const [compteParamsPub, setCompteParamsPub] = React.useState(undefined);
+  const [questionsPub, setQuestionsPub] = React.useState(null);     // null · [questions] (l'app DEMANDE)
+  const [guidePremiere, setGuidePremiere] = React.useState(null);   // null · fonction de reprise
+  const reglagesPub = fusionnerReglagesEbay(load(CLE_DEFAUTS_EBAY, null), reglagesA);
+  const typeComptePub = ((Array.isArray(comptesPub) ? comptesPub : []).find((c) => c.ref === comptePub) || {}).type || '';
+  const ouvrirReglages = async () => {
+    setFeuilleReglages(true); setCompteParamsPub(undefined);
+    const { j } = await appelEbay({ action: 'parametres', avecCompte: true, ...corpsCompteEbay(comptePub) });
+    setCompteParamsPub(j && j.ok ? (j.compte || null) : null);
+  };
+  // La 1re publication : une fenêtre dit les trois étapes, une fois (cet appareil).
+  const guideAvant = () => new Promise((resolve) => {
+    let vu = false; try { vu = !!load(CLE_GUIDE_VU, false); } catch (_) { vu = false; }
+    if (vu) { resolve(true); return; }
+    setGuidePremiere(() => (ok) => { setGuidePremiere(null); if (ok) { try { save(CLE_GUIDE_VU, true); } catch (_) {} } resolve(ok); });
+  });
+  const chercherCategorie = async (q) => {
+    const { j } = await appelEbay({ action: 'parametres', q, ...corpsCompteEbay(comptePub) });
+    return j && j.ok ? (Array.isArray(j.categories) ? j.categories : null) : null;
+  };
+  const repondreQuestion = async (q, v) => {
+    if (q.type === 'categorie') { await analyser(v.id, v.nom); return; }
+    if (q.type === 'caracteristique') { setAsp((x) => ({ ...x, [q.nom]: v })); setCheck(null); return; }
+    if (q.type === 'etat') { setCond(String(v.id)); setCheck(null); return; }
+    if (q.type === 'descripteur') { setReglagesA((r) => ({ ...r, descripteurs: [...(r.descripteurs || []).filter((d) => d.nom !== q.id), { nom: q.id, valeur: v.id }] })); return; }
+  };
   // (9 octobre) LA RÈGLE D'OFFRE de la nouvelle annonce (facultative) : eBay
   // acceptera toute offre à partir de ce montant. Validée en direct contre le
   // prix tapé (la même règle que la carte et la route, §11).
@@ -846,7 +895,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const catDepuisPubinfo = catDepuisPubinfoEbay;
   const appliquerPubinfo = (j, nomForce, fresh, genre) => {
     const c = catDepuisPubinfo(j, nomForce);
-    if (!c) { setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
+    // (11 nov.) eBay ne propose aucune catégorie : l'app DEMANDE (fenêtre
+    // « Quelle catégorie ? », recherche par mots) — jamais une catégorie devinée.
+    if (!c) { setRes({ err: (j && j.error) || tr('ebay.q.categorie.aucune') }); if (j && j.ok) setQuestionsPub([{ type: 'categorie', choix: [], pasSu: false }]); return; }
     const { attributs, conditions } = c;
     setCat(c);
     // Si eBay donne SA liste d'états pour cette catégorie et que l'état courant
@@ -911,6 +962,11 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     offreAccepte: offreA.trim() || undefined,
     offreRefuse: offreR.trim() || undefined,
     offreSousMoitie: (offreTropBas && offreBasOk) || undefined,
+    // (11 nov.) Ses réglages eBay, entiers (les défauts du moment compris), et
+    // le type du compte (la TVA n'est permise qu'à un pro constaté) ; `undefined`
+    // quand rien ne diffère d'avant ⇒ brouillon et item de la forme d'avant.
+    reglages: (parametresServeur(reglagesPub, { type: typeComptePub }) || apresPublication(reglagesPub)) ? reglagesPub : undefined,
+    typeCompte: (parametresServeur(reglagesPub, { type: typeComptePub }) || apresPublication(reglagesPub)) ? (typeComptePub || undefined) : undefined,
   });
   // Construit le payload OU dit ce qui manque — une seule règle pour vérifier
   // ET publier (§11) : impossible de vérifier autre chose que ce qu'on publie.
@@ -955,6 +1011,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setAsp(d.aspects || {}); setRes(null); setCheck(null); setBrouillonMsg('');
     setCompteChoisi(d.compte ? String(d.compte) : null);
     setOffreA(String(d.offreAccepte || '')); setOffreR(String(d.offreRefuse || '')); setOffreBasOk(d.offreSousMoitie === true);
+    setReglagesA(d.reglages && typeof d.reglages === 'object' ? d.reglages : {});
     const c0 = d.categorie && d.categorie.id ? d.categorie : null;
     if (c0) {
       const requis = c0.requis || [];
@@ -984,7 +1041,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // (9 octobre) Les avertissements d'eBay se VOIENT (la route les rendait,
       // l'écran les jetait) — une catégorie qui n'accepte pas les offres le dit ici.
       if (j && j.ok) setCheck({ ok: true, fees: j.fees, frais: j.frais || null, avertissements: Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [] });
-      else setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce.' });
+      else setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce.', ebay: erreurEbay(j) });
     } catch (_) { setCheck({ err: 'Vérification impossible (réseau).' }); }
     setVerif(false);
   };
@@ -1050,12 +1107,26 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     return problemesAnnonce({ titre, taille: String(taille || ''), famille: familleArticle({ titre, taille: String(taille || ''), marque: String(marque || '') }).famille, marque: String(marque || ''), categorie: (cat && cat.categoryId) || '', nPhotos: nPh, prix: item ? item.price : prix, achat, facultatifs: champsFacultatifs(vendActuel()) }, 'ebay');
   };
   const [autoPub, setAutoPub] = React.useState(null);   // null · { id, etape: 'analyse' | 'verif' }
-  const publierEnUnClic = (p) => { setRes(null); setCheck(null); setAutoPub({ id: p.id, etape: 'analyse' }); choisirPaire(p); };
+  const publierEnUnClic = async (p) => { if (!(await guideAvant())) return; setRes(null); setCheck(null); setAutoPub({ id: p.id, etape: 'analyse' }); choisirPaire(p); };
+  // Ce que ses réglages ajoutent à la confirmation : les choix qui diffèrent
+  // d'avant, les options payantes, et l'annonce sponsorisée avec son coût.
+  const lignesReglagesConfirmation = () => {
+    const r = resumeReglagesEbay(reglagesPub, { type: typeComptePub });
+    const sp = apresPublication(reglagesPub);
+    return [
+      r.length ? tr('ebay.conf.reglages', { liste: r.map((x) => tr(x.cle, x.vars)).join(' · ') }) : '',
+      sp ? tr('ebay.param.sponsorisee.cout', { n: Number(sp.promouvoir.taux) }) : '',
+    ];
+  };
   React.useEffect(() => {
     if (!autoPub || autoPub.etape !== 'analyse' || analyse || pairId !== autoPub.id || !autoAnalyse) return;
     if (!cat) { if (res && res.err) setAutoPub(null); return; }
     const manquants = (cat.required || []).filter((n) => !String(asp[n] || '').trim());
     if (manquants.length) {
+      // (11 nov.) L'app DEMANDE ce que Vinted ne donne pas, une question à la
+      // fois, avec les valeurs d'eBay ; la publication reprend quand tout est dit.
+      const qs = questionsEbay({ categoryId: cat.categoryId, aspects: (cat.attributs || []).filter((a) => a.requis), valeurs: asp });
+      if (qs.length) { setAutoPub({ id: autoPub.id, etape: 'questions' }); setQuestionsPub(qs); return; }
       setAutoPub(null);
       setRes({ err: `Il manque ${manquants.length === 1 ? 'un critère obligatoire' : manquants.length + ' critères obligatoires'} que Vinted ne donne pas : ${manquants.join(', ')}. Choisis-le${manquants.length > 1 ? 's' : ''} ci-dessous, puis « Publier sur eBay » — rien n'est publié.` });
       try { setTimeout(() => { const el = racine.current; if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 80); } catch (_) {}
@@ -1071,7 +1142,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       setVerif(true);
       const { j } = await appelEbay({ action: 'pubverify', item: b.item, ...corpsCompteEbay(comptePub) });
       setVerif(false);
-      if (!(j && j.ok)) { setAutoPub(null); setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce — rien n\'est publié.' }); return; }
+      if (!(j && j.ok)) { setAutoPub(null); setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce — rien n\'est publié.', ebay: erreurEbay(j) }); return; }
       const avertissements = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
       setCheck({ ok: true, fees: j.fees, frais: j.frais || null, avertissements });
       const fr = j.frais && typeof j.frais.total === 'number' ? j.frais.total : (typeof j.fees === 'number' ? j.fees : null);
@@ -1084,13 +1155,22 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         `Description : celle de Vinted${desc.trim() ? '' : ' (aucune captée : ses caractéristiques)'} · ${urls.length} photo${urls.length > 1 ? 's' : ''}`,
         fr == null ? 'Frais d\'insertion : eBay ne les a pas annoncés.' : `Frais d'insertion annoncés par eBay : ${eurEbay(fr)}.`,
         avertissements.length ? `eBay signale : ${avertissements.join(' · ')}` : '',
+        ...lignesReglagesConfirmation(),
       ].filter(Boolean).join('\n\n');
       const ok = await askConfirm({ title: 'Publier cet article sur eBay ?', desc: texteConf, ok: 'Oui, publier', cancel: 'Annuler' });
       setAutoPub(null);
       if (ok) await publier({ dejaConfirme: true, verifie: true });
     })();
   }, [autoPub, analyse, cat, asp, pairId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const fermerQuestions = (fini) => {
+    setQuestionsPub(null);
+    // Toutes les réponses données : la publication en un clic reprend (l'effet
+    // revérifie tout). « Plus tard » : elle s'arrête, rien n'est publié, c'est dit.
+    setAutoPub((a) => (a && a.etape === 'questions' ? (fini === true ? { id: a.id, etape: 'analyse' } : null) : a));
+    if (fini !== true) setRes((r) => (r && r.ok ? r : { err: tr('ebay.q.arrete') }));
+  };
   const publier = async (opts = {}) => {
+    if (!(opts && opts.dejaConfirme) && !(await guideAvant())) return;
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
     const g = gardePublier(); if (g) { setRes({ err: g.t }); return; }
     if (!(opts && opts.verifie) && !(await verifierAvantPublication(verifEbay(b.item), { site: 'ebay' }))) return;
@@ -1112,6 +1192,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       ].filter(Boolean);
       const ok = await askConfirm({ title: `Publier, et laisser eBay accepter les offres dès ${eurEbay(offre.accepte)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, publier', cancel: 'Annuler' });
       if (!ok) return;
+    } else if (!(opts && opts.dejaConfirme) && !plusieursPub && lignesReglagesConfirmation().some(Boolean)) {
+      // (11 nov.) Une option payante ou sponsorisée : toujours une confirmation qui la dit.
+      const ok = await askConfirm({ title: tr('ebay.conf.titre'), desc: [`« ${titre || ''} »`, ...lignesReglagesConfirmation()].filter(Boolean).join('\n\n'), ok: tr('ebay.conf.ok'), cancel: tr('ebay.conf.annuler') });
+      if (!ok) return;
     } else if (plusieursPub && !(opts && opts.dejaConfirme)) {
       // Plusieurs comptes : la confirmation NOMME le compte où elle part.
       const ok = await askConfirm({
@@ -1131,12 +1215,21 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       const mo = offre ? messageOffreCreation(j.offre, offre) : null;
       const avert = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
       try { const pid = (b && b.pairId) || pairId; if (j.itemId && pid) noterLienEbay(j.itemId, pid, b && b.item && b.item.numero, 'publication'); } catch (_) {}
-      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '', offreMsg: mo ? mo.msg : '', offreOk: !!(mo && mo.ok), offreIssue: mo ? mo.issue : '', avertissements: avert }); if (onPublie) onPublie(comptePub);
+      // (11 nov.) L'annonce SPONSORISÉE (éteinte par défaut) : sur ce même clic
+      // confirmé, la promotion « coût par vente » est posée chez eBay (Marketing
+      // API, `promouvoir`) ; un refus ne défait pas l'annonce et se dit.
+      let sponsorMsg = '';
+      const sp = apresPublication(reglagesPub);
+      if (sp && j.itemId) {
+        const pr = await appelEbay({ action: 'promouvoir', confirme: true, listingId: String(j.itemId), taux: sp.promouvoir.taux, ...corpsCompteEbay(comptePub) });
+        sponsorMsg = pr.j && pr.j.ok ? tr('ebay.pub.sponsorOk', { n: Number(sp.promouvoir.taux) }) : tr('ebay.pub.sponsorKo', { raison: (pr.j && pr.j.error) || '' });
+      }
+      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '', offreMsg: mo ? mo.msg : '', offreOk: !!(mo && mo.ok), offreIssue: mo ? mo.issue : '', avertissements: avert, sponsorMsg }); if (onPublie) onPublie(comptePub);
       // Publiée depuis un brouillon : il sort de la liste des brouillons.
       if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
     }
     else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRes({ err: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est partie. Rafraîchis depuis eBay (Paramètres → Comptes eBay) avant de recommencer.' });
-    else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
+    else setRes({ err: (j && j.error) || 'eBay a refusé la publication.', ebay: erreurEbay(j) });
     setBusy(false);
   };
   const lab = { fontSize: 13, color: C.muted, display: 'block', marginBottom: 6, fontWeight: 500 };
@@ -1178,7 +1271,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   };
   const reessayerPhoto = (e) => { setEnvois((l) => l.map((x) => (x.id === e.id ? { ...x, etat: 'envoi', raison: '' } : x))); enfilerPhoto(e); };
   const retirerEnvoi = (e) => { setEnvois((l) => l.filter((x) => x.id !== e.id)); try { URL.revokeObjectURL(e.apercu); } catch (_) {} };
-  const reset = () => { genEnvois.current++; pairCourante.current = null; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg(''); setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
+  const reset = () => { genEnvois.current++; pairCourante.current = null; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg(''); setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); setReglagesA({}); };
   // (17 oct.) Une paire n'est proposée qu'UNE fois, même sous deux N° (même
   // photo exacte, `jumellesParPhoto`) : on garde celle déjà sur eBay, sinon
   // l'annonce la plus récente ; l'autre numéro est dit sur la ligne.
@@ -1222,6 +1315,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>{res.sku
             ? <>Reliée à l'article par la référence <b style={{ color: C.text }}>{res.sku}</b> : s'il se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
             : <>Pas reliée à un article : relie-la depuis sa carte dans Annonces.</>}</div>
+          {res.sponsorMsg && <div data-publie-sponsor="" style={{ fontSize: 13, color: C.text, marginBottom: 10, lineHeight: 1.5 }}>{res.sponsorMsg}</div>}
           {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} data-publie-offre-issue={res.offreIssue || ''} style={{ fontSize: 13, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
           {Array.isArray(res.avertissements) && res.avertissements.length > 0 && <div data-publie-avertissements={res.avertissements.length} style={{ fontSize: 12, color: C.warn, marginBottom: 12, lineHeight: 1.5 }}>eBay signale : {res.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
           <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color:C.onAccent, borderRadius: 999, padding: '12px 20px', fontSize: 15, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
@@ -1340,6 +1434,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 {/* Les autres catégories proposées par eBay — si la 1ʳᵉ n'est pas
                     la bonne, on en choisit une autre (ses caractéristiques se
                     rechargent). Comme sur eBay ; rien n'est deviné. */}
+                <button type="button" data-ebay-chercher-categorie="" onClick={() => setQuestionsPub([{ type: 'categorie', choix: (cat.cats || []).map((c) => ({ id: c.categoryId, nom: c.categoryName })), pasSu: false }])} style={{ marginTop: 6, minHeight: 44, border: 'none', background: 'transparent', color: C.accentTexte, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{tr('ebay.q.categorie.autre')}</button>
                 {Array.isArray(cat.cats) && cat.cats.filter(c => c.categoryId !== cat.categoryId).length > 0 && (
                   <div style={{ marginTop: 8 }}>
                     <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Pas la bonne ? Autres catégories proposées par eBay :</div>
@@ -1418,6 +1513,16 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   <Pourquoi>Le transporteur (Mondial Relay, Chronopost, Colissimo…) se choisit dans eBay, et c'est eBay qui fixe le montant, l'encaisse et te fournit le bordereau.</Pourquoi>
                 </div>
               </div>
+              {/* (11 nov., ebay-complet) TOUS LES RÉGLAGES qu'eBay propose : format,
+                  enchères, offres, délai, lieu, retours, politiques, TVA (pro),
+                  programmation, sponsorisée, options payantes, annonce privée. */}
+              <div data-ebay-reglages-ligne="" style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px' }}>
+                <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ebay.param.titre')}</div>
+                  <div data-ebay-reglages-resume={resumeReglagesEbay(reglagesPub, { type: typeComptePub }).length} style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>{resumeReglagesEbay(reglagesPub, { type: typeComptePub }).map((x) => tr(x.cle, x.vars)).join(' · ') || tr('ebay.param.commeAvant')}</div>
+                </div>
+                <Bouton variante="secondaire" data-ebay-reglages-ouvrir="" onClick={ouvrirReglages}>{tr('ebay.param.regler')}</Bouton>
+              </div>
             </BlocEbay>
 
             {/* 5 — DESCRIPTION */}
@@ -1431,7 +1536,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 jamais la somme de tous les frais (elle doublait). Absent ⇒ « — ». */}
             {check && check.ok && <div data-publier-frais={check.fees == null ? 'pas-su' : String(check.fees)} style={{ fontSize: 13, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '10px 12px', lineHeight: 1.5 }}>✓ <b>eBay accepterait cette annonce.</b> Frais annoncés par eBay : {lignesFraisEbay(check.frais, false).map((l) => `${l.nom} ${l.montant == null ? '—' : eurEbay(l.montant)}`).join(' · ')} · <b>total {check.fees == null ? '— (eBay ne l\'a pas annoncé)' : eurEbay(check.fees)}</b>. Tu peux publier.</div>}
             {check && check.ok && Array.isArray(check.avertissements) && check.avertissements.length > 0 && <div data-publier-avertissements={check.avertissements.length} style={{ fontSize: 13, color: C.warn, lineHeight: 1.5 }}>eBay signale : {check.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
-            {check && check.err && <div style={{ fontSize: 13, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
+            {check && check.err && (check.ebay
+              ? <div data-ebay-erreur={check.ebay.cle} style={{ fontSize: 13, color: C.text, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '10px 12px', lineHeight: 1.5 }}><b>{check.ebay.phrase}</b><br/>{check.ebay.geste}{check.ebay.brut ? <Pourquoi>{tr('ebay.err.ebayDit', { message: check.ebay.brut })}</Pourquoi> : null}</div>
+              : <div style={{ fontSize: 13, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>)}
 
             {garde && <div data-publier-garde={garde.k} style={{ fontSize: 13, color: (garde.k === 'en-cours' || garde.k === 'photos-envoi') ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
@@ -1451,7 +1558,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           {brouillonMsg && <div data-brouillon-msg="1" style={{ fontSize: 13, color: /^✓/.test(brouillonMsg) ? C.text : C.warn, lineHeight: 1.5 }}>{brouillonMsg}</div>}
         </div>
       </>)}
-      {res && res.err && <div style={{ fontSize: 13, color: C.danger, margin: '0 14px 14px', lineHeight: 1.5 }}>{res.err}</div>}
+      {res && res.err && (res.ebay
+        ? <div data-ebay-erreur={res.ebay.cle} style={{ fontSize: 13, color: C.text, margin: '0 14px 14px', lineHeight: 1.5 }}><b>{res.ebay.phrase}</b> {res.ebay.geste}{res.ebay.brut ? <Pourquoi>{tr('ebay.err.ebayDit', { message: res.ebay.brut })}</Pourquoi> : null}</div>
+        : <div style={{ fontSize: 13, color: C.warn, margin: '0 14px 14px', lineHeight: 1.5 }}>{res.err}</div>)}
+      {feuilleReglages && <FeuilleParametresEbay Feuille={SheetShell} C={C} mode="annonce" valeurs={reglagesPub} onChange={(v) => { setReglagesA(v); setCheck(null); }} onClose={() => setFeuilleReglages(false)} compte={compteParamsPub} typeCompte={typeComptePub} devise={symboleEbayDeRef(comptePub)}
+        onProgrammer={titre.trim() ? async () => { setFeuilleReglages(false); await enregistrerBrouillon(); setBrouillonMsg(tr('ebay.param.programmation.fait')); } : null}/>}
+      {questionsPub && <QuestionsEbay questions={questionsPub} Feuille={SheetShell} C={C} titre={titre} onClose={fermerQuestions} onRepondre={repondreQuestion} onChercherCategorie={chercherCategorie}/>}
+      {guidePremiere && <FenetreGuideeEbay id="premiere" Feuille={SheetShell} C={C} onClose={() => guidePremiere(false)} action={<Bouton variante="primaire" data-ebay-guide-continuer="" onClick={() => guidePremiere(true)}>{tr('ebay.guide.continuer')}</Bouton>}/>}
     </div>
   );
 }
@@ -1494,13 +1607,7 @@ function carteDejaSurEbay({ pris, programmees, listeProgrammees, paires }) {
 
 // Les raisons d'échec de la connexion eBay, dites en clair (la route renvoie
 // un code ; un code inconnu est montré tel quel plutôt que caché).
-const RAISON_CONNEXION_EBAY = {
-  'identite-illisible': 'je n\'ai pas pu savoir quel compte eBay vient de se connecter — rien n\'a été ajouté, réessaie',
-  'principal-inconnu': 'je n\'ai pas pu relire ton premier compte eBay pour savoir si c\'est le même — rien n\'a été ajouté. Réessaie ; s\'il n\'est plus à toi, déconnecte-le d\'abord',
-  'comptes-pas-su': 'je n\'ai pas pu relire tes comptes eBay (la base n\'a pas répondu) — rien n\'a été rangé, réessaie',
-  'registre-ko': 'le compte est relié, mais je n\'ai pas pu le noter dans la liste de tes comptes — réessaie la connexion',
-  'store-failed': 'je n\'ai pas pu ranger la connexion (la base n\'a pas répondu) — réessaie',
-};
+// (11 nov.) Les raisons d'un retour de connexion raté sont traduites par `raisonConnexion` (src/ebay/parametres.js).
 function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const C = EBAY_SKIN;   // tout l'espace eBay est au look de l'appli eBay (Julien : « je veux exactement le même visuel que dans eBay »)
   const [st, setSt] = React.useState(null);          // {ready, canConsent} | null = en cours
@@ -1510,6 +1617,18 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const [comptesStatut, setComptesStatut] = React.useState(undefined);
   const [busy, setBusy] = React.useState(false);
   const [retour, setRetour] = React.useState('');
+  const [retourCx, setRetourCx] = React.useState(null);   // { statut, raison, compte, nouveau } lus au retour d'eBay
+  // (11 nov.) Les réglages de publication PAR DÉFAUT (Paramètres → Comptes eBay) :
+  // chaque nouvelle annonce les reprend (synchronisés, `vrm_ebay_publication_defaut`).
+  const [feuilleDefauts, setFeuilleDefauts] = React.useState(false);
+  const [defautsEbay, setDefautsEbay] = React.useState(() => defautsDepuis(load(CLE_DEFAUTS_EBAY, null)));
+  const [compteParams, setCompteParams] = React.useState(undefined);
+  const ouvrirDefauts = async () => {
+    setDefautsEbay(defautsDepuis(load(CLE_DEFAUTS_EBAY, null))); setFeuilleDefauts(true); setCompteParams(undefined);
+    const { j } = await appelEbay({ action: 'parametres', avecCompte: true });
+    setCompteParams(j && j.ok ? (j.compte || null) : null);
+  };
+  const changerDefauts = (v) => { const d = defautsDepuis(v); setDefautsEbay({ ...d, tauxSponsor: v.tauxSponsor, tva: v.tva }); save(CLE_DEFAUTS_EBAY, { ...d, tauxSponsor: v.tauxSponsor, tva: v.tva }); };
   // (1er nov.) La configuration eBay Developer / Vercel ne parle qu'au
   // propriétaire de l'installation ; un autre vendeur lit « pas encore activé ».
   const proprio = useEstProprietaire();
@@ -1521,9 +1640,9 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
       if (e) {
         const compte = p.get('compte') || '';
         const r = p.get('raison') || '';
-        setRetour(e === 'connecte' ? (p.get('nouveau') === '1' && compte ? `✓ Compte eBay « ${compte} » ajouté — il a ses propres annonces et ventes, choisis-le dans la liste « Compte » en haut.` : (compte ? `✓ Ton compte eBay « ${compte} » est bien relié.` : '✓ Ton compte eBay est bien relié.'))
-          : e === 'refus' ? 'Connexion annulée sur eBay — tu peux réessayer.'
-          : 'La connexion a échoué' + (r ? ` : ${RAISON_CONNEXION_EBAY[r] || r}` : '') + '.');
+        // (11 nov., ebay-complet) Ce qui a été CONSTATÉ au retour, ou l'erreur
+        // traduite avec son geste (`raisonConnexion`) — jamais un code brut.
+        setRetourCx({ statut: e, raison: r, compte, nouveau: p.get('nouveau') === '1' });
         p.delete('ebay'); p.delete('raison'); p.delete('compte'); p.delete('nouveau');
         window.history.replaceState(window.history.state, '', window.location.pathname + (p.toString() ? '?' + p.toString() : ''));
         if (e === 'connecte') signalerComptesEbay();
@@ -1675,6 +1794,8 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
       <div style={{ ...eti, marginBottom: 6 }}>Compte eBay · connexion</div>
       <BilanSynchronisation owner={AUTH.user?.id||''} sources={['annonces','commandes'].map(type=>({id:'ebay-'+type,libelle:type==='annonces'?'Annonces eBay':'Commandes eBay',comptes:(data?.lectures||[]).map(l=>({uid:l.compte.ref,nom:nomCompteEbay(l.compte)})),items:data?(type==='annonces'?data.listings:data.orders).map(x=>({id:type==='annonces'?x.itemId:x.orderId,compte:x._compte||'principal',titre:x.title||x.lineItems?.[0]?.title,valeurs:type==='annonces'?[x.title,x.price,x.quantity,x.listingStatus]:[x.orderPaymentStatus,x.orderFulfillmentStatus,x.cancelStatus]})):null,charge:syncing,echecs:(data?.lectures||[]).filter(l=>!l[type]||syncResult[l.compte.ref]?.etat==='erreur'||syncResult[l.compte.ref]?.manque?.includes(type)).map(l=>l.compte.ref),partiel:(data?.lectures||[]).some(l=>l[type]?.complet!==true),revision:(data?.lectures||[]).map(l=>[l.compte.ref,l[type]?.capturedAt])}))}/>
       {retour && <div style={{ fontSize: 13, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
+      {retourCx && <RetourConnexionEbay C={C} {...retourCx} onReessayer={() => { setRetourCx(null); connecter(retourCx.nouveau === true); }} onFermer={() => setRetourCx(null)}/>}
+      {feuilleDefauts && <FeuilleParametresEbay Feuille={SheetShell} C={C} mode="defauts" valeurs={defautsEbay} onChange={changerDefauts} onClose={() => setFeuilleDefauts(false)} compte={compteParams} typeCompte={Array.isArray(comptesStatut) && comptesStatut.length === 1 ? (comptesStatut[0].type || '') : (Array.isArray(comptesStatut) && comptesStatut.every((c) => c.type === 'pro') && comptesStatut.length ? 'pro' : '')} onUsine={() => changerDefauts(REGLAGES_EBAY_USINE)}/>}
       {st === null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
       ) : st.passu ? (
@@ -1699,6 +1820,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
               <Icon name="check" size={15}/> <b>Compte eBay relié</b>
               {Array.isArray(comptesStatut) && comptesStatut.length === 1 && typeCompteEbayTexte(comptesStatut[0]) && <span data-ebay-compte-type={comptesStatut[0].type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(comptesStatut[0])}</span>}
+              {Array.isArray(comptesStatut) && comptesStatut.length === 1 && <div style={{ marginTop: 4 }}><EtatJetonEbay C={C} compte={comptesStatut[0]} busy={busy} onReconnecter={() => connecter(!comptesStatut[0].principal)}/></div>}
             </div>
             <button type="button" onClick={synchroniser} disabled={syncing}
               style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '9px 13px', cursor: syncing ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: syncing ? 0.6 : 1 }}>
@@ -1717,7 +1839,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                   <div key={ref} data-ebay-compte-ligne={ref} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
                     <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}{typeCompteEbayTexte(c) ? <span data-ebay-compte-type={c.type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(c)}</span> : null}{siteCompteEbayTexte(c) ? <span data-ebay-compte-site={c.site || ''} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{siteCompteEbayTexte(c)}</span> : null}</div>
-                      <div style={{ fontSize: 11, color: c.relie === false ? C.warn : C.muted }}>{c.relie === true ? 'relié' : c.relie === false ? 'plus relié — reconnecte-le avec « Connecter un autre compte eBay »' : 'état pas lu'}</div>
+                      <div style={{ marginTop: 2 }}><EtatJetonEbay C={C} compte={c} busy={busy} onReconnecter={() => connecter(!c.principal)}/></div>
                       {etat && etat !== '…' && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{etat}</div>}
                     </div>
                     <button type="button" data-ebay-deconnecter={ref} disabled={etat === '…'} onClick={() => deconnecter(c)}
@@ -1733,6 +1855,14 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
               {busy ? 'Ouverture d\'eBay…' : '+ Connecter un autre compte eBay'}
             </button>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>Choisis l'AUTRE compte chez eBay. Chacun garde ses ventes à part.</div>
+          </div>
+          {/* (11 nov.) Les réglages que chaque nouvelle annonce reprend. */}
+          <div data-ebay-defauts-ligne="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
+            <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ebay.param.titreDefauts')}</div>
+              <div data-ebay-defauts-resume={resumeReglagesEbay(defautsEbay).length} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{resumeReglagesEbay(defautsEbay).length ? resumeReglagesEbay(defautsEbay).map((x) => tr(x.cle, x.vars)).join(' · ') : tr('ebay.param.commeAvant')}</div>
+            </div>
+            <Bouton variante="secondaire" data-ebay-defauts-ouvrir="" onClick={ouvrirDefauts}>{tr('ebay.param.regler')}</Bouton>
           </div>
           <details style={{fontSize:12,marginBottom:12}}><summary style={{cursor:'pointer'}}>Synchronisation par compte</summary><div style={{display:'grid',gap:8,marginTop:10}}>{(data?.lectures || []).map(l=>{const result=syncResult[l.compte.ref];const lecture=(v)=>v===undefined?'Lecture indisponible':v===null?'Jamais lu':Number(v.capturedAt)>0?new Date(Number(v.capturedAt)).toLocaleString('fr-FR'):'Date inconnue';return <div key={l.compte.ref} data-ebay-sync-compte={l.compte.ref} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:10}}><b>{nomCompteEbay(l.compte)}</b><div style={{color:C.muted,fontSize:11,marginTop:4}}>Annonces : {lecture(l.annonces)}{l.annonces && l.annonces.complet!==true?' · partiel':''}<br/>Commandes : {lecture(l.commandes)}{l.commandes && l.commandes.complet!==true?' · partiel':''}</div>{l.commandes?.lecture!=null && <p style={{fontSize:11,color:C.muted}}>{l.commandes.lecture}{l.commandes.totalLecture!=null?` sur ${l.commandes.totalLecture}`:''} commandes pour cette lecture eBay</p>}{commandesSuite[l.compte.ref] && <p role="status" style={{fontSize:11}}>{commandesSuite[l.compte.ref]}</p>}{result && <p role="status" style={{fontSize:11}}>{result.etat==='lecture'?'Lecture en cours…':result.etat==='ok'?'Actualisé':result.etat==='partiel'?[result.manque?.length?`Non relu : ${result.manque.join(', ')}.`:'',result.incompletes?.length?`Lecture partielle : ${result.incompletes.join(', ')}.`:'','Historique conservé.'].filter(Boolean).join(' '):'Lecture échouée. Dernières données conservées.'}</p>}<button type="button" disabled={syncing} onClick={()=>synchroniser(l.compte.ref)} style={{marginTop:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>{result && (result.etat==='erreur' || result.manque?.length)?'Reprendre ce compte':'Actualiser ce compte'}</button>{l.commandes?.complet!==true && <button type="button" disabled={syncing} onClick={()=>chargerPlusCommandes(l.compte.ref)} style={{marginTop:6,marginLeft:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>Lire davantage de commandes</button>}</div>;})}</div></details>
           <details className="vrm-ebay-settings"><summary>Solde et paramètres du compte</summary>
@@ -1849,14 +1979,9 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
         </>
       ) : (
         <>
-          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55, marginBottom: 10 }}>
-            Autorise ton compte chez eBay : <b>aucun mot de passe ne passe par VRM</b>.
-          </div>
-          <button type="button" onClick={() => connecter(false)} disabled={busy}
-            style={{ border: 'none', borderRadius: 12, background: C.accent, color:C.onAccent, padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
-            {busy ? 'Ouverture d\'eBay…' : 'Connecter mon compte eBay'}
-          </button>
-          {connected === null && <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>(État du compte non lisible pour l'instant — la base n'a pas répondu.)</div>}
+          {/* (11 nov., ebay-complet) La connexion GUIDÉE : ce qui va se passer,
+              dit AVANT ; ce qui a été constaté, dit APRÈS (RetourConnexionEbay). */}
+          <ConnexionEbayGuidee C={C} busy={busy} onConnecter={connecter} passu={connected === null}/>
         </>
       )}
     </div>
@@ -1883,7 +2008,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   const illisibles=lu?lu.illisibles.filter(c=>dansVueEbay({_compte:c.ref},vue)):[];
   const orders=lu===undefined?undefined:lu===null?null:lu.items.filter(o=>dansVueEbay(o,vue));
   const wrap = (kids) => <div className="vrm-ebay-sales" style={{ padding: 16, paddingBottom: 48 }}>{kids}</div>;
-  const head = <ScreenHead icon="cash" title="Ventes eBay"/>;
+  const head = <><ScreenHead icon="cash" title="Ventes eBay"/><GuidesEbay ids={['vente']}/></>;
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données (rien n'est perdu) : réessaie dans un instant.</div></>);
   if (orders === undefined) return wrap(<>{head}<Skeleton variant="row" count={3}/></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
@@ -5122,4 +5247,15 @@ const RAISON_RETRAIT_AUTO = {
   'ebay-apres-vente': 'l\'annonce eBay a été mise en ligne après la vente',
   'deja-terminee': 'eBay la dit déjà terminée',
 };
-export { EbayAnnonces, EbayConnexion, EbayVentes };
+// (11 nov., ebay-complet) « Comment faire ? » après la vente : une offre reçue,
+// une vente (l'étiquette PRÉPAYÉE se prend dans eBay — l'acheteur a payé le port,
+// §2.8), un retour. Des fenêtres guidées, rien n'est envoyé.
+function GuidesEbay({ ids = ['offre', 'vente', 'retour'] }) {
+  const C = EBAY_SKIN;
+  return (
+    <div data-ebay-guides={ids.join(',')} style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+      {ids.map((id) => <span key={id} style={{ display: 'flex', alignItems: 'center' }}><span style={{ fontSize: 12, color: C.muted }}>{tr(`ebay.guide.${id}.court`)}</span><BoutonGuideEbay id={id} Feuille={SheetShell} C={C}/></span>)}
+    </div>
+  );
+}
+export { EbayAnnonces, EbayConnexion, EbayVentes, GuidesEbay };

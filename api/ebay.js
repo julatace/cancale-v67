@@ -2061,8 +2061,8 @@ async function handleParametres(b, ctx) {
   const q = String(b.q || b.title || '').trim().slice(0, 80);
   const categoryId = b.categoryId == null || b.categoryId === '' ? '' : String(b.categoryId);
   if (categoryId && !/^\d{1,9}$/.test(categoryId)) return { status: 400, body: { ok: false, reason: 'categorie', error: 'Catégorie illisible — rien n\'a été demandé à eBay.' } };
-  if (!q && !categoryId) return { status: 400, body: { ok: false, reason: 'titre', error: 'Un titre ou une recherche d\'abord.' } };
-  const tree = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id=${MKT}`, token, H);
+  if (!q && !categoryId && b.avecCompte !== true) return { status: 400, body: { ok: false, reason: 'titre', error: 'Un titre ou une recherche d\'abord.' } };
+  const tree = q || categoryId ? await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id=${MKT}`, token, H) : { ok: false };
   const treeId = (tree.ok && tree.data && tree.data.categoryTreeId) || '';
   let categories = null, aspects = null, conditions = null;
   if (treeId && q) {
@@ -2079,7 +2079,7 @@ async function handleParametres(b, ctx) {
     conditions = cp.ok ? lireConditions(cp.data) : null;
   }
   let compte = null;
-  if (b.compte !== undefined || b.avecCompte === true) {
+  if (b.avecCompte === true) {
     const [prog, pay, ret, ful, loc] = await Promise.all([
       ebayJson(`${EBAY_API}/sell/account/v1/program/get_opted_in_programs`, token, H),
       ebayJson(`${EBAY_API}/sell/account/v1/payment_policy?marketplace_id=${MKT}`, token, H),
