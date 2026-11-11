@@ -169,28 +169,34 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       await capture(pg, `A-ventes-tous-${T.nom}`, '[data-a-venir]');
     });
     await essaie(`B ${T.nom}`, async () => {
-      await aller(pg, 'journee', '[data-journal-semaine]', 3500);
+      // (11 nov.) Depuis Ma journée v2 (9 nov., 60febc6) la carte « Semaine du … » n'est plus une carte
+      // à part : la semaine passée se TOUCHE dans la frise de la tête (`data-jv2-semaine`), avec les MÊMES
+      // règles (src/journalSemaine.js) ; « Revenir aux jours » remplace le repli. Le banc la touche.
+      await aller(pg, 'journee', '[data-jv2-semaine]', 3500);
+      const bouton = await attrs(pg, '[data-jv2-semaine]');
+      dit(bouton && bouton['jv2-semaine'] === ymL(lundiPasse), `B : « Semaine du ${ymL(lundiPasse)} » se touche dans la tête de Ma journée`, JSON.stringify(bouton));
+      const petits = await cibles(pg, '[data-jv2-semaine]');
+      dit(!petits.length, 'B : le bouton de la semaine fait 44 px', JSON.stringify(petits));
+      await pg.click('[data-jv2-semaine]');
+      await pg.waitForSelector('[data-journal-semaine]', { timeout: 10000 }).catch(() => {});
+      await pg.waitForTimeout(300);
       const J = await attrs(pg, '[data-journal-semaine]');
       dit(J && J['journal-semaine'] === ymL(lundiPasse), `B : le journal de la semaine du ${ymL(lundiPasse)} est en tête de Ma journée`, JSON.stringify(J));
-      const ordre = await pg.evaluate(() => { const j = document.querySelector('[data-journal-semaine]'); const t = document.querySelector('.vrm-fu-tete'); return !!(j && t && (t.compareDocumentPosition(j) & Node.DOCUMENT_POSITION_FOLLOWING)) && j.getBoundingClientRect().top < 900; });
-      dit(ordre, 'B : juste sous la tête sombre');
-      const cases = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-journal-case]')].map((e) => [e.getAttribute('data-journal-case'), e.getAttribute('data-valeur')])));
+      const ordre = await pg.evaluate(() => { const j = document.querySelector('[data-journal-semaine]'); const t = document.querySelector('.vrm-fu-tete'); return !!(j && t && (t === j || t.contains(j) || (t.compareDocumentPosition(j) & Node.DOCUMENT_POSITION_FOLLOWING))) && j.getBoundingClientRect().top < 900; });
+      dit(ordre, 'B : dans la tête sombre, sans défiler');
+      // Le panneau de la frise : ventes et colis (`data-journal-case`), le vendu en grand (`data-jv2-vendu`, centimes).
+      // Il ne porte plus de bénéfice brut (v2) : aucun chiffre de bénéfice ne peut y valoir 0.
+      const cases = await pg.evaluate(() => { const o = Object.fromEntries([...document.querySelectorAll('[data-journal-semaine] [data-journal-case]')].map((e) => [e.getAttribute('data-journal-case'), e.getAttribute('data-valeur')])); const g = document.querySelector('[data-journal-semaine] [data-jv2-vendu]'); o.vendu = g ? g.getAttribute('data-jv2-vendu') : null; o.benef = !!document.querySelector('[data-journal-semaine] [data-journal-case="brut"], [data-journal-semaine] [data-journal-case="benefice"]'); return o; });
       const dansSem = (d) => d >= lundiPasse && d < lundiCourant;
       const vSem = VENTES.filter((v) => v[3] && dansSem(v[4]));
       const vcDate = new Date(rows.find((r) => r.id === 'vc_ventes').data.ventes[72900001].date);
       const nAtt = vSem.length + (dansSem(vcDate) ? 1 : 0), eAtt = Math.round((vSem.reduce((t, v) => t + v[2], 0) + (dansSem(vcDate) ? VC_MONTANT : 0)) * 100);
       dit(cases.ventes === String(nAtt) && cases.vendu === String(eAtt) && cases.colis === '2', `B : ${nAtt} ventes, ${eAtt / 100} €, 2 colis envoyés (le geste hors semaine n’y est pas)`, JSON.stringify(cases));
-      dit(cases.brut === '', 'B : bénéfice brut « — » (aucun prix d’achat saisi), jamais 0', JSON.stringify(cases.brut));
-      const petits = await cibles(pg, '[data-journal-bascule]');
-      dit(!petits.length, 'B : la bascule fait 44 px', JSON.stringify(petits));
+      dit(cases.benef === false, 'B : aucun bénéfice brut dans le panneau de la semaine (aucun prix d’achat saisi : jamais un 0 inventé)', JSON.stringify(cases.benef));
       await capture(pg, `B-journee-${T.nom}`, '[data-journal-semaine]');
-      await pg.click('[data-journal-bascule]');
+      await pg.click('[data-jv2-semaine]');
       await pg.waitForTimeout(300);
-      await pg.reload({ waitUntil: 'domcontentloaded' });
-      await pg.waitForSelector('[data-journal-semaine]', { timeout: 20000 }).catch(() => {});
-      const R = await attrs(pg, '[data-journal-semaine]');
-      dit(R && R['journal-replie'] === '1' && !(await pg.$('[data-journal-case]')), 'B : replié, il le reste au rechargement (cette semaine)');
-      await pg.click('[data-journal-bascule]'); await pg.waitForTimeout(200);
+      dit(!(await pg.$('[data-journal-semaine]')), 'B : « Revenir aux jours » referme la semaine');
       dit(T.vp.width > 500 || (await deborde(pg)) <= 1, 'B : aucun débordement à 390 px');
     });
     await essaie(`C ${T.nom}`, async () => {
