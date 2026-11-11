@@ -55,8 +55,18 @@ l'achat (n° de transaction) liée à la fiche.
 - Audits verts : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
   quoi-de-neuf, traduction, stock-2d, stock-juste, vague3-ecrans. `audit-coque-parametres` : 1 rouge
   (icônes de Paramètres), **le même sur `origin/main`**, hors lot.
-- Banc `scripts/bancs/rangement-guide.cjs` (données inventées, 390 tactile clair et 1512 sombre) : voir
-  « ÉTAT À LA REPRISE ».
+- Banc `scripts/bancs/rangement-guide.cjs` (données inventées : achat 9301 au relais, 38 € ; Étagère A
+  3 × 2 dont deux cases prises, une par l'ancien « B230 » ; pool 1…7, 9, 12 avec des trous) : **30 verts**
+  à 390 tactile (clair) et 1512 (sombre) — R1 « J'ai retiré » ⇒ la feuille, N°13 (jamais 8/10/11),
+  case 3 du niveau 1, titre et prix LUS, RIEN d'écrit avant « Rangé » ; R2 case prise sans effet, case
+  libre prise d'un toucher ; R3 fiche N°13 liée à 9301, case, coût 38, N°13 au pool, pilule « N°13 rangé » ;
+  R4 « Annuler » défait fiche, case, coût, N°13 reste servi ; R5 Ma journée « 1 achat à ranger » ⇒ N°14.
+  **Mutation** (build où `prochainLibre` comble les trous, servi par `BANC_DIST`) : **10 rouges** (N°8
+  proposé, puis tout ce qui en dépend). Captures regardées (`docs/passation/planches-rangement/`).
+
+## ÉTAT À LA REPRISE
+
+Tout est livré et poussé ; build, audits du lot et banc verts. Rien n'est en cours.
 
 ## Ce qui reste / limites
 
