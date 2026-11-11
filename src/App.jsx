@@ -578,7 +578,10 @@ import './styles-inventaire.css'; // (8 nov.) style de ./InventaireStock.jsx, ga
 import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, fusionnerInventaire, normaliserInventaire, saisiesVivantes as inventaireSaisies } from "./inventaire.js";
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
-import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
+import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as raisonPasSuEnLigne } from "./enLigneDeuxFois.js";
+// (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
+import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
+import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
@@ -1454,6 +1457,24 @@ const lireAvisCompte = async (uid) => {
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) && j[0] && Array.isArray(j[0].avis) ? j[0].avis : null;
+  } catch (_) { return null; }
+};
+// (11 nov., lot photos-comptes) Les EMPREINTES de photos rangées par l'extension (5.358,
+// `photo_emprunte_{uid}`) : { 'vinted:<uid>': { [idAnnonce]: { [clé de photo]: empreinte } } }.
+// Une projection (jamais `select=data`), toutes les lignes (`Range`). Lecture ratée ⇒ `null`
+// (« pas vérifié », jamais « aucun doublon ») ; rien rangé ⇒ `{}`.
+const lireEmpreintesPhotos = async () => {
+  try {
+    const out = {};
+    for (let debut = 0; debut < 20000; debut += 1000) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.photo_emprunte_*&select=id,a:data->payload->annonces`, { headers: sbAuth({ Range: `${debut}-${debut + 999}` }) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!Array.isArray(j)) return null;
+      for (const l of j) { const m = /^photo_emprunte_(\d{1,15})$/.exec(String(l && l.id || '')); if (m && l.a && typeof l.a === 'object') out[`vinted:${m[1]}`] = l.a; }
+      if (j.length < 1000) break;
+    }
+    return out;
   } catch (_) { return null; }
 };
 const sbAuth = (extra) => {
@@ -32993,6 +33014,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum, dateDe: (it) => dateMiseEnLigneMs(it, listingDates) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff, listingDates]);
+  // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES VINTED (src/photoEmpreinte.js) :
+  // les empreintes calculées par l'extension (5.358), comparées entre comptes DIFFÉRENTS. Un RISQUE
+  // (Vinted relie les comptes), jamais une identité (§5 : rien n'est relié ni renuméroté). Mêmes
+  // annonces EN LIGNE que `enLigneDeux` ; compte pas lu ⇒ « pas vérifié ». `undefined` = en cours.
+  const [empreintesPhotos, setEmpreintesPhotos] = useState(undefined);
+  const [photosComptesOuvert, setPhotosComptesOuvert] = useState(false);
+  const relireEmpreintes = React.useCallback(() => { const owner = AUTH.user?.id; lireEmpreintesPhotos().then((e) => { if (AUTH.user?.id === owner) setEmpreintesPhotos(e); }); }, []);
+  useEffect(() => { if (AUTH.user?.id && cleComptes) relireEmpreintes(); }, [cleComptes, relireEmpreintes]);
+  const photosComptes = useMemo(() => {
+    if (empreintesPhotos === undefined || !Array.isArray(listings.items) || listings.loading || listings.comptes !== cleComptes) return null;
+    const ko = new Set((listings.ko || []).map(String));
+    const maintenant = Date.now();
+    const vinted = (accounts || []).filter((a) => !acctOff(a.vinted_user_id)).map((a) => {
+      const uid = String(a.vinted_user_id);
+      return { uid, nom: accNameOf(a), ok: !ko.has(uid), lu: listings.lues ? listings.lues[uid] : null,
+        enLigne: listings.items.filter((it) => String(it && it._acc && it._acc.vinted_user_id) === uid) };
+    });
+    const base = annoncesPourPhotos(vinted, { verdict: (c) => raisonPasSuEnLigne(c, maintenant), numeroDe: (id) => (numeros[id] || {}).numero || '' });
+    return calculerPhotosComptes({ ...base, empreintes: empreintesPhotos });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empreintesPhotos, listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff]);
+  // Publié pour les encarts « avant de publier » (Republier, Publier ailleurs) — un propriétaire (§11).
+  useEffect(() => { publierPhotosComptes(photosComptes); }, [photosComptes]);
   // (29 oct.) La lecture des annonces telle que la règle de l'offre la juge
   // (`annonceOffreEnVente`) : la MÊME que l'écran Annonces (§11) — en ligne, à
   // confirmer, masquées, brouillons, l'heure de la lecture qui fait foi par compte
@@ -41651,6 +41695,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, baseKO, sales.items, sales.loading, listings.items, listings.loading, txnPret, vendusAilleurs.v.at, vendusAilleurs.v.charge]);
   const [feuilleAilleurs, setFeuilleAilleurs] = useState(false);
   const [feuilleDeux, setFeuilleDeux] = useState(false);   // (6 nov.) « en ligne deux fois »
+  const [feuillePhotosJ, setFeuillePhotosJ] = useState(false);   // (11 nov.) « photos sur deux comptes »
   // ── (11 nov., anti double vente) VENDU SUR UN SITE ⇒ RETIRÉ DES AUTRES EN UN TOUCHER ──
   // Le plan (src/retirerAilleurs.js) range chaque annonce encore en ligne ailleurs : ce que
   // VRM retire sur SON clic (Leboncoin par l'extension `lbcsupprime`, eBay par la route
@@ -42953,12 +42998,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
+              // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES : une carte AMBRE, seulement s'il y en a.
+              const photosDouble = photosComptes && photosComptes.groupes.length ? photosComptes.groupes : [];
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (photosDouble.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
@@ -42983,6 +43030,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     title={t.complet} aria-label={t.complet} onClick={() => setFeuilleDeux(true)}>
                     <PileVignettes srcs={deuxFois.flatMap((g) => g.annonces.map((a) => a.photo))} n={deuxFois.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="alert" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="deux-fois">{t.detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
+                  </button>
+                );
+              };
+              const cartePhotosComptes = () => {
+                const t = textePhotosComptes(photosComptes);
+                return (
+                  <button key="photos-comptes" type="button" className="vrm-day-task vrm-fu-tache" data-journee-photos-comptes={photosDouble.map((g) => g.id).join(' ')} data-n={String(photosDouble.length)}
+                    title={`${t.titre}\n${t.detail}`} aria-label={`${t.titre} — ${t.detail}`} onClick={() => { relireEmpreintes(); setFeuillePhotosJ(true); }}>
+                    <PileVignettes srcs={photosDouble.flatMap((g) => g.annonces.map((a) => a.photo))} n={photosDouble.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="photos" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="photos-comptes">{t.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
                   </button>
                 );
@@ -43135,6 +43193,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const blocsAF = {
                 ailleurs: carteAilleurs ? [carteVendusAilleurs()] : [],
                 'deux-fois': deuxFois.length ? [carteDeuxFois()] : [],
+                'photos-comptes': photosDouble.length ? [cartePhotosComptes()] : [],
                 ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, cases.filter((x) => x.id === id).map((x) => carteCase(x))])),
                 'a-relier': comptesARelierJour.length ? [carteARelier()] : [],
                 'stock-sortie': sortiesStock.length ? [carteSortieStock()] : [],
@@ -43177,6 +43236,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {blocRetirerAilleurs(true)}
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
+                    </SheetShell>
+                  ) : null}
+                  {feuillePhotosJ ? (
+                    <SheetShell titre={tr('photosComptes.titre')} sousTitre={tr('photosComptes.sousTitre')} onClose={() => setFeuillePhotosJ(false)} maxWidth={620} data-feuille-photos-comptes="">
+                      <PhotosEntreComptesDetail res={photosComptes} PhotoVinted={PhotoVinted} extension={extSait('empreintes')} versionExt={EXT_CAPACITES.empreintes.replace(/\.0$/, '')}
+                        onRepublier={(c) => { const a = annSelectionnables.find((x) => String(x.uid) === String(c.compte) && String(x.id) === String(c.id)); if (!a) return; setFeuillePhotosJ(false); setRepubMainFile(null); setRepubMainOuvert(a); }}/>
                     </SheetShell>
                   ) : null}
                   {feuilleDeux && deuxFois.length ? (
@@ -45720,6 +45785,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        seule entrée). Rien n'est supprimé : leurs modales (`lotOpen`, `inventOpen`, `auditOpen`)
                        et les données (prix d'achat posés, numéros) restent ; plus rien ne les ouvre. Ne pas les
                        remettre sans sa demande. Les prix d'un achat groupé : Achats → Fournisseurs. */
+                    /* (11 nov., lot photos-comptes) La même photo sur deux de ses comptes Vinted : la feuille. */
+                    {k:'photos-comptes', icon:'photos', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     /* (5 nov., chantier C — revue 2.7) « Compléter les prix d'achat » n'est plus
                        dans ce menu : le bandeau « Prix d'achat · N/M → Compléter », au-dessus de
@@ -45732,9 +45799,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        les boîtes. Le code de la modale reste, mais plus rien ne l'ouvre.
                        Ne pas le remettre sans son accord explicite. */
                   ].map(t=>(
-                    <button key={t.k} type="button" className="vrm-annbar-outil" data-outil-annonces={t.k} onClick={t.on} title={t.desc}>
+                    <button key={t.k} type="button" className="vrm-annbar-outil" data-outil-annonces={t.k} data-outil-n={t.n ? String(t.n) : undefined} onClick={t.on} title={t.desc}>
                       <span aria-hidden="true" className="vrm-annbar-outil-icone"><Icon name={t.icon} size={18}/></span>
                       <span className="vrm-annbar-outil-mot">{t.lab}</span>
+                      {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',color:'var(--vrm-warn, #B25000)',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{t.n}</span> : null}
                     </button>
                   ))}
                 </div>
@@ -50208,6 +50276,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (k==='baisser') { const idx2 = new Map((listings.items||[]).map((it)=>[String((it._acc&&it._acc.vinted_user_id)||'')+':'+String(it.id), it])); setBaisseSel(choisies.filter(a=>a.etat==='en-ligne').map(a=>{ const it=idx2.get(a.uid+':'+a.id); return it ? annonceBaisse(it) : { id:a.id, uid:a.uid, compte:a.compte, numero:a.numero, titre:a.titre, photo:a.photo, prix:null }; })); return; }
             setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
       })()}
+      {photosComptesOuvert && (
+        // (11 nov., lot photos-comptes) « Photos en double entre comptes » (src/PhotosEntreComptes.jsx) :
+        // chaque groupe et UN geste, « Republier avec d'autres photos » = Republier à la main sur
+        // l'annonce la plus récente du groupe (il reprend des photos ; VRM garde le N°). Rien ne part seul.
+        <SheetShell titre={tr('photosComptes.titre')} sousTitre={tr('photosComptes.sousTitre')} onClose={()=>setPhotosComptesOuvert(false)} maxWidth={620} data-feuille-photos-comptes="">
+          <PhotosEntreComptesDetail res={photosComptes} PhotoVinted={PhotoVinted} extension={extSait('empreintes')} versionExt={EXT_CAPACITES.empreintes.replace(/\.0$/,'')}
+            onRepublier={(c)=>{ const a = annSelectionnables.find((x)=>String(x.uid)===String(c.compte) && String(x.id)===String(c.id)); if (!a) return; setPhotosComptesOuvert(false); setRepubMainFile(null); setRepubMainOuvert(a); }}/>
+        </SheetShell>
+      )}
       {miniSel && (
         // (6 nov., vague 2 · point 2) « Prix mini… » : la confirmation liste N° · prix · mini, puis
         // l'écriture par le chemin de la carte (`updatePair` … `min`/`refuse`), annonce par annonce.
