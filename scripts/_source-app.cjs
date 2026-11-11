@@ -79,7 +79,84 @@ function importesDe(texte) {
 const cheminVuDeSrc = (p) => (p.startsWith('../../') ? p.slice(3) : p.startsWith('../') ? './' + p.slice(3) : p);
 const cheminsVusDeSrc = (t) => t.replace(/(\bfrom\s+|\bimport\(\s*|^import\s+|new URL\(\s*)(['"])(\.\.\/[^'"\n]*)\2/gm, (m, a, q, p) => a + q + cheminVuDeSrc(p) + q);
 
-function sourceApp(racine) {
+
+// ════════════════════════════════════════════════════════════════════════════
+// (11 nov., traduction, lot 2) LE TEXTE FRANÇAIS RECOLLÉ À SA PLACE. Les écrans migrés
+// vers tr() (src/i18n/langues/fr*.js et fr/<écran>.js) ne portent plus leur phrase dans le code : `>{tr('journee.faire')}<`. Un audit qui juge
+// une phrase À SA PLACE (« ce bouton dit "Modifier ma journée" ») lit donc le texte de l'app
+// avec chaque appel remplacé par le FRANÇAIS du dictionnaire — ce que l'écran affiche en
+// français, à la même place : `>{tr('k')}<` ⇒ `>texte<`, `title={tr('k')}` ⇒ `title="texte"`,
+// `tr('k')` ⇒ `'texte'`, `tr('k', { x: String(e) })` ⇒ `` `… ${e} …` ``. Un pluriel ({ one, other })
+// reste un appel (aucune forme d'avant à rendre). Rien n'est affaibli : la clé doit exister,
+// et sa phrase française doit être celle que l'audit attend, là où il l'attend.
+// `VRM_SOURCE_BRUTE=1` rend le code tel quel.
+function dicoFrEcrans(racine) {
+  const d = {};
+  const lang = path.join(racine || RACINE, 'src', 'i18n', 'langues');
+  const fichiers = ['fr-accueil.js', 'fr.js'].map((n) => path.join(lang, n));
+  try { for (const n of fs.readdirSync(path.join(lang, 'fr'))) if (n.endsWith('.js')) fichiers.push(path.join(lang, 'fr', n)); } catch (_) {}
+  for (const f of fichiers) {
+    let t = ''; try { t = lireOrig.call(fs, f, 'utf8'); } catch (_) { continue; }
+    for (const m of t.matchAll(/^\s*"([^"]+)": ("(?:[^"\\]|\\.)*"),\s*$/gm)) { try { d[m[1]] = JSON.parse(m[2]); } catch (_) {} }
+  }
+  return d;
+}
+// L'objet `{ a: String(x), b: y }` d'un appel : ses entrées, coupées aux virgules du premier niveau.
+function entreesVars(corps) {
+  const out = {}; let prof = 0, debut = 0; const parts = [];
+  let q = null;
+  for (let i = 0; i < corps.length; i++) {
+    const c = corps[i];
+    if (q) { if (c === '\\') { i++; continue; } if (c === q) q = null; continue; }
+    if (c === "'" || c === '"' || c === '`') { q = c; continue; }
+    if ('([{'.includes(c)) prof++; else if (')]}'.includes(c)) prof--;
+    else if (c === ',' && prof === 0) { parts.push(corps.slice(debut, i)); debut = i + 1; }
+  }
+  parts.push(corps.slice(debut));
+  for (const p of parts) { const m = p.match(/^\s*(\w+)\s*:\s*([\s\S]*?)\s*$/); if (!m) return null; const e = m[2].match(/^String\(([\s\S]*)\)$/); out[m[1]] = e ? e[1] : m[2]; }
+  return out;
+}
+function enFrancais(texte, racine) {
+  if (process.env.VRM_SOURCE_BRUTE === '1') return texte;
+  const D = dicoFrEcrans(racine);
+  if (!Object.keys(D).length) return texte;
+  const sq = (v) => "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'";
+  const jsxSur = (v) => !/[{}<>]/.test(v);
+  let out = '';
+  let i = 0;
+  const re = /\btr\('([\w.-]+)'/g;
+  let m;
+  while ((m = re.exec(texte))) {
+    const k = m[1]; if (!(k in D)) continue;
+    const debut = m.index; let j = re.lastIndex;
+    let fin, vars = null;
+    if (texte[j] === ')') fin = j + 1;
+    else {
+      const a = texte.slice(j).match(/^,\s*\{/); if (!a) continue;
+      // l'objet jusqu'à sa fermeture, puis `)`
+      let prof = 0, q = null, x = j + a[0].length - 1;
+      for (; x < texte.length; x++) { const c = texte[x]; if (q) { if (c === '\\') { x++; continue; } if (c === q) q = null; continue; } if (c === "'" || c === '"' || c === '`') { q = c; continue; } if (c === '{' || c === '(' || c === '[') prof++; else if (c === '}' || c === ')' || c === ']') { prof--; if (prof === 0) break; } }
+      const apres = texte.slice(x + 1).match(/^\s*\)/); if (!apres) continue;
+      vars = entreesVars(texte.slice(j + a[0].length, x)); if (!vars) continue;
+      fin = x + 1 + apres[0].length;
+    }
+    const v = D[k];
+    let rempl, a0 = debut, a1 = fin;
+    if (vars) rempl = '`' + v.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '${' + vars[n] + '}' : mm)) + '`';
+    else {
+      const av = texte.slice(Math.max(0, debut - 40), debut), ap = texte.slice(fin, fin + 1);
+      const attr = av.match(/([\w-]+)=\{$/);
+      if (attr && ap === '}' && !v.includes('"')) { a0 = debut - 1; a1 = fin + 1; rempl = '"' + v + '"'; }
+      else if (av.endsWith('{') && ap === '}' && jsxSur(v) && !/[\w-]=\{$/.test(av)) { a0 = debut - 1; a1 = fin + 1; rempl = v; }
+      else rempl = sq(v);
+    }
+    out += texte.slice(i, a0) + rempl; i = a1; re.lastIndex = fin;
+  }
+  return out + texte.slice(i);
+}
+
+function sourceApp(racine) { return enFrancais(sourceAppCode(racine), racine); }
+function sourceAppCode(racine) {
   const fichiers = fichiersApp(racine);
   const app = lireOrig.call(fs, fichiers[0], 'utf8');
   if (fichiers.length === 1) return app;
@@ -171,4 +248,4 @@ function brancher() {
   try { require('module').syncBuiltinESMExports(); } catch (_) {}
 }
 
-module.exports = { sourceApp, sourceAppDe, fichiersApp, fichierQuiPorte, brancher, RACINE };
+module.exports = { sourceApp, sourceAppCode, enFrancais, sourceAppDe, fichiersApp, fichierQuiPorte, brancher, RACINE };

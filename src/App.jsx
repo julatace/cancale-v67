@@ -6468,7 +6468,7 @@ function NoteVenteEmail({ o }) {
     <div className="vrm-vente-email" data-vente-email={String(o.transaction_id)} data-vente-email-lu={Number.isFinite(lu) ? String(lu) : ''} data-sans-glisse=""
       style={{ fontSize: 13, lineHeight: 1.45, color: C.muted, overflowWrap: 'anywhere' }}>
       <span style={{ color: C.text, fontWeight: 600 }}>{STATUT_VENTE_EMAIL}</span>
-      {quand ? <> · ventes de ce compte relues {quand}</> : null}
+      {quand ? <> {tr('ventes.ventesCompteRelues')} {quand}</> : null}
       <br/><span data-vente-email-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
     </div>
   );
@@ -6486,7 +6486,7 @@ function NoteVentesEmailTete({ g, nom }) {
       style={{ fontSize: 13, lineHeight: 1.45, color: C.muted, overflowWrap: 'anywhere', margin: '0 0 10px', padding: '10px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
       <span style={{ color: C.text, fontWeight: 600 }}>{statutVentesEmail(g.txs.length)}</span>
       {nom ? <> · <span className="vrm-sensible" data-stream-type="compte">{nom}</span></> : null}
-      {quand ? <> · ventes de ce compte relues {quand}</> : null}
+      {quand ? <> {tr('ventes.ventesCompteRelues')} {quand}</> : null}
       <br/><span data-ventes-email-tete-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
     </div>
   );
@@ -10712,7 +10712,7 @@ function PhotoVenteSources({candidats,cle,onBesoinAlternative,onSourceChargee,st
  const source=choisirPhotoDisponible(candidats,etat,favori?.key===key?favori.url:null);
  const tousEnEchec=!!source && candidats.every(url=>etat(url)==='ko');
  React.useEffect(()=>{if(tousEnEchec && dejaDemande.current!==key){dejaDemande.current=key;demander.current?.();}},[key,tousEnEchec]);
- if(!source || tousEnEchec && !photosVinted.estPhotoVinted(source))return <span style={cadrePhoto(style)} role="img" aria-label="Photo indisponible" title="Photo indisponible"><Icon name="image" size={taillePicto(style)}/></span>;
+ if(!source || tousEnEchec && !photosVinted.estPhotoVinted(source))return <span style={cadrePhoto(style)} role="img" aria-label={tr('ventes.photoIndisponible')} title={tr('ventes.photoIndisponible')}><Icon name="image" size={taillePicto(style)}/></span>;
  return <PhotoVinted {...props} src={source} style={style} onLoad={()=>{setFavori({key,url:source});onSourceChargee?.(source);}} onError={()=>setEchecs(prev=>{const urls=prev.key===key?prev.urls:[];return urls.includes(source)?prev:{key,urls:[...urls,source]};})}/>;
 }
 // ── QUI DIT DÉJÀ, SUR CET ÉCRAN, CE QUI BLOQUE L'EXTENSION ? (§7) ────────────
@@ -13606,17 +13606,17 @@ function CoutAchatVente({ onSaisir, onRelier, surLigne = false, recap = false, p
   const valider = () => {
     const p = prixAchatSaisi(txt);
     if (p === undefined) { setEdit(false); setErr(''); return; }
-    if (p === null) { setErr('Un montant en euros (ex : 25 ou 25,50).'); return; }
+    if (p === null) { setErr(tr('ventes.montantEurosEx')); return; }
     onSaisir(p); setEdit(false); setTxt(''); setErr('');
   };
   return (
     <div data-cout-vente={surLigne ? 'ligne' : recap ? 'recap' : ''} className={recap ? 'vrm-cout-vente vrm-cout-recap' : 'vrm-cout-vente'} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <div className="vrm-cout-rangee" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {recap ? null : <span className="vrm-cout-label" style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>}
+        {recap ? null : <span className="vrm-cout-label" style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>{tr('ventes.coutAchat')}</span>}
         {edit ? (
           <form onSubmit={ev => { ev.preventDefault(); valider(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder="prix payé" aria-label="Prix d'achat de cet article"
+              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder={tr('ventes.prixPaye')} aria-label={tr('ventes.prixAchatArticle')}
                 onKeyDown={e => { if (e.key === 'Escape') { setEdit(false); setTxt(''); setErr(''); } }}
                 style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 28px 0 12px', fontSize: 17, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
@@ -13625,9 +13625,9 @@ function CoutAchatVente({ onSaisir, onRelier, surLigne = false, recap = false, p
           </form>
         ) : (
           <>
-            {propose && onUtiliser ? <Bouton variante="primaire" data-prix-propose={propose.centimes} data-prix-propose-par={propose.par} onClick={onUtiliser}>Utiliser {propose.texte}</Bouton> : null}
-            <Bouton variante="secondaire" icone="pencil" className={recap ? 'vrm-geste-ambre' : undefined} data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">{recap ? 'Saisir le prix d’achat' : 'Prix d’achat'}</Bouton>
-            {onRelier && <Bouton variante={recap ? 'discret' : 'secondaire'} icone="link" data-cout-vente-relier data-cout-vente-autre={propose && onUtiliser ? '1' : undefined} onClick={() => onRelier(!!(propose && onUtiliser))} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">{propose && onUtiliser ? 'Choisir un autre achat' : recap ? 'ou relier un achat' : 'Relier un achat'}</Bouton>}
+            {propose && onUtiliser ? <Bouton variante="primaire" data-prix-propose={propose.centimes} data-prix-propose-par={propose.par} onClick={onUtiliser}>{tr('ventes.utiliser')} {propose.texte}</Bouton> : null}
+            <Bouton variante="secondaire" icone="pencil" className={recap ? 'vrm-geste-ambre' : undefined} data-cout-vente-saisir onClick={() => setEdit(true)} title={tr('ventes.taperPrixPaye')}>{recap ? tr('ventes.saisirPrixAchat') : 'Prix d’achat'}</Bouton>
+            {onRelier && <Bouton variante={recap ? 'discret' : 'secondaire'} icone="link" data-cout-vente-relier data-cout-vente-autre={propose && onUtiliser ? '1' : undefined} onClick={() => onRelier(!!(propose && onUtiliser))} title={tr('ventes.choisirAchatVinted')}>{propose && onUtiliser ? tr('ventes.choisirAutreAchat') : recap ? tr('ventes.relierAchat') : tr('ventes.relierAchat2')}</Bouton>}
           </>
         )}
       </div>
@@ -19003,9 +19003,9 @@ function RaisonBordereauxGrises({ ventes, sansNombre = false }) {
       border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 12, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
       <span style={{ minWidth: 0 }}>
-        <b data-raison-bord-n={sansNombre ? '' : n}>{sansNombre ? 'Générer depuis l’app' : `${n} bordereau${n > 1 ? 'x' : ''} à générer`}</b><span className={r.code === 'telephone' ? 'vrm-aide' : undefined}> — {r.texte}</span>
+        <b data-raison-bord-n={sansNombre ? '' : n}>{sansNombre ? tr('ventes.genererDepuisApp') : tr('ventes.bordereauxGenerer', { n: String(n) })}</b><span className={r.code === 'telephone' ? 'vrm-aide' : undefined}> — {r.texte}</span>
         {(r.geste === 'recharger' || r.geste === 'extensions') && (
-          <> <Bouton variante="secondaire" className="vrm-b-petit" icone="sync" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }} style={{ marginLeft: 4 }}>Recharger la page</Bouton></>
+          <> <Bouton variante="secondaire" className="vrm-b-petit" icone="sync" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }} style={{ marginLeft: 4 }}>{tr('ventes.rechargerPage')}</Bouton></>
         )}
         {/* ⚠️ Le repli qui ne dépend PAS de l'extension de cette page : générer
             le bordereau sur Vinted. Le lien de CHAQUE vente est sur sa ligne
@@ -19015,7 +19015,7 @@ function RaisonBordereauxGrises({ ventes, sansNombre = false }) {
             (revue du 5 octobre). On donne le geste, pas la suite. */}
         {/* (30 oct.) Un repli « Bordereaux et impression › » ressemblait à un écran
             à ouvrir et ne disait qu'une phrase : elle passe derrière ⓘ. */}
-        {' '}<Pourquoi label="Autre solution">Tu peux aussi générer et imprimer le bordereau directement sur Vinted (lien « sur Vinted » de chaque vente).</Pourquoi>
+        {' '}<Pourquoi label={tr('ventes.autreSolution')}>{tr('ventes.peuxAussiGenerer')}</Pourquoi>
       </span>
     </div>
   );
@@ -19038,8 +19038,8 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const base = { display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
     fontSize: grand ? 15 : 13, padding: grand ? '11px 14px' : '7px 11px', cursor: 'pointer', whiteSpace: 'nowrap' };
   if (pdf) {
-    return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={onImprimer} title="Bordereau tamponné (titre + N°), puis impression"
-      style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="printer" size={grand ? 16 : 14}/>{grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Bordereau'}</button>;
+    return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={onImprimer} title={tr('ventes.bordereauTamponneTitre')}
+      style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="printer" size={grand ? 16 : 14}/>{grand ? <><span className="vrm-lib-long">{tr('ventes.imprimerBordereau')}</span><span className="vrm-lib-court">{tr('ventes.imprimer')}</span></> : tr('journee.bordereau')}</button>;
   }
   if (!aGenerer || !uid || !tx) return null;
   const glob = raisonExtGlobale(sansSouris);
@@ -19060,7 +19060,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     //    pu accepter après nos 9 s et générer le bordereau chez Vinted. On dit
     //    qu'on ne sait pas, et la ligne reprend la main dès qu'un évènement de
     //    CE colis arrive (voir `refusVu`).
-    if (!r) { setRefus("L'extension n'a pas répondu à temps — je ne sais pas s'il est parti : si cette ligne n'avance pas d'ici une minute, recharge la page avant de réessayer, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
+    if (!r) { setRefus(tr('ventes.extensionReponduTemps')); __vmrRates = 1; battementExt(); return; }
     if (!r.accepte) {
       setRefus(r.code === 'vinted-autre' ? `${NAV.Ce} est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
         : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} ${NAV.dans}.`
@@ -19090,14 +19090,14 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   return (
     <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-relais={etat && etat.relais ? (job && /^relais-/.test(job.etape) ? job.etape : 'oui') : undefined} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
-        title={raison || (enCours ? "L'extension travaille sur Vinted" : etat && etat.relais ? `Générer le bordereau ${viaOrdinateur(etat.vinted)}` : "L'extension génère le bordereau sur Vinted et l'envoie ici")}
+        title={raison || (enCours ? tr('ventes.extensionTravailleVinted') : etat && etat.relais ? tr('ventes.genererBordereau', { viaOrdinateur: String(viaOrdinateur(etat.vinted)) }) : tr('ventes.extensionGenereBordereau'))}
         style={{ ...base, border: `1px solid ${grise ? C.border : C.accent}`, background: grise ? 'transparent' : `${C.accent}14`,
           color: grise ? C.muted : C.accent, opacity: grise ? 0.55 : 1, cursor: grise || enCours ? 'not-allowed' : 'pointer', filter: grise ? 'grayscale(1)' : 'none' }}>
         <Icon name="doc" size={grand ? 16 : 14}/>{libelle}
       </button>
       {(distingue || refusVu || (ko && job.raison)) && (
         <span style={{ fontSize: 11, color: refusVu || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
-          {refusVu || (ko ? (job.etape === 'genere_sans_pdf' ? `Généré chez Vinted, mais le PDF n'est pas encore prêt (${job.raison}).` : job.raison) : distingue)}
+          {refusVu || (ko ? (job.etape === 'genere_sans_pdf' ? tr('ventes.genereChezVinted', { raison: String(job.raison) }) : job.raison) : distingue)}
         </span>
       )}
       {/* Le repli à la main : l'extension a posé un rendez-vous de 15 min, le PDF
@@ -19105,12 +19105,12 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
       {ko && job.etape === 'genere_sans_pdf' && (
         <a href={surVinted} target="_blank" rel="noreferrer"
           style={{ fontSize: 12, color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>
-          Ouvrir la vente sur Vinted et télécharger le PDF ↗
+          {tr('ventes.ouvrirVenteVinted')}
         </a>
       )}
       {repliVinted && !(ko && job.etape === 'genere_sans_pdf') && (
         <a data-bord-vinted={tx} href={surVinted} target="_blank" rel="noreferrer"
-          style={{ fontSize: 12, color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>sur Vinted ↗</a>
+          style={{ fontSize: 12, color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>{tr('ventes.vinted')}</a>
       )}
     </span>
   );
@@ -20735,9 +20735,9 @@ function RetirerArgent({ liveStats }) {
   return (
     <div data-retirer-argent={liste.length} data-portefeuille-vide={total === 0 ? "true" : undefined} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
       <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: '2px 0', minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
-        <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 15, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{/* Le total disponible est déjà écrit dans le résumé juste au-dessus : la
+        <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 15, fontWeight: 700 }}>{tr('ventes.retirerMonArgent')}</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{/* Le total disponible est déjà écrit dans le résumé juste au-dessus : la
             ligne repliée ne le redit pas (le même nombre deux fois, §7), elle dit
-            OÙ il est. */}{total > 0 ? (() => { const n = liste.filter((x) => x.dispo > 0).length; return n > 1 ? `Disponible sur ${n} comptes — détail par compte` : `Disponible sur ${liste.find((x) => x.dispo > 0)?.login || 'un compte'} — ouvre ton porte-monnaie`; })() : 'Rien de disponible pour l\'instant'}</span></span>
+            OÙ il est. */}{total > 0 ? (() => { const n = liste.filter((x) => x.dispo > 0).length; return n > 1 ? `Disponible sur ${n} comptes — détail par compte` : `Disponible sur ${liste.find((x) => x.dispo > 0)?.login || 'un compte'} — ouvre ton porte-monnaie`; })() : tr('ventes.rienDisponibleInstant')}</span></span>
         <span aria-hidden="true" style={{ color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span>
       </button>
       {ouvert && (
@@ -20745,13 +20745,13 @@ function RetirerArgent({ liveStats }) {
           {liste.map((x) => (
             <div key={x.uid} data-retirer-compte={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="vrm-sensible" style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || `compte ${x.uid}`}</div>
-                <div style={{ fontSize: 12, color: C.muted }}>{montant(x.dispo)} disponible{x.jours != null && x.jours > 0 ? ` · lu il y a ${x.jours} j` : ''}</div>
+                <div className="vrm-sensible" style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || tr('ventes.compte', { uid: String(x.uid) })}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>{montant(x.dispo)} {tr('ventes.disponible')}{x.jours != null && x.jours > 0 ? tr('ventes.lu', { jours: String(x.jours) }) : ''}</div>
               </div>
-              {x.dispo > 0 && <Bouton variante="secondaire" href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>Retirer sur Vinted ↗</Bouton>}
+              {x.dispo > 0 && <Bouton variante="secondaire" href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>{tr('ventes.retirerVinted')}</Bouton>}
             </div>
           ))}
-          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>Connecte-toi d'abord sur le bon compte dans ton navigateur.<Pourquoi label="Pourquoi sur Vinted ?">Le virement se fait dans ton porte-monnaie Vinted, sur le compte connecté dans ton navigateur. VRM ne déplace jamais ton argent lui-même.</Pourquoi></div>
+          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>{tr('ventes.connecteToiAbord')}<Pourquoi label={tr('ventes.pourquoiVinted')}>{tr('ventes.virementFaitDans')}</Pourquoi></div>
         </div>
       )}
     </div>
@@ -21654,22 +21654,22 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
-        <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
-        <span className="vrm-fu-vente-l2">{fusion.lot ? <span className="vrm-fu-lot" data-vente-lot={fusion.lot.n || ""} data-lot-nums={(fusion.lot.nums || []).join(",")} data-lot-non-relies={fusion.lot.nonRelies || 0}>{fusion.lot.n && new RegExp(`\\b${fusion.lot.n}\\s*articles?\\b`, "i").test(fusion.nom || "") ? null : <span className="vrm-fu-lot-mot">{fusion.lot.n ? `Lot · ${fusion.lot.n} articles` : "Lot"}</span>}{(fusion.lot.nums || []).map((n) => <Numero key={n} n={n} taille="petit" data-fu-num=""/>)}{fusion.lot.nonRelies ? <span className="vrm-fu-lot-mot vrm-fu-lot-manque" data-lot-ligne-manque={fusion.lot.nonRelies}>+ {fusion.lot.nonRelies} non relié{fusion.lot.nonRelies > 1 ? "s" : ""}</span> : null}</span> : fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.transp && fusion.transp.cle ? <span className="vrm-fu-vente-transp" title={fusion.transp.nom || ''} aria-label={fusion.transp.nom || ''} data-fu-transp-ligne={fusion.transp.cle}><LogoTransporteur cle={fusion.transp.cle} taille={16}/></span> : null}{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
+        <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || tr('journee.sansTitre')}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
+        <span className="vrm-fu-vente-l2">{fusion.lot ? <span className="vrm-fu-lot" data-vente-lot={fusion.lot.n || ""} data-lot-nums={(fusion.lot.nums || []).join(",")} data-lot-non-relies={fusion.lot.nonRelies || 0}>{fusion.lot.n && new RegExp(`\\b${fusion.lot.n}\\s*articles?\\b`, "i").test(fusion.nom || "") ? null : <span className="vrm-fu-lot-mot">{fusion.lot.n ? tr('ventes.lotArticles', { x: String(fusion.lot.n) }) : tr('ventes.lot')}</span>}{(fusion.lot.nums || []).map((n) => <Numero key={n} n={n} taille="petit" data-fu-num=""/>)}{fusion.lot.nonRelies ? <span className="vrm-fu-lot-mot vrm-fu-lot-manque" data-lot-ligne-manque={fusion.lot.nonRelies}>+ {fusion.lot.nonRelies} {tr('ventes.nonRelie')}{fusion.lot.nonRelies > 1 ? "s" : ""}</span> : null}</span> : fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.transp && fusion.transp.cle ? <span className="vrm-fu-vente-transp" title={fusion.transp.nom || ''} aria-label={fusion.transp.nom || ''} data-fu-transp-ligne={fusion.transp.cle}><LogoTransporteur cle={fusion.transp.cle} taille={16}/></span> : null}{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
         <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
       </span> : null}
-      <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{numTitre ? <><Numero n={numTitre} taille="petit" data-titre-num=""/>{' '}{titreNom || '(sans titre)'}</> : (titre || '(sans titre)')}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
+      <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{numTitre ? <><Numero n={numTitre} taille="petit" data-titre-num=""/>{' '}{titreNom || tr('journee.sansTitre')}</> : (titre || tr('journee.sansTitre'))}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
       {benef ? <span className="vrm-ledger-sale-achat" data-achat-ligne={benef.achatCentimes ?? ''} data-achat-etat={benef.achatCentimes == null ? 'manque' : 'lu'}>{benef.achatTxt}</span> : null}
-      {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">au plus </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
+      {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">{tr('ventes.plus')} </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
       <span className="vrm-ledger-sale-plus" aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
     {/* (3 nov., critique #5) Maquette FusionVentes : deux commandes au plus sur la carte (puce +
         bordereau). Le reste (prix d'achat, relier un achat, « Déposé », « sur Vinted ») passe
         derrière « … », le même motif que Colis — rien n'est retiré, un toucher l'ouvre. */}
     {/* (6 nov., vague 2) `basSeul` : la rangée du bas est toute visible (« Remettre en vente ») — pas de « … » vide. */}
-    {fusion && (gestes || (bas && !basSeul)) ? <button type="button" className="vrm-fu-plus vrm-fu-plus-vente" data-vente-plus="" data-fu-geste="" aria-label="Plus d'actions sur cette vente" aria-expanded="false"
+    {fusion && (gestes || (bas && !basSeul)) ? <button type="button" className="vrm-fu-plus vrm-fu-plus-vente" data-vente-plus="" data-fu-geste="" aria-label={tr('ventes.plusActionsVente')} aria-expanded="false"
       onClick={(e)=>{ const c = e.currentTarget.closest('[data-fu-forme]'); if (!c) return; const on = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', on); e.currentTarget.setAttribute('aria-expanded', on ? 'true' : 'false'); }}>
       <Icon name="more" size={18}/></button> : null}
     {frise}
@@ -21684,10 +21684,10 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
     {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className={recap?'vrm-ledger-drawer vrm-recap':'vrm-ledger-drawer'} role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} data-recap-vente={recap?'':undefined} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
         {recap ? <div className="vrm-main vrm-ledger-drawer-body vrm-recap-corps">{recap({ titreId: panneau+'-titre', fermerRef: fermer, fermer: close })}</div> : <>
-        <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
+        <header className="vrm-ledger-drawer-head"><div><span>{tr('ventes.vente')}</span><h2 id={panneau+'-titre'}>{titre || tr('ventes.vente2')}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label={tr('ventes.fermerDetailsVente')} onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
-          <div className="vrm-fiche-vente-acces"><span data-vente-acces="">{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'}{compte !== undefined ? <> · Vendue sur <CompteVente compte={compte} plateforme={plateforme} ou="detail"/></> : null}{sous ? ` · ${sous}` : (compte === undefined ? ' · Compte et date dans les détails' : '')}</span>
-          {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche N°{n} ›</Bouton>):<small title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</small>}</div>
+          <div className="vrm-fiche-vente-acces"><span data-vente-acces="">{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):tr('ventes.vente2')}{compte !== undefined ? <> {tr('ventes.vendue')} <CompteVente compte={compte} plateforme={plateforme} ou="detail"/></> : null}{sous ? ` · ${sous}` : (compte === undefined ? tr('ventes.compteDateDans') : '')}</span>
+          {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>{tr('ventes.fiche')}{n} ›</Bouton>):<small title={tr('ventes.numeroVrmConfirme')}>{tr('ventes.sansVrm')}</small>}</div>
           <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
         </>}
       </section>
@@ -43375,7 +43375,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
       {curSub==='ventes' && (<>
-        {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
+        {!dansPlateforme && <ScreenHead icon="cash" title={tr('nav.ventes')} desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
         {/* (11 nov., anti double vente) EN TÊTE : vendu ici, encore en ligne ailleurs — un toucher. */}
         {!baseKO && blocRetirerAilleurs(false)}
         {/* (2 nov., style « Fusion », son choix : « la première photo avec les stats
@@ -43418,8 +43418,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  mène à Colis (son `aller` du catalogue), elle ne déplie plus ici une seconde liste « à envoyer ». */
               attrsDe={(x) => x.place.id === 'vendu' && (x.p === 'mois' || (pf && x.p === pf)) ? { 'data-fu-vendu-mois': x.valeur == null ? '' : String(Math.round(x.valeur * 100)), 'data-fu-partiel': x.partiel ? '1' : undefined, 'data-fu-pas-su': x.valeur == null ? '1' : undefined } : x.place.id === 'aposter' ? { 'data-n': x.valeur == null ? '' : String(x.valeur), 'aria-pressed': vFilter === 'aexpedier' } : null}
               locaux={{
-                enroute: { nom: 'Ventes en route', court: 'en route', type: 'n', valeur: pasSu ? null : enRoute, titre: 'Déposées, pas encore livrées', onClick: () => setVFilter((v) => v === 'transit' ? 'all' : 'transit'), attrs: { 'data-n': pasSu ? '' : String(enRoute), 'aria-pressed': vFilter === 'transit' } },
-                apayer: { nom: 'Ventes à payer', court: 'à payer', type: 'n', valeur: pasSu ? null : aVenir, titre: "Livrées : l'argent arrive quand l'acheteur confirme", attrs: { 'data-n': pasSu ? '' : String(aVenir) } },
+                enroute: { nom: 'Ventes en route', court: tr('ventes.route'), type: 'n', valeur: pasSu ? null : enRoute, titre: tr('ventes.deposeesEncoreLivrees'), onClick: () => setVFilter((v) => v === 'transit' ? 'all' : 'transit'), attrs: { 'data-n': pasSu ? '' : String(enRoute), 'aria-pressed': vFilter === 'transit' } },
+                apayer: { nom: 'Ventes à payer', court: tr('ventes.payer'), type: 'n', valeur: pasSu ? null : aVenir, titre: tr('ventes.livreesArgentArrive'), attrs: { 'data-n': pasSu ? '' : String(aVenir) } },
               }}/>
           );
         })()}
@@ -43433,13 +43433,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         {/* (26 oct.) Dans l'espace Vinted, le nombre de résultats seul sur sa ligne
             ne servait qu'à repousser la liste : il ne reste que sur l'écran seul. */}
-        {!dansPlateforme && <div className="vrm-mobile-sales-intro"><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>}
+        {!dansPlateforme && <div className="vrm-mobile-sales-intro"><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? tr('ventes.resultats', { n: String(ventesAffichees.length) }) : sales.loading ? tr('reglages.langue.chargement') : tr('ventes.nonDisponible')}</span></div>}
         <div className="vrm-workbar vrm-sales-workbar" style={{position:'relative'}}>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
-            <ChampRecherche valeur={ordSearch} onChange={setOrdSearch} label="Rechercher dans les ventes Vinted" placeholder="Rechercher une vente" micro data-ventes-recherche=""/>
+            <ChampRecherche valeur={ordSearch} onChange={setOrdSearch} label={tr('ventes.rechercherDansVentes')} placeholder={tr('ventes.rechercherVente')} micro data-ventes-recherche=""/>
             {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
-              <span>Filtres actifs</span><Bouton variante="discret" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</Bouton>
+              <span>{tr('ventes.filtresActifs')}</span><Bouton variante="discret" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>{tr('ventes.reinitialiserVentes')}</Bouton>
             </div>}
           </div>
         )}
@@ -43454,7 +43454,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {[['all','Toutes'],['transit',L.enRoute],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
             <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'background-color .15s ease, color .15s ease'}}>{label}</button>
           ))}
-          {onNav ? <button type="button" className="vrm-ventes-vers-colis" data-ventes-vers-colis="" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{L.aEnvoyer} : Colis ›</button> : null}
+          {onNav ? <button type="button" className="vrm-ventes-vers-colis" data-ventes-vers-colis="" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{L.aEnvoyer} {tr('ventes.colis')}</button> : null}
         </div>
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
@@ -43466,7 +43466,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (30 oct.) Plus de point ROUGE : il signalait les litiges, retirés de ce
                   menu le 30 sept. — il ne menait plus à rien (§7 : le rouge, c'est le
                   doublon de N°). */}
-              <Bouton variante="secondaire" className="vrm-b-petit" icone="more" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Rapport comptable, registre annuel, export, rétrospective">Outils</Bouton>
+              <Bouton variante="secondaire" className="vrm-b-petit" icone="more" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title={tr('ventes.rapportComptableRegistre')}>{tr('ventes.outils')}</Bouton>
               {toolsOpen && outilsOrdinateur && menuOutilsVentes(false)}
             </div>
           )}
@@ -43479,7 +43479,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             au-dessus de tout : six pastilles + la recherche formaient deux blocs
             pleins avant la première vente. Ici, elle est là où on l'utilise —
             on choisit « Finalisées », puis le mois. */}
-        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes" datation="Date de vente"/>}
+        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} titre={tr('ventes.periodeVentes')} datation="Date de vente"/>}
         </div>
         <NoAcc/>
         {/* ⚠️ LES VENTES LEBONCOIN NE SONT PLUS ICI : elles vivent dans l'espace
@@ -43501,8 +43501,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
           return (
             <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{montant(tot)} de boosts sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span>
-                <Pourquoi label="D'où vient ce montant ?">Capté dans ta facturation Vinted par l'extension. Reporte chaque montant dans le champ « Boost » de son annonce pour un bénéfice net exact — l'app ne l'inscrit pas toute seule, pour ne pas écraser tes saisies.</Pourquoi></div>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{montant(tot)} {tr('ventes.boostsVinted')} <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} {tr('ventes.mise')}{boostsDetected.length>1?'s':''} {tr('ventes.avant')}</span>
+                <Pourquoi label={tr('ventes.vientMontant')}>{tr('ventes.capteDansFacturation')}</Pourquoi></div>
             </div>
           );
         })()}
@@ -43523,7 +43523,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             nommés au rendu — y compris quand la liste vient du cache. */}
         {nomsVentesKO.length>0 && (
           <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
-            {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} : {nomsVentesKO.join(', ')}. Ouvre {nomsVentesKO.length>1?'ces comptes':'ce compte'} sur vinted.fr, puis « Synchroniser ».
+            {nomsVentesKO.length} {tr('ventes.compte2')}{nomsVentesKO.length>1?'s':''} {tr('ventes.nonCharge')}{nomsVentesKO.length>1?'s':''} : {nomsVentesKO.join(', ')}{tr('ventes.ouvre')} {nomsVentesKO.length>1?tr('ventes.cesComptes'):tr('ventes.compte3')} {tr('ventes.vintedFrPuis')}
           </div>
         )}
         {/* (5 nov., chantier E2) UN COMPTE QUI ANNULE NETTEMENT PLUS QUE LES AUTRES, sur 30 jours.
@@ -43539,19 +43539,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!alertes.length) return null;
           const jourA = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
           return alertes.map((x) => (
-            <section key={x.uid} className="vrm-annul-alerte" data-annulations-alerte={x.uid} data-annulations-n={String(x.annulees)} data-annulations-sur={String(x.n)} aria-label={`Annulations du compte ${x.compte}`}>
+            <section key={x.uid} className="vrm-annul-alerte" data-annulations-alerte={x.uid} data-annulations-n={String(x.annulees)} data-annulations-sur={String(x.n)} aria-label={tr('ventes.annulationsCompte', { compte: String(x.compte) })}>
               <div className="vrm-annul-alerte-tete">
                 <Icon name="info" size={18}/>
                 <div style={{ minWidth: 0 }}>
-                  <p className="vrm-annul-alerte-titre"><span className="vrm-sensible">{x.compte}</span> annule plus que tes autres comptes</p>
-                  <p className="vrm-annul-alerte-sous">{x.annulees} annulation{x.annulees > 1 ? 's' : ''} sur {x.n} ventes en 30 jours ({pctFr(x.taux)}), contre {pctFr(x.tauxAutres)} sur tes autres comptes.</p>
+                  <p className="vrm-annul-alerte-titre"><span className="vrm-sensible">{x.compte}</span> {tr('ventes.annulePlusAutres')}</p>
+                  <p className="vrm-annul-alerte-sous">{x.annulees} {tr('ventes.annulation')}{x.annulees > 1 ? 's' : ''} {tr('journee.texte2')} {x.n} {tr('ventes.ventes30Jours')}{pctFr(x.taux)}{tr('ventes.contre')} {pctFr(x.tauxAutres)} {tr('ventes.autresComptes')}</p>
                 </div>
               </div>
               <details>
-                <summary className="vrm-annul-alerte-voir">Voir {x.annulees > 1 ? `les ${x.annulees} ventes annulées` : 'la vente annulée'}<span aria-hidden="true">›</span></summary>
+                <summary className="vrm-annul-alerte-voir">{tr('ventes.voir')} {x.annulees > 1 ? tr('ventes.ventesAnnulees', { annulees: String(x.annulees) }) : tr('ventes.venteAnnulee')}<span aria-hidden="true">›</span></summary>
                 {x.liste.map((v) => (
                   <div key={v.id} className="vrm-annul-ligne" data-annulation-vente={v.id}>
-                    <span>{v.titre || 'Vente sans titre'}<small>{jourA(v.ts)}{v.eur != null ? ` · ${montant(v.eur)}` : ''}{v.statut && !/^commande annul[ée]e$/i.test(v.statut.trim()) ? ` · ${v.statut}` : ''}</small></span>
+                    <span>{v.titre || tr('ventes.venteSansTitre')}<small>{jourA(v.ts)}{v.eur != null ? ` · ${montant(v.eur)}` : ''}{v.statut && !/^commande annul[ée]e$/i.test(v.statut.trim()) ? ` · ${v.statut}` : ''}</small></span>
                     {v.lien ? <a href={v.lien} target="_blank" rel="noreferrer" aria-label={`Ouvrir sur Vinted : ${v.titre || 'la vente'}`}>Vinted ↗</a> : null}
                   </div>
                 ))}
@@ -43563,7 +43563,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.error && <EtatPanne quoi="Tes ventes Vinted" raison="La lecture n’a pas répondu. Rien n’est perdu." onReessayer={()=>loadOrders('sold',setSales,true)}/>}
         {/* (5 nov., chantier E2) L'état vide dit ce qui va se passer : TOUTES les ventes arrivent ici
             (pas seulement les finalisées, comme le disait l'ancienne phrase). */}
-        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide vrm-vide-dessin" data-ventes-vide=""><Illustration nom="etiquette" taille={110}/><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part sur Vinted, il apparaît ici avec son état et son bordereau.</p></div>}
+        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide vrm-vide-dessin" data-ventes-vide=""><Illustration nom="etiquette" taille={110}/><p className="vrm-toutes-vide-titre">{tr('ventes.aucuneVenteInstant')}</p><p>{tr('ventes.articlePartVinted')}</p></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma
@@ -43580,7 +43580,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             absente, muette ou en retard, TOUS les boutons « Générer le
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
-        {nPropVentes > 1 && <div className="vrm-prix-proposes" data-prix-proposes={nPropVentes} style={{display:'flex',justifyContent:'flex-end',margin:'0 0 10px'}}><Bouton variante="secondaire" icone="check" data-prix-proposes-valider="" onClick={()=>validerPropositions([...propositionsPrix.m.keys()].filter(c=>c.startsWith('v:')))}>Valider les {nPropVentes} prix proposés</Bouton></div>}
+        {nPropVentes > 1 && <div className="vrm-prix-proposes" data-prix-proposes={nPropVentes} style={{display:'flex',justifyContent:'flex-end',margin:'0 0 10px'}}><Bouton variante="secondaire" icone="check" data-prix-proposes-valider="" onClick={()=>validerPropositions([...propositionsPrix.m.keys()].filter(c=>c.startsWith('v:')))}>{tr('ventes.valider')} {nPropVentes} {tr('ventes.prixProposes')}</Bouton></div>}
         {/* (6 nov., vague 2 · E2 « ce qui reste ») LE PRIX D'ACHAT SE DIT UNE FOIS, EN TÊTE — comme Annonces
             (chantier C, `data-ann-achats`) : « Prix d'achat N/M connus · Compléter ». Compté sur les ventes
             affichées qui ont un coût (pas les annulées, ni une autre devise), avec la règle de la ligne
@@ -43593,8 +43593,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div className="vrm-ann-avis vrm-ventes-avis" data-ventes-avis="">
               <div className="vrm-ann-achats" data-ventes-achats={`${n}/${m}`} role="status">
-                <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">Prix d’achat</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">connus</span></span>
-                <Bouton variante="discret" data-ventes-achats-completer="" title="Le bénéfice ne compte que les prix d’achat connus" onClick={()=>setFillBuyOpen(true)}>{VERBES.completer}</Bouton>
+                <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">{tr('ventes.prixAchat')}</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">{tr('ventes.connus')}</span></span>
+                <Bouton variante="discret" data-ventes-achats-completer="" title={tr('ventes.beneficeComptePrix')} onClick={()=>setFillBuyOpen(true)}>{VERBES.completer}</Bouton>
               </div>
             </div>
           );
@@ -43612,9 +43612,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {ventesAffichees.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieVentes}/></div>}
         <BarreSerie serie={serieVentes} actions={actionsSerieVentes()} rendreIcone={iconeApp}/>
         <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-          <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
+          <div className="vrm-ledger-heading" aria-hidden="true"><span>{tr('ventes.article')}</span><span className="vrm-ledger-state-heading">{tr('ventes.etat')}</span><span>{tr('ventes.montant')}</span></div>
           {/* (1er nov.) Sur ordinateur : les colonnes Prix · Achat · Bénéfice (maquette « ventes-ordi »). */}
-          <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Prix</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
+          <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>{tr('ventes.article')}</span><span>{tr('ventes.etat')}</span><span className="is-droite">{tr('accueil.nav.prix')}</span><span className="is-droite">{tr('ventes.achat')}</span><span className="is-droite">{tr('ventes.benefice')}</span><span/></div>
           {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
               Mesuré (banc `ventes-frappe.cjs`, téléphone ×4) : chaque lettre
               recréait les 60 lignes au rendu urgent PUIS au rendu différé —
@@ -43659,7 +43659,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const coutManque = !hidden && st!=='cancelled' && buy==null && (!(e && e.buyFromId) || !!propPrix);
             const benefLigne = { etat: lb.etat, achatCentimes: lb.achat!=null ? Math.round(lb.achat*100) : null, benefCentimes: lb.benefice!=null ? Math.round(lb.benefice*100) : null,
               achatTxt: lb.achat!=null ? `${eurosLigne(lb.achat)}\u00a0€` : (st==='cancelled' ? '' : coutManque ? 'à saisir' : '—'), benefTxt: texteBenefice(lb.etat==='partiel' ? { ...lb, etat:'ok' } : lb),
-              aria: lb.etat==='partiel' ? `Bénéfice : au plus ${texteBenefice({ ...lb, etat:'ok' })}, frais pas confirmés` : lb.etat==='achat' ? "Bénéfice : prix d'achat manquant" : undefined };
+              aria: lb.etat==='partiel' ? `Bénéfice : au plus ${texteBenefice({ ...lb, etat:'ok' })}, frais pas confirmés` : lb.etat==='achat' ? tr('ventes.beneficePrixAchat') : undefined };
             // (1er nov.) « DÉPOSÉ » : seulement une vente À EXPÉDIER, pas encore cochée.
             const txL = String(o.transaction_id);
             const deposeIci = !!(deposeVente.attente && deposeVente.attente.cle === txL);
@@ -43675,10 +43675,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // vente » (SON clic → « Republier à la main » depuis le coffre, src/annuleesChezToi.js).
             const annChez = annulChezParTx.get(txL) || null;
             const gesteRemise = annChez ? <div className="vrm-remise-ligne" data-remise-vente={txL} data-remise-etat={annChez.etat} data-remise-num={annChez.sansNum ? 'sans' : annChez.archive ? 'archive' : 'garde'}>
-                {annChez.item ? <Bouton variante="secondaire" icone="sync" data-remettre-vente={txL} onClick={()=>remettreEnVente(annChez)}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
-                {annChez.sansNum ? <span className="vrm-remise-note" data-remise-sans-num="">Paire pas reliée</span> : !annChez.item ? <span className="vrm-remise-note">Annonce pas identifiée</span> : null}
+                {annChez.item ? <Bouton variante="secondaire" icone="sync" data-remettre-vente={txL} onClick={()=>remettreEnVente(annChez)}>{annChez.etat === 'en-cours' ? tr('ventes.reprendreRemiseVente') : tr('ventes.remettreVente')}</Bouton> : null}
+                {annChez.sansNum ? <span className="vrm-remise-note" data-remise-sans-num="">{tr('ventes.paireReliee')}</span> : !annChez.item ? <span className="vrm-remise-note">{tr('ventes.annonceIdentifiee')}</span> : null}
               </div> : null;
-            const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
+            const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>{tr('ventes.depose')}</Bouton> : null;
             // ── (1er nov.) LE RÉCAPITULATIF DE LA VENTE — maquette A, « fiche en lignes nettes »
             // (Julien : « applique tout, je veux que ce soit clair »). De haut en bas : la paire
             // (photo, N° seulement si l'identité le donne, nom, taille), UNE phrase d'état et la
@@ -43739,19 +43739,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
                   <div className="vrm-recap-ident">
-                    {lot && lot.lu && lot.nums.length > 1 ? <span className="vrm-recap-nums-lot" data-recap-num={lot.nums.join(',')}>{lot.nums.map((n) => <Numero key={n} n={n} taille="grand"/>)}</span> : num ? <Numero n={num} taille="grand" data-recap-num={num}/> : <span className="vrm-recap-sans-num" data-recap-num="" title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</span>}
+                    {lot && lot.lu && lot.nums.length > 1 ? <span className="vrm-recap-nums-lot" data-recap-num={lot.nums.join(',')}>{lot.nums.map((n) => <Numero key={n} n={n} taille="grand"/>)}</span> : num ? <Numero n={num} taille="grand" data-recap-num={num}/> : <span className="vrm-recap-sans-num" data-recap-num="" title={tr('ventes.numeroVrmConfirme')}>{tr('ventes.sansVrm')}</span>}
                     <h2 id={titreId} className="vrm-recap-nom">{nom}</h2>
                     {sousTitre ? <p className="vrm-recap-sous">{sousTitre}</p> : null}
                   </div>
-                  <button ref={fermerRef} type="button" className="vrm-recap-fermer" aria-label="Fermer les détails de la vente" onClick={fermer}><Icon name="close" size={18}/></button>
+                  <button ref={fermerRef} type="button" className="vrm-recap-fermer" aria-label={tr('ventes.fermerDetailsVente')} onClick={fermer}><Icon name="close" size={18}/></button>
                 </header>
                 <section className="vrm-recap-etat" data-recap-etat={vs.label}>
                   <p className="vrm-recap-phrase" data-recap-phrase=""><strong>{phrase.gras}</strong>{phrase.suite ? ' ' + phrase.suite : ''}</p>
                   {issue ? <p className="vrm-recap-issue" data-retour-archive={issue.k}>{issue.t}</p> : null}
-                  {o._fromEmail ? <p className="vrm-recap-issue">Reconstituée depuis l'email — pas encore confirmée par Vinted.</p> : null}
+                  {o._fromEmail ? <p className="vrm-recap-issue">{tr('ventes.reconstitueeDepuisEmail')}</p> : null}
                   {pre.litige && !pre.litige.ancien ? (() => { const l = pre.litige; const lim = texteLimiteLitige(l); return (
                     <div className="vrm-recap-litige" data-recap-litige={l.genre} data-litige-limite={l.limite || ''} data-litige-cle={l.cle}>
-                      <p className="vrm-recap-issue"><strong>{LIBELLE_LITIGE[l.genre] || 'Litige'}</strong>{' · '}{lim ? `avant le ${lim}` : 'délai non lu'}</p>
+                      <p className="vrm-recap-issue"><strong>{LIBELLE_LITIGE[l.genre] || tr('ventes.litige')}</strong>{' · '}{lim ? tr('ventes.avant2', { lim: String(lim) }) : tr('ventes.delaiNonLu')}</p>
                       <Bouton variante="secondaire" className="vrm-b-petit" href={l.geste.url} target="_blank" rel="noreferrer" data-litige-geste={l.geste.url}>{l.geste.libelle} ↗</Bouton>
                     </div>); })() : null}
                   {/* (10 nov., lot BE) LA FRISE PROUVÉE : sept étapes, chacune seulement si SA preuve est lue
@@ -43760,58 +43760,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {pre.frisePv ? <FriseVente frise={pre.frisePv.frise} transporteur={trRecap} verse={pre.frisePv.verse} bordereau={pre.frisePv.bordereau} cle={txL}/> : null}
                 </section>
                 {lot ? <ArticlesLotVente lot={lot} devise={devise || 'EUR'} tx={txL} onRelier={hidden || st === 'cancelled' ? null : relierArticleLot}/> : null}
-                <section className="vrm-recap-argent" aria-label="L'argent">
-                  <h3 className="vrm-recap-titre">L'argent</h3>
+                <section className="vrm-recap-argent" aria-label={tr('ventes.argent')}>
+                  <h3 className="vrm-recap-titre">{tr('ventes.argent')}</h3>
                   {st !== 'cancelled' ? <BarreCoutVente c={cv}/> : null}
                   <dl>
-                    <div className="vrm-recap-ligne"><dt>Prix de vente</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt><PointCout cle="achat"/>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={(autre)=>openPicker({ ...saleItem, _dateRef: o.date, _autre: autre ? '1' : undefined })}/> : '—'}</dd></div> : null}
-                    {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt><PointCout cle="frais"/>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
-                    {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/>Emballage</dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt><PointCout cle="benefice"/>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
+                    <div className="vrm-recap-ligne"><dt>{tr('ventes.prixVente')}</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt><PointCout cle="achat"/>{tr('ventes.prixAchat')}</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={(autre)=>openPicker({ ...saleItem, _dateRef: o.date, _autre: autre ? '1' : undefined })}/> : '—'}</dd></div> : null}
+                    {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt><PointCout cle="frais"/>{tr('ventes.frais')}</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
+                    {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/>{tr('ventes.emballage')}</dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt><PointCout cle="benefice"/>{tr('ventes.benefice')}</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">{tr('ventes.plus')} </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
                   </dl>
                 </section>
-                <section className="vrm-recap-details" aria-label="Détails">
+                <section className="vrm-recap-details" aria-label={tr('ventes.details')}>
                   <dl>
-                    {acheteur ? <div className="vrm-recap-ligne"><dt>Acheteur</dt><dd>{acheteur}</dd></div> : null}
-                    <div className="vrm-recap-ligne" data-vente-acces=""><dt>Compte</dt><dd><CompteVente compte={o._acc ? (accNameOf(o._acc) || null) : null} plateforme="vinted" ou="detail"/> · Vinted</dd></div>
+                    {acheteur ? <div className="vrm-recap-ligne"><dt>{tr('ventes.acheteur')}</dt><dd>{acheteur}</dd></div> : null}
+                    <div className="vrm-recap-ligne" data-vente-acces=""><dt>{tr('ventes.compte4')}</dt><dd><CompteVente compte={o._acc ? (accNameOf(o._acc) || null) : null} plateforme="vinted" ou="detail"/> · Vinted</dd></div>
                     {/* (10 nov., lot U) L'avis de l'acheteur, relié par n° de transaction SEULEMENT (src/avisVente.js). */}
                     {o.transaction_id != null && st !== 'cancelled' && o._acc ? <AvisVente uid={o._acc.vinted_user_id} tx={String(o.transaction_id)} lire={lireAvisCompte}/> : null}
-                    {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{o.date ? dateFr(o.date, { weekday: 'short', day: 'numeric', month: 'short' }) : '— date pas lue'}</dd></div> : null}
-                    {!bordGeste && (trRecap.cle || trRecap.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trRecap} C={C} seul data-recap-transporteur=""/></dd></div> : null}
-                    {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
+                    {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>{tr('ventes.vendue2')}</dt><dd>{o.date ? dateFr(o.date, { weekday: 'short', day: 'numeric', month: 'short' }) : tr('ventes.dateLue')}</dd></div> : null}
+                    {!bordGeste && (trRecap.cle || trRecap.nom) ? <div className="vrm-recap-ligne"><dt>{tr('ventes.transporteur')}</dt><dd><PastilleTransporteur t={trRecap} C={C} seul data-recap-transporteur=""/></dd></div> : null}
+                    {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>{tr('ventes.suivi')}</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
                     {/* (10 nov., lot AZ) La photo du carton fermé, rangée avec CETTE vente (son n° de transaction). */}
                     {o.transaction_id != null && st !== 'cancelled' ? <PhotoCartonVente site="vinted" tx={txL} num={num || ''}/> : null}
-                    {cell ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd><button type="button" className="vrm-lien-action" onClick={()=>{fermer();onLocate&&onLocate(num);}} title="Voir la paire au stock">{garageCellLabel(cell)}</button></dd></div>
-                      : (num && aExpedier(o) && garageUtilise) ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd>pas au garage</dd></div> : null}
-                    {aRelie ? <div className="vrm-recap-ligne" data-recap-achat-relie=""><dt>Achat relié</dt><dd><span className="vrm-recap-achat-photo">{orderPhoto(aRelie) ? <PhotoVinted src={orderPhoto(aRelie)} alt="Photo de l'achat" data-photo-achat="1" loading="lazy" decoding="async"/> : null}</span>{[aRelie.date ? new Date(aRelie.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', 'Vinted'].filter(Boolean).join(' · ')}</dd></div> : null}
+                    {cell ? <div className="vrm-recap-ligne"><dt>{tr('ventes.rangement')}</dt><dd><button type="button" className="vrm-lien-action" onClick={()=>{fermer();onLocate&&onLocate(num);}} title={tr('ventes.voirPaireStock')}>{garageCellLabel(cell)}</button></dd></div>
+                      : (num && aExpedier(o) && garageUtilise) ? <div className="vrm-recap-ligne"><dt>{tr('ventes.rangement')}</dt><dd>{tr('ventes.garage')}</dd></div> : null}
+                    {aRelie ? <div className="vrm-recap-ligne" data-recap-achat-relie=""><dt>{tr('ventes.achatRelie')}</dt><dd><span className="vrm-recap-achat-photo">{orderPhoto(aRelie) ? <PhotoVinted src={orderPhoto(aRelie)} alt={tr('ventes.photoAchat')} data-photo-achat="1" loading="lazy" decoding="async"/> : null}</span>{[aRelie.date ? new Date(aRelie.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', 'Vinted'].filter(Boolean).join(' · ')}</dd></div> : null}
                   </dl>
                 </section>
-                <section className="vrm-recap-gestes" aria-label="Actions">
+                <section className="vrm-recap-gestes" aria-label={tr('ventes.actions')}>
                   {bordGeste ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
                   <div className="vrm-recap-grille">
-                    {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('cat_msg', null, ONGLETS_DEPLACES).tab); onNav('cat_msg'); }}>Conversation</Bouton> : null}
-                    {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche de la paire</Bouton> : null}
+                    {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('cat_msg', null, ONGLETS_DEPLACES).tab); onNav('cat_msg'); }}>{tr('ventes.conversation')}</Bouton> : null}
+                    {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={tr('ventes.fiche2', { num: String(num) })} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>{tr('ventes.fichePaire')}</Bouton> : null}
                     {/* (11 nov.) « Me le rappeler » : par le n° de transaction (§5), jamais le titre. */}
                     {o.transaction_id != null ? <BoutonRappel variante="grille" cible={{ sorte: 'vente', tx: String(o.transaction_id), num: num || '', plat: 'vinted' }} libelle={num ? `N°${num} · ${nom}` : nom}/> : null}
-                    {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
-                    {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
+                    {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">{tr('ventes.voirVinted')}</Bouton> : null}
+                    {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label={tr('ventes.voirStock')}>{tr('ventes.voirStock')}</Bouton> : null}
                     {/* (11 nov., lot ventes-lot) Les articles d'un lot PROUVÉ sont dans le récapitulatif (section
                         « Lot · N articles ») ; « Voir le lot » (lecture en direct) ne reste que pour un titre
                         « Lot » dont la transaction n'est pas dans la base. */}
-                    {isLotTitle(o.title) && !(lot && lot.lu) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
-                    {annChez && annChez.item ? <Bouton variante="secondaire" icone="sync" data-recap-remettre={txL} onClick={()=>{ fermer(); remettreEnVente(annChez); }}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
-                    {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>poserAnnuleeReglee(txL)}>Déjà remise en vente</Bouton> : null}
-                    {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
-                    {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu">Il est revenu</Bouton> : null}
+                    {isLotTitle(o.title) && !(lot && lot.lu) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title={tr('ventes.voirPairesLot')} aria-label={tr('ventes.voirPairesLot')}>{tr('ventes.voirLot')}</Bouton> : null}
+                    {annChez && annChez.item ? <Bouton variante="secondaire" icone="sync" data-recap-remettre={txL} onClick={()=>{ fermer(); remettreEnVente(annChez); }}>{annChez.etat === 'en-cours' ? tr('ventes.reprendreRemiseVente') : tr('ventes.remettreVente')}</Bouton> : null}
+                    {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title={tr('ventes.asDejaRemise')} onClick={()=>poserAnnuleeReglee(txL)}>{tr('ventes.dejaRemiseVente')}</Bouton> : null}
+                    {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={tr('ventes.asRembourseAcheteur', { num: String(num) })} aria-label={tr('ventes.declarerArticlePerdu')}>{tr('ventes.articlePerdu')}</Bouton> : null}
+                    {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={tr('ventes.annulerArticleFinalement', { num: String(num) })} aria-label={tr('ventes.annulerArticlePerdu')}>{tr('ventes.revenu')}</Bouton> : null}
                   </div>
                   {(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVente deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', centimes: sell != null && !autreDevise ? Math.round(sell * 100) : null, venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}
-                  <details className="vrm-sale-details vrm-recap-modifier"><summary title="Numéro, coût d’achat, frais">N° et frais</summary>
+                  <details className="vrm-sale-details vrm-recap-modifier"><summary title={tr('ventes.numeroCoutAchat')}>{tr('ventes.frais2')}</summary>
                     {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
                     {!hidden && (
                       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',minWidth:0}}>
-                        <div title={num?undefined:"Article pas encore identifié automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
+                        <div title={num?undefined:tr('ventes.articleEncoreIdentifie')} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
                           <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                           <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                         </div>
@@ -43819,15 +43819,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             ferait la même chose une seconde fois (même écriture) : il ne revient qu'une
                             fois le coût connu, pour le CORRIGER. */}
                         {!coutManque && <div style={{flex:'1 1 140px',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 8px',background:C.bg}}>
-                          <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                          <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?tr('ventes.achatAuto', { baseBuy: String(baseBuy) }):tr('ventes.prixAchat2')} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                           <span style={{fontSize:11,color:C.muted}}>€</span>
                         </div>}
-                        {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:11,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
+                        {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:11,color:C.muted,flexShrink:0}} title={tr('ventes.valeursSaisiesMain')}>✎</span>}
                       </div>
                     )}
                     {aRelie ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                      <Bouton variante="secondaire" icone="doc" data-recu-relie={String(aRelie.transaction_id||'')} disabled={recuOuverture===String(aRelie.transaction_id||'')} onClick={()=>ouvrirRecuRelie(aRelie, num)} title="Ouvrir le reçu d'achat" aria-label="Reçu d'achat">Reçu d’achat</Bouton>
-                      <Bouton variante="discret" data-recap-changer-achat="" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente, ou le délier">Changer l’achat relié</Bouton>
+                      <Bouton variante="secondaire" icone="doc" data-recu-relie={String(aRelie.transaction_id||'')} disabled={recuOuverture===String(aRelie.transaction_id||'')} onClick={()=>ouvrirRecuRelie(aRelie, num)} title={tr('ventes.ouvrirRecuAchat')} aria-label={tr('ventes.recuAchat')}>{tr('ventes.recuAchat2')}</Bouton>
+                      <Bouton variante="discret" data-recap-changer-achat="" onClick={()=>openPicker(saleItem)} title={tr('ventes.relierAutreAchat')}>{tr('ventes.changerAchatRelie')}</Bouton>
                     </div> : null}
                   </details>
                 </section>
@@ -43838,14 +43838,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  « Imprimer » quand le PDF est là — les MÊMES fonctions que les boutons de la ligne
                  (`demanderDepose` et sa barre « Annuler » 5 s ; `imprimerBordereauVente`). */
               <LigneGlissable actif={peutDeposer && !deposeIci} cle={txL} libelle={libDepose || 'vente'} actions={[
-                { cle: 'depose', libelle: 'Déposé', icone: <Icon name="check" size={18}/>, faire: ()=>demanderDepose(txL, o, libDepose), data: { 'data-lg-depose': txL } },
-                fuPdf ? { cle: 'imprimer', libelle: 'Imprimer', icone: <Icon name="printer" size={18}/>, faire: ()=>imprimerBordereauVente(o), data: { 'data-lg-imprimer': txL } } : null,
+                { cle: 'depose', libelle: tr('ventes.depose'), icone: <Icon name="check" size={18}/>, faire: ()=>demanderDepose(txL, o, libDepose), data: { 'data-lg-depose': txL } },
+                fuPdf ? { cle: 'imprimer', libelle: tr('ventes.imprimer'), icone: <Icon name="printer" size={18}/>, faire: ()=>imprimerBordereauVente(o), data: { 'data-lg-imprimer': txL } } : null,
               ]}>{(gp, tiroirG) => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={lot && lot.lu ? lot.nums : (num?[num]:[])} plateforme="vinted" photo={photo} photoNoeud={<><CaseSerie serie={serieVentes} cle={txL} etiquette={o.title} surPhoto/>{photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<PhotoVente src={photo} size={46} portrait/>}</>} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...avecSerie(gp, serieVentes.ligne(txL))} glisse={tiroirG} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
+                data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
                   {emailEnTete ? null : <NoteVenteEmail o={o}/>}
@@ -43853,7 +43853,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       tout de suite, avec le N° seulement s'il est sûr (src/bordereauVenteEmail.js). */}
                   {toShipEmailTx.has(txL) ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="" data-vente-email-bord={txL}>
                     <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
-                    <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
+                    <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">{tr('ventes.imprimerBordereau')}</span><span className="vrm-lib-court">{tr('ventes.imprimer')}</span></button>
                   </div> : null}
                   {toShipEmailTx.has(txL) && (!num || bordsSansNum[txL]) ? <div data-vente-sans-num={num ? 'avec' : 'sans'} data-sans-glisse="" style={{fontSize:12,fontWeight:600,color:C.warn,overflowWrap:'anywhere'}}>{phraseImprimeSansNumero(bordsSansNum, txL, num) || MENTION_SANS_NUM}</div> : null}
                 </> : peutDeposer ? <>
@@ -43863,7 +43863,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="">
                     <PastilleTransporteur t={fuTransp} C={C} className="vrm-fu-transp" data-fu-transporteur=""/>
                     {fuPdf
-                      ? <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
+                      ? <button type="button" className="vrm-fu-principal" data-fu-geste="" data-fu-imprimer={txL} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span className="vrm-lib-long">{tr('ventes.imprimerBordereau')}</span><span className="vrm-lib-court">{tr('ventes.imprimer')}</span></button>
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
@@ -43881,13 +43881,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
         {ventesAffichees.length > ventesMax && (
           <Bouton variante="secondaire" plein onClick={()=>React.startTransition(()=>setVentesMax(n=>n+120))} style={{marginTop:10}}>
-            Afficher {Math.min(120,ventesAffichees.length-ventesMax) > 1 ? `les ${Math.min(120,ventesAffichees.length-ventesMax)} suivantes` : 'la suivante'}{ventesAffichees.length-ventesMax > 120 ? ` · encore ${ventesAffichees.length-ventesMax-120} après` : ''}
+            {tr('commun.afficher')} {Math.min(120,ventesAffichees.length-ventesMax) > 1 ? tr('ventes.suivantes', { min: String(Math.min(120,ventesAffichees.length-ventesMax)) }) : tr('ventes.suivante')}{ventesAffichees.length-ventesMax > 120 ? tr('ventes.encoreApres', { x: String(ventesAffichees.length-ventesMax-120) }) : ''}
           </Bouton>
         )}
         {/* (29 oct., « un peu moche ») Les contrôles passent SOUS la liste : avant la
             première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
         <section className="vrm-ventes-controles" data-ventes-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
-          <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+          <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>{tr('ventes.verifications')}</h3>
   {/* (5 nov., revue 2.30) La fraîcheur (« Données ») et « Vendus ailleurs » ne se redisent plus
       ici : la fraîcheur vit dans la coque, « Vendus ailleurs » dans Ma journée. */}
   <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>
@@ -43903,7 +43903,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" onClick={()=>setAnalyseOpen(v=>!v)} aria-expanded={analyseOpen}
               style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
               <span aria-hidden="true" style={{color:C.accentTexte,display:'flex'}}><Icon name="chart" size={17}/></span>
-              <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Analyse de tes ventes</span>
+              <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.analyseVentes')}</span>
               <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{analyseOpen?'masquer':'voir'}</span>
               <span style={{fontSize:13,color:C.muted,transform:analyseOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
             </button>
@@ -43918,7 +43918,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0&&totals.benefConnu!=null?String(Math.round(totals.benefConnu*100)/100):''}
             data-ventes-benef-couverture={totals.couverture} data-ventes-benef-autres={totals.autresKO?'passu':'lu'}
             style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
-            <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            <StatBox compact label={tr('ventes.caFinalise')} value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
@@ -43938,10 +43938,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 30 sept. — « trop chargé » : sans AUCUN prix d'achat, « Coût
                 d'achat 0 € » et « Bénéfice — » disaient la même absence en deux
                 cases. Il n'en reste qu'une (Bénéfice), qui ouvre la saisie. */}
-            {totals.nbCout>0 && <StatBox compact label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.bN} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.bN?' · compléter':''}`}
+            {totals.nbCout>0 && <StatBox compact label={tr('ventes.coutAchat2')} value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.bN} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.bN?' · compléter':''}`}
               onClick={totals.nbCout<totals.bN ? ()=>setFillBuyOpen(true) : null}
-              title="Compléter les prix d'achat, article par article"/>}
-            {totals.frais>0 && <StatBox compact label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
+              title={tr('ventes.completerPrixAchat')}/>}
+            {totals.frais>0 && <StatBox compact label={tr('ventes.boosts')} value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
                 « bénéfice » vaut mécaniquement le CA (coût = 0) — c'est FAUX, et
                 l'afficher en gros trompe (plainte de Julien : « les données ne
@@ -43959,7 +43959,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 achat ; « Après frais de vente » = brut − boosts et frais. */}
             {totals.nbCout===0
               ? <StatBox compact label={NOM_BENEFICE_BRUT} value="—" color={C.muted} sub={null}
-                  onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, article par article"/>
+                  onClick={()=>setFillBuyOpen(true)} title={tr('ventes.saisirPrixAchat2')}/>
               : totals.benefBrut===totals.benefConnu && totals.benefConnu!=null
                 ? <StatBox compact label={NOM_BENEFICE_BRUT} value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                     subColor={totals.nbCout<totals.bN?C.warn:undefined}
@@ -43980,7 +43980,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               une vente Leboncoin ou eBay n'a un prix d'achat que si elle est
               reliée à sa paire par IDENTITÉ (SKU, référence, lien posé). */}
           {totals.bN>0 && <div data-ventes-benef-note="" style={{fontSize:12,color:C.muted,margin:'-6px 2px 12px',lineHeight:1.45}}>
-            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : bénéfice Vinted seul' : null}{!totals.autresKO && <> <Pourquoi label="Leboncoin et eBay">Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</Pourquoi></>}
+            {tr('ventes.prixAchatConnus')} {totals.couverture || '—'}{totals.autresKO ? tr('ventes.leboncoinEbayEncore') : null}{!totals.autresKO && <> <Pourquoi label={tr('ventes.leboncoinEbay')}>{tr('ventes.venteLeboncoinEbay')}</Pourquoi></>}
           </div>}
         </>)}
 
@@ -44016,7 +44016,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return t||n ? `Le plus pressé : ${n}${t}${q?` · ${q}`:''}` : (q?`Le plus pressé : ${q}`:null); })() : null}
               detail={`Vinted laisse environ ${SHIP_DAYS} jours après la vente pour expédier. À temps, ta note vendeur est préservée. L'échéance vient de l'email du bordereau (avec son heure) ; sans lui, elle est estimée. Le bordereau se génère depuis l'onglet Colis.`}
               action={onNav && (
-                <Bouton variante="secondaire" className="vrm-b-petit" icone="truck" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,alignSelf:'center'}}>Colis</Bouton>
+                <Bouton variante="secondaire" className="vrm-b-petit" icone="truck" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,alignSelf:'center'}}>{tr('nav.cat_bord')}</Bouton>
               )}/>
           );
         })()}
@@ -44054,8 +44054,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
                 <span aria-hidden="true" style={{flexShrink:0,color:C.accentTexte,display:'flex'}}><Icon name="calendar" size={18}/></span>
                 <span style={{flex:'1 1 150px',minWidth:0}}>
-                  <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Ventes par jour</span>
-                  <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>{liste.length} jour{liste.length>1?'s':''} · {totN} vente{totN>1?'s':''} · {fmtE0(totCa)} — sur {libellePeriode(periode).toLowerCase()}</span>
+                  <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.ventesJour')}</span>
+                  <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>{liste.length} {tr('ventes.jour')}{liste.length>1?'s':''} · {totN} {tr('journee.vente')}{totN>1?'s':''} · {fmtE0(totCa)} {tr('ventes.texte')} {libellePeriode(periode).toLowerCase()}</span>
                 </span>
               </summary>
               <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
@@ -44067,7 +44067,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span aria-hidden="true" style={{flex:1,minWidth:20,height:6,borderRadius:12,background:`${C.accent}22`,overflow:'hidden'}}>
                       <span style={{display:'block',height:'100%',width:`${Math.round(v.ca/max*100)}%`,background:C.accent}}/>
                     </span>
-                    <span style={{flexShrink:0,fontSize:12,color:C.muted,width:58,textAlign:'right'}}>{v.n} vente{v.n>1?'s':''}</span>
+                    <span style={{flexShrink:0,fontSize:12,color:C.muted,width:58,textAlign:'right'}}>{v.n} {tr('journee.vente')}{v.n>1?'s':''}</span>
                     <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.text,width:66,textAlign:'right',whiteSpace:'nowrap'}}>{fmtE0(v.ca)}</span>
                   </div>
                 ))}
@@ -44078,9 +44078,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Analyse de perf : temps de vente, écoulement, meilleure marque, top compte */}
         {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
-            {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
-            {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)}\u00a0%`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
-            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
+            {perf.joursMoy!=null && <StatBox label={tr('ventes.tempsVente')} value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
+            {perf.ecoul!=null && <StatBox label={tr('ventes.ecoulement')} value={`${perf.ecoul.toFixed(0)}\u00a0%`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
+            {perf.bestBrand && <StatBox label={tr('ventes.topMarque')} value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
             {/* (5 nov.) « Compte qui vend le mieux » : une seule place, Statistiques → « Quel compte vend le mieux ». */}
           </div>
         )}
@@ -44090,27 +44090,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {totals.nb>0 && (
           <details data-repere-modeles onToggle={(e)=>{ if (e.currentTarget.open) { setRepereOuvert(true); if (buys.items===null && !buys.loading && accounts.length) loadOrders('purchased', setBuys); } }}
             style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'9px 13px',marginBottom:8}}>
-            <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.text}}>Repère d'achat par modèle <span style={{fontWeight:500,color:C.muted}}>— combien tu gagnes en moyenne sur chaque modèle</span></summary>
+            <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.repereAchatModele')} <span style={{fontWeight:500,color:C.muted}}>{tr('ventes.combienGagnesMoyenne')}</span></summary>
             {(() => {
               const r = margeModeles;
               if (r === null) return null;
-              if (r === undefined) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>Lecture de tes achats…</div>;
-              if (r.pasSu) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>Tes achats n'ont pas pu être lus : je ne calcule rien pour l'instant. Referme et rouvre ce bloc dans un moment.</div>;
+              if (r === undefined) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>{tr('ventes.lectureAchats')}</div>;
+              if (r.pasSu) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>{tr('ventes.achatsOntPu')}</div>;
               const seuls = r.achatsSeuls || [];
-              const nonLus = (r.nonLus || []).length ? <div data-repere-non-lus={r.nonLus.join(',')} style={{fontSize:12,color:C.warn,marginTop:8,lineHeight:1.45}}>Ces moyennes ne comptent pas {r.nonLus.length>1?'les comptes':'le compte'} {r.nonLus.join(', ')}.{seuls.length>0?<span data-repere-achats-seuls={seuls.join(',')}> {seuls.length>1?'Leurs':'Ses'} achats n'ont pas pu être lus : ouvre {seuls.length>1?'ces comptes':'ce compte'} sur vinted.fr puis « Synchroniser ».</span>:null}</div> : null;
-              if (!r.lignes.length) return <>{nonLus}<div style={{fontSize:12,color:C.muted,marginTop:8}}>Pas encore assez de ventes et d'achats d'un même modèle : il en faut au moins 3 de chaque pour qu'une moyenne veuille dire quelque chose.</div></>;
+              const nonLus = (r.nonLus || []).length ? <div data-repere-non-lus={r.nonLus.join(',')} style={{fontSize:12,color:C.warn,marginTop:8,lineHeight:1.45}}>{tr('ventes.cesMoyennesComptent')} {r.nonLus.length>1?tr('ventes.comptes'):tr('ventes.compte5')} {r.nonLus.join(', ')}.{seuls.length>0?<span data-repere-achats-seuls={seuls.join(',')}> {seuls.length>1?tr('ventes.leurs'):tr('ventes.texte2')} {tr('ventes.achatsOntPu2')} {seuls.length>1?tr('ventes.cesComptes'):tr('ventes.compte3')} {tr('ventes.vintedFrPuis2')}</span>:null}</div> : null;
+              if (!r.lignes.length) return <>{nonLus}<div style={{fontSize:12,color:C.muted,marginTop:8}}>{tr('ventes.encoreAssezVentes')}</div></>;
               return (
                 <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
                   {nonLus}
                   {r.lignes.map((l)=>(
                     <div key={l.k} data-repere-modele={l.k} style={{display:'flex',alignItems:'baseline',gap:8,fontSize:12,color:C.text,padding:'4px 0',borderTop:`1px solid ${C.border}`}}>
                       <span style={{flex:1,minWidth:0,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.nom}</span>
-                      <span style={{color:C.muted,fontSize:11,whiteSpace:'nowrap'}}>revendue {fmtE(l.pV)} ({l.nV}) · achetée {fmtE(l.pA)} ({l.nA})</span>
+                      <span style={{color:C.muted,fontSize:11,whiteSpace:'nowrap'}}>{tr('ventes.revendue')} {fmtE(l.pV)} ({l.nV}{tr('ventes.achetee')} {fmtE(l.pA)} ({l.nA})</span>
                       <span style={{fontWeight:700,whiteSpace:'nowrap',color:l.marge<0?C.warn:C.text}}>{l.marge>=0?'+':'−'}{fmtE(Math.abs(l.marge))}</span>
                     </div>
                   ))}
                   <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.45}}>
-                    Prix moyen de revente moins prix moyen d'achat, avant frais de port, de protection et de boost — deux moyennes, pas la marge d'un article précis. Un lot acheté compte comme un achat. C'est un repère pour acheter : il n'entre dans aucun total, rapport ni export.{r.tropPeu>0?` ${r.tropPeu} autre${r.tropPeu>1?'s':''} modèle${r.tropPeu>1?'s':''} : pas encore assez de ventes ou d'achats.`:''}
+                    {tr('ventes.prixMoyenRevente')}{r.tropPeu>0?tr('ventes.autresModelesEncore', { n: String(r.tropPeu) }):''}
                   </div>
                 </div>
               );
@@ -44120,9 +44120,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Saisonnalité : meilleurs mois de vente → acheter avant les pics */}
         {seasonality && seasonality.top.length>0 && (
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'9px 13px',marginBottom:8}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.text}}>Tes meilleurs mois : </span>
+            <span style={{fontSize:12,fontWeight:600,color:C.text}}>{tr('ventes.meilleursMois')} </span>
             <span style={{fontSize:12,fontWeight:700,color:C.text}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
-            <span style={{fontSize:12,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes — achète un peu avant.</span>
+            <span style={{fontSize:12,color:C.muted,display:'block',marginTop:3}}>{tr('ventes.texte3')} {seasonality.total} {tr('ventes.ventesAchetePeu')}</span>
           </div>
         )}
 
@@ -44131,8 +44131,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div data-ventes-annulees={litiges.nb} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'6px 13px',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             {/* (30 oct.) Plus de rouge (§7) ; la consigne « filtre Annulées
                 ci-dessous » devient le geste lui-même. */}
-            <span style={{flex:'1 1 200px',minWidth:0,fontSize:13,color:C.text}}><b>{litiges.nb} vente{litiges.nb>1?'s':''} annulée{litiges.nb>1?'s':''}</b> · {fmtE(litiges.montant)} de manque à gagner</span>
-            <Bouton variante="discret" onClick={()=>{ setVFilter('annulees'); try { document.querySelector('.vrm-sales-workbar')?.scrollIntoView({block:'start',behavior:'smooth'}); } catch(_) {} }}>Voir les annulées</Bouton>
+            <span style={{flex:'1 1 200px',minWidth:0,fontSize:13,color:C.text}}><b>{litiges.nb} {tr('journee.vente')}{litiges.nb>1?'s':''} {tr('ventes.annulee')}{litiges.nb>1?'s':''}</b> · {fmtE(litiges.montant)} {tr('ventes.manqueGagner')}</span>
+            <Bouton variante="discret" onClick={()=>{ setVFilter('annulees'); try { document.querySelector('.vrm-sales-workbar')?.scrollIntoView({block:'start',behavior:'smooth'}); } catch(_) {} }}>{tr('ventes.voirAnnulees')}</Bouton>
           </div>
         )}
         {/* (4 nov.) L'objectif du mois vit dans la carte sombre de cet écran (une barre
@@ -44157,10 +44157,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 15px',marginBottom:12,boxShadow:C.shadow||'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:6}}>
-              <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tendance — 6 mois</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text}}>{tr('ventes.tendance6Mois')}</div>
               <div style={{display:'flex',gap:12,fontSize:11,fontWeight:500,color:C.muted}}>
                 <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:6,background:s1,display:'inline-block'}}/>CA</span>
-                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:6,background:s2,display:'inline-block'}}/>Bénéfice net</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:6,background:s2,display:'inline-block'}}/>{tr('ventes.beneficeNet')}</span>
               </div>
             </div>
             {/* (30 oct.) Le dessin fait 320 unités de large : étiré sur 1 300 px, ses

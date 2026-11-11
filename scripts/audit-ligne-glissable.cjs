@@ -82,7 +82,7 @@ function juger(regleSrc, sources) {
   return res;
 }
 
-const SOURCES = () => ({ composant: lire('src/LigneGlissable.jsx'), app: lire('src/App.jsx'), relais: lire('src/CarteRelais.jsx'), dorment: lire('src/design/QuiDorment.jsx'), depose: lire('src/GlisserDepose.jsx') });
+const SOURCES = () => ({ composant: lire('src/LigneGlissable.jsx'), app: require('./_source-app.cjs').enFrancais(lire('src/App.jsx'), RACINE)   /* (11 nov.) tr() ⇒ sa phrase française */, relais: lire('src/CarteRelais.jsx'), dorment: lire('src/design/QuiDorment.jsx'), depose: lire('src/GlisserDepose.jsx') });
 const REGLE = () => lire('src/glisserRegle.js');
 
 if (process.argv.includes('--mutation')) {

@@ -126,7 +126,7 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   dit(/onClick=\{\(\) => relierAchatAnnonce\(it, sg\.achat\)\}/.test(bn) && /meilleureSuggestion\(\{ item: it, achats: fillBuyAchats\.items/.test(bn), 'S11 … et la suggestion y est proposée, SON tap relie');
   dit(!/useEffect\([^;]*ecrirePrixTape/.test(APP) && !/useEffect\([^\n]*setBuyForKey/.test(APP), 'S12 aucun effet n’écrit un prix (rien sans son geste)');
   // (11 nov., traduction) La phrase vit dans src/i18n/langues/fr.js (pluriel « une ¦ plusieurs ») : la carte l'appelle par sa clé.
-  const FRD = fs.readFileSync(path.join(R, 'src', 'i18n', 'langues', 'fr.js'), 'utf8');
+  const FRD = fs.readFileSync(path.join(R, 'src', 'i18n', 'langues', 'fr', 'journee.js'), 'utf8');
   const clesPrix = [...FRD.matchAll(/^\s*"([\w.-]+)": [^\n]*prix d’achat/gm)].map((m) => m[1]);
   const jobsPrix = (APP.match(/jobs\.push\(\{ id: '[^']+'[^\n]*/g) || []).filter((j) => /prix d’achat/.test(j) || clesPrix.some((k) => j.includes(`tr('${k}'`)));
   const phrasePrix = (j) => /numérotée\$\{nR > 1 \? 's' : ''\} sans prix d’achat/.test(j) || (/tr\('journee\.annoncesNumeroteesSans', \{ n: String\(nR\) \}\)/.test(j) && /"journee\.annoncesNumeroteesSans": \{ one: "\{n\} annonce numérotée sans prix d’achat", other: "\{n\} annonces numérotées sans prix d’achat" \}/.test(FRD));

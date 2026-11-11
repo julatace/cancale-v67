@@ -13,7 +13,7 @@
 //        remplace (texte JSX ⇒ {tr('k')}, attribut ⇒ ={tr('k')}, littéral ⇒ tr('k'),
 //        gabarit `${x}` ⇒ tr('k', { x: String(x) }) — String() garde le rendu français
 //        EXACT : un N° ne prend jamais d'espace de milliers), ajoute l'import, et range
-//        les clés dans les cinq dictionnaires (section `// ── <prefixe>`).
+//        les clés dans les cinq langues : src/i18n/langues/<l>/<prefixe>.js (étalé dans <l>.js).
 //
 // Ce qui n'est JAMAIS touché : les attributs data-*, className, key, style ; un texte
 // comparé quelque part (=== 'texte', case 'texte', .includes('texte')) ; un gabarit qui
@@ -67,8 +67,9 @@ function cuireJsx(v) {
 
 function lireDicos() {
   const D = {};
-  for (const l of LANGUES) for (const part of [`${l}-accueil.js`, `${l}.js`]) {
-    const t = fs.readFileSync(path.join(R, 'src', 'i18n', 'langues', part), 'utf8');
+  const dossier = path.join(R, 'src', 'i18n', 'langues');
+  for (const l of LANGUES) for (const part of [`${l}-accueil.js`, `${l}.js`, ...(fs.existsSync(path.join(dossier, l)) ? fs.readdirSync(path.join(dossier, l)).filter((f) => f.endsWith('.js')).map((f) => `${l}/${f}`) : [])]) {
+    const t = fs.readFileSync(path.join(dossier, part), 'utf8');
     D[l] = D[l] || {};
     for (const m of t.matchAll(/^\s*"([^"]+)": ("(?:[^"\\]|\\.)*")/gm)) D[l][m[1]] = JSON.parse(m[2]);
   }
@@ -102,8 +103,8 @@ function lister() {
     enter(p) {
       const n = p.node;
       for (const z of zones) {
-        const [fn, sous] = z.split('#');
-        if (/^\d+-\d+$/.test(z)) continue;
+        const [fn, sous] = z.split('@')[0].split('#');
+        if (/^\d+-\d+(@|$)/.test(z)) continue;
         const nom = (n.type === 'FunctionDeclaration' || n.type === 'ClassDeclaration') && n.id ? n.id.name : n.type === 'VariableDeclarator' && n.id && n.id.name ? n.id.name : null;
         if (nom !== fn) continue;
         if (!sous) { inter.push([n.start, n.end, z]); continue; }
@@ -111,14 +112,16 @@ function lister() {
       }
     },
   });
-  for (const z of zones) if (/^\d+-\d+$/.test(z)) {
-    const [a, b] = z.split('-').map(Number);
+  for (const z of zones) if (/^\d+-\d+(@|$)/.test(z)) {
+    const [a, b] = z.split('@')[0].split('-').map(Number);
     const lignes = src.split('\n'); let o = 0; let s = 0, e = src.length;
     for (let i = 0; i < lignes.length; i++) { if (i + 1 === a) s = o; if (i + 1 === b + 1) { e = o; break; } o += lignes[i].length + 1; }
     inter.push([s, e, z]);
   }
   for (const z of zones) if (!inter.some((x) => x[2] === z)) { console.log(`zone « ${z} » introuvable`); process.exit(2); }
   const dans = (n) => inter.some(([a, b]) => n.start >= a && n.end <= b);
+  // `Zone@autre` : les clés de cette zone prennent le préfixe `autre` (un composant partagé ⇒ `commun`).
+  const prefixeDe = (it) => { const z = inter.filter(([a, b]) => it.start >= a && it.end <= b).sort((x, y) => (x[1] - x[0]) - (y[1] - y[0]))[0]; return z && z[2].includes('@') ? z[2].split('@')[1] : prefixe; };
 
   const items = [], manuels = [];
   const ligne = (n) => (n.loc ? n.loc.start.line : 0);
@@ -229,7 +232,7 @@ function lister() {
   for (const it of items) {
     const jt = J(it.texte);
     let k = parTexte.get(jt) || parT.get(jt);
-    if (!k) { const base = `${prefixe}.${nomCle(typeof it.texte === 'string' ? it.texte : it.texte.other)}`; k = base; let i = 2; while ((k in fr && J(fr[k]) !== jt) || (k in nouvelles && J(nouvelles[k]) !== jt)) k = `${base}${i++}`; nouvelles[k] = it.texte; }
+    if (!k) { const base = `${prefixeDe(it)}.${nomCle(typeof it.texte === 'string' ? it.texte : it.texte.other)}`; k = base; let i = 2; while ((k in fr && J(fr[k]) !== jt) || (k in nouvelles && J(nouvelles[k]) !== jt)) k = `${base}${i++}`; nouvelles[k] = it.texte; }
     parT.set(jt, k); it.cle = k;
   }
   const plan = { fichier, prefixe, zones, items: items.sort((a, b) => a.start - b.start), nouvelles, manuels };
@@ -287,13 +290,24 @@ function appliquer() {
   // Les dictionnaires.
   const nouv = Object.entries(plan.nouvelles);
   const ecrire = (v) => (typeof v === 'string' ? JSON.stringify(v) : `{ one: ${JSON.stringify(v.one)}, other: ${JSON.stringify(v.other)} }`);
-  if (nouv.length) for (const [i, l] of LANGUES.entries()) {
-    const d = path.join(R, 'src', 'i18n', 'langues', `${l}.js`);
-    let t = fs.readFileSync(d, 'utf8');
-    const bloc = `  // ── ${plan.prefixe} (${plan.zones.join(', ')})\n` + nouv.map(([k, v]) => `  ${JSON.stringify(k)}: ${ecrire(i === 0 ? v : trad[k][i - 1])},`).join('\n') + '\n';
-    const fin = t.lastIndexOf('};');
-    t = t.slice(0, fin) + bloc + t.slice(fin);
-    fs.writeFileSync(d, t);
+  // Chaque écran a SON fichier par langue (src/i18n/langues/<l>/<prefixe>.js), étalé dans <l>.js :
+  // deux lots qui migrent deux écrans n'écrivent jamais au même endroit.
+  const parPrefixe = new Map(); for (const e of nouv) { const pf = e[0].split('.')[0]; if (!parPrefixe.has(pf)) parPrefixe.set(pf, []); parPrefixe.get(pf).push(e); }
+  for (const [pf, lesNouv] of parPrefixe) for (const [i, l] of LANGUES.entries()) {
+    const dos = path.join(R, 'src', 'i18n', 'langues', l);
+    const d = path.join(dos, `${pf}.js`);
+    const lignes = lesNouv.map(([k, v]) => `  ${JSON.stringify(k)}: ${ecrire(i === 0 ? v : trad[k][i - 1])},`).join('\n') + '\n';
+    const sous = `  // ── ${plan.zones.join(', ')} (${plan.fichier})\n`;
+    if (fs.existsSync(d)) { let t = fs.readFileSync(d, 'utf8'); const fin = t.lastIndexOf('};'); t = t.slice(0, fin) + sous + lignes + t.slice(fin); fs.writeFileSync(d, t); }
+    else {
+      fs.mkdirSync(dos, { recursive: true });
+      fs.writeFileSync(d, `// ${l} · ${pf}\n// Écrit par scripts/i18n-migrer.cjs (la source : fr/${pf}.js ; méthode : docs/passation/2026-11-11-traduction.md).\nexport default {\n${sous}${lignes}};\n`);
+      const m = path.join(R, 'src', 'i18n', 'langues', `${l}.js`);
+      let t = fs.readFileSync(m, 'utf8');
+      const nom = 'ecran_' + pf.replace(/\W/g, '_');
+      t = t.replace('export default {\n', `import ${nom} from './${l}/${pf}.js';\nexport default {\n  ...${nom},\n`);
+      fs.writeFileSync(m, t);
+    }
   }
   console.log(`${plan.fichier} : ${plan.items.length} texte(s) remplacé(s), ${nouv.length} clé(s) ajoutée(s) aux cinq langues`);
 }
