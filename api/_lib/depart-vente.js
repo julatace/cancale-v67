@@ -49,6 +49,11 @@ const msDe = (v) => { if (Number.isFinite(v)) return v; const x = Date.parse(Str
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
 // La clé d'un bordereau — la MÊME que `bordKey` de l'app et `bKey` du widget.
+// (11 nov., lot DJ3 — Julien : « Tout imprimer » proposait une paire DÉJÀ DÉPOSÉE) Le n° du bordereau
+// de CETTE transaction : celui de son e-mail, sinon celui lu sur SON étiquette (`suiviPdf`, le PDF de la
+// même transaction). Mesuré le 11 nov. : 134 bordereaux sur 237 n'ont aucun n° dans l'e-mail ; l'e-mail
+// de dépôt de leur n° ne pouvait rien prouver. Identité seulement : jamais un n° d'une autre vente.
+export const suiviDuBord = (b) => (b ? (String(b.suivi || '').trim() || String(b.suiviPdf || '').trim()) : '');
 export const cleBordereau = (b) => (b ? String(b.transaction || b.suivi || b.numero || '') : '');
 
 // Les états d'un e-mail qui prouvent que le colis est DANS le réseau.
@@ -128,7 +133,7 @@ export function raisonDepartVente(tx, bord, ctx = {}) {
   if (t && panel[t]) return out({ type: 'panneau', at: msDe(panel[t]) });
   if (kb && panel[kb]) return out({ type: 'panneau', at: msDe(panel[kb]) });
   // Les preuves par n° de suivi : le n° EXACT du bordereau de CETTE transaction.
-  const k = normaliserSuivi(bord && bord.suivi);
+  const k = normaliserSuivi(suiviDuBord(bord));
   if (!k) return null;
   const amb = ctx.ambigus;
   if (amb && (amb instanceof Set ? amb.has(k) : Array.isArray(amb) && amb.includes(k))) return null;
@@ -149,9 +154,27 @@ export function raisonDepartVente(tx, bord, ctx = {}) {
 // `email_track_*` (null = pas su) ; `departs` : Map n° → `depart_` ; `ventesMs` :
 // { tx → ms } ; `entrants` : Set des n° d'ACHATS (ambigus).
 // Rend Map tx → raison.
-export function ventesPartiesParPreuve({ txs = null, bordsParTx = {}, shipDone = {}, bordsShipped = {}, panelBordsDone = {}, lignesEmail = null, departs = null, ventesMs = null, entrants = null } = {}) {
+// (11 nov., lot DJ3) Le bordereau d'une transaction reçoit le n° lu sur SON étiquette (même n° de
+// transaction, `vrm_bord_transporteurs.pdf[tx].s`) quand son e-mail n'en porte pas ; une étiquette
+// captée sans e-mail devient le bordereau de sa transaction. Identité seulement.
+export function bordsAvecEtiquettes(bordsParTx, etiquettes) {
   const bp = objet(bordsParTx);
-  const liste = Object.entries(bp).map(([tx, b]) => ({ cle: tx, suivi: b && b.suivi }));
+  if (!etiquettes || typeof etiquettes !== 'object') return bp;
+  let out = null;
+  for (const [tx, e] of Object.entries(etiquettes)) {
+    const s = e && typeof e.s === 'string' ? e.s.trim() : '';
+    if (!s || !/^\d+$/.test(String(tx))) continue;
+    const b = bp[tx];
+    if (suiviDuBord(b)) continue;                              // l'e-mail porte déjà SON n°
+    if (!out) out = { ...bp };
+    out[tx] = b ? { ...b, suiviPdf: s } : { transaction: tx, suiviPdf: s, etiquetteSeule: true };
+  }
+  return out || bp;
+}
+export function ventesPartiesParPreuve({ txs = null, bordsParTx = {}, shipDone = {}, bordsShipped = {}, panelBordsDone = {}, lignesEmail = null, departs = null, ventesMs = null, entrants = null, etiquettes = null } = {}) {
+  const bp = bordsAvecEtiquettes(bordsParTx, etiquettes);
+  // (11 nov., lot DJ3) Le n° de SON bordereau : celui de l'e-mail, sinon celui lu sur SON étiquette (PDF).
+  const liste = Object.entries(bp).map(([tx, b]) => ({ cle: tx, suivi: suiviDuBord(b) }));
   const ambigus = suivisAmbigus(liste, entrants instanceof Set ? new Set([...entrants].map(normaliserSuivi).filter(Boolean)) : null);
   const preuvesEmail = preuvesEmailParSuivi(lignesEmail);
   const ctx = { shipDone, bordsShipped, panelBordsDone, preuvesEmail, departs, ambigus };
@@ -175,6 +198,8 @@ export const SELECT_PREUVE_EMAIL = 'id,s:meta->>status,r:meta->>receivedAt,ea:me
 export const REQ_PREUVES_EMAIL = `app_data?id=like.email_track_*&meta->>status=in.(transit,available,delivered,retour,info)&select=${SELECT_PREUVE_EMAIL}`;
 export const REQ_PANNEAU = 'app_data?id=eq.panel_bords_done&select=data';
 export const REQ_ENTRANTS = 'app_data?id=like.transp_*&select=id';
+// (11 nov., lot DJ3) Les n° lus sur les étiquettes (ligne légère : { tx: { t, s } }, aucun PDF).
+export const REQ_ETIQUETTES = 'app_data?id=eq.vrm_bord_transporteurs&select=pdf:data->pdf';
 // `lireToutes(chemin)` : la lecture paginée du serveur (null = ratée) ;
 // `relire(ligne)` : la relecture d'une ligne d'e-mail par la règle de l'app (le
 // n° lu dans le sujet, api/_lib/suivi-colis.js `relireLigneMeta`).
@@ -182,9 +207,10 @@ export const REQ_ENTRANTS = 'app_data?id=like.transp_*&select=id';
 // lecture a raté : la preuve correspondante manque, le colis RESTE à envoyer.
 export async function lirePreuvesDepart(lireToutes, relire = (x) => x) {
   const sur = async (p) => { try { const r = await lireToutes(p); return Array.isArray(r) ? r : null; } catch (_) { return null; } };
-  const [em, pa, en] = await Promise.all([sur(REQ_PREUVES_EMAIL), sur(REQ_PANNEAU), sur(REQ_ENTRANTS)]);
+  const [em, pa, en, et] = await Promise.all([sur(REQ_PREUVES_EMAIL), sur(REQ_PANNEAU), sur(REQ_ENTRANTS), sur(REQ_ETIQUETTES)]);
   const lignesEmail = em ? em.map((x) => { try { return relire(x) || x; } catch (_) { return x; } }).filter(Boolean) : null;
   const panelBordsDone = pa ? objet(pa[0] && pa[0].data) : null;
   const entrants = en ? new Set(en.map((r) => { const m = /^transp_[a-z]+_([A-Z0-9]+)$/.exec(String((r && r.id) || '')); return m ? m[1] : ''; }).filter(Boolean)) : null;
-  return { lignesEmail, panelBordsDone, entrants };
+  const etiquettes = et ? objet(et[0] && et[0].pdf) : null;
+  return { lignesEmail, panelBordsDone, entrants, etiquettes };
 }

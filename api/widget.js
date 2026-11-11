@@ -353,7 +353,7 @@ async function colisVentesEmailDuWidget({ txSold, sold, vivants, masques, bordsP
     const lectures = (txSold ? txSold.lueParUid : sold && sold.lueParUid) || {};
     let connues = txSold ? [...txSold].map(String) : txsDeCommandes(sold);
     const base = { mails, comptes: [...vivants], masques, panneau, lectures, bordsParTx, shipDone, bordsShipped,
-      panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants };
+      panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants, etiquettes: preuves.etiquettes || null };
     const r = colisVentesEmailServeur({ ...base, connues });
     if (!txSold || !r.txs.length) return r;
     const uids = [...new Set(r.txs.map((t) => String((r.ventes[t] && r.ventes[t]._acc && r.ventes[t]._acc.vinted_user_id) || '')).filter(Boolean))];
@@ -813,7 +813,7 @@ export default async function handler(req, res) {
     const bordsTx0 = bordsParTransaction(bords, (b) => !!cachees0[bKey0(b)]);
     const txsVinted = (txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter((t) => !ventesMasquees.has(t));
     const preuves = await lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x)));
-    const partisVinted = ventesPartiesParPreuve({ txs: txsVinted, bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants });
+    const partisVinted = ventesPartiesParPreuve({ txs: txsVinted, bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants, etiquettes: preuves.etiquettes || null });
     const shipTxns = new Set(txsVinted.filter((t) => !partisVinted.has(t)));
     // (8 nov.) + les ventes vues par e-mail dont le bordereau est là (le nombre de Ma journée).
     const venteEmail = await colisVentesEmailDuWidget({ txSold, sold, vivants, masques: m.vinted_accounts_hidden, bordsParTx: bordsTx0, preuves, departs, shipDone, bordsShipped });

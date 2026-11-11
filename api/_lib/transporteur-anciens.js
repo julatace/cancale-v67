@@ -185,8 +185,14 @@ export const REQ_BORDS_PDF = 'app_data?id=like.email_bord_*&meta->>_pdf=eq.true&
 export const REQ_LABELS_PDF = 'app_data?id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,tx:meta->>tx,cap:meta->>capturedAt';
 export const reqPdf = (id) => `app_data?id=eq.${encodeURIComponent(id)}&select=pdf:data->>pdfB64`;
 
+// (11 nov., lot DJ3 — « InPost appartient à Mondial Relay ») Une étiquette décidée sous l'ancienne règle
+// est relue UNE fois : « inpost » (clé que la règle n'écrit plus : son n° Mondial Relay n'était pas lu) et
+// « plusieurs » (Mondial Relay + InPost ⇒ deux noms) sans la marque `g` de la règle du 11 nov.
+export const REGLE_PDF = 2;
+export const decisionARelire = (pdfTx, vuTx) => !!((pdfTx && pdfTx.t === 'inpost') || (!pdfTx && vuTx && vuTx.r === 'plusieurs' && !(Number(vuTx.g) >= REGLE_PDF)));
 export function candidatsPdf(bords, labels, cur) {
   const pdf = (cur && cur.pdf) || {}, vus = (cur && cur.pdfVus) || {};
+  const deja = (tx) => (pdf[tx] || vus[tx]) && !decisionARelire(pdf[tx], vus[tx]);
   const out = []; const avecEmail = new Set();
   for (const b of bords || []) {
     const tx = String((b && b.tx) || '') || String((b && b.id) || '').replace(/^email_bord_/, '');
@@ -194,14 +200,14 @@ export function candidatsPdf(bords, labels, cur) {
     avecEmail.add(tx);
     if (b.pdfLu != null) continue;                                   // lu à la réception
     if (b.transporteur && String(b.suivi || '').trim()) continue;    // rien à apprendre
-    if (pdf[tx] || vus[tx]) continue;
+    if (deja(tx)) continue;
     out.push({ tx, id: b.id, at: Date.parse(b.recu || '') || 0 });
   }
   for (const l of labels || []) {
     const id = String((l && l.id) || '');
     if (/_label_latest$/.test(id)) continue;
     const tx = String((l && l.tx) || '');
-    if (!RE_TX.test(tx) || avecEmail.has(tx) || pdf[tx] || vus[tx]) continue;
+    if (!RE_TX.test(tx) || avecEmail.has(tx) || deja(tx)) continue;
     if (out.some((c) => c.tx === tx)) continue;
     out.push({ tx, id, at: Date.parse(l.cap || '') || 0 });
   }
@@ -259,6 +265,8 @@ export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf,
     const f = frais && typeof frais === 'object' ? frais : {};
     const pdf = { ...(f.pdf || {}), ...neufsPdf }, pdfVus = { ...(f.pdfVus || {}), ...neufsVus };
     for (const k of Object.keys(neufsPdf)) delete pdfVus[k];
+    // (11 nov., lot DJ3) Une décision « inpost » relue qui ne nomme plus un seul transporteur : la nouvelle lecture fait foi.
+    for (const k of Object.keys(neufsVus)) if (pdf[k] && pdf[k].t === 'inpost') delete pdf[k];
     const ligne = { ...f, v: 1, pdf, pdfVus, at, pdfReste: resteApres(), pdfAt: at };
     ligne.pdfBilan = bilanPdf(ligne);
     const ok = await ecrire(ID_BORD_TRANSPORTEURS, ligne);
@@ -274,7 +282,7 @@ export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf,
     else {
       const d = await transporteurDuPdf(b64);
       if (d.etat === 'ok') { neufsPdf[c.tx] = { t: d.t, ...(d.s ? { s: d.s } : {}) }; ranges++; }
-      else { neufsVus[c.tx] = { r: d.etat, at }; nVus++; }
+      else { neufsVus[c.tx] = { r: d.etat, at, g: REGLE_PDF }; nVus++; }
     }
     depuisEcriture++;
     if (depuisEcriture >= ECRIRE_TOUS && !(await ecrirePaquet())) { ecritureRatee = true; break; }

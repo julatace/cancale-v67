@@ -335,7 +335,8 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/depart-colis.js';
-import {ventesPartiesParPreuve} from '../api/_lib/depart-vente.js';
+import {ventesPartiesParPreuve, suiviDuBord} from '../api/_lib/depart-vente.js';
+import { partiParPreuve } from './etiquettesDepart.js';
 import {publierDepartsVinted,raisonDepartPubliee} from './departVente.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
 import {CLE_COMPTES_EXCLUS,SANS_COMPTE_VC,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
@@ -31205,6 +31206,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const partisTransp = useMemo(() => txVintedParties(bordsParTransaction(emailBords, isBordHidden), vcLoc0.departs, { ventesMs: Object.fromEntries((sales.items || []).filter((o) => o && o.transaction_id != null && tsCommande(o)).map((o) => [String(o.transaction_id), tsCommande(o)])) }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [emailBords, bordsHidden, vcLoc0.departsCle, sales.items]);
+  // (11 nov., lot DJ3) Une étiquette lue (le cron ou cet appareil) peut apporter le n° d'un bordereau.
+  const [etiqLuesTic, setEtiqLuesTic] = useState(0);
+  useEffect(() => { const f = () => setEtiqLuesTic((x) => x + 1); window.addEventListener('vrm:etiquette-lue-ici', f); window.addEventListener('vrm:etiquettes-lues', f); return () => { window.removeEventListener('vrm:etiquette-lue-ici', f); window.removeEventListener('vrm:etiquettes-lues', f); }; }, []);
   const bordShipped = (b) => {
     // (8 nov., « à envoyer » prouvé) Par IDENTITÉ seulement : la preuve d'e-mail ou du
     // transporteur pour le n° EXACT du bordereau de CETTE transaction, n° ambigu ⇒ rien
@@ -31265,8 +31269,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pour le n° EXACT de son bordereau, prise en charge lue (`depart_*`). Map tx →
   // raison ; publiée pour Ventes et la loupe (src/departVente.js).
   const partisVinted = useMemo(() => {
+    // (11 nov., lot DJ3) + le n° lu sur SON étiquette (`vrm_bord_transporteurs`, par transaction) quand
+    // l'e-mail du bordereau n'en porte pas, et l'étiquette captée sans e-mail : l'e-mail de dépôt de CE n°
+    // prouve le départ (api/_lib/depart-vente.js `bordsAvecEtiquettes`, identité seulement).
     const m = ventesPartiesParPreuve({
-      bordsParTx: bordsParTransaction(emailBords, isBordHidden), shipDone, bordsShipped, panelBordsDone,
+      bordsParTx: bordsParTransaction(emailBords, isBordHidden), etiquettes: pdfEtiquettesParTx(), shipDone, bordsShipped, panelBordsDone,
       lignesEmail: Array.isArray(tracking) ? tracking : null, departs: vcLoc0.departs,
       ventesMs: Object.fromEntries((sales.items || []).filter((o) => o && o.transaction_id != null && tsCommande(o)).map((o) => [String(o.transaction_id), tsCommande(o)])),
       entrants: Array.isArray(transp) ? new Set(transp.map((t) => t && t.suivi).filter(Boolean)) : null,
@@ -31274,7 +31281,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     publierDepartsVinted(m);
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp]);
+  }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp, etiqLuesTic]);
   // Parti par UNE preuve sûre (Colis fait compris) : ce que chaque liste « à envoyer » de l'écran écarte.
   const estParti = (o) => isShipDone(o) || !!(o && o.transaction_id != null && partisVinted.has(String(o.transaction_id)));
   // ── (10 nov., lot BE) LA FRISE D'UNE VENTE, ÉTAPE PAR ÉTAPE (src/friseProuvee.js) ──────
@@ -31401,7 +31408,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
         return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
       })
-      .filter(e => !(e.b && isBordDone(e.b)));            // colis déjà parti : il sort tout seul
+      .filter(e => !(e.b && isBordDone(e.b)))             // colis déjà parti : il sort tout seul
+      // (11 nov., lot DJ3) …même sans bordereau e-mail : la preuve de SA transaction (e-mail de dépôt du n° de
+      // son étiquette, prise en charge, panneau, expédié à la main). « Colis fait » garde sa carte « posté ».
+      .filter(e => !partiParPreuve(partisVinted.get(e.txn)));
     // (8 nov.) LA VENTE VUE PAR E-MAIL ET SON BORDEREAU (src/bordereauVenteEmail.js) : le même n°
     //    de transaction (l'identité) ⇒ un colis à envoyer, prêt à imprimer, sans attendre que
     //    l'extension relise Vinted. La liste Vinted, dès qu'elle porte le n°, la remplace.
@@ -36664,6 +36674,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // dans le réseau du transporteur — le colis est parti.
       const b = o.transaction_id != null ? bordParTxn[String(o.transaction_id)] : null;
       if (b && isBordDone(b)) continue;
+      // (11 nov., lot DJ3) La même sortie que « Tout imprimer » : la preuve de SA transaction, sans e-mail de bordereau aussi.
+      if (partiParPreuve(partisVinted.get(String(o.transaction_id)))) continue;
       out.push({ o, ...limiteExpedition(o, b) });
     }
     // (8 nov.) La vente vue par e-mail dont le bordereau est là : la MÊME règle que Colis
@@ -38682,7 +38694,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const lignesLot = () => expeditions()
     .filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
     .map(e => { const cle = e.txn || e.key; const age = ageVenteJ(e.o); const imprime = (e.txn && bordsPrinted[e.txn]) || (e.b && isBordPrinted(e.b) ? bordsPrinted[bordKey(e.b)] : null) || null;
-      return { cle, e, age, imprime, ancienne: age != null && age > VENTE_LOT_MAX_J }; })
+      // (11 nov., lot DJ3) Déjà imprimé et AUCUN n° connu (ni e-mail, ni étiquette) : son dépôt n'est pas vérifiable par
+      // e-mail — il reste proposé, décoché, et le dit (« déposé ? à vérifier »), jamais caché en silence.
+      const pdfE = pdfEtiquettesParTx(); const numConnu = !!(suiviDuBord(e.b) || (pdfE && e.txn && pdfE[e.txn] && pdfE[e.txn].s));
+      return { cle, e, age, imprime, depotAVerifier: !!imprime && !numConnu, ancienne: age != null && age > VENTE_LOT_MAX_J }; })
     .sort((a, b) => (Date.parse(b.e.o && b.e.o.date) || 0) - (Date.parse(a.e.o && a.e.o.date) || 0));
   const signatureColis = e => empreinteColis({owner:AUTH.user?.id||'',compte:e.o?._acc?.vinted_user_id||e.b?.uid||'',transaction:e.txn||e.key,numero:(e.b?numForBord(e.b):'')||(e.o?effEntry(e.o)?.numero:'')||''});
   // ── (3 nov., choix de Julien n° 2) « TOUT IMPRIMER », TOUTES PLATEFORMES, PAR TRANSPORTEUR ──
@@ -45894,12 +45909,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                 <label className="vrm-preparation-selection"><input type="checkbox" aria-label={l.cochable===false?`${l.titre||'Commande'} : eBay`:`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy||l.cochable===false} checked={coche&&l.cochable!==false} onChange={()=>{ if(l.cochable!==false) basculer(l.cle); }} style={{width:18,height:18,flexShrink:0}}/></label>
                                 <PhotoVente src={photo} size={32} portrait/>
                                 <span style={{flex:1,minWidth:0}}>
-                                  <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{l.titre}</span>
+                                  <span className="vrm-titre-entier" data-titre-entier="lot" style={{display:'block',fontSize:13,fontWeight:600}}>{num?`N°${num} · `:''}{l.titre}</span>
                                   <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>
                                     {l.sous}{l.site === 'vinted' ? ` · vendue le ${fmtD(o)}` : ''}
                                     {l.pdf === false && l.cochable !== false ? <b data-lot-sans-bordereau="1" style={{color:C.warn,fontWeight:600}}> · Sans bordereau</b> : null}
                                     {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
                                     {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
+                                    {l.depotAVerifier && <b data-lot-depot-verifier="1" style={{color:C.warn,fontWeight:600}}> · déposé ? à vérifier</b>}
                                     {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
                                     <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
                                   </span>
