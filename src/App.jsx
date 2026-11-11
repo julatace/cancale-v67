@@ -51564,9 +51564,8 @@ async function ecrireNoteSatisfaction(data) {
 // ratée de l'alerte ou des vus ⇒ `undefined` (rien montré) ; texte ou profil pas lus ⇒ « Lis l'avis
 // sur Vinted » / lien par l'identifiant du compte.
 async function lireAvisBas() {
-  const uid = AUTH.user?.id; if (!uid) return undefined;
-  const qui = `&owner=eq.${encodeURIComponent(uid)}`;
-  const get = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}${qui}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+  // Comme les autres lectures de l'app : la base (RLS) ne rend que les lignes du vendeur de la session.
+  const get = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
   const [m, v] = await Promise.all([get(`app_data?id=eq.${LIGNE_AVIS_BAS}&select=a:data->alertes`), get(`app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`)]);
   if (m === null || v === null) return undefined;
   const alertes = m[0] && Array.isArray(m[0].a) ? m[0].a : [];
@@ -51584,9 +51583,8 @@ async function lireAvisBas() {
 }
 // « C'est vu » : lire-fusionner-réécrire SA ligne (`fn(vusLus)`) ; une lecture ratée n'écrit rien.
 async function ecrireAvisBasVus(fn) {
-  const uid = AUTH.user?.id; if (!uid) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&owner=eq.${encodeURIComponent(uid)}&select=data`, { headers: sbAuth(), cache: 'no-store' });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`, { headers: sbAuth(), cache: 'no-store' });
     if (!r.ok) return false;
     const j = await r.json();
     if (!Array.isArray(j)) return false;
