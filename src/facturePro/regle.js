@@ -1,5 +1,5 @@
 import { gabaritMail } from '../../api/_lib/mail-gabarit.js';
-import { traductionContenu, MESSAGE_DEFAUT_EN } from './anglais.js';
+import { traductionContenu, MESSAGE_DEFAUT_EN, bi } from './anglais.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  LA FACTURE PRO — la règle (2 novembre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -363,6 +363,17 @@ export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) 
 // Le texte du vendeur (`messageEmail`) et une version HTML qui dit la même chose
 // (tout est échappé : aucune valeur n'écrit du HTML), sans pied (11 nov.). Jamais de lien de désinscription : c'est un e-mail
 // transactionnel (la facture d'un achat), pas une lettre d'information.
+// La dernière ligne du PDF (./pdf.js) : son libellé et son montant, tels quels.
+// Un total illisible ⇒ rien (jamais un « 0,00 € » qui voudrait dire « pas su »).
+export function totalDocument(contenu) {
+  const T = contenu && contenu.totaux;
+  if (!T || !Number.isInteger(T.ttc)) return null;
+  const avoir = contenu.type === 'avoir';
+  const lib = contenu.regime === 'normal' ? (avoir ? 'Total TTC à rembourser' : 'Total TTC')
+    : contenu.regime === 'franchise' ? (avoir ? 'Montant à rembourser' : 'Net à payer')
+      : (avoir ? 'Montant à rembourser' : 'Total à payer');
+  return [bi(lib, !!contenu.anglais), euros(T.ttc)];   // la traduction du PDF (./anglais.js)
+}
 export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
   const { sujet, corps } = messageEmail(cfg, contenu);
   const nom = contenu.vendeur.nom;
@@ -376,11 +387,22 @@ export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
   // le NOM du vendeur en tête (c'est SA facture, pas un e-mail de VRM), son texte
   // échappé, la pièce jointe dite, aucun bouton, aucun pied (`marque` : pas de mentions de VRM).
   const doc = contenu.type === 'avoir' ? (contenu.anglais ? 'Avoir / Credit note' : 'Avoir') : (contenu.anglais ? 'Facture / Invoice' : 'Facture');
+  // (11 nov., lot emails-envoyes) Sous son message, l'essentiel du document d'un coup
+  // d'œil : son numéro et le montant — le MÊME chiffre et le même libellé que la
+  // dernière ligne du PDF (`totalDocument`), jamais recalculé ici — puis le nom du
+  // PDF joint. Aucun bouton (le document EST la pièce jointe), rien de VRM.
+  // Le texte brut reste exactement SON message (l'aperçu « Message » de l'app).
+  const total = totalDocument(contenu);
+  const en = (fr, an) => (contenu.anglais ? `${fr} / ${an}` : fr);   // deux mots que le PDF n'a pas
   const { html } = gabaritMail({
     titre: `${doc} ${contenu.numero}`,
     preentete: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
     paras: corps.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean),
-    apres: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
+    chiffres: [
+      [en('Numéro', 'Number'), String(contenu.numero)],
+      ...(total ? [total] : []),
+    ],
+    apres: `${en('Pièce jointe', 'Attachment')} : ${nomFichier(contenu)}`,
     pied: null,
     marque: { nom },
   });
