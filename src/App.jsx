@@ -13760,6 +13760,13 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
   const aRepublier = rep ? liste.filter((a) => coches.has(cle(a))) : [];
   return (
     <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
+      {/* (11 nov., lot DJ8) Le conseil passe AVANT les suivis : en arrivant, « À la main » se voit d'abord. */}
+      {/* (10 nov., lot AP — demande 17) À LA MAIN, CONSEILLÉ : le moins risqué (c'est lui qui publie,
+          rien ne part d'ici), rendu attirant — trois gestes prêts, le N° qui suit la paire. */}
+      {rep && <div className="vrm-kit-conseil vrm-kit-conseil-vue" data-republier-conseil="main">
+        <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
+        <div><b>À la main : conseillé, le moins risqué.</b><span>Photos dans ta galerie, N° et description à copier.</span></div>
+      </div>}
       {suivis.length > 0 && suivis.map((s) => (
         <div key={s.ancienId} data-suivi-main={s.ancienId} data-suivi-main-etat={s._etat} className="vrm-act-paire">
           <span className="vrm-act-paire-nom">{s.num ? <Numero n={s.num} taille="petit"/> : null}<b>{s.titre || 'Annonce'}</b></span>
@@ -13767,17 +13774,12 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
           <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>Reprendre</Bouton></div>
         </div>
       ))}
-      {/* (10 nov., lot AP — demande 17) À LA MAIN, CONSEILLÉ : le moins risqué (c'est lui qui publie,
-          rien ne part d'ici), rendu attirant — trois gestes prêts, le N° qui suit la paire. */}
-      {rep && <div className="vrm-kit-conseil vrm-kit-conseil-vue" data-republier-conseil="main">
-        <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
-        <div><b>À la main : conseillé, le moins risqué.</b><span>Photos dans ta galerie, N° et description à copier.</span></div>
-      </div>}
       <div className="vrm-sel-tete" data-sel-tete="">
         {/* (10 nov., lot AI) La consigne RÉÉCRITE en une phrase courte, sans pop-up (le geste suffit) ;
             sur la vue « Republier » (navigation fusionnée) : c'est toujours lui qui choisit et lance. */}
         <span data-sel-consigne="" style={{ minWidth: 0, flex: '1 1 auto' }}>{rep ? <>Coche des annonces, puis choisis <b>À la main</b> ou <b>Par VRM</b>.</> : filtre === 'brouillon' ? <>Coche tes brouillons, puis <b>Actions</b>.</> : <>Coche des annonces d’un compte, puis <b>Actions</b>.</>}</span>
-        {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
+        {/* (11 nov., lot DJ8) Un seul compte : son « Tout décocher » suffit (le même geste ne s'écrit pas deux fois). */}
+        {nCoches > 0 && groupes.length !== 1 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
         {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>Un par un</Bouton> : null}
       </div>
       {charge ? <div className="vrm-sel-vide" data-selection-charge="">{PAS_SU.enCours}</div>
@@ -13848,6 +13850,14 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
     <SheetShell onClose={onClose} maxWidth={520} titre={`Actions · ${n} annonce${n > 1 ? 's' : ''}`}>
       <div className="vrm-act" data-actions-selection={n} data-actions-tuiles={tuiles.length}>
         {tete ? <p className="vrm-act-raison" data-actions-raison="" role="status">{tete}</p> : null}
+        {/* (11 nov., lot DJ8 — « la repu à la main au premier plan ») « Republier à la main » AVANT
+            les tuiles : conseillé, le moins risqué (c'est lui qui publie, rien ne part d'ici). */}
+        {main ? (
+          <div className="vrm-act-main vrm-act-main-conseil" data-action-sel="main" data-action-sel-ok={main.ok ? 'oui' : 'non'}>
+            <Bouton variante={main.ok ? 'secondaire' : 'discret'} icone="shield" disabled={!main.ok} title={main.ok ? main.desc : main.raison} onClick={() => { if (main.ok) onLancer('main'); }}>{main.titre}</Bouton>
+            {main.ok || main.raison !== tete ? <span>{main.ok ? 'Conseillé : tu publies toi-même, VRM prépare tout.' : main.raison}</span> : null}
+          </div>
+        ) : null}
         <div className="vrm-act-tuiles">
           {tuiles.map((x) => { const sous = parTuile[x.k] || ''; return (
             <button key={x.k} type="button" className="vrm-act-choix" data-action-sel={x.k} data-action-sel-ok={x.ok ? 'oui' : 'non'} aria-disabled={x.ok ? undefined : 'true'} title={x.ok ? undefined : x.raison}
@@ -13857,12 +13867,6 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
             </button>
           ); })}
         </div>
-        {main ? (
-          <div className="vrm-act-main" data-action-sel="main" data-action-sel-ok={main.ok ? 'oui' : 'non'}>
-            <Bouton variante="discret" disabled={!main.ok} title={main.ok ? main.desc : main.raison} onClick={() => { if (main.ok) onLancer('main'); }}>{main.titre}</Bouton>
-            {main.ok || main.raison !== tete ? <span>{main.ok ? 'Sans l’extension : VRM te prépare tout, tu publies toi-même.' : main.raison}</span> : null}
-          </div>
-        ) : null}
         {mini ? (
           <div className="vrm-act-main" data-action-sel="mini" data-action-sel-ok={mini.ok ? 'oui' : 'non'}>
             <Bouton variante="discret" disabled={!mini.ok} title={mini.ok ? mini.desc : mini.raison} onClick={() => { if (mini.ok) onLancer('mini'); }}>{mini.titre}</Bouton>
@@ -43820,6 +43824,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
             </div>
             {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
+            {/* (11 nov., lot DJ8) L'écran complet : seuils par paire, aperçu, historique (Messages → Favoris & offres → Offres auto). */}
+            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>Régler par paire, voir l’historique ›</button>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
                 <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
@@ -48390,7 +48396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (10 nov., lot AP) Le kit « à la main » : rien ne part chez Vinted ; « Pas à pas » = la feuille en cinq étapes.
         <PreparerALaMain paires={kitMain} onClose={()=>setKitMain(null)}
           onUneParUne={()=>{ const l=kitMain; setKitMain(null); setRepubMainFile(l.length>1 ? { liste:l, i:0 } : null); setRepubMainOuvert(l[0]); }}
-          onOuvrirVinted={()=>{ for (const p of kitMain) { if (p.numero && !repubMain[String(p.id)]) poserRepubMain(String(p.id), { uid:String(p.uid||''), num:String(p.numero), titre:p.titre||'', domain:p.domain||'www.vinted.fr', at:new Date().toISOString() }); } }}/>
+          onOuvrirVinted={(l)=>{ for (const p of (Array.isArray(l) ? l : kitMain)) { if (p.numero && !repubMain[String(p.id)]) poserRepubMain(String(p.id), { uid:String(p.uid||''), num:String(p.numero), titre:p.titre||'', domain:p.domain||'www.vinted.fr', at:new Date().toISOString() }); } }}/>
       )}
       {brouillonsOpen && (
         <BrouillonsVinted br={brVinted} brouillonOk={extSait('brouillon')==='ok'} onClose={()=>setBrouillonsOpen(false)} onFile={()=>{ setBrouillonsOpen(false); setRepubAction('enLigne'); }}
