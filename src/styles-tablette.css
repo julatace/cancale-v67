@@ -46,6 +46,9 @@
 /* ── 3. L'ÎLE ET LA BARRE DU HAUT : 44 px ───────────────────────────────── */
 .vrm-app-shell[data-tablette] > header.vrm-app-header :is(button, a[href], [role="button"]) { min-height: 44px !important; min-width: 44px !important; }
 .vrm-app-shell[data-tablette] .vrm-barre-haut .vrm-filtre-site > button { min-width: 44px !important; flex-shrink: 0 !important; }
+/* Les filtres de site gardent leur largeur ; c'est la recherche qui se resserre (en portrait, la
+   rangée débordait vers la gauche, PAR-DESSUS le champ de recherche). */
+.vrm-app-shell[data-tablette] .vrm-barre-haut > .vrm-barre-haut-droite { flex: 0 0 auto !important; }
 
 /* ── 4. 744–767 px (iPad mini en portrait) : les règles TÉLÉPHONE de la coque
    (`max-width: 767px` : `.vrm-main` à 100 % de l'écran, zoom à 80 %) ne

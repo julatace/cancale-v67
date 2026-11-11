@@ -107,6 +107,12 @@ const MESURE = () => {
     mort: /n'a pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText || ''),
     railL: (() => { const s = document.querySelector('.vrm-sidebar'); return s && vis(s) ? Math.round(s.getBoundingClientRect().width) : 0; })() };
   out.libelles = (() => { const bs = [...document.querySelectorAll('.vrm-sidebar .vrm-rail-button')].filter(vis); return bs.length > 0 && bs.every((b) => vis(b.querySelector('.vrm-rail-lib'))); })();
+  // La barre du haut : la recherche, les filtres de site et l'île ne se chevauchent pas.
+  out.chevauche = (() => {
+    const boites = [document.querySelector('.vrm-barre-recherche'), document.querySelector('.vrm-barre-haut-droite .vrm-filtre-site'), document.querySelector('header.vrm-app-header')].filter(vis).map((e) => e.getBoundingClientRect());
+    for (let i = 0; i < boites.length; i++) for (let j = i + 1; j < boites.length; j++) { const a = boites[i], b = boites[j]; if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) return `${Math.round(a.left)}–${Math.round(a.right)} / ${Math.round(b.left)}–${Math.round(b.right)}`; }
+    return '';
+  })();
   // Ce qui se touche : rail, île et écran. Une feuille ouverte n'est pas mesurée ici.
   const zones = [document.querySelector('.vrm-sidebar'), document.querySelector('header.vrm-app-header'), mainEl].filter(Boolean);
   const SEL = 'button, a[href], [role="button"], [role="tab"], [role="switch"], [role="checkbox"], select, summary, input:not([type="hidden"]):not([type="file"])';
@@ -120,6 +126,8 @@ const MESURE = () => {
     if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;   // hors de la vue : mesuré quand on y défile
     // Un champ caché derrière son libellé (case maison) : c'est le libellé qu'on touche.
     if (el.tagName === 'INPUT' && /^(checkbox|radio)$/.test(el.type) && (cs.opacity === '0' || r.width < 6)) continue;
+    // Un <select> natif transparent posé SUR son libellé visible (le doigt ouvre la liste du système) : c'est le libellé qu'on voit.
+    if (el.tagName === 'SELECT' && cs.opacity === '0' && el.closest('label') && el.closest('label') !== el) continue;
     // Un lien DANS une phrase se touche comme la phrase (WCAG 2.5.8, exception « en ligne »).
     if (el.tagName === 'A' && el.parentElement && (el.parentElement.tagName === 'P' || (/inline/.test(cs.display) && /^(SPAN|LI|DIV|SMALL)$/.test(el.parentElement.tagName) && (el.parentElement.innerText || '').length > (el.innerText || '').length + 12))) continue;
     n++;
@@ -173,6 +181,7 @@ const aller = async (pg, t) => {
       const nom = `${cf.id} ${t}`;
       dit(!r.mort, `${nom} : l'écran s'affiche`);
       dit(r.docSw <= r.vw + 1 && r.mainSw <= r.mainCw + 1 && r.mainDroite <= r.vw + 1, `${nom} : aucun débordement horizontal`, `page ${r.docSw}/${r.vw}, main ${r.mainSw}/${r.mainCw}, bord droit de main ${r.mainDroite}`);
+      if (!cf.telephone) dit(!r.chevauche, `${nom} : recherche, filtres de site et île ne se chevauchent pas`, r.chevauche);
       if (cf.tablette) {
         dit(r.coarse, `${nom} : le banc sert bien un pointeur au doigt`);
         dit(r.sidebar && !r.tabbar, `${nom} : coque tablette (rail à gauche, pas de barre du bas)`, `rail ${r.sidebar} · barre du bas ${r.tabbar}`);

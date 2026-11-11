@@ -537,7 +537,9 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
   // leur voile la laissait claire et touchable.
   // (Le petit téléphone n'a pas la variante haute de « Tous les écrans » : son
   //  menu est dans « Gestion », en bas. On n'y juge que l'état des actions.)
-  const TAILLES3 = [[844, 390, 'téléphone en paysage 844×390', true], [568, 320, 'petit téléphone en paysage 568×320', false], [820, 1180, 'iPad 820×1180', true]];
+  const TAILLES3 = [[844, 390, 'téléphone en paysage 844×390', true], [568, 320, 'petit téléphone en paysage 568×320', false], [820, 1180, 'iPad 820×1180', false]];
+  // (11 nov., chantier iPad) L'iPad au doigt prend la coque ORDINATEUR (src/coque.js) : le rail
+  // remplace « Tous les écrans » (il n'existe plus là) ; l'état des actions reste jugé.
   const BAS_DE = `((sel) => {
     if (window.__bancWebkit) window.__bancWebkit();
     const W = innerWidth, H = innerHeight;
