@@ -49,7 +49,8 @@
 /* Les filtres de site gardent leur largeur ; c'est la recherche qui se resserre (en portrait, la
    rangée débordait vers la gauche, PAR-DESSUS le champ de recherche). */
 .vrm-app-shell[data-tablette] .vrm-barre-haut > .vrm-barre-haut-droite { flex: 0 0 auto !important; }
-.vrm-app-shell[data-tablette] .vrm-barre-haut > .vrm-barre-recherche { min-width: 96px !important; }
+.vrm-app-shell[data-tablette] .vrm-barre-haut > .vrm-recherche,
+.vrm-app-shell[data-tablette] .vrm-barre-haut .vrm-barre-recherche { min-width: 96px !important; }
 
 /* ── 4. 744–767 px (iPad mini en portrait) : les règles TÉLÉPHONE de la coque
    (`max-width: 767px` : `.vrm-main` à 100 % de l'écran, zoom à 80 %) ne
