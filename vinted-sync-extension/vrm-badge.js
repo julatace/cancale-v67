@@ -198,6 +198,7 @@
   /* 5.354 : le mini-résumé du mois, replié sous une ligne discrète (les styles de « Détails »). */
   .mois .mois-l { margin-top: 0; line-height: 1.45; }
   .mois .mois-l b { font-weight: 600; color: var(--texte); }
+  .mois .mois-l .seg { white-space: nowrap; }   /* coupé aux « · », jamais « 3 à / expédier » */
   .mois .outils { margin-top: 0; }
   .outils .lien { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 13px; cursor: pointer; }
   .outils .lien:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
@@ -457,12 +458,12 @@
     const ca = m.ca == null || (m.caAuMoins && !(m.ca > 0)) ? '—' : (m.caAuMoins ? 'au moins ' : '') + euros(m.ca);
     const nv = m.ventes == null ? '—' : Number(m.ventes).toLocaleString('fr-FR');
     const ae = m.aExpedier == null ? '—' : (m.aExpedierAuMoins ? 'au moins ' : '') + Number(m.aExpedier).toLocaleString('fr-FR');
-    const ventesMot = m.ventes === 1 ? 'vente' : 'ventes';
+    const ventesMot = m.ventes != null && m.ventes <= 1 ? 'vente' : 'ventes';   // « 0 vente », « 1 vente », « 42 ventes »
     const note = m.raison === 'mois' ? 'VRM n’a pas encore publié les chiffres de ce mois : ouvre VRM une fois.'
       : m.raison === 'jamais' ? 'Pas encore de chiffres publiés : ouvre VRM une fois.'
       : m.maj ? `Chiffres de VRM, publiés ${depuis(m.maj)}${m.aExpedier == null ? ' · colis : ouvre VRM pour les recompter' : ''}.` : '';
     return `<details class="detail mois" data-mois${moisOuvert ? ' open' : ''}><summary>Ce mois dans VRM</summary>
-      <div class="val mois-l" data-mois-ca="${m.ca == null ? '' : esc(m.ca)}" data-mois-ventes="${m.ventes == null ? '' : esc(m.ventes)}" data-mois-expedier="${m.aExpedier == null ? '' : esc(m.aExpedier)}">Ce mois : <b>${esc(ca)}</b> vendus · <b>${esc(nv)}</b> ${ventesMot} · <b>${esc(ae)}</b> à expédier</div>
+      <div class="val mois-l" data-mois-ca="${m.ca == null ? '' : esc(m.ca)}" data-mois-ventes="${m.ventes == null ? '' : esc(m.ventes)}" data-mois-expedier="${m.aExpedier == null ? '' : esc(m.aExpedier)}"><span class="seg">Ce mois : <b>${esc(ca)}</b> vendus</span> · <span class="seg"><b>${esc(nv)}</b> ${ventesMot}</span> · <span class="seg"><b>${esc(ae)}</b> à expédier</span></div>
       ${note ? `<div class="val gris" data-mois-note="${esc(m.raison || 'ok')}">${esc(note)}</div>` : ''}
       <div class="outils"><button class="lien" data-mois-voir>Voir dans VRM</button><button class="lien" data-mois-masquer>Masquer ce résumé</button></div>
     </details>`;
