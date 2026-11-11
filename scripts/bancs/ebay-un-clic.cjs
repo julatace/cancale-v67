@@ -27,7 +27,8 @@ async function scenario(b, avecCategorie) {
   if (avecCategorie) it.catalog_id = 1242;
   const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[it] } } };
   const envois = [];
-  const pg = await b.newPage({ viewport:{ width:390, height:1400 } });
+  // (11 nov., ebay-rouges) La langue de Julien, posée : depuis la traduction, l'app suit celle du navigateur.
+  const pg = await b.newPage({ viewport:{ width:390, height:1400 }, locale:'fr-FR' });
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401'])); }catch(_){}}, [NUMS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r)=>{ const t=r.request().resourceType(); if(t==='image') return r.fulfill({status:200,contentType:'image/png',body:PNG}); if(t==='media'||t==='font') return r.abort(); return r.continue(); });
@@ -75,6 +76,9 @@ async function scenario(b, avecCategorie) {
   dit(!!btn, `${avecCategorie ? 'A' : 'B'} · chaque article a son bouton « Publier » (un clic)`);
   if (!btn) { await pg.close(); return; }
   await btn.click();
+  // (11 nov., ebay-rouges) Depuis le 3 nov., un point à revoir (« 2 photos seulement ») ouvre d'abord la
+  //  feuille de vérification : le banc répond comme Julien, « Publier quand même » (`data-verif-publier`).
+  try { await pg.waitForSelector('[data-verif-publier]', { timeout: 5000 }); await pg.click('[data-verif-publier]'); } catch (_) {}
   const nom = avecCategorie ? 'A' : 'B';
   if (avecCategorie) {
     const feuille = pg.locator('div[style*="z-index"]').filter({ hasText: 'Publier cet article sur eBay ?' }).last();
@@ -90,6 +94,7 @@ async function scenario(b, avecCategorie) {
     // Après « Annuler », l'article reste choisi, critères remplis : le bouton
     // principal publie (avec sa propre confirmation).
     try { await pg.getByRole('button', { name: /Publier sur eBay/ }).last().click({ timeout: 5000 }); } catch (_) {}
+    try { await pg.waitForSelector('[data-verif-publier]', { timeout: 5000 }); await pg.click('[data-verif-publier]'); } catch (_) {}
     try { await pg.getByRole('button', { name: 'Oui, publier' }).last().click({ timeout: 8000 }); } catch (_) {}
     await pg.waitForTimeout(1500);
     const pubs = envois.filter(x=>x.action==='publish');
@@ -99,10 +104,16 @@ async function scenario(b, avecCategorie) {
     dit(a['Département'] === 'Homme' && a['Couleur'] === 'Bleu' && a['Type'] === 'Baskets' && a['Marque'] === 'Nike' && a['Pointure EU'] === '44', 'A · les critères partent remplis', JSON.stringify(a));
     dit(/portées deux fois/.test(String(it2.description || it2.desc || JSON.stringify(it2))), 'A · la description est celle de Vinted');
   } else {
-    await pg.waitForTimeout(3500);
+    // (11 nov., ebay-complet) Le critère manquant n'est plus une phrase « Il manque… » : eBay le DEMANDE,
+    //  une question à la fois (`QuestionsEbay`, data-ebay-question="caracteristique"), avec ses valeurs.
+    //  « Plus tard » arrête tout : rien n'est vérifié ni publié, et c'est dit (ebay.q.arrete).
+    let q = null; try { await pg.waitForSelector('[data-ebay-questions][data-ebay-question="caracteristique"]', { timeout: 8000 }); q = await pg.$eval('[data-ebay-questions]', (e) => ({ t: e.innerText, v: [...e.querySelectorAll('[data-ebay-q-valeur]')].map((x) => x.getAttribute('data-ebay-q-valeur')) })); } catch (_) {}
+    dit(!!q && /Département/.test(q.t) && ['Homme', 'Femme', 'Unisexe adulte'].every((v) => q.v.includes(v)), 'B · le critère manquant est DEMANDÉ et NOMMÉ (Département), avec les valeurs d\'eBay', q ? q.t.replace(/\s+/g, ' ').slice(0, 160) : 'aucune question');
+    if (q) await pg.click('[data-ebay-q-plus-tard]');
+    await pg.waitForTimeout(1500);
     const t = await pg.evaluate(()=>document.body.innerText);
     dit(!envois.some(x=>x.action==='pubverify' || x.action==='publish'), 'B · sans catégorie Vinted : rien n\'est vérifié ni publié');
-    dit(/Département/.test(t) && /rien n'est publié/.test(t), 'B · le critère manquant est NOMMÉ (Département)', (t.match(/Il manque[^\n]{0,200}/) || [''])[0]);
+    dit(/Rien n'est publié/.test(t), 'B · « Plus tard » : la publication s\'arrête, et c\'est dit', (t.match(/Rien n'est publié[^\n]{0,120}/) || [''])[0]);
   }
   dit(!errs.length, `${nom} · aucune erreur d'app`, errs.join(' | '));
   await pg.close();

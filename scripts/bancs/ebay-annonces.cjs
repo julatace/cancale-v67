@@ -219,7 +219,7 @@ const projette = (row, sel) => {
 // `opts` sert aussi à relever chaque état pris par l'interrupteur du retrait
 // automatique pendant le chargement (`window.__etatsAuto`).
 async function ouvrir(b, vp, panne, opts = {}) {
-  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const envois = [];

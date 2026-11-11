@@ -35,7 +35,8 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
 const envoisEbay = []; let avertir = false;
 (async()=>{
   const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium', args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
-  const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
+  // (11 nov., ebay-rouges) La langue de Julien, posée : depuis la traduction, l'app suit celle du navigateur.
+  const pg = await b.newPage({ viewport:{ width:390, height:1500 }, locale:'fr-FR' });
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401','402'])); }catch(_){}}, [NUMS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r)=>{ const t=r.request().resourceType(); if(t==='image') return r.fulfill({status:200,contentType:'image/png',body:PNG}); if(t==='media'||t==='font') return r.abort(); return r.continue(); });
@@ -140,9 +141,12 @@ const envoisEbay = []; let avertir = false;
   // ⚠️ LE CLAVIER NE DOIT PLUS SE FERMER À CHAQUE LETTRE. Cause : un composant
   // défini dans le rendu → remonté à chaque frappe → focus perdu. On tape une
   // lettre et on vérifie que le champ garde le focus (sur iPhone = clavier ouvert).
-  await pg.focus('input[placeholder^="Nike Air Max"]');
+  // (11 nov., ebay-rouges) L'exemple du titre suit ce que le vendeur vend (« Je vends », lot vendeur-généraliste :
+  //  « Nike Air Max… » pour les sneakers seulement) : le champ titre se trouve par SA règle, `maxlength="80"` (eBay).
+  const TITRE = 'input[maxlength="80"]';
+  await pg.focus(TITRE);
   await pg.keyboard.type('Z');
-  const focusGarde = await pg.evaluate(()=>{ const el=document.activeElement; return !!(el && el.tagName==='INPUT' && /Nike Air Max/.test(el.getAttribute('placeholder')||'')); });
+  const focusGarde = await pg.evaluate(()=>{ const el=document.activeElement; return !!(el && el.tagName==='INPUT' && el.getAttribute('maxlength')==='80'); });
   dit(focusGarde, 'taper dans le titre GARDE le focus (le clavier ne se ferme plus)');
   // ⚠️ Pas de zoom iOS : les champs sont à ≥ 16px.
   const petits = await pg.evaluate(()=>{ const els=[...document.querySelectorAll('main input, main select, main textarea')]; return els.filter(e=>{ const fs=parseFloat(getComputedStyle(e).fontSize); return fs && fs < 16; }).length; });
@@ -156,7 +160,7 @@ const envoisEbay = []; let avertir = false;
   dit(!venduBtn, 'une paire déjà VENDUE (annonce fermée) n\'est PAS proposée');
   if (pairBtn) await pairBtn.click();
   await pg.waitForTimeout(400);
-  const titleVal = await pg.$eval('input[placeholder^="Nike Air Max"]', el=>el.value).catch(()=>'');
+  const titleVal = await pg.$eval(TITRE, el=>el.value).catch(()=>'');
   dit(/nike/i.test(titleVal), 'choisir la paire remplit le titre tout seul', 'titre=' + titleVal.slice(0,40));
   dit(/taille 44/i.test(titleVal) && !/\bT44\b/.test(titleVal), 'le titre écrit « taille 44 », pas « T44 » (demande de Julien)', 'titre=' + titleVal);
   const nImgs = await pg.evaluate(()=>document.querySelectorAll('img[src^="https://img.example/"]').length);
