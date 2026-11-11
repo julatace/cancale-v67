@@ -51,7 +51,7 @@ export default function PartageFiche({ source, onFermer, Feuille, Bouton, Segmen
 
   const partager = async (p) => {
     const r = await partagerLien(p.url, fiche ? fiche.titre : p.titre, nav);
-    if (r === 'copie') toast('✓ Lien copié. Colle-le dans ton message.', 'ok');
+    if (r === 'copie') toast('Lien copié. Colle-le dans ton message.', 'ok');
     // Le téléphone a refusé d'ouvrir son partage après l'attente du serveur : le lien
     // est prêt, « Partager le lien » le rouvre d'un geste.
     else if (r === 'refuse') toast('Lien prêt : touche « Partager le lien ».', 'info');
@@ -61,7 +61,7 @@ export default function PartageFiche({ source, onFermer, Feuille, Bouton, Segmen
     setOccupe('creer');
     const j = await appel({ method: 'POST', body: JSON.stringify({ action: 'creer', fiche: brut, ident, duree }) });
     setOccupe('');
-    if (j.erreur) { toast('⚠️ ' + j.erreur, 'err'); return; }
+    if (j.erreur) { toast(j.erreur, 'err'); return; }
     setListe((l) => [j.partage, ...(Array.isArray(l) ? l : [])]);
     try { window.dispatchEvent(new Event('vrm:partage-cree')); } catch (_) {}
     await partager(j.partage);
@@ -71,20 +71,20 @@ export default function PartageFiche({ source, onFermer, Feuille, Bouton, Segmen
     setOccupe('maj');
     const j = await appel({ method: 'POST', body: JSON.stringify({ action: 'actualiser', ligne: actuel.ligne, fiche: brut }) });
     setOccupe('');
-    if (j.erreur) { toast('⚠️ ' + j.erreur, 'err'); return; }
+    if (j.erreur) { toast(j.erreur, 'err'); return; }
     setListe((l) => (l || []).map((p) => (p.ligne === actuel.ligne ? { ...p, ...j.partage } : p)));
-    toast('✓ Fiche mise à jour. Le lien ne change pas.', 'ok');
+    toast('Fiche mise à jour. Le lien ne change pas.', 'ok');
   };
   const arreter = async (p) => {
     setOccupe('arreter:' + p.ligne);
     const j = await appel({ method: 'POST', body: JSON.stringify({ action: 'arreter', ligne: p.ligne }) });
     setOccupe('');
-    if (j.erreur) { toast('⚠️ ' + j.erreur, 'err'); return; }
+    if (j.erreur) { toast(j.erreur, 'err'); return; }
     setListe((l) => (l || []).filter((x) => x.ligne !== p.ligne));
-    toast('✓ Partage arrêté. Le lien ne marche plus.', 'ok');
+    toast('Partage arrêté. Le lien ne marche plus.', 'ok');
   };
   const copier = async (p) => {
-    try { await navigator.clipboard.writeText(p.url); toast('✓ Lien copié.', 'ok'); } catch (_) { toast('Copie impossible ici : appuie longuement sur le lien.', 'info'); }
+    try { await navigator.clipboard.writeText(p.url); toast('Lien copié.', 'ok'); } catch (_) { toast('Copie impossible ici : appuie longuement sur le lien.', 'info'); }
   };
 
   const details = fiche ? [fiche.taille ? `Taille ${fiche.taille}` : '', fiche.etat].filter(Boolean).join(' · ') : '';

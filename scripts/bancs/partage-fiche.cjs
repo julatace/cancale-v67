@@ -194,15 +194,20 @@ const lireFeuille = (pg) => pg.evaluate(() => { const s = document.querySelector
           await pub.route(/^https:\/\/images1\.vinted\.net\//, (r) => r.fulfill({ status: 200, contentType: 'image/png', body: JPEG }));
           const resp = await pub.goto(`http://localhost:${PORT}/p/${jeton}`);
           const html = await resp.text();
-          const v = await pub.evaluate(() => ({ h1: (document.querySelector('h1') || {}).textContent || '', texte: document.body.innerText, deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          const v = await pub.evaluate(() => ({ h1: (document.querySelector('h1') || {}).textContent || '', texte: document.body.innerText,
+            // Le texte SANS la ligne de date (« 12 h 41 » n'est pas le N°41).
+            sansDate: [...document.body.querySelectorAll('h1, p:not([data-partage-date]):not([data-partage-perime]), a, footer')].map((e) => e.innerText).join(' '), deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
             imgs: document.querySelectorAll('img').length, liens: [...document.querySelectorAll('[data-site]')].map((a) => a.getAttribute('data-site') + ' ' + Math.round(a.getBoundingClientRect().height)),
             fond: getComputedStyle(document.body).backgroundColor }));
           dit(resp.status() === 200 && v.h1 === 'Nike Cortez blanche' && /Taille 42 · Très bon état/.test(v.texte) && /80\s€/.test(v.texte) && v.imgs === 2, 'C1 la page : titre, taille · état, 80 €, 2 photos', v.texte.replace(/\s+/g, ' ').slice(0, 200));
           dit(v.liens.length === 1 && /^vinted (4[4-9]|[5-9]\d)$/.test(v.liens[0]) && /Infos vérifiées le/.test(v.texte), 'C2 « Voir sur Vinted » (≥ 44 px), page datée', JSON.stringify(v.liens));
-          dit(!/\b41\b|30\s?€|atelier_test|Prix d’achat/.test(v.texte) && !/<script/i.test(html), 'C3 ni N°, ni prix d’achat, ni pseudo, aucun script');
+          dit(!/\b41\b|30\s?€|atelier_test|Prix d’achat/.test(v.sansDate) && !/\b41\b/.test(html.replace(/data-partage-date="">[^<]*/, '').replace(/https?:\/\/[^"]*/g, '')) && !/<script/i.test(html), 'C3 ni N°, ni prix d’achat, ni pseudo, aucun script');
           dit(/og:title" content="Nike Cortez blanche · 80\s€"/.test(html) && /og:image" content="https:\/\/images1\.vinted\.net\//.test(html), 'C4 Open Graph : titre · prix et photo (aperçu des messageries)');
           dit(v.deb <= 0 && (sombre ? /rgb\(0, 0, 0\)/.test(v.fond) : /rgb\(255, 255, 255\)/.test(v.fond)), 'C5 aucun débordement ; fond ' + (sombre ? 'noir' : 'blanc') + ' (thème du téléphone)', JSON.stringify({ deb: v.deb, fond: v.fond }));
-          if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pub.screenshot({ path: path.join(CAPT, `page-${suf}.png`), fullPage: true }).catch(() => {}); }
+          if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pub.waitForTimeout(600); await pub.screenshot({ path: path.join(CAPT, `page-${suf}.png`), fullPage: true }).catch(() => {}); }
+          // D. Arrêter — le geste qui coupe est AMBRE (§7), jamais l'accent bleu.
+          const coul = await pg.evaluate(() => { const b = document.querySelector('[data-partage-arreter]'); return b ? getComputedStyle(b).color : ''; });
+          dit(/^rgb\((17[0-9]|2[0-5]\d), (6\d|7\d|8\d|1[0-9]\d), (0|[1-6]?\d)\)$/.test(coul), 'D0 « Arrêter le partage » en ambre', coul);
           // D. Arrêter
           await pg.locator('[data-partage-arreter]').click();
           await pg.waitForFunction(() => !document.querySelector('[data-partage-actuel]'), null, { timeout: 10000 }).catch(() => {});

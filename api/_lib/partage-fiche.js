@@ -58,6 +58,7 @@ main{max-width:560px;margin:0 auto;padding:16px 16px 40px}
 .galerie::-webkit-scrollbar{display:none}
 .galerie img{flex:0 0 100%;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:18px;background:var(--carte);scroll-snap-align:center}
 .galerie.plusieurs img{flex-basis:86%}
+@media (min-width:700px){.galerie img{aspect-ratio:1/1}}
 .nb{margin:8px 0 0;font-size:13px;color:var(--doux);text-align:center}
 h1{font-size:24px;line-height:1.2;letter-spacing:-.02em;font-weight:700;margin:20px 0 6px;overflow-wrap:anywhere}
 .details{margin:0;color:var(--doux);font-size:15px}
