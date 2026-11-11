@@ -158,7 +158,9 @@ import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAch
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
-import { requeteDeLaVoix } from "./rechercheVocale.js";
+import { requeteDeLaVoix, ficheDeLaVoix } from "./rechercheVocale.js";
+import { VOIX, PHRASES_VOIX, ecouter, annulerVoix, arreterVoix, ecouteEnCours } from "./dicteeNavigateur.js";
+import { useEtatVoix, LigneVoix } from "./composants/voix.jsx";
 import { lireDemandeAchat, lireRechercheLien, poserDemandeAchat } from "./raccourcisSiri.js";
 import RaccourcisClavier from "./RaccourcisClavier.jsx";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
@@ -14262,8 +14264,8 @@ const Icon = ({ name, size = 24, style }) => {
 // pas le texte — on pose ce que le navigateur a reconnu, à lui de corriger.
 const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognition || window.webkitSpeechRecognition) === 'function';
 // (3 nov.) Le micro REFUSÉ (permission du navigateur, ou service coupé) : le
-// bouton disparaît aussi — partout, pour la session — sans un mot.
-const DICTEE_REFUS = { non: false };
+// bouton disparaît — partout, pour la session (`VOIX.refus`, src/dicteeNavigateur.js).
+// (11 nov.) Plus « sans un mot » : la phrase dit quoi faire (toast, et la loupe la garde).
 // (6 nov.) L'appareil photo de la recherche : ouvre « Chercher par photo »
 // (src/RecherchePhoto.jsx, chargé à ce moment-là seulement).
 function BoutonPhotoRecherche() {
@@ -14274,32 +14276,33 @@ function BoutonPhotoRecherche() {
     </button>
   );
 }
-function MicDictee({ onText, titre = 'Dicter', nu = false }) {
-  const [ecoute, setEcoute] = React.useState(false);
-  const [refus, setRefus] = React.useState(DICTEE_REFUS.non);
-  const recRef = React.useRef(null);
+// (11 nov., parler à la loupe) Le moteur est commun (src/dicteeNavigateur.js) :
+// transcription EN DIRECT (`onDirect`), texte final (`onText`), une erreur dite
+// (micro refusé : la phrase « autorise le micro… », puis plus de bouton).
+let N_MIC = 0;
+function MicDictee({ onText, onDirect, onErreur, titre = 'Dicter', nu = false, canal: canalVoulu }) {
+  const canalRef = React.useRef(null);
+  if (!canalRef.current) canalRef.current = canalVoulu || ('mic-' + (++N_MIC));
+  const canal = canalRef.current;
+  const ev = useEtatVoix(canal);
+  const ecoute = ev.ecoute;
+  const [, majRefus] = React.useReducer((n) => n + 1, 0);
+  const refus = VOIX.refus;
   React.useEffect(() => {
-    if (!DICTEE_OK || DICTEE_REFUS.non) return undefined;
+    if (!DICTEE_OK || VOIX.refus) return undefined;
     let mort = false;
     try { const p = navigator.permissions && navigator.permissions.query ? navigator.permissions.query({ name: 'microphone' }) : null;
-      if (p && p.then) p.then((r) => { if (!mort && r && r.state === 'denied') { DICTEE_REFUS.non = true; setRefus(true); } }).catch(() => {}); } catch (_) {}
+      if (p && p.then) p.then((r) => { if (!mort && r && r.state === 'denied') { VOIX.refus = true; majRefus(); } }).catch(() => {}); } catch (_) {}
     return () => { mort = true; };
   }, []);
+  React.useEffect(() => () => { if (!canalVoulu) annulerVoix(canal); }, [canal, canalVoulu]);
   if (!DICTEE_OK || refus) return null;
   const lancer = () => {
-    if (ecoute) { try { recRef.current && recRef.current.stop(); } catch (_) {} return; }
-    try {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const rec = new SR();
-      rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
-      rec.onresult = (e) => { const t = e && e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (t) onText(String(t).trim()); };
-      rec.onerror = (e) => { setEcoute(false); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { DICTEE_REFUS.non = true; setRefus(true); } };
-      rec.onend = () => { setEcoute(false); recRef.current = null; };
-      recRef.current = rec; setEcoute(true); rec.start();
-    } catch (_) { setEcoute(false); recRef.current = null; }
+    ecouter({ canal, onDirect: (t, fini) => { if (!fini && onDirect) onDirect(t); }, onFinal: (t) => onText(String(t).trim()),
+      onErreur: (code) => { if (onErreur) onErreur(code); else toast(PHRASES_VOIX[code] || PHRASES_VOIX.autre); if (code === 'refus') majRefus(); } });
   };
   return (
-    <button className={nu ? 'vrm-micro' : 'vrm-icon-control'} type="button" data-mic-dictee data-micro-ecoute={ecoute ? '1' : '0'} onClick={lancer} aria-label={titre} aria-pressed={ecoute}
+    <button className={nu ? 'vrm-micro' : 'vrm-icon-control'} type="button" data-mic-dictee data-micro-ecoute={ecoute ? '1' : '0'} onClick={lancer} aria-label={ecoute ? 'Arrêter la dictée' : titre} aria-pressed={ecoute}
       title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : titre}
       style={nu ? undefined : {flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:12,cursor:'pointer',fontFamily:'inherit',
         border:`1px solid ${ecoute?C.accent:C.border}`,background:ecoute?`${C.accent}18`:C.card,color:ecoute?C.accent:C.muted,transition:'background .15s,color .15s,border-color .15s'}}>
@@ -20397,7 +20400,7 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   // filtre choisi dessiné comme celui de Vinted (la règle commune `.vrm-filtres`, plus un aplat bleu à part).
   const tabs=[['all','Toutes'],['pending',L.aEnvoyer],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
   return <div className="vrm-workbar vrm-shared-workbar">
-    <ChampRecherche valeur={search} onChange={onSearch} label="Rechercher une vente" placeholder="Rechercher une vente" style={{marginBottom:10}} data-ventes-recherche=""/>
+    <ChampRecherche valeur={search} onChange={onSearch} label="Rechercher une vente" placeholder="Rechercher une vente" micro style={{marginBottom:10}} data-ventes-recherche=""/>
     {/* (27 oct., « pareil que Vinted ») « Mes vues » ne prend plus une ligne à
         lui seul : il est au bout de la ligne des filtres, et ne reprend toute
         la largeur que déplié (styles-annonces-ventes.css). */}
@@ -39494,7 +39497,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 elles sont ici, à un geste — les mêmes états (`ordSearch`, `periode`). */}
             {sales.items && sales.items.length>0 && <div className="vrm-outils-recherche" data-outils-recherche="" style={{display:'flex',flexDirection:'column',gap:8,padding:'4px 4px 10px'}}>
               <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
-                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:17,background:C.card,color:C.text,outline:'none',minHeight:44}}/></div>
+                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:17,background:C.card,color:C.text,outline:'none',minHeight:44}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « Nike rouge 42 »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></div>
               <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes" datation="Date de vente"/>
             </div>}
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
@@ -41821,7 +41824,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-workbar vrm-sales-workbar" style={{position:'relative'}}>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
-            <ChampRecherche valeur={ordSearch} onChange={setOrdSearch} label="Rechercher dans les ventes Vinted" placeholder="Rechercher une vente" data-ventes-recherche=""/>
+            <ChampRecherche valeur={ordSearch} onChange={setOrdSearch} label="Rechercher dans les ventes Vinted" placeholder="Rechercher une vente" micro data-ventes-recherche=""/>
             {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
               <span>Filtres actifs</span><Bouton variante="discret" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</Bouton>
             </div>}
@@ -42736,7 +42739,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {buysBase.length>0 && aFilter!=='attente' && <div className="vrm-achats-filtres">
         {buysBase.length>0 && aFilter!=='attente' && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
-            style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/></label>
+            style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « Nike rouge 42 »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
         <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats" datation="Date d’achat"/></div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
@@ -52070,6 +52073,7 @@ function AppCoeur() {
   // dans l'en-tête (téléphone) ; `gsOpen` ne dit plus « un écran par-dessus »
   // mais « le panneau des résultats est déplié sous le champ ».
   const gsChampRef=React.useRef(null);
+  const appuiLoupe=React.useRef({ t: null, long: false });   // (11 nov.) l'appui long sur la loupe (téléphone) ⇒ la dictée
   const [hautRecherche,setHautRecherche]=useState(56);
   const fermerRecherche=React.useCallback(()=>{ setGsOpen(false); try{ gsChampRef.current&&gsChampRef.current.blur(); }catch(_){} },[]);
   // `flushSync` : le champ du téléphone existe AVANT le focus, dans le même
@@ -54806,6 +54810,8 @@ function AppCoeur() {
               {/* (9 nov.) L'état vide UTILE : ce qu'on peut taper, et le clavier (ordinateur). */}
               <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>N°, pseudo, suivi, commande, code de retrait, montant ou titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
             </div>}
+            {/* (11 nov., parler à la loupe) J'écoute / ce qui est entendu en direct / l'erreur dite (micro refusé), et le « Pourquoi ? ». */}
+            <LigneVoix canal="loupe" Pourquoi={Pourquoi} couleur={C.muted} mobile={!ordi} vide={!q}/>
             {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
             {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues}</div>}
             {q && blocExactes}
@@ -54841,7 +54847,22 @@ function AppCoeur() {
   // derrière ne bouge pas.
   // (3 nov.) La voix : ce que le navigateur a reconnu passe par `requeteDeLaVoix`
   // (« numéro 124 », « cent vingt-quatre » ⇒ 124 ; « B 125 » ⇒ B125 ; sinon le texte).
-  const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
+  // (11 nov., parler à la loupe) La transcription s'affiche EN DIRECT dans le champ
+  // (`directRecherche`), puis le texte final passe par `requeteDeLaVoix` : un N° DIT dont
+  // l'identité est UNIQUE (`ficheDeLaVoix`, par `cleNum`, compte affiché) ouvre DIRECTEMENT
+  // sa fiche ; deux fiches, aucune, ou un texte ⇒ la recherche normale (la liste).
+  const directRecherche = (t) => { setGsQ(t); setGsOpen(true); };
+  const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return;
+    if (r.numero) {
+      const n = ficheDeLaVoix(r.requete, load('vinted_annonce_numeros', {}) || {}, cleNum, comptesRecherche(vintedAccounts));
+      if (n) { setGsQ(r.requete); setGsRecents(noterRecent(r.requete)); setGsOpen(false); setFicheNum(n); return; }
+    }
+    setGsQ(r.requete); setGsOpen(true); };
+  // Au téléphone, un APPUI LONG sur la loupe ouvre la recherche et écoute (le même canal
+  // « loupe » que le micro : re-toucher arrête). Sans reconnaissance : l'appui long ne fait rien de plus.
+  const erreurVoixLoupe = () => { setGsOpen(true); };
+  const dicterLoupe = () => ecouter({ canal: 'loupe', onDirect: (t, fini) => { if (!fini) directRecherche(t); }, onFinal: dicterRecherche, onErreur: erreurVoixLoupe });
+  const micLoupe = <MicDictee nu canal="loupe" titre="Chercher à la voix" onDirect={directRecherche} onText={dicterRecherche} onErreur={erreurVoixLoupe}/>;
   const champRecherche = (mobile) => <RechercheVivante rendre={(fil)=>(
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
       aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : `Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, suivi, code de retrait, montant, titre…'}
@@ -54855,7 +54876,7 @@ function AppCoeur() {
       <label className="vrm-barre-recherche" data-barre-recherche="">
         <Icon name="search" size={18}/>
         {champRecherche(false)}
-        <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
+        {micLoupe}
         <BoutonPhotoRecherche/>
         <RechercheVivante rendre={(fil)=> fil.q ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
           : <kbd className="vrm-barre-kbd">/</kbd>}/>
@@ -54867,7 +54888,7 @@ function AppCoeur() {
     <div className="vrm-hdr-recherche" data-recherche-zone="" style={{background:C.bg}}>
       <Icon name="search" size={18} style={{color:C.muted,flexShrink:0}}/>
       {champRecherche(true)}
-      <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
+      {micLoupe}
       <BoutonPhotoRecherche/>
       <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
     </div>
@@ -54953,7 +54974,12 @@ function AppCoeur() {
             {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
             {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
-            {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label={`Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
+            {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
+              onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
+                appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
+              onPointerUp={()=>clearTimeout(appuiLoupe.current.t)} onPointerCancel={()=>clearTimeout(appuiLoupe.current.t)} onPointerLeave={()=>clearTimeout(appuiLoupe.current.t)}
+              onContextMenu={(e)=>{ if(DICTEE_OK) e.preventDefault(); }}
+              onClick={()=>{ if(appuiLoupe.current.long){ appuiLoupe.current.long=false; return; } if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label={`Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}
             {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}

@@ -19,40 +19,36 @@
 import React from 'react';
 import { IconeComposant } from './icones.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
+import { voixDisponible, VOIX, ecouter, ecouteEnCours, annulerVoix, effacerErreurVoix, PHRASES_VOIX } from '../dicteeNavigateur.js';
+import { useEtatVoix } from './voix.jsx';
 
-const voixDisponible = () => typeof window !== 'undefined' && typeof (window.SpeechRecognition || window.webkitSpeechRecognition) === 'function';
-const MICRO_REFUSE = { oui: false };   // refusé une fois ⇒ plus de micro de la session
+// (11 nov., parler à la loupe) Le moteur est commun (src/dicteeNavigateur.js) : la
+// transcription s'affiche EN DIRECT dans le champ, puis le texte final passe par
+// `requeteDeLaVoix` ; une erreur dit quoi faire (micro refusé : la phrase reste
+// sous le champ, le micro disparaît — jamais un bouton mort).
+let N_CANAL = 0;
 
 export function ChampRecherche({ valeur = '', onChange, placeholder = 'Rechercher', label, micro = false, voix = 'requete',
   onValider, autoFocus = false, inputRef, className = '', ...rest }) {
   const refLocal = React.useRef(null);
   const ref = inputRef || refLocal;
-  const [ecoute, setEcoute] = React.useState(false);
-  const [refus, setRefus] = React.useState(MICRO_REFUSE.oui);
-  const refRec = React.useRef(null);
+  const canalRef = React.useRef(null);
+  if (!canalRef.current) canalRef.current = 'champ-' + (++N_CANAL);
+  const canal = canalRef.current;
+  const ev = useEtatVoix(canal);
+  const ecoute = ev.ecoute;
   const composition = React.useRef(false);
-  const avecMicro = micro && voixDisponible() && !refus;
+  const avecMicro = micro && voixDisponible() && !VOIX.refus;
+  const phrase = micro && voixDisponible() ? (ev.erreur || null) : null;
 
-  const interrompre = () => { const rec=refRec.current;refRec.current=null;try{rec?.abort();}catch(_){}setEcoute(false); };
-  React.useEffect(() => () => { const rec=refRec.current;refRec.current=null;try{rec?.abort();}catch(_){} }, []);
+  const interrompre = () => { if (ecouteEnCours(canal)) annulerVoix(canal); };
+  React.useEffect(() => () => { annulerVoix(canal); }, [canal]);
 
   const dicter = () => {
-    if (refRec.current) { try { refRec.current && refRec.current.stop(); } catch (_) {} return; }
-    try {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const rec = new SR();
-      rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
-      rec.onresult = (e) => {
-        if(refRec.current!==rec)return;
-        const t = e && e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript;
-        if (!t) return;
-        const texte = voix === 'brut' ? String(t).trim() : requeteDeLaVoix(t).requete;
-        if (onChange) onChange(texte);
-      };
-      rec.onerror = (e) => { if(refRec.current!==rec)return;refRec.current=null;setEcoute(false); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { MICRO_REFUSE.oui = true; setRefus(true); } };
-      rec.onend = () => { if(refRec.current!==rec)return;setEcoute(false); refRec.current = null; };
-      refRec.current = rec; setEcoute(true); rec.start();
-    } catch (_) { setEcoute(false); refRec.current = null; }
+    ecouter({ canal,
+      onDirect: (t, fini) => { if (!fini && onChange) onChange(t); },
+      onFinal: (t) => { const texte = voix === 'brut' ? String(t).trim() : requeteDeLaVoix(t).requete; if (onChange) onChange(texte); },
+    });
   };
   const effacer = () => {
     interrompre();
@@ -61,12 +57,12 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
   };
   const nom = label || placeholder;
   return (
-    <div className={`vrm-champ-recherche${className ? ' ' + className : ''}`} data-champ-recherche="" data-champ-recherche-plein={valeur ? '1' : '0'} {...rest}>
+    <div className={`vrm-champ-recherche${className ? ' ' + className : ''}`} data-champ-recherche="" data-champ-recherche-plein={valeur ? '1' : '0'} data-voix-ecoute={ecoute ? '1' : '0'} {...rest}>
       <span className="vrm-champ-recherche-loupe"><IconeComposant nom="search" taille={17}/></span>
       <input ref={ref} type="search" className="vrm-champ-recherche-saisie" value={valeur}
-        onChange={(e) => { interrompre();onChange && onChange(e.target.value); }}
+        onChange={(e) => { interrompre();effacerErreurVoix(canal);onChange && onChange(e.target.value); }}
         onCompositionStart={()=>{composition.current=true;interrompre();}} onCompositionEnd={()=>{composition.current=false;}}
-        onKeyDown={(e) => { if(composition.current||e.nativeEvent.isComposing||e.keyCode===229){if(e.key==='Enter'||e.key==='Escape')e.stopPropagation();return;} if (e.key === 'Enter' && onValider) { e.preventDefault(); onValider(valeur); } if (e.key === 'Escape' && (valeur||refRec.current)) { e.preventDefault(); e.stopPropagation(); effacer(); } }}
+        onKeyDown={(e) => { if(composition.current||e.nativeEvent.isComposing||e.keyCode===229){if(e.key==='Enter'||e.key==='Escape')e.stopPropagation();return;} if (e.key === 'Enter' && onValider) { e.preventDefault(); onValider(valeur); } if (e.key === 'Escape' && (valeur||ecouteEnCours(canal))) { e.preventDefault(); e.stopPropagation(); effacer(); } }}
         placeholder={placeholder} aria-label={nom} autoFocus={autoFocus}
         autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search"/>
       {valeur ? (
@@ -80,6 +76,9 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
           <IconeComposant nom="mic" taille={18}/>
         </button>
       ) : null}
+      {phrase ? <span className="vrm-champ-recherche-voix" data-voix-erreur={phrase} role="status"
+        style={{position:'absolute',left:0,right:0,top:'calc(100% + 4px)',zIndex:5,fontSize:12,lineHeight:1.4,padding:'6px 10px',borderRadius:10,background:'var(--vrm-surface, #fff)',color:'var(--vrm-ink, #1D1D1F)',border:'1px solid var(--vrm-line, rgba(0,0,0,.1))',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}
+        onClick={()=>effacerErreurVoix(canal)}>{PHRASES_VOIX[phrase] || PHRASES_VOIX.autre}</span> : null}
     </div>
   );
 }
