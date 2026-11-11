@@ -138,7 +138,7 @@ async function ouvrir(b, vp, pont, o = {}) {
 const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   rognes: [...document.querySelectorAll('button,input,a')].filter((e) => { const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1)) return false;
     for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth) return p.getBoundingClientRect().right > document.documentElement.clientWidth + 1; }
-    return true; }).map((e) => (e.textContent || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 24)) }));
+    return true; }).map((e) => { const c = e.closest('[data-remise-vente],[data-lbc-vente],[role=dialog]'); return (e.textContent || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 24) + (c ? ' @' + [...c.attributes].map((x) => x.name).filter((n) => /^data-|role/.test(n)).join('|') : ''); }) }));
 const ls = (pg, cle) => pg.evaluate((k) => { for (let i = 0; i < localStorage.length; i++) { const n = localStorage.key(i); if (n === k || n.endsWith(':' + k) || n.endsWith('_' + k) && false) { try { return JSON.parse(localStorage.getItem(n)); } catch (_) { return localStorage.getItem(n); } } } return null; }, cle);
 const cmds = (pg, re) => pg.evaluate((s) => window.__cmds.filter((x) => new RegExp(s).test(x)).map((x) => JSON.parse(x)), re);
 const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-plus-${nom}-${vp.width}.png`), fullPage: false });
@@ -211,7 +211,8 @@ const capture = (pg, nom, vp) => pg.screenshot({ path: path.join(SORTIE, `lbc-pl
       await o.pg.click('[data-remise-remis]').catch(() => {});
       await o.pg.waitForTimeout(500);
       await o.pg.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Remis' && !x.hasAttribute('data-remise-remis')); if (b) b.click(); });
-      await o.pg.waitForTimeout(1500);
+      // Les écritures du geste partent clé par clé (sauvegarde différée) : on attend la dernière.
+      await o.pg.waitForFunction(() => { try { return (JSON.parse(localStorage.getItem('vinted_annonces_vendues') || '[]') || []).includes('5002'); } catch (_) { return false; } }, null, { timeout: 10000 }).catch(() => {});
       const dec = await ls(o.pg, 'vrm_cycle_decisions'); const dates = await ls(o.pg, 'vrm_lbc_dates'); const vend = await ls(o.pg, 'vinted_annonces_vendues');
       dit(dec && dec['5002'] && dec['5002'].choix === 'vendu-main' && dec['5002'].numero === '13' && dec['5002'].montant === 95 && Array.isArray(vend) && vend.includes('5002'), '« Remis » : la fiche du N°13 sort du stock (vendue en main propre, 95 €), N° gardé', JSON.stringify({ dec, vend }));
       dit(dates && /^\d{4}-\d{2}-\d{2}$/.test(dates['70010001'] || ''), '… et la vente est datée pour la compta (`vrm_lbc_dates`)', JSON.stringify(dates));
