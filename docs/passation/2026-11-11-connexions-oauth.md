@@ -138,7 +138,9 @@ marche (Safari ≥ 11) ; double clic : verrou `demandeEnCours` (connexion) et `b
   rouges. Mutations (chacune rouge) : « annulée » testé avant le code (3 rouges) ; annulation
   de l'extension retirée (2) ; e-mail qui change non dit (2) ; `error_code` ignoré par l'app
   (1) ; « déjà relié à soi » confondu (1).
-- Banc `connexions-oauth.cjs` : voir le chiffre en bas (390 tactile + 1512).
+- Banc `connexions-oauth.cjs` : **96 verts, 0 échec** (P1–P14, 390 tactile + 1512). P14 rouge sur `origin/main` (4) et par mutation « pas de nouvel essai » (1).
+- Bancs existants : extension-oauth-app 21, carte-orion-sans-onglet 67, liaison-pont-orion 4, discord-nouveau-compte, session-reveil, connexion-claire, inscription-fiable, recuperation-auth 11 : verts. `profil-photo` : 111 verts au lot DJ6, non relancé ici. Rouges NON liés à ce lot : `connexions-reglages` 2 KO (« la version historique ne certifie pas cet appareil »), les mêmes sur `origin/main` ; `session.cjs` ne tourne pas ici (commit `cdc9c1d` absent du clone).
+- Audit `connexions-oauth` : **53 verts** (K1–K2 : un vérificateur par tentative).
 - Audits verts : variables, tdz, coherence, identite, icones, textes-courts (47),
   fonctions-api, secrets, csp, extension-zip, profil-oauth (41), discord-oauth (32),
   extension-oauth, extension-navigateurs, liaison-visite, pont-session, session-extension,
