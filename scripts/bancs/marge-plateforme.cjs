@@ -49,6 +49,9 @@ for(const a of accounts){
 for(const v of VENTES) rows.push({ id:`harvest_${v[0]}_txn_${v[1]}`, data:{ capturedAt:iso(MAINTENANT), payload:{ transaction:{ id:Number(v[1]), item_id:Number(v[1])+500000, status:450, status_title:FIN, status_updated_at:iso(v[3]) } } } });
 rows.push({ id:'lbc_ventes', data:{ ventes:{} } });
 rows.push({ id:'ebay_orders', data:{ orders:[] } });
+// (11 nov., C11) Vestiaire : des annonces LUES, aucune vente ⇒ montré ; Leboncoin et eBay : rien lu de
+// non vide et aucune vente ⇒ cachés (« pas su » ⇒ montrés : la lecture des lignes en panne, plus bas).
+rows.push({ id:'vc_listings', data:{ items:[{ id:'vc1', title:'Annonce inventée' }] } });
 
 function projette(row,select){
   if(!select||select==='*') return row;
@@ -90,6 +93,10 @@ async function page(b, T, opts={}){
     if(/select=owner/.test(u)) return j([{ owner: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' }]);
     const S=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
+    const ou=/[?&]or=\(([^)]*)\)/.exec(u);
+    if(ou){ if(opts.sitesKO) return route.fulfill({status:500,body:'{}'});
+      const conds=ou[1].split(',').map(c=>{ const m=/^id\.(eq|like)\.(.+)$/.exec(c); return m?(m[1]==='eq'?(id)=>id===m[2]:(id)=>new RegExp('^'+m[2].replace(/[.]/g,'\\.').replace(/[*%]/g,'.*')+'$').test(id)):()=>false; });
+      return j(rows.filter(r=>conds.some(f=>f(r.id))).map(r=>projette(r,S))); }
     const eq=/id=eq\.([^&]*)/.exec(u);
     if(eq&&eq[1]==='main') return j([projette({id:'main',data:opts.main||{}},S)]);
     if(eq) return j(rows.filter(r=>r.id===eq[1]).map(r=>projette(r,S)));
@@ -118,7 +125,7 @@ const lireCarte=(pg)=>pg.evaluate(()=>{ const c=document.querySelector('[data-st
   const v=document.querySelector('[data-stats-carte="vitesse-envoi"]'), s=document.querySelector('[data-stats-carte="sources-achats"]');
   const sb=c.querySelector('[data-mp-saisir]');
   const rouge=[...c.querySelectorAll('*')].some(e=>{ const m=/rgb\((\d+), (\d+), (\d+)\)/.exec(getComputedStyle(e).color)||[]; return +m[1]>180 && +m[2]<80 && +m[3]<80; });
-  return { etat:c.getAttribute('data-mp-etat'), releve:c.getAttribute('data-mp-releve'),
+  return { etat:c.getAttribute('data-mp-etat'), releve:c.getAttribute('data-mp-releve'), caches:c.getAttribute('data-mp-caches'),
     lignes:[...c.querySelectorAll('[data-mp-plat]')].map(e=>({ plat:e.getAttribute('data-mp-plat'), etat:e.getAttribute('data-mp-etat'), n:e.getAttribute('data-mp-n'), vendu:e.getAttribute('data-mp-vendu'), med:e.getAttribute('data-mp-mediane'), total:e.getAttribute('data-mp-total'), connu:e.getAttribute('data-mp-connu'), sans:e.getAttribute('data-mp-sans-achat'), texte:e.innerText.replace(/\s+/g,' ') })),
     voisins: !!(v && s && (s.compareDocumentPosition(c) & 4) && (v.compareDocumentPosition(c) & 4)),
     saisir: sb ? sb.getBoundingClientRect().height : null, rouge,
@@ -144,7 +151,7 @@ const lireCarte=(pg)=>pg.evaluate(()=>{ const c=document.querySelector('[data-st
         await aller(pg,'dashboard','[data-stats-carte="marge-plateforme"]',2500);
         await pg.waitForFunction(()=>{ const e=document.querySelector('[data-stats-carte="marge-plateforme"]'); return e && e.getAttribute('data-mp-releve')==='1' && e.getAttribute('data-mp-etat')==='lu'; },null,{timeout:20000}).catch(()=>{});
         r=await lireCarte(pg);
-        dit(r && r.lignes.map(x=>x.plat).join(',')==='Vinted,Leboncoin,eBay,Vestiaire','une ligne par site : Vinted, Leboncoin, eBay, Vestiaire',r&&r.lignes.map(x=>x.plat+':'+x.etat).join(','));
+        dit(r && r.lignes.map(x=>x.plat).join(',')==='Vinted,Vestiaire' && r.caches==='Leboncoin,eBay','(C11) un site qu’il n’utilise pas est caché : Leboncoin et eBay (ni vente ni annonce lue) ; Vestiaire (annonces lues) reste',r&&(r.lignes.map(x=>x.plat+':'+x.etat).join(',')+' cachés='+r.caches));
         const vi=r&&r.lignes.find(x=>x.plat==='Vinted');
         dit(vi && vi.n==='8' && vi.vendu==='46000','Vinted : 8 ventes, 460 € vendus (la règle de « Vendu »)',vi&&JSON.stringify(vi));
         dit(vi && vi.med==='3500' && vi.total==='17000' && vi.connu==='5' && vi.sans==='3','Vinted : médiane 35 €, total 170 € sur 5, prix d’achat manquant pour 3',vi&&JSON.stringify(vi));
@@ -159,6 +166,17 @@ const lireCarte=(pg)=>pg.evaluate(()=>{ const c=document.querySelector('[data-st
         dit(r && !r.rouge,'aucun rouge');
         dit(r && r.deb<=0,'aucun défilement horizontal',r&&r.deb);
         await captureEl(pg,'[data-stats-carte="marge-plateforme"]',`marge-plateforme-${suf}`);
+        dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,200));
+        await ctx.close();
+      });
+      // (11 nov., C11) « Pas su » ≠ absent : la lecture des lignes des sites en panne ⇒ les quatre restent.
+      await essaie('PS'+suf,async()=>{
+        const { ctx, pg, errs }=await page(b,T,{ main:{ vinted_sale_overrides:OV }, sombre, sitesKO:true });
+        await aller(pg,'dashboard','[data-stats-carte="marge-plateforme"]',2500);
+        await pg.waitForFunction(()=>{ const e=document.querySelector('[data-stats-carte="marge-plateforme"]'); return e && e.getAttribute('data-mp-etat')==='lu'; },null,{timeout:20000}).catch(()=>{});
+        await pg.waitForTimeout(800);
+        const r=await lireCarte(pg);
+        dit(r && r.lignes.map(x=>x.plat).join(',')==='Vinted,Leboncoin,eBay,Vestiaire' && !r.caches,'(C11) lignes des sites pas lues ⇒ rien caché (les quatre sites)',r&&(r.lignes.map(x=>x.plat).join(',')+' cachés='+r.caches));
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,200));
         await ctx.close();
       });

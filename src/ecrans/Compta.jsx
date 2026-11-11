@@ -19,16 +19,17 @@ import { recuPublieEntre } from '../design/carteChiffres.js';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre } from '../registres.js';
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
-import { lireFactures } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
+import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
+import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
-import { useProfilFiscal } from '../App.jsx';
+import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
@@ -843,6 +844,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // `vrm_pro_facture` — seul l'endroit change (§11 : un seul propriétaire).
   const [showPro,setShowPro]=useState(false);
   const [fetching,setFetching]=useState(false);
+  const [menuFac,setMenuFac]=useState(false);   // (11 nov., C4) la feuille « … » des factures au téléphone
+  const relireFacturesClic=async()=>{ setFetching(true); try{ const r=await import('../FacturePro.jsx').then((m)=>m.relireFactures(DEPS_FACTURE)).catch(()=>null); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } };
   const PER_PAGE=50;
 
   // ⚠️⚠️ CHEMIN GOOGLE SHEETS RETIRÉ (9 septembre) — IL ÉTAIT MORT, MESURÉ.
@@ -983,20 +986,35 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
         <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:"Factures"} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
-          right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          right={<>
+          {/* (11 nov., décision C4 — Julien : « tranche ») Au téléphone, les cinq boutons tassaient la
+              ligne du titre : le geste principal reste visible, les quatre autres passent dans « … »
+              (une feuille en portail, des lignes de 44 px). Sur ordinateur, rien ne change. */}
+          <div className="vrm-fac-actions" data-fac-actions="large" style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
               pouvait QUE échouer. Il relit maintenant les reçus arrivés par
               email — la source qui remplit vraiment cet écran. */}
-          <Btn small outline color={C.muted} disabled={fetching}
-            onClick={async()=>{ setFetching(true); try{ const r=await import('../FacturePro.jsx').then((m)=>m.relireFactures(DEPS_FACTURE)).catch(()=>null); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } }}
-            style={{display:'inline-flex',alignItems:'center',gap:5}}>
+          <Btn small outline color={C.muted} disabled={fetching} onClick={relireFacturesClic} style={{display:'inline-flex',alignItems:'center',gap:5}}>
             <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les factures'}
           </Btn>
           <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Ma facture</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages des factures</Btn>
-        </div>}/>
+          </div>
+          <div className="vrm-fac-actions-tel" data-fac-actions="tel">
+            <Btn small primaire onClick={()=>setShowForm(true)} data-fac-principal="">+ Nouvelle facture</Btn>
+            <button type="button" className="vrm-icon-control vrm-fac-plus" data-fac-plus="" aria-haspopup="dialog" aria-expanded={menuFac} aria-label="Autres actions des factures" onClick={()=>setMenuFac(true)}><Icon name="more" size={20}/></button>
+          </div>
+        </>}/>
+        {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre="Factures" data-fac-menu="">
+          <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(()=>setMenuFac(false), 0); }}>
+            <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?'Chargement…':'Relire les factures'}</button>
+            <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>Exporter Excel</button>
+            <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>Ma facture</button>
+            <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>Réglages des factures</button>
+          </div>
+        </SheetShell>}
         {/* (10 nov., Argent) Les segments SOUS la ligne du titre, pas dedans : cinq actions y
             tassaient la piste (« Statistiqu… », vu en capture à 1512 px). */}
         {argentNav}
@@ -1162,7 +1180,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
             }} placeholder="ex: 1280"/>
           </Field>
           <Field label="Désignation *">
-            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder="ex: Adidas Spezial bleu marine taille 365"/>
+            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder={vendActuel()==='sneakers' ? 'ex: Adidas Spezial bleu marine taille 365' : exemplesActuels().achat}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
             <Field label="Prix de vente&nbsp;€ *">
@@ -1941,8 +1959,8 @@ function ExportComptableCarte(props) {
     <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Exporter pour mon comptable</div>
-          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Ventes, achats, CA déclaré et URSSAF d’une période, en tableur et en PDF.</div>
+          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Pour mon comptable</div>
+          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Un zip : tableur, récap PDF et factures.</div>
         </div>
         {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
       </div>
@@ -1955,10 +1973,12 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   const ventesVcER = useVentesVestiaire();
   const ligne = useLigneUrssaf();
   const regime = useRegimeFiscal();
-  const [type, setType] = React.useState('trimestre');
+  // (11 nov.) Défaut : le dernier mois BOUCLÉ ; changer de type choisit la dernière période bouclée.
+  const [type, setTypeBrut] = React.useState('mois');
   const choix = React.useMemo(() => periodesExport(type), [type]);
-  const [periode, setPeriode] = React.useState(() => periodesExport('trimestre')[0]);
-  React.useEffect(() => { if (!choix.includes(periode)) setPeriode(choix[0]); }, [choix, periode]);
+  const [periode, setPeriode] = React.useState(() => periodeBouclee('mois'));
+  const setType = (t) => { setTypeBrut(t); setPeriode(periodeBouclee(t)); };
+  React.useEffect(() => { if (!choix.includes(periode)) setPeriode(periodeBouclee(type)); }, [choix, periode, type]);
   const [achats, setAchats] = React.useState(undefined);
   const [recus, setRecus] = React.useState(undefined);
   React.useEffect(() => {
@@ -1989,6 +2009,28 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
     } catch (err) { toast('Export pas créé : ' + ((err && err.message) || err)); }
     setEnCours('');
   };
+  // (11 nov.) LE ZIP, en un clic : justificatifs lus au clic, puis partage natif sinon téléchargement.
+  const [retourZip, setRetourZip] = React.useState(null);
+  React.useEffect(() => { setRetourZip(null); }, [periode]);
+  const preparerZip = async () => {
+    if (!D || enCours) return;
+    setEnCours('zip'); setRetourZip(null);
+    try {
+      let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
+      const d = ent && String(ent.nom || '').trim() ? { ...D, entreprise: { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } } : D;
+      const j = await lireJustificatifs(d, {
+        lireTout,
+        lireFactureAchat: (cle) => lireContenuFacture(cle, { fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: sbAuth }),
+        pdfFacture: async (c) => (await import('../facturePro/pdf.js')).pdfFacture(c),
+      });
+      const z = await zipExportComptable(d, j);
+      const fin = await partagerOuTelecharger(z.octets, z.nom, { telecharger: telechargerFichier });
+      setRetourZip({ fin, nom: z.nom, n: z.fichiers.length, ventes: j.ventes.length, achats: j.achats.length, manque: j.manque });
+    } catch (err) { setRetourZip({ fin: 'ko', raison: (err && err.message) || String(err) }); }
+    setEnCours('');
+  };
+  // Le libellé dit ce qui va se passer : feuille de partage si le navigateur sait partager un fichier.
+  const partageable = React.useMemo(() => { try { return typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && typeof File === 'function' && navigator.canShare({ files: [new File([new Uint8Array(1)], 'x.zip', { type: 'application/zip' })] }); } catch (_) { return false; } }, []);
   const cv = D ? couvertureExport(D) : [];
   const cts = (x) => (x == null ? '' : String(Math.round(x * 100)));
   return (
@@ -2008,10 +2050,20 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
             </div>))}
       </div>
       {cv.length > 0 && <ul data-export-manque={cv.length} style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{cv.map((c) => <li key={c}>{c}</li>)}</ul>}
-      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-        <Bouton variante="primaire" icone="save" data-export-csv="" disabled={!D || !!enCours} onClick={() => telecharger('csv')} style={{ flex: '1 1 140px' }} title="Un fichier pour Excel ou Numbers">{enCours === 'csv' ? '…' : 'Tableur (Excel)'}</Bouton>
-        <Bouton variante="secondaire" icone="doc" data-export-pdf="" disabled={!D || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 140px' }}>{enCours === 'pdf' ? '…' : 'PDF d’une page'}</Bouton>
-      </div>
+      <Bouton variante="primaire" icone="archive" data-export-zip="" data-export-zip-voie={partageable ? 'partage' : 'telechargement'} disabled={!D || !!enCours} onClick={preparerZip} style={{ marginTop: 12, width: '100%' }} title="Tableur, récap PDF et factures dans un seul fichier">{enCours === 'zip' ? 'Je prépare le zip…' : partageable ? 'Partager le zip' : 'Télécharger le zip'}</Bouton>
+      {retourZip && <p role="status" data-export-zip-fin={retourZip.fin} data-export-zip-manque={retourZip.manque ? retourZip.manque.length : ''} style={{ margin: '8px 0 0', fontSize: 13, color: retourZip.fin === 'ko' ? C.warn : C.muted, lineHeight: 1.5 }}>
+        {retourZip.fin === 'ko' ? `Zip pas créé : ${retourZip.raison}`
+          : retourZip.fin === 'annule' ? 'Partage annulé. Rien n’est parti.'
+          : <>{retourZip.fin === 'partage' ? 'Zip partagé' : 'Zip téléchargé'} : {retourZip.n} fichiers, dont {retourZip.ventes} facture{retourZip.ventes > 1 ? 's' : ''} de vente et {retourZip.achats} d’achat.
+            {retourZip.manque.length > 0 && <span data-export-zip-absents="" style={{ display: 'block', color: C.warn }}>Pas dedans : {retourZip.manque.join(' · ')}.</span>}</>}
+      </p>}
+      <details className="vrm-repli" data-export-a-part="" style={{ marginTop: 8 }}>
+        <summary style={{ fontSize: 13, color: C.muted }}>Un fichier seul</summary>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <Bouton variante="secondaire" icone="save" data-export-csv="" disabled={!D || !!enCours} onClick={() => telecharger('csv')} style={{ flex: '1 1 140px' }} title="Un fichier pour Excel ou Numbers">{enCours === 'csv' ? '…' : 'Tableur (CSV)'}</Bouton>
+          <Bouton variante="secondaire" icone="doc" data-export-pdf="" disabled={!D || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 140px' }}>{enCours === 'pdf' ? '…' : 'Récap PDF'}</Bouton>
+        </div>
+      </details>
     </div>
   );
 }

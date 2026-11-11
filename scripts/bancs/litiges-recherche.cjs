@@ -183,7 +183,7 @@ const cartes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-jo
         await essaie('Recherche', async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
           await pg.waitForTimeout(2500);
-          if (tel) await pg.locator('button[aria-label="Rechercher une paire"]').first().tap(); else await pg.locator('[data-recherche-champ]').first().click();
+          if (tel) await pg.locator('button[data-recherche-loupe]').first().tap(); else await pg.locator('[data-recherche-champ]').first().click();
           await pg.waitForTimeout(400);
           const taper = async (q) => { await pg.locator('[data-recherche-champ]').first().fill(q); for (let i = 0; i < 30; i++) { const n = await pg.evaluate(() => document.querySelectorAll('[data-recherche-resultat]').length); if (n) break; await pg.waitForTimeout(250); } await pg.waitForTimeout(250); };
           const res = () => pg.evaluate(() => ({ r: [...document.querySelectorAll('[data-recherche-resultat]')].map((x) => ({ type: x.getAttribute('data-recherche-resultat'), par: x.getAttribute('data-recherche-par'), cle: x.getAttribute('data-recherche-cle'), h: Math.round(x.getBoundingClientRect().height) })),

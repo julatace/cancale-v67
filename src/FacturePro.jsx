@@ -33,7 +33,7 @@ import {
   adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes,
 } from './facturePro/regle.js';
 import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/rattachement.js';
-import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriode, trousNumerotation, csvRegistre, totauxRegistre, nomZip } from './facturePro/registre.js';
+import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriode, trousNumerotation, csvRegistre, totauxRegistre, nomZip, SELECT_FACTURES_PRO } from './facturePro/registre.js';
 import { useRechercheEntreprise, CarteVerifEntreprise, CarteMentionsForme } from './RechercheEntreprise.jsx';
 import { comptesConnus, avecCompte } from './facturePro/comptes.js';
 
@@ -267,7 +267,10 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   const prochainN = etat && Number.isInteger(etat.prochain) ? etat.prochain : null;
   const numeroExemple = numeroFacture(cfg.prefixe, anneeParis(Date.now()), prochainN || 1);
   let apercu = null;
-  try { apercu = contenuApercu(cfg, EXEMPLE, { numero: numeroExemple, emiseLe: Date.now() }).contenu; } catch (_) { apercu = null; }
+  // (11 nov., lot DJ2) L'article d'exemple suit ce qu'il vend (une basket seulement pour Sneakers).
+  let exemple = EXEMPLE;
+  try { if (deps && typeof deps.vendActuel === 'function' && deps.vendActuel() !== 'sneakers' && typeof deps.exemples === 'function') exemple = { ...EXEMPLE, designation: deps.exemples().annonce.titre + ' (exemple)' }; } catch (_) { exemple = EXEMPLE; }
+  try { apercu = contenuApercu(cfg, exemple, { numero: numeroExemple, emiseLe: Date.now() }).contenu; } catch (_) { apercu = null; }
   const mentionsKo = apercu ? new Set(mentionsManquantes(apercu)) : new Set();
   const societe = estSociete(cfg.forme);
   const champ = ({ k, label, aide, type = 'text', placeholder, mode, auto, large: lg = false, majuscules = false }) => (
@@ -561,7 +564,7 @@ export function relireFactures(deps) {
     const [ventes, profils, factures] = await Promise.all([
       deps.lireTout('id=like.email_sale_*&data->>pro=eq.true&select=transaction:data->>transaction,nom:data->>nomComplet,adresse:data->>adresse,email:data->>email,account:data->>account,designation:data->>designation,prix:data->>prix,receivedAt:data->>receivedAt,uid:data->>uid', { strict: true }),
       deps.lireTout('id=like.harvest_*_profile&select=id,uid:data->>uid,business:data->payload->user->business,business_account_id:data->payload->user->business_account_id,business_account:data->payload->user->business_account'),
-      deps.lireTout('id=like.email_invoice_*&select=id,numero:data->>number,status:data->>status,transaction:data->>transaction,emiseLe:data->>emiseLe,envoi:data->envoi,envois:data->envois,retour:data->>retourNom,annuleePar:data->>annuleePar,type:data->>type,buyerEmail:data->>buyerEmail,acheteur:data->contenu->acheteur->>nom,ttc:data->contenu->totaux->>ttc,ht:data->contenu->totaux->>ht,tva:data->contenu->totaux->>tva,regime:data->contenu->>regime,emiseJour:data->contenu->>emiseJour,venteJour:data->contenu->>venteJour,designation:data->contenu->lignes->0->>designation,origine:data->>origine,preuve:data->preuve->>tx', { strict: true }),
+      deps.lireTout(`id=like.email_invoice_*&select=${SELECT_FACTURES_PRO}`, { strict: true }),
     ]);
     const v = Array.isArray(ventes) && Array.isArray(factures) ? (() => {
       // Les e-mails de vente Pro PAR n° de transaction (une LISTE : deux e-mails au

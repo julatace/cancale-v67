@@ -15,6 +15,7 @@
 import React from 'react';
 import { ageTexte } from './instantaneEcran.js';
 import { BarreObjectif } from './design/CarteStats.jsx';
+import { estEuros } from './objectifMois.js';
 import './styles-journee-instantanee.css';
 
 export function useInerte(ref) {
@@ -57,7 +58,7 @@ export function CasesInstantanees({ cases, prefixe = 'data-ji' }) {
 // La barre de l'objectif telle que rangée (les nombres de SA barre, src/objectifMois.js).
 export function progObjectif(O) {
   if (!O) return null;
-  const eur = O.type === 'ca';
+  const eur = estEuros(O.type);
   const cible = Number(O.cible); const val = O.valeur === '' ? null : Number(O.valeur);
   if (!Number.isFinite(cible) || cible <= 0) return null;
   return { type: O.type, objectif: eur ? cible / 100 : cible, valeur: val == null || !Number.isFinite(val) ? null : (eur ? val / 100 : val), pct: O.pct === '' ? null : Number(O.pct), partiel: !!O.partiel, atteint: !!O.atteint, manque: [] };

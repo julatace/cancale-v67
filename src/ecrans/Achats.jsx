@@ -6,13 +6,15 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { pairesDuModele } from '../dejaEnStock.js';
 import { cleFacture, verifierFichier } from '../factureAchat.js';
+import { lireTicketAchat, lireTexteTicket, texteMontantSaisie } from '../depensesTicket.js';
+import { ticketVersBrouillon, prixEncoreLu, champEncoreLu, resumeTicket } from '../achatTicket.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
 import { DejaEnStock } from '../DejaEnStock.jsx';
 import { prendreDemandeAchat, EVT_ACHAT_LIEN } from '../raccourcisSiri.js';
 import { ReventeModele } from '../ReventeModele.jsx';
 import { ImportAchatsFeuille } from '../composants/ImportAchats.jsx';
 import { prendrePhotoPartagee } from '../partagePhoto.js';
-import { Bouton, C, FermeAuRetour, SheetShell, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
+import { exemplesActuels, Bouton, C, FermeAuRetour, SheetShell, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
 
 // ⟦← App.jsx #1⟧
@@ -319,8 +321,13 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   // (10 nov., lot J) « Importer un tableur » (src/importAchats.js) : `importer` = { existants, numeroDe, etatNumero, onImporter }.
   const [importOuvert, setImportOuvert] = useState(false);
   // (10 nov., lot AN) `facture` (src/FactureAchat.jsx) : joindre une facture d'achat (PDF ou photo) à l'achat saisi.
-  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false, facture: null });
+  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false, facture: null, ticket: null });
   const factureRef = useRef(null);
+  // (11 nov., lot achat-photo) La photo du TICKET : lue DANS la page (src/depensesTicket.js, aucun service
+  // payant, §2.9), elle PROPOSE prix, date et lieu dans les champs vides (src/achatTicket.js). Le prix lu
+  // n'est enregistré que par SON clic « Valider … et ajouter » (§2.5) ; rien lu ⇒ champ vide.
+  const ticketRef = useRef(null);
+  const ticketJeton = useRef(0);
   const [form, setForm] = useState(null);       // null = fermé ; sinon le brouillon
   const [editId, setEditId] = useState(null);
   const [erreur, setErreur] = useState('');
@@ -371,7 +378,26 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     setEditId(b.id); setErreur('');
     setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo, facture: null });
   };
-  const fermer = () => { setForm(null); setEditId(null); setErreur(''); };
+  const fermer = () => { ticketJeton.current++; setForm(null); setEditId(null); setErreur(''); };
+  const choisirTicket = async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    const jeton = ++ticketJeton.current;
+    setErreur('');
+    setForm(d => d && ({ ...d, ticket: { etat: 'lecture' } }));
+    const b64 = await compressImage(f, 1600, 0.82);
+    if (jeton !== ticketJeton.current) return;
+    if (!b64) { setForm(d => d && ({ ...d, ticket: { etat: 'impossible', raison: 'image' } })); return; }
+    const r = await lireTexteTicket(b64);
+    if (jeton !== ticketJeton.current) return;
+    const lu = lireTicketAchat(r.texte, new Date());
+    // Le ticket devient la facture de l'achat (une photo), si aucune n'est choisie — écrite à « Ajouter » seulement.
+    let fichier = null;
+    try { const bl = await (await fetch(b64)).blob(); fichier = new File([bl], `ticket-${lu.date || dateLocaleISO()}.jpg`, { type: 'image/jpeg' }); } catch (_) { fichier = null; }
+    if (jeton !== ticketJeton.current) return;
+    setForm(d => d && ticketVersBrouillon(d, { lu, raison: r.raison, texte: r.texte, fichier: facture ? fichier : null, aujourdhui: dateLocaleISO(), enMontant: texteMontantSaisie }));
+  };
   const choisirPhoto = async (ev) => {
     const f = ev.target.files && ev.target.files[0];
     ev.target.value = '';
@@ -383,7 +409,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   const enregistrer = async () => {
     if (!form || envoi) return;
     const titre = form.title.trim();
-    if (!titre) { setErreur('Donne un nom à cet achat (ex : Nike P-6000 argent 38).'); return; }
+    if (!titre) { setErreur(`Donne un nom à cet achat (${exemplesActuels().achat}).`); return; }
     const prix = prixAchatSaisi(form.price);
     if (prix === null) { setErreur('Le prix payé doit être un montant en euros (ex : 25 ou 25,50).'); return; }
     setEnvoi(true);
@@ -452,23 +478,50 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
             {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>Importer un tableur</Bouton> : null}
           </div>
+          {/* 0. (11 nov., lot achat-photo) Le TICKET en photo : il propose prix, date et lieu. */}
+          {!editId && (() => {
+            const t = form.ticket;
+            const lecture = !!(t && t.etat === 'lecture');
+            const dateCourte = (iso) => { const x = new Date(iso + 'T12:00:00'); return isNaN(x) ? iso : x.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+            const resume = resumeTicket(t, { dateCourte, euros: (c) => `${texteMontantSaisie(c)}\u00a0€` });
+            return (
+              <div className="vrm-ahp-ticket-bloc" data-achat-ticket={t ? t.etat : ''} data-achat-ticket-raison={t && t.raison ? t.raison : undefined}>
+                <button type="button" className="vrm-ahp-ticket" data-achat-ticket-bouton="" disabled={lecture} aria-busy={lecture || undefined}
+                  onClick={() => ticketRef.current && ticketRef.current.click()} style={{ borderColor: C.border, background: C.card, color: C.text }}>
+                  <span className="vrm-ahp-ticket-icone" aria-hidden="true" style={{ background: C.card2 || C.bg, color: C.text }}>{lecture ? <span className="vrm-ahp-ticket-roue" /> : <Icon name="receipt" size={20} />}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{lecture ? 'Lecture du ticket…' : t ? 'Lire un autre ticket' : 'Photo du ticket'}</span>
+                    <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 1 }}>{lecture ? 'Sur ton appareil, rien n’est envoyé.' : 'Remplit le prix, la date et le lieu.'}</span>
+                  </span>
+                  {!lecture ? <Icon name="camera" size={18} style={{ color: C.muted, flexShrink: 0 }} /> : null}
+                </button>
+                <input data-achat-ticket-fichier ref={ticketRef} type="file" accept="image/*" onChange={choisirTicket} style={{ display: 'none' }} />
+                {t && t.etat !== 'lecture' ? (
+                  <div role="status" aria-live="polite" data-achat-ticket-resume="" style={{ fontSize: 13, lineHeight: 1.4, color: t.etat === 'lu' ? C.text : C.muted, padding: '8px 4px 0' }}>
+                    {resume}
+                    {t.articles > 1 ? <span data-achat-ticket-articles={t.articles} style={{ display: 'block', color: C.muted }}>{`${t.articles} articles sur ce ticket : c'est le total.`}</span> : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()}
           {/* 1. La photo d'abord : une grande tuile, un toucher (appareil photo ou galerie). */}
           <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? 'Changer la photo' : 'Ajouter une photo'} style={{ borderColor: C.border, background: C.card, color: C.text }}>
-            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" /> : <span className="vrm-ahp-photo-vide"><Icon name="camera" size={28} /><span>Photo</span></span>}
+            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" /> : <span className="vrm-ahp-photo-vide"><Icon name="camera" size={28} /><span>Photo de l’article</span></span>}
             {photoForm ? <span className="vrm-ahp-photo-changer">Changer</span> : null}
           </button>
           {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>Retirer la photo</Bouton>}
           <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
           {/* 2. Ce que c'est. */}
-          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
+          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder={exemplesActuels().achat} enterKeyHint="next" autoComplete="off" style={inp} />)}
           {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
           {/* (10 nov., lot AV) Ce que tu as revendu ce modèle : le passé, jamais un conseil (src/reventeModele.js). */}
           {titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}
           {/* 3. Le prix payé, en grand : c'est LUI qui le tape (§2.5). */}
-          {champ('Prix payé', <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums' }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
+          {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>Lu sur le ticket — vérifie</span> : 'Prix payé', <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label="Prix payé" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
           {/* 4. Où : ses derniers lieux d'abord, puis la liste courte ; un champ libre. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {champ('Où', <input data-champ="lieu" value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, magasin…" autoComplete="off" style={inp} />)}
+            {champ(champEncoreLu(form, 'source') ? 'Où · lu sur le ticket' : 'Où', <input data-champ="lieu" data-champ-lu={champEncoreLu(form, 'source') ? '1' : undefined} value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, magasin…" autoComplete="off" style={inp} />)}
             <div className="vrm-rangee vrm-ahp-lieux" data-achat-hors-lieux={lieux.filter((x) => x.recent).length} style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {lieux.map(({ l: s, recent }) => {
                 const actif = form.source.trim().toLowerCase() === s.toLowerCase();
@@ -478,7 +531,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             </div>
           </div>
           {/* 5. La date (aujourd'hui par défaut). */}
-          {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
+          {champ(champEncoreLu(form, 'date') ? 'Date · lue sur le ticket' : 'Date', <input data-champ="date" data-champ-lu={champEncoreLu(form, 'date') ? '1' : undefined} type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
           {/* 6. Le N° de rangement : le prochain libre PROPOSÉ, posé par SON toucher seulement. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {champ('N° de rangement (facultatif)', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder="—" style={inp} />)}
@@ -492,13 +545,13 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             return (
               <div data-achat-hors-facture="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {deja && !form.facture ? <PastilleFacture cle={cf} f={deja} onOuvrir={facture.ouvrir} enCours={facture.enCours === cf} Icon={Icon} /> : null}
-                {form.facture ? <span data-achat-hors-facture-choisie="" style={{ fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{form.facture.name}</span> : null}
+                {form.facture ? <span data-achat-hors-facture-choisie="" data-facture-du-ticket={form.factureDuTicket ? '1' : undefined} style={{ fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{form.factureDuTicket ? 'Ticket joint comme facture' : form.facture.name}</span> : null}
                 <Bouton variante="secondaire" icone="doc" data-achat-hors-facture-bouton onClick={() => factureRef.current && factureRef.current.click()} style={{ minHeight: 44 }}>
                   {form.facture || deja ? 'Changer la facture' : 'Facture (facultatif)'}
                 </Bouton>
-                {form.facture && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, facture: null }))}>Retirer</Bouton>}
+                {form.facture && <Bouton variante="discret" data-achat-hors-facture-retirer="" onClick={() => setForm(d => ({ ...d, facture: null, factureDuTicket: false }))}>Retirer</Bouton>}
                 <input data-achat-hors-facture-input ref={factureRef} type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
-                  onChange={(e) => { const fi = e.target.files && e.target.files[0]; e.target.value = ''; if (!fi) return; const v = verifierFichier({ type: fi.type, taille: fi.size, nom: fi.name }); if (!v.ok) { setErreur(v.message); return; } setErreur(''); setForm(d => d && ({ ...d, facture: fi })); }} />
+                  onChange={(e) => { const fi = e.target.files && e.target.files[0]; e.target.value = ''; if (!fi) return; const v = verifierFichier({ type: fi.type, taille: fi.size, nom: fi.name }); if (!v.ok) { setErreur(v.message); return; } setErreur(''); setForm(d => d && ({ ...d, facture: fi, factureDuTicket: false })); }} />
               </div>
             );
           })() : null}
@@ -515,8 +568,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           </details>
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 13, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
           <div className="vrm-ahp-gestes" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Bouton variante="primaire" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
-              style={{ width: '100%', minHeight: 54, fontSize: 17, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</Bouton>
+            <Bouton variante="primaire" data-achat-hors-enregistrer data-prix-a-valider={prixEncoreLu(form) ? '1' : '0'} disabled={envoi} onClick={enregistrer}
+              style={{ width: '100%', minHeight: 54, fontSize: 17, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : (prixEncoreLu(form) ? `Valider ${form.price}\u00a0€ et ajouter` : "Ajouter l'achat"))}</Bouton>
             <Bouton variante="discret" data-achat-hors-annuler onClick={fermer} style={{ width: '100%', minHeight: 44 }}>Annuler</Bouton>
           </div>
           {editId && <Bouton variante="discret" icone="trash" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start' }}>Supprimer cet achat</Bouton>}

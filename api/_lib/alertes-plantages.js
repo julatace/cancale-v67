@@ -20,6 +20,17 @@ import { sbCle } from './cle.js';
 import { normaliserEvenements, jourApresEvenements, alerteDue, apresNotification, texteAlerte, PREFIXE_TERRAIN } from '../../src/alertesPlantages.js';
 import { jourParis } from '../../src/mesuresTerrain.js';
 import { nomEcran } from './veille-plantages.js';
+// (11 nov.) L'envoi passe par le journal des alertes de production : même
+// regroupement à l'heure, interrupteur « Un écran plante », 30 jours.
+import { signalerProduction } from './alertes-production.js';
+
+async function direPlantages(enAttente, { proprio, env, fetcher, pousser, maintenant }) {
+  const notif = texteAlerte(enAttente, nomEcran);
+  if (!notif || !pousser) return false;
+  const n = enAttente.reduce((a, t) => a + (Number(t.n) || 0), 0);
+  const r = await signalerProduction({ proprio, env, fetcher, maintenant, pousser, signal: { type: 'plantage', cle: 'plantage', titre: notif.title, corps: notif.body, n, tag: 'vrm-alerte-plantages', compteur: false } });
+  return !!(r && r.notifiees > 0);
+}
 
 const cfg = (env) => ({ url: env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co', service: env.SUPABASE_SERVICE_KEY || '' });
 export const idTerrain = (jour) => PREFIXE_TERRAIN + jour;
@@ -74,8 +85,7 @@ export async function recevoirAlertesPlantages({ evenements, empreinte, proprio,
     if (!ecrit) continue;   // devancé : relire et rejouer
     let notifie = false;
     if (due && pousser) {
-      const notif = texteAlerte(enAttente, nomEcran);
-      try { const x = await pousser({ ...notif, cat: 'signalement', tag: 'vrm-alerte-plantages', url: '/?tab=settings' }); notifie = !!(x && x.sent > 0); } catch (_) { notifie = false; }
+      try { notifie = await direPlantages(enAttente, { proprio, env, fetcher, pousser, maintenant }); } catch (_) { notifie = false; }
     }
     return { fait: true, jour, types: evts.length, due, notifie };
   }
@@ -97,7 +107,7 @@ export async function vidangerAlertesPlantages({ proprio, env = process.env, fet
     const ecrit = await ecrireCas(env, fetcher, proprio, id, avant, apresNotification(avant, maintenant), maintenant);
     if (!ecrit) { out.push({ jour, fait: false, raison: 'pas écrit : rien envoyé' }); continue; }
     let notifie = false;
-    if (pousser) { try { const x = await pousser({ ...texteAlerte(enAttente, nomEcran), cat: 'signalement', tag: 'vrm-alerte-plantages', url: '/?tab=settings' }); notifie = !!(x && x.sent > 0); } catch (_) {} }
+    if (pousser) { try { notifie = await direPlantages(enAttente, { proprio, env, fetcher, pousser, maintenant }); } catch (_) {} }
     out.push({ jour, fait: true, types: enAttente.length, notifie });
   }
   return { fait: true, jours: out };
