@@ -2125,12 +2125,11 @@ async function handleApp(req, res) {
     // désigne rien. Ce qui engage (offre, retrait, programmation, annulation,
     // déplacement) exige en plus `confirme:true` — vérifié AVANT eBay aussi.
     const ACTIONS = {
-      agent:async(ctx)=>preparerAgentEbay({
-        orders:await lireDonnee(ligneDe('ebay_orders',ctx),ctx.owner),
-        messages:await gestionEbay.messages({page:1},ctx),
-        offres:await gestionEbay.offres({page:1},ctx),
-        journal:await lireDonnee(ligneDe('ebay_agent_journal',ctx),ctx.owner),
-      }),
+      // (11 nov., familles-serveur, H27/M87) L'AGENT eBAY EST ARRÊTÉ (Julien, 5 nov.) et
+      // l'app ne l'appelle plus : il relisait `ebay_orders` ENTIÈRE (`select=data`,
+      // adresses comprises) puis attendait messages et offres en série. Il répond
+      // 410 sans rien lire. `preparerAgentEbay` reste (bancs) si on le rallume.
+      agent:async()=>({status:410,body:{ok:false,reason:'agent-arrete',error:'L\'agent eBay est arrêté.'}}),
       commande:(ctx)=>gestionEbay.commande(b,ctx),
       transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),

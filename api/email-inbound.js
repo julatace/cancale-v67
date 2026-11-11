@@ -38,6 +38,7 @@ import { stampBordereau } from './_lib/stamp.js';
 import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
+import { modifierLigneCas } from './_lib/cas.js';   // (11 nov.) le journal par comparer-et-échanger
 // (9 nov.) Solo : la vente d'un compte hors offre ne sonne pas (api/_lib/plan-regle.js).
 import { venteHorsPlanServeur } from './_lib/plan-vendeur.js';
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres as fusionnerRegistresLib, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
@@ -308,16 +309,21 @@ export function compteDeLEmail(raw, accts, emails) {
 async function detectAccount(raw) {
   try {
     const headers = { ...sbCle(SUPABASE_KEY) };
+    // (11 nov., H11) « pas su » ≠ « aucun compte » : une lecture ratée rend `null`
+    // et l'e-mail repart en 503 (rejoué) — jamais rangé SANS compte sur une panne
+    // (le plan Solo serait jugé sur `uid:''`).
     const res = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`), { headers });
-    const accts = res.ok ? await res.json() : [];
+    if (!res.ok) return null;
+    const accts = await res.json();
+    if (!Array.isArray(accts)) return null;
     let emails = {};
-    try {
-      const r2 = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`), { headers });
-      if (r2.ok) { const rows = await r2.json(); emails = (rows[0] && rows[0].vinted_account_emails) || {}; }
-    } catch (_) {}
+    const r2 = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`), { headers });
+    if (!r2.ok) return null;
+    const rows = await r2.json();
+    if (!Array.isArray(rows)) return null;
+    emails = (rows[0] && rows[0].vinted_account_emails) || {};
     return compteDeLEmail(raw, accts, emails);
-  } catch (_) {}
-  return { uid: '', login: '', source: 'inconnu' };
+  } catch (_) { return null; }
 }
 
 // La paire d'un email de message, lue dans son SUJET (forme mesurée sur 59 emails :
@@ -806,13 +812,23 @@ async function logEmail(entry) {
     // ⚠️ Lire-fusionner-réécrire : une lecture RATÉE repartait d'un journal vide
     //    et le réécrivait avec la seule ligne du moment — les 199 autres, celles
     //    qui expliquent un colis manquant, partaient. Pas su ⇒ on n'écrit pas.
-    const lu = await supabaseLireRow('email_journal');
-    if (!lu.lu) return;
-    const cur = lu.data || { entries: [] };
     // 200 et non 30 : le 23 août, une rafale d'emails « offre » avait chassé du
     // journal la seule ligne qui expliquait un colis manquant.
     const contexte = contexteVendeur.getStore() || {};
-    const entries = [{ ...entry, ...(contexte.messageId ? {messageId:contexte.messageId,empreinte:contexte.empreinteEmail} : {}), at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 200);
+    const ligne = { ...entry, ...(contexte.messageId ? {messageId:contexte.messageId,empreinte:contexte.empreinteEmail} : {}), at: new Date().toISOString() };
+    // (11 nov., H10) COMPARER-ET-ÉCHANGER (_lib/cas.js) : deux e-mails traités en
+    // parallèle perdaient chacun l'entrée de l'autre (lire puis réécrire tout).
+    const owner = proprietaireCourant();
+    if (owner) {
+      const ok = await modifierLigneCas({ url: SUPABASE_URL, entetes: sbCle(SUPABASE_KEY), owner, id: 'email_journal',
+        modifier: (cur) => ({ ...(cur || {}), entries: [ligne, ...((cur && Array.isArray(cur.entries)) ? cur.entries : [])].slice(0, 200) }) });
+      if (ok === null) marquerEcritureRatee();   // comme avant : un journal pas écrit ⇒ 503, le collecteur rejoue
+      return;
+    }
+    const lu = await supabaseLireRow('email_journal');
+    if (!lu.lu) return;
+    const cur = lu.data || { entries: [] };
+    const entries = [ligne, ...(cur.entries || [])].slice(0, 200);
     await supabaseUpsert([{ id: 'email_journal', data: { entries } }]);
   } catch (_) {}
 }
@@ -2316,6 +2332,7 @@ export async function traiterEmail(req, res) {
   { const st = contexteVendeur.getStore(); if (st) { st.texte = corpsTexte; st.html = typeof mail.html === 'string' ? mail.html : ''; } }
   const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${corpsTexte}`;
   const acc = await detectAccount(rawForDetect);
+  if (acc === null) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes comptes : rien n'est rangé, renvoie-le." }); return; }
   // Date de RÉCEPTION de l'email : celle d'origine si on rejoue un email conservé
   // (voir api/email-rattacher.js), sinon maintenant.
   const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();

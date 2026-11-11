@@ -48,6 +48,7 @@ import { clesEtapeTx, jourParis } from './transporteurs.js';
 import { DESTINATIONS } from './lien-notif.js';
 import { texteArrivee } from './notif-textes.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { conditionRev, revSuivant } from './cas.js';   // (11 nov.) une règle de version pour tout le serveur
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -103,8 +104,8 @@ export async function modifierCas(id, modifier, essais = 6, { owner: ownerForce 
     const d = present ? (rows[0].data || {}) : null;
     const nouveau = modifier(d);
     if (nouveau === undefined) return false;
-    const rev0 = (d && Number.isSafeInteger(d.rev) && d.rev >= 0) ? d.rev : null;
-    const data = { ...nouveau, rev: (rev0 || 0) + 1 };
+    // (11 nov., M70) la version comparée SOUS SA FORME LUE (entier, chaîne, objet) : _lib/cas.js
+    const data = { ...nouveau, rev: revSuivant(d) };
     try {
       if (!present) {
         const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
@@ -117,7 +118,7 @@ export async function modifierCas(id, modifier, essais = 6, { owner: ownerForce 
         if (out.length >= 1) return true;
         continue;                                   // créée entre-temps : on relit
       }
-      const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
+      const cond = conditionRev(d);
       const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
         method: 'PATCH', headers: { ...tete, Prefer: 'return=representation' }, body: JSON.stringify({ data }),
       });

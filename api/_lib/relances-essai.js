@@ -45,6 +45,7 @@ import { envoyerSmtp, emailSur, hoteValide } from './smtp.js';
 import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
 import { lireMentions } from './mentions-legales.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { reserverMemo, modifierLigneCas } from './cas.js';   // (11 nov.) réservation par comparer-et-échanger
 
 export const SITE = 'https://vrm.center';
 export const ID_ENVOIS = 'relances_essai';
@@ -303,9 +304,13 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     const t = texteRelance(etape, { fin: a.fin_periode, annule: a.annule_fin_periode === true, relie, lien });
     if (!t || !lien) { ign('texte'); continue; }
     // Réserver AVANT d'envoyer : non confirmé ⇒ rien ne part.
-    const base = { ...(envois.envois || {}) };
-    const reserve = await ecrire(owner, ID_ENVOIS, { envois: { ...base, [etape]: { at: new Date(maintenant).toISOString(), issue: 'en-cours' } } });
-    if (!reserve) { ign('reservation non confirmee'); continue; }
+    // (11 nov., H15) par COMPARER-ET-ÉCHANGER (_lib/cas.js) : deux passages qui se
+    // chevauchent ⇒ un seul réserve l'étape (l'autre la voit déjà prise).
+    const ligneEnvois = { url: SUPABASE_URL(), entetes: sbCle(SERVICE()), owner, id: ID_ENVOIS };
+    const res = await reserverMemo({ ...ligneEnvois,
+      deja: (d) => !!(d && d.envois && d.envois[etape]),
+      nouveau: (d) => ({ ...(d || {}), envois: { ...((d && d.envois) || {}), [etape]: { at: new Date(maintenant).toISOString(), issue: 'en-cours' } } }) });
+    if (!res.reserve) { ign(res.raison === 'deja' ? 'deja reserve' : 'reservation non confirmee'); continue; }
     let r;
     try {
       r = await envoyer({
@@ -316,10 +321,12 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     } catch (e) { r = { issue: 'incertain', message: String(e && e.message || e).slice(0, 200) }; }
     const issue = ['envoye', 'refuse', 'incertain'].includes(r && r.issue) ? r.issue : 'incertain';
     // Un refus AVANT le message : rien n'est parti ⇒ l'étape est libérée (demain).
-    const fin = issue === 'refuse'
-      ? { ...base }
-      : { ...base, [etape]: { at: new Date(maintenant).toISOString(), issue } };
-    await ecrire(owner, ID_ENVOIS, { envois: fin, ...(issue === 'refuse' ? { dernierRefus: { etape, at: new Date(maintenant).toISOString(), etapeSmtp: String((r && r.etape) || '') } } : {}) });
+    await modifierLigneCas({ ...ligneEnvois, modifier: (d) => {
+      const envoisLus = { ...((d && d.envois) || {}) };
+      if (issue === 'refuse') delete envoisLus[etape]; else envoisLus[etape] = { at: new Date(maintenant).toISOString(), issue };
+      const { dernierRefus: _ancien, ...reste } = d || {};
+      return { ...reste, envois: envoisLus, ...(issue === 'refuse' ? { dernierRefus: { etape, at: new Date(maintenant).toISOString(), etapeSmtp: String((r && r.etape) || '') } } : {}) };
+    } });
     if (issue === 'envoye') envoyes++; else ign(`smtp ${issue}`);
   }
   return { pret: true, envoyes, essais: essais.length, ignores };

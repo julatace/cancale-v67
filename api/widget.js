@@ -191,9 +191,13 @@ async function ownerDuToken(req, res) {
 // que quand elle ne répondait pas — et le widget affichait alors `0 à expédier ·
 // 0 à retirer · 0 €` avec 14 colis à poster. C'est le mensonge que l'app a
 // appris à ne plus faire (§ baseKO), jamais reporté ici. `null` = « pas su ».
-async function rows(like) {
-  const j = await fetchPaginated(scoped(`app_data?id=like.${like}&select=data`));
-  return j ? j.map(x => x.data).filter(Boolean) : null;
+// (11 nov., familles-serveur) Les ventes lues dans les e-mails : le widget n'en
+// veut que la date, le compte et le prix. `select=data` ramenait chaque e-mail
+// de vente ENTIER (corps, article…) à chaque rafraîchissement : projeté (§4.4).
+export const SELECT_VENTES_EMAIL = 'receivedAt:data->>receivedAt,uid:data->>uid,prix:data->>prix';
+async function ventesEmails() {
+  const j = await fetchPaginated(scoped(`app_data?id=like.email_sale_*&select=${SELECT_VENTES_EMAIL}`));
+  return j ? j.filter((x) => x && typeof x === 'object') : null;
 }
 // ⚠️ ÉGRESS SUPABASE — NE JAMAIS faire `select=data` sur `email_bord_*` : chaque
 // ligne embarque le PDF du bordereau en base64 (brut + tamponné = deux fois),
@@ -772,7 +776,7 @@ export default async function handler(req, res) {
     const vivants = await comptesVivants();
     const [bords, txSold, txBuy, sales, m, snap, eb, departs, regle] = await Promise.all([
       bordRows(), comptesAExpedierOuRetirer('sold', vivants), comptesAExpedierOuRetirer('purchased', vivants),
-      rows('email_sale_*'), main(), snapshot(), colisEbayDuVendeur(), lireDeparts(),
+      ventesEmails(), main(), snapshot(), colisEbayDuVendeur(), lireDeparts(),
       regleDuVendeur(owner).catch(() => null),
     ]);
     const sold = txSold ? [] : await harvestOrders('sold', vivants);

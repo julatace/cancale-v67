@@ -367,8 +367,17 @@ async function avoir(owner, corps, res) {
   const data = { type: 'avoir_pro', number: contenu.numero, status: 'emise', contenu, emiseLe: contenu.emiseLe, transaction: tx, origine: fc.numero, buyerEmail: fc.acheteur.email, rev: nouveauRev() };
   const w = a ? await modifierSi(idA, owner, condRev(a.rev), data) : await creer(idA, owner, data);
   if (w !== 'ok') { const relu = await lireLigne(idA, owner); if (relu && relu.contenu) return repondre(res, 200, { ok: true, deja: true, avoir: facturePublique(relu, idA) }); return repondre(res, 503, { erreur: 'base', message: "L'avoir n'a pas pu être enregistré. Réessaie : il gardera le même numéro." }); }
-  await modifierSi(idF, owner, condRev(f.rev), { ...f, annuleePar: contenu.numero, rev: nouveauRev() });
-  return repondre(res, 200, { ok: true, avoir: facturePublique(data, idA) });
+  // (11 nov., M74) La facture marquée « annulée par » l'avoir : par comparer-et-échanger,
+  // RELUE et réessayée si un autre l'a touchée entre-temps ; jamais un résultat ignoré.
+  // Pas abouti ⇒ l'avoir EST émis (réponse ok) mais `avertissement` le dit.
+  let marque = false;
+  for (let essai = 0, cible = f; essai < 4 && cible && !marque; essai++) {
+    if (cible.annuleePar === contenu.numero) { marque = true; break; }
+    const w2 = await modifierSi(idF, owner, condRev(cible.rev), { ...cible, annuleePar: contenu.numero, rev: nouveauRev() });
+    if (w2 === 'ok') { marque = true; break; }
+    cible = await lireLigne(idF, owner);
+  }
+  return repondre(res, 200, { ok: true, avoir: facturePublique(data, idA), ...(marque ? {} : { avertissement: "L'avoir est émis, mais la facture n'a pas pu être marquée « annulée ». Rouvre la vente pour réessayer." }) });
 }
 
 // ── ENVOYER ─────────────────────────────────────────────────────────────────

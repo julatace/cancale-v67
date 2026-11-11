@@ -89,6 +89,7 @@ import { purgerHtml } from './_lib/email-html.js';
 import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { modifierLigneCas, reserverMemo } from './_lib/cas.js';   // (11 nov.) mémos par comparer-et-échanger
 import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
@@ -169,8 +170,11 @@ async function ownersActifs() {
 // Écrit un mémo de dédoublonnage POUR LE VENDEUR DU TOUR (clé (owner,id) quand on
 // est cloisonné, `id` seul sinon). Sans ça, deux vendeurs partageraient le même
 // `ship_reminder_dedup` et l'un ferait taire l'autre.
+// (11 nov., B128) Cloisonné : par comparer-et-échanger (_lib/cas.js) — deux
+// passages ne se réécrivent plus l'un sur l'autre sans le voir.
 async function ecrireDedup(id, data) {
   const o = proprietaireCourant();
+  if (o) return (await modifierLigneCas({ url: SUPABASE_URL, entetes: HEADERS, owner: o, id, modifier: () => data })) === true;
   const row = o ? { owner: o, id, data } : withOwnerAll([{ id, data }])[0];
   const conflict = o ? 'owner,id' : conflictTarget('id');
   // Rend VRAI seulement si la base a confirmé : le bilan de la semaine ne part
@@ -183,6 +187,18 @@ async function ecrireDedup(id, data) {
     });
     return !!(r && r.ok);
   } catch (_) { return false; /* un mémo raté n'empêche pas le rappel suivant */ }
+}
+// (11 nov., M80/M81/B130) RÉSERVER le mémo AVANT d'envoyer (comparer-et-échanger) :
+// deux passages simultanés ⇒ un seul envoie ; un mémo illisible ⇒ RIEN n'est
+// envoyé (« pas su » ne vaut jamais « jamais envoyé »). Base pas cloisonnée
+// (installation d'avant) : la lecture puis l'écriture d'avant, « pas su » compris.
+async function reserverDedup(id, deja, nouveau) {
+  const o = proprietaireCourant();
+  if (o) return reserverMemo({ url: SUPABASE_URL, entetes: HEADERS, owner: o, id, deja, nouveau });
+  const d = await getRow(id);
+  if (d === undefined) return { reserve: false, raison: 'pas-su' };
+  if (deja(d)) return { reserve: false, raison: 'deja' };
+  return (await ecrireDedup(id, nouveau(d))) ? { reserve: true } : { reserve: false, raison: 'pas-su' };
 }
 // ⚠️ §4.5 — Supabase tronque à 1000 lignes SANS LE DIRE. Ce cron balaie
 // `email_bord_*` et `harvest_%25_orders_sold` de TOUS les utilisateurs : à
@@ -831,14 +847,16 @@ async function traiterVendeurApresRelecture() {
     try {
       const mois = today.slice(0, 7);
       if (today.endsWith('-01')) {
-        const deja = (await getRow('urssaf_reminder_dedup')) || {};
-        if (deja.mois !== mois && await pushCategorieActive('urssaf')) {
+        const deja = await getRow('urssaf_reminder_dedup');
+        if (deja === undefined) urssaf = 'mémo illisible — rien';
+        else if ((deja || {}).mois !== mois && await pushCategorieActive('urssaf')) {
           const n = notificationUrssaf({ today, main: await getRowProjete('main', MAIN_URSSAF) });
+          let res = { reserve: false, raison: '' };
           if (n.envoyer) {
-            await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
-            await ecrireDedup('urssaf_reminder_dedup', { mois });
+            res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.mois === mois, (d) => ({ ...(d || {}), mois }));
+            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
           }
-          urssaf = n.envoyer ? 'envoyé · ' + n.raison : n.raison;
+          urssaf = !n.envoyer ? n.raison : res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé ce mois' : 'mémo illisible — rien';
         }
       } else {
         // (29 oct.) Le rappel avant l'échéance : une fois par échéance (`veille`
@@ -849,9 +867,9 @@ async function traiterVendeurApresRelecture() {
           if (deja && deja.veille === n.cle) urssaf = 'déjà rappelé avant l\'échéance';
           else if (deja === undefined) urssaf = 'mémo illisible — rien';
           else if (await pushCategorieActive('urssaf')) {
-            await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
-            await ecrireDedup('urssaf_reminder_dedup', { ...(deja || {}), veille: n.cle });
-            urssaf = 'envoyé · ' + n.raison;
+            const res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.veille === n.cle, (d) => ({ ...(d || {}), veille: n.cle }));
+            if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
+            urssaf = res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé avant l\'échéance' : 'mémo illisible — rien';
           }
         }
       }
@@ -941,15 +959,20 @@ async function traiterVendeurApresRelecture() {
     const nePasPoster = eb ? eb.nePasPoster : 0;
 
     // Anti-doublon : une seule notification par jour pour un même total.
-    const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: 'déjà notifié', total };
+    const dedupLu = await getRow('ship_reminder_dedup');
+    // (11 nov., M81) un mémo illisible n'est pas « jamais notifié » : rien ne part.
+    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: 'mémo illisible — rien', total };
+    const memeJour = (d) => !!d && d.date === today && d.total === total && (d.nePasPoster || 0) === nePasPoster;
+    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
+      // (11 nov., B130) réservé AVANT l'envoi : deux passages ⇒ une seule notification.
+      const res = await reserverDedup('ship_reminder_dedup', memeJour, () => ({ date: today, total, nePasPoster }));
+      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
-    }
-    await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
+    } else await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
     return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };

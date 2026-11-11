@@ -426,15 +426,18 @@ const clesEssai = (email, ids) => (normEmail(email) ? ['email:' + normEmail(emai
   .concat((ids || []).map((v) => 'vinted:' + String(v)));
 const enListe = (vals) => vals.map((v) => '%22' + encodeURIComponent(String(v)) + '%22').join(',');
 
+// (11 nov., M51) Trois états : la liste lue · `null` = pas su (lecture ratée).
+// `[]` sur une panne accordait l'essai sur le seul e-mail : un compte Vinted
+// déjà essayé l'obtenait à nouveau. Pas su ⇒ `essaiDejaUtilise` rend `null` ⇒ pas d'essai.
 async function lireVintedIds(owner) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-  if (!SERVICE || !owner) return [];
+  if (!SERVICE || !owner) return null;
   try {
     const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?owner=eq.${encodeURIComponent(owner)}&select=vinted_user_id`, { headers: sbCle(SERVICE) });
-    if (!r.ok) return [];
+    if (!r.ok) return null;
     const j = await r.json();
-    return Array.isArray(j) ? j.map((x) => x && x.vinted_user_id).filter(Boolean).map(String) : [];
-  } catch (_) { return []; }
+    return Array.isArray(j) ? j.map((x) => x && x.vinted_user_id).filter(Boolean).map(String) : null;
+  } catch (_) { return null; }
 }
 
 // true = un essai a DÉJÀ été consommé (par cet e-mail OU un de ces comptes
@@ -443,6 +446,7 @@ async function lireVintedIds(owner) {
 async function essaiDejaUtilise(email, ids) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return null;
+  if (ids === null) return null;   // (11 nov., M51) comptes Vinted pas sus ⇒ pas su
   const cles = clesEssai(email, ids);
   if (!cles.length) return null;
   try {
@@ -484,14 +488,18 @@ async function vintedPris(req, res) {
   const id = String((req.query && req.query.id) || '').trim();
   if (!/^[0-9]{1,20}$/.test(id)) return repondre(res, 400, { ok: false, raison: 'id' });
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-  if (!SERVICE) return repondre(res, 200, { ok: true, pris: false });
+  // (11 nov., M52) « pas su » n'est pas « libre » : une lecture ratée répond 503
+  // (`pris:null`) ; l'app ne dit alors rien, et la base bloque de toute façon.
+  const pasSu = () => repondre(res, 503, { ok: false, pris: null, raison: 'pas-su' });
+  if (!SERVICE) return pasSu();
   try {
     const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(id)}&select=owner`, { headers: sbCle(SERVICE) });
-    if (!r.ok) return repondre(res, 200, { ok: true, pris: false });
+    if (!r.ok) return pasSu();
     const j = await r.json();
-    const pris = Array.isArray(j) && j.some((row) => row && row.owner && String(row.owner) !== String(u.id));
+    if (!Array.isArray(j)) return pasSu();
+    const pris = j.some((row) => row && row.owner && String(row.owner) !== String(u.id));
     return repondre(res, 200, { ok: true, pris });
-  } catch (_) { return repondre(res, 200, { ok: true, pris: false }); }
+  } catch (_) { return pasSu(); }
 }
 
 const comptesVendeursLigne = (autres) => {
@@ -960,6 +968,7 @@ async function parrainage(req, res) {
     const corps = await lireCorpsJson(req);
     if (!corps || corps.action !== 'rattacher') return repondre(res, 400, { ok: false, raison: 'action' });
     const [ligne, idsVinted] = await Promise.all([ligneDe(req), lireVintedIds(u.id)]);
+    if (idsVinted === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Parrainage pas vérifié. Réessaie dans un instant.' });   // (11 nov., M51)
     const essaiDeja = await essaiDejaUtilise(u.email, idsVinted);
     const r = await rattacher(corps.code, { u, ligne, idsVinted, essaiDeja });
     return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message });
