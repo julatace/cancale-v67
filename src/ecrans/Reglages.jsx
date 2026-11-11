@@ -57,7 +57,8 @@ import SuiviComptes from '../SuiviComptes.jsx';
 // (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
 import { ToutVaBien } from '../ToutVaBien.jsx';
 import { SanteDonnees } from '../SanteDonnees.jsx';
-import HistoriqueVinted from '../ImportDepart.jsx';   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
+import HistoriqueVinted from '../ImportDepart.jsx';
+import HistoriqueSites from '../HistoriqueSites.jsx';   // (11 nov., lot import-historique-sites) Leboncoin, Vestiaire, eBay : la même carte (ext. 5.365)   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
@@ -1886,7 +1887,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
-      { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<HistoriqueVinted comptes={comptes||[]} variante="reglages"/> },
+      { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<><HistoriqueVinted comptes={comptes||[]} variante="reglages"/><HistoriqueSites/></> },
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
