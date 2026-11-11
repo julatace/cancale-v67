@@ -136,6 +136,8 @@ import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chev
 // ⟦→ ecrans/Ebay.jsx #4⟧
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
+// (11 nov., lot ventes-lot) Une vente de plusieurs articles = UNE vente, chaque article à sa place.
+import { resumeVenteLot, titreDitLot } from "./venteLot.js";
 import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
 import { motEtatVente, lignesAVenir, comptesQuiAnnulent, fenetreAnnulations, bandeauPrixAchat } from './ventesEcran.js';
 import './ventes-e2.css';
@@ -2619,6 +2621,8 @@ const SYNC_KEYS = [
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
+  // (11 nov., lot ventes-lot) Les articles d'un lot reliés par SON clic « Relier » : { [tx]: { [item]: N° } }.
+  'vrm_lot_liens',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed','vinted_retours_remis',
   // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
@@ -6785,6 +6789,33 @@ const fetchTxnItemIds = async () => {
     for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
     return map;
   } catch (_) { return {}; }
+};
+// ── (11 nov., lot ventes-lot) LES ARTICLES DES VENTES EN LOT ──────────────────
+// Vinted titre la commande d'un lot « Lot 3 articles » (aucun champ de nombre sur la liste
+// des ventes, mesuré le 3 nov.) : le titre dit seulement QUELLES transactions relire. Les
+// articles eux-mêmes (leur identifiant d'annonce, leur prix affiché) viennent de LA
+// transaction (`order.items`), relue en projection — jamais `select=data` (§4.4), et
+// seulement pour ces ventes-là. Rend { [tx]: { transaction } } (une transaction absente de
+// la base n'y est pas : « pas lue ») · null si la base n'a pas répondu (« pas su »).
+const fetchTransactionsLots = async (ventes) => {
+  const ids = [];
+  for (const o of (ventes || [])) {
+    if (!o || !titreDitLot(o.title) || o.transaction_id == null || !o._acc || o._acc.vinted_user_id == null) continue;
+    ids.push(`harvest_${o._acc.vinted_user_id}_txn_${o.transaction_id}`);
+  }
+  const out = {};
+  const uniques = [...new Set(ids)];
+  try {
+    for (let i = 0; i < uniques.length; i += 60) {
+      const rows = await lireTout(`id=in.(${uniques.slice(i, i + 60).join(',')})&select=id,nb:data->payload->transaction->>items_count,items:data->payload->transaction->order->items`, { strict: true });
+      if (rows === null) return null;
+      for (const r of rows) {
+        const m = /_txn_(\d+)$/.exec(String((r && r.id) || '')); if (!m) continue;
+        out[m[1]] = { transaction: { items_count: r.nb, ...(Array.isArray(r.items) ? { order: { items: r.items } } : {}) } };
+      }
+    }
+  } catch (_) { return null; }
+  return out;
 };
 // ── LA DATE DE VERSEMENT DE CHAQUE VENTE VINTED (3 octobre) ────────────────
 // Julien : « il faut dater la vente pour le CA du mois à la date de réception
@@ -12054,7 +12085,9 @@ const confirmerNumerosAVerifier = async (numeros) => {
 };
 const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
   if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
-  if (numero && !(await confirmerNumerosAVerifier([numero]))) throw new Error(NUM_A_VERIFIER_ANNULE);
+  // (11 nov., lot ventes-lot) Un lot : `opts.numeros` = les N° de ses articles, vérifiés UN PAR UN
+  // (le tampon « 124 · 131 » n'est pas un N°).
+  if (numero && !(await confirmerNumerosAVerifier(Array.isArray(opts.numeros) ? opts.numeros : [numero]))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument } = PL;
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
@@ -12068,7 +12101,7 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
-  const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
+  const filename = `bordereau${hasNum?'-N'+String(numero).replace(/[^\w]+/g,'-').replace(/^-+|-+$/g,''):''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   try { if(opts.avantOuverture)await opts.avantOuverture(); } catch(e) { URL.revokeObjectURL(url); throw e; }
   const ouvert = ouvrirPdfOnglet(url, filename);
@@ -20470,6 +20503,42 @@ function CompteVente({ compte, plateforme, ou = '' }) {
   if (!compteFourni(compte)) return null;
   return <span className="vrm-vente-compte vrm-sensible" data-vente-compte={compte ? String(compte) : ''} data-vente-compte-ou={ou || undefined} data-vente-compte-passu={compte ? undefined : ''} title={compte ? `Vendue sur le compte ${compte}` : undefined}>{texteCompteVente(compte, plateforme)}</span>;
 }
+// ── (11 nov., lot ventes-lot) LES ARTICLES D'UNE VENTE EN LOT, dans le récapitulatif ──────────
+// UNE vente, chaque article à sa place : son N° par identité (src/venteLot.js), SA part du prix
+// (au prorata des prix affichés, sinon parts égales DITES), son prix d'achat, son bénéfice. Un
+// article sans identité prouvée ⇒ « Non relié » + « Relier » (SON clic : il tape le N° écrit sur
+// l'article) ; jamais deviné. `lot` = `lotDeVente(o)`.
+function ArticlesLotVente({ lot, devise = 'EUR', tx, onRelier }) {
+  const [saisie, setSaisie] = React.useState(null);   // { item, val }
+  if (!lot) return null;
+  const eur = (c) => (c == null ? '—' : `${(c / 100).toFixed(2).replace('.', ',')}\u00a0${devise === 'EUR' ? '€' : devise}`);
+  if (!lot.lu) return <section className="vrm-recap-lot" data-recap-lot="" data-lot-etat={lot.attente ? 'attente' : lot.passu ? 'passu' : 'pas-lu'} aria-label="Les articles du lot">
+    <h3 className="vrm-recap-titre">Les articles du lot</h3>
+    <p className="vrm-recap-issue">{lot.attente ? 'Lecture des articles du lot…' : lot.passu ? 'La base n’a pas répondu : articles du lot pas lus. Réessaie plus tard.' : 'Articles du lot pas encore lus : ouvre cette vente sur vinted.fr (l’extension lit sa transaction). Rien n’est relié en attendant.'}</p>
+  </section>;
+  return <section className="vrm-recap-lot" data-recap-lot={lot.n} data-lot-mode={lot.mode || ''} data-lot-non-relies={lot.nonRelies} aria-label="Les articles du lot">
+    <h3 className="vrm-recap-titre">Lot · {lot.n} articles</h3>
+    <p className="vrm-recap-lot-note" data-lot-phrase={lot.mode || ''}>Une vente, un colis. Prix {lot.phrase}.</p>
+    {lot.nonRelies ? <p className="vrm-recap-lot-manque" data-lot-manque={lot.nonRelies}>{lot.phraseManque} : aucun N° n’est deviné.</p> : null}
+    <ul className="vrm-recap-lot-liste">
+      {lot.articles.map((a, i) => <li key={a.item || i} className="vrm-recap-lot-article" data-lot-article={a.item || ''} data-lot-num={a.num || ''} data-lot-par={a.par || ''} data-lot-part={a.part == null ? '' : a.part} data-lot-achat={a.achat == null ? '' : a.achat}>
+        <span className="vrm-recap-lot-photo">{a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy" decoding="async"/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</span>
+        <span className="vrm-recap-lot-txt">
+          <span className="vrm-recap-lot-l1">{a.num ? <Numero n={a.num} taille="petit"/> : <span className="vrm-recap-lot-sans" data-lot-sans="">{a.conflit ? 'N° en double' : 'Non relié'}</span>}<span className="vrm-recap-lot-nom">{a.titre || 'Article'}{a.taille && !String(a.titre || '').includes(a.taille) ? ` · ${a.taille}` : ''}</span></span>
+          <span className="vrm-recap-lot-l2">Part {eur(a.part)} · achat {a.achat == null ? '—' : eur(a.achat)}{a.benefice != null ? ` · bénéfice ${eur(a.benefice)}` : ''}</span>
+          {!a.num && a.item && onRelier ? (saisie && saisie.item === a.item
+            ? <span className="vrm-recap-lot-relier" data-lot-saisie={a.item}>
+                <input aria-label={`N° écrit sur l’article ${a.titre || ''}`} inputMode={clavierNum()} value={saisie.val} autoFocus onChange={(e) => setSaisie({ item: a.item, val: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && saisie.val.trim()) { onRelier(tx, a.item, saisie.val.trim()); setSaisie(null); } if (e.key === 'Escape') setSaisie(null); }} placeholder="N°"/>
+                <Bouton variante="secondaire" className="vrm-b-petit" disabled={!saisie.val.trim()} data-lot-valider={a.item} onClick={() => { onRelier(tx, a.item, saisie.val.trim()); setSaisie(null); }}>Relier</Bouton>
+                <Bouton variante="discret" className="vrm-b-petit" onClick={() => setSaisie(null)}>Annuler</Bouton>
+              </span>
+            : <Bouton variante="secondaire" className="vrm-b-petit" data-lot-relier={a.item} onClick={() => setSaisie({ item: a.item, val: '' })}>Relier</Bouton>) : null}
+          {a.par === 'main' && onRelier ? <Bouton variante="discret" className="vrm-b-petit" data-lot-delier={a.item} onClick={() => onRelier(tx, a.item, '')}>Délier</Bouton> : null}
+        </span>
+      </li>)}
+    </ul>
+  </section>;
+}
 function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, basSeul = false, fusion = null, ...props }) {
   const compte = compteFourni(compteBrut) ? compteBrut : undefined;
   // (5 nov., chantier E2) Le N° du titre en pastille `Numero` (la même qu'au téléphone) ; le texte
@@ -20552,7 +20621,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
         <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
-        <span className="vrm-fu-vente-l2">{fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.transp && fusion.transp.cle ? <span className="vrm-fu-vente-transp" title={fusion.transp.nom || ''} aria-label={fusion.transp.nom || ''} data-fu-transp-ligne={fusion.transp.cle}><LogoTransporteur cle={fusion.transp.cle} taille={16}/></span> : null}{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
+        <span className="vrm-fu-vente-l2">{fusion.lot ? <span className="vrm-fu-lot" data-vente-lot={fusion.lot.n || ""} data-lot-nums={(fusion.lot.nums || []).join(",")} data-lot-non-relies={fusion.lot.nonRelies || 0}><span className="vrm-fu-lot-mot">{fusion.lot.n ? `Lot · ${fusion.lot.n} articles` : "Lot"}</span>{(fusion.lot.nums || []).map((n) => <Numero key={n} n={n} taille="petit" data-fu-num=""/>)}</span> : fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.transp && fusion.transp.cle ? <span className="vrm-fu-vente-transp" title={fusion.transp.nom || ''} aria-label={fusion.transp.nom || ''} data-fu-transp-ligne={fusion.transp.cle}><LogoTransporteur cle={fusion.transp.cle} taille={16}/></span> : null}{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
         <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
       </span> : null}
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{numTitre ? <><Numero n={numTitre} taille="petit" data-titre-num=""/>{' '}{titreNom || '(sans titre)'}</> : (titre || '(sans titre)')}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
@@ -31976,6 +32045,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_sale_overrides', u); return u;
     });
   };
+  // ── (11 nov., lot ventes-lot) UNE VENTE DE PLUSIEURS ARTICLES = UNE VENTE ──────────
+  // Les transactions des ventes « Lot … » (src/venteLot.js) : trois états, undefined en
+  // cours · null pas su · { [tx]: transaction }. Relues quand l'ENSEMBLE de ces ventes change.
+  const [lotsTx, setLotsTx] = useState(undefined);
+  const cleLotsTx = useMemo(() => (Array.isArray(sales.items) ? sales.items.filter((o) => o && titreDitLot(o.title)).map((o) => `${(o._acc && o._acc.vinted_user_id) || ''}_${o.transaction_id}`).sort().join(',') : null), [sales.items]);
+  useEffect(() => {
+    if (cleLotsTx == null) return undefined;
+    if (!cleLotsTx) { setLotsTx({}); return undefined; }
+    let vivant = true;
+    fetchTransactionsLots(sales.items).then((m) => { if (vivant) setLotsTx(m); });
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleLotsTx]);
+  // Les articles reliés par SON clic « Relier » (jamais deviné) : { [tx]: { [item]: N° } }.
+  const [lotLiens, setLotLiens] = useStateCle('vrm_lot_liens', () => { const v = load('vrm_lot_liens', {}); return v && typeof v === 'object' ? v : {}; });
+  useEffect(() => onCloudReady(() => setLotLiens((v) => (v && Object.keys(v).length) ? v : (() => { const w = load('vrm_lot_liens', {}); return w && typeof w === 'object' ? w : {}; })())), []);
+  const relierArticleLot = (tx, item, num) => setLotLiens((prev) => {
+    const t = String(tx), i = String(item), n = String(num == null ? '' : num).trim();
+    const u = { ...prev, [t]: { ...(prev[t] || {}) } };
+    if (n) u[t][i] = n; else delete u[t][i];
+    if (!Object.keys(u[t]).length) delete u[t];
+    save('vrm_lot_liens', u); return u;
+  });
+  // Le résumé d'une vente en lot (`resumeVenteLot`) : null si ce n'est pas un lot PROUVÉ par sa
+  // transaction (plusieurs articles). { lu:false } tant que la transaction n'est pas lue.
+  // L'identité d'un article : sa fiche (identifiant d'annonce), sinon sa photo exacte, sinon
+  // SON lien — jamais le titre. Le prix d'achat : celui qu'il a posé sur la vente, sinon la
+  // somme des articles s'ils sont TOUS connus.
+  const achatArticleLot = (a) => {
+    const f = a.item && numeros[a.item] ? numeros[a.item] : (a.photo ? numeros[entryKeyByPhoto({ photo: a.photo })] : null);
+    const e = fusionEntreeVente(f && a.num && cleNum(f.numero) === cleNum(a.num) ? f : { numero: a.num }, null, buyByNum);
+    return e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? centimes(e.buyPrice) : null;
+  };
+  const lotDeVente = memoRendu((o) => {
+    if (!o || o.transaction_id == null || !titreDitLot(o.title)) return null;
+    const tx = String(o.transaction_id);
+    if (lotsTx === undefined) return { lu: false, attente: true, n: null, articles: [], nums: [], nonRelies: 0 };
+    if (lotsTx === null || !lotsTx[tx]) return { lu: false, attente: false, passu: lotsTx === null, n: null, articles: [], nums: [], nonRelies: 0 };
+    const ov = saleOv[tx] || {};
+    const pose = ov.buyPrice != null && String(ov.buyPrice).trim() !== '' ? centimes(ov.buyPrice) : null;
+    return resumeVenteLot(lotsTx[tx], centimes(o.price && o.price.amount != null ? o.price.amount : null), {
+      numeroDeItem: (id) => { if (onlineAnnonceIds.has(String(id))) return null; const f = numeros[String(id)]; return f && f.numero != null ? f.numero : null; },
+      numeroDePhoto: (ph) => { const k = entryKeyByPhoto({ photo: ph }); return k && numeros[k] && numeros[k].numero != null ? numeros[k].numero : null; },
+      liens: lotLiens[tx] || null, cle: cleNum, achatDe: achatArticleLot, achatPose: pose,
+    });
+  });
+  // L'entrée comptable d'une vente EN LOT : le prix d'achat du LOT (jamais celui d'un seul
+  // article). Une vente qui n'est pas un lot lu garde son entrée telle quelle.
+  const entreeVenteLot = (o, e) => {
+    const l = lotDeVente(o);
+    if (!l || !l.lu) return e;
+    return { ...(e || {}), buyPrice: l.achat && l.achat.achat != null ? (l.achat.achat / 100).toFixed(2) : '' };
+  };
   // Prochain N° suggéré = max de TOUTES les sources + 1 : numéros déjà utilisés,
   // annonces numérotées, ET numéros posés sur les ventes (saleOv, déclaré
   // juste au-dessus) — sinon on resuggère un numéro déjà donné (doublon !).
@@ -32951,10 +33073,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ts = o.date ? Date.parse(o.date) : NaN;
       if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
       const id = identiteAnnonce(o); if (id) ids.add(String(id));
+      // (11 nov., lot ventes-lot) Une vente en LOT : CHAQUE article de SA transaction est parti
+      // (identifiant d'annonce donné par Vinted, jamais le titre).
+      const l = lotDeVente(o);
+      if (l && l.lu) for (const a of l.articles) if (a.item) ids.add(String(a.item));
     }
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, txnItem, numeros]);
+  }, [sales.items, txnItem, numeros, lotsTx, lotLiens]);
   // (3 nov., choix n° 3) Les N° remis en stock après un retour (« Retour reçu ? » → « Remettre en
   // stock ») : posés par l'effet qui suit `retoursSuivis` (plus bas), lus par la publication ci-dessous.
   const [numsRemisCle, setNumsRemisCle] = useState('[]');
@@ -32981,6 +33107,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const clesVivants = new Set([...vivants].map(cleNum));
     const vendusPartis = new Set();
     for (const id of annoncesVendues) { const k = cleNum((numeros[id] || {}).numero); if (k && !clesVivants.has(k)) vendusPartis.add(k); }
+    // (11 nov., lot ventes-lot) Un article de lot relié par SON clic porte son N° sans fiche d'annonce.
+    for (const o of (sales.items || [])) { if (classifyOrderStatus(o.status) === 'cancelled') continue; const l = lotDeVente(o); if (l && l.lu) for (const a of l.articles) if (a.num && a.par === 'main') { const k = cleNum(a.num); if (k && !clesVivants.has(k)) vendusPartis.add(k); } }
     const { articles, sansNumero } = articlesAutresPlateformes({ ebay: ebayStock || [], lbc: lbcStock || [], cle: cleNum, vendusPartis });
     const autres = [];
     for (const a of articles) { const surVinted = clesVivants.has(a.cle); if (!surVinted) { vivants.add(a.numero); clesVivants.add(a.cle); } autres.push({ numero: a.numero, title: a.title, photo: a.photo, plateformes: a.plateformes, vinted: surVinted }); }
@@ -32991,7 +33119,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero);
       if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, at: Date.now() });
     } catch (_) {}
-  }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock, numsRemisCle]);
+  }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock, numsRemisCle, lotsTx, lotLiens]);
   const articlesVendusFavoris=useMemo(()=>{
     const ids=new Set([...soldManual,...venduesVinted].map(String));
     for(const vente of sales.items||[]){
@@ -36198,7 +36326,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (stt === 'pending') { enAttente += sellAmt; nbAttente += 1; }
       if (stt !== 'completed') continue;
       const sell = sellAmt;
-      const e = effEntry(o);
+      const e = entreeVenteLot(o, effEntry(o));   // (11 nov.) un lot : le prix d'achat du LOT
       const fee = chargesVente(e);
       const buy = achatDe(e);
       ajouterVenteBenefice(acc, sell, buy, fee);
@@ -36215,7 +36343,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     benefBrut = R.brut; benefConnu = R.net;
     return { ca, cout: R.cout, frais, benef: R.net, benefBrut, benefConnu, nb, nbCout: R.nCout, bN: R.n, sansCout: R.n-R.nCout, fraisInconnus: R.fraisInconnus, couverture: couvertureBenefice(R), autresKO, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice, lotsTx, lotLiens]);
 
   // ── LE BÉNÉFICE, PUBLIÉ JOUR PAR JOUR (19 oct.) — l'écran Ventes est son
   // PROPRIÉTAIRE (§11) : Comptabilité somme ces jours, elle ne relit aucun prix
@@ -36229,6 +36357,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Leboncoin ou eBay pas lus (en cours ou raté) ⇒ on ne publie RIEN : la
     // dernière publication, complète, reste (§5).
     if (!Array.isArray(autresBenefice)) return;
+    // (11 nov., lot ventes-lot) Les transactions des ventes en lot pas encore lues (ou pas sues) :
+    // rien n'est publié — le prix d'achat d'un lot n'est pas celui de son premier article.
+    if (!lotsTx) return;
     try {
       const an0 = new Date().getFullYear() - 1;          // l'année d'avant suffit (périodes en cours)
       const jours = {};
@@ -36238,7 +36369,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const t = o.date ? Date.parse(o.date) : NaN;
         if (isNaN(t) || new Date(t).getFullYear() < an0) continue;   // sans date : dans aucune période
         const k = jourClef(new Date(t));
-        const e = effEntry(o);
+        const e = entreeVenteLot(o, effEntry(o));   // (11 nov.) un lot : UNE vente, le prix d'achat du LOT
         ajouterVenteBenefice(jours[k] || (jours[k] = beneficeVide()), o.price?.amount, achatDe(e), chargesVente(e));
       }
       // Leboncoin et eBay, par la même règle (datés au jour de la vente / de la
@@ -36275,7 +36406,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) titreDe['lbc:' + v.txId] = v.title || '';
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
       const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
-        montant: montantCommandeLu, achat: (o) => achatDe(effEntry(o)), frais: (o) => chargesVente(effEntry(o)),
+        montant: montantCommandeLu, achat: (o) => achatDe(entreeVenteLot(o, effEntry(o))), frais: (o) => chargesVente(effEntry(o)),
+        // (11 nov., lot ventes-lot) Les articles d'un lot, chacun à SA part du prix (src/venteLot.js).
+        articles: (o) => { const l = lotDeVente(o); return l && l.lu ? l.articles.map((a) => [a.titre, a.num || '', a.part, a.achat, a.item || '']) : null; },
         compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
         numero: (o) => { const e = effEntry(o); return (e && e.numero) || ''; },
         versement: (o) => (versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '') });
@@ -36283,7 +36416,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -38407,12 +38540,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Coordonnées historiques : le moteur protège maintenant toute la page.
   const posForFormat = () => null; // Analyse du PDF courant, jamais une position héritée.
-  const processBordereau = async (numero, title, pdfBuf) => {
+  const processBordereau = async (numero, title, pdfBuf, opts) => {
     try {
       const { width, height } = await readPdfFirstPageSize(pdfBuf);
       const key = bordereauFormatKey(width, height);
       const pos = posForFormat(width, height);
-      const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
+      const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos, opts || {});
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
       return true;
     } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Impossible de lire ce PDF : '+String(err)); return false; }
@@ -38459,12 +38592,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
     const capte = tx ? labelsCaptes[tx] : null;
     const b = tx ? bordParTx[tx] : null;
-    const num = (effEntry(o) && effEntry(o).numero) || (b ? numForBord(b) : '') || '';
+    // (11 nov., lot ventes-lot) Un LOT : un colis, un bordereau, le tampon liste les N° de SES
+    // articles (« 124 · 131 · 140 », « + 1 sans N° ») — jamais le N° d'un seul article.
+    const lot = lotDeVente(o);
+    const enLot = !!(lot && lot.lu);
+    const num = enLot ? lot.tampon : ((effEntry(o) && effEntry(o).numero) || (b ? numForBord(b) : '') || '');
     const titre = (o && o.title) || (b ? (b.modele || b.article || '') : '');
-    if (b && b.hasPdf && invForBord(b)) { await printBordAndInvoice(b); return; }
+    if (!enLot && b && b.hasPdf && invForBord(b)) { await printBordAndInvoice(b); return; }
     const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
     if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
-    if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim()) noterImprimeSansNum([tx]);
+    if (await processBordereau(num, titre, lu.octets, enLot ? { numeros: lot.nums } : undefined) && !String(num || '').trim()) noterImprimeSansNum([tx]);
   };
   // ── UNE LIGNE DE VENTE NE SE REDESSINE QUE SI CE QU'ELLE MONTRE A CHANGÉ ──
   // (16 oct., « app plus rapide »). `LigneVenteVinted` compare `pre.deps` : la
@@ -38589,7 +38726,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (10 nov., lot BE) la frise prouvée du récapitulatif (ses preuves arrivent après le premier rendu).
     const frisePv = friseProuveeDe(o, litige);
     deps.push(frisePv.cle);
-    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv };
+    // (11 nov., lot ventes-lot) le résumé du lot (articles, N°, parts, achats) — lu après le premier rendu.
+    const lot = lotDeVente(o);
+    deps.push(lot ? JSON.stringify([lot.lu, lot.attente, lot.passu, lot.n, lot.mode, (lot.articles || []).map((a) => [a.item, a.num, a.par, a.part, a.achat, a.conflit ? 1 : 0])]) : '');
+    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv, lot };
   };
   // ── (10 nov., lots BB et BI) « LITIGES EN COURS » ET « RETOURS PAR MODÈLE » ─────────────
   // Les lignes de VENTE de `litigesSuivis` (src/litiges.js, la règle unique) avec les preuves
@@ -42009,7 +42149,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (!pre) pre = preparerLigneVente(o);
             const st = classifyOrderStatus(o.status);
             const hidden = pre.hidden;
-            const e = pre.e; const num = e?.numero;
+            // (11 nov., lot ventes-lot) Une vente EN LOT : UNE ligne, les N° de ses articles (par
+            // identité) et le prix d'achat du LOT (src/venteLot.js) — jamais celui d'un seul article.
+            const lot = pre.lot;
+            const e = lot && lot.lu ? entreeVenteLot(o, pre.e) : pre.e; const num = lot && lot.lu ? (lot.nums[0] || null) : e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
             const fees = chargesVente(e);
@@ -42117,7 +42260,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
                   <div className="vrm-recap-ident">
-                    {num ? <Numero n={num} taille="grand" data-recap-num={num}/> : <span className="vrm-recap-sans-num" data-recap-num="" title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</span>}
+                    {lot && lot.lu && lot.nums.length > 1 ? <span className="vrm-recap-nums-lot" data-recap-num={lot.nums.join(',')}>{lot.nums.map((n) => <Numero key={n} n={n} taille="grand"/>)}</span> : num ? <Numero n={num} taille="grand" data-recap-num={num}/> : <span className="vrm-recap-sans-num" data-recap-num="" title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</span>}
                     <h2 id={titreId} className="vrm-recap-nom">{nom}</h2>
                     {sousTitre ? <p className="vrm-recap-sous">{sousTitre}</p> : null}
                   </div>
@@ -42137,6 +42280,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Elle remplace ici la frise de la ligne (4 segments, inchangée sur la ligne). */}
                   {pre.frisePv ? <FriseVente frise={pre.frisePv.frise} transporteur={trRecap} verse={pre.frisePv.verse} bordereau={pre.frisePv.bordereau} cle={txL}/> : null}
                 </section>
+                {lot ? <ArticlesLotVente lot={lot} devise={devise || 'EUR'} tx={txL} onRelier={hidden || st === 'cancelled' ? null : relierArticleLot}/> : null}
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
                   {st !== 'cancelled' ? <BarreCoutVente c={cv}/> : null}
@@ -42172,7 +42316,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche de la paire</Bouton> : null}
                     {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
                     {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
-                    {isLotTitle(o.title) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
+                    {/* (11 nov., lot ventes-lot) Les articles d'un lot PROUVÉ sont dans le récapitulatif (section
+                        « Lot · N articles ») ; « Voir le lot » (lecture en direct) ne reste que pour un titre
+                        « Lot » dont la transaction n'est pas dans la base. */}
+                    {isLotTitle(o.title) && !(lot && lot.lu) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
                     {annChez && annChez.item ? <Bouton variante="secondaire" icone="sync" data-recap-remettre={txL} onClick={()=>{ fermer(); remettreEnVente(annChez); }}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
                     {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>poserAnnuleeReglee(txL)}>Déjà remise en vente</Bouton> : null}
                     {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
@@ -42209,9 +42356,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <GlisserVente actif={peutDeposer && !deposeIci} onDepose={()=>demanderDepose(txL, o, libDepose)}>{gp => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
+              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={lot && lot.lu ? lot.nums : (num?[num]:[])} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
+                data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
                   {emailEnTete ? null : <NoteVenteEmail o={o}/>}
