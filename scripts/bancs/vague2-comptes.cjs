@@ -182,13 +182,18 @@ async function ventes(nav, { W, theme }) {
   await attendre(500);
   const lire = (sel) => pg.evaluate(({ sel }) => {
     const f = document.querySelector(sel); if (!f) return null;
-    return [...f.querySelectorAll('[data-fu-etape]')].map((s) => { const sp = s.querySelector(':scope > span'); return { cle: s.getAttribute('data-fu-etape'), fait: s.getAttribute('data-fait'), cours: s.hasAttribute('data-cours'), lu: s.innerText.replace(/\s+/g, ' ').trim(), coupe: sp ? sp.scrollWidth > sp.clientWidth + 1 : null }; });
+    // (11 nov., lot ventes-achats-visuel) La frise n'écrit plus qu'UN mot à l'écran (la légende, l'étape
+    // actuelle) ; chaque segment garde son nom pour VoiceOver. « Pas coupé » se juge sur ce qui SE VOIT : la
+    // légende (le nom de chaque étape reste lu dans le segment, `lu`).
+    const leg = f.querySelector('[data-fu-legende]');
+    const legCoupe = leg ? leg.scrollWidth > leg.clientWidth + 1 : null;
+    return [...f.querySelectorAll('[data-fu-etape]')].map((s) => ({ cle: s.getAttribute('data-fu-etape'), fait: s.getAttribute('data-fait'), cours: s.hasAttribute('data-cours'), lu: s.textContent.replace(/\s+/g, ' ').trim(), coupe: legCoupe }));
   }, { sel });
   const f = await lire(`[data-fu-frise="${TX_VERIF}"]`);
   dit(f && f.map((e) => e.cle).join(',') === 'vendue,postee,centre,livree,payee', 'W3', `${T} la vente « Envoi au centre de vérification » : Vendue · Postée · Au centre de vérification · Livrée · Payée`, JSON.stringify(f));
   const c = f && f.find((e) => e.cle === 'centre');
   dit(c && c.cours && c.fait === '0' && (f.find((e) => e.cle === 'postee') || {}).fait === '1', 'W3', `${T} postée ⇒ l'étape est EN COURS, jamais cochée sans preuve`, JSON.stringify(c));
-  dit(f && f.every((e) => e.coupe === false), 'W3', `${T} aucun libellé de la frise n'est coupé (cinq segments)`, JSON.stringify(f && f.map((e) => [e.cle, e.coupe])));
+  dit(f && f.every((e) => e.coupe === false && e.lu.length > 0), 'W3', `${T} la frise à cinq segments : son mot visible n'est pas coupé, chaque étape garde son nom (lu)`, JSON.stringify(f && f.map((e) => [e.cle, e.coupe])));
   const autre = await lire('[data-fu-frise="62001"]');
   dit(autre && autre.length === 4 && !autre.some((e) => e.cle === 'centre'), 'W3', `${T} une vente ordinaire garde ses quatre étapes`, JSON.stringify(autre));
   await pg.locator(`[data-fu-frise="${TX_VERIF}"]`).first().scrollIntoViewIfNeeded().catch(() => {});

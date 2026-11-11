@@ -246,3 +246,18 @@ Remarque vue (pas de ce lot) : sur la carte d'un colis, le bouton « Relier » d
 - Un dépôt dont l'e-mail n'a AUCUN n° (mesuré : un « Preuve de dépôt » Chronopost sans n°) ne peut rien prouver
   (identité absente) : la ligne dit « déposé ? à vérifier » si elle a déjà été imprimée.
 - Julien : regarder « Tout imprimer » sur son iPhone ; aucun geste technique.
+
+## Reprise (3e passage, 11 nov.) — bancs finis un à un
+
+- **Défaut trouvé et corrigé** : `?tab=plat_leboncoin&section=colis` (ancien « Leboncoin → Colis ») menait à
+  `cat_bord` APRÈS la redirection des colis ⇒ écran blanc. `PLACE_SECTION.leboncoin.colis` (src/navigationTache.js)
+  mène désormais à Ventes · Leboncoin (« À expédier »).
+- `navigation-tache` porté (barre/colonne avec Achats, « Gérer » sans Achats, K : « À retirer » en tête d'Achats,
+  plus de « → Colis », Colis · Leboncoin dans Ventes, anciens liens `cat_bord`/`retraits`/`cat_achats`) :
+  **155 verts, 5 rouges — les 5 identiques sur origin/main** (« Argent » / Paramètres de la colonne, autres lots ;
+  origin/main en a 7).
+- Verts (build de la branche à jour d'origin/main) : `colis-a-leur-place` 185, `logos-bordereaux` 17,
+  `colis-retirer-propre` 129, `retraits-irreprochables` 28, `colis-envoyes-tri` 93, `scanner-colis-achats` 204,
+  `retirer-carte-delai` 111 ; `navigation-fusion` 11 rouges identiques sur origin/main (Favoris & offres, autre lot).
+- Audits verts : `variables`, `tdz`, `coherence`, `identite`, `icones`, `logos-bordereaux`, `relais-change`,
+  `raccourcis-clavier`, `fonctions-api`.
