@@ -31,6 +31,9 @@ import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCour
 import { DEPS_FACTURE } from '../App.jsx';
 const FactureVcTeteParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureVcTete })));
 const FactureVcTete = (props) => <React.Suspense fallback={null}><FactureVcTeteParesseuse {...props}/></React.Suspense>;
+// (11 nov., extension 5.340) La facture Pro d'UNE vente, quand l'extension a lu son prix de vente (`prixVente`).
+const FactureVcVenteParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
+const FactureVcVente = (props) => <React.Suspense fallback={null}><FactureVcVenteParesseuse {...props}/></React.Suspense>;
 
 // ⟦← App.jsx #3⟧
 const OffresVestiaire = aLaDemande(() => import('../OffresVestiaire.jsx'));
@@ -667,6 +670,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       <section className="vrm-recap-gestes" aria-label="Actions">
         {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
         {!(v.aExpedier&&!fait)&&v.bordereau?.id?<BoutonImprimerVc v={v} lectureSeule/>:null}
+        {v.prixVente && !vcVenteAnnulee(v) ? <FactureVcVente plateforme="vestiaire" vente={v} deps={DEPS_FACTURE}/> : null}
         <div className="vrm-recap-grille">
           {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => gesteVrm(fait ? 'Colis remis à envoyer' : 'Colis fait', [{ k: 'vrm_vc_colis_done', type: 'cle', id: String(v.id), apres: fait ? undefined : Date.now(), avant: vcCarte('vrm_vc_colis_done')[String(v.id)] }], { vrm_vc_colis_done: vcSetter('vrm_vc_colis_done') })}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
           {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(v.num) })); }}>Fiche de l’article</Bouton> : null}

@@ -160,12 +160,13 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer, deja = null }) {
 // (La liste des factures émises est le registre d'Argent → Factures, src/FacturePro.jsx :
 // il lit toutes les pièces `facture_pro`, Leboncoin et eBay comprises — pas de seconde liste.)
 
-// Vestiaire : la même raison pour CHAQUE vente (le prix payé par l'acheteur n'est
-// jamais relevé) ⇒ dite UNE fois, sous la liste (§7), au vendeur Pro seulement.
-// `ventes` : les ventes Vestiaire affichées (brutes, avec `id`).
+// Vestiaire : la même raison pour CHAQUE vente dont le prix de vente n'est pas lu
+// ⇒ dite UNE fois, sous la liste (§7), au vendeur Pro seulement. (11 nov., 5.340)
+// Une vente dont l'extension a lu le prix (`prixVente`) a sa facture dans son détail :
+// elle n'est pas comptée ici. `ventes` : les ventes Vestiaire affichées (brutes, avec `id`).
 export function FactureVcTete({ ventes, deps }) {
   const cfg = useFicheFacturation(deps);
-  const liste = Array.isArray(ventes) ? ventes.filter(Boolean) : [];
+  const liste = (Array.isArray(ventes) ? ventes.filter(Boolean) : []).filter((x) => !x.prixVente);
   if (estPro(cfg) !== true || !liste.length) return null;
   const v = venteAutre('vestiaire', liste[0]);
   if (v.ok) return null;
