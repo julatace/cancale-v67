@@ -237,7 +237,7 @@ const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.ex
         const [w, s0, e0, n0] = String(cv.cadre).split(',').map(Number);
         dit(cv.ep.length === 2 && w >= -2.77 && e0 <= -2.75 && s0 >= 47.65 && n0 <= 47.66, 'Vannes choisie : la carte ne porte que les 2 points de Vannes, cadrée sur eux', JSON.stringify(cv));
         dit(!!cv.centre && Math.abs(cv.centre[0] + 2.7585) < 0.02 && Math.abs(cv.centre[1] - 47.6555) < 0.02, 'le centre de la carte est à Vannes', JSON.stringify(cv.centre));
-        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.locator('.vrm-rpf-carte').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `retirer-carte-vannes-${nom}.png`) }); }
+        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.evaluate(() => window.scrollTo(0, 0)); if (await pg.$('.vrm-rpf-carte')) await pg.locator('.vrm-rpf-carte').first().scrollIntoViewIfNeeded(); /* (intégration) plus de carte : capture du haut de la liste */ await pg.screenshot({ path: path.join(SHOTS, `retirer-carte-vannes-${nom}.png`) }); }
         await pg.locator('[data-retirer-villes] [data-ville=""]').first().click();
         await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-carte [data-relais-epingle]').length >= 6, null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
