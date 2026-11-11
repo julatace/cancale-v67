@@ -201,6 +201,7 @@ import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix,
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import { ventesPourHistorique } from './favorisParcours.js';   // (11 nov., lot favoris-clair)
+import { useNouveauxFavoris, preparerEnvoiFavoris } from './favorisJournee.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
@@ -41154,6 +41155,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const favorisCompte = accounts.find(a=>String(a.vinted_user_id)===favorisUid);
   // (11 nov., lot favoris-clair) L'historique « acheté après un message » : les ventes de CE compte
   // réduites à leurs identités (n° d'annonce de la transaction, l'autre personne de la conversation).
+  // (11 nov., lot favoris-clair) Ma journée : « N annonces ont de nouveaux favoris depuis hier » (le compte de Messages).
+  const nouveauxFav = useNouveauxFavoris({ uid: favorisUid, owner: AUTH.user?.id || '', ownerActuel: () => AUTH.user?.id || '', base: SUPABASE_URL, headers: () => sbAuth(), actif: only === 'journee', vendus: articlesVendusFavoris });
   const ventesFavorisHisto = useMemo(() => ventesPourHistorique({ ventes: sales.items || [], txnItem, conversations: convs.items || [], uid: favorisUid, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled' }), [sales.items, txnItem, convs.items, favorisUid]);
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
   // (11 nov., lot DJ8) Favoris & offres : deux vues, « Favoris » et « Offres auto ».
@@ -42986,10 +42989,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + (nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0) + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
@@ -43173,6 +43176,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // `cyclesJ` est vide) ; « À trancher » est une carte FIXE, rendue en tête de la section.
                 autres: autres.map((j, i) => tache(j, i)),
                 urssaf: urssafJob ? [tache(urssafJob, 99)] : [],
+                // (11 nov., lot favoris-clair) Nouveaux favoris : ouvre l'envoi PRÉPARÉ (ces annonces choisies), rien ne part seul.
+                favoris: nouveauxFav && nouveauxFav.annonces > 0 ? [tache({ id: 'favoris-nouveaux', n: nouveauxFav.annonces, icon: 'heart', color: C.text, court: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), detail: null, title: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), action: tr('favoris.journee.geste'), tab: 'cat_msg', avant: () => { preparerEnvoiFavoris(favorisUid); demanderVue('favoris'); } }, 98)] : [],
               };
               const forcesAF = [], montresAF = [];
               for (const id of ordreJournee('afaire', persoJ)) {
