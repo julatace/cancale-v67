@@ -33,6 +33,11 @@ bloquant après l'avoir vu vert sur GitHub).
 
 ## 2. Les défauts Safari de l'APP (lus dans le code, corrigés)
 
+(Après le merge de `main` du 11 nov. après-midi : `src/depensesTicket.js`, lot achat-photo, en
+apportait 4 de plus — attrapés par l'audit, réécrits avec `apres(re, interdit)` qui essaie chaque
+position comme le moteur le fait avec un lookbehind ; **équivalence prouvée sur 60 000 tickets**
+tirés au hasard (montant, date, articles), `audit-depense-ticket` 10/0, `audit-achat-ticket` 41/0.)
+
 Plancher retenu : **iOS 15.4** (iPhone 6s/7/SE 1 s'arrêtent en iOS 15.8 ; `.at()`, `structuredClone`,
 `Object.hasOwn` y sont). Les bancs WebKit de la CI tournent sur le DERNIER WebKit : ils ne
 peuvent pas voir ces défauts — d'où un audit statique.
@@ -69,8 +74,32 @@ pas un audit : la police CALCULÉE compte), `window.open` après un `await` (pop
 
 ## 3. Les parcours critiques dans le job WebKit
 
-Voir §5 (mis à jour en fin de session) : chaque banc ajouté passe par `lancer()` (donc WebKit
-quand `NAVIGATEUR=webkit`) et a été vu vert sous Chromium avant d'entrer dans le job.
+Job `bancs-webkit` (`.github/workflows/verifier.yml`) : `connexion-claire` (connexion),
+`journee-coherence` (Ma journée), `ventes-e2` (Ventes), `colis-retirer-propre` + `retraits-suivi`
+(achats et colis à retirer, leur suivi), `tout-imprimer` (impression des bordereaux), `iphone-reprise`
+(barre du bas, reprise), `nouveau-vendeur` (tous les écrans d'un nouveau vendeur). `LARGEURS=390`
+(l'iPhone), 30 min par banc, 75 min de job. Chacun passe par `lancer()` (`_navigateur.cjs`) ; les
+cinq nouveaux y ont été branchés (une ligne chacun), et tous ont été vus **verts sous Chromium**,
+avec le chemin CORS forcé (`BANC_CORS=1`) :
+
+| banc | Chromium (local, 11 nov.) |
+|---|---|
+| connexion-claire | OK (4 s) |
+| journee-coherence | OK (99 s) |
+| ventes-e2 | OK seul (un rouge « localStorage : Access is denied » une fois, machine chargée par 3 bancs à la fois — à surveiller) |
+| colis-retirer-propre | 129 / 0 |
+| retraits-suivi | OK (28 s) |
+| tout-imprimer | 26 / 26 (un contrôle périmé depuis le lot AJ — « groupes de l'écran » — suit la liste unique d'aujourd'hui) |
+| iphone-reprise | 139 / 0 (deux fois) |
+| nouveau-vendeur (390, jeu, clair) | vert ; les 2 rouges vus sur `origin/main` aussi (« · » en début de ligne) corrigés : un texte réservé au lecteur d'écran (`.vrm-sr-seul`, lot P) que le banc croyait visible, et le « · vérifié hier 14:38 » d'« À retirer » (lot retraits irréprochables) qui commençait une ligne à 390 px — le « · » finit maintenant la ligne d'avant (capture regardée) |
+
+Pas entrés (rouges sous Chromium AVANT tout changement, périmés par d'autres lots, hors de ce
+lot) : `facture-pro` (3 : « Ma facture » introuvable en 20 s), `coque-parametres` (16, H1/H3),
+`achats-retraits` (8 : « Peut-être en double · 9 », « à vérifier » 0/3). Paramètres et la facture
+sont donc couverts seulement par `nouveau-vendeur` (écran Paramètres, écran Argent) sous WebKit.
+Le profil iPhone exact (`devices['iPhone 15']`) n'est pas posé : les bancs gardent leur 390 px
+(tactile pour colis, retraits, impression, reprise, nouveau-vendeur ; souris pour journée et
+ventes) — changer de profil change leurs mesures, à faire banc par banc.
 
 ## 4. Bloquant ?
 
