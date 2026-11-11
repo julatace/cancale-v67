@@ -64,9 +64,9 @@ export const INDICATEURS = Object.freeze(['note', 'avisBas', 'delai', 'retards',
 export const GESTES = Object.freeze({
   moderation: '?tab=settings&section=santecomptes',
   retards: '?tab=ventes',
-  annulees: '?tab=dashboard',
-  avisBas: '?tab=dashboard',
-  note: '?tab=dashboard',
+  annulees: '?tab=stats',
+  avisBas: '?tab=stats',
+  note: '?tab=stats',
   delai: '?tab=ventes',
 });
 
