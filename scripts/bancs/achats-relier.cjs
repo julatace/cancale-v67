@@ -42,16 +42,19 @@ const SHOTS = process.env.SHOTS || '';
 const J = 86400e3, U = sc.UID[0];
 const iso = (ms) => new Date(ms).toISOString();
 const TITRE = 'Adidas Spezial noir 42';
-const photo = (tx) => ({ url: `https://images1.vinted.net/t/01_banc/f800/${tx}.jpeg` });
+// Un DOSSIER par photo : le rapprochement par dossier « non ambigu » (entryKeyByPhoto) ne doit rien relier ici.
+const photo = (tx) => ({ url: `https://images1.vinted.net/t/${tx}_d/f800/${tx}.jpeg` });
 const achat = (tx) => ({ ...sc.ordre({ tx, titre: TITRE, prix: 40, statut: sc.STATUT_FINAL, dateMs: sc.NOW - 40 * J }), photo: photo(tx) });
 const TXS = Array.from({ length: 52 }, (_, i) => String(91000001 + i));
 const ACHATS = TXS.map(achat);
 const PROPOSE = '91000007', CHOISI = '91000037', CHOISI_ANN = '91000044', RELIE_MAIL = '91000051', RELIE_SANS = '91000052';
 // L'annonce en ligne sans achat (Annonces → Sans achat relié).
-const listing = { ...sc.annonce({ id: '93000', titre: TITRE, prix: 70, taille: 42, marque: 'Adidas' }), created_at_ts: Math.floor((sc.NOW - 20 * J) / 1000), photo: { url: 'https://images1.vinted.net/t/01_banc/f800/annonce93000.jpeg' } };
+const listing = { ...sc.annonce({ id: '93000', titre: TITRE, prix: 70, taille: 42, marque: 'Adidas' }), created_at_ts: Math.floor((sc.NOW - 20 * J) / 1000), photo: { url: 'https://images1.vinted.net/t/a93000_d/f800/a93000.jpeg' } };
 // Trois ventes : une sans prix (proposition par la photo exacte de 91000007), deux reliées.
 const vente = (tx, item, ph) => ({ ...sc.ordre({ tx, titre: TITRE, prix: 70, statut: sc.STATUT_FINAL, dateMs: sc.NOW - 5 * J, item }), photo: ph });
-const VENTES = [vente('95000001', '93900', photo(PROPOSE)), vente('95100001', '93901', { url: 'https://images1.vinted.net/t/01_banc/f800/v951.jpeg' }), vente('95200001', '93902', { url: 'https://images1.vinted.net/t/01_banc/f800/v952.jpeg' })];
+const VENTES = [vente('95000001', '93900', photo(PROPOSE)), vente('95100001', '93901', { url: 'https://images1.vinted.net/t/v951_d/f800/v951.jpeg' }), vente('95200001', '93902', { url: 'https://images1.vinted.net/t/v952_d/f800/v952.jpeg' })];
+// La transaction de chaque vente (forme de Vinted) : c'est ELLE qui donne l'annonce (`item_id`), l'identité de la paire.
+const txnVente = (tx, item) => ({ id: `harvest_${U}_txn_${tx}`, data: { capturedAt: iso(sc.NOW - 3600e3), payload: { transaction: { id: Number(tx), item_id: Number(item), user_side: 'seller', status: 450, status_title: 'Commande finalisée', items_count: 1 } } } });
 const snap = (tx) => ({ title: TITRE, date: iso(sc.NOW - 40 * J), photo: photo(tx).url, price: 40, devise: 'EUR', seller: 'vendeuse_inventee', status: sc.STATUT_FINAL, account: 'boutique_nord' });
 const NUMEROS = {
   93000: { numero: '1', title: TITRE, price: 70 },
@@ -64,7 +67,7 @@ const main = (sombre) => sc.ligneMain({ vinted_dark: sombre, vinted_annonce_nume
 // Le reçu e-mail de 91000051 (forme `email_achat_*` : la colonne `meta` est servie depuis `data`).
 const RECU = { id: 'email_achat_banc51', data: { subject: 'Ton reçu pour « Adidas Spezial noir 42 »', article: TITRE, prix: '40,00', transaction: RELIE_MAIL, account: 'boutique_nord', receivedAt: iso(sc.NOW - 39 * J), type: 'achat',
   texte: `Article : ${TITRE}\nPrix : 37,30 €\nFrais de port : 2,70 €\nMontant payé : 40,00 €\nTransaction : ${RELIE_MAIL}` } };
-const ROWS = [{ ...sc.ligneListings(U, [listing]), data: { ...sc.ligneListings(U, [listing]).data, capturedAt: iso(sc.NOW - 60e3) } }, sc.lignePurch(U, ACHATS), sc.ligneSold(U, VENTES), RECU];
+const ROWS = [txnVente('95000001', '93900'), txnVente('95100001', '93901'), txnVente('95200001', '93902'), { ...sc.ligneListings(U, [listing]), data: { ...sc.ligneListings(U, [listing]).data, capturedAt: iso(sc.NOW - 60e3) } }, sc.lignePurch(U, ACHATS), sc.ligneSold(U, VENTES), RECU];
 const projette = (row, sel) => {
   if (!sel || sel === '*') return row;
   const out = {};
@@ -267,7 +270,7 @@ async function passe(b, nom, ctxOpts, sombre) {
       await pg.fill('[data-champ="titre"]', 'Adidas Samba banc 43');
       await pg.fill('[data-champ="prix"]', '18');
       await pg.locator('[data-achat-hors-enregistrer]').evaluate((x) => x.click());
-      const pool = await attendre(async () => { const l = await local(pg); for (const [k, v] of Object.entries(l)) if (/vinted_used_numeros/.test(k) && v && v.includes(`"${e.propose}"`)) return v; return null; });
+      const pool = await attendre(async () => { const l = await local(pg); for (const [k, v] of Object.entries(l)) if (/vinted_used_numeros/.test(k) && v) { try { if (JSON.parse(v).some((x) => String(x) === e.propose)) return v; } catch (_) {} } return null; });
       dit(!!pool, `${nom} · E9 · le N° pris est réservé dans le pool (jamais redonné)`, pool || '');
     }
   } else dit(false, `${nom} · E0 · « Nouvel achat » s'ouvre`);

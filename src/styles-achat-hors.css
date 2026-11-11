@@ -35,6 +35,10 @@
     font-size: 13px; font-weight: 600;
     -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   }
+  /* Le prix payé, en grand : les règles de champ de l'app (17 px !important, hors couche) cèdent à
+     une déclaration !important DANS la couche — c'est la règle des couches CSS. */
+  [data-achat-hors-form] .vrm-ahp-prix input { font-size: 28px !important; height: 58px !important; font-weight: 700 !important; font-variant-numeric: tabular-nums; }
+  [data-achat-hors-form] .vrm-ahp-gestes [data-achat-hors-enregistrer] { min-height: 54px !important; font-size: 17px !important; }
   .vrm-ahp-lieux { scrollbar-width: none; }
   .vrm-ahp-lieux::-webkit-scrollbar { display: none; }
   @media (min-width: 700px) {
