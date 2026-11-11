@@ -596,7 +596,7 @@
     const cle = 'vrmVcPublieClique:' + String(ad.id);
     let deja = true;
     try { deja = !!sessionStorage.getItem(cle); } catch (_) { deja = true; }
-    if (deja) return { ok: false, raison: 'j\'ai déjà cliqué « Publier » pour cette paire dans cet onglet — je ne reclique jamais (une seconde publication est pire)' };
+    if (deja) return { ok: false, raison: `j'ai déjà cliqué « Publier » pour ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'} dans cet onglet — je ne reclique jamais (une seconde publication est pire)` };
     const vides = obligatoiresVides();
     if (vides.length) return { ok: false, attente: true, raison: 'il reste à choisir : ' + vides.slice(0, 3).join(', ') + ' — VRM ne le devine pas, choisis-le et je publie' };
     const pk = prixRefusVc(ad); if (pk) return { ok: false, raison: pk };

@@ -25,6 +25,7 @@
 //    Publiée par l'écran Annonces sous `vrm_valeur_stock` (`publierValeurStock`),
 //    lue par le Stock et Statistiques (`lireValeurStock`) — jamais recalculée.
 // ════════════════════════════════════════════════════════════════════════════
+import { motsVendeur } from './profilVendeur.js';
 import { beneficePaire, centimes } from './beneficePaire.js';
 
 const vide = (v) => v == null || String(v).trim() === '';

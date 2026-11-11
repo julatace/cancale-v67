@@ -289,11 +289,11 @@
       if (a.querySelector('img') || pa === 'absolute' || pa === 'fixed' || a.getBoundingClientRect().height > 80) {
         const c = carteDe(a);
         if (c !== a && c.querySelector('[data-vrm-num-pour="' + cle + '"]')) continue;   // déjà posée sur la carte
-        const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+        const e = pilule(`N°${n}`, `Numéro VRM de ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'}`);
         e.setAttribute('data-vrm-num-pour', cle);
         epingler(e, a); c.appendChild(e);
       } else {
-        const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+        const e = pilule(`N°${n}`, `Numéro VRM de ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'}`);
         e.style.setProperty('margin-left', '6px', 'important'); e.style.setProperty('vertical-align', 'middle', 'important');
         a.appendChild(e);
       }
@@ -308,7 +308,7 @@
     if (!n) { if (deja) deja.remove(); return; }
     if (deja && deja.getAttribute('data-vrm-num-page') === String(n)) return;
     if (deja) deja.remove();
-    const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+    const e = pilule(`N°${n}`, `Numéro VRM de ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'}`);
     e.setAttribute('data-vrm-num-page', String(n));
     const h1 = document.querySelector('h1');
     if (h1 && !conv) { e.style.marginLeft = '8px'; e.style.verticalAlign = 'middle'; h1.appendChild(e); }

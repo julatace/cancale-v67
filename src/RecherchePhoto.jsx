@@ -73,7 +73,7 @@ export default function RecherchePhoto({ C, Feuille, Bouton, PhotoVinted, lireCa
     <Feuille onClose={onClose} titre="Chercher par photo" data-recherche-photo="" data-rp-etat={etat}>
       <div style={{ padding: '0 16px 16px' }}>
         <p style={{ ...texte, marginTop: 0 }}>
-          Prends {motsVendeur().le} en photo : VRM te montre les annonces dont la photo lui ressemble le plus. C'est toi qui choisis — rien n'est relié, et ta photo ne quitte pas cet appareil. Le mieux : la paire de profil, sur un fond uni.
+          Prends {motsVendeur().le} en photo : VRM te montre les annonces dont la photo lui ressemble le plus. C'est toi qui choisis — rien n'est relié, et ta photo ne quitte pas cet appareil. Le mieux : {motsVendeur().le} de profil, sur un fond uni.
         </p>
         {choix}
         {apercu && (

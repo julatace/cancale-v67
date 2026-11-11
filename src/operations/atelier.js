@@ -19,6 +19,7 @@
 // exécutent les MÊMES fonctions (§11).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { motsVendeur } from '../profilVendeur.js';
 export const ETAPES_DEFAUT = Object.freeze([
   { id: 'recue', nom: 'Reçue' },
   { id: 'nettoyee', nom: 'Nettoyée' },

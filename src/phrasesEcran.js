@@ -14,6 +14,7 @@
 // 10 mots au plus : ce qu'on fait ici et le geste principal. Pas un paragraphe,
 // pas de « pourquoi » (il vit derrière « ⓘ »). Pour la retirer à nouveau :
 // vider l'entrée ici, rien d'autre à toucher (récit : docs/passation/2026-11-08-clarte.md).
+import { motsVendeur } from './profilVendeur.js';
 export const ECRANS_SANS_PHRASE = [];
 export const PHRASES_ECRAN = {
   journee: 'Ce qui t’attend aujourd’hui, le plus pressé en haut.',

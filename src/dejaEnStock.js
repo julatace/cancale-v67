@@ -17,6 +17,7 @@
 // La marque, le modèle et les couleurs viennent des règles de l'app
 // (`extractBrand`, `extractModel`, `extractColors`), passées en paramètre : une
 // seule définition (§11). Module PUR : scripts/audit-plancher-stock.cjs l'EXÉCUTE.
+import { motsVendeur } from './profilVendeur.js';
 import { tailleNorm, tailleDuTitre } from './suggestionsAchat.js';
 
 const bas = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();

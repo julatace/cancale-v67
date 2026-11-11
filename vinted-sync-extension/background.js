@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.342.0';
+const CODE_VERSION = '5.347.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4683,13 +4683,81 @@ function numerosDuCompte(m, uid, msg) {
 // Un autre compte (le sien ou pas) ⇒ rien. Pas su ⇒ le champ manque (jamais 0).
 // Le prix d'achat part BRUT (la fiche et `vinted_buyprice_by_num` du N°) : la page
 // le lit par `prixAchatDe`, la règle de l'app recopiée (vrm-regles-achat.js).
+// ── « PAIRE » OU « ARTICLE » (11 nov., lot vocabulaire-article, 5.347.0) ─────
+// Le vocabulaire de l'app (src/profilVendeur.js) recopié TEL QUEL entre les marques
+// (`node scripts/audit-vocabulaire-article.cjs --recopie`). Ce qu'il vend : `vrm_je_vends`
+// de SA ligne main ; « automatique » ⇒ Sneakers pour le propriétaire de l'installation
+// (lu chez vrm.center, une fois par 24 h), « article » sinon — la règle `jeVendsEffectif`.
+// Rangé dans chrome.storage.local.vrm_vend_ext pour les pages (vrm-mots.js). Rien de
+// su ⇒ les textes d'avant (« paire »). Aucune écriture en base.
+const MOTS_ARTICLE = (() => {
+// <mots-article> (copie, ne pas modifier ici)
+const MOTS = {
+  sneakers: { nom: 'paire', noms: 'paires', un: 'une paire', Un: 'Une paire', le: 'la paire', Le: 'La paire', ce: 'cette paire', tes: 'tes paires', e: 'e', es: 'es', chaque: 'Chaque paire', elle: 'elle', Elle: 'Elle', une: 'une',
+    // (11 nov., lot vocabulaire-article) les formes des écrans secondaires, des notifications et de l'extension.
+    Nom: 'Paire', Noms: 'Paires', sa: 'sa paire', la: 'la', La: 'La', de: 'de la paire', a: 'à la paire', Ce: 'Cette paire', aucune: 'aucune paire', Aucune: 'Aucune paire',
+    celle: 'celle', celles: 'celles', toutes: 'toutes', Toutes: 'Toutes', laquelle: 'laquelle', autre: 'une autre paire', meme: 'la même paire', Meme: 'La même paire', lui: 'elle', eux: 'elles', deNom: 'de paire', deNoms: 'de paires', Tes: 'Tes paires', quelle: 'quelle paire', bonne: 'la bonne paire', AucuneDe: 'Aucune de ces paires', mes: 'mes paires', deMeme: 'de la même paire', quelles: 'quelles paires', ancienne: 'ANCIENNE paire', nouvelle: 'la nouvelle', ta: 'ta paire', deCe: 'de cette paire', deLa: 'de la' },
+  autre:    { nom: 'article', noms: 'articles', un: 'un article', Un: 'Un article', le: 'l’article', Le: 'L’article', ce: 'cet article', tes: 'tes articles', e: '', es: 's', chaque: 'Chaque article', elle: 'il', Elle: 'Il', une: 'un',
+    Nom: 'Article', Noms: 'Articles', sa: 'son article', la: 'le', La: 'Le', de: 'de l’article', a: 'à l’article', Ce: 'Cet article', aucune: 'aucun article', Aucune: 'Aucun article',
+    celle: 'celui', celles: 'ceux', toutes: 'tous', Toutes: 'Tous', laquelle: 'lequel', autre: 'un autre article', meme: 'le même article', Meme: 'Le même article', lui: 'lui', eux: 'eux', deNom: 'd’article', deNoms: 'd’articles', Tes: 'Tes articles', quelle: 'quel article', bonne: 'le bon article', AucuneDe: 'Aucun de ces articles', mes: 'mes articles', deMeme: 'du même article', quelles: 'quels articles', ancienne: 'ANCIEN article', nouvelle: 'le nouvel article', ta: 'ton article', deCe: 'de cet article', deLa: 'du' },
+};
+// </mots-article>
+  return MOTS;
+})();
+let _vendExt = 'sneakers';
+try { chrome.storage.local.get('vrm_vend_ext').then((o) => { const v = o && o.vrm_vend_ext; _vendExt = v && v.vend === 'autre' ? 'autre' : 'sneakers'; }).catch(() => {}); } catch (_) {}
+function motsExt() { return MOTS_ARTICLE[_vendExt === 'autre' ? 'autre' : 'sneakers']; }
+function vendDeReglage(r, proprietaire) {
+  const c = r && typeof r === 'object' ? r.choix : r;
+  if (c === 'sneakers' || c === 'autre') return c;
+  return proprietaire === true ? 'sneakers' : 'autre';
+}
+const ABONNEMENT_API = 'https://vrm.center/api/compte?mode=abonnement';
+async function proprietaireExt(owner) {
+  try {
+    const o = await chrome.storage.local.get('vrm_proprio_ext');
+    const m = o && o.vrm_proprio_ext;
+    const connu = m && m.owner === owner && typeof m.v === 'boolean';
+    if (connu && Date.now() - Number(m.at || 0) < 24 * 3600000) return m.v;
+    const s = await loadSession();
+    if (!s || !s.access_token || String(s.user_id || '') !== owner) return connu ? m.v : null;
+    const r = await fetch(ABONNEMENT_API, { headers: { Authorization: `Bearer ${s.access_token}` }, cache: 'no-store' });
+    if (!r.ok) return connu ? m.v : null;
+    const j = await r.json().catch(() => null);
+    if (!j || typeof j.proprietaire !== 'boolean') return connu ? m.v : null;
+    await chrome.storage.local.set({ vrm_proprio_ext: { owner, v: j.proprietaire, at: Date.now() } });
+    return j.proprietaire;
+  } catch (_) { return null; }
+}
+async function rafraichirVendExt(reglage, owner) {
+  if (!owner) return _vendExt;
+  const c = reglage && typeof reglage === 'object' ? reglage.choix : null;
+  const vend = vendDeReglage(reglage, (c === 'sneakers' || c === 'autre') ? null : await proprietaireExt(owner));
+  _vendExt = vend;
+  try { await chrome.storage.local.set({ vrm_vend_ext: { vend, owner, at: Date.now() } }); } catch (_) {}
+  return vend;
+}
+// Relu au plus toutes les 6 h (au démarrage, à chaque synchronisation) : UNE petite projection.
+async function vendExtAJour() {
+  try {
+    const owner = String((await loadSession())?.user_id || '');
+    if (!owner) return;
+    const o = await chrome.storage.local.get('vrm_vend_ext');
+    const v = o && o.vrm_vend_ext;
+    if (v && v.owner === owner && Date.now() - Number(v.at || 0) < 6 * 3600000) { _vendExt = v.vend === 'autre' ? 'autre' : 'sneakers'; return; }
+    const main = await lireMain(['vrm_je_vends']);
+    if (main === null) return;
+    await rafraichirVendExt(main.vrm_je_vends, owner);
+  } catch (_) {}
+}
 let _infosPage = null;
 async function donneesInfosPage(uid) {
   const owner = String((await loadSession())?.user_id || '');
   if (!owner || !uid) return null;
   if (_infosPage && _infosPage.owner === owner && _infosPage.uid === uid && Date.now() - _infosPage.at < 120000) return _infosPage;
-  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit']);
+  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit', 'vrm_je_vends']);
   if (main === null) return null;
+  await rafraichirVendExt(main.vrm_je_vends, owner);   // (5.347) « paire » / « article »
   const dates = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
   if (dates === null) return null;
   const dr = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
@@ -8850,7 +8918,7 @@ function effacerReculBase() {
   }).catch(() => {});
   return _reculChaine;
 }
-function fullSync() { captureAllAccounts().then(() => runActive()); }
+function fullSync() { vendExtAJour(); captureAllAccounts().then(() => runActive()); }
 
 // ⚠️ APRÈS UNE MISE À JOUR, Chrome n'injecte PAS le nouveau bridge.js dans les
 //    onglets de l'app déjà ouverts : l'app parlerait à l'ancien (orphelin,
@@ -9967,7 +10035,7 @@ async function autoAccepterOffres(uid) {
             await chrome.storage.local.set({ vrmOffresGardeDit: dits });
             noterDiag('offre_auto_garde_' + raison);
             logActivity(raison === 'vendue-ailleurs'
-              ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : cette paire est vendue ailleurs (retire l'annonce Vinted)`
+              ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : ${motsExt().ce} est vendu${motsExt().e} ailleurs (retire l'annonce Vinted)`
               : `⏸ Offre de ${o.prix.toFixed(2)} € pas acceptée : ouvre VRM pour qu'il vérifie qu'elle n'est vendue nulle part ailleurs`);
           }
           continue;
@@ -10425,18 +10493,18 @@ function tailleRefusee(rc) {
   const errs = j && Array.isArray(j.errors) ? j.errors : [];
   return errs.some((e) => e && (/^(size|size_id)\b/i.test(String(e.field || e.name || '')) || /champ taille/i.test(String(e.value || e.message || ''))));
 }
-const TEXTE_TAILLE_REFUSEE = " Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne pose une taille que si Vinted en propose une au libellé exact de ta paire.";
+const texteTailleRefusee = () => ` Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne pose une taille que si Vinted en propose une au libellé exact de ${motsExt().ta}.`;
 const TEXTE_PHOTOS_REFUSEES = " Vinted refuse les photos de ce brouillon : ouvre-le sur Vinted (Mes brouillons → Modifier), rajoute les photos, puis « Publier ». VRM ne les renvoie pas tout seul (jamais d'essais en rafale).";
 function gesteRefus(rc, corps) {
   if (!tailleRefusee(rc)) return (typeof photosRefusees === 'function' && photosRefusees(rc)) ? TEXTE_PHOTOS_REFUSEES : '';
   const pourquoi = rc && rc.tailleRaison ? ` VRM a cherché la bonne taille : ${rc.tailleRaison}.` : '';
-  if (pourquoi) return pourquoi + TEXTE_TAILLE_REFUSEE;
+  if (pourquoi) return pourquoi + texteTailleRefusee();
   try {
     const d = (corps && (corps.draft || corps.item)) || {};
     const t = (Array.isArray(d.item_attributes) ? d.item_attributes : []).filter((a) => a && a.code === 'size').map((a) => (a.ids || []).join('+')).join(',');
     echantillonRate('vinted_refus_taille', String(d.id || ''), JSON.stringify({ catalog_id: d.catalog_id || null, size: t || null }));
   } catch (_) {}
-  return TEXTE_TAILLE_REFUSEE;
+  return texteTailleRefusee();
 }
 // ── LA TAILLE RETROUVÉE (29 oct., sa décision : « VRM doit pouvoir regarder la
 // taille, garder toutes les infos de l'article ») ─────────────────────────────
@@ -10485,7 +10553,7 @@ function formeJson(j, prof = 0) {
 }
 function choisirTaille(options, libelle) {
   const cible = libelleTaille(libelle);
-  if (!cible) return { raison: "VRM ne connaît pas la taille de cette paire" };
+  if (!cible) return { raison: `VRM ne connaît pas la taille ${motsExt().deCe}` };
   const ids = [...new Set((options || []).filter((o) => libelleTaille(o.t) === cible).map((o) => o.id))];
   if (ids.length === 1) return { id: ids[0] };
   if (ids.length > 1) return { raison: `Vinted propose plusieurs tailles « ${String(libelle).slice(0, 12)} » pour cette catégorie — VRM ne choisit pas entre elles` };
@@ -10585,7 +10653,7 @@ async function champsManquantsAvant(uid, acc, it, idsPaire, opts = {}) {
       const sz = a('size'); const ids = sz ? sz.ids.map(Number) : [];
       if (!ids.length || !ids.some((x) => g.options.some((o) => o.id === x))) {
         const libelle = await libelleTaillePaire(uid, idsPaire || []);
-        const t = libelle ? choisirTaille(g.options, libelle) : { raison: "VRM ne connaît pas la taille de cette paire" };
+        const t = libelle ? choisirTaille(g.options, libelle) : { raison: `VRM ne connaît pas la taille ${motsExt().deCe}` };
         if (t.id) { it.item_attributes = [...attrs.filter((x) => x && x.code !== 'size'), { code: 'size', ids: [t.id] }]; noterDiag('avant_taille_corrigee'); }
         else { manque.push(`la taille (${t.raison})`); noter('size'); }
       }
@@ -10869,7 +10937,7 @@ async function reglerAvant(uid, acc, it, ids, reponses, ctx = {}) {
 }
 function phraseQuestion(q, avant) {
   if (!q) return '';
-  const qui = q.num ? `de la N°${q.num}` : 'de cette paire';
+  const qui = q.num ? `${motsExt().deLa} N°${q.num}` : motsExt().deCe;
   const base = q.options ? `Il manque ${q.nom} ${qui} : choisis dans VRM, la republication reprend sur ta réponse.` : `Il manque ${q.nom} ${qui}. ${q.geste}`;
   return `${base}${q.autres && q.autres.length ? ` (Il manque aussi : ${q.autres.join(', ')}.)` : ''}${avant ? ' Rien n’a été touché.' : ''}`;
 }
@@ -11694,7 +11762,7 @@ async function gardeJourRepub(uid) {
   const l = base.length > loc.length ? base : loc;
   if (l.length < REPUB_PAR_JOUR) return null;
   const h = Math.max(1, Math.ceil((Math.min(...l) + 86400000 - Date.now()) / 3600000));
-  return { code: 'quota-jour', raison: `${REPUB_PAR_JOUR} paires republiées sur ce compte ces dernières 24 h — c'est la limite de VRM pour ne pas te faire repérer. La prochaine dans environ ${h} h. Rien n'a été touché.` };
+  return { code: 'quota-jour', raison: `${REPUB_PAR_JOUR} ${motsExt().noms} republié${motsExt().e}s sur ce compte ces dernières 24 h — c'est la limite de VRM pour ne pas te faire repérer. La prochaine dans environ ${h} h. Rien n'a été touché.` };
 }
 function idPhotoReponse(j) {
   const n = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : ((typeof v === 'string' && /^\d{1,15}$/.test(v)) ? Number(v) : null);
@@ -11918,12 +11986,12 @@ async function publierBrouillon(msg) {
   }
   { const gL = await gardeLecture(uid, acc, 'clic');
     if (!ancienneOk) {
-      if (gL) return { accepte: false, code: 'ancienne-pas-sure', raison: "VRM n'est pas sûr que l'ancienne annonce de cette paire a été supprimée, et ne peut pas la relire maintenant — réessaie dans un moment. Rien n'a été touché." };
+      if (gL) return { accepte: false, code: 'ancienne-pas-sure', raison: `VRM n'est pas sûr que l'ancienne annonce ${motsExt().deCe} a été supprimée, et ne peut pas la relire maintenant — réessaie dans un moment. Rien n'a été touché.` };
       const ra = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${b.ancienId}`, null, { timeoutMs: 30000 });
       if (ra && ra.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(ra) };
       if (!(ra && (ra.status === 404 || ra.status === 410))) {
         noterDiag('brouillon_publier_ancienne_en_ligne');
-        return { accepte: false, code: 'ancienne-en-ligne', raison: ra && ra.ok ? "l'ancienne annonce de cette paire est TOUJOURS sur Vinted : la mettre en ligne la vendrait deux fois. Supprime l'ancienne sur Vinted, puis réessaie. Rien n'a été touché." : "VRM n'a pas pu vérifier que l'ancienne annonce de cette paire a été supprimée — réessaie dans un moment. Rien n'a été touché." };
+        return { accepte: false, code: 'ancienne-en-ligne', raison: ra && ra.ok ? `l'ancienne annonce ${motsExt().deCe} est TOUJOURS sur Vinted : la mettre en ligne la vendrait deux fois. Supprime l'ancienne sur Vinted, puis réessaie. Rien n'a été touché.` : `VRM n'a pas pu vérifier que l'ancienne annonce ${motsExt().deCe} a été supprimée — réessaie dans un moment. Rien n'a été touché.` };
       }
     }
     if (!gL) {
@@ -12583,7 +12651,7 @@ async function recreerVinted(msg) {
       // nouvelle recréation de CETTE annonce (sinon un second brouillon, puis une seconde
       // suppression). « Brouillons → en ligne » reste ouvert pour le brouillon rangé.
       await poserVerrouRecreer(id);
-      return { refaire: true, accepte: true, etape: 'incertain', draftId, raison: "le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois la même paire en ligne) — regarde ton dressing ; si elle n'y est plus, « Brouillons → en ligne » met le brouillon en ligne." };
+      return { refaire: true, accepte: true, etape: 'incertain', draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois ${motsExt().meme} en ligne) — regarde ton dressing ; si elle n'y est plus, « Brouillons → en ligne » met le brouillon en ligne.` };
     }
     if (!suppIncertaine && !rdV.ok) {
       noterDiag(`versbrouillon_suppression_refusee_${rdV.status}`);
@@ -13283,7 +13351,7 @@ async function executerPourApp(msg, sender) {
   //    confirmation… et le pont le jetait : le fond ne l'exigeait que par le
   //    relais du téléphone. N'importe quel message `exec` de l'app acceptait
   //    donc une offre sans elle. Exigé ici, pour toutes les voies.
-  if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti' };
+  if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti` };
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
@@ -14491,7 +14559,7 @@ function relaisCommande(d) {
 const RAISON_REFUS_RELAIS = {
   'arguments': 'commande incomplète — rien n\'est parti',
   'non-autorise': 'action non autorisée depuis le téléphone — rien n\'est parti',
-  'confirmation': 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti',
+  'confirmation': `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti`,
   'expiree': 'commande trop ancienne (plus de 10 min) — rien n\'est parti, relance-la si tu le veux encore',
 };
 // `null` = le stockage n'a pas répondu (on ne décide rien sur « pas su »).
