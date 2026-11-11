@@ -1,6 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- 016 — LE MODE ÉQUIPE (fonction n°37 retenue le 11 octobre 2026). PAS APPLIQUÉE.
 -- ════════════════════════════════════════════════════════════════════════════
+-- ⚠️⚠️ PRÉALABLE (revue de sécurité du 11 nov.) : NE L'APPLIQUER QU'AVEC
+--    « Confirm email » ALLUMÉ chez Supabase (Authentication → Providers →
+--    Email). L'acceptation d'une invitation se fie à `email_confirmed_at` : si
+--    la confirmation est coupée, Supabase le remplit à l'inscription, et la
+--    première personne qui crée un compte à l'adresse invitée devient membre.
+--    Récit : docs/passation/2026-11-11-securite-revue.md.
 -- Le vendeur invite un MEMBRE (un aide, un proche) qui prépare les colis. Le
 -- membre a un accès LIMITÉ, tenu PAR LA BASE (RLS), pas par l'écran :
 --   • il LIT les colis du vendeur : bordereaux (email et capturés), suivis
