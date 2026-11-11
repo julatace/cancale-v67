@@ -65,11 +65,22 @@ affaire » reste refusé, CLAUDE.md §3), aucune fonction payante sur sa clé (�
   rangée, retirée qui revient, route qui rend `vus`, port inconnu gratuit).
 - Banc `scripts/bancs/alertes-ebay.cjs` (390 tactile clair, 1512 sombre) : liste, marges (son prix,
   médiane, port inconnu), 44 px, « Retirer », « Me prévenir » ⇒ `veille.alerte`, pas su, aucune
-  erreur ni débordement. Captures regardées.
+  erreur ni débordement, gestes dans la ligne et sur une seule ligne de texte (ce dernier contrôle
+  ROUGE sur le build d'avant — « Reti/rer » coupé à 1512 px par la grille à quatre colonnes de la
+  couche premium ; les gestes passent désormais sous le contenu à toutes les largeurs). Captures regardées.
 - Audits voisins verts : `ebay-recherche` (59), `notifications` (F5 passé à neuf types),
   `cibles-notif` (aperçu de la nouvelle famille), `notifs-belles`, `notifs-centre`, `notifs-groupees`,
   `traduction`, `quoi-de-neuf`, `variables`, `tdz`, `coherence`, `identite`, `icones`,
   `textes-courts`, `fonctions-api`, `secrets`.
+
+- Passe complète d'audits (496) : 22 rouges, **les 22 déjà rouges sur origin/main** (même arbre,
+  rejoués un à un : annuler-commandes, benefice, centre-aide, chrome-en-dur, colis-envoi,
+  config-facture, coque-parametres, coque-tablette, donnees-ecrans, export-donnees,
+  frein-relais-vinted, label-latest, lancement, lbc-plus-vue-pause, lectures-lourdes,
+  lus-deux-appareils, onglets-d, photos-vinted, politique-hotes, relier-compte, rouge-doublon, safari).
+  Deux contrôles voisins passés à neuf familles (`audit-compte-pas-relu` A26, banc `configuration-depart`).
+- Banc voisin `ebay-achats-recherche` : 36 rouges, **les mêmes sur le build de main** (le bouton
+  « Achats » qu'il cherche n'existe plus sous ce nom) — pas de ce lot.
 
 ## ⚠️ Non mesuré
 - Aucun appel réel à eBay d'ici (formes de la documentation Browse/OAuth, servies par un faux eBay).
