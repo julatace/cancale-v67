@@ -1,5 +1,5 @@
 import { gabaritMail } from '../../api/_lib/mail-gabarit.js';
-import { traductionContenu, MESSAGE_DEFAUT_EN, PIED_VRM_EN } from './anglais.js';
+import { traductionContenu, MESSAGE_DEFAUT_EN } from './anglais.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  LA FACTURE PRO — la règle (2 novembre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -361,26 +361,27 @@ export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) 
 // ── L'E-MAIL DE LA FACTURE (6 nov., décision de Julien : « ça peut être VRM qui
 // envoie et met en copie le vendeur ») ───────────────────────────────────────
 // Le texte du vendeur (`messageEmail`) et une version HTML qui dit la même chose
-// (tout est échappé : aucune valeur n'écrit du HTML), avec en petit pourquoi VRM
-// l'envoie et à qui répondre. Jamais de lien de désinscription : c'est un e-mail
+// (tout est échappé : aucune valeur n'écrit du HTML), sans pied (11 nov.). Jamais de lien de désinscription : c'est un e-mail
 // transactionnel (la facture d'un achat), pas une lettre d'information.
 export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
   const { sujet, corps } = messageEmail(cfg, contenu);
   const nom = contenu.vendeur.nom;
-  const pied = via === 'vrm'
-    ? `Cette facture vous est envoyée par VRM pour le compte de ${nom}. Pour toute question, répondez simplement à cet e-mail : votre réponse arrive chez ${nom}.${contenu.anglais ? ` ${PIED_VRM_EN(nom)}` : ''}`
-    : '';
-  const texte = pied ? `${corps}\n\n—\n${pied}` : corps;
+  // (11 nov., lot DJ1 — Julien : « Cette facture vous est envoyée par VRM pour le compte
+  // de … Pour toute question, répondez simplement à cet e-mail … Je veux pas de ce
+  // message. ») PLUS AUCUN PIED : l'e-mail ne garde que SON texte (signé de sa boutique)
+  // et la pièce jointe. La réponse de l'acheteur arrive toujours chez lui, sans le dire :
+  // c'est l'en-tête Reply-To (= l'e-mail du vendeur, api/_lib/facture-pro.js) qui le tient.
+  const texte = corps;
   // (8 nov.) Le HTML passe par le gabarit commun des e-mails (api/_lib/mail-gabarit.js) :
   // le NOM du vendeur en tête (c'est SA facture, pas un e-mail de VRM), son texte
-  // échappé, la pièce jointe dite, aucun bouton. Le texte brut reste exactement le sien.
+  // échappé, la pièce jointe dite, aucun bouton, aucun pied (`marque` : pas de mentions de VRM).
   const doc = contenu.type === 'avoir' ? (contenu.anglais ? 'Avoir / Credit note' : 'Avoir') : (contenu.anglais ? 'Facture / Invoice' : 'Facture');
   const { html } = gabaritMail({
     titre: `${doc} ${contenu.numero}`,
     preentete: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
     paras: corps.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean),
     apres: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
-    pied: pied ? { texte: pied } : null,
+    pied: null,
     marque: { nom },
   });
   return { sujet, texte, html, nomExpediteur: via === 'vrm' ? `${nom} via VRM`.slice(0, 120) : nom };
