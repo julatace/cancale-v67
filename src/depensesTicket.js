@@ -107,18 +107,20 @@ export function dateDuTicket(texte, aujourdhui = new Date()) {
 // (le nom du magasin y est imprimé). Rend le texte LU (mis en forme), ou null.
 const ENSEIGNES = ['Vinted', 'Leboncoin', 'Vestiaire Collective', 'eBay', 'Emmaüs', 'Decathlon', 'Intersport', 'Go Sport', 'Courir', 'Foot Locker', 'JD Sports', 'Snipes', 'Sport 2000', 'Zalando', 'Amazon', 'Kiabi', 'Primark', 'Zara', 'H&M', 'Uniqlo', 'Nike', 'Adidas', 'Carrefour', 'Leclerc', 'Auchan', 'Lidl', 'Intermarché', 'Action', 'Cash Express', 'Cash Converters', 'Easy Cash', 'La Halle', 'Celio', 'Jules', 'Galeries Lafayette', 'Printemps', 'Veepee', 'Showroomprivé', 'Back Market', 'Label Emmaüs', 'Ding Fring', 'Le Relais', 'Oxfam'];
 const cleNom = (x) => sansAccent(x).replace(/[^a-z0-9&]+/g, '');
-export function lieuDuTicket(texte) {
+// `connueSeulement` : sans total ni date lus, ce n'est peut-être pas un ticket — seule une enseigne connue compte.
+export function lieuDuTicket(texte, { connueSeulement = false } = {}) {
   const lignes = lignesDe(texte);
   const tout = lignes.map(cleNom);
   for (const e of ENSEIGNES) {
     const k = cleNom(e);
     if (tout.some((l) => (k.length <= 4 ? l === k || l.startsWith(k + 'sa') || l.startsWith(k + 'france') : l.includes(k)))) return e;
   }
+  if (connueSeulement) return null;
   const BRUIT = /ticket|facture|recu|bienvenue|merci|caisse|client|siret|siren|\btva\b|tel\b|telephone|www|http|@|commande|date|heure|total|magasin\s*n|n°|rue|avenue|bd\b|boulevard|place|chemin|route/;
   for (const l of lignes.slice(0, 4)) {
     const t = sansAccent(l);
     const lettres = (t.match(/[a-z]/g) || []).length;
-    if (lettres < 3 || BRUIT.test(t) || /\d{3,}/.test(t) || lettres / t.replace(/\s/g, '').length < 0.7) continue;
+    if (lettres < 4 || !/[a-z]{4}/.test(t) || BRUIT.test(t) || /\d{3,}/.test(t) || lettres / t.replace(/\s/g, '').length < 0.7) continue;
     const propre = l.replace(/[^\p{L}\p{N}&'’ -]/gu, ' ').replace(/\s+/g, ' ').trim();
     if (propre.length < 3 || propre.length > 30) continue;
     return propre === propre.toUpperCase() ? propre.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (_, a, b) => a + b.toUpperCase()) : propre;
@@ -139,7 +141,8 @@ export function articlesDuTicket(texte) {
 }
 // Tout ce qu'un ticket d'achat dit, LU : { montant (centimes|null), date, lieu, articles }.
 export function lireTicketAchat(texte, aujourdhui = new Date()) {
-  return { montant: montantDuTicket(texte), date: dateDuTicket(texte, aujourdhui), lieu: lieuDuTicket(texte), articles: articlesDuTicket(texte) };
+  const montant = montantDuTicket(texte), date = dateDuTicket(texte, aujourdhui);
+  return { montant, date, lieu: lieuDuTicket(texte, { connueSeulement: montant == null && !date }), articles: articlesDuTicket(texte) };
 }
 export const texteMontantSaisie = (c) => (c == null ? '' : `${Math.floor(c / 100)},${String(c % 100).padStart(2, '0')}`);
 
