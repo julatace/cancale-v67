@@ -13,8 +13,8 @@ import CarteMois from './CarteMois.jsx';
 import { SheetShell } from '../composants/SheetShell.jsx';
 import { montant } from '../format.js';
 import './aideCarte.css';
-import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif } from './carteChiffres.js';
-import { TYPES_OBJECTIF, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif, resteObjectif, phraseResteObjectif } from '../objectifMois.js';
+import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif, valeurObjectifMois } from './carteChiffres.js';
+import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif, resteObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, propositionObjectif, moisPleinsAvant, moisPasse, objectifDuMoisYm, bilanMoisPasse, phraseBilan } from '../objectifMois.js';
 import ChoixPeriode from '../ChoixPeriode.jsx';
 import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
 
@@ -89,14 +89,20 @@ const majuscule = (s) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase()
 // chiffre ancien ne se lit jamais comme un chiffre relu, src/JourneeInstantanee.jsx).
 export function BarreObjectif({ prog, fmt, onOuvrir = null, maintenant = null, prefixe = 'data-objectif' }) {
   if (!prog) return null;
-  const eur = prog.type === 'ca';
+  const eur = estEuros(prog.type);
   const montre = (v) => (eur ? euros(v) : String(v));
   const cible = montre(prog.objectif);
   const quand = maintenant || Date.now();
   const r = resteObjectif(prog, quand);
   const bas = phraseResteObjectif(prog, montre, quand);
-  const titre = prog.valeur == null ? 'Objectif du mois : pas su'
-    : `${prog.partiel ? 'Au moins ' : ''}${eur ? fmt(prog.valeur) : prog.valeur} sur ${eur ? fmt(prog.objectif) : prog.objectif}${prog.partiel && prog.manque.length ? ` · ${prog.manque.join(', ')} pas lu` : ''}`;
+  // (11 nov., lot objectifs-mois) « 2 000 € vendus ce mois · tu en es à 1 340 € » + le rythme.
+  const ry = rythmeObjectif(prog, quand);
+  const rythme = phraseRythme(ry, prog.type, montre);
+  const def = TYPES_OBJECTIF[prog.type] || TYPES_OBJECTIF.ca;
+  const tete = `${eur ? cible : `${prog.objectif} ventes`} ${def.ceMois}`;
+  const manque = [prog.partiel && prog.manque.length ? `${prog.manque.join(', ')} pas lu` : '', prog.couverture ? `prix d’achat connu pour ${prog.couverture} ventes` : ''].filter(Boolean).join(' · ');
+  const titre = prog.valeur == null ? `${tete} : pas su`
+    : `${tete} · tu en es à ${prog.partiel ? 'au moins ' : ''}${eur ? fmt(prog.valeur) : prog.valeur}${manque ? ` · ${manque}` : ''}`;
   const P = prefixe;
   const attrs = {
     className: 'vrm-fu-objectif' + (onOuvrir ? ' is-touchable' : ''), [P]: prog.type, [P + '-cible']: eur ? String(Math.round(prog.objectif * 100)) : String(prog.objectif),
@@ -104,23 +110,52 @@ export function BarreObjectif({ prog, fmt, onOuvrir = null, maintenant = null, p
     [P + '-pct']: prog.pct == null ? '' : String(prog.pct), [P + '-partiel']: prog.partiel ? '1' : undefined, [P + '-atteint']: prog.atteint ? '1' : undefined,
     [P + '-reste']: r && !r.atteint ? (eur ? String(Math.round(r.reste * 100)) : String(r.reste)) : undefined,
     [P + '-par-jour']: r && !r.atteint && r.parJour != null ? (eur ? String(Math.round(r.parJour * 100)) : String(r.parJour)) : undefined,
+    [P + '-jours']: r && !r.atteint ? String(r.jours) : undefined,
+    [P + '-rythme']: ry ? ry.etat : undefined, [P + '-ecart']: ry && ry.etat !== 'dans' ? (eur ? String(Math.round(ry.ecart * 100)) : String(ry.ecart)) : undefined,
+    [P + '-couverture']: prog.couverture || undefined,
     title: titre,
   };
   const corps = (
     <>
       <span className="vrm-fu-objectif-ligne">
-        <span>Objectif du mois</span>
-        <b>{prog.valeur == null ? '—' : <>{prog.partiel ? <span className="vrm-fu-objectif-sur">au moins </span> : null}{montre(prog.valeur)}<span className="vrm-fu-objectif-sur"> sur {cible}</span></>}</b>
+        <span {...{ [P + '-tete']: '' }}>{tete}</span>
+        <b>{prog.valeur == null ? '—' : <>{prog.partiel ? <span className="vrm-fu-objectif-sur">au moins </span> : null}{montre(prog.valeur)}</>}</b>
       </span>
       <span className="vrm-fu-objectif-piste" role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct}>
         {prog.pct ? <span style={{ width: `${prog.pct}%` }} /> : null}
       </span>
-      <span className={'vrm-fu-objectif-reste' + (prog.atteint ? ' is-atteint' : '')} {...{ [P + '-phrase']: '' }}>{bas}</span>
+      <span className="vrm-fu-objectif-bas">
+        <span className={'vrm-fu-objectif-reste' + (prog.atteint ? ' is-atteint' : '')} {...{ [P + '-phrase']: '' }}>{bas}</span>
+        {rythme ? <span className={'vrm-fu-objectif-rythme is-' + ry.etat} {...{ [P + '-rythme-phrase']: '' }}>{rythme}</span> : null}
+      </span>
     </>
   );
   return onOuvrir
-    ? <button type="button" {...attrs} data-objectif-ouvrir="" aria-label={`${titre} — ${bas}. Régler l’objectif`} onClick={onOuvrir}>{corps}</button>
+    ? <button type="button" {...attrs} data-objectif-ouvrir="" aria-label={`${titre} — ${bas}${rythme ? ` · ${rythme}` : ''}. Régler l’objectif`} onClick={onOuvrir}>{corps}</button>
     : <div {...attrs}>{corps}</div>;
+}
+
+// ── LE BILAN DU MOIS PASSÉ (11 nov., lot objectifs-mois) ────────────────────
+// Du 1er au 7, une ligne sous la barre : « Octobre : objectif atteint ✓ » ou
+// l'écart ; « OK » l'écrit vu (`bilanVu`, synchronisé) — il ne revient plus.
+export const bilanObjectif = (brut, sources, regles, maintenant = Date.now()) => {
+  const mp = moisPasse(maintenant);
+  const o = objectifDuMoisYm(brut, mp.ym);
+  if (!o) return null;
+  return bilanMoisPasse(brut, valeurObjectifMois(o.type, sources, regles, mp, maintenant), maintenant);
+};
+export function BilanObjectif({ bilan, fmt, onVu = null, prefixe = 'data-objectif-bilan' }) {
+  if (!bilan) return null;
+  const eur = estEuros(bilan.prog.type);
+  const montre = (v) => (eur ? euros(v) : String(v));
+  const phrase = phraseBilan(bilan, montre);
+  const P = prefixe;
+  return (
+    <div className={'vrm-fu-objectif-bilan' + (bilan.prog.atteint ? ' is-atteint' : '')} {...{ [P]: bilan.ym, [P + '-atteint']: bilan.prog.atteint ? '1' : '0', [P + '-ecart']: bilan.ecart == null ? '' : (eur ? String(Math.round(bilan.ecart * 100)) : String(bilan.ecart)) }}>
+      <span>{phrase}</span>
+      {onVu ? <button type="button" className="vrm-fu-objectif-vu" data-objectif-bilan-vu="" aria-label={`${phrase}. Compris`} onClick={onVu}>OK</button> : null}
+    </div>
+  );
 }
 
 // (6 nov., onglets A) « ? » : d'où vient chaque chiffre de la carte — sa phrase (rangée avec sa
@@ -150,7 +185,7 @@ function FeuilleAide({ page, places, fmt, fermer, FermeAuRetour, surtitre }) {
   );
 }
 
-export default function CarteStats({ owner = '', page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null, aide = false }) {
+export default function CarteStats({ owner = '', page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, objectifBrut = null, poserObjectif = null, aide = false }) {
   const [ouvert, setOuvert] = React.useState(false);
   const [aideOuverte, setAideOuverte] = React.useState(false);
   // (9 nov.) La barre de l'objectif touchée ouvre la feuille « Modifier » sur l'objectif, déplié.
@@ -169,6 +204,8 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
   };
   const g = V.g;
   const prog = objectifSurPage(objectif, page) ? progressionObjectif(objectif, valeurObjectif(objectif, sources, regles)) : null;
+  // Le bilan du mois passé : sur Ma journée seulement (une fois, puis « OK »).
+  const bilan = page === 'journee' && poserObjectif ? bilanObjectif(objectifBrut, sources, regles) : null;
   const courbe = g.place.id === 'vendu' && !g.hors ? courbeVendu(sources, sel, g.p, regles) : null;
   const modifier = (
     <button type="button" className="vrm-fu-modifier" data-carte-modifier={page} aria-label="Modifier les chiffres de la carte" title="Choisir les chiffres que montre cette carte" onClick={() => setOuvert(true)}>Modifier</button>
@@ -200,9 +237,10 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },
         }))}>
         {prog ? <BarreObjectif prog={prog} fmt={fmt} onOuvrir={poserObjectif ? () => { setObjOuvert(true); setOuvert(true); } : null} /> : null}
+        {bilan ? <BilanObjectif bilan={bilan} fmt={fmt} onVu={() => { const n = objectifAEnregistrer(objectifBrut, { bilanVu: bilan.ym }); if (n) poserObjectif(n); }} /> : null}
       </CarteMois>
       {aide && aideOuverte ? <FeuilleAide page={page} places={[g, ...V.c]} fmt={fmt} fermer={() => setAideOuverte(false)} FermeAuRetour={FermeAuRetour} surtitre={V.perimetre} /> : null}
-      {ouvert ? <FeuilleCarte owner={owner} page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => { setOuvert(false); setObjOuvert(false); }} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} objectifOuvert={objOuvert} /> : null}
+      {ouvert ? <FeuilleCarte owner={owner} page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => { setOuvert(false); setObjOuvert(false); }} FermeAuRetour={FermeAuRetour} objectif={objectif} objectifBrut={objectifBrut} poserObjectif={poserObjectif} objectifOuvert={objOuvert} /> : null}
     </>
   );
 }
@@ -212,7 +250,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
 // chiffre qui y va. La période se choisit pour CE chiffre quand la page n'a pas
 // son propre filtre de période. Chaque choix est rangé tout de suite (la carte,
 // derrière, change sous ses yeux) ; « Par défaut » rend la carte des maquettes.
-function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null, objectifOuvert = false }) {
+function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, objectifBrut = null, poserObjectif = null, objectifOuvert = false }) {
   const R = reglageDePage(reglage, page, locaux);
   const [place, setPlace] = React.useState(0);
   const places = [R.g, ...R.c];
@@ -285,29 +323,53 @@ function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, 
               );
             })}
           </ul>
-          {poserObjectif ? <ObjectifFeuille page={page} objectif={objectif} poserObjectif={poserObjectif} ouvertDepart={objectifOuvert} /> : null}
+          {poserObjectif ? <ObjectifFeuille page={page} objectif={objectif} objectifBrut={objectifBrut} poserObjectif={poserObjectif} ouvertDepart={objectifOuvert} sources={sources} regles={regles} /> : null}
           <button type="button" className="vrm-carte-defaut" data-carte-defaut-remettre="" onClick={() => { poser(reglageAEnregistrer(reglage, page, null)); setPlace(0); }}>Par défaut</button>
         </div>
     </SheetShell>
   );
 }
 
+// (11 nov., lot objectifs-mois) LA PROPOSITION EN UN GESTE : la moyenne de ses 3
+// derniers mois pleins, par la MÊME règle que la barre (`valeurObjectifMois`) ;
+// un mois pas su, partiel ou avant le début de l'historique ⇒ aucune proposition,
+// et la raison en une phrase. Toucher « Viser … » POSE l'objectif (son clic).
+export const propositionDepuis = (type, sources, regles, maintenant = Date.now()) =>
+  propositionObjectif(type, moisPleinsAvant(maintenant, 3).map((b) => valeurObjectifMois(type, sources, regles, b, maintenant)));
+export function PropositionObjectif({ type, sources, regles, onViser }) {
+  if (!sources || !regles) return null;
+  const pr = propositionDepuis(type, sources, regles);
+  const eur = estEuros(type);
+  const montre = (v) => (eur ? euros(v) : `${v} vente${v > 1 ? 's' : ''}`);
+  if (!pr) return <p className="vrm-carte-objectif-prop is-vide" data-objectif-proposition="">Pas assez d’historique pour te proposer un chiffre.</p>;
+  return (
+    <div className="vrm-carte-objectif-prop" data-objectif-proposition={String(eur ? Math.round(pr.valeur * 100) : pr.valeur)} data-objectif-moyenne={String(eur ? Math.round(pr.moyenne * 100) : pr.moyenne)}>
+      <button type="button" className="vrm-carte-ok" data-objectif-viser="" onClick={() => onViser(pr.valeur)}>Viser {montre(pr.valeur)}</button>
+      <span>Ta moyenne sur 3 mois.</span>
+    </div>
+  );
+}
+
 // ── « Objectif » DANS LA FEUILLE (4 nov.) ───────────────────────────────────
-// CA vendu ou Nombre de ventes (son choix), un montant, « OK » ; « Sur cette
-// carte » (montrée ou non ici) et « Retirer ». Rien n'est enregistré tant qu'il
-// n'a pas touché « OK » ; une saisie illisible n'enregistre rien.
-export function ObjectifFeuille({ page, objectif, poserObjectif, ouvertDepart = false }) {
+// Vendu, Bénéfice ou Ventes (son choix), un montant, « OK » — ou « Viser … » (sa
+// moyenne sur 3 mois) ; « Sur cette carte » (montrée ou non ici) et « Retirer ».
+// Rien n'est enregistré tant qu'il n'a pas touché « OK » ou « Viser ».
+// `objectifBrut` : le réglage rangé, avec son histoire (jamais perdue en le modifiant).
+export function ObjectifFeuille({ page, objectif, objectifBrut = null, poserObjectif, ouvertDepart = false, sources = null, regles = null }) {
   const [ouvert, setOuvert] = React.useState(!!ouvertDepart);
   const [type, setType] = React.useState(objectif ? objectif.type : 'ca');
   const [saisie, setSaisie] = React.useState(objectif ? String(objectif.valeur).replace('.', ',') : '');
   const lu = lireSaisieObjectif(type, saisie);
-  const valider = () => { if (lu == null) return; const n = objectifAEnregistrer(objectif, { type, valeur: lu }); if (n) { poserObjectif(n); setOuvert(false); } };
+  const base = objectifBrut || objectif;
+  const poserValeur = (v) => { const n = objectifAEnregistrer(base, { type, valeur: v }); if (n) { poserObjectif(n); setOuvert(false); } };
+  const valider = () => { if (lu == null) return; poserValeur(lu); };
   const ici = objectifSurPage(objectif, page);
+  const eur = estEuros(type);
   return (
     <div className="vrm-carte-objectif" data-carte-objectif={objectif ? objectif.type : ''} data-carte-objectif-ici={objectif ? (ici ? '1' : '0') : undefined}>
       <button type="button" className="vrm-carte-choix" aria-expanded={ouvert} data-carte-objectif-ouvrir="" onClick={() => setOuvert(!ouvert)}>
         <span className="vrm-carte-choix-nom">Objectif</span>
-        <span className="vrm-carte-choix-v">{objectif ? (objectif.type === 'ca' ? euros(objectif.valeur) : `${objectif.valeur} ventes`) : '—'}</span>
+        <span className="vrm-carte-choix-v">{objectif ? (estEuros(objectif.type) ? `${euros(objectif.valeur)}${objectif.type === 'benefice' ? ' de bénéfice' : ''}` : `${objectif.valeur} ventes`) : '—'}</span>
         <span className="vrm-carte-coche" aria-hidden="true">{ouvert ? '−' : '+'}</span>
       </button>
       {ouvert ? (
@@ -317,16 +379,18 @@ export function ObjectifFeuille({ page, objectif, poserObjectif, ouvertDepart = 
               <button key={k} type="button" aria-pressed={type === k} data-carte-objectif-type={k} onClick={() => setType(k)}>{d.nom}</button>
             ))}
           </div>
+          <PropositionObjectif type={type} sources={sources} regles={regles} onViser={poserValeur} />
           <div className="vrm-carte-objectif-saisie">
-            <input type="text" inputMode={type === 'ca' ? 'decimal' : 'numeric'} aria-label={type === 'ca' ? 'Objectif en euros' : 'Objectif en nombre de ventes'} data-carte-objectif-saisie=""
-              value={saisie} onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') valider(); }} placeholder={type === 'ca' ? '2 000' : '40'} />
-            <span aria-hidden="true">{type === 'ca' ? '€' : 'ventes'}</span>
+            <input type="text" inputMode={eur ? 'decimal' : 'numeric'} aria-label={eur ? 'Objectif en euros' : 'Objectif en nombre de ventes'} data-carte-objectif-saisie=""
+              value={saisie} onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') valider(); }} placeholder={eur ? '2 000' : '40'} />
+            <span aria-hidden="true">{eur ? '€' : 'ventes'}</span>
             <button type="button" className="vrm-carte-ok" data-carte-objectif-ok="" disabled={lu == null} onClick={valider}>OK</button>
           </div>
+          {type === 'benefice' ? <p className="vrm-carte-objectif-prop is-vide">Seules les ventes au prix d’achat connu comptent.</p> : null}
           {objectif ? (
             <div className="vrm-carte-objectif-gestes">
-              <button type="button" className="vrm-carte-defaut" aria-pressed={ici} data-carte-objectif-page={ici ? '1' : '0'} onClick={() => { const n = objectifAEnregistrer(objectif, { page, cacher: ici }); if (n) poserObjectif(n); }}>{ici ? 'Masquer sur cette carte' : 'Montrer sur cette carte'}</button>
-              <button type="button" className="vrm-carte-defaut" data-carte-objectif-retirer="" onClick={() => { poserObjectif(objectifAEnregistrer(objectif, null)); setSaisie(''); setOuvert(false); }}>Retirer</button>
+              <button type="button" className="vrm-carte-defaut" aria-pressed={ici} data-carte-objectif-page={ici ? '1' : '0'} onClick={() => { const n = objectifAEnregistrer(base, { page, cacher: ici }); if (n) poserObjectif(n); }}>{ici ? 'Masquer sur cette carte' : 'Montrer sur cette carte'}</button>
+              <button type="button" className="vrm-carte-defaut" data-carte-objectif-retirer="" onClick={() => { poserObjectif(objectifAEnregistrer(base, null)); setSaisie(''); setOuvert(false); }}>Retirer</button>
             </div>
           ) : null}
         </div>
