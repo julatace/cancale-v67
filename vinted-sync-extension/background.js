@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.339.0';
+const CODE_VERSION = '5.340.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5937,6 +5937,38 @@ function avisPropre(f) {
   if (typeof f.feedback === 'string') o.feedback = f.feedback.slice(0, 600);
   return o;
 }
+// 5.340 (11 nov.) — UN POINT PAR CAPTURE : { at, total (Vinted, ou null), n (avis lus),
+// c: [nombre de 1★, 2★, 3★, 4★, 5★] }. Jamais un texte, un pseudo ni un identifiant
+// d'avis : des nombres seulement. 90 jours et 120 points au plus ; deux captures le
+// même jour ⇒ la plus récente remplace l'autre. Rebâti champ par champ (liste blanche).
+const AVIS_HISTO_JOURS = 90, AVIS_HISTO_MAX = 120;
+function pointAvis(at, avis, pag) {
+  const t = Date.parse(at || '');
+  if (!Number.isFinite(t)) return null;
+  const c = [0, 0, 0, 0, 0];
+  let n = 0;
+  for (const a of Array.isArray(avis) ? avis : []) { const r = Number(a && a.rating); if (Number.isInteger(r) && r >= 1 && r <= 5) { c[r - 1]++; n++; } }
+  const tot = pag && Number.isInteger(Number(pag.total_entries)) && Number(pag.total_entries) >= 0 ? Number(pag.total_entries) : null;
+  return { at: new Date(t).toISOString(), total: tot, n, c };
+}
+function historiqueAvis(avant, point, maintenant = Date.now()) {
+  const lim = maintenant - AVIS_HISTO_JOURS * 864e5;
+  const propre = (p) => {
+    if (!p || typeof p !== 'object') return null;
+    const t = Date.parse(p.at || '');
+    if (!Number.isFinite(t) || t < lim || t > maintenant + 6e4) return null;
+    const c = Array.isArray(p.c) && p.c.length === 5 && p.c.every((x) => Number.isInteger(x) && x >= 0 && x <= 1000) ? p.c.slice() : null;
+    if (!c) return null;
+    const n = c.reduce((a, b) => a + b, 0);
+    const total = Number.isInteger(p.total) && p.total >= 0 ? p.total : null;
+    return { at: new Date(t).toISOString(), total, n, c };
+  };
+  const l = (Array.isArray(avant) ? avant : []).map(propre).filter(Boolean);
+  const nouveau = propre(point);
+  if (nouveau) { const j = nouveau.at.slice(0, 10); for (let i = l.length - 1; i >= 0; i--) if (l[i].at.slice(0, 10) === j) l.splice(i, 1); l.push(nouveau); }
+  l.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  return l.slice(-AVIS_HISTO_MAX);
+}
 async function capterAvis(uid) {
   try {
     if (!uid) return false;
@@ -5965,7 +5997,13 @@ async function capterAvis(uid) {
     }
     const user_feedbacks = liste.slice(0, 20).map(avisPropre).filter(Boolean);
     const pag = rep.json.pagination && typeof rep.json.pagination === 'object' ? { total_entries: Number(rep.json.pagination.total_entries) || null, total_pages: Number(rep.json.pagination.total_pages) || null } : null;
-    const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_feedbacks`, data: { type: 'feedbacks', uid: String(uid), domain: acc.domain || 'www.vinted.fr', capturedAt: new Date().toISOString(), nItems: user_feedbacks.length, payload: { user_feedbacks, ...(pag ? { pagination: pag } : {}) } } }], 'id');
+    // 5.340 — L'HISTORIQUE DATÉ (lire-fusionner-réécrire) : l'historique d'avant, projeté
+    // en scalaire ; une lecture ratée n'écrit RIEN (sinon elle effacerait l'historique).
+    const hr = await sbGet(`app_data?id=eq.harvest_${uid}_feedbacks&select=h:data->payload->historique`);
+    if (hr === null) { noterDiag('avis_historique_lecture_ratee'); return false; }
+    const maintenant = new Date().toISOString();
+    const historique = historiqueAvis(hr && hr[0] && hr[0].h, pointAvis(maintenant, user_feedbacks, pag));
+    const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_feedbacks`, data: { type: 'feedbacks', uid: String(uid), domain: acc.domain || 'www.vinted.fr', capturedAt: maintenant, nItems: user_feedbacks.length, payload: { user_feedbacks, ...(pag ? { pagination: pag } : {}), historique } } }], 'id');
     noterDiag(ok === false ? 'avis_ecriture_ratee' : 'avis_ecrits');
     return ok !== false;
   } catch (_) { return false; }
@@ -12857,7 +12895,8 @@ function publierJaugeVisite(uid) {
 // AUCUN geste : le journal se tait, le geste est déjà fait.
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
-const JOURNAL_SORTES = ['republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau'];
+// (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
+const JOURNAL_SORTES = ['republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off'];
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
@@ -12912,6 +12951,14 @@ async function journalCommande(msg, r) {
     const id = msg.cmd === 'publierBrouillon' ? (r.itemId || undefined) : msg.id;
     await noterJournal(msg.uid, s, { a: id, b: r.nouvelId, de: r.ancien, vers: s === 'baisse_prix' ? r.prixVu : r.nouveau });
   } catch (_) {}
+}
+// (11 nov., 5.340) Le mode vacances : la sorte vient de l'état RELU (`r.vacances`), jamais de la demande.
+function sorteVacances(r) {
+  if (!r || r.accepte !== true || r.etape !== 'fait' || typeof r.vacances !== 'boolean') return null;
+  return r.vacances ? 'vacances_on' : 'vacances_off';
+}
+async function journalVacances(msg, r) {
+  try { const s = sorteVacances(r); if (s) await noterJournal(msg && msg.uid, s, {}); } catch (_) {}
 }
 // Un geste de la messagerie de l'app (`executerPourApp`) : la sorte se lit sur le
 // CHEMIN (liste blanche `EXEC_PERMIS`), jamais sur le corps (le texte n'est pas gardé).
@@ -14141,7 +14188,8 @@ async function executerCommande(msg) {
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted(msg); await journalCommande(msg, r); return r; }
   // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).
-  if (msg && msg.cmd === 'vacancesVinted') return await mettreVacancesVinted(msg);
+  // 11 nov. (5.340) : posé / retiré au journal SEULEMENT quand Vinted l'a accepté ET relu (« fait » ; « déjà », « écart », « incertain » : rien).
+  if (msg && msg.cmd === 'vacancesVinted') { const r = await mettreVacancesVinted(msg); await journalVacances(msg, r); return r; }
   if (msg && msg.cmd === 'recreerVinted') { const r = await recreerVinted(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'publierBrouillon') { const r = await publierBrouillon(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'refaireBrouillon') { const r = await refaireBrouillon(msg); await journalCommande(msg, r); return r; }
@@ -17222,6 +17270,14 @@ const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/smart-listing/';
 // ratée ⇒ rien n'est écrit. Une liste « à expédier » lue EN ENTIER fait foi :
 // une vente qui n'y est plus n'est plus « à expédier » (expédiée ou annulée —
 // on ne dit PAS laquelle). Une vente n'est jamais effacée.
+// 5.340 — `prixVente` = { valeur (euros, > 0, au centime), devise 'EUR', cle 'sellerPrice' } :
+// rebâti champ par champ ; toute autre forme ⇒ null (« pas su », jamais deviné).
+function prixVenteVc(p) {
+  if (!p || typeof p !== 'object' || p.cle !== 'sellerPrice' || p.devise !== 'EUR') return null;
+  const v = Number(p.valeur);
+  if (!Number.isFinite(v) || v <= 0 || v >= 1e6 || Math.abs(Math.round(v * 100) - v * 100) > 1e-6) return null;
+  return { valeur: Math.round(v * 100) / 100, devise: 'EUR', cle: 'sellerPrice' };
+}
 let _vcVentesChaine = Promise.resolve();
 function rangerVcVentes(m) {
   const run = _vcVentesChaine.then(() => rangerVcVentesMaintenant(m)).catch(() => false);
@@ -17246,6 +17302,9 @@ async function rangerVcVentesMaintenant(m) {
       productId: x.productId || prev.productId || '', ref: x.ref || prev.ref || '',
       etat: x.etat || prev.etat || '', date: x.date || prev.date || '',
       montant: x.montant || prev.montant || null,
+      // 5.340 : le prix de vente (`sellerPrice`) pour la facture Pro — seulement s'il est lu
+      // en euros (`prixVenteVc`) ; absent ⇒ rien (jamais le montant versé à sa place).
+      ...(prixVenteVc(x.prixVente) || prixVenteVc(prev.prixVente) ? { prixVente: prixVenteVc(x.prixVente) || prixVenteVc(prev.prixVente) } : {}),
       limite: x.limite || prev.limite || '', suivi: x.suivi || prev.suivi || '', transporteur: x.transporteur || prev.transporteur || '',
       // 5.316 : le titre affiché et la photo ; et ce que la page « suivi » a appris (gardé).
       titre: x.titre || prev.titre || '', photo: x.photo || prev.photo || '',

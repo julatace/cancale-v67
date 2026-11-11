@@ -51,6 +51,27 @@ export const evolutionAvis = (lus) => {
   const r = moyNotes(a), v = moyNotes(b);
   return { recent: r, avant: v, nRecent: a.length, nAvant: b.length, sens: r > v ? 'hausse' : r < v ? 'baisse' : 'egal' };
 };
+// (11 nov., extension 5.340) L'HISTORIQUE DATÉ par capture (`payload.historique` :
+// [{ at, total, n, c:[1★…5★] }], des nombres seulement, 90 jours). Le premier point des
+// 90 jours contre le dernier : « +N avis » (si Vinted a dit les deux totaux) et la
+// moyenne de la page lue à chaque fois. Moins de deux jours de lecture ⇒ null (« pas su »).
+export const HISTO_AVIS_JOURS = 90;
+const moyC = (c) => { const n = c.reduce((a, b) => a + b, 0); return n ? Math.round(c.reduce((a, x, i) => a + x * (i + 1), 0) / n * 10) / 10 : null; };
+export const evolutionHistorique = (hist, maintenant = Date.now()) => {
+  if (!Array.isArray(hist)) return null;
+  const lim = maintenant - HISTO_AVIS_JOURS * 86400000;
+  const pts = hist.map((p) => {
+    const t = Date.parse((p && p.at) || '');
+    const c = p && Array.isArray(p.c) && p.c.length === 5 && p.c.every((x) => Number.isInteger(x) && x >= 0) ? p.c : null;
+    if (!Number.isFinite(t) || t < lim || t > maintenant + 60000 || !c) return null;
+    return { t, total: Number.isInteger(p.total) && p.total >= 0 ? p.total : null, moy: moyC(c) };
+  }).filter(Boolean).sort((a, b) => a.t - b.t);
+  if (pts.length < 2) return null;
+  const a = pts[0], b = pts[pts.length - 1];
+  if (new Date(a.t).toISOString().slice(0, 10) === new Date(b.t).toISOString().slice(0, 10)) return null;
+  const nouveaux = a.total != null && b.total != null && b.total >= a.total ? b.total - a.total : null;
+  return { depuis: a.t, jusqua: b.t, points: pts.length, nouveaux, moyAvant: a.moy, moyApres: b.moy };
+};
 // Un texte d'avis COURT pour l'écran (jamais le pseudo : l'extension ne le range pas).
 export const texteCourtAvis = (t, max = 90) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s; };
 
@@ -84,7 +105,7 @@ export const notesParCompte = ({ profils, comptes = [], maintenant = Date.now(),
       n: n ?? 0, pos: num(p.pos), neu: num(p.neu), neg: num(p.neg),
       at: isFinite(p.atMs) ? p.atMs : null,
       vieux: !(isFinite(p.atMs) && maintenant - p.atMs <= PROFIL_VIEUX_J * 86400000),
-      liste: lus ? { dernieres: lus.slice(0, nDernieres), sousCinq: lus.filter((x) => x.note < 5), lus: lus.length, moyenneLus: moyNotes(lus), evolution: evolutionAvis(lus), total: totalVinted } : null,
+      liste: lus ? { dernieres: lus.slice(0, nDernieres), sousCinq: lus.filter((x) => x.note < 5), lus: lus.length, moyenneLus: moyNotes(lus), evolution: evolutionAvis(lus), total: totalVinted, historique: evolutionHistorique(p.hist, maintenant) } : null,
     };
   });
   const lus = liste.filter((x) => x.etat === 'lu');
