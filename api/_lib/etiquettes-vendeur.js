@@ -15,7 +15,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
-import { ordreStable } from './ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';
 import { passeTransporteursPdf, reqPdf } from './transporteur-anciens.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -31,6 +31,7 @@ async function lireTout(chemin) {
     let r;
     try { r = await fetch(ordreStable(`${SUPABASE_URL}/rest/v1/${avecOwner(chemin, owner)}`), { headers: { ...entetes(), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;

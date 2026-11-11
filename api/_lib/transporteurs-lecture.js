@@ -65,7 +65,7 @@ import * as T from './transporteurs.js';
 import * as D from './depart-colis.js';
 import { envoyerNotifTransp, notifEncoreValable } from './transporteurs-notif.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
-import { ordreStable } from './ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -152,6 +152,7 @@ async function lireTout(chemin) {
     try {
       r = await fetch(ordreStable(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
     } catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;

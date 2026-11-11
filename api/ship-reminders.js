@@ -40,7 +40,7 @@ import { bordsParTransaction, compterEcheances, heureCourte } from './_lib/limit
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
-import { ordreStable } from './_lib/ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
@@ -88,7 +88,7 @@ import { purgerHtml } from './_lib/email-html.js';
 import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
-import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+import { passerVendeurs, BUDGET_VENDEURS_MS, TEMPS_VENDEUR_MS } from './_lib/cron-lots.js';
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
 import { passageSondes } from './_lib/statut-sondes.js';
@@ -194,6 +194,7 @@ async function fetchPaginated(path) {
     // (7 nov.) Un ordre TOTAL : sans `order=`, une ligne peut sauter ou revenir d'une page à l'autre.
     try { r = await fetch(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
@@ -1511,12 +1512,13 @@ export default async function handler(req, res) {
     const budget = Number(process.env.VRM_CRON_BUDGET_MS) > 0 ? Number(process.env.VRM_CRON_BUDGET_MS) : BUDGET_VENDEURS_MS;
     const lot = await passerVendeurs({
       owners, moment: momentCurseur, jour: parisDate(0), debut: debutCron, budgetMs: budget, parallele: VENDEURS_EN_PARALLELE,
+      tempsVendeurMs: Number(process.env.VRM_CRON_VENDEUR_MS) > 0 ? Number(process.env.VRM_CRON_VENDEUR_MS) : TEMPS_VENDEUR_MS,   // (11 nov.) un vendeur énorme ne garde pas sa place
       traiter: (o) => contexteVendeur.run({ owner: o }, () => traiter()),
       lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre, retirerCurseur: retirerNeutre,
     });
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
-      lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
+      lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, reportes: lot.reportes, curseur: lot.curseur },
       bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
