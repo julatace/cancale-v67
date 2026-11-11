@@ -72,8 +72,11 @@ Planche : `docs/passation/planches-dj5/icones-avant-apres.png`.
 - `scripts/bancs/achats-relier.cjs` (neuf, données inventées, 390 tactile et 1512, clair et sombre) :
   A proposition + « Choisir un autre achat » + 50 achats au même titre, SON clic relie 91000037 jamais
   91000007 ; B reçu e-mail ⇒ feuille, sans ⇒ visionneuse, **aucun événement download** ; C Délier ;
-  D « Autre achat » de « Sans achat relié » ; E Nouvel achat ; F icônes. Résultats : voir la ligne
-  « Bancs » plus bas.
+  D « Autre achat » de « Sans achat relié » ; E Nouvel achat ; F icônes. **126 verts** (4 passes) ;
+  sur `origin/main` rebâti (git archive) : **26 rouges** (390 + 1512 sombre : A1, B0, B2, C1, D1,
+  E1-E7, F1-F2).
+- Audits verts : variables, tdz, coherence, identite, icones, suggestions-achat, plateformes-logo,
+  raccourcis-siri, import-partage-aide. `npm run build` vert. `git merge origin/main` sans conflit.
 - Captures regardées : `docs/passation/planches-dj5/`.
 
 ## Ce qui reste
