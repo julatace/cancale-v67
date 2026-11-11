@@ -71,3 +71,39 @@ et vert après (build de cette branche).
   s'il datait d'avant le changement de point, il pourrait ne plus valoir. Jamais observé ; à mesurer.
 * Deux éléments portent `id="colis-a-expedier"` (la section Leboncoin et l'en-tête de la section Vinted ne sont
   jamais montés ensemble : sans effet aujourd'hui).
+
+## Suite : intégration du paquet colis (demande de la session principale, 11 nov. après-midi)
+
+Sur `claude/revue-colis`, pas de PR (la session principale intègre).
+
+1. **Vrai `git merge origin/claude/integration-11nov-e2`** (main + paquet : ouverture légère, meilleures sources,
+   reprise-ecrans, restes, actions-série, ventes-lot, stats-plus). Les deux côtés gardés : `lireTxnMeta` /
+   `lireFamilleCopiee` + `cap` (déjà dans `VERSION_META` : rien à ajouter à `TXN_COPIE_SELECT`, un alias en double
+   aurait été refusé) ; `noterEtatsTxn` garde `su` et `cap` ; `ecranAOuvrir` (reprise synchronisée) puis
+   `placeDesColis` ; carte « À trancher » (`jobTrancher`) + « commandes à vérifier » ; `MeilleuresSources` +
+   `ExtEnRetard` hors outils ; badges Ventes/Achats (l'entrée « À trancher » a quitté la navigation, lot DJ4).
+   Bancs en conflit : `tout-imprimer` garde l'ordre de l'écran par clés (la variante « groupes de l'écran »
+   comparait des transporteurs à des clés), `colis-retirer-propre` attend l'ÉTAT sans l'onglet disparu.
+2. **`git merge origin/claude/ventes-achats-visuel`** : frise fine en ligne (`friseEtat`) posée sur la ligne de vente
+   qui porte aussi le lot (ventes-lot) ; styles ventes-achats-visuel importés avant ceux de la tablette.
+   **`origin/claude/agent2-nsk5su`** : déjà entièrement contenu dans la branche (`git merge-base --is-ancestor`) —
+   ligne fine par colis, « Imprimer » à place fixe, étagère du Stock : rien à reprendre.
+3. **Arbitrages tranchés** :
+   (a) `colis-villes` porté sur « aucune hypothèse » : Cancale 3, « Autres · 2 », « Lieu à confirmer » 3, le bouton
+   de la ville à la place de la carte sombre — 46 verts ;
+   (b) les outils de retrait d'Achats suivent le filtre de site (Vinted, écran d'arrivée, montre tout ; rien sous
+   eBay / Leboncoin / Vestiaire) — `achats-retirer-site` 24 verts ;
+   (c) « Tout imprimer » : l'emplacement (pièce · meuble · case, par SON N°, `ouEstNumero`) en petit sous chaque paire,
+   « emplacement non noté » sinon — `tout-imprimer` C ;
+   (d) point relais changé : le code d'un autre e-mail du même n° n'est montré que s'il est daté APRÈS le changement,
+   sinon « Code à confirmer » — `audit-relais-change` 32 verts, mutation « code-ancien-montre » attrapée (9/9) ;
+   (e) une seule définition d'ancre (`ID_SECTION_COLIS`, src/colisPlace.js) ; `liens-colis-anciens` vérifie UNE ancre
+   dans la page pour chacun des 7 anciens chemins ;
+   (f) date limite au téléphone : sur l'état intégré elle passe à la ligne (capture regardée) ; le banc
+   `annonces-ventes-brouillon` mesure désormais « aucune ellipse » sur chaque carte (390 et 1512).
+4. **Bancs portés** (nombre « À retirer » = entrée Achats de la navigation + `data-cc-n` de la liste ; section
+   d'Achats ; retour par Ventes) : `colis-sms` 57, `journee-photos` 105, `retraits-frais` F1, `retrait-relais-carte`,
+   `retrait-autre-ville`, `vestiaire-colis`, `gestes-annuler` G1/G2, `iphone-reprise` 139 (B9/R2), `navigation-tache`
+   162 (À trancher est une carte de Ma journée), `colis-envoyes-tri` 92 (le « ↗ » de la ligne de suivi).
+   Restent rouges, les mêmes que sur `main` : `retraits-frais` F6 (ligne de fraîcheur), `gestes-annuler` G1 « avant
+   toute écriture » et G3 (2), `achats-retraits` (8).
