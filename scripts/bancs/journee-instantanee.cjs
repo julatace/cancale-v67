@@ -170,8 +170,9 @@ async function main() {
         const o = ref.obj;
         dit(!!o && o.valeur === ref.vendu && o.cible === String(OBJ * 100), `O ${T} la barre de l'objectif = la case « Vendu · mois » (${venduMois} € sur ${OBJ} €)`, JSON.stringify(o && { valeur: o.valeur, cible: o.cible, caseVendu: ref.vendu }));
         dit(!!o && o.reste === String(Math.round(resteMain * 100)) && o.parJour === String(parJourMain * 100), `O ${T} ce qui reste (${resteMain} €) et le rythme (${parJourMain} €/jour sur ${joursRestants} jours, aujourd'hui compris)`, JSON.stringify(o && { reste: o.reste, parJour: o.parJour }));
-        const txtAttendu = joursRestants > 1 ? `encore ${fr(resteMain)} € · ≈ ${fr(parJourMain)} €/jour d’ici le ${finMois}` : `encore ${fr(resteMain)} € aujourd’hui`;
-        dit(!!o && o.texte.includes(`sur ${fr(OBJ)} €`) && o.texte.includes(txtAttendu), `O ${T} la phrase : « ${fr(venduMois)} € sur ${fr(OBJ)} € · ${txtAttendu} »`, o && o.texte);
+        // (11 nov., lot objectifs-mois) « 2 000 € vendus ce mois · encore 660 € en 19 jours · ≈ 35 €/jour ».
+        const txtAttendu = joursRestants > 1 ? `encore ${fr(resteMain)} € en ${joursRestants} jours · ≈ ${fr(parJourMain)} €/jour` : `encore ${fr(resteMain)} € aujourd’hui`;
+        dit(!!o && o.texte.includes(`${fr(OBJ)} € vendus ce mois`) && o.texte.includes(txtAttendu), `O ${T} la phrase : « ${fr(OBJ)} € vendus ce mois · ${fr(venduMois)} € · ${txtAttendu} »`, o && o.texte);
         dit(!!o && o.plein && o.piste && o.plein !== o.piste && /rgba\(255, 255, 255, 0\.1/.test(o.piste), `O ${T} la piste neutre, l'accent seulement sur la part faite`, o && `${o.piste} / ${o.plein}`);
         await shot(pg, `ji-vrai-${vp.width}-${theme}`);
         // Toucher la barre ⇒ le réglage de l'objectif, déplié.
