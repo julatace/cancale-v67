@@ -101,6 +101,12 @@ const COUPLES = {
   'src/modeVacances.js|www.leboncoin.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|www.ebay.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|fr.vestiairecollective.com': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
+  // (11 nov., ci-vert) Lots clôture d'année et « retirer ailleurs » : des liens <a>, sur SON clic.
+  'src/ClotureAnnee.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted ↗ » : ventes de l’année au détail pas encore relu'],
+  'src/RetirerAilleurs.jsx|www.vinted.fr': ['lien', LIEN + ' — « à faire sur le site » : retirer l’annonce sur Vinted'],
+  'src/RetirerAilleurs.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « à faire sur le site » : retirer l’annonce sur Vestiaire'],
+  'src/RetirerAilleurs.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « à faire sur le site » : Mes annonces Leboncoin'],
+  'src/RetirerAilleurs.jsx|www.ebay.fr': ['lien', LIEN + ' — « à faire sur le site » : annonces actives eBay'],
   'src/ecrans/Compta.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted ↗ » : ventes pas encore datées (relecture du détail)'],
   'src/ecrans/Compta.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire ↗ » : ventes pas encore datées'],
   'src/relaisChange.js|maps.apple.com': ['lien', LIEN + ' — « Itinéraire » vers le nouveau point relais (adresse lue dans l’e-mail)'],

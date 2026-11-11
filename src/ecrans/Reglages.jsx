@@ -1914,7 +1914,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
-      AUTH.user && { id:'agenda', type:'panneau', ic:'clock', lib:tr('reglages.agenda.lib'), desc:tr('reglages.agenda.desc'), data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
+      AUTH.user && { id:'agenda', type:'panneau', ic:'target', lib:tr('reglages.agenda.lib'), desc:tr('reglages.agenda.desc'), data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:tr('reglages.alertes.lib'), desc:tr('reglages.alertes.desc'), on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
@@ -1987,7 +1987,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'securite', type:'panneau', ic:'shield', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:tr('reglages.donnees.lib'), desc:tr('reglages.donnees.desc'), onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
-      { id:'importer', type:'panneau', nu:true, ic:'box', lib:tr('reglages.importer.lib'), desc:tr('reglages.importer.desc'), data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
+      { id:'importer', type:'panneau', nu:true, ic:'copy', lib:tr('reglages.importer.lib'), desc:tr('reglages.importer.desc'), data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
       { id:'export', type:'action', ic:'archive', lib:tr('reglages.export.lib'), desc:tr('reglages.export.desc'), onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       // (11 nov.) Revenir en arrière : des points posés tout seuls (avant une action en série, un
       // import, chaque jour) ou une sauvegarde complète ⇒ aperçu précis ⇒ choisir quoi ⇒ confirmer (src/restauration.js).
@@ -2002,7 +2002,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     )},
     {id:'aide',titre:tr('reglages.groupe.aide'),items:[
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
-      { id:'verifier', type:'panneau', nu:true, ic:'check', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
+      { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:tr('reglages.visite.lib'), desc:tr('reglages.visite.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
@@ -2014,7 +2014,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
       // (11 nov.) « Quoi de neuf » : les nouveautés qui le concernent depuis son inscription (src/nouveautes.js).
-      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'spark', lib:tr('reglages.quoi-de-neuf.lib'), desc:tr('reglages.quoi-de-neuf.desc'), data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
+      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'vitrine', lib:tr('reglages.quoi-de-neuf.lib'), desc:tr('reglages.quoi-de-neuf.desc'), data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
       // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
       { id:'centre-aide', type:'action', ic:'search', lib:tr('reglages.centre-aide.lib'), desc:tr('reglages.centre-aide.desc'), onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
@@ -3265,7 +3265,7 @@ function DiscordCompte() {
 const texteInvitationEquipe = (email) => `Je t'invite à préparer mes colis sur VRM.\nCrée ton compte sur https://vrm.center avec ${email}.\nConfirme ton e-mail, puis touche « Accepter ».`;
 async function partagerInvitationEquipe(email) {
   const text = texteInvitationEquipe(email);
-  try { if (navigator.share) { await navigator.share({ text }); return 'partage'; } } catch (e) { if (e && e.name === 'AbortError') return 'annule'; }
+  try { if (typeof navigator.share === 'function') { await navigator.share({ text }); return 'partage'; } } catch (e) { if (e && e.name === 'AbortError') return 'annule'; }
   try { await navigator.clipboard.writeText(text); return 'copie'; } catch (_) { return 'montre'; }
 }
 function EquipeSetting() {

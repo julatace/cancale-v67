@@ -113,7 +113,10 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   // (9 nov., Ma journée v2) La prochaine chose à faire est posée EN TÊTE (`data-prochain`) : elle
   // est un geste de « À faire » (comptée dans « N gestes »), hors de la liste « Ensuite ».
   const pro = [...document.querySelectorAll('[data-prochain]')].filter(vis);
-  out.nCartes = cartes.length + pro.filter((e) => !(lst && lst.contains(e))).length + va.filter((e) => !(lst && lst.contains(e)) && !e.hasAttribute('data-prochain')).length;
+  // (11 nov., ci-vert — lot DJ4) « À trancher » n'est plus un écran : SA carte se pose en tête de
+  // « À faire », hors de la liste « Ensuite », et compte UN geste (`jobTrancher` dans nGestes).
+  const at = sec ? [...sec.querySelectorAll('[data-at-journee] > .vrm-day-task-list > [data-job="a-trancher"]')].filter(vis) : [];
+  out.nCartes = cartes.length + at.filter((e) => !(lst && lst.contains(e))).length + pro.filter((e) => !(lst && lst.contains(e))).length + va.filter((e) => !(lst && lst.contains(e)) && !e.hasAttribute('data-prochain')).length;
   out.ailleurs = va.map((e) => ({ dansListe: !!(lst && lst.contains(e)) || e.hasAttribute('data-prochain'), n: e.getAttribute('data-n') || '', texte: txt(e).slice(0, 80) }));
   // E5 — les verbes et les icônes des cartes.
   out.cartes = cartes.map((c) => {
@@ -252,8 +255,13 @@ async function tournee(nav, { W, theme, scenario }) {
   }
   // E4
   if (sombre && m.tete && m.carte0) {
-    const t = await moyenne(pg, nav, { x: m.tete.x + 4, y: m.tete.b - 18, width: Math.min(60, m.tete.w / 4), height: 10 });
-    const c = await moyenne(pg, nav, { x: m.carte0.x + m.carte0.w - 40, y: m.carte0.y + 4, width: 30, height: 8 });
+    // (11 nov., ci-vert) La journée défile dans un conteneur : on amène chaque zone à l'écran et on la
+    // mesure LÀ (coordonnées de la fenêtre). La carte « À trancher » (DJ4) pousse la 1re carte sous le pli.
+    const ici = (sel, amener) => pg.evaluate(([q, a]) => { const e = document.querySelector(q); if (!e) return null; if (a) e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, b: r.bottom }; }, [sel, amener]);
+    const tv = await ici('.vrm-fu-tete', true);
+    const t = await moyenne(pg, nav, { x: tv.x + tv.w / 2 - 30, y: tv.y + 8, width: 60, height: 8 });   // en haut, au milieu : le fond de la tête (son bas porte, au téléphone, les tuiles du mois ; ses coins sont arrondis)
+    const cv = await ici('.vrm-fu-afaire [data-barre-jour] > :not([style*="contents"]), .vrm-fu-afaire [data-barre-jour] > [style*="contents"] > *', true);
+    const c = await moyenne(pg, nav, { x: cv.x + cv.w - 40, y: cv.y + 4, width: 30, height: 8 });
     const rap = (Math.max(lum(t), lum(c)) + 0.05) / (Math.min(lum(t), lum(c)) + 0.05);
     const ec = ecartCouleur(t, c);
     dit(ec >= 14, 'E4', `${T} la tête sombre se détache des cartes (écart de couleur ${Math.round(ec)} ≥ 14, contraste ${rap.toFixed(2)})`, `tête rgb(${Math.round(t.r)},${Math.round(t.g)},${Math.round(t.b)}) carte rgb(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)})`);

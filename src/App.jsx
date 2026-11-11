@@ -41662,7 +41662,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const lbcSaitSuppr = extSait('lbcsupprime');
   const planAilleurs = planRetirerAilleurs(vendusAilleurs.v, {
     lbcOk: lbcSaitSuppr === 'ok',
-    lbcPourquoi: lbcSaitSuppr === 'absente' ? 'à faire sur Leboncoin — ici, pas d’extension VRM (ouvre VRM dans ton Chrome pour que VRM la supprime)' : 'à faire sur Leboncoin — ton extension est trop ancienne pour supprimer depuis VRM (mets-la à jour)',
+    lbcPourquoi: lbcSaitSuppr === 'absente' ? `à faire sur Leboncoin — ici, pas d’extension VRM (ouvre VRM ${NAV.dansNu} pour que VRM la supprime)` : 'à faire sur Leboncoin — ton extension est trop ancienne pour supprimer depuis VRM (mets-la à jour)',
     ebayOk: !!(AUTH.session && AUTH.session.access_token),
   });
   const [retraitsAilleurs, setRetraitsAilleurs] = useState(null);   // { plan, res } : le plan tel qu'exécuté, les issues
