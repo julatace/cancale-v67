@@ -104,8 +104,13 @@ const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) 
     const e2 = A.lignesATrancher({ pubs: pub2, comptes: [], maintenant: T + 300e3 });
     dit(A.appliquerTranches(e2, new Set(['supprimes-vinted:7'])).total === e2.total, '9 · republiée sans elle par son propriétaire, la chose ne retire plus rien (jamais deux fois)');
     const app2 = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
-    const corps = (/const trancherAT=\(carte,choix\)=>\{([\s\S]*?)\n  \};/.exec(app2) || [])[1] || '';
-    dit(/gesteVrm\(/.test(corps) && /CYCLE_DECISIONS/.test(corps) && /CHOIX_CYCLE\.CHEZ_MOI/.test(corps) && !/askConfirm|vmrCmd|fetch\(|vinted_pairs_lost|vinted_annonces_vendues/.test(corps), '9 · « Oui, chez moi » : la réponse de Ma journée en geste annulable, rien d’autre (ni confirmation, ni Vinted, ni vendu, ni sorti)', corps.slice(0, 120));
+    // (11 nov., lot DJ4) « Tu l'as encore ? » : trois réponses (garder · enlever + raison · plus tard),
+    // toutes par `gesteChezToi` (les opérations de `opsChezToi`, en geste annulable) ; ni confirmation,
+    // ni Vinted, ni vente inventée (`vinted_annonces_vendues`).
+    const corps = (/const trancherAT=\(carte,choix,raison\)=>\{([\s\S]*?)\n  \};/.exec(app2) || [])[1] || '';
+    const corpsG = (/function gesteChezToi\(carte, reponse, raison, apres = null\) \{([\s\S]*?)\n\}/.exec(app2) || [])[1] || '';
+    dit(/gesteChezToi\(/.test(corps) && /'garde'/.test(corps) && /'enleve'/.test(corps) && /'plus-tard'/.test(corps) && /gesteVrm\(/.test(corpsG) && /opsChezToi\(/.test(corpsG)
+      && !/askConfirm|vmrCmd|fetch\(|vinted_annonces_vendues/.test(corps + corpsG), '9 · « Tu l’as encore ? » : trois réponses en geste annulable, rien d’autre (ni confirmation, ni Vinted, ni vente inventée)', corps.slice(0, 120));
   }
 
   console.log(ko ? `\n${ko} rouge(s)` : '\nÀ trancher : chaque nombre vient de son écran, pas su ≠ 0.');

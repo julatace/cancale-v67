@@ -18,6 +18,8 @@
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const GARDE_RESEAU = `--require=${path.join(__dirname, 'bancs', '_garde-reseau.cjs')}`;   // (11 nov.) aucun banc ne joint un vrai serveur
+const avecGarde = (e) => Object.assign({}, e, { NODE_OPTIONS: [e.NODE_OPTIONS || '', GARDE_RESEAU].join(' ').trim() });
 
 const RACINE = path.join(__dirname, '..');
 // Les parts et les durées : docs/passation/2026-11-06-filets-anti-bug.md (§1).
@@ -52,7 +54,7 @@ function lancer(nom, port) {
     const fichier = path.join(RACINE, 'scripts', 'bancs', nom + '.cjs');
     if (!fs.existsSync(fichier)) { resolve({ nom, code: 2, ms: 0, sortie: 'banc introuvable : ' + fichier }); return; }
     const enfant = spawn(process.execPath, [fichier], {
-      cwd: RACINE, env: Object.assign({}, process.env, { BANC_PORT: String(port), PORT: String(port) }), stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+      cwd: RACINE, env: avecGarde(Object.assign({}, process.env, { BANC_PORT: String(port), PORT: String(port) })), stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     let sortie = '';
     const garder = (b) => { const t = b.toString(); sortie += t; process.stdout.write(t.replace(/^/gm, `[${nom}] `)); };

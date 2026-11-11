@@ -49,7 +49,14 @@ dit(/^deny$/i.test(((h('X-Frame-Options') || {}).value || '')), 'X-Frame-Options
 
 console.log('\n── index.html');
 const html = lire('index.html');
-const enLigne = (html.match(/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) || []);
+// (11 nov.) Seule exception : un BLOC DE DONNÉES `application/ld+json` (données
+// structurées de la page d'accueil). Le navigateur ne l'exécute jamais (la CSP
+// ne régit que les scripts exécutés) ; il doit être du JSON valide, sans rien
+// d'autre qu'un objet.
+const blocsDonnees = (html.match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/gi) || []);
+const donneesOk = blocsDonnees.every((b) => { try { const j = JSON.parse(b.replace(/^<script[^>]*>|<\/script>$/g, '')); return j && typeof j === 'object'; } catch (_) { return false; } });
+dit(donneesOk, `les blocs de données structurées (${blocsDonnees.length}) sont du JSON valide, jamais exécutés`);
+const enLigne = (html.match(/<script(?![^>]*\bsrc=)(?![^>]*type="application\/ld\+json")[^>]*>[\s\S]*?<\/script>/gi) || []);
 dit(enLigne.length === 0, "aucun script en ligne (ils vivent dans public/demarrage-*.js)", enLigne.map((s) => s.slice(0, 50)).join(' | '));
 for (const m of html.matchAll(/<script[^>]*\bsrc="(\/[^"]+)"/g)) {
   const f = m[1];

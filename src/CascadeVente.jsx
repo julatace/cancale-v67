@@ -80,7 +80,8 @@ export function ValeurStockCarte({ v, onSaisir = null, mots = null }) {
       {v && v.n ? <div className="vrm-cv-stock-jauge" role="img" aria-label={`${v.nPrix} sur ${v.n} avec un prix d’achat`}><span style={{ width: `${pct}%` }}/></div> : null}
       <div className="vrm-cv-stock-sous">
         {!v ? <span data-valeur-stock-passu="">annonces pas encore lues</span> : null}
-        {t.sur ? <span data-valeur-stock-sur="">{t.sur}</span> : null}
+        {/* (11 nov., lot DJ4) Le Stock compte les paires EN LIGNE ; la valeur, elles et celles gardées à part (à confirmer, masquées) : dit. */}
+        {t.sur ? <span data-valeur-stock-sur="">{t.sur} chez toi</span> : null}
         {t.sans ? (onSaisir
           ? <button type="button" className="vrm-cv-porte" data-valeur-stock-saisir="" onClick={onSaisir}>{t.sans} ›</button>
           : <span>{t.sans}</span>) : null}
