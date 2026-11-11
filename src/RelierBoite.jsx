@@ -12,6 +12,7 @@
 //    automatique ne démarre pas.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ADRESSE_COLLECTRICE } from '../api/_lib/proprietaire-email.js';
+import Pourquoi from './composants/PourquoiReplie.jsx';
 import { MESSAGERIES, EXPEDITEURS, ADRESSE_EXEMPLE, BOITE_VRM_EXEMPLE, regleFiltre, motsScene } from './relierBoite.js';
 
 const DUREE_ETAPE = 4200;
@@ -120,7 +121,8 @@ export default function RelierBoite({ onAdresses, messagerieInitiale = 'gmail' }
   const basculer = (id) => setChoisis((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
   return (
     <div className="vrm-relier" data-relier-boite="" data-messagerie={m.id}>
-      <p className="vrm-relier-intro">Ta messagerie fait suivre à VRM une <b>copie</b> des e-mails de Vinted, des transporteurs et des sites de vente. Rien d’autre ne part, et cette page n’envoie rien : elle te montre le geste.</p>
+      <p className="vrm-relier-intro">Ta messagerie fait suivre à VRM une <b>copie</b> des e-mails de vente. Rien d’autre ne part.</p>
+      <Pourquoi>Ta messagerie fait suivre à VRM une copie des e-mails de Vinted, des transporteurs et des sites de vente. Rien d’autre ne part, et cette page n’envoie rien : elle te montre le geste.</Pourquoi>
 
       <div className="vrm-relier-choix" role="group" aria-label="Ta messagerie">
         {MESSAGERIES.map((x) => <button key={x.id} type="button" aria-pressed={x.id === m.id} data-relier-messagerie={x.id} onClick={() => { setMid(x.id); setI(0); }}>
@@ -147,7 +149,7 @@ export default function RelierBoite({ onAdresses, messagerieInitiale = 'gmail' }
 
       {!sansRegle && <section className="vrm-relier-bloc" aria-label="Les expéditeurs à faire suivre">
         <h3>Les expéditeurs à faire suivre</h3>
-        <p className="vrm-relier-doux">Touche un expéditeur pour voir sa règle dans l’animation. Décoche ceux que tu n’utilises pas.</p>
+        <p className="vrm-relier-doux">Touche un expéditeur pour voir sa règle. Décoche ceux que tu n’utilises pas.</p>
         <ul className="vrm-relier-exp">
           {EXPEDITEURS.map((x) => <li key={x.id} data-relier-exp={x.id} data-choisi={choisis.includes(x.id) ? '1' : '0'}>
             <label className="vrm-relier-case"><input type="checkbox" checked={choisis.includes(x.id)} onChange={() => basculer(x.id)}/><span className="vrm-sr">Faire suivre {x.nom}</span></label>
@@ -171,7 +173,7 @@ export default function RelierBoite({ onAdresses, messagerieInitiale = 'gmail' }
           <button type="button" disabled={!regle.texte} onClick={() => copier(regle.texte, 'Règle')}>Copier</button>
         </div>}
         {copie && <p role="status" className="vrm-relier-doux">{copie}</p>}
-        <p className="vrm-relier-doux">Avant ou après, déclare et confirme ton adresse personnelle : c’est elle qui dit que ces e-mails sont à toi.</p>
+        <p className="vrm-relier-doux">Déclare et confirme aussi ton adresse : elle prouve que ces e-mails sont à toi.</p>
         {onAdresses && <button type="button" className="vrm-relier-lien vrm-pied-lien" data-pied-lien="adresses" data-relier-adresses="" onClick={onAdresses}>Mes adresses de réception <span aria-hidden="true">→</span></button>}
       </section>}
     </div>

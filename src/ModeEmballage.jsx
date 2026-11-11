@@ -85,7 +85,7 @@ export default function ModeEmballage({ colis, lecture = null, onFermer, onMarqu
     if (vue === 'fait') return (
       <div className="vrm-emb-fin" data-emb-fait={fait ? fait.n : 0}>
         <p className="vrm-emb-grand-texte">{fait && fait.n > 1 ? `${fait.n} colis marqués postés.` : '1 colis marqué posté.'}</p>
-        <p className="vrm-emb-aide">Ils sortent de « Prêts à imprimer ». Vinted confirmera l'envoi au premier passage chez le transporteur.</p>
+        <p className="vrm-emb-aide">Ils sortent de « Prêts à imprimer ». Vinted confirme l'envoi au dépôt.</p>
       </div>
     );
     if (!n) return (
