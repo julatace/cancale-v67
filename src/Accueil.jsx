@@ -396,7 +396,7 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in">
             <p className="av-pour" data-pour-qui="">L’outil des revendeurs Vinted, Leboncoin et eBay. Tous articles.</p>
             <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">Vinted, Leboncoin, eBay, Vestiaire : chaque matin, VRM te dit quoi faire, sans te tromper d’article.</p>
+            <p className="av-sous">Vinted, Leboncoin, eBay, Vestiaire : chaque matin, quoi faire, sans erreur d’article.</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
