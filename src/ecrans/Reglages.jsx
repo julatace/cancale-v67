@@ -64,6 +64,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
 // ⟦← App.jsx #5⟧
@@ -1404,6 +1405,9 @@ function PushPrefsSetting({ comptes, onMuets }) {
   const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
   // (8 nov.) Allumé par défaut (api/_lib/notif-textes.js, `regrouper`) : seul un `false` posé l'éteint.
   const regroupe = !(prefs && prefs.regrouper === false);
+  // (11 nov., C8) L'heure choisie tombe dans ses heures calmes ⇒ dit (la règle du serveur, `dansHeuresCalmes`).
+  const soir = reglageSoir(prefs || {});
+  const soirCalme = (() => { if (soir.heure == null || !calme.actif || calme.sauf.includes('rappels')) return false; const mn = (h) => { const [a, b] = String(h).split(':').map(Number); return a * 60 + b; }; const d = mn(calme.debut), f = mn(calme.fin), m = soir.heure * 60; if (d === f) return false; return d < f ? (m >= d && m < f) : (m >= d || m < f); })();
   const n = prefs ? PUSH_FAMILLES.filter(actif).length : 0;
   return (
     <>
@@ -1458,6 +1462,18 @@ function PushPrefsSetting({ comptes, onMuets }) {
           <Interrupteur on={calme.sauf.includes('doublevente')} onClick={()=>poserCalme({ sauf: calme.sauf.includes('doublevente') ? calme.sauf.filter((x)=>x!=='doublevente') : [...calme.sauf, 'doublevente'] })} disabled={!prefs||busy} label="La double vente sonne pendant les heures calmes"/>
         </div>
       )}
+      {/* (11 nov., décision C8 — Julien : « tranche ») L'heure du résumé du soir : le défaut
+          INCHANGÉ (19 h l'hiver, 20 h l'été), ou son heure, de 18 h à 22 h (heure de Paris).
+          Rangée dans `push_prefs.soirHeure` ; le serveur la lit (api/_lib/notif-textes.js, `soirALHeure`). */}
+      <div className="vrm-np-ligne" data-np-soir={soir.heure == null ? 'defaut' : String(soir.heure)}>
+        <span className="vrm-np-lib">Résumé du soir<small>Ce qu’il y a à faire demain.</small></span>
+        <select className="vrm-np-soir" aria-label="Heure du résumé du soir" data-np-soir-choix="" value={soir.heure == null ? '' : String(soir.heure)} disabled={!prefs||busy}
+          onChange={(e)=>{ const v = e.target.value; const suite = { ...(prefs || {}) }; if (v === '') delete suite.soirHeure; else suite.soirHeure = Number(v); ecrirePrefs(suite, 'L’heure du résumé'); }}>
+          <option value="">19 h (hiver) · 20 h (été)</option>
+          {HEURES_SOIR.map((h)=><option key={h} value={String(h)}>{h} h</option>)}
+        </select>
+      </div>
+      {soirCalme ? <div className="vrm-np-relance" data-np-soir-calme="">Pendant tes heures calmes : il ne sonnera pas.</div> : null}
       <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
         <span className="vrm-np-lib">Regrouper<small>« 3 bordereaux prêts à imprimer » au lieu de trois notifications.</small></span>
         <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper : ${regroupe?'activé':'désactivé'}`}/>

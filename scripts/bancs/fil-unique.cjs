@@ -2,7 +2,8 @@
 // Données INVENTÉES (aucune donnée réelle), à la forme des lignes que lit l'app :
 // boîtes Vinted `harvest_{uid}_inbox`, fils captés `harvest_{uid}_conv_{id}`,
 // `lbc_fil_*` / `vc_fil_*` lus en scalaires `meta`, `vc_messages`, `vc_listings`.
-//   A. « Tous » existe dans Messages ; `?tab=messages` (sans site) reste Vinted ;
+//   A. « Tous » existe dans Messages ; (11 nov., C9) « Tous » par défaut, SON dernier choix retenu,
+//      l'ancienne valeur posée à chaque visite (« vinted ») n'est plus lue, `site=vinted` reste Vinted ;
 //   B. 301 et 302 : le MÊME acheteur (5301) sur la MÊME annonce (444) ⇒ UN fil ;
 //      303 et 304 : deux acheteurs au MÊME pseudo, même paire ⇒ deux fils ;
 //      Leboncoin et Vestiaire : un fil chacun (rien de fusionné seul) ;
@@ -133,11 +134,31 @@ const attendreFils = async (pg) => { await pg.waitForFunction(() => { const e = 
       await r.pg.waitForSelector('[data-filtre-site="messages"]', { timeout: 15000 }).catch(() => {});
       await r.pg.waitForTimeout(1500);
       dit(await r.pg.$('[data-filtre-site="messages"] [data-site="toutes"]') != null, 'A · Messages porte « Tous »');
-      dit(await r.pg.$('[data-fils-tous]') == null && await r.pg.$('[data-filtre-site="messages"] [data-site="vinted"][aria-pressed="true"]') != null, 'A · `?tab=messages` reste sur Vinted');
+      await attendreFils(r.pg);
+      dit(await r.pg.$('[data-fils-tous]') != null && await r.pg.$('[data-filtre-site="messages"] [data-site="toutes"][aria-pressed="true"]') != null, 'A · (C9) `?tab=messages` ouvre « Tous » par défaut (les fils)');
+      // L'ancienne mémoire (posée à chaque visite, « vinted » chez tous) ne compte plus ; SON toucher, si.
+      await r.pg.evaluate(() => { localStorage.setItem('vrm_filtre_site', JSON.stringify({ messages: 'vinted' })); });
+      await r.pg.goto(r.pg.url().replace(/\?.*$/, '') + '?tab=messages', { waitUntil: 'domcontentloaded' });
+      await r.pg.waitForSelector('[data-filtre-site="messages"]', { timeout: 15000 }).catch(() => {}); await attendreFils(r.pg);
+      dit(await r.pg.$('[data-filtre-site="messages"] [data-site="toutes"][aria-pressed="true"]') != null, 'A · (C9) l’ancienne valeur automatique « vinted » n’est plus lue : « Tous »');
+      await r.pg.click('[data-filtre-site="messages"] [data-site="vinted"]');
+      await r.pg.waitForTimeout(600);
+      await r.pg.goto(r.pg.url().replace(/\?.*$/, '') + '?tab=messages', { waitUntil: 'domcontentloaded' });
+      await r.pg.waitForSelector('[data-filtre-site="messages"]', { timeout: 15000 }).catch(() => {}); await r.pg.waitForTimeout(1500);
+      dit(await r.pg.$('[data-fils-tous]') == null && await r.pg.$('[data-filtre-site="messages"] [data-site="vinted"][aria-pressed="true"]') != null, 'A · (C9) son dernier choix (Vinted, touché) est retenu');
       await r.pg.click('[data-filtre-site="messages"] [data-site="toutes"]');
       await attendreFils(r.pg);
       dit(await r.pg.$('[data-fils-tous]') != null, 'A · « Tous » ouvre les fils');
       dit(!r.errs.length, 'A · aucune erreur', r.errs.join(' | '));
+      await r.ctx.close();
+    }
+    {
+      // (11 nov., C9) Un lien qui vise Vinted (notification, Favoris) reste sur Vinted, et n'écrit pas de choix.
+      const r = await ouvrir(b, { width: 390, height: 844 }, { url: '/?tab=messages&site=vinted' });
+      await r.pg.waitForSelector('[data-filtre-site="messages"]', { timeout: 15000 }).catch(() => {}); await r.pg.waitForTimeout(1500);
+      dit(await r.pg.$('[data-filtre-site="messages"] [data-site="vinted"][aria-pressed="true"]') != null, 'A · (C9) `site=vinted` (notifications) reste sur Vinted');
+      const m = await r.pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_filtre_site') || '{}'));
+      dit(!m['messages:choix'], 'A · (C9) un lien n’est pas un choix : rien retenu', JSON.stringify(m));
       await r.ctx.close();
     }
     for (const [vp, sombre, nom] of [[{ width: 1512, height: 950 }, false, '1512-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 390, height: 844 }, false, '390-clair'], [{ width: 1512, height: 950 }, true, '1512-sombre']]) {
