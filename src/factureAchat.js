@@ -109,10 +109,15 @@ export async function lireContenuFacture(cle, { fetch: f, url, auth, owner = '' 
   } catch (_) { return null; }
 }
 // Pour l'export comptable : la mention d'une ligne du registre (`l.id` = « tx » Vinted ou « hors:id »).
+// (11 nov.) La clé de la facture d'une ligne du registre : la même pour la mention et pour le zip.
+export function cleFactureLigne(ligne) {
+  if (!ligne) return '';
+  const id = String(ligne.id || '');
+  return id.startsWith('hors:') ? cleFacture('hors', id.slice(5)) : cleFacture('tx', ligne.reference || '');
+}
 export function mentionFacture(ligne, factures) {
   if (!ligne || !factures) return '';
-  const id = String(ligne.id || '');
-  const cle = id.startsWith('hors:') ? cleFacture('hors', id.slice(5)) : cleFacture('tx', ligne.reference || '');
+  const cle = cleFactureLigne(ligne);
   const f = cle ? factures[cle] : null;
   return f ? `facture jointe${f.nom ? ` (${f.nom})` : ''}` : '';
 }
