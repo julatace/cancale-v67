@@ -218,6 +218,8 @@ const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
 const OffresAuto = aLaDemande(() => import('./OffresAuto.jsx'));
 const AchatsOutils = aLaDemande(() => import('./AchatsOutils.jsx'));
+// (11 nov.) « Tes meilleures sources » dans Achats (src/MeilleuresSources.jsx, la même carte qu'Argent).
+const MeilleuresSources = aLaDemande(() => import('./MeilleuresSources.jsx'));
 // ⟦→ ecrans/Vestiaire.jsx #3⟧
 // ⟦→ ecrans/Compta.jsx #3⟧
 const RechercheEbay = aLaDemande(() => import('./ebayRecherche.jsx'));
@@ -475,7 +477,8 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 import { auCentreDeVerification } from "./verificationArticle.js";
 import { preuvesFriseVinted, bifurcationVente, friseProuvee } from "./friseProuvee.js";   // (10 nov., lot BE) la frise d'une vente, étape par étape
 import FriseVente from "./FriseVente.jsx";
-import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js";   // (10 nov., lot BG) d'où viennent mes achats
+import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js";
+import { bilanSources, publierMeilleures } from "./meilleuresSources.js";   // (11 nov.) tes meilleures sources   // (10 nov., lot BG) d'où viennent mes achats
 import { lignesVitesse, publierVitesse } from "./vitesseEnvoi.js";   // (10 nov., lot BM) vitesse d'envoi
 import { LigneVitesse } from "./VitesseEnvoi.jsx";
 import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
@@ -37701,6 +37704,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, offBuys, registreFo, autresBenefice, hiddenSales, hiddenAccts]);
+  // ── (11 nov.) TES MEILLEURES SOURCES — publiées pour Argent et Achats (src/meilleuresSources.js) ──
+  // Les ACHATS (Vinted lus, hors annulés — la règle de « Dépensé » ; hors plateforme ; en gros chez
+  // un fournisseur QU'IL a créé), et les ventes prouvées pas annulées, rattachées à LEUR achat par
+  // identité seulement (`achatDeVente` : `buyFromId`, `buyGros.id`, N° unique d'un achat hors
+  // plateforme). Bénéfice : la règle unique (`beneficeLigneVente` / `ventesAutresBenefice`).
+  // Rien n'est publié tant qu'une lecture manque (ventes, achats, Leboncoin/eBay) : la dernière reste.
+  useEffect(() => {
+    if (!Array.isArray(sales.items) || !Array.isArray(buys.items)) return;
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
+    if ((Array.isArray(buys.failedUids) ? buys.failedUids : []).some((u) => !acctOff(u))) return;
+    if (!Array.isArray(autresBenefice)) return;
+    try {
+      const ventes = [];
+      for (const o of sales.items) {
+        if (!o || isHidden(o) || o.transaction_id == null || classifyOrderStatus(o.status) === 'cancelled') continue;
+        const e = effEntry(o); if (!e) { ventes.push({ id: 'vinted:' + o.transaction_id, entree: null }); continue; }
+        const t = o.date ? Date.parse(o.date) : NaN;
+        const devise = o.price && o.price.currency_code;
+        const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
+        const prix = devise && devise !== 'EUR' ? null : montantCommandeLu(o);
+        ventes.push({ id: 'vinted:' + o.transaction_id, ts: isFinite(t) ? t : null, entree: e, prix: prix == null ? null : Math.round(prix * 100),
+          benefice: lb.benefice == null ? null : Math.round(lb.benefice * 100), partiel: lb.etat === 'partiel' });
+      }
+      for (const x of autresBenefice) {
+        if (!x) continue;
+        // Une commande eBay à plusieurs N° : aucune fiche unique ⇒ sans achat relié (jamais attribuée).
+        const f = x.num && !/\+/.test(x.num) ? ficheUniqueDuNumero(numeros, cleNum(x.num)) : null;
+        const b = x.achat != null && isFinite(x.eur) ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) : null;
+        ventes.push({ id: String(x.id), ts: isFinite(x.ts) ? x.ts : null, entree: f ? withBuyByNum(f) : null, prix: isFinite(x.eur) ? Math.round(x.eur * 100) : null, benefice: b, partiel: false });
+      }
+      const masques = achatsMasques();
+      const r = bilanSources({
+        achatsVinted: buysBase.filter((o) => !masques.has(String(o.transaction_id))), estAnnule: achatAnnule,
+        montantVinted: (o) => { const d = o && o.price && o.price.currency_code; return d && d !== 'EUR' ? null : montantCommandeLu(o); },
+        hors: offBuys, prixHors: prixAchatHorsNombre, registre: lireRegistre(registreFo), fiches: numeros, saleOv, ventes, cleNum,
+      });
+      publierMeilleures(r, { owner: AUTH.user?.id || '' });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, buys.items, buys.failedUids, buysBase, numeros, saleOv, buyByNum, offBuys, registreFo, autresBenefice, hiddenSales, hiddenAccts]);
   // ── (10 nov., lot BM) VITESSE D'ENVOI — publiée pour Statistiques et Ma semaine (src/vitesseEnvoi.js) ──
   // Le départ d'une vente est la règle unique (`partisVinted`, api/_lib/depart-vente.js) avec SA date
   // (Colis fait / scan, panneau, e-mail du n° exact, prise en charge) ; une vente partie d'après Vinted
@@ -42742,6 +42785,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
             compte connecté dans l'onglet) : dit ICI, sur l'écran où il le constate. Se tait si elle est à jour. */}
         <ExtEnRetard onNav={onNav}/>
+        {/* (11 nov.) Où acheter ce qui se revend le mieux : la carte lit la publication faite plus haut
+            (`publierMeilleures`), la même qu'Argent → Statistiques. */}
+        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '12px 16px 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
         {/* (5 nov., revue 2.16) Fournisseurs · Délai · Lots rangés derrière « … » : une seule carte de
             chiffres en tête, les outils à un geste (src/AchatsOutils.jsx, inchangé). */}
         {!modeRetraits && !baseKO && achatsOutilsOuverts && <div className="vrm-achats-outils" id="vrm-achats-outils" data-achats-outils="ouverts">
