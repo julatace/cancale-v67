@@ -156,7 +156,7 @@ async function neuf(nav, W, theme) {
   dit(e.centre, `${T} le titre est au milieu`);
   dit(e.segments === 7 && e.n === '1' && e.sur === '7', `${T} barre de progression (7 étapes sans statut), 1 sur 7`, JSON.stringify(e));
   dit(!e.retourVisible, `${T} pas de « Retour » à la 1re étape`);
-  dit(e.cartes.length === 18 && e.cartes.every((c) => c.h >= 44 && !c.coche), `${T} des tuiles à toucher (≥ 44 px, 18 propositions depuis le 9 nov. soir), rien de coché d'avance`, JSON.stringify(e.cartes));
+  dit(e.cartes.length === 19 && e.cartes.every((c) => c.h >= 44 && !c.coche), `${T} des tuiles à toucher (≥ 44 px, 19 propositions : Lunettes depuis le 11 nov.), rien de coché d'avance`, JSON.stringify(e.cartes));
   dit(/Passer/.test(e.suivant), `${T} sans réponse, le bouton dit « Passer cette étape »`, e.suivant);
   await capture(o.pg, `cfg-${W}-${theme}-1-vends`);
   await choisir(o.pg, 'vends:autre');
@@ -195,8 +195,11 @@ async function neuf(nav, W, theme) {
   dit(await attendre(o.pg, async () => { const d = ligneMain(base).vrm_numero_ecrit; return d && d.actif === true && (d.ou || []).join() === 'description,titre'; }), `${T} « fin de description + titre » ⇒ vrm_numero_ecrit { actif, ou } (le réglage de numeroEcrit)`, JSON.stringify(ligneMain(base).vrm_numero_ecrit));
   dit(!('vrm_methode_numero' in ligneMain(base)), `${T} aucune clé à part pour la méthode`);
   dit(e && e.etape === 'affichage', `${T} étape affichage`, JSON.stringify(e));
+  // (11 nov., lot DJ2) Un toucher sur la carte choisit ET passe à la suite (plus de « Continuer »).
   await choisir(o.pg, 'affichage:simple');
-  e = await continuer(o.pg);
+  await attendre(o.pg, async () => { const x = await etat(o.pg); return x && x.etape !== 'affichage'; }, 6000);
+  e = await etat(o.pg);
+  dit(e && e.etape === 'notifs', `${T} un toucher sur « Simple » passe seul à l’étape suivante`, JSON.stringify(e && e.etape));
   dit(await attendre(o.pg, async () => (ligneMain(base).vrm_affichage || {}).choix === 'simple'), `${T} affichage Simple écrit`);
   await attendre(o.pg, async () => { const x = await etat(o.pg); return x && x.cartes.some((c) => c.cle.startsWith('notif:')); }, 5000);
   e = await etat(o.pg);

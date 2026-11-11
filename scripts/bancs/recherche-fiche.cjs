@@ -149,7 +149,7 @@ async function preparer(b, vp, { sombre = false } = {}) {
 }
 const pret = async (pg) => { for (let i = 0; i < 60; i++) { if (await pg.evaluate(() => { const p = document.querySelector('[data-recherche-panneau]'); return !!(p && p.getAttribute('data-recherche-pret') === '1'); })) return true; await pg.waitForTimeout(250); } return false; };
 const ouvrirLoupe = async (pg, tel) => {
-  if (tel) await pg.locator('button[aria-label="Rechercher une paire"]').first().tap();
+  if (tel) await pg.locator('button[data-recherche-loupe]').first().tap();
   else { await pg.mouse.click(5, 300); await pg.keyboard.press('Control+K'); }
   return pret(pg);
 };

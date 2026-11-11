@@ -37,13 +37,13 @@ export const VERSION_CONFIGURATION = 1;
 // ── LES ÉTAPES ───────────────────────────────────────────────────────────────
 // `si` : l'étape n'existe que pour certains choix (micro ⇒ URSSAF ; société ⇒ TVA).
 export const ETAPES_CONFIGURATION = [
-  { cle: 'vends', titre: 'Qu’est-ce que tu vends ?', sous: 'Touche tout ce qui te concerne. Sneakers seules : VRM parle de « paires » ; sinon, d’« articles ».' },
+  { cle: 'vends', titre: 'Tu vends quoi ?', sous: 'Touche tout ce que tu vends. VRM adapte ses mots et ses exemples.' },
   { cle: 'plateformes', titre: 'Où vends-tu ?', sous: 'Seules ces plateformes s’affichent. Rien n’est supprimé, aucun total ne change.' },
   { cle: 'statut', titre: 'Quel est ton statut ?', sous: 'VRM adapte ta comptabilité. Il ne le devine jamais.' },
   { cle: 'micro', titre: 'Ta micro-entreprise', sous: 'Ce que VRM ne peut pas lire sur ton espace URSSAF.', si: (c) => c.statut === 'micro-vente' || c.statut === 'micro-services' },
   { cle: 'societe', titre: 'Ta TVA', sous: 'Ta société facture-t-elle la TVA ?', si: (c) => c.statut === 'societe' },
   { cle: 'numero', titre: 'Où est ton numéro ?', sous: 'Le numéro de rangement : il dit où est l’article (carton, étagère, bac…).' },
-  { cle: 'affichage', titre: 'Tout voir, ou l’essentiel ?', sous: 'Ce choix ne change que le menu et les conseils : aucun chiffre, aucune donnée.' },
+  { cle: 'affichage', titre: 'Quel VRM te ressemble ?', sous: 'Ça ne change que le menu. Aucun chiffre, aucune donnée.' },
   { cle: 'notifs', titre: 'Ce qui sonne sur ton téléphone', sous: 'Les notifications que tu veux recevoir.' },
   { cle: 'recap', titre: 'Tout est prêt', sous: 'Voici ton VRM. Chaque choix se change dans Réglages → Ma configuration.' },
 ];
@@ -86,21 +86,25 @@ export const CHOIX_NUMERO = [
 // Les endroits où il l'écrit (plusieurs possibles, jamais aucun) : ceux de src/numeroEcrit.js.
 const SOUS_OU = { description: 'Tu écris « N° 123 » en bas de l’annonce.', titre: 'Tu écris « #123 » dans le titre.', ref: 'SKU eBay, référence Leboncoin.' };
 export const CHOIX_OU = OU_NUMERO.map((v) => ({ v, titre: NOM_OU[v], sous: SOUS_OU[v] || '' }));
-// (9 nov., soir) Julien : « Cette étape n'est pas claire. » Chaque carte dit, en puces
-// CONCRÈTES, ce qu'elle montre ou cache — exactement ce que font `entreeMontree` et
-// `caseJourneeMontree` de src/profilVendeur.js (Simple ne cache que des entrées du menu
-// et un conseil ; aucun total ne change ; chaque écran reste joignable).
+// (9 nov., soir, puis 11 nov.) Julien : « Cette étape n'est pas claire : "Simple ou complet ?
+// Tu pourras changer à tout moment." » DEUX grandes cartes (plus de « Laisser VRM choisir »,
+// un 3e choix qui brouillait) : pour QUI (`pourQui`), ce qu'on VOIT en 3 puces courtes
+// (`ic` = l'icône de la puce), un aperçu miniature du menu (`apercu` = nombre de lignes).
+// Les puces disent exactement ce que font `entreeMontree` et `caseJourneeMontree` de
+// src/profilVendeur.js (Simple ne cache que des entrées du menu et un conseil ; aucun total
+// ne change ; chaque écran reste joignable). Un réglage « auto » déjà enregistré reste tel
+// quel (aucune carte cochée, rien réécrit tant qu'il ne touche pas une carte).
 export const CHOIX_AFFICHAGE = [
-  { v: 'simple', titre: 'L’essentiel (Simple)', sous: 'Pour démarrer : un compte, peu de ventes.', puces: [
-    'Le menu cache Stock tant que tu n’as rangé aucun meuble, et Republier tant que tu n’as jamais republié.',
-    'Les plateformes que tu n’as pas reliées n’apparaissent pas.',
-    'Ma journée garde tout ce qui est à faire, sans le conseil « Prix à baisser ».',
+  { v: 'simple', titre: 'Simple', pourQui: 'Je débute, je vends peu', apercu: 4, puces: [
+    { ic: 'menu', t: 'Menu court : sans Stock ni Republier au début' },
+    { ic: 'plateformes', t: 'Seules tes plateformes reliées' },
+    { ic: 'journee', t: 'Ma journée sans le conseil «\u00a0Prix à baisser\u00a0»' },
   ] },
-  { v: 'complet', titre: 'Tout voir (Complet)', sous: 'Pour plusieurs comptes ou beaucoup de ventes.', puces: [
-    'Tous les écrans dans le menu, même ceux qui ne servent pas encore.',
-    'Tous les conseils de Ma journée.',
+  { v: 'complet', titre: 'Complet', pourQui: 'Je vends beaucoup, plusieurs comptes', apercu: 8, puces: [
+    { ic: 'menu', t: 'Tous les écrans dans le menu' },
+    { ic: 'plateformes', t: 'Toutes les plateformes' },
+    { ic: 'journee', t: 'Tous les conseils de Ma journée' },
   ] },
-  { v: 'auto', titre: 'Laisser VRM choisir', sous: 'L’essentiel tant que tu as un seul compte Vinted et moins de 30 ventes sur 30 jours ; tout, au-delà.' },
 ];
 // « Recommandé pour toi » : la règle existante (`affichageAuto`), seulement quand on SAIT
 // (comptes Vinted et ventes des 30 jours lus). Pas su ⇒ aucune recommandation.
@@ -110,7 +114,7 @@ export function affichageRecommande(contexte) {
   if (c.proprietaire !== false || typeof c.nComptesVinted !== 'number' || typeof c.nVentes30j !== 'number') return null;
   return affichageAuto(c);
 }
-export const CHEMIN_REGLAGE_AFFICHAGE = 'Réglages → Affichage → Affichage';
+export const CHEMIN_REGLAGE_AFFICHAGE = 'Paramètres → Affichage';
 
 // ── LIRE CE QUI EST DÉJÀ ENREGISTRÉ ──────────────────────────────────────────
 export function lireConfiguration(brut) {
@@ -286,6 +290,29 @@ export function configurationAOuvrir({ pret, baseKO, exemple, bienvenue, proprie
   return true;
 }
 
+// ── « TU VENDS QUOI ? », UNE FOIS, POUR UN COMPTE DÉJÀ INSTALLÉ (11 nov., lot DJ2) ──
+// Julien : « la première question c'est sneakers ou autre chose ». Un vendeur NEUF la voit
+// en tête de « Ma configuration » ; un compte qui existait avant (Julien compris) la voit
+// UNE fois, seule, RIEN de pré-coché (« préremplie d'après rien »), et choisit. Tant qu'il
+// n'a pas choisi, rien ne change pour lui (le défaut d'avant : « paire » pour le
+// propriétaire, « article » sinon). « Plus tard » ⇒ `vu` rangé DANS `vrm_je_vends` (la même
+// source, synchronisée) : elle ne revient pas. Jamais en mode exemple, base injoignable,
+// pendant Bienvenue, ni quand la configuration complète s'ouvre (elle la pose déjà).
+export function questionVendsAOuvrir({ pret, baseKO, exemple, bienvenue, proprietaire, configuration, plateformes, jeVends } = {}) {
+  if (!pret || baseKO || exemple || bienvenue) return false;
+  if (typeof proprietaire !== 'boolean') return false;                        // pas su ⇒ on attend
+  if (configurationAOuvrir({ pret, baseKO, exemple, bienvenue, proprietaire, configuration, plateformes })) return false;
+  const l = lireReglageJeVends(jeVends);
+  return l.choix === 'auto' && !l.categories && !l.vu;
+}
+// « Plus tard » sur la question seule : retenue, RIEN d'autre (aucun choix posé à sa place).
+export function ecritureVendsVu(jeVends, at = new Date().toISOString()) {
+  const l = lireReglageJeVends(jeVends);
+  if (l.choix !== 'auto' || l.categories || l.vu) return null;               // déjà choisi ou déjà vu : rien
+  const brut = jeVends && typeof jeVends === 'object' ? jeVends : {};
+  return { cle: CLE_JE_VENDS, valeur: { ...brut, choix: 'auto', vu: at } };
+}
+
 // ── LE RÉCAP ─────────────────────────────────────────────────────────────────
 const nomDe = (liste, v) => ((liste.find((x) => x.v === v) || {}).titre) || null;
 export function recapConfiguration(choix, { nomsPlateformes = {}, famillesNotif = FAMILLES_NOTIF } = {}) {
@@ -301,7 +328,7 @@ export function recapConfiguration(choix, { nomsPlateformes = {}, famillesNotif 
   }
   if (c.statut === 'societe') L.push({ etape: 'societe', titre: 'Ta TVA', valeur: nomDe(CHOIX_TVA_SOCIETE, c.tvaSociete) });
   L.push({ etape: 'numero', titre: 'Ton numéro', valeur: c.numero === 'moi' ? `Tu numérotes : ${(c.numeroOu || []).map((k) => NOM_OU[k].replace(/^À la fin de la /, 'fin de la ').replace(/^Dans le champ « référence » de la plateforme$/, 'champ référence').replace(/^Dans le /, '')).join(', ')}` : nomDe(CHOIX_NUMERO, c.numero) });
-  L.push({ etape: 'affichage', titre: 'Affichage', valeur: nomDe(CHOIX_AFFICHAGE, c.affichage) });
+  L.push({ etape: 'affichage', titre: 'Affichage', valeur: c.affichage === 'auto' ? 'Choisi par VRM' : nomDe(CHOIX_AFFICHAGE, c.affichage) });
   if (c.familles) {
     const on = famillesNotif.filter((f) => c.familles[f.id]).length;
     L.push({ etape: 'notifs', titre: 'Notifications', valeur: `${on} sur ${famillesNotif.length}` });

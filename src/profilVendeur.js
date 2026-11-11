@@ -32,7 +32,9 @@ const choixDe = (r, permis) => {
   return permis.includes(c) ? c : 'auto';
 };
 export const lireReglageAffichage = (r) => ({ choix: choixDe(r, ['auto', 'simple', 'complet']), at: (r && r.at) || null });
-export const lireReglageJeVends = (r) => ({ choix: choixDe(r, ['auto', 'sneakers', 'autre']), at: (r && r.at) || null, categories: categoriesDe(r), autre: autreDe(r) });
+// `vu` (11 nov., lot DJ2) : la question « Tu vends quoi ? » a été montrée et mise de côté
+// (src/configurationDepart.js `ecritureVendsVu`) ; elle ne revient pas.
+export const lireReglageJeVends = (r) => ({ choix: choixDe(r, ['auto', 'sneakers', 'autre']), at: (r && r.at) || null, categories: categoriesDe(r), autre: autreDe(r), vu: r && typeof r === 'object' && typeof r.vu === 'string' ? r.vu : null });
 
 // ── CE QU'IL VEND, EN DÉTAIL (9 nov., soir) ─────────────────────────────────
 // Julien : « tout le monde ne vend pas des sneakers ; la première question c'est
@@ -50,6 +52,7 @@ export const CATEGORIES_VENDS = [
   { v: 'luxe', titre: 'Luxe & créateurs' },
   { v: 'sacs', titre: 'Sacs & maroquinerie' },
   { v: 'montres', titre: 'Montres & bijoux' },
+  { v: 'lunettes', titre: 'Lunettes' },   // (11 nov., lot DJ2) « il y a des personnes qui vendent des lunettes »
   { v: 'accessoires', titre: 'Accessoires' },
   { v: 'vintage', titre: 'Vintage' },
   { v: 'enfants', titre: 'Enfants & puériculture' },
@@ -99,7 +102,8 @@ export function reglageJeVendsDepuisChoix(avant, choix, at = new Date().toISOStr
   const l = lireReglageJeVends(avant);
   if (choix === 'sneakers') return { choix, categories: ['sneakers'], at };
   if (choix === 'autre' && l.categories && choixDeCategories(l.categories) === 'autre') return { choix, categories: l.categories, ...(l.autre ? { autre: l.autre } : {}), at };
-  return { choix: choix === 'autre' ? 'autre' : 'auto', at };
+  // (11 nov.) Un choix fait ici vaut réponse : la question « Tu vends quoi ? » ne revient pas (`vu`).
+  return { choix: choix === 'autre' ? 'autre' : 'auto', at, ...(choix === 'autre' ? {} : { vu: at }) };
 }
 export const nomsCategories = (cats, autre = '') => (cats || []).map((v) => (v === 'autre' && autre ? autre : (CATEGORIES_VENDS.find((c) => c.v === v) || {}).titre)).filter(Boolean);
 

@@ -9,7 +9,7 @@ export const ETAPES_ECRANS = {
   ],
   "annonces": [
     "Passe sur Vinted avec l’extension : tes annonces arrivent ici.",
-    "Écris le N° de chaque paire sur son carton.",
+    "Écris le N° là où tu ranges l’article.",
     "Saisis le prix d’achat sur la carte de l’annonce.",
     "Touche une photo pour la voir en grand."
   ],
