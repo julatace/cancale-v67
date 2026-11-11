@@ -11,7 +11,9 @@ import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './platef
 
 import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
-import {stockageParcours,lireReprise,garderReprise} from './repriseEcran.js';
+import {stockageParcours,garderReprise} from './repriseEcran.js';
+// (11 nov., reprise-ecrans) La reprise SYNCHRONISÉE, par compte VRM (src/repriseSynchro.js).
+import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches } from './repriseSynchro.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
@@ -153,6 +155,7 @@ import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAcha
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
+import './styles-reprise-ecrans.css'; // (11 nov.) le bandeau « Affiché avec … · Effacer » (src/repriseSynchro.js)
 import './styles-achats-outils.css';
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
 import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
@@ -2522,6 +2525,9 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (11 nov., reprise-ecrans) Chaque écran se rouvre comme on l'a laissé, sur tous ses appareils :
+  // filtres, tri, recherche (10 min), compte par site, dernier écran (30 min) — src/repriseSynchro.js.
+  CLE_REPRISE_ECRANS,
   'vrm_vc_etiquettes','vrm_lbc_dates',
   // (11 nov., lot stats-categories) La catégorie qu'IL a choisie pour une vente sans
   // catégorie lue : { ['vinted:tx'|'lbc:id'|'ebay:id'|'vestiaire:id']: { f, at } } — src/statsCategories.js.
@@ -3767,6 +3773,7 @@ if (typeof window !== 'undefined') {
 
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
+const _saveRun = {};   // (11 nov.) la sauvegarde en attente de chaque clé (`viderSave`)
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
@@ -3833,7 +3840,8 @@ const save = (k,v,quand) => {
   if (typeof quand === 'function') (_saveQuand[k] || (_saveQuand[k] = [])).push(quand);
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   else if (SYNC_KEYS.includes(k)) { try { const t = localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
-  _saveTimers[k] = setTimeout(() => {
+  const executer = () => {
+    delete _saveRun[k];
     if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
     // (2 nov.) Ce que le navigateur portait AVANT ce geste : la base de la file
     // d'envoi tant que cet onglet n'a pas encore lu le nuage.
@@ -3866,8 +3874,73 @@ const save = (k,v,quand) => {
     if (r.fusionne && !egalStable(r.v, v)) emettreClesRelues([k]);
     if (r.conflit) { conflitNumerosNuage(r.conflit); return; }
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
-  }, 500);
+  };
+  _saveRun[k] = executer;
+  _saveTimers[k] = setTimeout(executer, 500);
 };
+// (11 nov., reprise-ecrans) La sauvegarde EN ATTENTE d'une clé, faite tout de suite (même
+// chemin : fusion, file d'envoi, nuage). Au passage en arrière-plan seulement : iOS peut
+// tuer l'app avant les 500 ms (l'écran et la recherche de la reprise se perdaient).
+const viderSave = (k) => { const f = _saveRun[k]; if (_saveTimers[k] && f) { clearTimeout(_saveTimers[k]); f(); } };
+
+// ── (11 nov., reprise-ecrans) LA REPRISE SYNCHRONISÉE : un écrivain différé ──
+// Filtres, tri, recherche, compte par site, dernier écran : UNE clé légère
+// (`vrm_reprise_ecrans`, SYNC_KEYS), écrite DATÉE (l'heure du geste, pas de l'envoi)
+// et avec un délai (`DELAI_REPRISE`) — une frappe dans la recherche n'écrit pas à
+// chaque lettre. Au passage en arrière-plan, ce qui attend part tout de suite.
+// Jamais pour un autre vendeur : le patch porte SON identifiant et se tait sinon.
+let _repriseAttente = null, _repriseMinuteur = 0;
+const ownerReprise = () => AUTH.user?.id || readSession()?.user?.id || '';
+const carteReprise = () => lireCarteReprise(load(CLE_REPRISE_ECRANS, null), ownerReprise());
+const ecrireRepriseMaintenant = () => {
+  clearTimeout(_repriseMinuteur); _repriseMinuteur = 0;
+  const p = _repriseAttente; _repriseAttente = null;
+  if (!p) return;
+  const owner = AUTH.user?.id || '';
+  if (!owner || p.owner !== owner || readSession()?.user?.id !== owner) return;
+  try { save(CLE_REPRISE_ECRANS, poserCarteReprise(load(CLE_REPRISE_ECRANS, null), p, owner, ONGLETS_LIENS)); } catch (_) {}
+};
+const noterReprise = (patch) => {
+  const owner = ownerReprise();
+  if (!owner || !patch) return;
+  if (_repriseAttente && _repriseAttente.owner !== owner) _repriseAttente = null;
+  _repriseAttente = { ...cumulerPatchReprise(_repriseAttente, patch), owner };
+  clearTimeout(_repriseMinuteur);
+  _repriseMinuteur = setTimeout(ecrireRepriseMaintenant, DELAI_REPRISE);
+};
+// Les vues montées (filtre, tri, recherche de chaque écran) : ce que le bandeau
+// « repris comme tu l'as laissé » dit, et ce que « Effacer » remet au défaut.
+const _vuesMontees = new Map();   // cle -> { nom, initial, valeur, touche, poser }
+const _rechercheQuittee = new Map(); // cle -> heure où l'écran de la recherche a été quitté
+const signalerVuesMontees = () => { try { window.dispatchEvent(new Event('vrm:vues-montees')); } catch (_) {} };
+// Quitter un écran (ou l'app) : une recherche non vide est datée de ce moment
+// (« quittée il y a moins de 10 min »).
+const quitterRecherches = (tab, now = Date.now()) => {
+  const vues = {};
+  for (const [cle, m] of _vuesMontees) {
+    if (!estRechercheVue(m.nom) || !vueSynchronisee(m.nom) || (tab && !ecransDeVue(m.nom).includes(tab))) continue;
+    if (typeof m.valeur !== 'string' || !m.valeur.trim()) continue;
+    _rechercheQuittee.set(cle, now); vues[m.nom] = { valeur: m.valeur, at: now };
+  }
+  if (Object.keys(vues).length) noterReprise({ vues });
+};
+// Revenir sur un écran : une recherche quittée depuis 10 min ou plus repart vide.
+const reprendreRecherches = (tab, now = Date.now()) => {
+  for (const [cle, m] of _vuesMontees) {
+    if (!estRechercheVue(m.nom) || !ecransDeVue(m.nom).includes(tab)) continue;
+    const q = _rechercheQuittee.get(cle);
+    if (q != null && now - q >= DUREE_RECHERCHE_REPRISE) { _rechercheQuittee.delete(cle); m.poser(m.initial, { sansEcrire: true }); }
+    else _rechercheQuittee.delete(cle);
+  }
+};
+// Le site retenu d'une tâche : celui du compte (synchronisé) d'abord, sinon celui de l'appareil.
+const filtreRetenuCompte = (tab) => { try { const s = siteReprise(carteReprise(), tab); if (s) return siteDeTache(tab, s); } catch (_) {} return filtreRetenu(tab); };
+const siteDuTab = (tab, sub) => (estTacheSite(tab) ? siteDeTache(tab, sub) : ({ plat_vinted: 'vinted', plat_leboncoin: 'leboncoin', plat_ebay: 'ebay', plat_vestiaire: 'vestiaire' }[tab] || tab));
+if (typeof document !== 'undefined') {
+  const auRepos = () => { try { quitterRecherches(_histoOnglet.tab || ''); } catch (_) {} ecrireRepriseMaintenant(); viderSave(CLE_REPRISE_ECRANS); };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') auRepos(); });
+  window.addEventListener('pagehide', auRepos);
+}
 
 // ── « ANNULER » PARTOUT, GESTES INSTANTANÉS (6 nov., v36, src/gesteAnnulable.js) ─
 // Un geste INTERNE à VRM s'affiche tout de suite, son écriture part par `save`
@@ -20014,21 +20087,81 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
 // qui RÉSERVE la place (jamais un trou, jamais une fausse image). Si le lien a
 // expiré, on retombe sur le cadre — la carte le constate elle-même.
 // Préférences temporaires, isolées par vendeur et effacées à la déconnexion.
+// (11 nov., reprise-ecrans) UN FILTRE RETENU EST TOUJOURS DIT, AVEC « EFFACER ». Rouvert sur
+// un autre appareil (ou plus tard), un écran peut montrer moins que tout : la ligne le dit,
+// sous la barre du haut, et un toucher remet le défaut. « Réinitialiser l'écran » remet tout
+// (filtres, tri, recherche, compte choisi). Rien n'est caché en silence.
+function RepriseRetenue({ tab, compteChoisi, effacerCompte }) {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { window.addEventListener('vrm:vues-montees', maj); return () => window.removeEventListener('vrm:vues-montees', maj); }, []);
+  const liste = retenusAffiches([..._vuesMontees.values()], tab);
+  if (!liste.length) return null;
+  const effacer = (nom) => { for (const m of _vuesMontees.values()) if (m.nom === nom) m.poser(m.initial); };
+  const reinitialiser = () => { for (const x of liste) effacer(x.nom); if (compteChoisi && effacerCompte) effacerCompte(); };
+  return (
+    <div className="vrm-reprise-retenue" role="status" data-reprise-retenue={liste.map((x) => x.nom).join(' ')}>
+      <span className="vrm-reprise-titre">Affiché avec</span>
+      {liste.map((x) => (
+        <span key={x.nom} className="vrm-reprise-puce" data-vue-retenue={x.nom}>
+          <span className="vrm-reprise-quoi">{x.quoi}{x.valeur ? <> : <b>{x.valeur}</b></> : null}</span>
+          <button type="button" className="vrm-reprise-effacer" data-effacer-vue={x.nom} onClick={() => effacer(x.nom)} aria-label={`Effacer : ${x.quoi}`}>Effacer</button>
+        </span>
+      ))}
+      {liste.length > 1 ? <button type="button" className="vrm-reprise-effacer" data-reinitialiser-ecran="" onClick={reinitialiser}>Réinitialiser l’écran</button> : null}
+    </div>
+  );
+}
 function useVueSession(nom, initial) {
   const owner=readSession()?.user?.id||'';
   const cle=`${owner || 'local'}:${nom}`;
-  // (5 nov., reprise) Rangé sur l'APPAREIL (src/repriseEcran.js) : un `sessionStorage`
-  // repart vide quand iOS rouvre l'app installée. Stockage bloqué ⇒ rien de rangé.
-  if(!vuesSession.has(cle)){try{const st=stockageParcours();const v=st?restaurerVue(st,owner,nom,initial):initial;vuesSession.set(cle,v);}catch(_){}}
-  const [etat,setEtat]=useState(()=>({cle,valeur:vuesSession.has(cle)?vuesSession.get(cle):initial}));
+  // (11 nov., reprise-ecrans) Filtre, tri, période, recherche : SYNCHRONISÉS par compte VRM
+  // (`vrm_reprise_ecrans`, src/repriseSynchro.js) — l'iPhone retrouve le filtre posé sur
+  // l'ordinateur. Une recherche ne revient que quittée il y a moins de 10 min. Les « Voir
+  // plus » (`-limite`) restent sur l'appareil, comme le 5 nov. (stockageParcours).
+  const synchro=vueSynchronisee(nom);
+  const lireRangee=()=>{ try{ if(synchro) return vueReprise(carteReprise(),nom,initial); const st=stockageParcours(); return st?restaurerVue(st,owner,nom,initial):initial; }catch(_){ return initial; } };
+  const [etat,setEtat]=useState(()=>{
+    if(!vuesSession.has(cle)) vuesSession.set(cle,lireRangee());
+    else if(synchro&&estRechercheVue(nom)){ const q=_rechercheQuittee.get(cle); if(q!=null&&Date.now()-q>=DUREE_RECHERCHE_REPRISE){ vuesSession.set(cle,initial); _rechercheQuittee.delete(cle); } }
+    return {cle,valeur:vuesSession.has(cle)?vuesSession.get(cle):initial};
+  });
   const valeur=etat.cle===cle?etat.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
-  const changer=next=>setEtat(prev=>{
+  const touche=React.useRef(false);
+  const poser=(next,{sansEcrire=false,geste=true}={})=>setEtat(prev=>{
     const ancien=prev.cle===cle?prev.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
     const nouveau=typeof next==='function'?next(ancien):next;
     vuesSession.set(cle,nouveau);
-    try{const st=stockageParcours();if(st&&(readSession()?.user?.id||'')===owner)garderParcours(st,owner,'vue:'+nom,nouveau);}catch(_){}
+    if(geste) touche.current=true;
+    // Rien de changé (un écran qui repose la même valeur) : rien d'écrit, l'heure du geste reste.
+    if(!sansEcrire&&JSON.stringify(nouveau)!==JSON.stringify(ancien)&&(readSession()?.user?.id||'')===owner){
+      if(synchro){ const defaut=JSON.stringify(nouveau)===JSON.stringify(initial); noterReprise({vues:{[nom]:defaut?{efface:true}:{valeur:nouveau,at:Date.now()}}}); }
+      else { try{const st=stockageParcours();if(st)garderParcours(st,owner,'vue:'+nom,nouveau);}catch(_){} }
+    }
     return {cle,valeur:nouveau};
   });
+  const changer=next=>poser(next);
+  // Le registre des vues montées : le bandeau de l'écran et « Effacer » le lisent.
+  const poserRef=React.useRef(poser); poserRef.current=poser;
+  React.useEffect(()=>{
+    if(!synchro) return undefined;
+    const m={nom,initial,valeur,touche:false,poser:(v,o)=>poserRef.current(v,o)};
+    _vuesMontees.set(cle,m); signalerVuesMontees();
+    // L'autre appareil a changé ce réglage : on le prend, SEULEMENT s'il n'a pas été
+    // touché ici depuis l'ouverture (on ne remplace que ce qui est resté tel quel).
+    const adopter=()=>{ if(touche.current) return;
+      const v=vueReprise(carteReprise(),nom,initial);
+      const cur=vuesSession.has(cle)?vuesSession.get(cle):initial;
+      if(JSON.stringify(v)!==JSON.stringify(cur)) poserRef.current(v,{sansEcrire:true,geste:false}); };
+    const relu=(e)=>{ const d=e&&e.detail; if(!d||d.k!==CLE_REPRISE_ECRANS||!d.distant) return; adopter(); };
+    // Le nuage lu à l'ouverture (onCloudReady, §5) ou relu ensuite (« distant »).
+    const offNuage=onCloudReady(adopter);
+    window.addEventListener('vrm:save',relu);
+    return ()=>{ window.removeEventListener('vrm:save',relu); if(typeof offNuage==='function') offNuage();
+      const cur=vuesSession.has(cle)?vuesSession.get(cle):initial;
+      if(estRechercheVue(nom)&&typeof cur==='string'&&cur.trim()){ _rechercheQuittee.set(cle,Date.now()); noterReprise({vues:{[nom]:{valeur:cur,at:Date.now()}}}); }
+      if(_vuesMontees.get(cle)===m){ _vuesMontees.delete(cle); signalerVuesMontees(); } };
+  },[cle]);
+  React.useEffect(()=>{ const m=_vuesMontees.get(cle); if(m&&m.valeur!==valeur){ m.valeur=valeur; m.touche=touche.current; signalerVuesMontees(); } },[cle,valeur]);
   return [valeur,changer];
 }
 
@@ -52010,7 +52143,11 @@ function AppCoeur() {
   // rangés sur CET appareil pour CE vendeur (src/repriseEcran.js). Un lien
   // `?tab=` reçu gagne : la reprise se tait et `goto` mène au lien. Rien de
   // lisible ⇒ Ma journée, comme avant.
-  const [reprise0]=useState(()=>{ try{ return lireReprise(stockageParcours(), AUTH.user?.id||readSession()?.user?.id||'', ONGLETS_LIENS, window.location.search); }catch(_){ return null; } });
+  // (11 nov., reprise-ecrans) Et SUR N'IMPORTE QUEL APPAREIL : le plus frais de cet appareil
+  // et du compte (`vrm_reprise_ecrans`), s'il a moins de 30 min — sinon Ma journée. Un lien
+  // `?tab=` reçu gagne toujours (ecranAOuvrir se tait).
+  const [search0]=useState(()=>{ try{ return window.location.search||''; }catch(_){ return ''; } });
+  const [reprise0]=useState(()=>{ try{ const owner=AUTH.user?.id||readSession()?.user?.id||''; const st=stockageParcours(); return ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ return null; } });
   const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
@@ -52062,7 +52199,7 @@ function AppCoeur() {
   const [platSub,setPlatSub]=useState(()=>{
     if(!reprise0) return 'ventes';
     if(reprise0.sub) return reprise0.sub;
-    return estTacheSite(reprise0.tab)?(filtreRetenu(reprise0.tab)||siteDeTache(reprise0.tab,null)):'ventes';
+    return estTacheSite(reprise0.tab)?(filtreRetenuCompte(reprise0.tab)||siteDeTache(reprise0.tab,null)):'ventes';
   });
   // (2 nov.) Colis : « À envoyer » / « À retirer ». `ongletColis` = le choix
   // (son toucher, ou un lien « à retirer » : `retraits`, une carte de Ma journée,
@@ -52100,7 +52237,7 @@ function AppCoeur() {
       sectionsPlateformes.current[precedent]=platSub;
       // Une tâche (Ventes, Annonces, Messages) rouvre sur le dernier filtre de
       // site choisi (mémorisé sur l'appareil), sinon son défaut.
-      setPlatSub(subVoulue.current||sectionsPlateformes.current[tab]||(estTacheSite(tab)?(filtreRetenu(tab)||siteDeTache(tab,null)):'ventes'));
+      setPlatSub(subVoulue.current||sectionsPlateformes.current[tab]||(estTacheSite(tab)?(filtreRetenuCompte(tab)||siteDeTache(tab,null)):'ventes'));
       dernierePlateforme.current=tab;
     }
     subVoulue.current=null;
@@ -52158,7 +52295,47 @@ function AppCoeur() {
     return ()=>window.removeEventListener('popstate',onPop);
   },[]);
   // (5 nov.) La reprise : l'écran, sa section, l'onglet de Colis choisi à la main.
-  React.useEffect(()=>{ try{ garderReprise(stockageParcours(), AUTH.user?.id||'', { tab, sub:platSub, colis:ongletColis }, ONGLETS_LIENS); }catch(_){} },[tab,platSub,ongletColis]);
+  // (11 nov.) Rangée sur l'appareil ET pour le compte (synchronisée, avec un délai) — jamais au
+  // montage : l'écran de départ n'est pas un geste, il effacerait celui de l'autre appareil.
+  const repriseMontee=React.useRef(false), aNavigue=React.useRef(false), tabDepart=React.useRef(tab);
+  React.useEffect(()=>{
+    if(!repriseMontee.current){ repriseMontee.current=true; return; }
+    // Une section ajustée à l'ouverture n'est pas un geste : seul un AUTRE écran l'est.
+    if(tab!==tabDepart.current) aNavigue.current=true;
+    try{ garderReprise(stockageParcours(), AUTH.user?.id||'', { tab, sub:platSub, colis:ongletColis }, ONGLETS_LIENS); }catch(_){}
+    noterReprise({ ecran:{ tab, sub:platSub, colis:ongletColis, at:Date.now() } });
+  },[tab,platSub,ongletColis]);
+  // Quitter un écran date ses recherches (10 min) ; y revenir efface celles quittées depuis trop longtemps.
+  const ecranQuitte=React.useRef(tab);
+  React.useEffect(()=>{ const avant=ecranQuitte.current; if(avant!==tab){ quitterRecherches(avant); reprendreRecherches(tab); ecranQuitte.current=tab; } },[tab]);
+  // Le nuage arrive APRÈS le premier écran : s'il dit un écran plus frais (posé sur
+  // l'autre appareil, moins de 30 min) et que rien n'a été touché ici, on y va — une fois.
+  // Jamais avec un lien reçu (search0), jamais après un geste de navigation.
+  React.useEffect(()=>{
+    let fait=false, adopte=false;
+    const f=(e)=>{ const d=e&&e.detail; if(fait||(d&&(d.k!==CLE_REPRISE_ECRANS||!d.distant))||(!d&&e!=='nuage')) return;
+      fait=true;
+      if(aNavigue.current) return;
+      let r=null; try{ const owner=AUTH.user?.id||''; const st=stockageParcours(); r=ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ r=null; }
+      if(!r||(reprise0&&r.at<=reprise0.at)) return;
+      adopte=true;
+      if(r.colis) setOngletColis(r.colis);
+      if(r.tab!==tabCourant.current){ if(r.sub) subVoulue.current=r.sub; setTabBrut(r.tab); }
+      else if(r.sub) setPlatSub(r.sub);
+      if(!compteTouche.current){ const c=compteReprise(carteReprise(),siteDuTab(r.tab,r.sub)); if(c!=null) setCompteSelBrut(c); }
+    };
+    // Sans écran plus frais : le site et le compte de l'écran ouvert, s'ils n'ont pas été touchés ici.
+    const g=(e)=>{ const d=e&&e.detail; if((d&&(d.k!==CLE_REPRISE_ECRANS||!d.distant))||(!d&&e!=='nuage')||aNavigue.current||adopte) return;
+      const t=tabCourant.current, sub=histoRef.current.sub;
+      if(estTacheSite(t)){ const sx=siteReprise(carteReprise(),t); if(sx&&sx!==siteDeTache(t,sub)) setPlatSub(sx); }
+      if(!compteTouche.current){ const c=compteReprise(carteReprise(),siteDuTab(t,sub)); if(c!=null) setCompteSelBrut(c); }
+    };
+    window.addEventListener('vrm:save',g);
+    // Le nuage lu à l'ouverture (onCloudReady, §5) : la même décision, une fois.
+    const offNuage=onCloudReady(()=>{ f('nuage'); g('nuage'); });
+    window.addEventListener('vrm:save',f);
+    return ()=>{ window.removeEventListener('vrm:save',f); window.removeEventListener('vrm:save',g); if(typeof offNuage==='function') offNuage(); };
+  },[]);
   // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
   // « Tous les comptes » par défaut. En choisir un ne montre QUE ses annonces /
   // ventes / messages, sur l'onglet où on est — pas ailleurs. `''` = tous.
@@ -52173,10 +52350,18 @@ function AppCoeur() {
   // un autre site retrouve SON choix, jamais celui-ci (la règle du 31 oct. tient).
   const siteCourant=estTacheSite(tab)?siteDeTache(tab,platSub):({plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay',plat_vestiaire:'vestiaire'}[tab]||tab);
   const lireCarteChoix=()=>{ try{ return lireChoixComptes(localStorage.getItem(CLE_CHOIX_COMPTES)); }catch(_){ return {}; } };
-  const [compteSel,setCompteSelBrut]=useState(()=>choixPourSite(lireCarteChoix(),siteCourant));
-  const setCompteSel=(v)=>{ const n=typeof v==='function'?v(compteSel):v; setCompteSelBrut(n); try{ localStorage.setItem(CLE_CHOIX_COMPTES,JSON.stringify(memoriserChoix(lireCarteChoix(),siteCourant,n))); }catch(_){} };
-  React.useEffect(()=>{ setCompteSelBrut(choixPourSite(lireCarteChoix(),siteCourant)); },[siteCourant]);
-  React.useEffect(()=>{ if(estTacheSite(tab)) retenirFiltre(tab, siteDeTache(tab,platSub)); },[tab,platSub]);
+  // (11 nov., reprise-ecrans) Le choix du compte suit aussi le COMPTE VRM : celui du compte
+  // (synchronisé) d'abord, sinon celui de cet appareil.
+  const choixEffectif=(site)=>{ const s=compteReprise(carteReprise(),site); return s!=null?s:choixPourSite(lireCarteChoix(),site); };
+  const compteTouche=React.useRef(false);
+  const [compteSel,setCompteSelBrut]=useState(()=>choixEffectif(siteCourant));
+  const setCompteSel=(v)=>{ const n=typeof v==='function'?v(compteSel):v; setCompteSelBrut(n); compteTouche.current=true; try{ localStorage.setItem(CLE_CHOIX_COMPTES,JSON.stringify(memoriserChoix(lireCarteChoix(),siteCourant,n))); }catch(_){} noterReprise({ comptes:{ [siteCourant]:{ valeur:String(n==null?'':n), at:Date.now() } } }); };
+  React.useEffect(()=>{ setCompteSelBrut(choixEffectif(siteCourant)); },[siteCourant]);
+  // Le site choisi d'une tâche : rangé pour le compte aussi, seulement quand il CHANGE (jamais au montage).
+  const siteMonte=React.useRef(false);
+  React.useEffect(()=>{ if(!estTacheSite(tab)) return; const site=siteDeTache(tab,platSub); const pose=retenirFiltre(tab, site);
+    if(!siteMonte.current){ siteMonte.current=true; return; }
+    if(pose && siteReprise(carteReprise(),tab)!==site) noterReprise({ sites:{ [tab]:{ valeur:site, at:Date.now() } } }); },[tab,platSub]);
   // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
   // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
   // lignes nettes et en tête, les autres estompées — Julien, 7 octobre).
@@ -54777,7 +54962,7 @@ function AppCoeur() {
           <PhraseEcran cle={t}/>
         </header>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
-          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>retenirFiltre(t,s,true)}/></DansBarreHaut>
+          <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>
           {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
@@ -55401,6 +55586,7 @@ function AppCoeur() {
         {/* (31 oct., maquette Colis) Sur ordinateur, la barre du haut : la
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {ordi && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
         {rpOuvert && <React.Suspense fallback={null}>
