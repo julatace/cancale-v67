@@ -31,8 +31,8 @@ module.exports = [
   {
     nom: 'widget : servir le premier vendeur venu sans clé',
     fichier: 'api/widget.js', route: 'widget.js',
-    de: 'if (mains.length === 1 && !mains[0].vrm_widget_token) return mains[0].owner || \'\';',
-    vers: 'if (mains.length >= 1) return mains[0].owner || \'\';',
+    de: 'if (deux.length === 1 && !deux[0].vrm_widget_token) return deux[0].owner || \'\';',
+    vers: 'if (deux.length >= 1) return deux[0].owner || \'\';',
   },
   {
     nom: 'proxy Vinted : lire le compte Vinted sans le filtre du vendeur, clé de service',
