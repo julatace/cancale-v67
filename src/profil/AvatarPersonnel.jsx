@@ -1,4 +1,5 @@
 import React,{useState,useEffect} from 'react';
+import {signalDelai} from '../compatSafari.js';
 import {createPortal} from 'react-dom';
 import {choisirAvatar} from './identiteProfil.js';
 // ── LA PHOTO DE PROFIL ET « MASQUER MON NOM » ─────────────────────────────────
@@ -13,7 +14,7 @@ async function charger(owner,headers){
  // (11 nov., lot DJ6) La photo déjà en mémoire ⇒ `si=<empreinte>` : le serveur répond
  // `inchange` sans la renvoyer (relue à chaque retour sur l'onglet, §4.4).
  const avant=cache.get(owner),si=avant&&avant.lu&&avant.image&&/^[0-9a-f]{64}$/.test(avant.hash||'')?'&si='+avant.hash:'';
- const p=(async()=>{try{const r=await fetch('/api/compte?mode=profil-avatar'+si,{headers:headers(),cache:'no-store',signal:AbortSignal.timeout(20000)});const j=await r.json();if(r.ok&&j.ok){if(j.inchange===true&&si&&j.hash===avant.hash)publier(owner,{partageCarte:j.partageCarte===true,nomMasque:j.nomMasque===true,lu:true});else publier(owner,{image:j.image||'',hash:j.hash||'',partageCarte:j.partageCarte===true,nomMasque:j.nomMasque===true,lu:true});return j;}}catch(_){}return null;})();enVol.set(owner,p);try{return await p;}finally{enVol.delete(owner);}
+ const p=(async()=>{try{const r=await fetch('/api/compte?mode=profil-avatar'+si,{headers:headers(),cache:'no-store',signal:signalDelai(20000)});const j=await r.json();if(r.ok&&j.ok){if(j.inchange===true&&si&&j.hash===avant.hash)publier(owner,{partageCarte:j.partageCarte===true,nomMasque:j.nomMasque===true,lu:true});else publier(owner,{image:j.image||'',hash:j.hash||'',partageCarte:j.partageCarte===true,nomMasque:j.nomMasque===true,lu:true});return j;}}catch(_){}return null;})();enVol.set(owner,p);try{return await p;}finally{enVol.delete(owner);}
 }
 // La fiche GoTrue (identités reliées), lue par l'app (App.jsx pose le lecteur).
 let lecteurFiche=null;const fiches=new Map(),fichesVol=new Map(),abonnesFiche=new Set();
@@ -37,7 +38,7 @@ export const useProfilCompte=usePhoto;
 // `true` / `false` (lu) · `undefined` (pas encore lu : on ne montre PAS le nom en attendant).
 export function useNomMasque(owner,headers){const p=usePhoto(owner,headers);return p&&p.lu?p.nomMasque===true:undefined;}
 export async function poserNomMasque(owner,headers,masque){
- const r=await fetch('/api/compte?mode=profil-avatar',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({nomMasque:!!masque}),signal:AbortSignal.timeout(20000)});
+ const r=await fetch('/api/compte?mode=profil-avatar',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({nomMasque:!!masque}),signal:signalDelai(20000)});
  const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw Error(j.message||'Le réglage n’est pas confirmé. Réessaie.');
  publier(owner,{image:j.image||'',hash:j.hash||'',partageCarte:j.partageCarte===true,nomMasque:j.nomMasque===true,lu:true});return j.nomMasque===true;
 }
@@ -94,7 +95,7 @@ export function ChoixPhoto({owner,headers,theme,surFait,compact=false}){
  const p=usePhoto(owner,headers),[busy,setBusy]=useState(false),[msg,setMsg]=useState(''),[source,setSource]=useState(null);const t=theme;
  useEffect(()=>()=>{if(source)URL.revokeObjectURL(source.objet);},[source]);
  async function enregistrer(image,partageCarte,retirer=false){
-  setBusy(true);setMsg('');try{const r=await fetch('/api/compte?mode=profil-avatar',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({image,partageCarte,retirer}),signal:AbortSignal.timeout(25000)});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.message||'L’enregistrement de la photo n’est pas confirmé. Réessaie.');publier(owner,{image:j.image||'',hash:j.hash||'',partageCarte:j.partageCarte===true,nomMasque:j.nomMasque===true,lu:true});setMsg(retirer?'Photo retirée.':'Photo enregistrée.');surFait?.();}catch(e){setMsg(e.name==='TimeoutError'?'L’enregistrement n’est pas confirmé. Rouvre cet écran pour vérifier avant de recommencer.':e.message);throw e;}finally{setBusy(false);}
+  setBusy(true);setMsg('');try{const r=await fetch('/api/compte?mode=profil-avatar',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({image,partageCarte,retirer}),signal:signalDelai(25000)});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.message||'L’enregistrement de la photo n’est pas confirmé. Réessaie.');publier(owner,{image:j.image||'',hash:j.hash||'',partageCarte:j.partageCarte===true,nomMasque:j.nomMasque===true,lu:true});setMsg(retirer?'Photo retirée.':'Photo enregistrée.');surFait?.();}catch(e){setMsg(e.name==='TimeoutError'?'L’enregistrement n’est pas confirmé. Rouvre cet écran pour vérifier avant de recommencer.':e.message);throw e;}finally{setBusy(false);}
  }
  return <>
   <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>

@@ -127,7 +127,7 @@ const dispo = (corpsCode = 'Votre code de retrait est 482913\n') => mr(`Votre co
     dit(relais().length === 1, 'une notification « à retirer »', `${relais().length}`);
     dit(/482913/.test(p.body || ''), 'le CODE de retrait est dans la notification', p.body);
     dit(/Phone Cash Banc/.test(p.body || ''), 'le LIEU est dans la notification', p.body);
-    dit(/^\/\?tab=cat_bord&cible=retrait&suivi=[A-Z0-9]{6,}$/.test(p.url || ''), 'le clic ouvre Colis → « À retirer », SA carte (par le n° de suivi) — 31 oct.', p.url);
+    dit(/^\/\?tab=achats&cible=retrait&suivi=[A-Z0-9]{6,}$/.test(p.url || ''), 'le clic ouvre Achats → « À retirer », SA carte (par le n° de suivi) — 31 oct.', p.url);
     await recoit(dispo());
     dit(relais().length === 1, 'le même email renvoyé : rien de plus (une fois par n° de suivi)', `${relais().length}`);
   });

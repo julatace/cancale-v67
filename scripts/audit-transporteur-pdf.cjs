@@ -195,6 +195,26 @@ const LIGNE_J = { owner: J, data: { adresses: { 'recu@vrm.center': { owner: J } 
     dit(String(A.REQ_RELUS).includes('pdf:data->pdf') && !/select=data(&|$)/.test(A.REQ_RELUS) && !/pdfB64/.test(A.REQ_BORDS_PDF + A.REQ_LABELS_PDF), 'F3 lectures légères : jamais `select=data`, jamais le PDF dans une liste (§4.4)');
   });
 
+  // (11 nov., Julien : « tu les vois sur les bordereaux » ; « InPost est avec Mondial Relay ») MESURÉ sur ses vrais
+  // bordereaux InPost / Mondial Relay : aucun nom en texte (logos en image), mais le code-barres imprimé en clair,
+  // 26 chiffres « 56… », dont les chiffres 3 à 10 = le n° Mondial Relay de l'e-mail (3 sur 3). Valeurs INVENTÉES ici.
+  await essaie('M', async () => {
+    const TP = await imp('api/_lib/transporteur-pdf.js');
+    const TB = await imp('api/_lib/transporteur-bordereau.js');
+    const d1 = await TP.transporteurDuPdf(await pdfLignes(['Receiver', 'Shipment Nr', '56 87654321 0101 0992 7303 3798', 'Customer Reference']));
+    dit(d1.etat === 'ok' && d1.t === 'mondialrelay' && d1.s === '87654321', 'M1 étiquette InPost/Mondial Relay sans nom : le code 56… UNIQUE ⇒ Mondial Relay et son n° (chiffres 3 à 10)', JSON.stringify(d1));
+    const d2 = await TP.transporteurDuPdf(await pdfLignes(['Receiver', '56 87654321 0101 0992 7303 3798', '56 11112222 0101 0992 7303 3798']));
+    dit(d2.etat === 'aucun' && !d2.t, 'M2 deux codes 56… différents ⇒ rien (jamais deviné)', JSON.stringify(d2));
+    const d3 = await TP.transporteurDuPdf(await pdfLignes(['InPost', 'Mondial Relay', 'Receiver']));
+    dit(d3.etat === 'ok' && d3.t === 'mondialrelay', 'M3 « InPost » et « Mondial Relay » sur la même étiquette = UN réseau (plus « plusieurs »)', JSON.stringify(d3));
+    const d4 = await TP.transporteurDuPdf(await pdfLignes(['Chronopost', 'Mondial Relay']));
+    dit(d4.etat === 'plusieurs', 'M4 deux réseaux différents ⇒ toujours rien', JSON.stringify(d4));
+    dit(TB.transporteurDeTexteBordereau('Ton colis InPost / Mondial Relay') === 'mondialrelay' && TB.transporteurDeTexteBordereau('Colis InPost') === 'mondialrelay', 'M5 l’e-mail aussi : InPost = Mondial Relay');
+    const c = A.candidatsPdf([{ id: 'email_bord_45000000001', tx: '45000000001', pdfLu: 'aucun' }, { id: 'email_bord_45000000002', tx: '45000000002', pdfLu: 'plusieurs' }], [], { pdfVus: {} });
+    const c2 = A.candidatsPdf([{ id: 'email_bord_45000000001', tx: '45000000001', pdfLu: 'aucun' }], [], { pdfVus: { 45000000001: { r: 'aucun', v: TP.REGLE_PDF } } });
+    dit(c.map((x) => x.tx).join() === '45000000001' && c2.length === 0, 'M6 un ancien « aucun » est relu UNE fois avec la nouvelle règle (« plusieurs » ne l’est pas)', JSON.stringify({ c, c2 }));
+  });
+
   console.log(ko ? `\n❌ audit-transporteur-pdf : ${ko} rouge(s) sur ${ok + ko}` : `\n✅ audit-transporteur-pdf : ${ok} verts`);
   process.exit(ko ? 1 : 0);
 })();

@@ -1,0 +1,67 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MA JOURNÉE COMPOSÉE PAR LUI (11 nov., lot journee-perso).
+   « Modifier ma journée » : la liste des cartes (interrupteur + poignée), dans une
+   feuille de Ma journée et dans Paramètres → Affichage ; la ligne du bas de Ma
+   journée ; la mention « Affichée car urgent ». Même couche que la direction
+   artistique, chargée après Ma journée v2. Rien d'autre n'est touché.
+   Détail : docs/passation/2026-11-11-journee-perso.md.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* ── 1. L'éditeur ─────────────────────────────────────────────────────────── */
+.vrm-jp { display: flex; flex-direction: column; gap: 18px; color: var(--p-encre, inherit); }
+.vrm-jp-aide { margin: 0; font-size: 14px; line-height: 1.45; color: var(--p-gris, #6E6E73); }
+.vrm-jp-zone { margin: 0; }
+.vrm-jp-zone-titre {
+  margin: 0 0 6px 4px; font-size: 13px; font-weight: 600; letter-spacing: .01em;
+  color: var(--p-gris, #6E6E73); text-transform: none;
+}
+.vrm-jp-liste {
+  list-style: none; margin: 0; padding: 0;
+  background: var(--p-carte, #fff); border-radius: var(--p-r-carte, 18px); overflow: hidden;
+  box-shadow: 0 0 0 .5px var(--p-filet, rgba(60,60,67,.14));
+}
+.vrm-jp-ligne {
+  display: flex; align-items: center; gap: 6px; min-height: 60px;
+  padding: 4px 8px 4px 2px; position: relative; background: var(--p-carte, #fff);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+.vrm-jp-ligne + .vrm-jp-ligne::before {
+  content: ''; position: absolute; top: 0; left: 46px; right: 0; height: .5px; background: var(--p-filet, rgba(60,60,67,.14));
+}
+.vrm-jp-ligne.is-glisse {
+  z-index: 1; background: var(--p-carte, #fff);
+  box-shadow: 0 8px 24px rgba(0,0,0,.14), 0 0 0 .5px var(--p-filet, rgba(60,60,67,.14));
+}
+.vrm-jp-ligne.is-glisse::before, .vrm-jp-ligne.is-glisse + .vrm-jp-ligne::before { opacity: 0; }
+.vrm-jp-poignee {
+  flex: 0 0 44px; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important;
+  display: grid; place-items: center; padding: 0 !important; margin: 0 !important;
+  border: 0 !important; border-radius: 10px !important; background: transparent !important;
+  color: var(--p-gris, #6E6E73) !important; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-jp-poignee.is-fixe { cursor: default; }
+.vrm-jp-ligne.is-glisse .vrm-jp-poignee { cursor: grabbing; color: var(--p-encre, inherit) !important; }
+.vrm-jp-poignee:focus-visible { outline: 2px solid #0071E3; outline-offset: -2px; }
+.vrm-jp-textes { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }
+.vrm-jp-nom { font-size: 16px; line-height: 1.3; color: var(--p-encre, inherit); }
+.vrm-jp-desc { font-size: 13px; line-height: 1.35; color: var(--p-gris, #6E6E73); }
+.vrm-jp-ligne.is-cachee .vrm-jp-nom { color: var(--p-gris, #6E6E73); }
+.vrm-jp-pied { display: flex; justify-content: center; }
+
+/* ── 2. Le bas de Ma journée ──────────────────────────────────────────────── */
+.vrm-jp-bas { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; margin: 22px 0 8px; }
+.vrm-jp-bas-note { font-size: 13px; color: var(--p-gris, #6E6E73); }
+
+/* ── 3. « Affichée car urgent » (ambre : un geste à faire, jamais le rouge) ── */
+.vrm-jp-urgent {
+  display: block; font-size: 12px; font-weight: 600; line-height: 1.3;
+  color: var(--p-ambre-texte, #B25000);
+}
+.vrm-jv2-prochain .vrm-jp-urgent { color: #FFB340; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-jp-ligne { transition: none; }
+}
+}
