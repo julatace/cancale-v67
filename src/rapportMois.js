@@ -94,7 +94,7 @@ export function donneesRapportMois({ ym, maintenant = Date.now(), boutique = nul
   const lignes = vendu && Array.isArray(vendu.lignes) ? vendu.lignes.filter((l) => l && Number.isFinite(l.ts) && l.ts >= b.de && l.ts < b.a && cts(l.eur) != null) : null;
   const nonComptees = vendu && Array.isArray(vendu.nonComptees) ? vendu.nonComptees.filter((x) => x && x.ts != null && x.ts >= b.de && x.ts < b.a) : [];
   if (!lignes) ajoute('Ventes pas encore lues : ouvre Ventes une fois');
-  for (const m of ((vendu && vendu.manque) || [])) ajoute(`Ventes ${m} pas lues : le vendu est un minimum`);
+  for (const m of ((vendu && vendu.manque) || [])) ajoute(m === 'lecture en cours' ? 'Une lecture des ventes était encore en cours : le vendu est un minimum' : `Ventes ${m} pas lues : le vendu est un minimum`);
   if (nonComptees.length) {
     const par = {}; for (const x of nonComptees) { const k = `${x.plateforme} (${x.raison || 'montant pas lu'})`; par[k] = (par[k] || 0) + 1; }
     for (const [k, n] of Object.entries(par)) ajoute(`${pl(n, 'vente')} ${k} : vendue${n > 1 ? 's' : ''}, montant hors du total`);
