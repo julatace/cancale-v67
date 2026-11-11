@@ -12,7 +12,7 @@ import { photoArticle } from '../photosArticles.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis, cleStatTransporteur } from '../transporteursVisuels.js';
 import { attrCible } from '../cibleNotif.js';
-import { champsFacultatifs } from '../profilVendeur.js';
+import { champsFacultatifs, motsVendeur } from '../profilVendeur.js';
 import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, vendActuel } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
@@ -929,7 +929,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
     if (mode === 'run' || !fiches.length || bloqueExt || invalides.length || sansFiche) return;
     const ok = await askConfirm({
       title: `Republier ${fiches.length} annonce${fiches.length > 1 ? 's' : ''} sur Leboncoin ?`,
-      desc: `Pour chacune, une à la fois : VRM la SUPPRIME de Leboncoin, puis la republie comme une annonce neuve (titre, description, photos de la paire${pMode !== 'aucun' ? ', nouveau prix' : ''}).\n\nLa suppression est sans retour : les favoris, les messages et les statistiques de l'ancienne annonce sont perdus. Si la republication n'aboutit pas, la paire revient dans « À publier ».\n\nL'extension agit depuis ta session Leboncoin, sans option payante.`,
+      desc: `Pour chacune, une à la fois : VRM la SUPPRIME de Leboncoin, puis la republie comme une annonce neuve (titre, description, photos ${motsVendeur().de}${pMode !== 'aucun' ? ', nouveau prix' : ''}).\n\nLa suppression est sans retour : les favoris, les messages et les statistiques de l'ancienne annonce sont perdus. Si la republication n'aboutit pas, ${motsVendeur().le} revient dans « À publier ».\n\nL'extension agit depuis ta session Leboncoin, sans option payante.`,
       ok: 'Oui, republier', cancel: 'Annuler', danger: true,
     });
     if (!ok) return;
@@ -975,7 +975,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
   const bouton = (actif, plein) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, padding: '0 16px', borderRadius: 12, border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? (actif ? C.accent : C.border) : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, fontSize: 13, fontWeight: 600, cursor: actif ? 'pointer' : 'not-allowed', opacity: actif ? 1 : 0.55, fontFamily: 'inherit' });
   const ETAPES = [['choix', '1. Choisir'], ['modif', '2. Modifier'], ['envoi', '3. Republier']];
   const nbExclues = Object.values(exclues || {}).reduce((a, b) => a + b, 0);
-  const LIB_KO = { sansPaire: 'pas reliée à une paire (ni lien, ni référence VRM)', pasEnLigne: 'paire plus en ligne sur Vinted', plusieurs: 'plusieurs annonces Vinted pour ce N°', vendue: 'paire vendue sur Vinted', retiree: 'paire retirée du stock ou décochée pour Leboncoin', deux: 'deux annonces Leboncoin pour la même paire', marque: 'marquée publiée sous un N° que VRM ne sait pas retirer', jumelle: 'même photo qu’une autre paire' };
+  const LIB_KO = { sansPaire: `pas reliée à ${motsVendeur().un} (ni lien, ni référence VRM)`, pasEnLigne: `${motsVendeur().nom} plus en ligne sur Vinted`, plusieurs: 'plusieurs annonces Vinted pour ce N°', vendue: `${motsVendeur().nom} vendu${motsVendeur().e} sur Vinted`, retiree: `${motsVendeur().nom} retiré${motsVendeur().e} du stock ou décoché${motsVendeur().e} pour Leboncoin`, deux: `deux annonces Leboncoin pour ${motsVendeur().meme}`, marque: 'marquée publiée sous un N° que VRM ne sait pas retirer', jumelle: `même photo qu’${motsVendeur().autre}` };
   return (
     <SheetShell onClose={() => { if (mode !== 'run') onClose(); }} maxWidth={620}>
       <div data-repub-lbc={etape} data-repub-lbc-mode={mode}>
@@ -1858,7 +1858,7 @@ function LeboncoinScreen() {
         if (!rates.length) return null;
         const liste = rates.length === 1 ? rates[0] : rates.slice(0, -1).join(', ') + ' ni ' + rates[rates.length - 1];
         const effets = [
-          data.preuveKO && 'la liste à publier peut contenir des paires déjà vendues sur Vinted',
+          data.preuveKO && `la liste à publier peut contenir des ${motsVendeur().noms} déjà vendu${motsVendeur().e}s sur Vinted`,
           data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucun article vendu ici n'est encore en vente sur Vinted",
           data.lbcKO && 'je ne peux pas te dire lesquelles retirer de Leboncoin',
           data.echecLecture && 'la file à publier est incomplète',
@@ -2004,7 +2004,7 @@ function LeboncoinScreen() {
           const carteDoute = vendues.some((r) => r.sortie) ? 'vendues' : doute.some((r) => r.sortie) ? 'doute' : pause.some((r) => r.sortie) ? 'pause' : null;
           const phraseDoute = nDoute > 0 ? (
             <div data-lbc-retirer-doute={nDoute} style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
-              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, <b>une autre annonce</b> est peut-être en ligne : ouvre ta page profil Leboncoin.
+              {nDoute > 1 ? `Pour ${nDoute} de ces ${motsVendeur().noms}` : `Pour ${motsVendeur().une} de ces ${motsVendeur().noms}`}, <b>une autre annonce</b> est peut-être en ligne : ouvre ta page profil Leboncoin.
             </div>
           ) : null;
           return (<>
@@ -2164,7 +2164,7 @@ function LeboncoinScreen() {
               // ⚠️ « Tout est publié 🎉 » serait faux : rien n'est publié, tout
               //    a été retiré de la file. Deux causes, deux phrases.
               ? <div style={{ fontSize: 13, color: C.muted }}>Rien dans la file</div>
-              : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div>) : (<>
+              : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 ({motsVendeur().toutes} {motsVendeur().tes} numéroté{motsVendeur().e}s en ligne sont sur Leboncoin).</div>) : (<>
             {/* ⚠️⚠️ « EXACTEMENT TEL QU'IL PARTIRA » EST UNE PROMESSE SUR L'EXTENSION.
                 C'est ELLE qui publie, avec SA version de la règle : une extension
                 antérieure à 5.55.4 enverra l'ancien titre, coupé en plein mot.
@@ -2276,7 +2276,7 @@ function LeboncoinScreen() {
           se LIT une fois descend ici ; ce qui se FAIT reste en haut. */}
       {data && Array.isArray(data.liensPoses) && data.liensPoses.length > 0 && (
         <details data-lbc-liens={data.liensPoses.length} className="vrm-repli" style={{ marginTop: 6 }}>
-          <summary>Paires que tu as reliées ({data.liensPoses.length}) — corriger une erreur</summary>
+          <summary>{motsVendeur().Noms} que tu as relié{motsVendeur().e}s ({data.liensPoses.length}) — corriger une erreur</summary>
           <Card>
             {data.liensPoses.map((l, i) => (
               <div key={l.id} data-lien-lbc={l.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: i ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap' }}>
@@ -2384,11 +2384,11 @@ function LeboncoinScreen() {
           était la seule à ne rien déclencher »), et l'écran Annonces, lui,
           traitait déjà les trois. *« Pas su » ne vaut pas « oui ».* */}
       {/* (6 nov., v36-visuel — « des murs de texte ») Une ligne ; le comment, derrière le « ⓘ ». */}
-      <div style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.4 }}>La file : tes annonces en ligne sur Vinted.{' '}<Pourquoi label="Comment se fait la file" titre="La file Leboncoin">La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.4 }}>La file : tes annonces en ligne sur Vinted.{' '}<Pourquoi label="Comment se fait la file" titre="La file Leboncoin">La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, {motsVendeur().noms} retiré{motsVendeur().e}s exclu{motsVendeur().e}s). {(() => {
         // Trois états, jamais deux (§ extSait) — et la phrase suit la version
         // INSTALLÉE : c'est l'extension qui publie, avec SA règle.
         const e = extSait('publication');
-        if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
+        if (e === 'ok') return <>{motsVendeur().chaque} a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
         if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Paramètres → État des connexions</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
         return <>Publie depuis l'ordinateur où est l'extension.</>;
       })()}</Pourquoi></div>

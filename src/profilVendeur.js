@@ -176,12 +176,27 @@ export const caseJourneeMontree = (id, mode) => mode !== 'simple' || !CASES_JOUR
 // forme est écrite en entier (le genre change l'accord : « une paire vendue »,
 // « un article vendu ») : jamais un remplacement de mot dans une phrase.
 const MOTS = {
-  sneakers: { nom: 'paire', noms: 'paires', un: 'une paire', Un: 'Une paire', le: 'la paire', Le: 'La paire', ce: 'cette paire', tes: 'tes paires', e: 'e', es: 'es', chaque: 'Chaque paire', elle: 'elle', Elle: 'Elle', une: 'une' },
-  autre:    { nom: 'article', noms: 'articles', un: 'un article', Un: 'Un article', le: 'l’article', Le: 'L’article', ce: 'cet article', tes: 'tes articles', e: '', es: 's', chaque: 'Chaque article', elle: 'il', Elle: 'Il', une: 'un' },
+  sneakers: { nom: 'paire', noms: 'paires', un: 'une paire', Un: 'Une paire', le: 'la paire', Le: 'La paire', ce: 'cette paire', tes: 'tes paires', e: 'e', es: 'es', chaque: 'Chaque paire', elle: 'elle', Elle: 'Elle', une: 'une',
+    // (11 nov., lot vocabulaire-article) les formes des écrans secondaires, des notifications et de l'extension.
+    Nom: 'Paire', Noms: 'Paires', sa: 'sa paire', la: 'la', La: 'La', de: 'de la paire', a: 'à la paire', Ce: 'Cette paire', aucune: 'aucune paire', Aucune: 'Aucune paire',
+    celle: 'celle', celles: 'celles', toutes: 'toutes', Toutes: 'Toutes', laquelle: 'laquelle', autre: 'une autre paire', meme: 'la même paire', Meme: 'La même paire', lui: 'elle', eux: 'elles' },
+  autre:    { nom: 'article', noms: 'articles', un: 'un article', Un: 'Un article', le: 'l’article', Le: 'L’article', ce: 'cet article', tes: 'tes articles', e: '', es: 's', chaque: 'Chaque article', elle: 'il', Elle: 'Il', une: 'un',
+    Nom: 'Article', Noms: 'Articles', sa: 'son article', la: 'le', La: 'Le', de: 'de l’article', a: 'à l’article', Ce: 'Cet article', aucune: 'aucun article', Aucune: 'Aucun article',
+    celle: 'celui', celles: 'ceux', toutes: 'tous', Toutes: 'Tous', laquelle: 'lequel', autre: 'un autre article', meme: 'le même article', Meme: 'Le même article', lui: 'lui', eux: 'eux' },
 };
 export const motsArticle = (vend) => MOTS[vend === 'sneakers' ? 'sneakers' : 'autre'];
 // « 3 paires » / « 1 article » (le nombre et le nom accordé).
 export const nArticles = (n, vend) => { const m = motsArticle(vend); return `${n} ${n > 1 ? m.noms : m.nom}`; };
+// (11 nov., lot vocabulaire-article) Le vocabulaire du vendeur CONNECTÉ, pour tout module
+// (écrans découpés, règles qui écrivent une phrase) sans faire descendre `vend` partout.
+// L'app pose la source une fois (`poserSourceVend(() => vendActuel())`, src/App.jsx) ;
+// sans source (audits, bancs d'une règle seule) ⇒ « sneakers », les textes d'avant mot pour mot.
+let sourceVend = null;
+export const poserSourceVend = (f) => { sourceVend = typeof f === 'function' ? f : null; };
+export const vendCourant = () => { try { const v = sourceVend ? sourceVend() : 'sneakers'; return v === 'sneakers' ? 'sneakers' : 'autre'; } catch (_) { return 'sneakers'; } };
+export const motsVendeur = () => motsArticle(vendCourant());
+// « 3 paires » / « 1 article », pour le vendeur connecté (ou `vend` donné).
+export const motArticle = (n, { vend } = {}) => nArticles(n, vend === undefined ? vendCourant() : vend);
 
 // ── TAILLE ET MARQUE : FACULTATIVES HORS SNEAKERS ───────────────────────────
 // Ce qu'on passe à `problemesAnnonce` (src/verifAnnonce.js) : `facultatifs: true`

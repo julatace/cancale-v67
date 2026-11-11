@@ -31,6 +31,7 @@ import { placeCase } from './stockSortie.js';
 import { SegmenteBase } from './composants/Bouton.jsx';
 import { Numero } from './composants/Numero.jsx';
 import Pourquoi from './composants/PourquoiReplie.jsx';
+import { motsVendeur } from './profilVendeur.js';
 import './styles-inventaire.css';
 import { useLectureCamera, creerBip } from './ScannerColis.jsx';   // (10 nov., lot W) la caméra du lot V
 import { numeroDuScan } from './inventaireAnnuel.js';
@@ -71,7 +72,7 @@ const jour = (t) => { try { return new Date(t).toLocaleDateString('fr-FR', { day
 export function motJugement(j) {
   if (!j) return { t: '', s: '' };
   if (j.etat === 'illisible') return { t: 'Pas un N°', s: 'Tape le numéro écrit sur l’article ou son rangement (125, B125…)' };
-  const dbl = j.doublon ? ' · porté par deux paires : vérifie les deux' : '';
+  const dbl = j.doublon ? ` · porté par deux ${motsVendeur().noms} : vérifie les deux` : '';
   if (j.etat === 'attendu') {
     if (j.raison === 'gardee') return { t: '✓ Attendu', s: `Tu l’avais gardé « encore là »${dbl}` };
     const u = j.unite || {};
@@ -228,7 +229,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       <div className="vrm-inv-intro">Tape chaque N° vu : <b>attendu</b>, <b>en trop</b> ou <b>vendu</b>. Aucun N° changé. <Pourquoi>Passe devant tes rangements (cartons, étagères, bacs…) et tape chaque N° que tu vois. Je te dis tout de suite s’il est attendu, en trop ou vendu ; à la fin, ce qui manque. Aucun numéro n’est changé.</Pourquoi></div>
       {stock === undefined ? <p className="vrm-inv-note" data-inv-lecture="encours">Je lis tes annonces…</p>
         : (!stock || !stock.su ? <p className="vrm-inv-note" data-inv-lecture="passu">Annonces pas lues{lecturesTxt ? ` (${lecturesTxt})` : ''} : « manque » pas su. Ouvre Vinted, puis reviens.</p>
-          : <p className="vrm-inv-note" data-inv-lecture="ok" data-inv-attendus={index ? index.unites.length : 0}>{plur(index ? index.unites.length : 0, 'paire attendue', 'paires attendues')} en stock{lecturesTxt ? <> · <b>pas lu : {lecturesTxt}</b> — ses paires ne comptent pas</> : null}.</p>)}
+          : <p className="vrm-inv-note" data-inv-lecture="ok" data-inv-attendus={index ? index.unites.length : 0}>{plur(index ? index.unites.length : 0, `${motsVendeur().nom} attendu${motsVendeur().e}`, `${motsVendeur().noms} attendu${motsVendeur().e}s`)} en stock{lecturesTxt ? <> · <b>pas lu : {lecturesTxt}</b> — ses {motsVendeur().noms} ne comptent pas</> : null}.</p>)}
       <button type="button" className="vrm-b vrm-b-primaire vrm-inv-large" data-inv-commencer="" disabled={sync === 'lecture' || stock === undefined} onClick={commencer}>Commencer l’inventaire</button>
       {sync === 'lecture' ? etatSync : (sync === 'ko' ? <p className="vrm-inv-sync" data-inv-sync="ko">{horsLigne ? 'Hors connexion : un inventaire commencé sur un autre appareil n’apparaît pas ici.' : 'Je n’ai pas pu relire ton inventaire : un inventaire commencé sur un autre appareil n’apparaît pas encore ici.'}</p> : null)}
     </div>
@@ -244,7 +245,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
             <div className="vrm-inv-case" data-inv-case={caseCour.cle}>
               <button type="button" className="vrm-inv-pas" aria-label="Case précédente" disabled={caseIdx <= 0} onClick={() => setCaseIdx((i) => Math.max(0, i - 1))}>‹</button>
               <span className="vrm-inv-case-nom"><b>{caseCour.nom}</b>
-                <small>{noteesIci.length ? <>Notées ici : {noteesIci.map((k) => <span key={k} data-inv-notee={k} data-inv-notee-vue={vusCles.has(k) ? '1' : '0'} className="vrm-inv-notee">N°{k}{vusCles.has(k) ? ' ✓' : ''}</span>)}</> : 'Aucune paire notée dans cette case'}</small></span>
+                <small>{noteesIci.length ? <>Notées ici : {noteesIci.map((k) => <span key={k} data-inv-notee={k} data-inv-notee-vue={vusCles.has(k) ? '1' : '0'} className="vrm-inv-notee">N°{k}{vusCles.has(k) ? ' ✓' : ''}</span>)}</> : `${motsVendeur().Aucune} noté${motsVendeur().e} dans cette case`}</small></span>
               <button type="button" className="vrm-inv-pas" aria-label="Case suivante" data-inv-case-suivante="" disabled={caseIdx >= cases.length - 1} onClick={() => setCaseIdx((i) => Math.min(cases.length - 1, i + 1))}>›</button>
             </div>
           )}
@@ -257,7 +258,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
           : dernier.annule ? <><span className="vrm-inv-retour-n">N°{dernier.s}</span><span className="vrm-inv-retour-t">Annulé</span><span className="vrm-inv-retour-s">Il n’est plus compté</span></>
           : dernier.deja ? <><span className="vrm-inv-retour-n">N°{dernier.j.k}</span><span className="vrm-inv-retour-t">Déjà compté</span><span className="vrm-inv-retour-s">à {heure(dernier.deja.at)} — même article, rien à faire.</span>
               <button type="button" className="vrm-b vrm-b-secondaire" data-inv-deuxieme={dernier.j.k} onClick={() => valider(dernier.j.k, { deuxieme: true })}>C’est un 2ᵉ article N°{dernier.j.k}</button></>
-          : (() => { const m = motJugement(dernier.j); return <><span className="vrm-inv-retour-n">{dernier.j.etat === 'illisible' ? `« ${dernier.s} »` : `N°${dernier.j.k}`}</span><span className="vrm-inv-retour-t">{dernier.deuxieme ? 'Deux articles sous ce N°' : m.t}</span><span className="vrm-inv-retour-s">{dernier.deuxieme ? 'Deux paires sous un même numéro : la mauvaise peut partir. Ouvre sa fiche après l’inventaire.' : m.s}{dernier.ailleurs ? ` · noté dans ${nomCase(dernier.ailleurs)}` : ''}{!dernier.ailleurs && !dernier.deuxieme && dernier.j.etat === 'vendu' && slots && slots[dernier.j.k] ? ` · ${nomCase(String(slots[dernier.j.k].m) + ':' + Number(slots[dernier.j.k].i))}` : ''}</span></>; })()}
+          : (() => { const m = motJugement(dernier.j); return <><span className="vrm-inv-retour-n">{dernier.j.etat === 'illisible' ? `« ${dernier.s} »` : `N°${dernier.j.k}`}</span><span className="vrm-inv-retour-t">{dernier.deuxieme ? 'Deux articles sous ce N°' : m.t}</span><span className="vrm-inv-retour-s">{dernier.deuxieme ? `Deux ${motsVendeur().noms} sous un même numéro : ${motsVendeur().la} mauvais${motsVendeur().e} peut partir. Ouvre sa fiche après l’inventaire.` : m.s}{dernier.ailleurs ? ` · noté dans ${nomCase(dernier.ailleurs)}` : ''}{!dernier.ailleurs && !dernier.deuxieme && dernier.j.etat === 'vendu' && slots && slots[dernier.j.k] ? ` · ${nomCase(String(slots[dernier.j.k].m) + ':' + Number(slots[dernier.j.k].i))}` : ''}</span></>; })()}
       </div>); })()}
       <form className="vrm-inv-champ" onSubmit={(e) => { e.preventDefault(); valider(texte); }}>
         <input ref={champ} value={texte} onChange={(e) => setTexte(e.target.value)} inputMode={lettres ? 'text' : (auDoigt ? 'none' : 'numeric')} pattern={lettres ? undefined : '[0-9]*'}
@@ -305,10 +306,10 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       </div>
       {!bilan.su ? <p className="vrm-inv-note" data-inv-lecture="passu">Je n’ai pas pu lire tes annonces : je ne dis pas ce qui manque.</p> : null}
       {(lectures.length > 0 || bilan.aConfirmer.length > 0) && <p className="vrm-inv-note" data-inv-lectures-manquent="">
-        {lectures.length ? <>Pas lu : <b>{lecturesTxt}</b> — ses paires ne sont pas comptées comme manquantes. </> : null}
+        {lectures.length ? <>Pas lu : <b>{lecturesTxt}</b> — ses {motsVendeur().noms} ne sont pas compté{motsVendeur().e}s comme manquant{motsVendeur().e}s. </> : null}
         {bilan.aConfirmer.length ? <>{plur(bilan.aConfirmer.length, 'annonce', 'annonces')} « à confirmer » (lecture de plus de 24 h) pas vue{bilan.aConfirmer.length > 1 ? 's' : ''} : {bilan.aConfirmer.slice(0, 6).map((u) => 'N°' + u.numero).join(', ')}{bilan.aConfirmer.length > 6 ? '…' : ''} — repasse sur Vinted avec ce compte, puis refais le tour. </> : null}
       </p>}
-      {section('doublons', 'Deux paires sous un même N°', bilan.doublons, (v) => ligneBilan(v.k, v.k, 'doublon', v.raison === 'cartons' ? 'Deux articles rangés portent ce N°' : 'Porté par deux paires dans VRM', 'La mauvaise paire peut partir : ouvre la fiche et corrige avant d’expédier.', gesteFiche(v.k)), null)}
+      {section('doublons', `Deux ${motsVendeur().noms} sous un même N°`, bilan.doublons, (v) => ligneBilan(v.k, v.k, 'doublon', v.raison === 'cartons' ? 'Deux articles rangés portent ce N°' : `Porté par deux ${motsVendeur().noms} dans VRM`, `${motsVendeur().La} mauvais${motsVendeur().e} ${motsVendeur().nom} peut partir : ouvre la fiche et corrige avant d’expédier.`, gesteFiche(v.k)), null)}
       {section('vendus', 'À vérifier — vendues, encore rangées', bilan.vendus, (v) => ligneBilan(v.k, v.k, 'vendu', v.jugement.parti === true ? 'Colis parti selon VRM' : 'À sortir pour l’envoi', [v.jugement.unite && v.jugement.unite.titre, v.jugement.parti === true ? 'vérifie : retour, ou mauvais carton ?' : placeDe(v.k)].filter(Boolean).join(' · '),
         <>{onSortir && peutSortir && peutSortir(v.k) ? <button type="button" className="vrm-b vrm-b-secondaire" data-inv-sortir={v.k} onClick={() => onSortir(v.k)}>Je l’ai sortie</button> : null}{gesteFiche(v.k)}</>), 'Prouvées vendues : sors-les de leur rangement pour l’envoi.')}
       {section('manque', 'À chercher', bilan.manque, (u) => ligneBilan(u.cles[0], u.numero, 'manque', u.titre || 'Sans titre lu', [u.source === 'gardee' ? 'tu l’avais gardée « encore là »' : (u.plateformes || []).map((x) => NOM_PLAT[x] || x).join(' et '), comptes(u), placeDe(u.cles[0]) ? 'notée : ' + placeDe(u.cles[0]) : ''].filter(Boolean).join(' · '),
@@ -317,7 +318,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       {section('passu', 'Pas su', bilan.passu, (v) => ligneBilan(v.k, v.k, 'passu', motJugement(v.jugement).s, '', gesteFiche(v.k)), null)}
       {section('place', 'Pas dans leur case', bilan.pasASaPlace, (v) => ligneBilan(v.k, v.k, 'place', 'Vue dans ' + v.cases.map(nomCase).join(', '), 'notée dans ' + nomCase(v.notee.m + ':' + v.notee.i), onVoirCase ? <button type="button" className="vrm-b vrm-b-discret" data-inv-voir-case={v.k} onClick={() => onVoirCase(v.k)}>Voir la case</button> : null), null)}
       {bilan.vendusNonVus.length > 0 && <p className="vrm-inv-note" data-inv-vendus-non-vus={bilan.vendusNonVus.length}>{plur(bilan.vendusNonVus.length, 'vente à envoyer', 'ventes à envoyer')} pas vue{bilan.vendusNonVus.length > 1 ? 's' : ''} : N°{bilan.vendusNonVus.slice(0, 8).join(', N°')}{bilan.vendusNonVus.length > 8 ? '…' : ''} — déjà emballée{bilan.vendusNonVus.length > 1 ? 's' : ''} ?</p>}
-      {bilan.attendus.length > 0 && <p className="vrm-inv-note" data-inv-attendus-vus={bilan.attendus.length}>{plur(bilan.attendus.length, 'paire attendue vue', 'paires attendues vues')} : tout va bien pour elle{bilan.attendus.length > 1 ? 's' : ''}.</p>}
+      {bilan.attendus.length > 0 && <p className="vrm-inv-note" data-inv-attendus-vus={bilan.attendus.length}>{plur(bilan.attendus.length, `${motsVendeur().nom} attendu${motsVendeur().e} vu${motsVendeur().e}`, `${motsVendeur().noms} attendu${motsVendeur().e}s vu${motsVendeur().e}s`)} : tout va bien pour {bilan.attendus.length > 1 ? motsVendeur().eux : motsVendeur().lui}.</p>}
       {bilan.sansNumero > 0 && <p className="vrm-inv-note">{plur(bilan.sansNumero, 'annonce', 'annonces')} sans N° : l’inventaire ne peut pas les vérifier (donne-leur un N° dans Annonces).</p>}
       <div className="vrm-inv-gestes">
         {!ouvert ? <button type="button" className="vrm-b vrm-b-secondaire" data-inv-reprendre="" onClick={reprendre}>Reprendre cet inventaire</button> : <button type="button" className="vrm-b vrm-b-secondaire" onClick={() => setVue('auto')}>Continuer la saisie</button>}
@@ -351,7 +352,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
     </section>) : null);
   const vueRevoir = sRevoir ? (() => { const c = sRevoir.constat; const fin = Number(sRevoir.finAt) || Number(sRevoir.debut) || 0; return (
     <div className="vrm-inv-bilan" data-inv-vue="revoir" data-inv-revu={sRevoir.id}>
-      <p className="vrm-inv-note">Constat du <b>{jour(fin)} à {heure(fin)}</b>{c && c.base ? <> — fait hors connexion, avec la liste des paires du {jour(c.base)} à {heure(c.base)}</> : null}. Tel qu’il était ce jour-là, rien recalculé.</p>
+      <p className="vrm-inv-note">Constat du <b>{jour(fin)} à {heure(fin)}</b>{c && c.base ? <> — fait hors connexion, avec la liste des {motsVendeur().noms} du {jour(c.base)} à {heure(c.base)}</> : null}. Tel qu’il était ce jour-là, rien recalculé.</p>
       {c ? (<>
         <div className="vrm-inv-resume">
           <div><b>{c.vus}</b><small>vus</small></div>
@@ -359,8 +360,8 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
           <div><b>{c.trop.length}</b><small>à vérifier</small></div>
           <div><b>{c.vendus.length}</b><small>vendus rangés</small></div>
         </div>
-        {c.lectures.length ? <p className="vrm-inv-note">Pas lu ce jour-là : <b>{c.lectures.join(', ')}</b> — ses paires n’étaient pas comptées.</p> : null}
-        {listeN('doublons', 'Deux paires sous un même N°', c.doublons, 'doublon')}
+        {c.lectures.length ? <p className="vrm-inv-note">Pas lu ce jour-là : <b>{c.lectures.join(', ')}</b> — ses {motsVendeur().noms} n’étaient pas compté{motsVendeur().e}s.</p> : null}
+        {listeN('doublons', `Deux ${motsVendeur().noms} sous un même N°`, c.doublons, 'doublon')}
         {listeN('vendus', 'À vérifier — vendues, encore rangées', c.vendus, 'vendu')}
         {listeN('manque', 'À chercher', c.manque, 'manque', 'Attendues, pas vues ce jour-là.')}
         {listeN('trop', 'À vérifier', c.trop, 'trop', 'Vues, mais VRM ne les attendait pas.')}
@@ -374,7 +375,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
   // au-delà d'un jour, ambre : des paires ont pu partir ou arriver depuis.
   const ageH = horsLigne && Number.isFinite(horsLigne.at) ? (Date.now() - horsLigne.at) / 3600e3 : null;
   const teteHl = horsLigne ? (<>
-    <p className="vrm-inv-hl" role="status" data-inv-hors-ligne={new Date(horsLigne.at).toISOString()}>Hors connexion · liste des paires du {jour(horsLigne.at)} à {heure(horsLigne.at)}. Tes N° partent au retour du réseau.</p>
+    <p className="vrm-inv-hl" role="status" data-inv-hors-ligne={new Date(horsLigne.at).toISOString()}>Hors connexion · liste des {motsVendeur().noms} du {jour(horsLigne.at)} à {heure(horsLigne.at)}. Tes N° partent au retour du réseau.</p>
     {ageH != null && ageH >= 24 ? <p className="vrm-inv-hl-vieux" role="note" data-inv-hl-vieux={Math.floor(ageH)}>Liste de plus d’un jour : refais le bilan avec du réseau.</p> : null}
   </>) : null;
 
