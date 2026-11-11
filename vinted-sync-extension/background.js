@@ -5977,11 +5977,11 @@ function alertesDepotVinted(page, d) {
   const ouDesc = !Array.isArray(d.ou) || d.ou.includes('description');
   const lu = desc != null && desc.trim().length >= 5 ? VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(desc.slice(0, 20000), 'description')) : null;
   if (d.ecrit === true && ouDesc && lu) {
-    if (lu.etat === 'rien') out.push({ code: 'numero', texte: 'Aucun N° à la fin de la description', pourquoi: 'Tu numérotes toi-même : sans N°, VRM ne retrouve pas la paire.' });
+    if (lu.etat === 'rien') out.push({ code: 'numero', texte: 'Aucun N° à la fin de la description', pourquoi: `Tu numérotes toi-même : sans N°, VRM ne retrouve pas ${motsExt().le}.` });
     else if (lu.etat === 'ambigu') out.push({ code: 'numero', texte: 'Deux N° différents dans la description', pourquoi: 'VRM ne saura pas lequel est le bon.' });
   }
   const cle = lu && lu.etat === 'lu' ? lu.cle : '';
-  if (cle && d.enLigne && typeof d.enLigne.has === 'function' && d.enLigne.has(cle)) out.push({ code: 'enligne', texte: `N°${cle} déjà en ligne sur ce compte`, pourquoi: 'Deux annonces pour une paire : risque de la vendre deux fois.' });
+  if (cle && d.enLigne && typeof d.enLigne.has === 'function' && d.enLigne.has(cle)) out.push({ code: 'enligne', texte: `N°${cle} déjà en ligne sur ce compte`, pourquoi: `Deux annonces pour ${motsExt().un} : risque de ${motsExt().la} vendre deux fois.` });
   const p = nombreVerif(page.prix), ac = cle && d.buyByNum ? nombreVerif(d.buyByNum[cle]) : null;
   if (p != null && p > 0 && ac != null && ac > 0 && p < ac) out.push({ code: 'prix', texte: `Prix ${eurosVerif(p)} sous ton prix d’achat ${eurosVerif(ac)}`, pourquoi: 'Tu vendrais moins cher que ce que tu l’as payée.' });
   return out.filter((a) => !coupees.has(a.code));

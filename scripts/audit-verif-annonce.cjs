@@ -38,7 +38,8 @@ const MUTATIONS = {
 async function charger(src) {
   const f = path.join(os.tmpdir(), `verifAnnonce-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
   // (11 nov.) La règle importe src/numeroEcrit.js : le chemin est rendu absolu.
-  fs.writeFileSync(f, src.replace("from './numeroEcrit.js'", `from ${JSON.stringify(require('url').pathToFileURL(path.join(RAC, 'src', 'numeroEcrit.js')).href)}`));
+  // (11 nov., intégration 5.355) + src/profilVendeur.js (« paire » / « article ») : toute importation relative est rendue absolue.
+  fs.writeFileSync(f, src.replace(/from '\.\/([A-Za-z0-9_-]+\.js)'/g, (_, m) => `from ${JSON.stringify(require('url').pathToFileURL(path.join(RAC, 'src', m)).href)}`));
   try { return await import(f); } finally { try { fs.unlinkSync(f); } catch (_) {} }
 }
 const PROPRE = { titre: 'Nike Air Max 1 blanc taille 42', taille: '42', famille: 'chaussures', marque: 'Nike', categorie: 'Chaussures', nPhotos: 5, prix: 80, achat: 40 };

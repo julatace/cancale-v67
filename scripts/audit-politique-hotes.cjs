@@ -99,6 +99,12 @@ const COUPLES = {
   'src/profilFiscal.js|www.autoentrepreneur.urssaf.fr': ['lien', LIEN + ' — le site de l’URSSAF (Ma configuration)'],
   'src/ModeVacances.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvre vinted.fr sur ce compte » (mode vacances, sur SON clic)'],
   'src/moderationVinted.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvre l’annonce sur Vinted » / « Vérifie tes messages Vinted » (alerte « Vinted a agi », sur SON clic)'],
+  // (11 nov., intégration 5.355) liens ouverts d'un clic, arrivés avec les lots du paquet (clôture de l'année, « retirer des autres sites »).
+  'src/ClotureAnnee.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted ↗ » (clôture de l’année, sur SON clic)'],
+  'src/RetirerAilleurs.jsx|www.vinted.fr': ['lien', LIEN + ' — « à faire sur le site ↗ » (vendu ailleurs, sur SON clic)'],
+  'src/RetirerAilleurs.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « à faire sur le site ↗ » (vendu ailleurs, sur SON clic)'],
+  'src/RetirerAilleurs.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « à faire sur le site ↗ » (vendu ailleurs, sur SON clic)'],
+  'src/RetirerAilleurs.jsx|www.ebay.fr': ['lien', LIEN + ' — « à faire sur le site ↗ » (vendu ailleurs, sur SON clic)'],
   'src/modeVacances.js|www.leboncoin.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|www.ebay.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|fr.vestiairecollective.com': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],

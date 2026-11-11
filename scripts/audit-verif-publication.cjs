@@ -54,7 +54,8 @@ const MUTATIONS_BG = {
 
 async function charger(src) {
   const f = path.join(os.tmpdir(), `verifPub-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
-  fs.writeFileSync(f, src.replace("from './numeroEcrit.js'", `from ${JSON.stringify(NUM)}`));
+  // (11 nov., intégration 5.355) Toute importation relative de la règle (numeroEcrit.js, profilVendeur.js) est rendue absolue.
+  fs.writeFileSync(f, src.replace(/from '\.\/([A-Za-z0-9_-]+\.js)'/g, (_, m) => `from ${JSON.stringify(url.pathToFileURL(path.join(RAC, 'src', m)).href)}`));
   try { return await import(f); } finally { try { fs.unlinkSync(f); } catch (_) {} }
 }
 const mots = (t) => String(t || '').trim().split(/\s+/).filter(Boolean).length;

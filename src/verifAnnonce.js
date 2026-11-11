@@ -25,6 +25,7 @@
 //   100 (refus de `recreerVinted`, « titre limité à 100 caractères »).
 //   Vestiaire : aucune limite connue ⇒ pas jugé.
 import { lireNumeroTexte, lectureRecue, cleNumero } from './numeroEcrit.js';
+import { motsVendeur } from './profilVendeur.js';
 export const TITRE_MAX = { lbc: 50, ebay: 80, vinted: 100 };
 export const PHOTOS_MIN = 3;
 export const SITES_VERIF = { lbc: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire', vinted: 'Vinted' };
@@ -40,7 +41,7 @@ const GESTES = {
   lbc: { numero: 'Écris le N° à la fin de la description', enligne: 'Retire l’autre annonce, ou ne publie pas', taille: 'Ajoute la taille sur l’annonce Vinted', photos: 'Ouvre l’annonce sur Vinted : ses photos arrivent ici', prix: 'Corrige le prix dans la fiche', titre: 'Raccourcis le titre dans la fiche', marque: 'Ajoute la marque sur l’annonce Vinted', categorie: 'Précise le titre (le type d’article)' },
   ebay: { numero: 'Écris le N° à la fin de la description', enligne: 'Termine l’autre annonce eBay, ou ne publie pas', taille: 'Remplis la pointure dans les caractéristiques', photos: 'Ajoute des photos', prix: 'Corrige le prix', titre: 'Raccourcis le titre', marque: 'Remplis la marque dans les caractéristiques', categorie: 'Choisis la catégorie' },
   vestiaire: { numero: 'Écris le N° à la fin de la description Vinted', enligne: 'Retire l’autre annonce, ou ne publie pas', taille: 'Ajoute la taille sur l’annonce Vinted', photos: 'Ouvre l’annonce sur Vinted : ses photos arrivent ici', prix: 'Corrige le prix sur Vinted', titre: 'Raccourcis le titre sur Vinted', marque: 'Ajoute la marque sur l’annonce Vinted', categorie: 'Choisis la catégorie sur Vestiaire' },
-  vinted: { numero: 'Écris le N° à la fin de la description', enligne: 'Une seule annonce par paire : vérifie l’autre', taille: 'Ajoute la taille sur Vinted', photos: 'Ajoute des photos sur Vinted', prix: 'Change le prix dans Republier', titre: 'Raccourcis le titre dans Republier', marque: 'Ajoute la marque sur Vinted', categorie: 'Choisis la catégorie sur Vinted', description: 'Écris la description sur Vinted', couleur: 'Choisis la couleur sur Vinted', etat: 'Choisis l’état sur Vinted', titreVide: 'Écris un titre sur Vinted', prixVide: 'Mets un prix sur Vinted' },
+  vinted: { numero: 'Écris le N° à la fin de la description', get enligne() { return `Une seule annonce par ${motsVendeur().nom} : vérifie l’autre`; }, taille: 'Ajoute la taille sur Vinted', photos: 'Ajoute des photos sur Vinted', prix: 'Change le prix dans Republier', titre: 'Raccourcis le titre dans Republier', marque: 'Ajoute la marque sur Vinted', categorie: 'Choisis la catégorie sur Vinted', description: 'Écris la description sur Vinted', couleur: 'Choisis la couleur sur Vinted', etat: 'Choisis l’état sur Vinted', titreVide: 'Écris un titre sur Vinted', prixVide: 'Mets un prix sur Vinted' },
 };
 // (5 nov., Julien : « avant de lancer une action, savoir s'il manque quelque
 // chose pour la publication ») Ce que l'extension exige AVANT une mise en ligne
@@ -106,8 +107,8 @@ export const CLE_VERIF_COUPEES = 'vrm_verif_coupees';
 export const NOMS_ALERTES = { photos: 'Peu de photos', numero: 'N° absent de la description', prix: 'Prix sous le prix d’achat', enligne: 'Déjà en ligne', taille: 'Taille absente', marque: 'Marque absente', categorie: 'Catégorie absente', titre: 'Titre trop long', description: 'Description absente ou courte', couleur: 'Couleur absente', etat: 'État absent', titreVide: 'Sans titre', prixVide: 'Sans prix' };
 // Pourquoi chaque alerte est là (une phrase courte, montrée sous la ligne).
 export const POURQUOI_ALERTE = {
-  numero: 'Tu numérotes toi-même : sans N°, VRM ne retrouve pas la paire.',
-  enligne: 'Deux annonces pour une paire : risque de la vendre deux fois.',
+  get numero() { return `Tu numérotes toi-même : sans N°, VRM ne retrouve pas ${motsVendeur().le}.`; },
+  get enligne() { return `Deux annonces pour ${motsVendeur().un} : risque de ${motsVendeur().la} vendre deux fois.`; },
   prix: 'Tu vendrais moins cher que ce que tu l’as payée.',
   photos: 'Une annonce avec peu de photos inspire moins confiance.',
 };

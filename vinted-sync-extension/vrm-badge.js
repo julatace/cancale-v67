@@ -434,7 +434,7 @@
     if (e.capte && envoiRefuse(f, v) && !(site.choix === 'non' && e.plateforme === 'vinted')) return { etat: 'geste', texte: 'Dernier envoi refusé : voir ci-dessous' };
     if (e.plateforme === 'leboncoin') {
       const n = e.aRetirer && Array.isArray(e.aRetirer.liste) ? e.aRetirer.liste.length : 0;
-      if (n) return { etat: 'geste', texte: n > 1 ? `${n} paires à retirer de Leboncoin` : '1 paire à retirer de Leboncoin' };
+      if (n) return { etat: 'geste', texte: (() => { const m = (globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : null) || { nom: 'paire', noms: 'paires' }; return n > 1 ? `${n} ${m.noms} à retirer de Leboncoin` : `1 ${m.nom} à retirer de Leboncoin`; })() };
       const l = e.lbc;
       if (l && l.compte && l.compte.ok === false) return { etat: 'geste', texte: 'Leboncoin attend un geste : voir ci-dessous' };
       if (!site.id && !(l && l.compte && l.compte.ok === true)) return { etat: 'attente', texte: 'Compte Leboncoin pas encore reconnu' };
