@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  « DÉPOSÉ » DEPUIS LA LISTE DES VENTES (1er nov., maquette « ventes-B-journal »)
 //  Sur téléphone, une vente À EXPÉDIER se glisse vers la gauche pour dire
-//  « Déposé ». Le bouton « Déposé » de la ligne fait EXACTEMENT la même chose
+//  « Déposé » (src/LigneGlissable.jsx). Le bouton « Déposé » de la ligne fait EXACTEMENT la même chose
 //  (jamais un geste caché seul). Les deux appellent `demander`, qui n'écrit
 //  RIEN tout de suite : une barre « Déposé · Annuler » reste quelques secondes ;
 //  « Annuler » ⇒ rien n'est écrit. Passé le délai (ou un autre « Déposé », ou
@@ -58,47 +58,5 @@ export function BarreAnnulerDepose({ attente, onAnnuler, zIndex = 19000 }) {
   );
 }
 
-// La ligne qui se glisse — un rendu à fonction : `children(gp)` reçoit les
-// propriétés à poser sur la LIGNE elle-même (aucune enveloppe : les règles
-// `.vrm-ventes-liste > .vrm-sale-row` restent vraies). `actif` faux ⇒ `gp` vide.
-// Le « Déposé » révélé à droite est dessiné par la feuille (`::after`).
-const SEUIL = 0.32;     // part de la largeur à glisser pour valider
-export function GlisserVente({ actif, onDepose, children }) {
-  const g = React.useRef(null);   // { id, x0, y0, dx, sens, w, el }
-  const avale = React.useRef(false);
-  const [dx, setDx] = React.useState(0);
-  if (!actif) return children({});
-  const fin = (valide) => {
-    const s = g.current; g.current = null;
-    setDx(0);
-    if (s && s.sens === 'h') { avale.current = true; setTimeout(() => { avale.current = false; }, 350); }
-    if (valide && onDepose) onDepose();
-  };
-  const gp = {
-    'data-glisse-depose': '',
-    'data-glisse-actif': dx ? '1' : undefined,
-    'data-glisse-pret': dx && g.current && -dx >= g.current.w * SEUIL ? '1' : undefined,
-    onPointerDown: (e) => {
-      if (e.pointerType === 'mouse' || !e.isPrimary) return;
-      if (e.target && e.target.closest && e.target.closest('input,textarea,select,a,[data-sans-glisse]')) return;
-      g.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, sens: null, w: e.currentTarget.offsetWidth || 360, el: e.currentTarget };
-    },
-    onPointerMove: (e) => {
-      const s = g.current; if (!s || e.pointerId !== s.id) return;
-      const ddx = e.clientX - s.x0, ddy = e.clientY - s.y0;
-      if (!s.sens) {
-        if (Math.abs(ddx) < 10 && Math.abs(ddy) < 10) return;
-        s.sens = Math.abs(ddx) > Math.abs(ddy) * 1.4 && ddx < 0 ? 'h' : 'v';
-        if (s.sens === 'h') { try { s.el.setPointerCapture(e.pointerId); } catch (_) {} }
-      }
-      if (s.sens !== 'h') return;
-      s.dx = Math.max(-s.w * 0.6, Math.min(0, ddx));
-      setDx(s.dx);
-    },
-    onPointerUp: (e) => { const s = g.current; if (!s || e.pointerId !== s.id) return; fin(s.sens === 'h' && -s.dx >= s.w * SEUIL); },
-    onPointerCancel: () => { if (g.current) fin(false); },
-    onClickCapture: (e) => { if (avale.current) { e.preventDefault(); e.stopPropagation(); } },
-    style: dx ? { transform: `translate3d(${dx}px,0,0)`, transition: 'none' } : undefined,
-  };
-  return children(gp);
-}
+// (11 nov., gestes-glisser) Le glisser de la ligne vit dans src/LigneGlissable.jsx (un seul composant,
+// réutilisé par Ventes, Achats et Annonces) ; ici ne restent que la file « Déposé » et sa barre « Annuler ».

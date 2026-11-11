@@ -464,7 +464,8 @@ const TOURNEE_SUR_JOURNEE = false;
 // (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee) : la grille des widgets n'est plus sur Ma journée.
 const JOURNEE_AVEC_WIDGETS = false;
 import { UneLigne } from "./UneLigne.jsx";
-import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
+import { useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
+import LigneGlissable from "./LigneGlissable.jsx";   // (11 nov., gestes-glisser) glisser pour agir, comme Mail (Ventes, Achats, Annonces)
 import { propsGlisserFait } from "./GlisserColis.js";   // (8 nov., « beauté ») « Colis fait » au glisser vers la droite
 import { phraseDuJour } from "./phraseJour.js";   // (8 nov., « beauté ») la phrase d'en-tête de Ma journée
 import { installerFonduPhotos } from "./fonduPhotos.js";   // (8 nov., « beauté ») les vignettes arrivent en fondu
@@ -20672,7 +20673,7 @@ function CompteVente({ compte, plateforme, ou = '' }) {
   if (!compteFourni(compte)) return null;
   return <span className="vrm-vente-compte vrm-sensible" data-vente-compte={compte ? String(compte) : ''} data-vente-compte-ou={ou || undefined} data-vente-compte-passu={compte ? undefined : ''} title={compte ? `Vendue sur le compte ${compte}` : undefined}>{texteCompteVente(compte, plateforme)}</span>;
 }
-function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, basSeul = false, fusion = null, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, basSeul = false, fusion = null, glisse = null, ...props }) {
   const compte = compteFourni(compteBrut) ? compteBrut : undefined;
   // (5 nov., chantier E2) Le N° du titre en pastille `Numero` (la même qu'au téléphone) ; le texte
   // complet « N°x · nom » reste le nom lu et l'infobulle.
@@ -20776,6 +20777,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
     {numerosNote.length ? <div className="vrm-note-rangee" data-vente-notes="">{numerosNote.map((n) => <NotePaireCoque key={n} numero={n}/>)}</div> : null}
     {gestes ? <div className="vrm-ledger-gestes" data-gestes-ligne="">{gestes}</div> : null}
     {bas}
+    {/* (11 nov., gestes-glisser) Le tiroir de LigneGlissable : un enfant DIRECT de la ligne. */}
+    {glisse}
     {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
     {ouvert && <FermeAuRetour fermer={close}/>}
     {dejaOuvert.current && createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
@@ -42449,11 +42452,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </>;
             };
             return (
-              <GlisserVente actif={peutDeposer && !deposeIci} onDepose={()=>demanderDepose(txL, o, libDepose)}>{gp => (
+              /* (11 nov., gestes-glisser) Glisser vers la gauche : « Déposé » (principale, le glisser long) et
+                 « Imprimer » quand le PDF est là — les MÊMES fonctions que les boutons de la ligne
+                 (`demanderDepose` et sa barre « Annuler » 5 s ; `imprimerBordereauVente`). */
+              <LigneGlissable actif={peutDeposer && !deposeIci} cle={txL} libelle={libDepose || 'vente'} actions={[
+                { cle: 'depose', libelle: 'Déposé', icone: <Icon name="check" size={18}/>, faire: ()=>demanderDepose(txL, o, libDepose), data: { 'data-lg-depose': txL } },
+                fuPdf ? { cle: 'imprimer', libelle: 'Imprimer', icone: <Icon name="printer" size={18}/>, faire: ()=>imprimerBordereauVente(o), data: { 'data-lg-imprimer': txL } } : null,
+              ]}>{(gp, tiroirG) => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
-                {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
+                {...gp} glisse={tiroirG} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
@@ -42478,7 +42487,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
                 </> : gesteRemise} basSeul={!peutDeposer && !!gesteRemise} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !estParti(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'&&!annChez?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
-              )}</GlisserVente>
+              )}</LigneGlissable>
             );
           }}/></React.Fragment>; })}
         </div>
@@ -43123,8 +43132,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     // relais et le code de retrait. Pour Vinted Go c'est la seule
                     // source — aucun email ne les porte (voir `colisRelais`).
                     const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
+                    // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, la pilule « Annuler »
+                    // 5 s de `gesteVrm`) et le lien du code — les MÊMES gestes que les boutons de la carte.
+                    const hrefCode = (rel && (rel.qr || rel.url)) || lienConv(o);
                     return (
-                    <div className="vrm-pickup-card" key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:12,padding:'10px 12px'}}>
+                    <LigneGlissable key={'x'+i} cle={String(o.transaction_id||'')} libelle={o.title||'colis'} actions={[
+                      { cle: 'retire', libelle: 'Retiré', icone: <Icon name="check" size={18}/>, faire: ()=>markPickupDone(o), data: { 'data-lg-retire': String(o.transaction_id||'') } },
+                      hrefCode ? { cle: 'code', libelle: 'Le code', icone: <Icon name="qr" size={18}/>, href: hrefCode, data: { 'data-lg-code': String(o.transaction_id||'') } } : null,
+                    ]}>{(gp, tiroirG) => (
+                    <div className="vrm-pickup-card" {...gp} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:12,padding:'10px 12px'}}>
                       {thumb(orderPhoto(o)||(rel&&rel.photo))}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
@@ -43223,7 +43239,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       )}
                       {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} codePostal={codePostalLu({lieu: rel && rel.lieu})} enLigne court/> : null; })()}
                       <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
+                      {tiroirG}
                     </div>
+                    )}</LigneGlissable>
                     );
           };
           // ⚠️ ON NE DEVINE PLUS LE LIEU (Julien, 23 sept. : « ne prends plus en
@@ -43418,8 +43436,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     //    comptoir : le geste n'est pas le même, le texte non plus.
                     const casier = !!t.consigne || !!ident;
                     const jours = joursAvant(t.limite);
+                    // (11 nov., gestes-glisser) « Retiré » au glisser (le geste annulable `markCollected`) et
+                    // « Le code » en grand quand la carte porte le bouton du QR (`openQrView`).
                     return (
-                      <div className="vrm-pickup-card vrm-pickup-row" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                      <LigneGlissable key={i} cle={colisKey(t)} libelle={t.title||'colis'} actions={[
+                        { cle: 'retire', libelle: 'Retiré', icone: <Icon name="check" size={18}/>, faire: ()=>markCollected(t), data: { 'data-lg-retire': colisKey(t) } },
+                        qrVivant(t) ? { cle: 'code', libelle: 'Le code', icone: <Icon name="qr" size={18}/>, faire: ()=>openQrView(t), data: { 'data-lg-code': colisKey(t) } } : null,
+                      ]}>{(gp, tiroirG) => (
+                      <div className="vrm-pickup-card vrm-pickup-row" {...gp} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
                         {thumb(photoColis(t))}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
@@ -43537,7 +43561,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         )}
                         <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
+                        {tiroirG}
                       </div>
+                      )}</LigneGlissable>
                     );
                   })}
                   {(extraFusion[normNom(nom)]||[]).map((o,i)=>carteColisVinted(o,'f'+i,true,null))}
