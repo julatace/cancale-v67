@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════
 //  BANC — « QUOI DE NEUF » (11 nov., src/nouveautes.js, src/QuoiDeNeuf.jsx)
 //  Base INVENTÉE (_base-volume, 1 compte) ; rien de réel.
-//  Q1  vendeur inscrit le 8 nov. au soir, Sneakers, micro, Complet : une ligne « Nouveau · N
+//  Q1  vendeur inscrit le 9 nov. au soir, Sneakers, micro, Complet : une ligne « Nouveau · N
 //      nouveautés » en haut de Ma journée (aucune fenêtre ouverte) ; un toucher ⇒
 //      la feuille (une ligne par nouveauté, « Voir » ≥ 44 px) ; « Voir » ⇒ l'écran
 //      cible, la carte dit N−1 ; « Tout vu » ⇒ la carte part, `vrm_nouveautes_vues`
@@ -119,13 +119,13 @@ const attendre = async (pg, f, ms = 9000) => { const t0 = Date.now(); while (Dat
 const nCarte = (pg) => pg.evaluate(() => { const c = document.querySelector('[data-quoi-de-neuf-carte]'); return c ? Number(c.getAttribute('data-n')) : 0; });
 const idsFeuille = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-quoi-de-neuf-feuille] [data-nouveaute]')].map((x) => x.getAttribute('data-nouveaute')));
 const COMPLET = ['offres-auto-sures', 'republier-main', 'chercher-photo'];
-const PRO = ['facture-siret', 'dates-versement', 'export-comptable'];
+const PRO = ['facture-siret', 'dates-versement', 'pour-mon-comptable'];
 
 async function scenario(nav, nom, W, theme) {
   const sombre = theme === 'sombre';
   const T = `[${nom} ${W} ${theme}]`, pref = `${nom}-${W}-${theme}`;
   if (nom === 'Q1') {
-    SESSION = session('2026-11-08T20:00:00.000Z');
+    SESSION = session('2026-11-09T20:00:00.000Z');
     const b = base({ affichage: 'complet' });
     const o = await ouvrir(nav, { W, sombre, base: b });
     const vu = await attendre(o.pg, async () => (await nCarte(o.pg)) > 0, 20000);
@@ -143,7 +143,7 @@ async function scenario(nav, nom, W, theme) {
     const ids = await idsFeuille(o.pg);
     dit(ids.length === n, `${T} la feuille : une ligne par nouveauté (${ids.length})`, ids.join(','));
     dit(ids.includes('facture-siret') && ids.includes('offres-auto-sures') && !ids.includes('ebay-sans-pointure'), `${T} Sneakers + micro + Complet : pro et Complet oui, « pas que des sneakers » non`, ids.join(','));
-    dit(!ids.includes('centre-aide'), `${T} rien d’avant son inscription (centre d’aide du 8 nov.)`);
+    dit(!ids.includes('chercher-photo'), `${T} rien du jour de son inscription ni d’avant (chercher par photo, 9 nov.)`);
     const voirH = await o.pg.evaluate(() => Math.min(...[...document.querySelectorAll('[data-nouveaute-voir]')].map((a) => a.getBoundingClientRect().height)));
     dit(voirH >= 44, `${T} « Voir » ≥ 44 px (${voirH})`);
     dit(await o.pg.evaluate(() => !!document.querySelector('body > * [data-quoi-de-neuf-feuille], body > [data-quoi-de-neuf-feuille]') && !document.querySelector('.vrm-main [data-quoi-de-neuf-feuille]')), `${T} la feuille est un portail (hors de l’écran)`);

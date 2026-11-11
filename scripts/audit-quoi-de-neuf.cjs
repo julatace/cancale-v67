@@ -127,7 +127,7 @@ async function verifier(racine, { muet = false } = {}) {
     ['src/nouveautes.js', 'une phrase de 13 mots', "phrase: 'Elle n’est demandée que pour les sneakers.'", "phrase: 'Elle n’est plus du tout demandée que pour les sneakers, partout, toujours, voilà.'"],
     ['src/nouveautes.js', 'un écran qui n’existe pas', "tab: 'ebay_annonces', pour: 'autre'", "tab: 'ebay_nulle_part', pour: 'autre'"],
     ['src/nouveautes.js', 'un id en double', "{ id: 'profil-photo',", "{ id: 'tu-vends-quoi',"],
-    ['src/nouveautes.js', 'ordre cassé', "{ id: 'centre-aide', date: '2026-11-08'", "{ id: 'centre-aide', date: '2026-11-12'"],
+    ['src/nouveautes.js', 'ordre cassé', "{ id: 'chercher-photo', date: '2026-11-09'", "{ id: 'chercher-photo', date: '2026-11-12'"],
     ['src/App.jsx', 'clé hors SYNC_KEYS', '  CLE_NOUVEAUTES_VUES,\n', ''],
     ['src/App.jsx', 'carte retirée de Ma journée', '            {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}\n', ''],
     ['src/App.jsx', 'statut pas su ⇒ pas pro', "pro: reg == null ? null :", 'pro: reg == null ? false :'],

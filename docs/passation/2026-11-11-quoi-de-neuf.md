@@ -1,6 +1,6 @@
 # 11 nov. 2026 — « Quoi de neuf », discret, après chaque mise en ligne
 
-Branche `claude/quoi-de-neuf` (depuis `origin/main` fc3883d), poussée à chaque commit. Pas de PR, pas
+Branche `claude/quoi-de-neuf` (depuis `origin/main` fc3883d, puis `origin/main` ed0529c fusionnée), poussée à chaque commit. Pas de PR, pas
 de fusion. Rien dans `vinted-sync-extension/`, aucune fonction `api/`, aucune écriture en base réelle.
 Principe de Julien : « plus beau, simple, surtout PRATIQUE ».
 
@@ -31,15 +31,22 @@ Principe de Julien : « plus beau, simple, surtout PRATIQUE ».
 - Composants : `src/QuoiDeNeuf.jsx`, styles `src/quoi-de-neuf.css` (jetons ; l'accent sur la seule
   pastille « Nouveau » et le point).
 
-## Ce qui est dans la liste (vérifié présent dans `main`)
-11 nov. : Facture Pro SIRET (pro) · « Tu vends quoi ? » · plus de « pointure » sur eBay (autre) ·
-photo de profil = menu · offres auto sûres (Complet) · republier à la main en 3 gestes (Complet) ·
-« Créé par VRM » · dates de versement plus vite (pro) · Messages « Tous » · heure du résumé du soir.
-10 nov. : import d'un tableur · partage d'une photo vers VRM. 9 nov. : export comptable (pro) ·
-chercher par photo (Complet) · objectif du mois. 8 nov. : centre d'aide.
-**Pas mis** (introuvables dans `main` à cette heure, sans doute des lots parallèles) : « statistiques
-par catégorie ». « App installable » n'a pas de ligne : le guide iPhone existe depuis le 5 nov. et
-aucune nouveauté du jour ne le touche — à ajouter par le lot qui la livre.
+## Ce qui est dans la liste (vérifié présent dans `main` après la fusion de #1129)
+11 nov. : import de départ · stats par catégorie · achat en photo du ticket · partager une fiche ·
+objectif du mois · pour mon comptable (pro) · le « ? » de chaque écran · VRM installable · Facture Pro
+SIRET (pro) · « Tu vends quoi ? » · plus de « pointure » sur eBay (autre) · photo de profil = menu ·
+offres auto sûres (Complet) · republier à la main (Complet) · « Créé par VRM » · dates de versement
+(pro) · Messages « Tous » · heure du résumé du soir. 10 nov. : import d'un tableur · partager une
+photo vers VRM. 9 nov. : chercher par photo (Complet).
+Pas mis : le parcours d'arrivée (il ne concerne qu'un compte NEUF, qui ne voit de toute façon rien
+d'avant son inscription) et les alertes de production (propriétaire seul).
+
+## Incident de fusion (corrigé)
+Le premier `git merge origin/main` a eu des conflits (CLAUDE.md §9, historique-divers) et ma commande
+a enchaîné `git add -A && git commit` : les marqueurs de conflit ont été poussés dans le commit de
+fusion 889392f (CLAUDE.md et historique-divers seulement, rien dans `src/`). Corrigé au commit
+suivant : la version de `main` gardée, ma ligne en tête, la plus ancienne ligne §9 (« Partager une
+fiche ») déplacée telle quelle dans historique-divers. Leçon : ne jamais enchaîner un commit après un merge sans regarder sa sortie.
 
 ## ⚠️ La règle pour la suite
 **Chaque lot visible ajoute SA ligne en tête de `src/nouveautes.js`** (id neuf jamais réutilisé, date
