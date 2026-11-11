@@ -1,4 +1,5 @@
 import { PlateformesSetting } from '../App.jsx';
+import { RappelsSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
 import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
@@ -1858,6 +1859,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
+      // (11 nov.) « Me le rappeler » : les rappels qu'il a posés sur un article, une vente, un achat (api/_lib/rappels-perso.js).
+      { id:'rappels', type:'panneau', ic:'clock', lib:'Rappels', desc:'Ceux que tu as posés avec « Me le rappeler » : à 9 h le jour choisi.', data:{ 'data-reglage-rappels':'' }, el:<RappelsSetting/> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
