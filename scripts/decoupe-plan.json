@@ -221,6 +221,31 @@
           "composant": "Comptabilite",
           "condition": "bordResult",
           "nom": "FeuilleBordResult"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "pickerFor",
+          "nom": "FeuillePickerFor"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "showBrandCurves",
+          "nom": "FeuilleShowBrandCurves"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "dortAgir",
+          "nom": "FeuilleDortAgir"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "fileOpen",
+          "nom": "FeuilleFileOpen"
+        },
+        {
+          "composant": "Comptabilite",
+          "condition": "passportFor",
+          "nom": "FeuillePassportFor"
         }
       ]
     },
@@ -259,6 +284,13 @@
         "ActionsSelectionFeuille",
         "PlaceurTamponFeuille",
         "HotePublierAilleurs"
+      ],
+      "vues": [
+        {
+          "composant": "AppCoeur",
+          "condition": "ficheNum",
+          "nom": "FeuilleFicheNum"
+        }
       ]
     }
   ],
@@ -290,6 +322,11 @@
     {
       "nom": "ConfigurationDepart",
       "attente": "feuille"
+    },
+    {
+      "nom": "Bienvenue",
+      "attente": "rien",
+      "_note": "feuille de la première visite seulement"
     }
   ]
 }
