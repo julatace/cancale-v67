@@ -31,7 +31,7 @@ const MUTATIONS = {
   'tout-range': ['reprise', 'const r = { tab };', 'const r = { ...etat, tab };'],
   'recherche-7j': ['parcours', "/recherche$/.test(nom)?DUREE_RECHERCHE:DUREE_PARCOURS", 'DUREE_PARCOURS'],
   'futur': ['parcours', '&&now>=x.at&&', '&&'],
-  'vue-session': ['app', 'const st=stockageParcours();const v=st?restaurerVue(st,owner,nom,initial):initial;', 'const st=sessionStorage;const v=st?restaurerVue(st,owner,nom,initial):initial;'],
+  'vue-session': ['app', 'const st=stockageParcours(); return st?restaurerVue(st,owner,nom,initial):initial;', 'const st=sessionStorage; return st?restaurerVue(st,owner,nom,initial):initial;'],
   'depart-fixe': ['app', "const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');", "const [tab,setTabBrut]=useState('journee');"],
   'pas-de-retour': ['app', '<FermeAuRetour fermer={()=>setOpen(false)}/>\n          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas', '<div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas'],
   'bord': ['app', 'if(t && (t.clientX<BORD_SYSTEME || t.clientX>(window.innerWidth||0)-BORD_SYSTEME)){ swipeStart.current=null; return; }', ''],
@@ -110,9 +110,11 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   });
   essaie('câblage', () => {
     const app = sansCommentaires(src.app);
-    dit(/const \[reprise0\]=useState\(\(\)=>\{ try\{ return lireReprise\(stockageParcours\(\),[^;]*ONGLETS_LIENS, window\.location\.search\)/.test(app), 'l’écran de départ vient de lireReprise(stockage de l’appareil, liste blanche, adresse)');
+    // (11 nov., reprise-ecrans) Le départ vient d'ecranAOuvrir : le plus frais de l'appareil
+    // (reprise locale) et du compte (synchronisée), liste blanche, adresse reçue au chargement.
+    dit(/const \[reprise0\]=useState\(\(\)=>\{ try\{ [^\n]*return ecranAOuvrir\(\{ carte:carteReprise\(\), locale:st\?repriseLocale\(st,owner\):null, ongletsOk:ONGLETS_LIENS, search:search0 \}\)/.test(app) && /const \[search0\]=useState\(\(\)=>\{ try\{ return window\.location\.search/.test(app), 'l’écran de départ vient de la reprise (appareil + compte, liste blanche, adresse)');
     dit(/useState\(\(\)=>reprise0\?reprise0\.tab:'journee'\)/.test(app), 'sans reprise : Ma journée');
-    dit(/garderReprise\(stockageParcours\(\),[^)]*\{ tab, sub:platSub, colis:ongletColis \}, ONGLETS_LIENS\);[^\n]*\},\[tab,platSub,ongletColis\]\)/.test(app), 'la reprise est rangée à chaque changement d’écran, de section, d’onglet de Colis');
+    dit(/garderReprise\(stockageParcours\(\),[^)]*\{ tab, sub:platSub, colis:ongletColis \}, ONGLETS_LIENS\);[\s\S]{0,200}?\},\[tab,platSub,ongletColis\]\)/.test(app), 'la reprise est rangée à chaque changement d’écran, de section, d’onglet de Colis');
     dit(/const TABS_OK=ONGLETS_LIENS;/.test(app), 'les liens ?tab= et la reprise partagent la même liste blanche');
     const vue = (app.match(/function useVueSession[\s\S]*?\n\}/) || [''])[0];
     dit(/restaurerVue\(st,owner,nom,initial\)/.test(vue) && /garderParcours\(st,owner,'vue:'\+nom,nouveau\)/.test(vue) && !/sessionStorage/.test(vue) && /stockageParcours\(\)/.test(vue), 'les filtres sont rangés sur l’appareil (stockageParcours), plus dans le sessionStorage');
@@ -122,7 +124,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const menu = (app.match(/function MenuEcrans[\s\S]*?\n\}/) || [''])[0];
     dit(/<FermeAuRetour fermer=\{\(\)=>setOpen\(false\)\}\/>\s*<div ref=\{panneau\} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas/.test(menu), '« Plus » se ferme au geste retour (FermeAuRetour), le retour ne quitte plus VRM');
     dit(/data-plus-ecran=\{courant\?cleEntree\(courant\):''\}/.test(menu), 'la 5ᵉ place dit l’écran de « Plus » où l’on est');
-    dit(/t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système');
+    // (11 nov.) Depuis la décision de Julien du 9 nov. (b6cde2bc) il n'y a plus de changement d'onglet au doigt :
+    // soit aucun balayage d'onglet n'est écouté (`swipeStart`, `slideTab(` au doigt), soit il laisse les bords.
+    const balayageOnglet = /swipeStart\.current=\{x:t\.clientX/.test(app) || /onTouchEnd=\{[^\n]*\n?[\s\S]{0,400}slideTab\(/.test(app);
+    dit(!balayageOnglet || /t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système (aucun balayage d’onglet au doigt depuis le 9 nov.)');
     dit(/const badgesBarre=badges\?\{\.\.\.badges,ventes:undefined\}:badges;/.test(app) && /<BadgeNav t=\{t\} badges=\{badgesBarre\} place="barre"\/>/.test(app), 'dans la barre, Ventes ne répète pas le nombre de Colis (§7)');
     dit(/viderParcours\(sessionStorage,garder\); viderParcours\(localStorage,garder\);/.test(app), 'à la connexion d’un autre vendeur, ses reprises seules restent');
   });

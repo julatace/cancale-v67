@@ -2,6 +2,12 @@
 // LA PAGE D'ACCUEIL PUBLIQUE — ce que voit quelqu'un qui ne connaît pas VRM
 // ══════════════════════════════════════════════════════════════════════════
 // (8 nov., refaite pour VENDRE — calme, premium, style Apple de VRM.)
+// (11 nov., lot accueil-public) Pour TOUT revendeur (pas que des sneakers) :
+// « pour qui » au-dessus de la promesse, cinq moments (Messages et offres en
+// plus), les captures en catalogue MÉLANGÉ (mode exemple `varie`), deux cartes
+// de prix Solo / Pro (noms et phrases : OFFRES, montants : accueil-reglages,
+// comparés aux CGV par les audits), la FAQ en vraies questions/réponses, et
+// l'image de partage (public/og-vrm.jpg, scripts/accueil-og.cjs).
 // La promesse en une phrase : « Tes ventes, tes colis et ta compta, au même
 // endroit. » Puis la journée d'un revendeur, en quatre moments, montrée par de
 // VRAIES captures de l'app (mode exemple, scripts/accueil-captures.cjs) : le
@@ -52,24 +58,31 @@ function Capture({ nom, alt, taille = TEL, paresseuse = true, prioritaire = fals
 const MOMENTS = [
   {
     id: 'matin', capture: 'journee',
-    alt: 'L’écran Ma journée de VRM : le montant vendu aujourd’hui, la semaine, et la liste « À faire » — 1 colis à envoyer, 2 colis à retirer, 2 messages. Données d’exemple.',
+    alt: 'L’écran Ma journée de VRM : en haut, « 1 colis à envoyer » avec le bouton Imprimer, puis la semaine jour par jour et 60 € vendus aujourd’hui. Données d’exemple.',
     titre: 'Chaque matin, le prochain geste.',
     texte: 'Ma journée met en haut ce qui presse : le colis à envoyer avant sa date limite, les achats arrivés au relais, les messages qui attendent. Un bouton par geste.',
-    points: ['Tous tes comptes Vinted, Leboncoin et eBay dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
+    points: ['Tous tes comptes Vinted, Leboncoin, eBay et Vestiaire dans une seule liste.', 'La date limite vient de l’e-mail du bordereau ; une estimation est dite comme telle.'],
   },
   {
     id: 'colis', capture: 'retirer',
     alt: 'L’écran Colis de VRM, onglet « À retirer » : le point relais Le Fournil à Rennes, deux colis, et le code de retrait 582913 prêt à copier. Données d’exemple.',
     titre: 'Tes colis, à envoyer comme à retirer.',
-    texte: 'Les bordereaux s’impriment d’un geste, tamponnés du titre et du numéro de la paire. Au relais, tes codes de retrait t’attendent, rangés par point, même sans réseau.',
+    texte: 'Les bordereaux s’impriment d’un geste, tamponnés du titre et du numéro de l’article. Au relais, tes codes de retrait t’attendent, rangés par point, même sans réseau.',
     points: ['Le code, le QR et le point relais de chaque achat.', '« J’ai retiré » le sort de la liste ; un colis douteux reste visible, jamais caché.'],
   },
   {
     id: 'numeros', capture: 'numeros',
-    alt: 'L’écran Annonces de VRM : chaque paire en ligne porte son numéro de rangement en pastille noire, N°14, N°15, N°16, N°9. Données d’exemple.',
-    titre: 'Un numéro par paire. Jamais deux fois.',
-    texte: 'Chaque annonce reçoit un numéro de rangement : il dit où est l’article (carton, étagère, bac…). Une vente est reliée à sa paire par une identité — l’annonce, la photo, la transaction —, jamais par un titre qui se ressemble.',
-    points: ['Un numéro n’est jamais redonné à une autre paire.', 'Deux paires sous un même numéro : VRM te le dit, en rouge, tout de suite.'],
+    alt: 'L’écran Annonces de VRM : chaque article en ligne porte son numéro de rangement en pastille noire — N°12 à 110 €, N°11 une veste en jean à 105 €. Données d’exemple.',
+    titre: 'Un numéro par article. Jamais deux fois.',
+    texte: 'Chaque annonce reçoit un numéro de rangement : il dit où est l’article (carton, étagère, bac…). Une vente est reliée à son article par une identité — l’annonce, la photo, la transaction —, jamais par un titre qui se ressemble.',
+    points: ['Un numéro n’est jamais redonné à un autre article.', 'Deux articles sous un même numéro : VRM te le dit, en rouge, tout de suite.'],
+  },
+  {
+    id: 'messages', capture: 'messages',
+    alt: 'L’écran Messages de VRM : trois conversations de deux comptes dans une liste — « Vous feriez 50 € ? », « Toujours disponible en M ? », « Merci, bien reçu ! ». Données d’exemple.',
+    titre: 'Tes messages et tes offres, tous comptes réunis.',
+    texte: 'Les conversations de tes comptes Vinted arrivent dans une seule liste, les non-lues en tête. Une offre se tranche depuis VRM : accepter, refuser ou proposer un prix.',
+    points: ['C’est toi qui cliques ; VRM envoie au nom du compte ouvert sur ton ordinateur.', 'Accepter seul une offre au-dessus de ton prix mini : possible, éteint tant que tu ne l’allumes pas.'],
   },
   {
     id: 'compta', capture: 'compta',
@@ -80,11 +93,40 @@ const MOMENTS = [
   },
 ];
 
+// ── Les questions : une question (h3), sa réponse. Une réponse ne promet que
+//    ce que le code fait ; `si` cache une question quand elle n'a plus lieu d'être.
+const FAQ = [
+  { q: 'Pourquoi une extension ?', r: [<>Elle lit Vinted là où tu es connecté. Aucun mot de passe demandé. <a href="/aide/extension">L’installer</a>.</>] },
+  { q: 'Vinted peut-il bloquer mon compte à cause de VRM ?', r: ['Personne ne peut le garantir. VRM agit comme toi : une requête à la fois.', '50 actions par heure au plus, pause si Vinted ralentit.'] },
+  { q: 'Mes données sont-elles en sécurité ?', r: ['Aucun autre vendeur ne voit ta boutique. Double vérification possible.', <a key="c" href="/legal/confidentialite.html">La politique de confidentialité</a>] },
+  { q: 'Comment j’arrête ?', r: ['Tu résilies depuis l’app : fin à la période payée, rien à payer pendant l’essai.', '« Fermer mon compte » efface tes données.'] },
+  { q: 'Et sur mon téléphone ?', r: ['Tout se consulte, codes de retrait même sans réseau, une notification par vente.', 'Les actions passent par ton ordinateur.'] },
+  { q: 'J’ai plusieurs comptes Vinted.', r: ['C’est fait pour, chiffres séparés.', 'Solo : un compte vend sur chaque plateforme, les autres achètent.', 'Et avec Pro, tous tes comptes vendent, sans limite.'] },
+  { q: 'C’est seulement pour les baskets ?', r: ['Non : tout article (vêtements, sacs, livres…). VRM adapte ses mots à ce que tu vends.'] },
+  { q: 'Et Vestiaire Collective ?', si: () => !VESTIAIRE_BRANCHE, r: ['En cours : ses ventes n’entrent encore dans aucun total.'] },
+  { q: 'Une autre question ?', r: [<><a href="/aide">L’aide</a> ; <a href="/statut">l’état du service</a>.</>] },
+];
+
 const LEGAL = [
   ['CGV', '/legal/cgv.html'], ['CGU', '/legal/cgu.html'], ['Confidentialité', '/legal/confidentialite.html'],
   ['Mentions légales', '/legal/mentions-legales.html'], ['Cookies', '/legal/cookies.html'],
 ];
 
+// ⚠️ Les commentaires vivent ICI, pas dans la chaîne (elle est envoyée telle quelle
+//    au navigateur, dans le fichier d’entrée au budget compté par le banc). Dans l’ordre :
+//   · La barre : le fond de la page dès qu'on défile, rien de plus.
+//   · Les boutons : une forme (pilule), deux poids.
+//   · Le haut de page : la promesse, centrée — le seul moment centré de la page.
+//   · La scène du haut : l'ordinateur et le téléphone, de vraies captures.
+//   · La journée : sur ordinateur, le téléphone reste fixe et change d'écran.
+//   · Les comptes et l'installation : une bande grise, deux colonnes de texte.
+//   · Le prix : deux cartes côte à côte ; Pro porte la carte sombre, signature de VRM.
+//   · Les questions : du texte qu'on lit, sans accordéon.
+//   · La fin : une phrase, un geste.
+//   · Le pied : la marque revient, puis les liens utiles.
+//   · Apparition au défilement : une fois, en montée courte ; jamais caché sans observateur.
+//   · Tablette et petit ordinateur.
+//   · Téléphone.
 const CSS = `
 .av{--fond:#FFFFFF;--fond2:#F5F5F7;--encre:#1D1D1F;--gris:#6E6E73;--accent:#0071E3;--accent-texte:#0066CC;--nuit:#1D1D1F;--nuit-encre:#F5F5F7;--nuit-gris:#A1A1A6;--cadre:#1D1D1F;--ombre:0 1px 2px rgba(0,0,0,.06),0 24px 48px -12px rgba(0,0,0,.18);
   position:relative;background:var(--fond);color:var(--encre);min-height:100vh;overflow-x:clip;
@@ -100,8 +142,6 @@ const CSS = `
 :where(.av) :where(h1,h2,h3,p,ol,ul,figure){margin:0}
 .av-in{max-width:1180px;margin:0 auto;padding:0 24px}
 .av-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
-
-/* La barre : le fond de la page dès qu'on défile, rien de plus. */
 .av-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:transparent;transition:background-color 200ms ease}
 .av-nav.defile{background:var(--fond)}
 .av-nav .av-in{display:flex;align-items:center;gap:8px;height:56px}
@@ -112,8 +152,6 @@ const CSS = `
 .av-liens a{font-size:14px;color:var(--gris);text-decoration:none;padding:12px 10px;border-radius:8px;transition:color 150ms ease}
 @media (hover:hover) and (pointer:fine){.av-liens a:hover{color:var(--encre)}}
 .av-droite{margin-left:auto;display:flex;align-items:center;gap:4px}
-
-/* Les boutons : une forme (pilule), deux poids. */
 .av .av-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 24px;border-radius:999px;border:none;cursor:pointer;font:inherit;font-size:17px;font-weight:600;letter-spacing:-.01em;text-decoration:none;white-space:nowrap;background:var(--accent);color:#FFFFFF;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease}
 .av .av-btn:active{transform:scale(.97)}
 @media (hover:hover) and (pointer:fine){.av .av-btn:hover{background:#0077ED}}
@@ -123,9 +161,8 @@ const CSS = `
 .av-nav .av-btn{min-height:36px;padding:0 16px;font-size:14px;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity 160ms ease,transform 160ms ease}
 .av-nav .av-btn.la{opacity:1;pointer-events:auto;transform:none}
 .av-nav .av-lien{font-size:14px}
-
-/* Le haut de page : la promesse, centrée — le seul moment centré de la page. */
 .av-hero{padding:72px 0 0;text-align:center}
+.av-pour{font-size:clamp(15px,1.2vw,17px);font-weight:600;color:var(--gris);margin:0 auto 14px;max-width:30em;text-wrap:balance}
 .av-h1{font-size:clamp(36px,5.2vw,76px);line-height:1.04;letter-spacing:-.035em;font-weight:700;max-width:16em;margin:0 auto;text-wrap:balance}
 .av-sous{font-size:clamp(19px,1.7vw,24px);line-height:1.4;color:var(--gris);max-width:34em;margin:24px auto 0;text-wrap:balance;letter-spacing:-.015em}
 .av-actions{display:flex;align-items:center;justify-content:center;gap:12px 20px;margin-top:32px;flex-wrap:wrap}
@@ -133,8 +170,6 @@ const CSS = `
 .av-prix-ligne b{color:var(--encre);font-weight:600}
 .av-prix-ligne .nw{white-space:nowrap}
 .av-prereq{margin:6px auto 0;font-size:15px;color:var(--gris);max-width:40em;line-height:1.5}
-
-/* La scène du haut : l'ordinateur et le téléphone, de vraies captures. */
 .av-scene{position:relative;margin:56px auto 0;max-width:1100px;padding:0 24px}
 .av-ecran-bureau{display:block;border-radius:14px;overflow:hidden;background:var(--fond2);box-shadow:var(--ombre)}
 .av-ecran-bureau img,.av-tel img{display:block;width:100%;height:auto}
@@ -143,8 +178,6 @@ const CSS = `
 .av-scene .av-tel{position:absolute;right:-8px;bottom:-56px;width:230px}
 .av-legende{font-size:13px;color:var(--gris);margin-top:16px;text-align:left}
 .av-scene .av-legende{margin-top:72px;text-align:center}
-
-/* La journée : sur ordinateur, le téléphone reste fixe et change d'écran. */
 .av-journee{padding:160px 0 40px}
 .av-journee-tete{max-width:780px}
 .av-h2{font-size:clamp(30px,3.6vw,48px);line-height:1.08;letter-spacing:-.03em;font-weight:700;text-wrap:balance}
@@ -163,9 +196,6 @@ const CSS = `
 .av-moment li{position:relative;padding-left:20px;font-size:16px;color:var(--gris);line-height:1.45}
 .av-moment li:before{content:"";position:absolute;left:2px;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--gris)}
 .av-moment .av-tel-seul{display:none}
-.av-moment[data-actif] h3{color:var(--encre)}
-
-/* Les comptes et l'installation : une bande grise, deux colonnes de texte. */
 .av-bande{background:var(--fond2);padding:128px 0;margin-top:120px}
 .av-deux{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:96px;align-items:start}
 .av-bande p{font-size:17px;line-height:1.55;margin-top:16px;max-width:34em}
@@ -176,47 +206,42 @@ const CSS = `
 .av-etapes h3{font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3}
 .av-etapes p{margin-top:4px;font-size:16px;color:var(--gris)}
 .av-note{font-size:15px!important;color:var(--gris)}
-
-/* Le prix : la carte sombre, signature de VRM. */
 .av-prix{padding:160px 0 0}
-.av-carte-prix{background:var(--nuit);color:var(--nuit-encre);border-radius:28px;padding:64px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:end}
-.av-carte-prix .av-h2{color:var(--nuit-encre)}
-.av-montant{display:flex;align-items:baseline;gap:12px;margin-top:28px;font-variant-numeric:tabular-nums}
-.av-montant b{font-size:clamp(64px,8vw,112px);font-weight:700;letter-spacing:-.045em;line-height:.95}
-.av-montant span{white-space:nowrap;font-size:21px;color:var(--nuit-gris)}
-.av-carte-prix p{font-size:17px;line-height:1.55;color:var(--nuit-encre);max-width:30em}
-.av-carte-prix p + p{margin-top:14px}
-.av-carte-prix .petit{font-size:15px;color:var(--nuit-gris)}
-.av-carte-prix .petit a{color:var(--nuit-encre);text-underline-offset:3px}
-.av-carte-prix .av-btn{margin-top:28px}
-.av-offert{display:inline-block;margin-top:20px;font-size:15px;font-weight:600;color:var(--nuit-encre)}
-
-/* Les questions : du texte qu'on lit, sans accordéon. */
+.av-prix-tete{max-width:780px}
+.av-offres{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;margin-top:56px}
+.av-offre{background:var(--fond2);border-radius:28px;padding:48px;display:flex;flex-direction:column}
+.av-offre h3{font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.av-offre p{margin-top:20px;font-size:17px;line-height:1.55;max-width:30em}
+.av-offre-pro{background:var(--nuit);color:var(--nuit-encre)}
+.av-montant{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin-top:16px;font-variant-numeric:tabular-nums}
+.av-montant b{font-size:clamp(56px,6vw,88px);font-weight:700;letter-spacing:-.045em;line-height:.95}
+.av-montant span{white-space:nowrap;font-size:19px;color:var(--gris)}
+.av-offre-pro .av-montant span{color:var(--nuit-gris)}
+.av-prix-pied{margin-top:40px;max-width:40em}
+.av-prix-pied p{font-size:17px;line-height:1.55}
+.av-prix-pied p + p{margin-top:10px}
+.av-prix-pied .petit{font-size:15px;color:var(--gris)}
+.av-prix-pied .petit a{color:var(--accent-texte);text-underline-offset:3px}
+.av-prix-pied .av-btn{margin-top:28px}
+.av-offert{font-weight:600}
 .av-faq{padding:160px 0 0}
 .av-faq-grille{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,8fr);gap:64px;align-items:start}
 .av-faq-texte{columns:2;column-gap:56px}
 .av-faq-texte p{break-inside:avoid;margin:0 0 24px;font-size:16px;line-height:1.55;color:var(--gris)}
-.av-faq-texte p b{color:var(--encre);font-weight:600}
 .av-faq-q{break-inside:avoid;margin:0 0 24px}
-.av-faq-q>b{display:block;font-size:16px;line-height:1.55;color:var(--encre);font-weight:600}
+.av-faq-q>h3{font-size:16px;line-height:1.55;color:var(--encre);font-weight:600}
 .av-faq-texte .av-faq-q p{margin:0}
 .av-auto{margin:8px 0 0;padding-left:1.2em;font-size:17px;line-height:1.55;max-width:34em}
 .av-faq-texte a{color:var(--accent-texte);text-underline-offset:3px}
-
-/* La fin : une phrase, un geste. */
 .av-fin{padding:200px 0 160px;text-align:left}
 .av-fin p{font-size:clamp(24px,2.4vw,32px);line-height:1.25;letter-spacing:-.022em;font-weight:600;max-width:24em;text-wrap:balance}
 .av-fin .av-actions{justify-content:flex-start;margin-top:28px}
-
-/* Le pied : la marque revient, puis les liens utiles. */
 .av-pied{background:var(--fond2);padding:56px 0 calc(40px + env(safe-area-inset-bottom));font-size:13px;color:var(--gris)}
 .av-pied .av-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:start}
 .av-pied nav{display:flex;flex-wrap:wrap;gap:0 4px;justify-content:flex-end}
 .av-pied nav a,.av-pied nav span{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;text-decoration:none;color:var(--gris)}
 @media (hover:hover) and (pointer:fine){.av-pied nav a:hover{color:var(--encre);text-decoration:underline;text-underline-offset:3px}}
 .av-pied .marque{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--encre);display:block;margin-bottom:8px}
-
-/* Apparition au défilement : une fois, en montée courte ; jamais caché sans observateur. */
 @media (prefers-reduced-motion:no-preference){
   .av-hero > .av-in > *{animation:avMonte 520ms cubic-bezier(.23,1,.32,1) both}
   .av-hero .av-sous{animation-delay:70ms}.av-hero .av-actions{animation-delay:140ms}.av-hero .av-prix-ligne,.av-hero .av-prereq{animation-delay:200ms}
@@ -227,18 +252,15 @@ const CSS = `
 }
 @keyframes avMonte{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.av *{animation:none!important;transition:none!important}}
-
-/* Tablette et petit ordinateur. */
 @media (max-width:1023px){
   .av-split{grid-template-columns:1fr;gap:0;margin-top:32px}
   .av-plateau{display:none}
   .av-moment{min-height:0;padding:56px 0 0}
   .av-moment .av-tel-seul{display:block;width:min(300px,78vw);margin:32px auto 0}
-  .av-deux,.av-carte-prix,.av-faq-grille{grid-template-columns:1fr;gap:40px}
-  .av-carte-prix{padding:48px 32px}
+  .av-deux,.av-faq-grille{grid-template-columns:1fr;gap:40px}
+  .av-offre{padding:40px 32px}
   .av-liens{display:none}
 }
-/* Téléphone. */
 @media (max-width:759px){
   .av-in{padding:0 20px}
   .av-hero{padding-top:40px}
@@ -253,7 +275,8 @@ const CSS = `
   .av-moment p{font-size:17px}
   .av-bande{padding:88px 0;margin-top:96px}
   .av-prix,.av-faq{padding-top:104px}
-  .av-carte-prix{padding:40px 24px;border-radius:24px}
+  .av-offres{grid-template-columns:1fr;gap:16px;margin-top:40px}
+  .av-offre{padding:32px 24px;border-radius:24px}
   .av-faq-texte{columns:1}
   .av-fin{padding:120px 0 104px}
   .av-fin .av-actions{align-items:flex-start}
@@ -278,7 +301,7 @@ export default function Accueil({ onEntrer }) {
     return () => { try { mq && mq.removeEventListener && mq.removeEventListener('change', poser); } catch (_) {} document.body.style.background = avant; document.title = titre; };
   }, []);
 
-  // La barre : le fond dès 8 px ; « Créer mon compte » n'y paraît que quand le
+  // La barre : le fond dès 8 px ; « Essayer gratuitement » n'y paraît que quand le
   // bouton du haut est sorti de l'écran (un seul bouton principal à la fois).
   const sentinelle = React.useRef(null), ctaHaut = React.useRef(null);
   const [defile, setDefile] = React.useState(false);
@@ -338,7 +361,7 @@ export default function Accueil({ onEntrer }) {
   // ⚠️ Des fonctions qui RENDENT un bouton, pas des composants déclarés ici
   //    (un composant redéfini à chaque rendu perdrait le focus clavier).
   const creer = (extra) => (
-    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>Créer mon compte</a>
+    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>Essayer gratuitement</a>
   );
   const connexion = (extra) => (
     <a href="/?connexion" className="av-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>Se connecter<span aria-hidden="true">›</span></a>
@@ -362,7 +385,7 @@ export default function Accueil({ onEntrer }) {
             <a href="/aide">Aide</a>
           </nav>
           <div className="av-droite">
-            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte</a>
+            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Essayer gratuitement</a>
             <a href="/?connexion" className="av-lien" data-cta-nav="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>Se connecter</a>
           </div>
         </div>
@@ -371,8 +394,9 @@ export default function Accueil({ onEntrer }) {
       <main>
         <section className="av-hero" data-section="hero">
           <div className="av-in">
+            <p className="av-pour" data-pour-qui="">L’outil des revendeurs Vinted, Leboncoin et eBay. Tous articles.</p>
             <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">Vinted, Leboncoin, eBay : VRM te dit chaque matin quoi faire, sans erreur de paire.</p>
+            <p className="av-sous">Vinted, Leboncoin, eBay, Vestiaire : chaque matin, quoi faire, sans erreur d’article.</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
@@ -400,8 +424,8 @@ export default function Accueil({ onEntrer }) {
         <section className="av-journee" id="journee" data-section="journee">
           <div className="av-in">
             <div className="av-journee-tete" data-reveil="">
-              <h2 className="av-h2">Ta journée de revendeur, en quatre moments.</h2>
-              <p className="av-chapo">Le matin, au relais, au stock, en fin de mois : ce qu’il y a à faire, rien de plus.</p>
+              <h2 className="av-h2">Ta journée de revendeur, en cinq moments.</h2>
+              <p className="av-chapo">Le matin, au relais, au stock, avec tes acheteurs, en fin de mois.</p>
             </div>
             <div className="av-split">
               <div className="av-plateau" aria-hidden="true">
@@ -456,24 +480,28 @@ export default function Accueil({ onEntrer }) {
 
         <section className="av-prix" id="prix" data-section="prix">
           <div className="av-in">
-            <div className="av-carte-prix" data-reveil="">
-              <div>
-                <h2 className="av-h2">Deux offres. Tout VRM.</h2>
-                {ACCES_OFFERT && <span className="av-offert" data-acces-offert="">Gratuit pour l’instant</span>}
-                <div className="av-montant" data-prix="" data-offre="solo"><b>{PRIX_MOIS}&nbsp;€</b><span>par mois · {OFFRES.solo.nom}</span></div>
-                <div className="av-montant" data-prix-pro="" data-offre="pro"><b>{PRIX_PRO_MOIS}&nbsp;€</b><span>par mois · {OFFRES.pro.nom}{PRO_OUVERT ? '' : ' · bientôt'}</span></div>
-              </div>
-              <div>
-                <p data-offre-phrase="solo"><b>{OFFRES.solo.nom}</b> : {OFFRES.solo.phrase}</p>
-                <p data-offre-phrase="pro"><b>{OFFRES.pro.nom}</b> : {OFFRES.pro.phrase}{PRO_OUVERT ? '' : ' Ouverture prochaine.'}</p>
-                <p>Toutes les fonctions, l’extension et l’app sur ton iPhone, dans les deux offres.</p>
-                <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>, une fois par e-mail et par compte Vinted. Sans engagement : tu résilies depuis l’app.</p>
-                <p className="petit">
-                  {ACCES_OFFERT && 'Tant que l’abonnement n’est pas exigé, VRM reste gratuit. '}
-                  Aucun paiement sans que tu aies vu le prix et accepté les <a href="/legal/cgv.html">conditions générales de vente</a>.
-                </p>
-                {creer()}
-              </div>
+            <div className="av-prix-tete" data-reveil="">
+              <h2 className="av-h2">Deux offres. Tout VRM.</h2>
+              <p className="av-chapo">Toutes les fonctions dans les deux. La seule différence : combien de tes comptes vendent.</p>
+            </div>
+            <div className="av-offres" data-reveil="">
+              {/* Les noms et les phrases : OFFRES (api/_lib/plan-regle.js, la phrase
+                  des Paramètres et du serveur). Les montants : PRIX_MOIS / PRIX_PRO_MOIS
+                  (src/accueil-reglages.js), comparés aux CGV et au serveur par
+                  scripts/audit-plans-solo-pro.cjs et le banc accueil. */}
+              {[['solo', PRIX_MOIS, true], ['pro', PRIX_PRO_MOIS, PRO_OUVERT]].map(([cle, prix, ouvert]) => (
+                <article key={cle} className={`av-offre av-offre-${cle}`} data-offre={cle} data-prix-offre={prix}>
+                  <h3>{OFFRES[cle].nom}</h3>
+                  <div className="av-montant"><b>{prix}&nbsp;€</b><span>par mois{ouvert ? '' : ' · bientôt'}</span></div>
+                  <p data-offre-phrase={cle}>{OFFRES[cle].phrase}{ouvert ? '' : ' Ouverture prochaine.'}</p>
+                </article>
+              ))}
+            </div>
+            <div className="av-prix-pied" data-reveil="">
+              {ACCES_OFFERT && <p className="av-offert" data-acces-offert="">Gratuit pour l’instant : tant que l’abonnement n’est pas exigé, VRM ne coûte rien.</p>}
+              <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>, une fois par e-mail et par compte Vinted. Sans engagement : tu résilies depuis l’app.</p>
+              <p className="petit">Aucun paiement sans que tu aies vu le prix et accepté les <a href="/legal/cgv.html">conditions générales de vente</a>.</p>
+              {creer()}
             </div>
           </div>
         </section>
@@ -482,15 +510,12 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in av-faq-grille">
             <h2 className="av-h2">Questions fréquentes</h2>
             <div className="av-faq-texte">
-              <div className="av-faq-q"><b>Pourquoi une extension ?</b><p>Elle lit Vinted là où tu es connecté. Aucun mot de passe demandé. <a href="/aide/extension">L’installer</a>.</p></div>
-              <div className="av-faq-q"><b>Vinted peut-il bloquer mon compte à cause de VRM ?</b><p>Personne ne peut le garantir. VRM agit comme toi : une requête à la fois.</p><p>50 actions par heure au plus, pause si Vinted ralentit.</p></div>
-              <div className="av-faq-q"><b>Mes données sont-elles en sécurité ?</b><p>Aucun autre vendeur ne voit ta boutique. Double vérification possible.</p><p><a href="/legal/confidentialite.html">La politique de confidentialité</a>.</p></div>
-              <div className="av-faq-q"><b>Comment j’arrête ?</b><p>Tu résilies depuis l’app : fin à la période payée, rien à payer pendant l’essai.</p><p>« Fermer mon compte » efface tes données.</p></div>
-              <div className="av-faq-q"><b>Et sur mon téléphone ?</b><p>Tout se consulte, codes de retrait même sans réseau, une notification par vente.</p><p>Les actions passent par ton ordinateur.</p></div>
-              <div className="av-faq-q"><b>J’ai plusieurs comptes Vinted.</b><p>C’est fait pour, chiffres séparés.</p><p>Solo : un compte vend par plateforme, les autres achètent.</p><p>Et avec Pro, tous tes comptes vendent, sans limite.</p></div>
-              <p><b>C’est seulement pour les baskets ?</b> Non : tout article (vêtements, sacs, livres…).</p>
-              {!VESTIAIRE_BRANCHE && <p><b>Et Vestiaire Collective ?</b> En cours : ses ventes n’entrent encore dans aucun total.</p>}
-              <p><b>Une autre question ?</b> <a href="/aide">L’aide</a> ; <a href="/statut">l’état du service</a>.</p>
+              {FAQ.filter((q) => !q.si || q.si()).map((q) => (
+                <div key={q.q} className="av-faq-q" data-question="">
+                  <h3>{q.q}</h3>
+                  {q.r.map((x, i) => <p key={i}>{x}</p>)}
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -510,7 +535,7 @@ export default function Accueil({ onEntrer }) {
         <div className="av-in">
           <div>
             <span className="marque">VRM</span>
-            <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
+            <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin, eBay ou Vestiaire Collective.</span>
           </div>
           <nav aria-label="Informations">
             <a href="/aide">Aide</a>

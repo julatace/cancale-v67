@@ -147,3 +147,22 @@ html body .vrm-recap .vrm-recap-modifier[open] { display: flex; flex-direction: 
 /* (2 nov.) Le transporteur LU, juste au-dessus du bouton bordereau (src/PastilleTransporteur.jsx). */
 .vrm-recap-principal { display: flex; flex-direction: column; gap: 8px; }
 .vrm-recap-principal > .vrm-transporteur { align-self: flex-start; width: auto; }
+
+/* ── (11 nov., lot ventes-lot) Une vente EN LOT : les articles, chacun à sa place ──── */
+.vrm-recap-nums-lot { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.vrm-recap-lot-note { margin: 4px 0 0; font-size: 13px; color: var(--recap-muted); line-height: 1.45; }
+.vrm-recap-lot-manque { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: var(--recap-warn); line-height: 1.45; }
+.vrm-recap-lot-liste { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vrm-recap-lot-article { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: start; }
+.vrm-recap-lot-photo { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; background: var(--recap-soft); display: flex; align-items: center; justify-content: center; }
+.vrm-recap-lot-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-recap-lot-txt { min-width: 0; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.vrm-recap-lot-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.vrm-recap-lot-nom { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-recap-lot-l2 { font-size: 13px; color: var(--recap-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-recap-lot-sans { font-size: 12px; font-weight: 600; color: var(--recap-warn); padding: 4px 6px; border-radius: 8px; background: var(--recap-soft); flex-shrink: 0; }
+.vrm-recap-lot-relier { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vrm-recap-lot-relier input { width: 84px; min-height: 44px; font: inherit; font-size: 15px; padding: 0 10px; border: 1px solid var(--recap-line); border-radius: 10px; background: var(--vrm-surface, #fff); color: var(--recap-ink); }
+.vrm-fu-lot { display: inline-flex; align-items: center; gap: 4px; flex-wrap: nowrap; flex-shrink: 0; }
+.vrm-fu-lot-mot { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #636366); white-space: nowrap; }
+.vrm-fu-lot-manque { color: var(--vrm-warn, #B25000); }

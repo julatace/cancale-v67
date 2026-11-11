@@ -1,3 +1,4 @@
+import {signalDelai} from '../compatSafari.js';
 // Relier une identité au compte connecté, jamais ouvrir une nouvelle connexion.
 export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cle,origine,verifier,challenge,fetcher=fetch,storage=sessionStorage,stockageAppareil=localStorage,maintenant=Date.now()}){
  if(!['google','discord'].includes(provider)||!enabled)return{ok:false,error:'Cette connexion n’est pas encore activée dans VRM.'};
@@ -10,7 +11,7 @@ export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cl
   // nul, `new URL('')` lève → « Impossible de préparer ». Avec ce paramètre,
   // l'endpoint rend `{url}` en JSON (c'est ainsi que le SDK Supabase le lit).
   url.search=new URLSearchParams({provider,redirect_to:origine+'/?tab=settings&vue=compte',code_challenge:challenge,code_challenge_method:'s256',skip_http_redirect:'true'}).toString();
-  const r=await fetcher(url.href,{headers:{apikey:cle,Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
+  const r=await fetcher(url.href,{headers:{apikey:cle,Authorization:'Bearer '+token},signal:signalDelai(20000)});
   const j=await r.json().catch(()=>null);
   // (11 nov., lot DJ6) « Manual linking » éteint chez Supabase : le DIRE (geste du propriétaire),
   // jamais retomber sur une connexion qui créerait un compte neuf.

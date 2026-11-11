@@ -1,3 +1,72 @@
+# Parité Vinted → Leboncoin, eBay, Vestiaire — état mesuré dans le code (11 nov.)
+
+Julien (3 nov.) : « tout ce qui est fait pour Vinted doit être fait pour le reste des apps ».
+Le 11 nov., chaque ligne a été **remesurée dans le code** (`src/App.jsx`, `src/ecrans/*`,
+`api/*`, `vinted-sync-extension/`), pas recopiée. **fait** · **partiel** (ce qui manque est
+dit) · **manque** (faisable, pas fait) · **impossible** (raison : la plateforme ne donne pas
+l'information, ou règle §3). Les cases marquées ★ ont été comblées le 11 nov. (récit :
+`2026-11-11-parite-plateformes.md`, audit `audit-parite-plateformes.cjs`, banc
+`bancs/parite-plateformes.cjs`).
+
+| fonction | Vinted | Leboncoin | eBay | Vestiaire |
+|---|---|---|---|---|
+| Ventes lues (liste, montant) | fait | fait (`lbc_ventes`, prix en centimes) | fait (commandes, `montantRecuEbay`) | fait (`vc_ventes`, `montantRecuVc` ; montant pas sûr ⇒ dit) |
+| « Vendue » prouvée (jamais par absence) | fait (`<preuve-vente-regle>`) | fait (`isSeller` + transaction) | fait (commande PAID engagée) | fait (vente lue par id) |
+| Annonces en ligne (lecture complète qui fait foi) | fait | fait (5.288+) | fait (lecture serveur) | fait (5.296+) |
+| Date de vente | fait | fait (relevée, ou datée à la main `vrm_lbc_dates`) | fait (`creationDate`) | fait (`dateVenteVc`) |
+| Date de versement (CA déclaré) | fait (transaction 450 ; 5.341 accélère) | **impossible** : Leboncoin n'en donne pas ⇒ date de vente (règle §5) | **impossible** : pas de date de versement lue ⇒ date de commande | fait (`dateVersementVc`) |
+| Colis à expédier : nombre (Ma journée, cloche, widget, rappels) | fait | fait (`colisLbcAPoster`) — sans date limite (Leboncoin n'en donne pas : jamais « en retard ») | fait | fait |
+| Colis : récapitulatif « au moins » si une source n'est pas lue | fait | ★ fait (avant : eBay seul) | fait | ★ fait |
+| Filtre « Leboncoin » de Colis | — | fait autrement : ouvre l'écran Colis Leboncoin (bordereau, QR) | fait | fait |
+| Bordereau + impression tamponnée N° | fait | fait (5.136) | **impossible** : l'étiquette est achetée chez eBay par l'acheteur (§2.8), VRM n'a pas de PDF | fait (5.316) |
+| Codes de retrait (achats au relais) | fait | partiel : seulement par l'e-mail/SMS du transporteur (la transaction n'a ni point ni code) | **impossible** en général (livraison à domicile ; un relais passe par l'e-mail transporteur, déjà lu) | partiel : e-mail transporteur seulement |
+| Messages : lire | fait | fait (5.318, `lbcfil`) | fait (`GetMyMessages`) | fait (5.317, Stream) |
+| Messages : répondre sur son clic | fait | fait après une recette APPRISE (`lbcrepondre`) | fait (`AddMemberMessageRTQ`) | fait après recette apprise (`vcrepondre`) |
+| Offres : répondre sur son clic | fait | **impossible** : Leboncoin n'a pas d'offre structurée | fait (`RespondToBestOffer`) | fait après recette apprise (5.319) |
+| Acceptation automatique d'offres | fait (éteint par défaut, §3) | impossible | fait sous UNE forme (seuil natif eBay, §3) | **impossible** (§3 : forme Vinted seulement) |
+| Favoris : qui | fait | **impossible** (nombre seulement) | **impossible** (observateurs en nombre) | **impossible** (nombre seulement, 5.295) |
+| Facture Pro | fait | fait (compte dit pro) | fait (compte dit pro) | fait (5.340, prix de vente lu) |
+| CA déclaré / URSSAF / DAC7 | fait | fait | fait | fait |
+| Comptes écartés hors des totaux | fait | fait — ★ y compris « Finalisé par plateforme » (il les comptait encore) | ★ idem | ★ idem |
+| Statistiques : vendu, semaines, comparer les mois, marge et frais par plateforme | fait | fait | fait | fait |
+| Statistiques : « CA entre deux dates » | fait | ★ fait (avant : Vinted seul, écrit « Vinted, tous comptes ») | ★ fait | ★ fait (montant pas sûr : dit hors total) |
+| Statistiques : temps pour vendre, ce qui part vite, rotation | fait | **manque** : la date de mise en ligne Leboncoin est captée (`publieeLe`) mais jamais lue par l'app | partiel : `StartTime` lu côté serveur seulement | **impossible** aujourd'hui : aucune date de mise en ligne relevée |
+| Statistiques : « Finalisé sur Vinted », moyennes, CA par compte | fait | — (cartes Vinted, titrées « Vinted » : c'est vrai) | — | — |
+| Export comptable (Compta → « Exporter pour mon comptable », livre des recettes, e-reporting, DAC7) | fait | fait | fait | fait |
+| Rapport du mois et registre annuel (Ventes) : prix d'achat, N°, marge | fait | ★ fait, par identité (`autresBenefice`, id `lbc:`) ; avant : vides | ★ fait (id `ebay:`) | ★ fait (id `vestiaire:`) ; « sources non lues » nomme Vestiaire ★ |
+| Tableur « comptabilite-ventes.csv » | fait | ★ fait (ventes finalisées, colonne Plateforme) | ★ fait | ★ fait |
+| Objectif du mois | fait | fait (`ventesFaites`) | fait | fait |
+| Bilan semaine / mois (e-mail), Ma semaine | fait | fait | fait | fait |
+| Notification « vendu » | fait (e-mail de vente) | **manque** : aucun e-mail de vente Leboncoin appris (`email-inbound.js`) | **manque** : la relecture serveur des commandes ne sonne pas | fait (e-mail de vente) |
+| Frise d'une vente | fait (7 étapes prouvées, `FriseVente.jsx`) | partiel (4 étapes, `friseVenteLue`) | partiel (4 étapes ; « Livrée » jamais cochée seule) | partiel (4 étapes) |
+| N° écrit dans la description | fait (lu et appliqué, « Prendre / Garder ») | partiel : aperçu dans Réglages seulement (réf + description + titre) | fait autrement (SKU `VRM-{n°}`) ; aperçu seulement | partiel : aperçu, titre seulement |
+| Cycle d'un article (supprimé sans vente ⇒ carte) | fait | **manque** | **manque** | **manque** |
+| Republier (atelier sur son clic) | fait | fait | partiel (remise en vente des inactives) | **manque** (forme d'envoi jamais apprise) |
+| Supprimer sur son clic, confirmé | refusé en automatique (§3) | fait (5.291) | fait | **manque** (aucune route vue) |
+| Un N° de rangement par annonce, double vente | fait | fait | fait | fait |
+| Widget iPhone | fait | fait | fait | fait |
+
+## Ce qui reste, par valeur pour un vendeur (faisable sans rien inventer)
+1. **Notification « vendu » eBay** : la relecture serveur (`api/ebay.js`) voit les commandes neuves ;
+   il faut une mémoire « déjà annoncée » par commande (une ligne serveur) avant de pousser.
+2. **Temps pour vendre Leboncoin** : `publieeLe` est déjà rangé par l'extension
+   (background.js) — l'app ne le lit pas ; relier la vente à SON annonce par identité (`itemId`).
+3. **Frise complète** Leboncoin/eBay/Vestiaire : les étapes prouvées existent
+   (`etapeVenteVc`, `parcelColor`, `etatCommandeEbay`) ; eBay « Livrée » demande le suivi lu.
+4. **Cycle d'un article** Leboncoin/Vestiaire : même règle que Vinted (liste COMPLÈTE, vente non prouvée).
+5. À mesurer avant tout code : suppression Vestiaire, republication Vestiaire, e-mail de vente Leboncoin.
+
+## Ce qui est impossible, et où l'écran le dit
+- Date de versement Leboncoin/eBay : le CA déclaré prend la date de vente (Leboncoin) ou de commande (eBay), règle §5 ; une vente Leboncoin sans date est dite dans « Déclarer » avec son geste (« à la main », `src/versementRaisons.js`).
+- Bordereau eBay : Colis le dit sur la ligne (« L’étiquette se prend dans eBay, prépayée par le port de l’acheteur », lien vers la commande).
+- Favoris « qui » : Leboncoin → Messages dit « Leboncoin donne le nombre de favoris, jamais qui : VRM n'écrit à personne » ; Vestiaire montre le nombre par annonce (`vcfavoris`).
+- Offres Leboncoin : il n'y en a pas (rien à afficher).
+- Date limite d'envoi Leboncoin : jamais « en retard » (rien de lu ⇒ aucune date dite).
+
+---
+
+# Archive : l'état du 3 novembre (tel quel)
+
 # Parité Vinted → Vestiaire, Leboncoin, eBay (3 novembre)
 
 Julien (3 nov., 10 h 05) : « tout ce qui est fait pour Vinted doit être fait pour le reste

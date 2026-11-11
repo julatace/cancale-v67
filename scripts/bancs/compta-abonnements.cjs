@@ -19,7 +19,7 @@
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { getPath } = require('./_minipgrest.cjs');
-const { ouvrirAvanceCompta } = require('./_compta.cjs');
+const { ouvrirAvanceCompta, ouvrirDetailCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4571;
@@ -149,7 +149,9 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       // ── Un abonnement de 10 €/mois commencé le 1er du mois il y a 3 mois.
       // (16 oct.) Le formulaire est replié derrière « + Ajouter un abonnement » :
       // on l'ouvre comme lui (un formulaire ouvert d'office n'existe plus).
-      const ouvrirAbo = async () => { if (!(await pg.$('[data-abo-libelle]'))) { const o = await pg.$('[data-abo-ouvrir]'); if (o) await o.click(); await pg.waitForSelector('[data-abo-libelle]', { timeout: 3000 }).catch(() => {}); } };
+      // (11 nov., rouges A) Depuis Argent (10 nov.), les abonnements vivent dans Résumé → « Le
+      // détail » (Dépenses), le profil fiscal dans Déclarer : on va au segment comme lui.
+      const ouvrirAbo = async () => { await ouvrirDetailCompta(pg); if (!(await pg.$('[data-abo-libelle]'))) { const o = await pg.$('[data-abo-ouvrir]'); if (o) await o.click(); await pg.waitForSelector('[data-abo-libelle]', { timeout: 3000 }).catch(() => {}); } };
       try {
         await ouvrirAbo();
         await pg.fill('[data-abo-libelle]', 'Logiciel test');
@@ -197,7 +199,9 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
         const rA = await lire(pg);
         dit(rA.nAbo === 0 && /corbeille/i.test(pil) && (await pg.locator('[data-pilule-annuler]').count()) > 0, 'supprimer un abonnement : la ligne part, la pilule dit « Mis à la corbeille » et offre « Annuler »', pil.replace(/\s+/g, ' '));
         await pg.click('[data-pilule-annuler]');
-        await pg.waitForTimeout(1500);
+        // (11 nov., restes) §6.5 : on attend l'ISSUE de l'annulation (la pilule « Annulé », ou plus de
+        // pilule), jamais un délai fixe — mesuré : « Annulation… » à 1,5 s, « Annulé » à ~2 s, sous charge.
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-pilule]'); const t = e && e.getAttribute('data-pilule-etat'); return !t || t === 'annule' || t === 'echec-annulation'; }, null, { timeout: 10000 }).catch(() => {});
         const stA = await stocke(); const rB = await lire(pg);
         dit(rB.nAbo === 1 && stA && JSON.stringify(stA.abo) === JSON.stringify(avant.abo) && !Object.keys(stA.corb).length, '« Annuler » remet la ligne exacte (écran et `vrm_compta`), corbeille vide', `${rB.nAbo} · ${stA && stA.abo.length}`);
         await pg.click('[data-abo] [data-compta-supprimer]');
@@ -207,7 +211,8 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
         dit(rS.nAbo === 0 && stS.abo.length === 0 && e && e.type === 'abonnement' && JSON.stringify(e.morceaux[0].avant) === JSON.stringify(avant.abo[0]), 'supprimée : hors de l’écran et de `vrm_compta`, entière dans la corbeille', `${rS.nAbo} · ${stS && stS.abo.length} · ${e && e.type}`);
       } catch (e) { dit(false, 'la suppression d’un abonnement se joue', String(e.message).slice(0, 140)); }
 
-      // ── Le SIREN.
+      // ── Le SIREN (segment Déclarer).
+      await ouvrirAvanceCompta(pg);
       dit(r2.profil === 'lu', 'le profil fiscal est lu (la ligne `vrm_pro_facture` a répondu)', r2.profil);
       try {
         await pg.fill('[data-profil-champ="siret"]', '123456789');

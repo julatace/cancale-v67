@@ -48,7 +48,7 @@ function fetchServeur(lignes) {
     return R(404, {});
   };
 }
-const ROUTES = { compte: 'api/compte.js', relais: 'api/relais.js', push: 'api/push.js' };
+const ROUTES = { compte: 'api/compte.js', relais: 'api/relais.js', push: 'api/push.js', 'vinted-connect': 'api/vinted-connect.js' };   // (11 nov.) + la liaison serveur (5.332)
 const handlers = {};
 // Un appel au VRAI gestionnaire (forme Vercel : req.query, req.headers, req.body).
 async function appeler(route, { method, headers, body, query }, lignes) {
@@ -66,7 +66,7 @@ const TYPES_SIMPLES = /^(application\/x-www-form-urlencoded|multipart\/form-data
 const journal = [];
 async function fetchOrion(url, opts, lignes) {
   const u = new URL(url);
-  const route = (/^\/api\/(compte|relais|push)$/.exec(u.pathname) || [])[1];
+  const route = (/^\/api\/(compte|relais|push|vinted-connect)$/.exec(u.pathname) || [])[1];
   if (!route) { journal.push({ url, refus: 'route inconnue' }); return { reseau: true }; }
   const method = String(opts.method || 'GET').toUpperCase();
   const hs = {}; for (const [k, v] of Object.entries(opts.headers || {})) hs[k.toLowerCase()] = String(v);

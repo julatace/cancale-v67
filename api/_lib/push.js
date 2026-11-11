@@ -108,6 +108,7 @@ export const PUSH_DEFAUT = {
   soir:     true,   // la veille au soir : « Demain : N colis à poster » (api/ship-reminders.js?moment=soir)
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
+  rappel:   true,   // « Me le rappeler » : un rappel posé par LUI (api/_lib/rappels-perso.js)
   lbcsuppression: true, // Leboncoin a supprimé une annonce : ouvrir « Mes annonces » (api/_lib/lbc-suppression.js)
   relecture: true,  // un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h (api/_lib/comptes-a-relire.js)
   doublevente: true, // vendue sur Vinted, N° PROUVÉ encore en vente sur eBay/Leboncoin (api/_lib/double-vente.js)
@@ -345,6 +346,8 @@ export const instantNotif = () => {
   const t = v ? Date.parse(v) : NaN;
   return Number.isFinite(t) ? t : Date.now();
 };
+// Ancien nom (rappels perso, audit-rappels-perso) : la MÊME horloge.
+export const instantCalme = instantNotif;
 export async function sendPushToAll(payload) {
   // ⚠️ QUI NE PAIE PLUS NE REÇOIT PLUS RIEN (Julien, 4 octobre). La règle est
   //    celle de la base (`vrm_acces_pour`), la même qui ferme ses données. On

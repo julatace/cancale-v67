@@ -35,8 +35,15 @@ const ECRANS = [
   { nom: 'journee', tab: 'journee', w: 390, h: 844 },
   { nom: 'retirer', tab: 'cat_bord', w: 390, h: 844, gestes: [/^\s*À retirer/, /^\s*Code\s*$/], defile: 560 },
   { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844, defile: 620 },
-  { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/Micro-entrepreneur/, /^\s*Par mois\s*$/] },
+  { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/^\s*Ventes\s*$/, /^\s*Argent\s*$/, /^\s*Argent\s*$/, /^\s*Déclarer\s*$/, /^\s*Micro-entrepreneur/, /^\s*Par mois\s*$/] },
+  { nom: 'messages', tab: 'messages', w: 390, h: 844 },
   { nom: 'bureau', tab: 'journee', w: 1440, h: 900 },
+];
+const CATALOGUE_VARIE = [
+  ['Veste en jean bleue', "Levi's", 'M'], ['Air Max 90 blanche', 'Nike', '42'], ['Sac cabas en cuir camel', 'Sézane', ''],
+  ['Pull en laine écru', 'Maje', 'S'], ['Robe longue fleurie', 'Sandro', '38'], ['Manteau en laine gris', 'COS', 'L'],
+  ['Samba OG noire', 'Adidas', '39'], ['Jean droit brut', 'A.P.C.', 'W32'], ['Doudoune sans manches noire', 'Uniqlo', 'M'],
+  ['Lunettes de soleil écaille', 'Persol', ''], ['Chemise en lin blanche', 'Arket', 'L'], ['Bottines en cuir marron', 'Clarks', '40'],
 ];
 const SEUL = liste('SEUL', ECRANS.map((e) => e.nom).join(','));
 
@@ -57,9 +64,12 @@ async function capturer(nav, e, theme) {
   const ctx = await nav.newContext({ viewport: { width: e.w, height: e.h }, isMobile: tel, hasTouch: tel, deviceScaleFactor: 2, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', reducedMotion: 'reduce', serviceWorkers: 'block' });
   const sorties = [];
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => { sorties.push(r.request().url().slice(0, 80)); return r.abort(); });
-  await ctx.addInitScript((sombre) => {
-    try { sessionStorage.setItem('vrm_mode_exemple', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
-  }, sombre);
+  // (11 nov.) Le catalogue MÉLANGÉ (src/exempleDonnees.js `catalogue`) : la page
+  // parle à tout revendeur. Il vit ICI, pas dans l'app livrée (budget du fichier
+  // d'entrée). CATALOGUE=baskets rend le jeu d'avant (pour comparer). Tout est inventé.
+  await ctx.addInitScript(({ sombre, catalogue }) => {
+    try { sessionStorage.setItem('vrm_mode_exemple', '1'); if (catalogue) window.__vrmExempleCatalogue = catalogue; localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
+  }, { sombre, catalogue: process.env.CATALOGUE === 'baskets' ? null : CATALOGUE_VARIE });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (x) => erreurs.push(String(x.message || x).slice(0, 200)));

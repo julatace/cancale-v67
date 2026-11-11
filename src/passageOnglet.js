@@ -16,6 +16,8 @@
 //  Le geste est fréquent : court, jamais un délai avant de répondre.
 // ════════════════════════════════════════════════════════════════════════════
 
+import { MQ_ORDINATEUR } from './coque.js';
+
 export const DUREE_FONDU_MS = 200;
 export const COURBE_FONDU = 'cubic-bezier(.22, 1, .36, 1)';
 export const mouvementReduit = () => {
@@ -26,6 +28,6 @@ export const mouvementReduit = () => {
 export function fonduEntree(el) {
   if (!el || mouvementReduit() || typeof el.animate !== 'function') return null;
   // Sur ordinateur, à peine (la zone de travail ne s'éteint pas) : 0,9 → 1 en 180 ms (comme avant).
-  let bureau = false; try { bureau = window.matchMedia('(min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine)').matches; } catch (_) {}
+  let bureau = false; try { bureau = window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) {}
   try { return el.animate([{ opacity: bureau ? 0.9 : 0 }, { opacity: 1 }], { duration: bureau ? 180 : DUREE_FONDU_MS, easing: bureau ? 'ease' : COURBE_FONDU }); } catch (_) { return null; }
 }

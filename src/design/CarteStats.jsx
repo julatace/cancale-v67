@@ -13,7 +13,7 @@ import CarteMois from './CarteMois.jsx';
 import { SheetShell } from '../composants/SheetShell.jsx';
 import { montant } from '../format.js';
 import './aideCarte.css';
-import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif, valeurObjectifMois } from './carteChiffres.js';
+import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, maxCases, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif, valeurObjectifMois } from './carteChiffres.js';
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif, resteObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, propositionObjectif, moisPleinsAvant, moisPasse, objectifDuMoisYm, bilanMoisPasse, phraseBilan } from '../objectifMois.js';
 import ChoixPeriode from '../ChoixPeriode.jsx';
 import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
@@ -50,7 +50,8 @@ const affiche = (x, fmt, grand) => {
   // Dans une case : les centimes tant que ça tient (moins de 1 000 €), l'euro rond au-delà (jamais rogné).
   // (6 nov., onglets A) Les milliers séparés comme partout ailleurs : « 1 514,33 € », pas « 1514,33 € »
   // (le `fmt` des règles est sans séparateur) ; une case de 1 000 € ou plus reste à l'euro.
-  const corps = t === 'eur' ? ((grand || Math.abs(Number(x.valeur)) < 1000) ? montant(x.valeur) : euros(x.valeur)) : String(x.valeur);
+  // (11 nov., lot stats-plus) Un pourcentage (l'objectif du mois) s'écrit « 62 % ».
+  const corps = t === 'eur' ? ((grand || Math.abs(Number(x.valeur)) < 1000) ? montant(x.valeur) : euros(x.valeur)) : t === 'pct' ? `${x.valeur}\u00a0%` : String(x.valeur);
   if (!x.partiel) return corps;
   // (3 nov.) Jamais « ≥ » sur une case : le chiffre seul, « au moins » dans son titre (`titreDe`).
   return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : corps;
@@ -263,17 +264,39 @@ function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, 
     const dejaIci = L.findIndex((x, i) => i !== place && x && x.id === nouvelle.id && clePeriode(x.p) === clePeriode(nouvelle.p));
     if (dejaIci >= 0) L[dejaIci] = L[place];
     L[place] = nouvelle;
-    poser(reglageAEnregistrer(reglage, page, { g: L[0], c: L.slice(1, 4) }));
+    poser(reglageAEnregistrer(reglage, page, { g: L[0], c: L.slice(1) }));
+  };
+  // (11 nov., lot stats-plus) Une page à plus de trois cases (Ma journée, 6) : il AJOUTE une
+  // case (le premier chiffre proposé qui n'est pas déjà sur la carte), la RETIRE (une au moins
+  // reste) ou la RANGE (↑ ↓). Chaque geste est rangé tout de suite, comme un choix.
+  const max = maxCases(page);
+  const cases = places.slice(1);
+  const ranger = (c) => poser(reglageAEnregistrer(reglage, page, { g: places[0], c }));
+  const ajouter = () => {
+    if (cases.length >= max) return;
+    const pris = new Set(places.map((x) => x && x.id + '|' + clePeriode(x.p)));
+    const id = chiffresProposes(sel, locaux).find((k) => { const d = defDe(k, locaux); return !pris.has(k + '|' + clePeriode(Array.isArray(d && d.periodes) ? periodeDefaut(d) : undefined)); });
+    if (!id) return;
+    const d = defDe(id, locaux);
+    ranger([...cases, Array.isArray(d.periodes) ? { id, p: periodeDefaut(d) } : { id }]);
+    setPlace(cases.length + 1);
+  };
+  const retirer = (i) => { if (i < 1 || cases.length <= 1) return; ranger(cases.filter((_, k) => k !== i - 1)); setPlace(Math.max(1, Math.min(i, cases.length - 1))); };
+  const deplacer = (i, sens) => {
+    const k = i - 1, j = k + sens;
+    if (k < 0 || j < 0 || j >= cases.length) return;
+    const c = cases.slice(); [c[k], c[j]] = [c[j], c[k]];
+    ranger(c); setPlace(j + 1);
   };
   const ids = chiffresProposes(sel, locaux);
   const def = actuelle ? defDe(actuelle.id, locaux) : null;
   const periodePage = sel && sel.periode;
-  const noms = ['Grand chiffre', 'Case 1', 'Case 2', 'Case 3'];
+  const noms = ['Grand chiffre', ...cases.map((_, i) => `Case ${i + 1}`)];
   const apercu = (id) => {
     const d = defDe(id, locaux);
     const v = valeurChiffre(id, { id, p: (actuelle && actuelle.id === id && actuelle.p) || periodeDefaut(d) }, sources, sel, regles);
     if (v.valeur == null) return '—';
-    return (v.partiel ? 'au moins ' : '') + (d.type === 'eur' ? euros(v.valeur) : String(v.valeur));
+    return (v.partiel ? 'au moins ' : '') + (d.type === 'eur' ? euros(v.valeur) : d.type === 'pct' ? `${v.valeur}\u00a0%` : String(v.valeur));
   };
   // (5 nov., chantier E1) La feuille unique de l'app (`SheetShell`, chantier B) : portail, fond
   // opaque dès la première image, poignée au doigt, titre et croix en icône, retour du navigateur.
@@ -291,7 +314,19 @@ function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, 
                 </button>
               );
             })}
+            {max > 3 && cases.length < max ? (
+              <button type="button" className="vrm-carte-place vrm-carte-ajouter" data-carte-ajouter="" onClick={ajouter} aria-label={`Ajouter un chiffre (${cases.length} sur ${max})`}>
+                <span>{cases.length}/{max}</span><b>+ Ajouter</b>
+              </button>
+            ) : null}
           </div>
+          {max > 3 && place >= 1 && actuelle ? (
+            <div className="vrm-carte-ranger" role="group" aria-label={`Ranger la case ${place}`} data-carte-ranger={place}>
+              <button type="button" className="vrm-carte-defaut" data-carte-monter="" disabled={place <= 1} onClick={() => deplacer(place, -1)} aria-label={`Monter la case ${place}`}>↑ Avant</button>
+              <button type="button" className="vrm-carte-defaut" data-carte-descendre="" disabled={place >= cases.length} onClick={() => deplacer(place, 1)} aria-label={`Descendre la case ${place}`}>Après ↓</button>
+              <button type="button" className="vrm-carte-defaut" data-carte-retirer="" disabled={cases.length <= 1} onClick={() => retirer(place)} aria-label={`Retirer la case ${place}`}>Retirer</button>
+            </div>
+          ) : null}
           {/* (3 nov.) La période : un CALENDRIER (le même que Ventes, Achats et Statistiques) pour un chiffre
               qui se calcule sur des dates libres ; sinon ses seules périodes (Mois · Trimestre · Année),
               en contrôle segmenté sur une rangée — plus de rangée qui défile de côté. */}

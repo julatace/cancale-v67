@@ -6,6 +6,9 @@
 //   · aucune carte pour : en ligne (11), jamais vue en ligne (B13), vendue prouvée
 //     par sa transaction (14), déjà « Toujours chez moi » (15), retirée par VRM
 //     (Republier, coffre, 16), masquée par Vinted (17), republiée sous le même N° (18) ;
+//   · ⚠️ (11 nov., lot DJ4) la question vit dans la carte « À trancher » : « L'enlever du stock ? »
+//     (data-a-trancher-carte), « Enlever du stock » · « Non, je l'ai » · « Plus tard » ; le texte
+//     ci-dessous (menu de quatre réponses) est l'état d'avant ;
 //   · (9 nov., Ma journée v2) UNE carte « articles supprimés de Vinted », une RANGÉE par
 //     article (`data-cycle-num`) et SA réponse dans un menu de 44 px : « Toujours chez moi »
 //     · « Remise en ligne » · « Vendu en main propre » · « Je m'en sépare » (avant : trois
@@ -122,40 +125,45 @@ const ouvrir = async (b, vp, sombre) => {
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       try {
         await pg.locator('.vrm-day-layout').first().waitFor({ timeout: 30000 });
-        await pg.locator('[data-job="supprime-vinted"]').first().waitFor({ timeout: 25000 }).catch(() => {});
-        await pg.waitForTimeout(1500);
+        // (11 nov., lot DJ4) La question vit dans la carte « À trancher » de Ma journée (ouverte
+        // d'office si ≤ 3 choses, sinon un toucher) : « L'enlever du stock ? », trois réponses.
+        await pg.locator('[data-job="a-trancher"]').first().waitFor({ timeout: 25000 }).catch(() => {});
+        if (await pg.$('[data-at-journee="ferme"] [data-job="a-trancher"]')) await pg.click('[data-job="a-trancher"]');
+        await pg.locator('[data-a-trancher-carte="supprimes-vinted"]').first().waitFor({ timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(1200);
         const m = await pg.evaluate(() => {
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-          const groupes = [...document.querySelectorAll('[data-job="supprime-vinted"]')].filter(vis);
-          const cartes = groupes.flatMap((g) => [...g.querySelectorAll('[data-cycle-num]')]).filter(vis);
+          const cartes = [...document.querySelectorAll('[data-a-trancher-carte="supprimes-vinted"]')].filter(vis);
           return {
-            groupes: groupes.length,
-            nums: cartes.map((c) => c.getAttribute('data-cycle-num')).sort(),
-            choix: cartes.map((c) => { const sel = c.querySelector('select[data-cycle-select]'); if (!sel || !vis(sel)) return []; const r = sel.getBoundingClientRect();
-              return [...sel.querySelectorAll('option[data-cycle-choix]')].map((o) => ({ k: o.getAttribute('data-cycle-choix'), h: Math.round(r.height), r: Math.round(r.right) })); }),
+            nums: cartes.map((c) => c.getAttribute('data-num')).sort(),
+            choix: cartes.map((c) => [...c.querySelectorAll('button[data-role]')].filter(vis).map((b) => { const r = b.getBoundingClientRect(); return { k: b.getAttribute('data-role'), h: Math.round(r.height), r: Math.round(r.right) }; })),
             deb: document.documentElement.scrollWidth - window.innerWidth,
             vw: window.innerWidth,
             paire: cartes.some((c) => /\bpaires?\b/i.test(c.innerText)),
           };
         });
-        dit(m.groupes === 1 && JSON.stringify(m.nums) === JSON.stringify(['12']), 'UNE carte, une seule rangée : N°12 (vue en ligne, absente d\'une lecture complète, sans vente)', JSON.stringify({ groupes: m.groupes, nums: m.nums }));
+        dit(JSON.stringify(m.nums) === JSON.stringify(['12']), 'UNE question, une seule : N°12 (vue en ligne, absente d\'une lecture complète, sans vente)', JSON.stringify(m.nums));
         const c0 = m.choix[0] || [];
-        dit(c0.map((x) => x.k).join(',') === 'chez-moi,remise,vendu-main,separe', 'quatre réponses dans le menu de la rangée (« Remise en ligne » comprise)', c0.map((x) => x.k).join(','));
-        dit(c0.length && c0.every((x) => x.h >= 44 && x.r <= m.vw + 1), 'menu de 44 px, dans l\'écran', JSON.stringify(c0));
+        dit(c0.map((x) => x.k).join(',') === 'non,oui,plus-tard', '(DJ4) trois réponses : « Enlever du stock » d\'abord, « Non, je l\'ai », « Plus tard »', c0.map((x) => x.k).join(','));
+        dit(c0.length && c0.every((x) => x.h >= 44 && x.r <= m.vw + 1), 'chaque réponse fait 44 px, dans l\'écran', JSON.stringify(c0));
         dit(m.deb <= 1, 'aucun débordement horizontal', String(m.deb));
         dit(!m.paire, 'jamais « paire » sur la carte');
-        if (SHOTS) { const el = pg.locator('[data-job="supprime-vinted"]').first(); if (await el.count()) { await el.scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `cycle-${nom}.png`) }); await el.screenshot({ path: path.join(SHOTS, `cycle-carte-${nom}.png`) }); } }
+        const CARTE = '[data-a-trancher-carte="supprimes-vinted"][data-a-trancher-id="7002"]';
+        if (SHOTS) { const el = pg.locator(CARTE).first(); if (await el.count()) { await el.scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `cycle-${nom}.png`) }); await el.screenshot({ path: path.join(SHOTS, `cycle-carte-${nom}.png`) }); } }
         if (!MUTATION && m.nums.includes('12')) {
-          const CH = nom.startsWith('390') ? 'chez-moi' : 'remise';
-          await pg.locator('[data-cycle-num="12"] select[data-cycle-select]').selectOption(CH);
-          await pg.waitForTimeout(800);
-          const apres = await pg.evaluate(() => {
-            const lire = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (_) { return d; } };
-            return { carte: !!document.querySelector('[data-cycle-num="12"]'), dec: lire('vrm_cycle_decisions', {})['7002'] || null,
-              vendus: lire('vinted_annonces_vendues', []), perdues: Object.values(lire('vinted_pairs_lost', {})).map((e) => e && e.id) };
+          // 390 : « Non, je l'ai » (chez-moi) · 1512 : « Plus tard » (se tait 20 h).
+          const role = nom.startsWith('390') ? 'oui' : 'plus-tard';
+          await pg.click(`${CARTE} button[data-role="${role}"]`);
+          const lire = () => pg.evaluate(() => {
+            const l = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (_) { return d; } };
+            return { carte: !!document.querySelector('[data-a-trancher-carte="supprimes-vinted"][data-a-trancher-id="7002"]'), dec: l('vrm_cycle_decisions', {})['7002'] || null, tard: l('vrm_cycle_plus_tard', {})['7002'] || null,
+              vendus: l('vinted_annonces_vendues', []), perdues: Object.values(l('vinted_pairs_lost', {})).map((e) => e && e.id) };
           });
-          dit(!apres.carte, `« ${CH} » : la rangée part`);
-          dit(apres.dec && apres.dec.choix === CH && apres.dec.numero === '12', `sa réponse « ${CH} » est rangée (vrm_cycle_decisions)`, JSON.stringify(apres.dec));
+          let apres = await lire();
+          for (let i = 0; i < 40 && !(role === 'oui' ? apres.dec : apres.tard); i++) { await pg.waitForTimeout(200); apres = await lire(); }
+          dit(!apres.carte, `« ${role} » : la question part tout de suite`);
+          if (role === 'oui') dit(apres.dec && apres.dec.choix === 'chez-moi' && apres.dec.numero === '12', 'sa réponse « chez-moi » est rangée (vrm_cycle_decisions)', JSON.stringify(apres.dec));
+          else dit(!!apres.tard && !apres.dec, '« Plus tard » : la question se tait (vrm_cycle_plus_tard), aucune décision', JSON.stringify(apres));
           dit(!apres.vendus.includes('7002') && !apres.perdues.includes('7002'), 'l\'article n\'est ni vendu ni sorti du stock', JSON.stringify(apres));
         }
         dit(!errs.length, 'aucune erreur d\'app', errs.join(' | ').slice(0, 200));

@@ -134,14 +134,18 @@ export function filtreRetenu(tab) {
     return typeof v === 'string' ? siteDeTache(tab, v) : null;
   } catch (_) { return null; }
 }
+// (11 nov., reprise-ecrans) Rend `true` quand le site est RETENU (écrit, ou déjà le même) — la
+// coque le range alors aussi pour le compte VRM (src/repriseSynchro.js) ; `false` quand cet écran
+// ne retient pas un site vu sans choix (`choixSeul`).
 export function retenirFiltre(tab, site, choix = false) {
-  if (!estTacheSite(tab)) return;
-  if (TACHES_SITE[tab].choixSeul && !choix) return;
+  if (!estTacheSite(tab)) return false;
+  if (TACHES_SITE[tab].choixSeul && !choix) return false;
   try {
     const m = JSON.parse(localStorage.getItem(CLE_FILTRES) || '{}') || {};
     const k = cleFiltre(tab);
-    if (m[k] === site) return;
+    if (m[k] === site) return true;
     m[k] = site;
     localStorage.setItem(CLE_FILTRES, JSON.stringify(m));
   } catch (_) {}
+  return true;
 }

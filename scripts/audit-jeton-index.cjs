@@ -128,13 +128,15 @@ const resMock = () => { const r = { code: 0, corps: null };
   const appelW = async (k) => { const res = resMock(); const n0 = base.journal.length;
     await widget({ method: 'GET', query: { k }, headers: {} }, res);
     const j = base.journal.slice(n0);
-    return { res, j, servies: j.reduce((s, e) => s + e.servies, 0), balayage: j.some((e) => /id=eq\.main&select=owner,vrm_widget_token/.test(e.url)) }; };
+    return { res, j, servies: j.reduce((s, e) => s + e.servies, 0), balayage: j.some((e) => /id=eq\.main&(data->>vrm_widget_token=eq\.[^&]+&)?select=owner,vrm_widget_token/.test(e.url)), toutes: j.some((e) => /id=eq\.main&select=owner,vrm_widget_token/.test(e.url) && !/limit=2/.test(e.url)) }; };
   const idxW = (t) => `${NEUTRE}|jeton_widget_${sha(t)}`;
 
   // ── J1. Transition ────────────────────────────────────────────────────
   let r = await appelW(JW);
   vrai(r.res.code !== 401 && r.res.code !== 503, `J1 jeton sans index ⇒ servi (code ${r.res.code})`);
   vrai(r.balayage, 'J1 l’ancienne recherche a eu lieu (transition)');
+  // (11 nov., revue de sécurité) …mais par un FILTRE EXACT sur la clé, jamais en lisant toutes les lignes `main`.
+  vrai(!r.toutes, 'J1 la recherche de transition ne lit pas toutes les lignes `main`');
   vrai(base.lignes.has(idxW(JW)) && base.lignes.get(idxW(JW)).owner === A && base.lignes.get(idxW(JW)).genre === 'widget', 'J1 l’index `jeton_widget_<sha256>` est écrit chez le propriétaire neutre, il désigne A');
   vrai(![...base.lignes.keys()].some((k) => k.includes(JW)), 'J1 le jeton n’est jamais rangé en clair dans un identifiant');
   vrai(r.j.filter((e) => /owner=eq\./.test(e.url) && !/owner=eq\.00000000-/.test(e.url) && e.methode === 'GET').every((e) => e.url.includes('owner=eq.' + A)), 'J1 ensuite, chaque lecture est filtrée sur A');

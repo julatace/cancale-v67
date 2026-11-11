@@ -1,5 +1,5 @@
 /* Le bureau utilise la place disponible ; les règles téléphone restent intactes. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-app-shell { --vrm-largeur-contenu: 1360px; --vrm-largeur-journee: 1360px; }
   .vrm-app-shell .vrm-main[data-ecran="settings"] { --vrm-largeur-contenu: 1120px; }
   .vrm-app-shell .vrm-main > :not(.vrm-barre-haut) { min-width: 0; }

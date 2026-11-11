@@ -1,0 +1,51 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- 034 — FACULTATIVE : RETIRER DEUX INDEX QU'AUCUNE REQUÊTE N'UTILISE
+--       (11 novembre 2026) — PAS ENCORE APPLIQUÉE, et rien ne presse.
+--       Récit : docs/passation/2026-11-11-base-optimisee.md.
+-- ════════════════════════════════════════════════════════════════════════════
+-- L'assistant « Performance » de Supabase (11 nov.) liste 10 index « jamais
+-- utilisés ». Ce n'est PAS une raison de les retirer : l'agent eBay sert peu et
+-- la communauté démarre, un index peut ne pas avoir servi encore. Chaque index a
+-- été rapproché des requêtes du code (SQL des migrations + api/ + src/) :
+--
+--   index                               sert à                                   verdict
+--   app_data_ebay_ids (026)             vrm_ebay_cibles (suppression eBay)       GARDER
+--   vrm_agent_journal_owner_cible       vrm_agent_anonymiser_journal (owner,    GARDER
+--                                       cible) + effacement d'un vendeur
+--   vrm_agent_file_prochain             la file de l'agent (prochain <= now)     GARDER
+--   vrm_agent_file_en_vol               « un appel en vol par groupe »           GARDER
+--   vrm_communaute_conv_b               liste des conversations (a = moi OR      GARDER
+--                                       b = moi) + effacement d'un membre
+--   vrm_agent_vus_at                    purge des 14 jours (at < …)              GARDER
+--   vrm_agent_memos_expire              purge (expire < …)                       GARDER
+--   vrm_ebay_annonces_index_compte      (owner, compte) : renommage, retrait,    GARDER
+--                                       réindexation des annonces d'un compte
+--   vrm_ebay_titulaires_owner (owner)   RIEN : la contrainte unique              RETIRABLE
+--                                       vrm_ebay_titulaires_libelle (owner,
+--                                       compte) a déjà son index, qui commence
+--                                       par owner et sert les mêmes requêtes
+--   vrm_agent_journal_owner_at          RIEN aujourd'hui : aucune requête ne     RETIRABLE
+--     (owner, at desc)                  trie le journal d'un vendeur par date
+--                                       (l'app lit `ebay_agent_journal` dans
+--                                       app_data) ; la purge (at < 13 mois)
+--                                       ne peut pas s'en servir (owner d'abord)
+--
+-- GAIN : petit (ces tables sont minuscules) — un peu moins de travail à chaque
+-- écriture et deux lignes de moins dans l'assistant. RISQUE : nul pour les
+-- données (un index ne contient rien qui ne soit déjà dans la table) ; si un
+-- jour l'agent eBay affiche son journal trié par date, recréer
+-- vrm_agent_journal_owner_at (ligne de 014-agent.sql, 210). Rejouer 014 les
+-- recrée aussi (create index if not exists) : sans effet sur son empreinte
+-- (colonnes et contraintes seulement).
+--
+-- MODE D'EMPLOI (éditeur SQL de Supabase) : `drop index concurrently` ne
+-- marche PAS dans une transaction, et l'éditeur enveloppe ce qu'on colle dans
+-- une transaction. Deux façons :
+--   a) coller UNE ligne `drop index concurrently …` à la fois, Run, puis la
+--      suivante (chaque Run seul passe) ;
+--   b) ou, plus simple (tables minuscules, verrou d'une fraction de seconde),
+--      retirer le mot `concurrently` et coller les deux lignes ensemble.
+-- L'outil demande une confirmation (DROP) : c'est attendu.
+
+drop index concurrently if exists public.vrm_ebay_titulaires_owner;
+drop index concurrently if exists public.vrm_agent_journal_owner_at;

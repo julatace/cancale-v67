@@ -19,6 +19,9 @@ const FICHIER = path.join(R, 'src', 'statsCategories.js');
 const SRC = fs.readFileSync(FICHIER, 'utf8');
 const APP = require('./_source-app.cjs').sourceAppDe(path.join(R, 'src', 'App.jsx'));
 const STATS = fs.readFileSync(path.join(R, 'src', 'ecrans', 'Stats.jsx'), 'utf8');
+// (11 nov., lot rapport-mois) Les lectures (catalogue, catégories des fiches) vivent dans src/categoriesLecture.js,
+// partagées avec le Rapport du mois : la même règle s'y lit.
+const LECT = (() => { try { return fs.readFileSync(path.join(R, 'src', 'categoriesLecture.js'), 'utf8'); } catch (_) { return ''; } })();
 const PROFIL = fs.readFileSync(path.join(R, 'src', 'profilVendeur.js'), 'utf8');
 
 const MUTATIONS = {
@@ -136,7 +139,7 @@ async function audit(src, bavard) {
   b(/'vrm_categories_main',/.test(APP), 'SON choix est synchronisé (SYNC_KEYS)');
   b(/parCatalogue\[k\] = \(parCatalogue\[k\] \|\| 0\) \+ 1/.test(APP) && /dort: stockDort, parCatalogue/.test(APP), 'l’écran Annonces publie le stock par catégorie Vinted (`vrm_stats_stock.parCatalogue`)');
   b(/lignes\.push\(\{ plateforme: 'Leboncoin'[^\n]*tx: String\(v\.txId\)/.test(APP) && /plateforme: 'eBay'[^\n]*tx: String\(e\.orderId\)/.test(APP) && /plateforme: 'Vestiaire'[^\n]*tx: String\(v\.id\)/.test(APP), 'chaque ligne du vendu porte l’identité de SA vente (Leboncoin, eBay, Vestiaire)');
-  b(!/select=data[&`]/.test(corpsCarte) && /->>catalogId/.test(STATS), 'les catégories des fiches se lisent en scalaire, jamais `select=data`');
+  b(!/select=data[&`]/.test(corpsCarte) && !/select=data[&`]/.test(LECT) && /->>catalogId/.test(STATS + LECT), 'les catégories des fiches se lisent en scalaire, jamais `select=data`');
   if (prouve) {
     console.log('\n── Preuve par mutation');
     for (const [nom, mut] of Object.entries(MUTATIONS)) {

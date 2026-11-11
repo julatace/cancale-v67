@@ -120,13 +120,19 @@ jobs:
         run: node scripts/lancer-bancs.cjs ${{ matrix.lot }}
 
   bancs-webkit:
-    # (6 nov., filet 6) Safari : trois bancs sous WebKit. NON BLOQUANT au début
+    # (6 nov., filet 6) Safari : des bancs sous WebKit. NON BLOQUANT au début
     # (continue-on-error) : on apprend d'abord ce que WebKit voit de différent ;
     # à rendre bloquant quand il est vert plusieurs fois de suite (la passation le dit).
+    # (11 nov., webkit-fiable) + les parcours critiques sur iPhone : connexion, Ma journée,
+    # Ventes, colis à retirer et leur suivi, impression des bordereaux. Le faux Supabase
+    # des bancs sert le CORS sous WebKit (_navigateur.cjs) ; nouveau-vendeur ne joue que
+    # 390 px (l'iPhone ; 1512 reste dans les bancs Chromium). Récit :
+    # docs/passation/2026-11-11-webkit-fiable.md. Pour le rendre BLOQUANT : retirer
+    # `continue-on-error: true` ci-dessous (après trois passages verts sans changement).
     name: Bancs sous WebKit (Safari, non bloquant)
     needs: construire
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -145,4 +151,51 @@ jobs:
         env:
           NAVIGATEUR: webkit
           BANCS_PORT_BASE: '10030'
-        run: node scripts/lancer-bancs.cjs nouveau-vendeur iphone-reprise colis-retirer-propre
+          BANCS_TIMEOUT_S: '1800'
+          LARGEURS: '390'
+        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur
+
+  e2e-extension:
+    # (11 nov.) L'APP ET LA VRAIE EXTENSION ENSEMBLE : un vrai Chromium (nouveau
+    # headless, le binaire COMPLET — le « headless shell » ne charge pas
+    # d'extension), la vraie extension MV3 chargée depuis son dossier, le vrai
+    # dist/, un faux vinted.fr et un faux Supabase servis en local sous leurs vrais
+    # noms (rien ne sort). Six scénarios : liaison, dressing ⇒ Annonces, vente ⇒
+    # Ventes, baisse de prix commandée par l'app (compte de l'onglet, plafond, 429),
+    # autre compte dans l'onglet, extension en retard. NON BLOQUANT au début
+    # (continue-on-error) : à rendre bloquant après plusieurs passages verts de suite
+    # sur GitHub (docs/passation/2026-11-11-e2e-extension.md).
+    name: App + vraie extension (Chromium, non bloquant)
+    needs: construire
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Installer Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          sudo mkdir -p /opt/pw-browsers
+          sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
+          echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"
+      - name: Lancer le banc e2e-extension
+        env:
+          BANC_PORT: '10060'
+          BANC_CAPTURE: e2e-captures
+        run: node scripts/bancs/e2e-extension.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-extension-captures
+          path: e2e-captures
+          retention-days: 5
+          if-no-files-found: ignore

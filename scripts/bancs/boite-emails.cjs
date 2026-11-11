@@ -181,7 +181,8 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           const chrono = E.find((e) => /Chronopost/.test(e.from) && parId[e.id]);
           const colore = (c) => { const n = (String(c).match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number); return n.length === 3 && Math.max(...n) - Math.min(...n) > 12; };
           const fondsColores = marques.filter((x) => x.ok && colore(x.fond));
-          dit(marques.every((x) => x.ok && x.cache && x.gauche && x.taille >= 32) && mq[id(2)].logo === 'vinted' && mq[id(27)].logo === 'vestiaire' && ['monogramme', 'transporteur'].includes(mq[id(1)].k) && mq[id(1)].mono === 'MR' && !!chrono && mq[chrono.id].mono === 'C' && fondsColores.length === 0, `${nom} : la marque de l'expéditeur à GAUCHE de chaque ligne (≥ 32 px) — logo du site, monogramme neutre (« MR », « C ») pour un transporteur, aucun fond de couleur`, JSON.stringify([mq[id(1)], mq[id(2)], fondsColores.slice(0, 1)]));
+          // (11 nov.) À la souris d'un ordinateur, l'avatar fait 28 px (liste dense comme Mail) ; au doigt, 32 px au moins.
+          dit(marques.every((x) => x.ok && x.cache && x.gauche && x.taille >= (tactile ? 32 : 28)) && mq[id(2)].logo === 'vinted' && mq[id(27)].logo === 'vestiaire' && ['monogramme', 'transporteur'].includes(mq[id(1)].k) && mq[id(1)].mono === 'MR' && !!chrono && mq[chrono.id].mono === 'C' && fondsColores.length === 0, `${nom} : la marque de l'expéditeur à GAUCHE de chaque ligne (≥ 32 px) — logo du site, monogramme neutre (« MR », « C ») pour un transporteur, aucun fond de couleur`, JSON.stringify([mq[id(1)], mq[id(2)], fondsColores.slice(0, 1)]));
           // L'heure alignée à droite, sur la ligne de la nature ; le transporteur et le compte en dessous.
           const heures = await lignes.evaluateAll((l) => l.map((x) => { const t = x.querySelector('time'), q = x.querySelector('[data-boite-quoi]'), tx = x.querySelector('.vrm-boite-ligne-txt'); if (!t || !q || !tx) return null; const rt = t.getBoundingClientRect(), rq = q.getBoundingClientRect(), rx = tx.getBoundingClientRect(); return { droite: Math.abs(rt.right - rx.right) <= 1, ligne: rt.top < rq.bottom && rt.bottom > rq.top }; }));
           const heureLue = /\b15:58\b/.test(parId[id(1)].texte) && /compte-un/.test(parId[id(1)].texte) && /Mondial Relay/.test(parId[id(1)].texte);
@@ -222,7 +223,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           }
           // Le compte : un menu simple (le nom, jamais l'adresse quand le nom suffit), 44 px.
           const menu = await b.locator('[data-boite-adresse]').evaluate((s) => ({ options: [...s.options].map((o) => o.textContent), h: s.getBoundingClientRect().height }));
-          dit(JSON.stringify(menu.options) === JSON.stringify(['Tous les comptes', 'compte-un', 'compte-deux', 'compte-trois']) && menu.h >= 44, `${nom} : le menu des comptes dit le NOM du compte (aucune adresse technique), 44 px`, JSON.stringify(menu));
+          dit(JSON.stringify(menu.options) === JSON.stringify(['Tous les comptes', 'compte-un', 'compte-deux', 'compte-trois']) && menu.h >= (tactile ? 44 : 26), `${nom} : le menu des comptes dit le NOM du compte (aucune adresse technique), 44 px`, JSON.stringify(menu));
           // « Actualiser » n'est là que s'il sert : la liste vient d'être lue.
           dit(await b.locator('[data-boite-actualiser]').count() === 0 && !/Actualiser/.test(await b.innerText()), `${nom} : liste toute fraîche ⇒ pas de bouton « Actualiser »`);
         }
@@ -242,7 +243,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           });
           const attendu = { tout: String(E.length), ventes: String(parRubrique.ventes), achats: String(parRubrique.achats), codes: String(parRubrique.codes), colis: String(parRubrique.colis), offres: String(parRubrique.offres), 'a-verifier': String(COMPTEURS.aVerifier) };   // (6 nov., onglets C) + la pastille « À vérifier »
           const nOk = r.n.every(([k, v]) => v === attendu[k]);
-          dit(nOk && r.h >= 44 && r.tops === 1 && r.wrap === 'nowrap' && ['auto', 'scroll'].includes(r.ox), `${nom} : rubriques — une rangée (une seule ligne), 44 px au doigt, le nombre de CHAQUE rubrique, défilement si ça ne rentre pas`, JSON.stringify(r));
+          dit(nOk && r.h >= (tactile ? 44 : 26) && r.tops === 1 && r.wrap === 'nowrap' && ['auto', 'scroll'].includes(r.ox), `${nom} : rubriques — une rangée (une seule ligne), 44 px au doigt, le nombre de CHAQUE rubrique, défilement si ça ne rentre pas`, JSON.stringify(r));
           if (tactile) {
             const avant = await b.locator('.vrm-boite-rubriques').evaluate((x) => x.scrollLeft);
             await b.locator('.vrm-boite-rubriques').evaluate((x) => { x.scrollLeft = x.scrollWidth; });
@@ -431,7 +432,8 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         if (tactile) { dit(await pg.locator('[data-boite-feuille]').count() === 1, `${nom} : feuille ouverte`); await pg.locator('[data-boite-feuille] [data-boite-fermer]').click(); await pg.waitForTimeout(300); dit(await pg.locator('[data-boite-feuille]').count() === 0, `${nom} : « ‹ Boîte de réception » ferme la feuille`); }
         const debord = await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
         dit(!debord, `${nom} : aucun débordement horizontal (boîte)`);
-        const petits = await pg.locator('[data-boite-emails] button:visible, [data-boite-emails] select:visible').evaluateAll((l) => l.filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.textContent.trim().slice(0, 30)));
+        // (11 nov., lot emails-ecran) 44 px AU DOIGT (§7) ; à la souris d'un ordinateur, l'écran est dense comme Mail : 26 px (même requête que la CSS).
+        const petits = await pg.locator('[data-boite-emails] button:visible, [data-boite-emails] select:visible').evaluateAll((l) => l.filter((x) => x.getBoundingClientRect().height < (matchMedia('(min-width:900px) and (hover:hover) and (pointer:fine)').matches ? 25.5 : 43.5)).map((x) => x.textContent.trim().slice(0, 30)));
         dit(petits.length === 0, `${nom} : cibles au doigt ≥ 44 px (boîte)`, petits.join(' | '));
         // Relier ma boîte
         const avant = appels.length;
