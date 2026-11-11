@@ -354,9 +354,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
   const SCENARIOS = [
     { nom: "Achats · Reçu d'achat", tab: 'plat_vinted', section: 'Achats', recu: true, etapes: async (pg) => { await clic(pg, '.vrm-recus-email > summary', 700); await clic(pg, '.vrm-recus-email li button'); } },
     { nom: 'Achats · Note interne', tab: 'plat_vinted', section: 'Achats', etapes: async (pg) => { await clic(pg, '.vrm-seg-btn:has-text("Tous")', 1500); await clic(pg, '.vrm-buy-more', 600); await clic(pg, '[role=menuitem]:has-text("note interne")'); } },
-    { nom: 'Annonces · Répartir un lot', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Répartir un lot') },
-    { nom: 'Annonces · Inventaire physique', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Inventaire physique') },
-    { nom: 'Annonces · Audit du stock', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Audit du stock') },
+    // (11 nov., lot DJ4) « Répartir un lot », « Inventaire physique », « Audit du stock » : retirés du menu (sa décision).
     { nom: "Annonces · Compléter les prix d'achat", tab: 'plat_vinted', section: 'Annonces', etapes: outil("Compléter les prix d'achat") },
     { nom: 'Annonces · Studio photo', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Studio photo') },
     // (29 oct.) « ⋯ Gérer l'annonce » n'existe plus : ses gestes sont à la vue

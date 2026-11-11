@@ -149,7 +149,10 @@ const ECRANS = {
         onglets: [...r.querySelectorAll('[data-inst-onglet-choix]')].map((b) => b.getAttribute('data-inst-onglet-choix') + '=' + b.getAttribute('data-inst-onglet-n')).join(' '),
         nums: [...r.querySelectorAll('[data-inst-colis]')].map((c) => c.getAttribute('data-inst-colis')).join(' ') };
     },
-    attendu: { grand: '3', nums: '73 42 117' },
+    // (11 nov.) L'ordre de « À envoyer » est celui du lot AJ (9 nov., décision de Julien : « du plus
+    // récent en haut au plus vieux en bas ») : 9101 (N°117) et 9102 (N°42) vendues il y a 1 j, dans
+    // l'ordre lu, puis 9103 (N°73), il y a 3 j. L'ancien attendu suivait le tri par urgence remplacé.
+    attendu: { grand: '3', nums: '117 42 73' },
   },
   ventes: {
     tab: 'ventes', cle: (uid) => 'vrm_ventes_instantane:' + uid,

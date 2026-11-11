@@ -89,7 +89,7 @@ export function InventaireAnnuel({ owner = '', cle, Feuille, onFermer, onSaisirP
     const montre = tout[id] ? l : l.slice(0, MAX_LISTE);
     return (
       <section className="vrm-ia-ecart" data-ia-ecart={id} data-ia-ecart-n={l.length}>
-        <h4><span>{titre}</span><b data-ia-ton={ton || ''}>{l.length}</b></h4>
+        <h4><span>{titre}</span><b data-ia-ton={ton || ''} className={ton === 'doublon' ? 'is-double' : undefined}>{l.length}</b></h4>
         {aide ? <p className="vrm-ia-aide">{aide}</p> : null}
         <ul>{montre.map(rendu)}</ul>
         {l.length > montre.length ? <button type="button" className="vrm-ia-lien" onClick={() => setTout((x) => ({ ...x, [id]: true }))}>Voir les {l.length}</button> : null}

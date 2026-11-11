@@ -32,6 +32,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn, execSync } = require('child_process');
+const GARDE_RESEAU = `--require=${path.join(__dirname, 'bancs', '_garde-reseau.cjs')}`;   // (11 nov.) aucun banc ne joint un vrai serveur
+const avecGarde = (e) => Object.assign({}, e, { NODE_OPTIONS: [e.NODE_OPTIONS || '', GARDE_RESEAU].join(' ').trim() });
 
 const RACINE = path.join(__dirname, '..');
 const EXCEPTIONS_FICHIER = path.join(__dirname, 'audits-exceptions.json');
@@ -63,7 +65,7 @@ function lancer(fichier) {
     const debut = Date.now();
     // Un groupe de processus à lui : à l'échéance, l'audit ET ses enfants partent.
     const enfant = spawn(process.execPath, [path.join('scripts', fichier)], {
-      cwd: RACINE, env: Object.assign({}, process.env, { FORCE_COLOR: '0' }), stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+      cwd: RACINE, env: avecGarde(Object.assign({}, process.env, { FORCE_COLOR: '0' })), stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     let sortie = '';
     const garder = (b) => { sortie += b.toString(); if (sortie.length > 200000) sortie = sortie.slice(-200000); };

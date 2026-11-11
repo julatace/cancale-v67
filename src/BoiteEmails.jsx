@@ -263,7 +263,9 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
     })();
     return () => { vivant = false; };
   }, [id, entetes, essai, stream]);
-  useEffect(() => { if (m && m.email && titre.current) { try { titre.current.focus({ preventScroll: true }); } catch (_) {} } }, [m]);
+  // (11 nov.) Sur ordinateur, le focus reste sur la ligne choisie : ↑ ↓ passent à l'e-mail voisin
+  // tout de suite, comme dans Mail. Au téléphone (feuille plein écran), le titre le prend.
+  useEffect(() => { if (plein && m && m.email && titre.current) { try { titre.current.focus({ preventScroll: true }); } catch (_) {} } }, [m, plein]);
   const e = m && m.email;
   const lecture = e ? ceQueVrmAFait(e, delies) : null;
   const t = e ? titreSimple(e, delies) : null;
@@ -614,16 +616,63 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     // rognée par le <main> et la suite ne venait jamais à 1512 px — mesuré au banc).
     let racine = null;
     for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (o === 'auto' || o === 'scroll') { racine = p; break; } }
-    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { root: racine, rootMargin: '900px 0px' });
+    // (11 nov.) Sur ordinateur, la colonne de la liste défile seule et ses lignes sont plus
+    // basses : 900 px d'avance y chargeaient la page suivante d'emblée ; 400 suffisent.
+    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { root: racine, rootMargin: large ? '400px 0px' : '900px 0px' });
     io.observe(n);
     return () => io.disconnect();
-  }, [pages, lecture]);
+  }, [pages, lecture, large]);
   const photoLigne = useCallback((e) => (photoDe ? photoDe(e) : null), [photoDe]);
+  // (11 nov., « tout fait trop gros, surtout sur ordi ») Sur ordinateur, la boîte est UN
+  // panneau à deux colonnes qui remplit la fenêtre, comme Mail : la liste et la lecture
+  // défilent chacune de leur côté. Sa hauteur = la hauteur visible sous ce qui la précède
+  // (titre, onglets), relue au redimensionnement et quand le haut de l'écran change.
+  const corpsRef = useRef(null);
+  const lectureCol = useRef(null);
+  useEffect(() => {
+    const n = corpsRef.current;
+    if (!large || !n) return undefined;
+    let defile = null;
+    for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (o === 'auto' || o === 'scroll') { defile = p; break; } }
+    let raf = 0;
+    const maj = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const hautFen = defile ? defile.getBoundingClientRect().top : 0;
+        const hFen = defile ? defile.clientHeight : window.innerHeight;
+        const dec = (defile ? defile.scrollTop : window.scrollY) + n.getBoundingClientRect().top - hautFen;
+        n.style.setProperty('--bx-panneau-h', `${Math.max(460, Math.round(hFen - dec - 16))}px`);
+      });
+    };
+    maj();
+    window.addEventListener('resize', maj);
+    let ro = null;
+    try { let c = n; while (defile && c.parentElement && c.parentElement !== defile) c = c.parentElement; ro = new ResizeObserver(maj); ro.observe(defile ? c : document.body); } catch (_) {}
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', maj); if (ro) ro.disconnect(); n.style.removeProperty('--bx-panneau-h'); };
+  }, [large]);
+  useEffect(() => { if (large && lectureCol.current) lectureCol.current.scrollTop = 0; }, [ouvert, large]);
+  // Le clavier, comme Mail (ordinateur) : ↓ / ↑ ouvrent l'e-mail voisin, Échap ferme la lecture.
+  // Seulement quand le focus est sur une ligne de la liste (jamais dans un champ).
+  const auClavier = (ev) => {
+    if (!large || ev.altKey || ev.metaKey || ev.ctrlKey) return;
+    const ligne = ev.target && ev.target.closest ? ev.target.closest('.vrm-boite-ligne') : null;
+    if (ev.key === 'Escape' && ouvert && !/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName || '')) { ev.preventDefault(); setOuvert(''); return; }
+    if (!ligne || (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp')) return;
+    const toutes = [...ev.currentTarget.querySelectorAll('.vrm-boite-ligne[data-boite-email], .vrm-boite-ligne[data-boite-pile-tete]')];
+    const i = toutes.indexOf(ligne);
+    const suiv = toutes[i + (ev.key === 'ArrowDown' ? 1 : -1)];
+    if (i < 0 || !suiv) return;
+    ev.preventDefault();
+    try { suiv.focus({ preventScroll: true }); suiv.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+    const id = suiv.getAttribute('data-boite-email');
+    const e = id && pages && pages.emails.find((x) => x.id === id);
+    if (e) ouvrir(e);
+  };
   const rendreEmail = (e) => <Ligne key={e.id} e={e} delies={delies} ouvert={ouvert === e.id} lu={luDe(e)} photo={photoLigne(e)} onOuvrir={ouvrir} onLu={onLu} maintenant={maintenant}/>;
   const nPastille = (id) => (filtre || !complet ? null : Number.isFinite(parR[id]) ? parR[id] : null);
   return (
-    <div className="vrm-boite-corps-ecran" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'}>
-      <div className="vrm-boite-liste-col">
+    <div ref={corpsRef} className="vrm-boite-corps-ecran" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'} onKeyDown={auClavier}>
+      <div className="vrm-boite-liste-col" data-boite-liste-col="">
         {tete}
         <div className="vrm-boite-filtres">
           <label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
@@ -694,7 +743,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
         {pages && pages.suite && !pages.suiteKO && <button type="button" className="vrm-boite-plus" data-boite-plus="" disabled={lecture} onClick={() => charger((pages.page || 0) + 1)}>{lecture ? 'Lecture…' : 'Voir plus'}</button>}
         {pages && !pages.suite && pages.emails.length > 0 && <p className="vrm-boite-fin" data-boite-fin="">{pages.emails.length} e-mail{pages.emails.length > 1 ? 's' : ''}{filtre || rubrique || adresse ? ' dans cette vue' : ''} · c’est tout</p>}
       </div>
-      {large && <div className="vrm-boite-lecture-col">
+      {large && <div ref={lectureCol} className="vrm-boite-lecture-col">
         {ouvert ? <Lecture onRelier={onRelier} key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={onAller} onNum={onNum} plein={false} lu={(() => { const e = pages && pages.emails.find((x) => x.id === ouvert); return e ? luDe(e) : null; })()} onLu={onLu} photoDe={photoDe}/>
           : <div className="vrm-boite-vide-lecture" data-boite-vide-lecture=""><Dessin k="vide"/><p>Choisis un e-mail pour le lire.</p></div>}
       </div>}

@@ -109,7 +109,10 @@ async function audit(fichiers, bavard) {
   const autres = (app.match(/\brePhoto\b|\bphotoACacher\b/g) || []);
   dit(autres.length === 0, '4.7 aucune autre règle de photo dans l\'app (la décision vient de src/modeStream.js)', JSON.stringify(autres));
   dit(/\[data-stream="1"\] \[data-stream-photo\],\s*\[data-apercu-photo="floue"\] img \{ filter: blur\((\d+)px\)/.test(html) && Number((/\[data-stream-photo\],\s*\[data-apercu-photo="floue"\] img \{ filter: blur\((\d+)px\)/.exec(html) || [])[1]) >= 16, '4.8 le CSS floute FORT les photos (et l\'aperçu montre le même flou)');
-  dit(/className="vrm-photo-panel" data-stream-article=\{titre \|\| ''\}/.test(app), '4.9 la visionneuse « Agrandir » dit son article');
+  // (11 nov., clics-directs) La photo d'une vente s'ouvre dans LA visionneuse de l'app (plus de panneau
+  // à part) : elle reçoit le titre de l'article et le pose sur `data-stream-article`.
+  const visio = (() => { try { return sansCommentaires(fs.readFileSync(path.join(path.dirname(fichiers.app), 'Visionneuse.jsx'), 'utf8')); } catch (_) { return ''; } })();
+  dit(/ouvrirVisionneuse\([^;]*\{titre:titre\|\|'',article:titre\|\|''\}\)/.test(app) && /data-stream-article=\{article \|\| undefined\}/.test(visio) && /article: d\.article \|\| ''/.test(visio), '4.9 la visionneuse dit l\'article de la photo agrandie');
   const grand = /\[data-stream="1"\] \[data-stream-article\] \[data-stream-photo\],[^{]*\{ filter: blur\((\d+)px\)/.exec(html);
   dit(!!grand && Number(grand[1]) >= 40, '4.9 bis une photo en GRAND (visionneuse, recadrage) a un flou doublé', grand && grand[1]);
   dit(/if \(R\.photosToutes \|\| photoACacherSelon\(articleDe\(el, racine, texteDe, altDe\), R\)\) aFlouter\.add\(el\);/.test(regle), '4.10 la couche de la page décide par photoACacherSelon (même règle)');

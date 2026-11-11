@@ -227,12 +227,18 @@ const iso = (j) => new Date(NOW - j * J).toISOString();
     dit(/vrm:relier-compte/.test(relierDe) && /detail:'emails'/.test(relierDe), 'R7 `relierBoiteDe` ouvre E-mails sur le pas-à-pas DU compte');
     const ligneCL = (/function LigneEmailsCompte\([\s\S]*?\n\}/.exec(APP) || [''])[0];
     const colisF = (/function ComptesARelierColis\([\s\S]*?\n\}/.exec(APP) || [''])[0];
-    const appels = [/const relier = \(\) => relierBoiteDe\(uid\);/.test(ligneCL), /onClick=\{\(\) => relierBoiteDe\(c\.uid\)\}/.test(colisF), /relierBoiteDe\(comptesARelierJour\[0\]\.uid\)/.test(APP)];
+    const appels = [/const relier = \(\) => relierBoiteDe\(uid\);/.test(ligneCL), (/onClick=\{\(\) => relierBoiteDe\(c\.uid\)\}/.test(colisF) || /data-colis-sans-email=\{String\(acc\.vinted_user_id\)\}[\s\S]{0,600}?onClick=\{\(\) => relierBoiteDe\(String\(acc\.vinted_user_id\)\)\}/.test(APP)), /relierBoiteDe\(comptesARelierJour\[0\]\.uid\)/.test(APP)];
     dit(appels.every(Boolean), 'R7 un seul chemin (`relierBoiteDe`) depuis Comptes liés, Colis et Ma journée', JSON.stringify(appels));
     dit(/<EcranEmails comptes=\{vintedAccounts\}/.test(APP) && /lireDernier=\{lireDernierEmailCompte\}/.test(APP), 'R7 E-mails monte `EcranEmails` (comptes à relier + la preuve)');
     const colis = (/function ComptesARelierColis\([\s\S]*?\n\}/.exec(APP) || [''])[0];
-    dit(/aExpedier\(o\)/.test(colis) && /useComptesARelier\(comptes\)/.test(colis) && /!Array\.isArray\(liste\)/.test(colis), 'R7 Colis : seulement un compte à relier qui a des colis à envoyer (la règle `aExpedier`), rien sur une lecture ratée');
-    dit(/\{only === 'bordereaux' && <ComptesARelierColis comptes=\{accounts\}\/>\}/.test(APP), 'R7 Colis porte la ligne');
+    // (11 nov.) Depuis le 10 nov. (6f60bc8b, « plus de bandeaux e-mails doublons ») le bandeau `ComptesARelierColis`
+    // est retiré : une marque discrète sur la CARTE du colis du compte (`data-colis-sans-email`). Mêmes règles :
+    // seulement là où ce compte a un colis, et rien sur une lecture ratée (liste pas un tableau ⇒ aucune marque).
+    const ancien = /aExpedier\(o\)/.test(colis) && /useComptesARelier\(comptes\)/.test(colis) && /!Array\.isArray\(liste\)/.test(colis);
+    const marque = /const uidsSansEmail = new Set\(only === 'bordereaux' && Array\.isArray\(aRelierListe\) \? aRelierListe\.map\(\(c\) => String\(c\.uid\)\) : \[\]\);/.test(APP)
+      && /\{acc && uidsSansEmail\.has\(String\(acc\.vinted_user_id\)\) \? <button type="button" className="vrm-colis-sans-email" data-colis-sans-email=/.test(APP);
+    dit(ancien || marque, 'R7 Colis : seulement un compte à relier qui a des colis (sa carte de colis), rien sur une lecture ratée');
+    dit(/\{only === 'bordereaux' && <ComptesARelierColis comptes=\{accounts\}\/>\}/.test(APP) || marque, 'R7 Colis porte la marque (sur la carte du colis)');
     // (11 nov.) Ma journée v2 range ses cartes dans une liste (`[{ el: carteARelier() }]`) ; même règle : UNE carte.
     dit((/\{comptesARelierJour\.length \? (?:carteARelier\(\)|P\(carteARelier\(\)\)) : null\}/.test(APP) || /\.\.\.\(comptesARelierJour\.length \? \[\{ el: carteARelier\(\) \}\] : \[\]\)/.test(APP)) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
     // (11 nov.) Depuis le 10 nov. (6f60bc8b) Colis lit aussi la règle (la marque sur les cartes des comptes muets).

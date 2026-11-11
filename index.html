@@ -73,20 +73,34 @@
        Bricolage Grotesque a du caractère (terminaisons coupées, chiffres
        larges) sans être fantaisiste — et elle est superbe en gros chiffre,
        ce que cette app affiche partout. -->
-  <title>VRM — revente de sneakers centralisée (Vinted, Leboncoin, eBay)</title>
-  <!-- SEO page d'accueil publique (26 oct.) : description + canonical + Open
-       Graph. L'app est derrière connexion ; seule l'accueil `/` et les pages
-       légales (fichiers séparés) sont publiques. Le canonical pointe `/` : les
-       routes applicatives (?tab=…) servent ce même index.html et ne doivent pas
-       être indexées à part. -->
-  <meta name="description" content="VRM centralise ta revente de sneakers d'occasion : annonces, ventes, achats, colis, numéros de rangement et comptabilité, sur Vinted, Leboncoin et eBay. Un seul outil pour tout piloter." />
+  <title>VRM — tes ventes, tes colis et ta compta, au même endroit</title>
+  <!-- SEO page d'accueil publique (26 oct. ; 11 nov., lot accueil-public : pour
+       TOUT revendeur, plus seulement les sneakers). L'app est derrière
+       connexion ; seule l'accueil `/` et les pages légales (fichiers séparés)
+       sont publiques. Le canonical pointe `/` : les routes applicatives
+       (?tab=…) servent ce même index.html et ne doivent pas être indexées à part.
+       L'image de partage (1200 × 630) est une vraie capture de l'app en MODE
+       EXEMPLE (scripts/accueil-og.cjs, empreinte dans public/og-vrm.json). -->
+  <meta name="description" content="L’outil des revendeurs Vinted, Leboncoin et eBay : ventes, colis à envoyer et à retirer, codes de retrait, numéros de rangement, offres et compta URSSAF, au même endroit." />
   <link rel="canonical" href="https://vrm.center/" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="VRM — ta revente de sneakers, centralisée" />
-  <meta property="og:description" content="Annonces, ventes, achats, colis et comptabilité sur Vinted, Leboncoin et eBay — dans un seul outil." />
+  <meta property="og:locale" content="fr_FR" />
+  <meta property="og:site_name" content="VRM" />
+  <meta property="og:title" content="VRM — tes ventes, tes colis et ta compta, au même endroit" />
+  <meta property="og:description" content="Pour les revendeurs Vinted, Leboncoin et eBay — vêtements, sacs, livres, tout ce qui se revend." />
   <meta property="og:url" content="https://vrm.center/" />
-  <meta property="og:image" content="https://vrm.center/logo-vrm.png" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="https://vrm.center/og-vrm.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="VRM : tes ventes, tes colis et ta compta, au même endroit — à côté, l’écran Ma journée de l’app sur des données d’exemple." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!-- Données structurées (11 nov.) : un BLOC DE DONNÉES (type application/ld+json),
+       jamais exécuté — la CSP ne s'y applique pas (scripts/audit-csp.cjs l'admet
+       à cette seule condition). ⚠️ Aucun avis, aucune note (aggregateRating,
+       review : interdits, il n'y en a pas). Les prix = PRIX_MOIS / PRIX_PRO_MOIS
+       (src/accueil-reglages.js) — le banc accueil compare. -->
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"VRM","url":"https://vrm.center/","applicationCategory":"BusinessApplication","operatingSystem":"Web, iOS, Android","inLanguage":"fr-FR","description":"L’outil des revendeurs Vinted, Leboncoin et eBay : ventes, colis, codes de retrait, numéros de rangement, offres et compta URSSAF, au même endroit.","image":"https://vrm.center/og-vrm.jpg","offers":[{"@type":"Offer","name":"Solo","price":"16.99","priceCurrency":"EUR","url":"https://vrm.center/#prix"},{"@type":"Offer","name":"Pro","price":"19.99","priceCurrency":"EUR","url":"https://vrm.center/#prix"}]}</script>
   <!-- ⚠️ AVANT LE PREMIER RENDU, sinon l'app s'affiche en clair puis bascule.
        On lit le MÊME réglage que React (`vinted_dark`) et on estampille la
        racine : le CSS ci-dessous et la barre d'état suivent aussitôt. Trois
