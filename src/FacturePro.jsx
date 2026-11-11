@@ -348,11 +348,11 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
             {comptesConnus(cfg).map((c) => (
               <label key={c.cle} className="vrm-fp-compte" data-fp-compte={c.cle} data-fp-compte-oui={c.oui ? '1' : '0'}>
                 <input type="checkbox" checked={c.oui} onChange={(e) => upd('comptesFacture', avecCompte(cfg, c.plateforme, c.compte, e.target.checked))}/>
-                <span><b className="vrm-sensible" data-stream-type="compte">{c.compte}</b><small>{c.plateforme === 'ebay' ? 'eBay' : 'Leboncoin'}</small></span>
+                <span><b className="vrm-sensible" data-stream-type="compte">{c.compte}</b><small>{c.plateforme === 'ebay' ? 'eBay' : c.plateforme === 'vestiaire' ? 'Vestiaire' : 'Leboncoin'}</small></span>
               </label>
             ))}
           </div> : null}
-          <p className="vrm-fp-muet">Leboncoin, eBay : VRM te demande à la première vente de chaque compte.</p>
+          <p className="vrm-fp-muet">Leboncoin, eBay, Vestiaire : VRM te demande à la première vente de chaque compte.</p>
         </section>
 
         <section className="vrm-fp-section">

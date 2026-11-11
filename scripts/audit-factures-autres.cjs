@@ -116,7 +116,7 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
 
   // ── S4/S5 LA ROUTE ───────────────────────────────────────────────────────
   // (11 nov., lot DJ1) Les comptes qu'il a dits professionnels (src/facturePro/comptes.js).
-  const CFG = { nom: 'Boutique Banc', forme: 'EI', siret: SIRET, adresse: '1 rue du Banc', codePostal: '35000', ville: 'Rennes', tva_regime: 'franchise', prefixe: 'FA', comptesFacture: { 'leboncoin:compte_banc': true, 'ebay:principal': true, 'ebay:abcdef0123456789': true } };
+  const CFG = { nom: 'Boutique Banc', forme: 'EI', siret: SIRET, adresse: '1 rue du Banc', codePostal: '35000', ville: 'Rennes', tva_regime: 'franchise', prefixe: 'FA', comptesFacture: { 'leboncoin:compte_banc': true, 'ebay:principal': true, 'ebay:abcdef0123456789': true, 'vestiaire:principal': true } };
   const annee = new Date().getFullYear();
   const raz = () => { base = new Map(); pannes.clear(); ecritures.length = 0;
     base.set(cle(A, 'vrm_pro_facture'), CFG);

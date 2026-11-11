@@ -80,8 +80,8 @@ async function verifier(racine, { muet = false } = {}) {
   dit(/data-ent-oui/.test(re) && /data-ent-non/.test(re) && /C’est bien toi \?/.test(re) && /<CarteMentionsForme /.test(fp), 'H3 la carte « C’est bien toi ? » (Oui / Non) et la carte du statut sont branchées');
 
   // ── C : compte professionnel ──
-  dit(CO.compteFacturable({}, 'leboncoin', 'shop') === 'demander' && CO.compteFacturable({ comptesFacture: { 'leboncoin:shop': true } }, 'leboncoin', 'Shop') === true && CO.compteFacturable({ comptesFacture: { 'leboncoin:shop': false } }, 'leboncoin', 'shop') === false && CO.compteFacturable({}, 'leboncoin', '') === null && CO.compteFacturable({ comptesFacture: { 'vestiaire:x': true } }, 'vestiaire', 'x') === null,
-    'C1 jamais répondu ⇒ on demande ; oui ⇒ facture ; non ⇒ rien ; compte pas lu ou Vestiaire ⇒ rien');
+  dit(CO.compteFacturable({}, 'leboncoin', 'shop') === 'demander' && CO.compteFacturable({ comptesFacture: { 'leboncoin:shop': true } }, 'leboncoin', 'Shop') === true && CO.compteFacturable({ comptesFacture: { 'leboncoin:shop': false } }, 'leboncoin', 'shop') === false && CO.compteFacturable({}, 'leboncoin', '') === null && CO.compteFacturable({ comptesFacture: { 'vestiaire:x': true } }, 'vestiaire', 'x') === true && CO.compteFacturable({ comptesFacture: { 'vinted:x': true } }, 'vinted', 'x') === null,
+    'C1 jamais répondu ⇒ on demande ; oui ⇒ facture ; non ⇒ rien ; compte pas lu ⇒ rien ; Vinted : jamais ici (Vinted le dit)');
   dit(CO.compteDeVente('ebay', {}) === 'principal' && CO.compteDeVente('ebay', { _compte: 'abc', _pseudo: 'joli' }) === 'abc' && CO.compteDeVente('leboncoin', { account: 'x' }) === 'x', 'C2 le compte d’une vente : celui de SA ligne (jamais le pseudo affiché)');
   const fa = fs.readFileSync(path.join(racine, 'src', 'FactureAutres.jsx'), 'utf8');
   const srvA = fs.readFileSync(path.join(racine, 'api', '_lib', 'facture-autres.js'), 'utf8');

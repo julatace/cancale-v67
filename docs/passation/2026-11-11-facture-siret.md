@@ -58,8 +58,9 @@ son e-mail ; une relecture ratée ne remplace pas une lecture réussie.
    doigt sur le champ) ; EI : « nom EI », pas de capital, RCS seulement si inscrit, et « Micro sous le
    seuil de TVA ? » ⇒ « Oui, franchise » (sur son clic). « C'est bon » ferme.
 4. **Compte professionnel seulement** (`src/facturePro/comptes.js`) : Vinted = ce que Vinted dit
-   (profil `business` ou e-mail Vinted Pro), inchangé. Leboncoin / eBay (aucune plateforme ne dit
-   « pro ») : `vrm_pro_facture.comptesFacture` { `leboncoin:<compte>` | `ebay:<compte VRM>` : true/false } ;
+   (profil `business` ou e-mail Vinted Pro), inchangé. Leboncoin / eBay / Vestiaire (aucune ne dit
+   « pro » ; Vestiaire facturable depuis l'extension 5.340, fusionnée ici) : `vrm_pro_facture.comptesFacture`
+   { `leboncoin:<compte>` | `ebay:<compte VRM>` | `vestiaire:<compte ou principal>` : true/false } ;
    jamais répondu ⇒ la vente DEMANDE « <compte> est-il ton compte Leboncoin professionnel ? Oui, facturer
    / Non » (fiche relue avant d'écrire, lecture ratée ⇒ rien) ; non ⇒ aucun bouton ; Ma facture →
    « Sur quels comptes ? » les liste (cases). **Le serveur refuse** (`api/_lib/facture-autres.js`, 409
