@@ -27,6 +27,7 @@ const F = {
   ecran: path.join(RAC, 'src', 'OffresAuto.jsx'),
   app: path.join(RAC, 'src', 'App.jsx'),
   garde: path.join(RAC, 'src', 'offresGarde.js'),
+  bg: path.join(RAC, 'vinted-sync-extension', 'background.js'),
 };
 const lire = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (_) { return ''; } };
 const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
@@ -48,6 +49,15 @@ const MUTATIONS = {
   ecran_absent: { f: 'app', m: (s) => s.replace("zoneFav==='offres' && <OffresAuto ", "zoneFav==='offres' && false && <OffresAuto ") },
   ecran_envoie: { f: 'ecran', m: (s) => s.replace("eteindreOffres && eteindreOffres();", "eteindreOffres && eteindreOffres(); vmrCmd({ cmd: 'accepterOffre' });") },
   arret_allume: { f: 'ecran', m: (s) => s.replace("JSON.stringify({ action: 'auto_stop' })", "JSON.stringify({ action: 'auto_regler' })") },
+  // 5.342 — le vrai moteur réaffaibli :
+  ext_virgule_ignoree: { f: 'bg', m: (s) => s.replace("const t = String(v).replace(/\\s|€/g, '').replace(',', '.');", "const t = String(v);") },
+  ext_depuis_le_fond: { f: 'bg', m: (s) => s.replace("const r = await vintedPage(acc, 'PUT', chemin, null, { timeoutMs: 12000 });", "const r = await vintedSend(acc, 'PUT', chemin, null);") },
+  ext_sans_onglet_faite: { f: 'bg', m: (s) => s.replace("        break;\n      }\n      st[o.oid] = Date.now();", "      }\n      st[o.oid] = Date.now();") },
+  ext_frein_ignore: { f: 'bg', m: (s) => s.replace("if (await lireFreinRepub(uid)) { noterDiag('offre_auto_frein'); return 0; }", "") },
+  ext_refus_en_serie: { f: 'bg', m: (s) => s.replace("      } else { break; }                                 // garde-fou atteint", "      } else if (r && r.code) { break; }                                 // garde-fou atteint") },
+  ext_geste_fond: { f: 'bg', m: (s) => s.replace("const rp = await vintedPage(acc, methode, msg.endpoint, msg.body, { timeoutMs: 12000 });", "const rp = { sansPage: 'onglet' };") },
+  ext_geste_bloque: { f: 'bg', m: (s) => s.replace("if (rp && rp.sansPage && !rp.pause) return vintedSend(acc, methode, msg.endpoint, msg.body);", "") },
+  ecran_virgule_toujours: { f: 'ecran', m: (s) => s.replace("virgule: virguleLue === true });\n", "virgule: true });\n") },
 };
 
 async function chargerRegle(src) {
@@ -67,19 +77,26 @@ function conv({ item, tx, oid, price, user = 500 }) {
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }],
   } } };
 }
-async function moteur({ prix, min, refuse, garde }) {
+let BG_SRC = null;   // le fond à exécuter (chemin), remplacé par une mutation
+async function moteur({ prix, min, refuse, garde, onglets, frein, deux, refusVinted }) {
   const item = 444, tx = 9001, oid = 7001;
   const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: prix }) };
   const fiche = { num: '7' }; if (min !== undefined) fiche.min = min; if (refuse !== undefined) fiche.refuse = refuse;
   lignes.main = { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: fiche }, vinted_offre_refus_msg: '' };
+  if (deux) lignes[`harvest_${UID}_conv_${oid + 1}`] = conv({ item, tx: tx + 1, oid: oid + 1, price: prix, user: 501 });
   lignes.main.vinted_offres_garde = garde === undefined ? GARDE_OK() : garde;
-  const f = faireFond({ lignes, connecte: UID, vinted: () => ({ status: 200, body: {} }) });
+  const store = frein ? { vrmFreinRepub: { [UID]: { jusqua: Date.now() + 3600000, restreint: false, status: 422, at: Date.now() } } } : {};
+  const f = faireFond({ src: BG_SRC || undefined, lignes, store, connecte: UID, ...(onglets ? { onglets } : {}),
+    vinted: (e) => (refusVinted && /\/offer_requests\//.test(e.chemin) ? { status: 422, body: { message: 'expired' } } : { status: 200, body: {} }) });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
   const pv = f.store.vrmOffresPrevues || {}; for (const k in pv) if (pv[k]) pv[k].at = Date.now() - 1000;
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  const acc = f.j.vinted.filter((v) => v.methode === 'PUT' && /\/offer_requests\/\d+\/accept$/.test(v.chemin)).length;
-  const rej = f.j.vinted.filter((v) => v.methode === 'PUT' && /\/offer_requests\/\d+\/reject$/.test(v.chemin)).length;
-  return acc ? 'accepter' : rej ? 'refuser' : 'rien';
+  const offres = f.j.vinted.filter((v) => v.methode === 'PUT' && /\/offer_requests\/\d+\/(accept|reject)$/.test(v.chemin));
+  const acc = offres.filter((v) => /accept$/.test(v.chemin)).length;
+  const rej = offres.filter((v) => /reject$/.test(v.chemin)).length;
+  const fond = offres.filter((v) => v.origine !== 'page' || Object.keys(v.entetes || {}).some((k) => /^authorization$/i.test(k)) || v.credentials === 'omit').length;
+  const faites = Object.keys(f.store.vrmOffresFaites || {}).length, prevues = Object.keys(f.store.vrmOffresPrevues || {}).length;
+  return { quoi: acc ? 'accepter' : rej ? 'refuser' : 'rien', n: offres.length, fond, faites, prevues };
 }
 const CAS = [
   { nom: 'offre = mini', prix: 40, min: '40' },
@@ -107,7 +124,8 @@ async function auditer(src, { parite = true } = {}) {
   try { R = src.regle ? await chargerRegle(src) : null; } catch (e) { dit(false, 'A0 src/offresSures.js se charge', e.message); }
   dit(!!R, 'A0 la règle de l’écran existe (src/offresSures.js)');
   if (R) {
-    dit(R.seuilMoteur('45,5') === null && R.seuilMoteur('45.5') === 45.5 && R.seuilMoteur('') === null && R.seuilMoteur(null) === null && R.seuilMoteur('0') === null, 'A1 un seuil se lit comme le MOTEUR le lit (« 45,5 » : ignoré)');
+    dit(R.seuilMoteur('45,5') === null && R.seuilMoteur('45.5') === 45.5 && R.seuilMoteur('') === null && R.seuilMoteur(null) === null && R.seuilMoteur('0') === null, 'A1 extension d’avant 5.342 : « 45,5 » ignoré (comme elle)');
+    dit(R.seuilMoteur('45,5', true) === 45.5 && R.seuilMoteur('', true) === null && R.seuilMoteur('abc', true) === null && R.seuilMoteur('0', true) === null, 'A1b extension 5.342 : « 45,5 » lu 45,5 (comme elle)');
     dit(R.montantSeuil('45,5 €') === '45.5' && R.montantSeuil(' 40 ') === '40' && R.montantSeuil('') === '' && R.montantSeuil('abc') === 'abc', 'A2 l’écriture rend un seuil que le moteur lit (« 45,5 € » ⇒ « 45.5 »), illisible gardé tel quel', JSON.stringify([R.montantSeuil('45,5 €'), R.montantSeuil(' 40 '), R.montantSeuil('abc')]));
     const ill = R.seuilsIllisibles({ 1: { min: '45,5' }, 2: { min: '40' }, 3: { refuse: '30,5', min: '50' } });
     dit(ill.length === 2 && ill.some((x) => x.id === '1' && x.champ === 'min') && ill.some((x) => x.id === '3' && x.champ === 'refuse'), 'A3 les seuils affichés mais ignorés par le moteur sont comptés', JSON.stringify(ill));
@@ -136,12 +154,32 @@ async function auditer(src, { parite = true } = {}) {
     dit(R.journeeCalme(l1, t0 + 3600000) && !R.journeeCalme(l1, t0 + 25 * 3600000) && R.journeeCalme([], t0) === null, 'A10 journée calme conseillée 24 h après le dernier frein, puis plus rien');
     // ── B : la parité avec le VRAI moteur ──
     if (parite) {
+      let fond = 0, n = 0;
       for (const c of CAS) {
-        const vrai = await moteur(c);
-        const d = R.decisionMoteur({ prix: c.prix, item: '444' }, { min: c.min, refuse: c.refuse }, c.garde === undefined ? GARDE_OK() : c.garde).quoi;
+        const v = await moteur(c); fond += v.fond; n += v.n;
+        const d = R.decisionMoteur({ prix: c.prix, item: '444' }, { min: c.min, refuse: c.refuse }, c.garde === undefined ? GARDE_OK() : c.garde, Date.now(), { virgule: true }).quoi;
         const ecran = d === 'accepter' ? 'accepter' : d === 'refuser' ? 'refuser' : 'rien';
-        dit(vrai === ecran, `B ${c.nom} : moteur « ${vrai} », écran « ${d} »`);
+        dit(v.quoi === ecran, `B ${c.nom} : moteur 5.342 « ${v.quoi} », écran « ${d} »`);
       }
+      // 5.342 (P1) : chaque réponse part de l'ONGLET vinted.fr, jamais du fond (Bearer, sans cookies).
+      dit(n > 0 && fond === 0, `B1 les ${n} réponses du moteur partent de l’onglet vinted.fr (aucune du fond, aucun Authorization)`, { n, fond });
+      const sans = await moteur({ prix: 45, min: '40', onglets: [] });
+      dit(sans.n === 0 && sans.faites === 0 && sans.prevues === 1, 'B2 sans onglet vinted.fr : rien ne part, l’offre reste prévue (pas « faite »)', sans);
+      const fr = await moteur({ prix: 45, min: '40', frein: true });
+      dit(fr.n === 0, 'B3 compte freiné par Vinted : le moteur ne répond à aucune offre', fr);
+      const serie = await moteur({ prix: 45, min: '40', deux: true, refusVinted: true });
+      dit(serie.n === 1, 'B4 un refus de Vinted arrête le passage (pas de refus en série)', serie);
+      // 5.342 (P1) : SON geste depuis l'app (répondre) part de l'onglet quand il est ouvert ;
+      // sans onglet (téléphone), il part comme avant — un geste humain, un à la fois.
+      const geste = async (onglets) => {
+        const f = faireFond({ src: BG_SRC || undefined, lignes: { main: { capturedAt: new Date().toISOString() } }, connecte: UID, ...(onglets ? { onglets } : {}), vinted: () => ({ status: 200, body: {} }) });
+        let r = null; try { r = await f.ctx.executerPourApp({ uid: UID, method: 'POST', endpoint: '/api/v2/conversations/55/replies', body: { message: 'ok' } }, { origin: 'https://vrm.center' }); } catch (e) { r = { err: e.message }; }
+        const w = f.j.vinted.filter((v) => v.methode === 'POST' && /\/replies$/.test(v.chemin));
+        return { ok: !!(r && r.ok), n: w.length, origine: w.map((v) => v.origine).join(','), auth: w.some((v) => Object.keys(v.entetes || {}).some((k) => /^authorization$/i.test(k))) };
+      };
+      const gp = await geste(null), gs = await geste([]);
+      dit(gp.ok && gp.n === 1 && gp.origine === 'page' && !gp.auth, 'B5 son geste « Répondre » part de l’onglet vinted.fr quand il est ouvert', gp);
+      dit(gs.ok && gs.n === 1 && gs.origine === 'fond', 'B6 sans onglet (téléphone), son geste part quand même, un seul', gs);
     }
   }
   // ── C : le branchement ──
@@ -154,18 +192,21 @@ async function auditer(src, { parite = true } = {}) {
   dit(actions.length >= 2 && actions.every((a) => a === 'auto_stop' || a === 'arreter'), '« Tout arrêter » n’emploie que des actions qui ÉTEIGNENT (auto_stop, arreter)'.replace(/^/, 'C5 '), actions.join(','));
   dit(/basculer=\{basculerOffresAuto\}/.test(app) && /onClick=\{basculer\}/.test(ecran), 'C6 l’interrupteur est LE même (confirmation qui dit le risque, éteint par défaut)');
   dit(/select=id,e:data->e/.test(ecran) && !/select=data[&'`]/.test(ecran), 'C7 l’historique se lit en projection (jamais select=data)');
+  dit(/virguleLue=\{extSait\('offrespage'\)==='ok'\}/.test(app) && /apercuMoteur\(\{[^)]*virgule: virguleLue === true \}\)/.test(ecran), 'C8 la virgule n’est lue dans l’aperçu QUE pour une extension 5.342 (capacité offrespage), jamais supposée');
   return out;
 }
 
 (async () => {
-  const base = { regle: lire(F.regle), ecran: lire(F.ecran), app: lire(F.app), garde: lire(F.garde) };
+  const base = { regle: lire(F.regle), ecran: lire(F.ecran), app: lire(F.app), garde: lire(F.garde), bg: lire(F.bg) };
+  const bgTmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'offres-sures-bg-')), 'background.js');
+  const avecBg = async (bg, fn) => { if (bg === base.bg) { BG_SRC = F.bg; } else { fs.writeFileSync(bgTmp, bg); BG_SRC = bgTmp; } try { return await fn(); } finally { BG_SRC = null; } };
   if (process.argv.includes('--prouve')) {
     let rouges = 0, n = 0;
     for (const [nom, { f, m }] of Object.entries(MUTATIONS)) {
       n++;
       const s = { ...base, [f]: m(base[f]) };
       if (s[f] === base[f]) { console.log(`⚠️  mutation ${nom} : l’ancre ne correspond plus`); continue; }
-      let r; try { r = await auditer(s, { parite: true }); } catch (e) { r = [{ ok: false, m: 'plante : ' + e.message }]; }
+      let r; try { r = await avecBg(s.bg, () => auditer(s, { parite: true })); } catch (e) { r = [{ ok: false, m: 'plante : ' + e.message }]; }
       const ko = r.filter((x) => !x.ok);
       if (ko.length) rouges++;
       console.log(`${ko.length ? '✅' : '❌'} mutation ${nom} : ${ko.length} rouge(s)${ko.length ? ' — ' + ko[0].m : ''}`);
@@ -173,7 +214,7 @@ async function auditer(src, { parite = true } = {}) {
     console.log(`\n${rouges}/${n} mutations attrapées`);
     process.exit(rouges === n ? 0 : 1);
   }
-  let r; try { r = await auditer(base); } catch (e) { console.log('❌ l’audit plante : ' + e.message); process.exit(1); }
+  let r; try { r = await avecBg(base.bg, () => auditer(base)); } catch (e) { console.log('❌ l’audit plante : ' + e.message); process.exit(1); }
   for (const x of r) console.log(`${x.ok ? '✅' : '❌'} ${x.m}${x.d !== undefined && x.d !== '' && !x.ok ? ' — ' + x.d : ''}`);
   const ko = r.filter((x) => !x.ok).length;
   console.log(ko ? `\n❌ audit-offres-sures : ${ko} rouge(s) sur ${r.length}` : `\n✅ audit-offres-sures : ${r.length} contrôles — l’écran dit ce que le moteur fera, et n’envoie rien`);

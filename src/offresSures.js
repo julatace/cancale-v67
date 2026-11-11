@@ -26,7 +26,10 @@ export const CALME_MS = 24 * 3600 * 1000;  // une « journée calme » conseill�
 // pour elle — le mini est IGNORÉ, alors que l'écran l'affichait « 45,50 € ».
 // Mesuré le 11 nov. dans le code : la carte d'annonce écrivait la saisie brute
 // (`updatePair(item,{min:v})`, clavier décimal français = virgule).
-export function seuilMoteur(v) {
+// (5.342, P4) L'extension 5.342 lit la virgule comme l'écran (`seuilOffreLu`) :
+// `virgule` = true pour elle ; une extension plus ancienne (false) l'ignore encore.
+export function seuilMoteur(v, virgule = false) {
+  if (virgule) return seuilEcran(v);
   if (v == null || typeof v === 'object' || typeof v === 'boolean') return null;
   if (typeof v === 'string' && !v.trim()) return null;
   const n = Number(v);
@@ -50,7 +53,8 @@ export function montantSeuil(v) {
   if (n == null) return brut;
   return String(Math.round(n * 100) / 100);
 }
-// Les fiches dont un seuil s'AFFICHE mais que le moteur ne lit pas.
+// Les fiches dont un seuil s'AFFICHE mais qu'une extension d'avant 5.342 ne lit
+// pas (virgule) : à réécrire « 45.5 », lisible par toutes les versions.
 export function seuilsIllisibles(numeros) {
   const out = [];
   for (const [id, f] of Object.entries(numeros || {})) {
@@ -72,18 +76,19 @@ export function seuilsIllisibles(numeros) {
 //   'toi'       — entre les deux : c'est lui qui négocie ;
 //   'sans'      — aucune règle sur cette annonce (ou annonce pas identifiée).
 // L'ordre est celui du moteur : l'acceptation passe avant le refus.
-export function decisionMoteur(offre, fiche, garde, maintenant = Date.now()) {
+export function decisionMoteur(offre, fiche, garde, maintenant = Date.now(), { virgule = false } = {}) {
   const prix = Number(offre && offre.prix);
   const item = offre && offre.item != null && offre.item !== '' ? String(offre.item) : null;
   if (!item || !Number.isFinite(prix) || prix <= 0) return { quoi: 'sans', raison: 'annonce' };
   const f = fiche && typeof fiche === 'object' ? fiche : {};
-  const min = seuilMoteur(f.min), refuse = seuilMoteur(f.refuse);
+  const min = seuilMoteur(f.min, virgule), refuse = seuilMoteur(f.refuse, virgule);
   if (min != null && prix >= min) {
     const r = gardeRefuse(garde, item, maintenant);
     return r ? { quoi: 'garde', raison: r, min } : { quoi: 'accepter', raison: '', min };
   }
   if (refuse != null && prix < refuse) return { quoi: 'refuser', raison: '', refuse };
-  if (min == null && refuse == null) return { quoi: 'sans', raison: seuilEcran(f.min) != null || seuilEcran(f.refuse) != null ? 'illisible' : 'aucune' };
+  const brut = (x) => x != null && typeof x !== 'object' && String(x).trim() !== '';
+  if (min == null && refuse == null) return { quoi: 'sans', raison: brut(f.min) || brut(f.refuse) ? 'illisible' : 'aucune' };
   return { quoi: 'toi', raison: '', min, refuse };
 }
 export const LIBELLE_DECISION = {
@@ -103,7 +108,7 @@ export const RAISON_GARDE = {
 // offres : la Map de Messages (`${uid}_${conv}` → { prix, tx, oid, item, titre, side })
 // — `undefined` en lecture, `null` pas su. Seules SES ventes (une offre reçue
 // quand il achète n'est pas pour le moteur).
-export function apercuMoteur({ offres, numeros, garde, maintenant = Date.now(), comptes = null } = {}) {
+export function apercuMoteur({ offres, numeros, garde, maintenant = Date.now(), comptes = null, virgule = false } = {}) {
   if (offres === undefined) return undefined;
   if (offres === null) return null;
   const lignes = [];
@@ -114,7 +119,7 @@ export function apercuMoteur({ offres, numeros, garde, maintenant = Date.now(), 
     if (!m) continue;
     if (comptes && !comptes.has(m[1])) continue;
     const fiche = o.item != null ? (numeros || {})[String(o.item)] : null;
-    const d = decisionMoteur(o, fiche, garde, maintenant);
+    const d = decisionMoteur(o, fiche, garde, maintenant, { virgule });
     lignes.push({ cle: String(cle), uid: m[1], conv: m[2], item: o.item != null ? String(o.item) : null, prix: Number(o.prix), titre: String(o.titre || ''), numero: fiche && fiche.numero ? String(fiche.numero) : '', ...d });
   }
   const ordre = { accepter: 0, garde: 1, refuser: 2, toi: 3, sans: 4 };
@@ -153,14 +158,14 @@ export function journalOffres(rows, { uids = null, max = 30 } = {}) {
 
 // ── LES SEUILS PAR PAIRE (l'écran les montre et les modifie en série) ────────
 // annonces : [{ id, uid, numero, titre, prix }] (ses annonces Vinted en ligne).
-export function lignesSeuils(annonces, numeros, { filtre = 'toutes', recherche = '' } = {}) {
+export function lignesSeuils(annonces, numeros, { filtre = 'toutes', recherche = '', virgule = false } = {}) {
   const q = String(recherche || '').trim().toLowerCase();
   const out = [];
   for (const a of Array.isArray(annonces) ? annonces : []) {
     if (!a || a.id == null) continue;
     const f = (numeros || {})[String(a.id)] || {};
-    const min = seuilMoteur(f.min), refuse = seuilMoteur(f.refuse);
-    const illisible = (seuilEcran(f.min) != null && min == null) || (seuilEcran(f.refuse) != null && refuse == null);
+    const min = seuilMoteur(f.min, virgule), refuse = seuilMoteur(f.refuse, virgule);
+    const illisible = (seuilEcran(f.min) != null && seuilMoteur(f.min) == null) || (seuilEcran(f.refuse) != null && seuilMoteur(f.refuse) == null);
     const l = { id: String(a.id), uid: String(a.uid || ''), numero: String(a.numero || f.numero || ''), titre: String(a.titre || ''), prix: Number(a.prix) > 0 ? Number(a.prix) : null,
       min, refuse, minBrut: f.min == null ? '' : String(f.min), refuseBrut: f.refuse == null ? '' : String(f.refuse), illisible,
       incoherent: min != null && refuse != null && refuse >= min };

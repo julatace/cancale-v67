@@ -1291,7 +1291,7 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
       {/* Le conseil, en tête : une phrase, trois gestes. */}
       <div className="vrm-kit-conseil" data-kit-conseil="">
         <span className="vrm-kit-conseil-icone" aria-hidden="true"><Icon name="shield" size={20}/></span>
-        <div><b>Le plus sûr : tu publies toi-même.</b><span>Pour chaque paire : photos, Vinted, puis colle N° et description.</span></div>
+        <div><b>Le plus sûr : tu publies toi-même.</b><span>Par paire : photos, Vinted, puis N° et description.</span></div>
       </div>
       <div className="vrm-kit-barre">
         <span className="vrm-rm-muet" data-kit-couverture={`${cv.lues}/${cv.n}`}>{cv.enCours ? 'Lecture des fiches…' : cv.lues === cv.n ? `${n} description${n > 1 ? 's' : ''} prête${n > 1 ? 's' : ''}` : `Descriptions lues : ${cv.lues} sur ${cv.n}`}</span>

@@ -61,7 +61,7 @@ function ChampSeuil({ valeur, onPoser, label, data }) {
   );
 }
 
-export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg, annonces, numeros, offres, lireGarde = () => null, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null }) {
+export default function OffresAuto({ actif, virguleLue = false, basculer, refusMsg = '', setRefusMsg, annonces, numeros, offres, lireGarde = () => null, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null }) {
   const nomDe = React.useCallback((u) => { const a = (comptes || []).find((c) => String(c.uid) === String(u)); return a ? a.nom : ''; }, [comptes]);
   const uids = React.useMemo(() => new Set((comptes || []).map((c) => String(c.uid))), [comptes]);
   // 1. Le plafond du compte de l'onglet (la jauge, et l'alerte avant l'arrêt).
@@ -79,15 +79,15 @@ export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg
     window.addEventListener('vrm:save', f);
     return () => window.removeEventListener('vrm:save', f);
   }, [lireGarde]);
-  const apercu = apercuMoteur({ offres, numeros, garde, comptes: uids.size ? uids : null });
+  const apercu = apercuMoteur({ offres, numeros, garde, comptes: uids.size ? uids : null, virgule: virguleLue === true });
   // 3. Les paires.
   const [filtre, setFiltre] = React.useState('toutes');
   const [recherche, setRecherche] = React.useState('');
   const [max, setMax] = React.useState(PAR_PAGE);
   const [coches, setCoches] = React.useState(() => new Set());
-  const lignes = lignesSeuils(annonces, numeros, { filtre, recherche });
+  const lignes = lignesSeuils(annonces, numeros, { filtre, recherche, virgule: virguleLue === true });
   const illisibles = seuilsIllisibles(numeros);
-  const nAvec = lignesSeuils(annonces, numeros, { filtre: 'avec' }).length;
+  const nAvec = lignesSeuils(annonces, numeros, { filtre: 'avec', virgule: virguleLue === true }).length;
   // 4. L'historique : les gestes notés par l'extension (une lecture, projetée).
   const [rowsJournal, setRowsJournal] = React.useState(undefined);
   const lireJournal = React.useCallback(() => {
@@ -173,7 +173,7 @@ export default function OffresAuto({ actif, basculer, refusMsg = '', setRefusMsg
       <h3 className="vrm-oa-titre">Tes paires</h3>
       {illisibles.length ? (
         <div className="vrm-oa-illisible" data-oa-illisibles={illisibles.length} role="status">
-          <span>{illisibles.length} seuil{illisibles.length > 1 ? 's' : ''} avec virgule, ignoré{illisibles.length > 1 ? 's' : ''} par l’extension.</span>
+          <span>{illisibles.length} seuil{illisibles.length > 1 ? 's' : ''} avec virgule{virguleLue === true ? ' : à écrire avec un point.' : `, ignoré${illisibles.length > 1 ? 's' : ''} par ton extension.`}</span>
           <Bouton variante="secondaire" data-oa-corriger="" onClick={corrigerIllisibles}>Corriger</Bouton>
         </div>
       ) : null}
