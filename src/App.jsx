@@ -321,7 +321,8 @@ import { noterPlantage, viderPlantages, ecouterViolationsCspDans, derniersPlanta
 // (8 nov.) « Signaler un problème » enrichi et le « ? » de chaque écran.
 import { instantaneEcran } from "./signalementContexte.js";
 import { lecturesRecentes } from "./lecturesRecentes.js";
-import { AideEcran as AideEcranBase } from "./composants/AideEcran.jsx";
+import { AideEcran as AideEcranBase, CentreAide as CentreAideBase } from "./composants/AideEcran.jsx";
+import { fichesPour as fichesAidePour, chercherAide, REGLAGES_AIDE } from "./aideFiches.js";
 import { InfoPop as InfoPopBase, PuceProposition as PucePropositionBase } from "./composants/InfoPop.jsx";   // (9 nov., lot AI) une ligne courte + sa pop-up
 import { NoteSatisfaction } from "./composants/NoteSatisfaction.jsx";   // (9 nov.) « VRM t'aide-t-il ? » en bas de Ma journée
 import { ID_SATISFACTION } from "./satisfaction.js";
@@ -2937,8 +2938,15 @@ function SignalerProbleme({ ecran, ...props }) {
 }
 // (8 nov.) LE « ? » DE CHAQUE ÉCRAN (src/composants/AideEcran.jsx) : trois
 // questions de CET écran, l'article du centre d'aide, « Signaler un problème ».
+// (11 nov., lot centre-aide) Le profil (« Tu vends quoi ? », Simple/Complet) règle les mots et les fiches.
 function AideEcran({ cle }) {
-  return <AideEcranBase cle={cle} Feuille={SheetShell} Bouton={Bouton} Signaler={SignalerProblemeFeuilleBase} entetes={enTeteSession} masque={masquerPourEnvoi} contexte={() => contexteSignalement()}/>;
+  const p = useProfilVendeur();
+  return <AideEcranBase cle={cle} vend={p.vend || vendActuel()} mode={p.mode} Feuille={SheetShell} Bouton={Bouton} Signaler={SignalerProblemeFeuilleBase} entetes={enTeteSession} masque={masquerPourEnvoi} contexte={() => contexteSignalement()}/>;
+}
+// L'aide ouverte depuis la loupe (« Comment faire », `vrm:aide`) : un hôte dans la coque.
+function CentreAide() {
+  const p = useProfilVendeur();
+  return <CentreAideBase vend={p.vend || vendActuel()} mode={p.mode} Feuille={SheetShell} Bouton={Bouton} Signaler={SignalerProblemeFeuilleBase} entetes={enTeteSession} masque={masquerPourEnvoi} contexte={() => contexteSignalement()}/>;
 }
 GardeEcran.Signaler = SignalerProbleme;
 // (9 nov., lot AI — Julien : « tous les textes comme ça remplacés par des pop-ups ») UNE ligne
@@ -51759,6 +51767,8 @@ function AppCoeur() {
       if(t==='semaine'){ const l=p.get('lundi'); DEMANDE_SEMAINE.lundi=l&&/^\d{4}-\d{2}-\d{2}$/.test(l)?l:null; try{ window.dispatchEvent(new Event('vrm:semaine')); }catch(_){} }
       // (10 nov., lot H) « Nouvel appareil » : Appareils connectés, CETTE session en évidence.
       if(t==='settings'&&section==='appareils'){ DEMANDE_APPAREIL.session=sessionValide(p.get('session')); DEMANDE_REGLAGE_SOUS.id='appareils'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
+      // (11 nov., lot centre-aide) « M'y emmener » d'une fiche d'aide : le panneau de Réglages nommé (liste fermée, src/aideFiches.js).
+      { const rg=p.get('reglage'); if(t==='settings'&&rg&&REGLAGES_AIDE.includes(rg)){ DEMANDE_REGLAGE_SOUS.id=rg; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
@@ -54603,6 +54613,15 @@ function AppCoeur() {
             {ligneTexte(a.libelle, a.sous)}
             <span style={{fontSize:17,color:C.muted}}>›</span>
           </button>);
+        // (11 nov., lot centre-aide) « Comment faire » : les fiches d'aide (src/aideFiches.js), trois au plus ;
+        // un toucher ouvre la feuille d'aide sur la fiche (`vrm:aide`), d'où « M'y emmener ».
+        const fichesGs = q && q.length >= 3 && !estNumQ ? chercherAide(memoSur('gs-aide', [PROFIL_VENDEUR.vend, PROFIL_VENDEUR.mode], () => fichesAidePour({ vend: PROFIL_VENDEUR.vend || vendActuel(), mode: PROFIL_VENDEUR.mode })), qBrut, { max: 3 }) : [];
+        const blocAide = fichesGs.length ? <div data-recherche-groupe="aide" data-recherche-n={fichesGs.length}>{entete('Comment faire', null, 'aide')}{fichesGs.map((f)=>(
+          <button key={'aide-' + f.id} type="button" className="vrm-recherche-ligne" onClick={()=>{ if (qBrut.trim()) setGsRecents(noterRecent(qBrut.trim())); setGsOpen(false); try { window.dispatchEvent(new CustomEvent('vrm:aide', { detail: { fiche: f.id, q: qBrut.trim() } })); } catch (_) {} }} data-recherche-resultat="aide" data-recherche-aide-fiche={f.id} title="Ouvrir l’aide" style={styleLigne}>
+            {thumb(null, <Icon name="help" size={18} style={{color:C.text}}/>)}
+            {ligneTexte(f.q, f.etapes[0])}
+            <span style={{fontSize:17,color:C.muted}}>›</span>
+          </button>))}</div> : null;
         const blocActions = actionsGs.length ? <div data-recherche-groupe="action" data-recherche-n={actionsGs.length}>{entete('Actions', null, 'action')}{actionsGs.map(ligneAction)}</div> : null;
         return (
         <div className="vrm-global-search vrm-recherche-panneau" id="vrm-recherche-resultats" data-recherche-panneau="" data-recherche-q={q} data-recherche-pret={gsData ? '1' : '0'} role="region" aria-label="Résultats de la recherche"
@@ -54625,7 +54644,8 @@ function AppCoeur() {
             {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues}</div>}
             {q && blocExactes}
             {q && !estNumQ && blocActions}
-            {q && total===0 && !estNumQ && !actionsGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
+            {q && blocAide}
+            {q && total===0 && !estNumQ && !actionsGs.length && !fichesGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
             {q && estNumQ && exacteNumero && <div data-recherche-exacte-numero="" style={{padding:'8px 2px 0',fontSize:12,color:C.muted,lineHeight:1.4}}>Correspondance exacte · trouvé par son N° — pas par ressemblance.</div>}
             {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {q && estNumQ && blocActions}
@@ -54698,6 +54718,8 @@ function AppCoeur() {
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
       <Toaster/>
+      {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
+      <CentreAide/>
       <PiluleAnnulerCoque/>
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
       <RaccourcisClavier Feuille={SheetShell}/>
