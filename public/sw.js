@@ -268,6 +268,9 @@ self.addEventListener('fetch', event => {
   // (8 nov.) Le centre d'aide (/aide, public/aide/) : des pages statiques, au réseau —
   // sinon la navigation les rangerait sous « / » et ouvrirait l'app à leur place.
   if (url.pathname === '/aide' || url.pathname.startsWith('/aide/')) return;
+  // (11 nov.) Une fiche partagée (/p/<jeton>, api/_lib/partage-fiche.js) : au réseau,
+  // sans cache — rangée sous « / », elle remplacerait l'app ; gardée, un lien arrêté vivrait.
+  if (url.pathname.startsWith('/p/')) return;
 
   // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;

@@ -46,6 +46,8 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 envoyés LÉGERS, fusionnés dans la ligne
 //                                 `harvest_{uid}_orders_*` — api/_lib/commandes-leger.js
 //   /api/compte?mode=agenda       (GET/POST, session ; GET &f=<jeton>.ics sans session) l'agenda .ics
+//   /api/compte?mode=partage      (GET/POST, session ; GET &p=<jeton> sans session) « Partager » une
+//                                 fiche : la page publique vrm.center/p/<jeton> — api/_lib/partage-fiche.js
 //   /api/compte?mode=mail-essai   (POST, session) « M'envoyer un e-mail d'essai » :
 //                                 à l'adresse de SON compte, 3/h — api/_lib/mail-essai.js
 //   /api/compte?mode=supprimer    (GET/POST, session) SUPPRIMER MON COMPTE : GET
@@ -85,6 +87,7 @@ import { routeCommandes } from './_lib/commandes-leger.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { verifierNouvelAppareil } from './_lib/appareil-nouveau.js';   // (10 nov., lot H)
 import { traiterAgenda } from './_lib/agenda-ics.js';                 // (10 nov., lot H)
+import { traiterPartage, CSP_PAGE as CSP_PARTAGE } from './_lib/partage-fiche.js';   // (11 nov., lot partage-fiche)
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
 import { effacerCompte } from './_lib/effacer-compte.js';
@@ -1154,6 +1157,29 @@ async function agenda(req, res) {
   if (r.type === 'ics') res.setHeader('Content-Disposition', 'inline; filename="vrm-echeances.ics"');
   res.end(r.body);
 }
+// (11 nov., lot partage-fiche) « Partager » une fiche (api/_lib/partage-fiche.js) : la page
+// PUBLIQUE par le jeton seul (`p`, réécrit depuis /p/<jeton>), les gestes sur SA session.
+async function partage(req, res) {
+  const p = req.query && req.query.p != null ? String(req.query.p) : null;
+  let user = null, corps = null;
+  if (p == null) {
+    user = await vendeurExige(req, res);
+    if (!user) return;
+    if (req.method === 'POST') {
+      corps = await lireCorpsJson(req);
+      if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+    }
+  }
+  const r = await traiterPartage({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', methode: req.method, p, user, corps, acces: accesVendeur });
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (r.type === 'json') return repondre(res, r.status, r.body);
+  res.statusCode = r.status;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Security-Policy', CSP_PARTAGE);
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  res.end(req.method === 'HEAD' ? '' : r.body);
+}
 async function journalVrm(req, res) {
   const u = await vendeurExige(req, res);
   if (!u) return;
@@ -1776,6 +1802,7 @@ export default async function handler(req, res) {
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'agenda') return (m === 'GET' || m === 'POST') ? agenda(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'partage') return (m === 'GET' || m === 'POST' || (m === 'HEAD' && req.query && req.query.p != null)) ? partage(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   // (5 nov.) Les e-mails de l'essai gratuit : état, choix, lien de désinscription.
   if (mode === 'relances') return (m === 'GET' || m === 'POST') ? relances(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

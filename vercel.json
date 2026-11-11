@@ -36,6 +36,10 @@
       "destination": "/api/compte?mode=sante"
     },
     {
+      "source": "/p/:jeton",
+      "destination": "/api/compte?mode=partage&p=:jeton"
+    },
+    {
       "source": "/agenda/:fichier",
       "destination": "/api/compte?mode=agenda&f=:fichier"
     },
