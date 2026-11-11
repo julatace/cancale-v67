@@ -33649,6 +33649,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'ordre de `annShown` est gardé dans chaque compte (src/annoncesGrille.js) ; un compte prend la place de
   // sa première annonce (celui de l'onglet reste en tête). Affichage seulement : rien n'entre ni ne sort.
   const annGroupes = useMemo(() => groupesParCompte(annShown, (it) => String((it && it._acc && it._acc.vinted_user_id) || '')), [annShown]);
+  // (11 nov., pire cas) La grille ne DESSINE que les `annMax` premières vignettes (comme Ventes) :
+  // 2 000 annonces montaient 137 000 nœuds d'un coup, 2 s de gel au défilement du téléphone.
+  // Les comptes, les totaux et l'en-tête de chaque compte portent TOUJOURS sur l'ensemble.
+  const [annMax, setAnnMax] = useVueSession('annonces-limite', 120);
+  const annGroupesVus = useMemo(() => { let reste = annMax; return annGroupes.map((g) => { const items = g.items.slice(0, Math.max(0, reste)); reste -= items.length; return { ...g, tous: g.items.length, items }; }).filter((g) => g.items.length); }, [annGroupes, annMax]);
   // Les annonces que l'alerte « même paire en ligne deux fois » nomme (lot AF, mêmes groupes, §11) : une marque sur leur vignette.
   const annEnDouble = useMemo(() => new Set(groupesDeuxFois.filter((g) => g.length > 1).flat()), [groupesDeuxFois]);
   // La grille de vignettes est montrée pour « Toutes » et ses tris (pas pour les vues à cocher ni les files).
@@ -44540,11 +44545,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             éléments, mêmes écritures, mêmes data-* (rien n'est retiré, seulement replié). Toucher la PHOTO ouvre la
             visionneuse unique (src/visionneuse.js). L'ordre et la règle « en ligne » ne changent pas (`annShown`). */}
         <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes" data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
-          {annGroupes.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
-          <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.items.length} role="heading" aria-level={3}>
+          {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
+          <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.tous} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
-            <span className="vrm-ann-compte-nom">{nomG || 'Compte Vinted'}</span>
-            <span className="vrm-ann-compte-n">{g.items.length} annonce{g.items.length>1?'s':''}</span>
+            <span className="vrm-ann-compte-nom" title={nomG || undefined}>{nomG || 'Compte Vinted'}</span>
+            <span className="vrm-ann-compte-n">{g.tous} annonce{g.tous>1?'s':''}</span>
           </div>,
           ...g.items.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
@@ -44777,6 +44782,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })]; })}
         </div>
+        {annShown.length > annMax && (
+          <Bouton variante="secondaire" plein data-ann-suite="" onClick={()=>React.startTransition(()=>setAnnMax(n=>n+120))} style={{marginTop:16}}>
+            Afficher {Math.min(120,annShown.length-annMax) > 1 ? `les ${Math.min(120,annShown.length-annMax)} suivantes` : 'la suivante'}{annShown.length-annMax > 120 ? ` · encore ${annShown.length-annMax-120} après` : ''}
+          </Bouton>
+        )}
         </>)}
           </>)}
         {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>

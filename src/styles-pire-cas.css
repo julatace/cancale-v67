@@ -24,3 +24,8 @@
    Il se raccourcit en « … » (la ligne entière se touche : la lecture dit « Reçu sur » en entier). */
 .vrm-boite-ligne-pied > .vrm-boite-qui { overflow: hidden; }
 .vrm-boite-qui > .vrm-boite-compte-nom { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Stock : la fin de la bande « À ranger » quand elle en a plus de 60 (les autres sont dans la liste). */
+.vrm-s2d-bande-reste { flex: 0 0 auto; width: 70px; height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 12px; background: var(--w-fond-2, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.vrm-s2d-bande-reste small { font-size: 11px; font-weight: 500; color: var(--w-gris-1, #6E6E73); text-align: center; line-height: 1.2; }

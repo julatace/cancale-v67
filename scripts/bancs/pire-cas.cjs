@@ -302,6 +302,21 @@ async function main() {
           const { pg, ctx, errs } = await ouvrir(b, { largeur, sombre, tab, nomJeu: jeuNom });
           const fichier = `${jeuNom}-${tab}-${largeur}-${sombre ? 'sombre' : 'clair'}`;
           await capture(pg, fichier);
+          if (process.env.BANC_PROFIL) {
+            // Un profil CPU de 6 s (BANC_PROFIL=1) : les fonctions qui prennent le plus de temps propre.
+            const cdp = await pg.context().newCDPSession(pg);
+            await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start');
+            if (process.env.BANC_PROFIL === 'defile') await defiler(pg); else await pg.waitForTimeout(6000);
+            const { profile } = await cdp.send('Profiler.stop');
+            const self = new Map(); const dt = profile.timeDeltas; const parId = new Map(profile.nodes.map((n) => [n.id, n]));
+            profile.samples.forEach((id, i) => { const n = parId.get(id); const f = n.callFrame; const k = `${f.functionName || '(anon)'} ${String(f.url).split('/').pop()}:${f.lineNumber + 1}`; self.set(k, (self.get(k) || 0) + (dt[i] || 0)); });
+            // Le temps TOTAL (soi + appelés) par fonction : remonter chaque échantillon vers la racine.
+            const parent = new Map(); for (const n of profile.nodes) for (const c of n.children || []) parent.set(c, n.id);
+            const tot = new Map();
+            profile.samples.forEach((id, i) => { const vus = new Set(); for (let x = id; x != null; x = parent.get(x)) { const f = parId.get(x).callFrame; const k = `${f.functionName || '(anon)'} ${String(f.url).split('/').pop()}:${f.lineNumber + 1}`; if (vus.has(k)) continue; vus.add(k); tot.set(k, (tot.get(k) || 0) + (dt[i] || 0)); } });
+            console.log('     PROPRE :', [...self].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `${Math.round(v / 1000)}ms ${k}`).join('\n       '));
+            console.log('     TOTAL :', [...tot].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([k, v]) => `${Math.round(v / 1000)}ms ${k}`).join('\n       '));
+          }
           if (process.env.BANC_SONDE) console.log('     sonde :', JSON.stringify(await pg.evaluate(process.env.BANC_SONDE), null, 1).slice(0, 4000));
           await juger(pg, T, nom, { jeuNom, errs });
           if (jeuNom === 'extreme' && !sombre && ['annonces', 'ventes', 'achats', 'garage', 'messages'].includes(tab)) {
