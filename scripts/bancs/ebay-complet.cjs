@@ -45,7 +45,8 @@ const remettre = (sc = {}) => {
     { id: 'main', data: { vinted_annonce_numeros: FICHES } },
     { id: 'harvest_111_listings', data: LISTINGS },
     { id: 'vinted_item_details', data: DETAILS },
-    { id: 'ebay_listings', data: { items: [], capturedAt: MAINTENANT } },
+    { id: 'ebay_listings', data: { items: [{ itemId: '110000000044', title: 'Nike Air Max 90 taille 42', price: '95.0', sku: 'VRM-31' }], capturedAt: MAINTENANT } },
+    { id: 'ebay_comptes', data: { comptes: [{ principal: true, cle: 'aaaaaaaaaaaaaaaa', pseudo: 'vendeur_pro', type: 'pro', site: 'FR' }] } },
     { id: 'ebay_orders', data: { orders: [], capturedAt: MAINTENANT } },
   ];
   envois = [];
@@ -129,6 +130,10 @@ async function ouvrir(b, vp, sombre) {
     }
     if (body.action === 'publish') return j({ ok: true, itemId: '110000000031', url: 'https://www.ebay.fr/itm/110000000031', sku: 'VRM-' + ((body.item && body.item.numero) || '') });
     if (body.action === 'promouvoir') return j({ ok: true, taux: body.taux, campagne: '1' });
+    if (body.action === 'remises') return j({ ok: true, remises: [{ id: '9001', nom: 'Soldes', etat: 'RUNNING', type: 'periode', debut: '2026-11-01T00:00:00Z', fin: '2026-11-20T10:00:00Z' }] });
+    if (body.action === 'poserremise') return j({ ok: true, id: '9100', type: body.type, fin: body.fin, n: (body.listingIds || []).length });
+    if (body.action === 'messages') return j({ ok: true, page: 1, totalPages: 1, messages: [{ id: '5550001', itemId: '110000000044', titre: 'Nike Air Max 90 taille 42', sender: 'acheteur_x', subject: 'Question', body: 'Elle taille grand ?', responses: [], status: 'Unanswered', date: '2026-11-11T08:00:00Z', type: 'AskSellerQuestion' }] });
+    if (body.action === 'repondre') return j({ ok: true });
     return j({ ok: true });
   });
   return { ctx, pg, errs };
@@ -295,6 +300,46 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         const t = await pg2.$eval('[data-ebay-guide="vente"]', (e) => e.innerText);
         dit(/tu ne paies rien/.test(t) && /étiquette prépayée/.test(t) && !!(await pg2.$('[data-ebay-guide-lien="vente"]')), 'H. « Comment faire ? » ⇒ la fenêtre « vendue » : l’acheteur a payé le port, l’étiquette prépayée dans eBay', t.replace(/\s+/g, ' ').slice(0, 200));
         await capt(pg2, `H-${tag}`);
+      });
+      await essaie('J', async () => {
+        envois = [];
+        await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=promo`, { waitUntil: 'domcontentloaded' });
+        await pg2.waitForSelector('[data-ebay-remises="1"]', { timeout: 25000 });
+        const fin = await pg2.$eval('[data-ebay-remise="9001"]', (e) => e.innerText);
+        dit(/fin le 20 novembre/.test(fin), 'J. remises en cours : la date de fin est dite', fin.replace(/\s+/g, ' '));
+        await pg2.waitForSelector('[data-ebay-remise-annonce="110000000044"] input', { timeout: 10000 });
+        await pg2.fill('[data-ebay-remise-pct]', '15');
+        await pg2.check('[data-ebay-remise-annonce="110000000044"] input');
+        const prix = await pg2.$eval('[data-ebay-remise-annonce="110000000044"] [data-ebay-remise-prix]', (e) => e.getAttribute('data-ebay-remise-prix'));
+        dit(prix === '80.75', '   le prix après remise est dit (95 € − 15 % = 80,75 €)', prix);
+        await capt(pg2, `J-${tag}`);
+        await pg2.click('[data-ebay-remise-poser]');
+        const conf = pg2.locator('div[style*="z-index"]').filter({ hasText: 'Poser cette remise sur eBay ?' }).last();
+        await conf.waitFor({ timeout: 8000 });
+        const tc = await conf.innerText();
+        dit(/−15 % sur 1 annonce/.test(tc) && /s'arrête le/.test(tc) && /jamais de livraison gratuite/.test(tc), '   la confirmation dit la remise, la date de fin, et jamais de livraison gratuite (§2.8)', tc.replace(/\s+/g, ' ').slice(0, 220));
+        dit(action('poserremise').length === 0, '   rien n’est posé avant « Oui »');
+        await ok(pg2, /Oui, poser/);
+        await pg2.waitForTimeout(800);
+        const p = action('poserremise')[0];
+        dit(!!p && p.confirme === true && p.type === 'periode' && p.remise === 15 && p.listingIds.join() === '110000000044' && Math.abs(Date.parse(p.fin) - MAINTENANT - 7 * JOUR) < 5 * 60000, '   `poserremise` : −15 %, SON annonce, fin dans 7 j, confirmé', JSON.stringify(p));
+      });
+      await essaie('K', async () => {
+        envois = [];
+        await pg2.goto(`http://localhost:${PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' });
+        await pg2.waitForSelector('[data-fil-sites="ebay"]', { timeout: 25000 });
+        dit(true, 'K. Messages · Tous : l’échange eBay est dans la liste unifiée');
+        await pg2.click('[data-fil-sites="ebay"]');
+        await pg2.waitForSelector('[data-fil-ebay="5550001"]', { timeout: 10000 });
+        const q = await pg2.$eval('[data-fil-ebay-question]', (e) => e.innerText);
+        dit(/taille grand/.test(q), '   le fil eBay montre la question', q);
+        await pg2.fill('[data-fil-ebay-saisie]', 'Elle taille normalement.');
+        await pg2.click('[data-fil-ebay-envoyer]');
+        await ok(pg2, /Oui, envoyer/);
+        await pg2.waitForTimeout(800);
+        const r = action('repondre')[0];
+        dit(!!r && r.confirme === true && r.messageId === '5550001' && r.itemId === '110000000044' && r.body === 'Elle taille normalement.', '   « Envoyer » sur SON clic confirmé : `repondre` sur CETTE question', JSON.stringify(r));
+        await capt(pg2, `K-${tag}`);
       });
       const tous = [...errs, ...o2.errs];
       dit(tous.length === 0, `aucune erreur de page (${tag})`, tous.join(' | '));
