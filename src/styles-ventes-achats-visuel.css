@@ -108,17 +108,23 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
 }
 
 /* ── 3 et 4. LA LIGNE D'UNE VENTE (Vinted, forme Fusion) ────────────────────── */
-/* Téléphone : photo 56 · (nom + prix / N° · site · compte / état / frise) ; dessous, à droite, les actions. */
+/* Téléphone : photo 56 · (nom + prix / N° · site · compte / état / frise) ; dessous, à droite, les actions.
+   (11 nov., Julien sur iPhone : « un grand vide sous la frise ») Plus d'écart de RANGÉE dans la grille : une rangée
+   implicite vide (0 px) en prenait un de 8 px sous la frise ; l'écart frise ↔ texte est la marge de la frise.
+   Le logo du transporteur et le compte : la ligne « N° · Vinted · logo · compte » passe à la ligne plutôt que de
+   réduire le compte à « … ». */
 @media (max-width: 1023px) {
   :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] { padding: 12px 14px !important; gap: 10px !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle {
-    display: grid !important; grid-template-columns: 56px minmax(0, 1fr) !important; column-gap: 12px !important; row-gap: 8px !important; align-items: start !important;
+    display: grid !important; grid-template-columns: 56px minmax(0, 1fr) !important; column-gap: 12px !important; row-gap: 0 !important; align-items: start !important;
   }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { grid-column: 1 !important; grid-row: 1 / span 2 !important; width: 56px !important; height: 56px !important; border-radius: 12px !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-fu-vente-txt { grid-column: 2 !important; grid-row: 1 !important; }
   /* Le « … » se pose sous le prix : seules les lignes 2 et 3 lui laissent sa place. */
   :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme]:has(> .vrm-fu-plus-vente) > button.vrm-ledger-sale-toggle :is(.vrm-fu-vente-l2, .vrm-fu-vente-l3) { padding-right: 40px !important; }
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise { display: block !important; grid-column: 2 !important; grid-row: 2 !important; max-width: 220px !important; position: static !important; width: auto !important; height: auto !important; clip: auto !important; overflow: visible !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle .vrm-fu-vente-l2 { flex-wrap: wrap !important; row-gap: 2px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle .vrm-fu-vente-l2 .vrm-fu-vente-compte { flex: 0 1 auto !important; min-width: min(100%, 9ch) !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise { display: block !important; grid-column: 2 !important; grid-row: 2 !important; margin-top: 8px !important; max-width: 220px !important; position: static !important; width: auto !important; height: auto !important; clip: auto !important; overflow: visible !important; }
   /* Le « … » de la ligne : en haut à droite, 44 px. */
   :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] { position: relative !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-fu-plus-vente { position: absolute !important; top: 48px !important; right: 6px !important; width: 44px !important; height: 44px !important; min-height: 44px !important; }

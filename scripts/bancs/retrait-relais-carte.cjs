@@ -160,7 +160,10 @@ async function main() {
         const fondOk = await pg.evaluate(() => !!document.querySelector('[data-relais-fond="pret"]'));
         // (9 nov. au soir) Depuis « retraits frais », la carte est aussi dessinée au téléphone (deux doigts la
         // déplacent, un doigt fait défiler la page) : le point y est placé comme à l'ordinateur.
-        dit(!!k && k.c === '2' && k.t === '1' && k.n === '1' && k.rp === 'oui', `${T} Colis : Kusmi Tea, point n° 1, 2 colis + 1 en route, placé sur la carte`, JSON.stringify(pts.map((p) => [p.cle, p.n, p.c, p.t, p.rp])));
+        // (11 nov., Julien : « enlève la carte, ça sert à rien ») Plus de carte : le point n'est plus placé (`sans-carte`),
+        // aucune carte n'est rendue ; le reste (rang, comptes, en route) est inchangé.
+        const nCartes = await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-carte, [data-retirer-carte-etat], .maplibregl-map').length);
+        dit(!!k && k.c === '2' && k.t === '1' && k.n === '1' && k.rp === 'sans-carte' && nCartes === 0, `${T} Colis : Kusmi Tea, point n° 1, 2 colis + 1 en route ; plus de carte (décision du 11 nov.)`, JSON.stringify(pts.map((p) => [p.cle, p.n, p.c, p.t, p.rp])));
         const ti = pts.find((p) => p.cle === 'tabacinconnu|29200');
         // (9 nov. au soir) La colonne refaite (« À retirer » au style de « À envoyer », 3 nov. ; « retraits frais » D1) :
         // les achats EN ROUTE sont dans le repli « En route » — le point sans rue y est nommé sur la ligne de son achat,
@@ -175,7 +178,9 @@ async function main() {
         const miens = ban.filter((u) => /[?&]postcode=/.test(u));
         // (9 nov. au soir) Et AUCUNE recherche sans code postal (« 13 Rue Saint-Vincent » seul existe dans des dizaines de villes).
         dit(ban.every((u) => /[?&]postcode=\d{5}/.test(u)), `${T} Colis : aucune adresse cherchée sans son code postal`, JSON.stringify(ban));
-        dit(miens.length === 1 && /postcode=56000/.test(miens[0]) && !ban.some((u) => /Brest|29200/.test(decodeURIComponent(u))), `${T} Colis : une seule recherche d'adresse, avec le code postal ; aucune pour l'adresse incomplète`, JSON.stringify(ban));
+        // (11 nov.) Sans carte, plus aucune adresse à géocoder pour « À retirer » (l'itinéraire part de l'adresse LUE) ;
+        // jamais une recherche pour l'adresse incomplète.
+        dit(miens.length === 0 && !ban.some((u) => /Brest|29200/.test(decodeURIComponent(u))), `${T} Colis : aucune recherche d'adresse (plus de carte) ; jamais pour l'adresse incomplète`, JSON.stringify(ban));
         if (!repli) { const note = await pg.evaluate(() => (document.querySelector('[data-retirer-en-route-sans]') || {}).innerText || '');
           dit(/1 achat en route dont Vinted ne dit pas encore le point/.test(note), `${T} Colis : l'achat sans destination est dit à part`, note); }
         const tot = await pg.evaluate(() => { const c = document.querySelector('[data-cc-colonne="retirer"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { n: Number(c.getAttribute('data-cc-n')), pub: pub && pub.total }; });

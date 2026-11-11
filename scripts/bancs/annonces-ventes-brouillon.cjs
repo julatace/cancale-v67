@@ -81,7 +81,7 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     lignesComptes:vis(document.querySelector('[data-comptes-annonces]')),
     titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)),
     titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
-    recusTop:top(document.querySelector('[data-recus-email]')),sourcesTop:top(document.querySelector('[data-achats-sources]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
+    recusTop:top(document.querySelector('[data-recus-email]')),colisVentes:!!document.querySelector('[data-colis-section="ventes"]'),navColis:[...document.querySelectorAll('[data-nav-entree="cat_bord"],[data-nav-entree="colis"]')].length,sourcesTop:top(document.querySelector('[data-achats-sources]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
     colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),convEcart:(()=>{const a=document.querySelector('.vrm-messages-sections'),b=document.querySelector('.vrm-msg-search');return a&&b?Math.round(b.getBoundingClientRect().top-a.getBoundingClientRect().bottom):null;})(),
     chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
     dateCap:(()=>{const d=document.querySelector('.vrm-day-greeting .vrm-day-date');return d&&d.getBoundingClientRect().height>0?getComputedStyle(d).textTransform:null;})(),
@@ -156,7 +156,9 @@ if(sub==='ventes'){
   dit(W<600?m.titreEcran.length===0:m.titreEcran.includes(t),`[${W}] « ${t} » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
 } else if(v==='cat_bord'){
   // (11 nov., restes) Chaque écran porte son h1 au téléphone aussi (ScreenHead, 2 nov.) : une fois, jamais deux.
-  dit(W<600?m.titreEcran.length<=1:m.titreEcran.includes('Colis'),`[${W}] « Colis » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
+  // (11 nov., lot DJ3 intégré) Plus d'écran ni d'entrée « Colis » : l'ancien lien `?tab=cat_bord` mène à Ventes · À expédier,
+  // et aucune entrée de navigation (barre, rail) ne s'appelle plus « Colis ».
+  dit(m.colisVentes&&m.navColis===0&&m.titreEcran.length<=1,`[${W}] l'ancien « Colis » mène à Ventes · À expédier ; aucune entrée « Colis » dans la navigation`,JSON.stringify({v:m.colisVentes,nav:m.navColis,t:m.titreEcran}));
   dit(m.limites.length>=3,`[${W}] les cartes de Colis portent leur date limite`,String(m.limites.length));
   dit(m.limites.every(x=>!x.deborde),`[${W}] la date limite ne déborde pas de sa carte`,JSON.stringify(m.limites.filter(x=>x.deborde)));
   // (11 nov., intégration colis — défaut f, session restes) La date limite se lit EN ENTIER : ni coupée par l'ellipse, ni masquée par son conteneur.

@@ -205,3 +205,37 @@ suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 e
     rogne, et aucune boîte entre lui et la carte ne porte nowrap + ellipsis (au téléphone la place suffisait, l'ellipse posée
     passait) ; mutation `AVB_MUTATION=ellipse`. Et « Tes meilleures sources » doit venir APRÈS la liste d'Achats (après les
     étapes, avant les reçus).
+* **Autres bancs portés sur le lot DJ3** : `colis-colonnes` (« À retirer » = section de tête d'Achats, nombre par l'entrée
+  Achats + `data-cc-n` ; « À envoyer / Envoyés » = Ventes) ; `retirer-carte-delai` (capture sans carte) ;
+  `retrait-relais-carte` (plus de carte ⇒ `sans-carte`, plus aucune recherche d'adresse) ; `annonces-ventes-brouillon`
+  (l'ancien `?tab=cat_bord` mène à Ventes · À expédier, aucune entrée « Colis » dans la navigation) ; `navigation-tache`
+  (« Plus » par sa classe : son libellé suit la langue).
+* **Ligne glissable** : au repos le tiroir est caché (un liseré bleu de l'action principale dépassait à droite de chaque
+  ligne d'« À retirer », dont la ligne est en retrait de sa carte — vu sur la capture du banc `colis-retirer-propre`).
+
+## Suite 4 (11 nov., soir) : bugs vus par Julien sur iPhone (Ventes) + « des barres de progression fiables »
+
+* **Logos de transporteur** (Julien : « dans les ventes il MANQUE les logos de transporteur ») : UNE règle — le logo du
+  transporteur CONNU (`transporteurVente` → `transporteurDeVente` : prise en charge lue, étiquette, bordereau, e-mails du
+  même n°, par identité) au MÊME endroit sur toutes les lignes, juste après « Vinted » (`data-fu-transp-ligne`,
+  `data-transporteur`), y compris à envoyer (avant : un carré à gauche de « Imprimer » sur celles-là seulement) ; inconnu ⇒
+  rien. La ligne « N° · Vinted · logo · compte » passe à la ligne au téléphone plutôt que de réduire le compte à « … ».
+  **Mesuré en lecture seule sur la vraie base** : la transaction Vinted ne porte AUCUN mode de livraison
+  (`transaction.shipment` = `id, status, status_title, status_updated_at` sur 556 lignes) ; sur 239 bordereaux e-mail,
+  5 nomment leur transporteur, 2 l'ont lu sur l'étiquette, 105 portent un n° ; la ligne des étiquettes relues au cron
+  (`vrm_bord_transporteurs`) a `parTx` VIDE (0) et 68 étiquettes lues. ⇒ beaucoup de ventes anciennes n'ont aucun
+  transporteur PROUVÉ : elles restent sans logo (jamais deviné par la forme du n°). Piste pour la suite : la relecture du
+  texte des anciens e-mails de bordereau (`transporteur-anciens`, cron) n'a rien rangé — à vérifier côté cron.
+* **Vide sous la frise** (iPhone) : la grille de la ligne avait une rangée implicite de 0 px qui prenait un écart de 8 px
+  sous la frise ; écart de rangée retiré (la frise porte sa marge). Mesuré au banc : 20 ⇒ 12 px (la marge de la ligne).
+* **« Colis » dans la barre** : la version en ligne n'a pas encore le lot DJ3 ; sur cette branche la barre est Journée ·
+  Annonces · Ventes · Achats · Plus, le badge des colis à poster est sur Ventes, `?tab=cat_bord` ⇒ Ventes · À expédier
+  (`colis-a-leur-place` 184 verts, `liens-colis-anciens`, `annonces-ventes-brouillon`).
+* **Envoi prouvé ⇒ plus de bordereau** : la règle existait (`ventesPartiesParPreuve`, api/_lib/depart-vente.js : e-mail
+  de dépôt/prise en charge pour le n° EXACT de SON bordereau, `depart_*` lu par le serveur, étiquette lue) et elle ne
+  dépend d'aucune lecture Vinted : une lecture « à envoyer » plus récente ne fait rien revenir. La frise allume « Postée »
+  sur cette même preuve. Banc neuf `ventes-achats-visuel` P : vente 9604 que Vinted dit « à envoyer » (relue 10 min avant),
+  e-mail « entre de bonnes mains » du même n° il y a 12 h ⇒ ni « Imprimer » ni rangée de bordereau, « Postée » allumée,
+  logo gardé, « Tout imprimer » reste à 3. Mutation `VAV_MUTATION=sans-preuve` (la preuve retirée) ⇒ rouge.
+* Banc `ventes-achats-visuel` : L (logo au même endroit, rien sans transporteur lu, plus dans la rangée), V (≤ 16 px sous la
+  frise), P ; mutation `VAV_MUTATION=sans-logo` ⇒ L rouge.
