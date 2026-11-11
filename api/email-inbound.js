@@ -335,6 +335,18 @@ export function paireDuSujetMessage(sujet) {
 }
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
+// L'identité d'un e-mail de finalisation (versement) : `{ cle, transaction, via }`.
+// Fonction PURE (scripts/audit-robustesse-serveur.cjs).
+export function cleFinalisation({ texte, messageId, sujet, corps }) {
+  const t = String(texte || '');
+  const m = t.match(/N[°ºo]?\s*de\s*(?:la\s+)?transaction\s*:?\s*#?\s*(\d{6,})/i)
+    || t.match(/\/transactions?\/(\d{6,})/i)
+    || t.match(/transaction_id=(\d{6,})/i);
+  if (m) return { cle: 'tx' + m[1], transaction: m[1], via: 'transaction' };
+  const mid = String(messageId || '').trim();
+  if (mid) return { cle: 'm' + crypto.createHash('sha256').update(mid).digest('hex').slice(0, 20), transaction: '', via: 'message-id' };
+  return { cle: shortHash(String(sujet || '') + '|' + String(corps || '').slice(0, 400)), transaction: '', via: 'texte' };
+}
 function shortHash(s) {
   let h = 0; const str = String(s || '');
   for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
@@ -1689,9 +1701,61 @@ async function noterEssaiAdresse(owner, mail) {
     });
   } catch (_) {}
 }
+// (11 nov., robustesse) LES PIÈCES JOINTES D'UN E-MAIL MIS DE CÔTÉ SONT GARDÉES.
+// Avant : seul leur NOM ; au rejeu (api/email-rattacher.js), le bordereau ou le
+// reçu revenait sans son PDF — perdu pour toujours (« on ne jette aucun email »).
+// Une ligne SŒUR par pièce (`email_qpj_{suffixe}_{i}`, propriétaire neutre) :
+// la ligne de quarantaine reste légère (les listes la projettent, §4.4) et chaque
+// ligne ne porte qu'UNE pièce, comme `email_bord_*` porte son PDF. Le préfixe
+// n'est PAS `email_quarantaine_` : la liste des e-mails à réclamer ne les voit pas.
+// L'identifiant vient du Message-ID quand il existe : un rejeu du collecteur
+// réécrit la même ligne au lieu d'en créer une copie.
+export const PREFIXE_PJ_QUARANTAINE = 'email_qpj_';
+export const MAX_PJ_QUARANTAINE = 20;
+export const MAX_OCTETS_PJ_B64 = 6 * 1024 * 1024;   // au-delà, Vercel n'aurait pas reçu le corps (4,5 Mo)
+export const idPieceQuarantaine = (idQuarantaine, i) => PREFIXE_PJ_QUARANTAINE + String(idQuarantaine).replace(/^email_quarantaine_/, '') + '_' + i;
+// La ligne `email_bord_{tx}` de CE vendeur porte-t-elle déjà un PDF ?
+// true · false · null (pas su). Ne transfère jamais le PDF.
+async function bordereauADejaUnPdf(id) {
+  try {
+    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&data->>pdfB64=not.is.null&select=id&limit=1`), { headers: { ...sbCle(SUPABASE_KEY) } });
+    if (!r || !r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j.length > 0 : null;
+  } catch (_) { return null; }
+}
 async function mettreEnQuarantaine(mail, adresses, raison) {
   try {
-    const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const mid = String((mail && mail.messageId) || '').trim();
+    const id = 'email_quarantaine_' + (mid
+      // (relecture) Les ADRESSES font partie de l'identité : le même Message-ID livré à
+      // deux adresses inconnues (deux exemplaires) donne deux mises de côté — sinon la
+      // 2e écrasait la 1re et la 1re adresse ne pouvait plus réclamer son e-mail.
+      // Un rejeu du collecteur (mêmes adresses) réécrit toujours la même ligne.
+      ? 'm' + crypto.createHash('sha256').update(mid + '|' + String(raison || '') + '|' + [...new Set((adresses || []).map((a) => String(a).toLowerCase()))].sort().join(',')).digest('hex').slice(0, 20)
+      : Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+    // Les pièces d'abord : si l'une ne s'écrit pas, la quarantaine ne s'écrit pas
+    // non plus et la route répond 503 (le collecteur rejoue) — jamais un e-mail
+    // « gardé » dont le PDF manque.
+    const toutes = (mail.attachments || []).slice(0, MAX_PJ_QUARANTAINE);
+    const pieces = [];
+    for (let i = 0; i < toutes.length; i++) {
+      const a = toutes[i] || {};
+      const b64 = typeof a.contentB64 === 'string' ? a.contentB64 : '';
+      const p = { filename: a.filename, contentType: a.contentType };
+      if (b64 && b64.length <= MAX_OCTETS_PJ_B64) {
+        const idPj = idPieceQuarantaine(id, i);
+        const rp = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+          method: 'POST',
+          headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id: idPj, data: { quarantaine: id, i, filename: a.filename || '', contentType: a.contentType || '', contentB64: b64 } }]),
+        }).catch(() => null);
+        if (!rp || !rp.ok) { marquerEcritureRatee(); return; }
+        p.ligne = idPj; p.taille = b64.length;
+      } else if (b64) p.omise = 'trop lourde';
+      pieces.push(p);
+    }
+    if ((mail.attachments || []).length > MAX_PJ_QUARANTAINE) pieces.push({ omises: (mail.attachments || []).length - MAX_PJ_QUARANTAINE });
     // Les adresses aussi en UNE chaîne : la base ne copie dans `meta` que les
     // valeurs simples dont le JSON tient en 600 octets (`vrm_meta`,
     // `octet_length(v::text) <= 600`). La liste des emails à réclamer y trouve
@@ -1713,7 +1777,8 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
         from: mail.from || '', to: mail.to || '', subject: mail.subject || '',
         text: String(mail.text || '').slice(0, 20000),
         html: String(mail.html || '').slice(0, 40000),
-        pieces: (mail.attachments || []).map(a => ({ filename: a.filename, contentType: a.contentType })),
+        pieces,
+        ...(mid ? { messageId: mid.slice(0, 300) } : {}),
       },
     };
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
@@ -2673,7 +2738,16 @@ export async function traiterEmail(req, res) {
           pdfB64: pdf ? pdf.contentB64 : null, filename: pdf ? pdf.filename : null,
           pdfTamponneB64, posKnown, receivedAt: now },
       };
-      await supabaseUpsert([row]);
+      // (11 nov., robustesse) UN 2e E-MAIL SANS PIÈCE JOINTE N'EFFACE JAMAIS UN PDF
+      // DÉJÀ RANGÉ. L'upsert remplace `data` en entier : une copie transférée ou un
+      // renvoi texte de « Bordereau d'envoi » (même transaction) mettait
+      // `pdfB64: null` par-dessus l'étiquette. On ne remplace qu'une valeur absente :
+      // la ligne déjà munie d'un PDF est gardée telle quelle. La présence se lit
+      // par un FILTRE (`data->>pdfB64=not.is.null`, `select=id`) — jamais le PDF
+      // lui-même (§4.4). Lecture ratée ⇒ rien n'est écrit, 503 (rejeu).
+      const pdfDeja = pdf ? false : await bordereauADejaUnPdf(row.id);
+      if (pdfDeja === null) { marquerEcritureRatee(); }
+      else if (!pdfDeja) await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
       // (8 nov.) La notification ne nomme que le N° LU dans l'e-mail (écrit par lui dans le titre) —
       // jamais celui retrouvé par ressemblance de titre (`parTitre`) : 50 paires au même titre, un
@@ -2691,7 +2765,14 @@ export async function traiterEmail(req, res) {
     // finalisée », corps « Viré sur ton compte Vinted : 41,00 € ».
     const finText = `${subject}\n${corpsTexte.slice(0, 1500)}`;
     if (/transaction\s+(?:est\s+)?finalis/i.test(finText) || /vir[ée]\s+sur\s+ton\s+compte/i.test(finText) || /ajout[ée]s?\s+(?:à|dans)\s+ton\s+porte-monnaie/i.test(finText) || /disponibles?\s+(?:dans|sur)\s+ton\s+porte-monnaie/i.test(finText)) {
-      const key = shortHash(subject + '|' + corpsTexte.slice(0, 400));
+      // (11 nov., robustesse) LA CLÉ D'UN VERSEMENT EST SON IDENTITÉ. Avant :
+      // `shortHash(sujet + 400 caractères)` — deux finalisations identiques (même
+      // titre, même montant) donnaient la MÊME ligne, la seconde écrasait la
+      // première : un versement disparaissait du « reçu » et du CA daté au
+      // versement. Ordre : n° de transaction lu · Message-ID · (sans l'un ni
+      // l'autre) l'ancienne clé, pour qu'un rejeu ne crée jamais de doublon.
+      const ident = cleFinalisation({ texte: `${finText}\n${corpsTexte}\n${String(mail.html || '')}`, messageId: mail.messageId, sujet: subject, corps: corpsTexte });
+      const key = ident.cle;
       const article = ((finText.match(/la vente de\s+(.+?)\s+a été réalis/i) || [])[1] || '').trim();
       // Montant crédité : on tente plusieurs formulations, puis en dernier
       // recours le plus gros montant € de l'email (le crédit) — avant ce
@@ -2705,6 +2786,7 @@ export async function traiterEmail(req, res) {
       const numero = jn.numero;
       await supabaseUpsert([{ id: `email_final_${key}`, data: {
         type: 'finalisation', subject, article, montant, numero, ...(jn.numeroTitre ? { numeroTitre: jn.numeroTitre } : {}),
+        ...(ident.transaction ? { transaction: ident.transaction } : {}), ...(mail.messageId ? { messageId: String(mail.messageId).slice(0, 300) } : {}),
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]);
       // Notif push : l'argent arrive dans le porte-monnaie.

@@ -6,7 +6,7 @@
 //   F1 chaque colis sous SON point ; deux Super U de Lille à deux rues = deux cartes ;
 //   F2 un casier au nom seul (« LOCKER 24/7 SUPER U », adresse pas lue) reste seul, jamais avec un autre ;
 //   F3 le code se LIT sur la ligne (0 toucher) ;
-//   F4 « Point relais changé » montre le code du colis (lu dans un autre e-mail du même n°) et l'ancien point ;
+//   F4 « Point relais changé » montre le code d'un autre e-mail du même n° s'il est daté APRÈS le changement (sinon « à confirmer ») et l'ancien point ;
 //   F5 un colis non revu depuis 48 h dit « pas confirmé depuis le … » (ambre), les autres non ;
 //   F6 masquer un point laisse sa trace (« 1 point masqué · Afficher »), et le rend d'un toucher.
 const path = require('path');
@@ -47,6 +47,9 @@ const LIGNES = [
   // point relais changé : l'e-mail du changement n'a pas de code, un autre e-mail du même n° l'a
   { id: 'email_track_mondialrelay_41100009', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '41100009', status: 'transit', statusLabel: 'Point relais changé', subject: 'Votre colis a changé de plan 📍', relaisChange: true, code: null, lieu: 'BAR EXEMPLE, 7 Rue Exemple, 13001 Marseille', ancienLieu: 'TABAC ANCIEN EXEMPLE, 1 Rue Exemple, 13003 Marseille', account: 'compte_a', emailAt: Z('11-11T10:00'), receivedAt: Z('11-11T10:01'), qrB64: null, qrUrl: null, qrType: null } },
   { id: 'email_track_vinted_41100009', data: { type: 'suivi', carrier: 'vinted', suivi: '41100009', status: 'info', statusLabel: 'Mise à jour', subject: 'Ton colis a été déposé', code: '510009', lieu: null, account: 'compte_a', emailAt: Z('11-09T10:00'), receivedAt: Z('11-09T10:01'), qrB64: null, qrUrl: null, qrType: null } },
+  // (arbitrage d, revue-colis) même cas, mais l'e-mail du code est daté APRÈS le changement de point : il vaut, il est montré
+  { id: 'email_track_mondialrelay_41100010', data: { type: 'suivi', carrier: 'mondialrelay', suivi: '41100010', status: 'transit', statusLabel: 'Point relais changé', subject: 'Votre colis a changé de plan 📍', relaisChange: true, code: null, lieu: 'BAR EXEMPLE, 7 Rue Exemple, 13001 Marseille', ancienLieu: 'TABAC ANCIEN EXEMPLE, 1 Rue Exemple, 13003 Marseille', account: 'compte_a', emailAt: Z('11-11T08:00'), receivedAt: Z('11-11T08:01'), qrB64: null, qrUrl: null, qrType: null } },
+  { id: 'email_track_vinted_41100010', data: { type: 'suivi', carrier: 'vinted', suivi: '41100010', status: 'info', statusLabel: 'Mise à jour', subject: 'Ton colis a été déposé', code: '510010', lieu: null, account: 'compte_a', emailAt: Z('11-11T09:30'), receivedAt: Z('11-11T09:31'), qrB64: null, qrUrl: null, qrType: null } },
 ];
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.mjs': 'text/javascript' };
 const srv = http.createServer((q, r) => {
@@ -144,8 +147,10 @@ const lire = (pg) => pg.evaluate(() => {
           return { cle: l.getAttribute('data-cc-carte'), point: sec ? (sec.getAttribute('data-relais-point') || sec.getAttribute('data-relais-point-suite')) : '',
             pasLue: !!(sec && sec.querySelector('[data-relais-adresse-pas-lue]')), adr: sec ? ((sec.querySelector('[data-relais-adresse]') || {}).textContent || '') : '',
             visible: (l.querySelector('[data-rp-code-visible]') || { getAttribute: () => '' }).getAttribute('data-rp-code-visible') || '',
-            texteCode: ((l.querySelector('[data-rp-code]') || {}).textContent || '').trim(), pasConfirme: !!l.querySelector('[data-rp-pas-confirme="1"]'),
-            verifie: ((l.querySelector('[data-rp-verifie-texte]') || {}).textContent || '').trim() };
+            // (intégration journee-perso) le code est ÉCRIT sur la ligne (plus de bouton « Code ») ; « pas confirmé depuis »
+            // est la puce ambre de la ligne (les sources et l'heure de vérification sont passées dans le détail ouvert).
+            texteCode: ((l.querySelector('[data-rp-code-visible]') || {}).textContent || '').trim(), pasConfirme: !!l.querySelector('[data-rp-pas-confirme="1"]'),
+            verifie: ((l.querySelector('[data-rp-pas-confirme="1"]') || l.querySelector('[data-rp-verifie-texte]') || {}).textContent || '').trim() };
         }));
         const m = await lire2();
         const L = (k) => m.find((l) => l.cle.includes(k)) || null;
@@ -157,10 +162,20 @@ const lire = (pg) => pg.evaluate(() => {
         dit([['41100001', '510001'], ['XW511000003TS', '510003'], ['4110000400000', '510004'], ['41100006', '510006']].every(([k, c]) => { const x = L(k); return x && x.visible === c && x.texteCode === c; }), 'F3 le code se lit sur la ligne (sans toucher)', J(m.map((x) => [x.cle, x.texteCode])));
         const al = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-change-suivi]')].map((e) => ({ s: e.getAttribute('data-relais-change-suivi'), code: (e.querySelector('[data-relais-change-code]') || { getAttribute: () => null }).getAttribute('data-relais-change-code'), de: (e.querySelector('[data-relais-change-code-de]') || { getAttribute: () => null }).getAttribute('data-relais-change-code-de'), ancien: ((e.querySelector('[data-relais-change-ancien]') || {}).textContent || '') })));
         const c9 = al.find((x) => x.s === '41100009');
-        dit(c9 && c9.code === '510009' && c9.de === 'autre-email' && /TABAC ANCIEN EXEMPLE/.test(c9.ancien), 'F4 « Point relais changé » : le code du colis (autre e-mail du même n°) et l’ancien point', J(al));
+        // (arbitrage d, revue-colis) Le code d'un AUTRE e-mail du même n° n'est montré que s'il est daté APRÈS le changement de
+        // point (il pourrait ne plus valoir) ; daté d'avant ⇒ « Code à confirmer », aucun code montré.
+        const c10 = al.find((x) => x.s === '41100010');
+        dit(c10 && c10.code === '510010' && c10.de === 'autre-email' && /TABAC ANCIEN EXEMPLE/.test(c10.ancien), 'F4 « Point relais changé » : le code d’un autre e-mail du même n°, daté APRÈS le changement, et l’ancien point', J(al));
+        dit(c9 && !c9.code && c9.de === 'a-confirmer' && /TABAC ANCIEN EXEMPLE/.test(c9.ancien), 'F4 code d’un autre e-mail daté AVANT le changement ⇒ « Code à confirmer », jamais montré', J(c9));
         const vieux = L('6A41100000801');
         dit(vieux && vieux.pasConfirme && /pas confirmé depuis le 8 nov/.test(vieux.verifie) && a && !a.pasConfirme, 'F5 vu il y a 4 jours, rien depuis ⇒ « pas confirmé depuis le 8 nov. » (ambre) ; un colis vu hier ne l’est pas', J([vieux, a && a.verifie]));
-        dit(a && /^vérifié par e-mail/.test(a.verifie), 'F7 la ligne dit QUI a vérifié en dernier (« vérifié par e-mail … »)', a && a.verifie);
+        // (intégration journee-perso — Julien : « des infos dans tous les sens ») Les sources et l'heure de la dernière
+        // vérification sont dans le DÉTAIL ouvert de la ligne, plus sur la ligne : on ouvre la ligne et on y lit QUI a vérifié.
+        const sansSources = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.getAttribute('data-cc-carte').includes('41100001')); return !!l && !l.querySelector('[data-rp-detail]') && !l.querySelector('[data-rp-sources-ligne]'); });
+        await pg.locator('.vrm-rpf-ligne[data-cc-carte*="41100001"] button[aria-expanded], .vrm-rpf-ligne[data-cc-carte*="41100001"] .vrm-rpf-tap').first().click().catch(() => {});
+        await pg.waitForSelector('.vrm-rpf-ligne[data-cc-carte*="41100001"] [data-rp-detail] [data-rp-verifie-texte]', { timeout: 8000 }).catch(() => {});
+        const verifDetail = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.getAttribute('data-cc-carte').includes('41100001')); const v = l && l.querySelector('[data-rp-detail] [data-rp-verifie-texte]'); return v ? v.textContent.trim() : ''; });
+        dit(sansSources && /^vérifié par e-mail/.test(verifDetail), 'F7 la ligne fermée ne porte plus ses sources ; ouverte, son détail dit QUI a vérifié en dernier (« vérifié par e-mail … »)', JSON.stringify({ sansSources, verifDetail }));
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1, 'rien ne déborde', `${deb}px`);
         if (SHOTS) {

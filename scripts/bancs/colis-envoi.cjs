@@ -220,7 +220,7 @@ async function scenario(b, vp, sombre) {
     // ── B : la barre du haut.
     const barre = () => pg.evaluate(() => { const r = document.querySelector('[data-colis-barre]'); if (!r) return null;
       return [...r.querySelectorAll('[data-colis-barre-btn]')].filter((x) => x.offsetParent).map((x) => { const q = x.getBoundingClientRect(); const s = getComputedStyle(x);
-        return { k: x.getAttribute('data-colis-barre-btn'), x: Math.round(q.x), w: Math.round(q.width), h: Math.round(q.height), r: s.borderTopLeftRadius }; }); });
+        return { k: x.getAttribute('data-colis-barre-btn'), x: Math.round(q.x), w: Math.round(q.width), h: Math.round(q.height), r: s.borderTopLeftRadius, t: x.textContent.trim(), fw: s.fontWeight, wf: +q.width.toFixed(2) }; }); });
     const bE = await barre();
     // ── L : les colonnes à l'ordinateur.
     if (!tel) {
@@ -289,13 +289,18 @@ async function scenario(b, vp, sombre) {
     }
     // ── À retirer : la barre seulement (l'onglet est à une autre branche), puis « En grand ».
     await onglet(pg, 'retirer');
-    await pg.waitForSelector('[data-rp-code]', { timeout: 10000 }).catch(() => {});
+    // (intégration journee-perso) Plus de bouton « Code » sur la ligne : le code y est ÉCRIT ; « En grand » est dans le
+    // détail, qu'ouvre un toucher sur la ligne (la 1re ligne qui a un code ou un QR).
+    await pg.waitForSelector('.vrm-rpf-ligne [data-rp-code-visible]', { timeout: 10000 }).catch(() => {});
     await shot(pg, `colis-envoi-${nom}-retirer`);
-    await pg.click('[data-rp-code]').catch(() => {});
+    await pg.evaluate(() => { const c = [...document.querySelectorAll('.vrm-rpf-ligne [data-rp-code-visible]')].find((x) => x.getAttribute('data-rp-code-visible') !== 'desaccord'); const b = c && c.closest('.vrm-rpf-ligne').querySelector('button[aria-expanded]'); if (b) b.click(); });
     await pg.waitForSelector('[data-colis-plein-ecran]', { timeout: 5000 }).catch(() => {});
     const bR = await barre();
     const sig = (x) => JSON.stringify((x || []).map((y) => [y.k, y.x, y.w, y.h]));
-    dit(!!bE && bE.length >= 2 && sig(bE) === sig(bS) && sig(bE) === sig(bR), `${nom} : B la barre du haut est la même sur les trois onglets`, JSON.stringify({ envoyer: bE, envoyes: bS, retirer: bR }));
+    // (11 nov., lot DJ3 intégré) « À envoyer » et « Envoyés » sont deux onglets de Ventes : leur barre ne bouge pas d'un
+    // pixel. « À retirer » vit dans Achats, avec SA barre (le scanner seul) : même forme de bouton, pas les mêmes boutons.
+    dit(!!bE && bE.length >= 2 && sig(bE) === sig(bS), `${nom} : B la barre du haut est la même sur « À envoyer » et « Envoyés »`, JSON.stringify({ envoyer: bE, envoyes: bS }));
+    dit(!!bR && bR.length >= 1 && !!bE && bR.every((y) => y.h === bE[0].h && y.r === bE[0].r), `${nom} : B la barre d'Achats · À retirer a la même forme de bouton`, JSON.stringify({ retirer: bR }));
     dit(!!bE && new Set(bE.map((x) => x.h + '/' + x.r)).size === 1, `${nom} : B une seule forme de bouton (hauteur, rayon)`, JSON.stringify(bE));
     if (tel) dit(!!bE && bE.every((x) => x.h >= 44), `${nom} : B 44 px au doigt`, JSON.stringify(bE));
     const pl = await pg.$('[data-colis-plein-ecran]');

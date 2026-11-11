@@ -142,3 +142,66 @@ Sur `claude/revue-colis`, pas de PR (la session principale intègre).
   chiffres d'Achats. Le contrôle « dans le premier écran » reste rouge (la section « À retirer » est en tête, par décision).
 * À signaler (hors périmètre, pas touché) : au banc (navigateur en anglais) la navigation s'affiche en anglais
   (« My day », « Listings »…) — c'est le lot Traduction, alors que §3 dit « VRM reste sur la France ».
+
+## ÉTAT À LA REPRISE (arrêt demandé par Julien, 11 nov. soir — le travail continue dans la session principale)
+
+**Branche** `claude/revue-colis` (poussée). Pas de PR.
+
+**Fusions faites** : `integration-11nov-e2`, `ventes-achats-visuel`, `integration-11nov-e3` (vrais merges, deux côtés
+gardés ; `agent2-nsk5su` déjà ancêtre). **À faire** : `origin/main` à jour avec E3 si E3 y a bougé depuis, et
+`claude/journee-perso` à `c69e8b1a` (pas encore fusionnée ici) — vrai `git merge`, puis relancer les bancs ci-dessous.
+
+**Bancs sur le dernier build (après E3)** : verts — tout-imprimer 28, lot-bordereaux 17, logos-bordereaux 16,
+colis-a-leur-place 184, tout-imprimer-garde 8, achats-retirer-site 24, liens-colis-anciens 42, colis-relier-carte 20,
+suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 et logos-bordereaux 41 portés).
+**Rouges à reprendre** (pas finis) :
+* `journee-perso` E (4) : l'éditeur compte 18 cartes (+ `suivi`, « Commandes à vérifier ») — banc porté à 18 dans ce
+  dernier commit, PAS relancé.
+* `retraits-fiables` F4 (2) : le banc attend le code d'un autre e-mail du même n° ; avec l'arbitrage (d) ce code est
+  daté d'AVANT le changement ⇒ « à confirmer ». Porter le banc (dater l'e-mail du code après le changement, et ajouter
+  le cas « avant ⇒ à confirmer »), ne pas affaiblir la règle.
+* `navigation-tache` A (390) : les libellés de la barre sortent EN ANGLAIS (« Today »…) au banc — c'est le lot
+  Traduction (langue du navigateur) ; et un `tap` qui n'aboutit plus. À voir avec ce lot (§3 : VRM reste en français).
+* `colis-envoi` B (4) : la barre d'Achats diffère par conception + 1 px entre « À envoyer » et « Envoyés ».
+* Pas relancés après E3 : selection-bordereaux, transporteurs-logos, colis-propre-logos, journee-photos et les bancs
+  portés plus haut (colis-sms, iphone-reprise, navigation…).
+
+**Pièges** :
+* `REGLE_PDF` vient de `api/_lib/transporteur-pdf.js` et est RÉ-EXPORTÉE par transporteur-anciens.js — ne pas la
+  redéclarer (le module ne se charge plus).
+* `TXN_COPIE_SELECT` porte déjà `cap` par `VERSION_META` : ne pas l'ajouter une 2e fois.
+* Deux moteurs `Comptabilite only="bordereaux"` (Ventes et Achats, écrans gardés) : toute demande globale (« Tout
+  imprimer », etc.) doit être prise par le moteur MONTRÉ (`prendImpression`).
+* Achats n'a pas de « Toutes » : Vinted est l'écran d'arrivée et montre TOUS les colis à retirer.
+* CLAUDE.md doit rester < 60 Ko : déplacer telles quelles les plus anciennes lignes du §9 vers historique-divers.
+
+## Suite 3 (11 nov., soir) : fusion de `main` et de `journee-perso` (c69e8b1a), rouges repris
+
+* **Vrai `git merge origin/main`** (robustesse serveur, E3 déjà dedans) : seul conflit `historique-divers.md` (deux côtés gardés).
+* **Vrai `git merge origin/claude/journee-perso`** — la demande la plus RÉCENTE de Julien sur « À retirer » (récit
+  `2026-11-11-bordereaux-transporteurs-retraits.md` §5). SES choix gagnent là où ils croisent les arbitrages :
+  - plus de carte des points relais (`avecCarte={false}`), « Itinéraire » au bout de l'adresse LUE — **arbitrage** : jamais
+    un itinéraire vers un nom seul (adresse pas lue ⇒ pas de lien : chercher un nom, c'est deviner le point) ;
+  - code ÉCRIT sur la ligne + n° de suivi complet, plus de bouton « Code » ni de ligne de sources ; une seule section
+    « À retirer » ; détail sans phrases QR ; achat prouvé en attente qui choisit son témoin d'abord (`achat-arrive-relais.js`) ;
+  - gardé de retraits fiables : « déplacé · selon … à hh:mm » (puce ambre), « Adresse pas lue », ordre Récents / Date limite,
+    Masquer un point ; **« pas confirmé depuis le … » reste sur la ligne en puce ambre** (le seul geste qu'appellent les
+    sources ; les sources elles-mêmes et « vérifié par … » sont dans le détail) ;
+  - titre : **en entier** (lot DJ3, « on ne voit pas tout le titre ») plutôt que « deux lignes » — la règle DJ3 était déjà la
+    plus forte en cascade (`@layer` + `!important`) ; la règle 2 lignes de `styles-retraits-clairs.css` est alignée.
+  - CLAUDE.md : la ligne §9 « Bordereaux, transporteurs, retraits » ajoutée ; la plus ancienne (actions-série) déplacée telle
+    quelle dans `historique-divers.md` (< 59 000 octets).
+* **Audits portés** (règle inchangée) : `audit-retraits-fiables` (le code est écrit sur la ligne, le glisser le copie) ;
+  `audit-traduction` C2 (9 entrées de navigation : Colis a quitté la barre, toutes les clés exigées).
+* **Bancs portés** :
+  - `retraits-fiables` F4 sur l'arbitrage (d) : un 2e colis (41100010) dont l'e-mail du code est daté APRÈS le changement ⇒
+    code montré ; celui d'AVANT (41100009) ⇒ « Code à confirmer », aucun code (règle jamais affaiblie) ; F3/F5/F7 lisent le
+    code écrit, la puce « pas confirmé », et « vérifié par e-mail » dans le détail OUVERT (la ligne fermée ne le porte plus).
+  - `navigation-tache` A : jugé sur `data-nav-entree` et sur le dictionnaire de la langue ACTIVE (`src/i18n/langues/<lang>.js`),
+    jamais une chaîne française en dur (au banc, navigateur anglais : « Today »… est juste).
+  - `colis-envoi` B : « À envoyer » = « Envoyés » au pixel (deux onglets de Ventes) ; Achats · À retirer a SA barre (même
+    forme de bouton). G : « En grand » s'ouvre depuis le détail de la ligne (plus de bouton « Code »).
+  - `annonces-ventes-brouillon` : la date limite ne peut plus être coupée — le TEXTE (Range) doit tenir dans chaque boîte qui
+    rogne, et aucune boîte entre lui et la carte ne porte nowrap + ellipsis (au téléphone la place suffisait, l'ellipse posée
+    passait) ; mutation `AVB_MUTATION=ellipse`. Et « Tes meilleures sources » doit venir APRÈS la liste d'Achats (après les
+    étapes, avant les reçus).

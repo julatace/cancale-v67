@@ -100,7 +100,7 @@ const envoyer = async (m) => { mails.push(m); return { issue: 'envoye' }; };
     dit(!mails.length && r.ignores['smtp non configure'] === 1, 'SMTP pas configuré : aucun e-mail, et le passage le dit', JSON.stringify(r.ignores));
   });
   await essaie('12 mois', async () => {
-    prepare(); mails = [];
+    prepare(); await passe(mois(11, 1)); mails = [];          // (11 nov.) l'avis est PARTI d'abord
     const r = await passe(mois(12, 1));
     const restent = etat.base.app_data.filter((l) => l.owner === A).map((l) => l.id).sort().join(',');
     dit(r.supprimes === 1 && !etat.base.utilisateurs.has(A) && restent === 'email_invoice_av902,email_invoice_tx901', '12 mois : A est supprimé — il ne reste que ses factures Pro', restent);
@@ -114,6 +114,33 @@ const envoyer = async (m) => { mails.push(m); return { issue: 'envoye' }; };
     const n = vrais(); mails = [];
     const r2 = await passe(mois(12, 2));
     dit(r2.fait && r2.supprimes === 0 && vrais() === n && !mails.length, 'rejoué le lendemain : plus rien à faire (idempotent)', JSON.stringify(r2.ignores));
+  });
+
+  console.log('\n── (11 nov.) Jamais effacé sans l’avis PROUVÉ parti');
+  await essaie('12 mois sans avis', async () => {
+    prepare(); mails = [];
+    const h = process.env.RELANCES_SMTP_HOTE; delete process.env.RELANCES_SMTP_HOTE;
+    const r = await passe(mois(12, 1)); const r2 = await passe(mois(13, 1));
+    process.env.RELANCES_SMTP_HOTE = h;
+    dit(etat.base.utilisateurs.has(A) && !etat.deletes.length && r.supprimes === 0 && r2.supprimes === 0 && r2.ignores['smtp non configure'] >= 1,
+      '12 et 13 mois, SMTP jamais configuré (aucun avis parti) : RIEN n’est effacé, et le passage dit pourquoi', JSON.stringify(r2.ignores));
+  });
+  await essaie('avis incertain', async () => {
+    prepare(); mails = [];
+    const r0 = await passe(mois(11, 1), { envoyer: async (m) => { mails.push(m); return { issue: 'incertain' }; } });
+    const r = await passe(mois(13, 1));
+    dit(r0.avis === 1 && etat.base.utilisateurs.has(A) && !etat.deletes.length && r.ignores['avis pas prouve : rien efface'] === 1,
+      'avis « incertain » (pas prouvé parti) : rien n’est effacé, c’est dit', JSON.stringify(r.ignores));
+  });
+  await essaie('avis tardif', async () => {
+    prepare(); mails = [];
+    const r = await passe(mois(12, 5));
+    dit(r.avis === 1 && r.supprimes === 0 && etat.base.utilisateurs.has(A), 'à 12 mois sans avis : l’avis part maintenant, rien n’est effacé', JSON.stringify(r));
+    dit(mails[0] && /seront supprimées le/.test(mails[0].sujet) && !/15\/09\/2026/.test(mails[0].sujet), '… et la date annoncée est décalée (au moins 30 j après l’avis)', mails[0] && mails[0].sujet);
+    const r2 = await passe(mois(12, 20));
+    dit(r2.supprimes === 0 && etat.base.utilisateurs.has(A), '15 jours après l’avis : toujours rien', JSON.stringify(r2.ignores));
+    const r3 = await passe(mois(13, 10));
+    dit(r3.supprimes === 1 && !etat.base.utilisateurs.has(A), '35 jours après l’avis : effacé', JSON.stringify(r3));
   });
 
   console.log('\n── Jamais : actif, pas su, test, propriétaire');
@@ -154,13 +181,14 @@ const envoyer = async (m) => { mails.push(m); return { issue: 'envoye' }; };
     dit(!r.fait && etat.base.utilisateurs.has(A) && !etat.deletes.length, 'la liste des abonnements ne se lit pas : rien', JSON.stringify(r));
   });
   await essaie('inventaire illisible', async () => {
-    prepare(); etat.pannes.add('lecture-app_data');
+    prepare(); await passe(mois(11, 1)); etat.pannes.add('lecture-app_data');
     const r = await passe(mois(13));
     dit(etat.base.utilisateurs.has(A) && !etat.deletes.length, 'une lecture ratée (avis, inventaire) : rien n’est effacé', JSON.stringify(r.ignores));
   });
   await essaie('borné', async () => {
     prepare(); etat.base.abonnements[B] = { owner: B, statut: 'canceled', client_stripe: 'cus_B', abonnement_stripe: 'sub_B', mode_test: false };
     etat.base.subs.sub_B = { id: 'sub_B', customer: 'cus_B', status: 'canceled', ended_at: Math.floor(T0 / 1000) };
+    await passe(mois(11, 1));
     const r = await passe(mois(13), { maxSuppressions: 1 });
     dit(r.supprimes === 1 && [A, B].filter((x) => etat.base.utilisateurs.has(x)).length === 1, 'deux comptes à supprimer, plafond 1 : un seul par passage', JSON.stringify(r.ignores));
     const r2 = await passe(mois(13, 2), { maxSuppressions: 1 });
@@ -169,7 +197,7 @@ const envoyer = async (m) => { mails.push(m); return { issue: 'envoye' }; };
 
   console.log('\n── Les factures Pro gardées, effacées après 10 ans');
   await essaie('10 ans', async () => {
-    prepare(); await passe(mois(12, 1));
+    prepare(); await passe(mois(11, 1)); await passe(mois(12, 1));
     const m = await import('file://' + path.join(RACINE, 'api', '_lib', 'effacer-compte.js'));
     const r9 = await m.purgerFacturesGardees({ url: 'https://lgonxzrzjcqthjtbdpzo.supabase.co', service: F.SERVICE, maintenant: Date.now() + 9 * 365 * JOUR });
     dit(r9.purges === 0 && etat.base.app_data.some((l) => l.owner === A && /^email_invoice_/.test(l.id)), 'à 9 ans : gardées');

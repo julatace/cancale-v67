@@ -54,6 +54,8 @@ catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 
 const { metaVersData } = require('./_meta.cjs');
 const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
+// (11 nov.) Le dictionnaire de la langue active (src/i18n/langues/<lang>.js, module ESM) : les libellés se jugent contre lui.
+const dicoLangue = async (l) => { const f = path.join(__dirname, '..', '..', 'src', 'i18n', 'langues', (/^(fr|en|es|it|de)$/.test(l) ? l : 'fr') + '.js'); const m = await import(require('url').pathToFileURL(f).href); return m.default || m[Object.keys(m)[0]] || {}; };
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 8940;
 const CAPTURES = process.env.CAPTURES || '';
@@ -203,7 +205,13 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         const { ctx, pg, errs } = await ouvrir(b, tel, 'journee', { local: { vrm_colis_aposter: { total: 2, enRetard: 0, vinted: 2, ebay: 0, at: maintenant.getTime() }, vrm_colis_retirer: { total: 3, prets: 3, sansCode: 0, aVerifier: 0, urgents: 0, at: maintenant.getTime() } } });
         if (tel) {
           const barre = await pg.evaluate(() => [...document.querySelectorAll('.vrm-mobile-nav > button')].map((x) => ({ lib: (x.querySelector('.vrm-nav-label') || x).innerText.trim(), h: Math.round(x.getBoundingClientRect().height), entree: x.getAttribute('data-nav-entree') || '' })));
-          dit(barre.length === 5 && barre.map((x) => x.lib).join('|') === 'Journée|Annonces|Ventes|Achats|Plus', 'A. la barre du bas : Journée · Annonces · Ventes · Achats · Plus (11 nov., lot DJ3 : Colis vit dans Ventes et Achats)', JSON.stringify(barre));
+          // (11 nov., intégration — lot Traduction) Les libellés passent par tr() : la langue suit le réglage du vendeur
+          // (sinon celle du navigateur). On juge l'ENTRÉE (data-nav-entree) et, pour le libellé, le texte du dictionnaire
+          // de la langue ACTIVE (src/i18n/langues/<lang>.js) — jamais une chaîne française en dur.
+          const langue = await pg.evaluate(() => (document.documentElement.getAttribute('lang') || 'fr').slice(0, 2));
+          const dico = await dicoLangue(langue);
+          const attendu = ['nav.journee.court', 'nav.annonces', 'nav.ventes', 'nav.achats', 'nav.plus'].map((k) => dico[k]);
+          dit(barre.length === 5 && barre.slice(0, 4).map((x) => x.entree).join('|') === 'journee|annonces|ventes|achats' && attendu.every(Boolean) && barre.map((x) => x.lib).join('|') === attendu.join('|'), `A. la barre du bas : Journée · Annonces · Ventes · Achats · Plus (11 nov., lot DJ3 : Colis vit dans Ventes et Achats ; langue ${langue})`, JSON.stringify({ barre, attendu }));
           dit(barre.every((x) => x.h >= 44), 'A. chaque onglet ≥ 44 px', JSON.stringify(barre.map((x) => x.h)));
           const badge = await pg.evaluate(() => { const x = document.querySelector('.vrm-mobile-nav [data-badge-nav="ventes"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter')); } catch (_) {} return { n: x ? x.getAttribute('data-badge-n') : '', pub: pub && pub.total }; });
           dit(badge.n !== '' && badge.n === String(badge.pub) && Number(badge.n) > 0, 'H. badge sur Ventes (colis à poster, lot DJ3) = le nombre PUBLIÉ (`vrm_colis_aposter`), jamais recalculé', JSON.stringify(badge));
