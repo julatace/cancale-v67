@@ -102,7 +102,7 @@ window.__grisImages = async (b64) => {
   }
   return { images, n, gris };
 };
-window.__fabriquer = async (mise) => __b64(await __vrm.fabriquerBordereau(window.PDFLib, window.qrcode, mise, {}));
+window.__fabriquer = async (mise, o = {}) => __b64(await __vrm.fabriquerBordereau(window.PDFLib, window.qrcode, mise, o || {}));
 window.__imprimer = async (b64, reg, numero, titre, taille) => {
   const PL = window.PDFLib, src = await PL.PDFDocument.load(__oct(b64)), out = await PL.PDFDocument.create();
   __vrm.store({ vrm_impression: reg });
@@ -172,7 +172,7 @@ const capture = async (nom, pages) => { if (!CAPT) return; fs.mkdirSync(CAPT, { 
 async function cas(pg, mise, format, reg = {}, o = {}) {
   const t = `${mise} → ${format}${o.nom ? ' · ' + o.nom : ''}`;
   const R = { format, ...reg };
-  const src = await pg.evaluate((m) => __fabriquer(m), mise);
+  const src = await pg.evaluate(([m, f]) => __fabriquer(m, f), [mise, o.fab || {}]);
   let a;
   try { a = await pg.evaluate(([b, r, n, ti, ta]) => __imprimer(b, r, n, ti, ta), [src, R, NUMERO, TITRE, TAILLE]); }
   catch (e) { dit(false, `${t} : le bordereau sort`, String(e.message || e).split('\n')[0].slice(0, 160)); return null; }
@@ -282,6 +282,12 @@ async function cas(pg, mise, format, reg = {}, o = {}) {
       const f = avec.pages[1];
       dit(f && Math.abs(f.w - 100 * MM) < 1 && Math.abs(f.h - 150 * MM) < 1, 'fiche : même papier que l\'étiquette (10 × 15)', f ? `${(f.w / MM).toFixed(0)} × ${(f.h / MM).toFixed(0)} mm` : 'absente');
       dit(f && /Fiche de préparation/.test(f.texte) && /DANS le colis/.test(f.texte) && /N°\s*B125/.test(f.texte) && /Nike Air/.test(f.texte) && /Taille 42,5/.test(f.texte), 'fiche : « à mettre DANS le colis », N°, titre, taille', f ? f.texte.slice(0, 140) : '');
+    }
+    // Un blanc collé au QR, assez grand pour le tampon seulement SANS la garde de 5 mm autour
+    // des codes : la garde le refuse (issue « fiche »), `sansBloques` y poserait le N°.
+    if (!SEUL || SEUL.includes('blanc-qr')) {
+      const pres = await cas(pg, '10x15-plein', '10x15', {}, { nom: 'blanc collé au QR', etiquettes: 1, remplit: false, fab: { blancQr: Number(process.env.BLANC_QR) || 30 } });
+      if (pres) dit((pres.r0.tampons || [])[0] === 'fiche', '10×15 pleine, blanc collé au QR : la garde des codes refuse ce blanc (issue « fiche »)', JSON.stringify(pres.r0.tampons));
     }
     const sans = await cas(pg, '10x15-plein', '10x15', { fiche: false }, { nom: 'fiche coupée', etiquettes: 1, remplit: false });
     if (sans) dit((sans.r0.tampons || [])[0] === 'aucun' && sans.pages.length === 1, 'fiche coupée : rien de tamponné, l\'issue le dit (« aucun »), aucune page en plus', JSON.stringify(sans.r0.tampons) + ` ${sans.pages.length} p.`);

@@ -85,6 +85,9 @@ export function dessinerEtiquette(page, PL, qrcode, f, fb, ox, oy, w, h, o = {})
   for (const l of ADRESSE_INVENTEE) { T(l, ox + m, y, 11, l === ADRESSE_INVENTEE[0] ? fb : f); y -= 13; }
   const mod = o.mod || Math.max(2.2, Math.min(3.2, w / 110));
   sousBlanc(ox + w - m - 33 * mod, oy + m + 26, 37 * mod, 37 * mod);
+  // `blancQr` (points) : un blanc AU-DESSUS du QR, collé à lui — assez grand pour un tampon
+  // seulement si l'on oublie la garde de 5 mm autour des codes (le banc s'en sert pour le prouver).
+  if (o.plein && o.blancQr) page.drawRectangle({ x: ox + w * 0.56, y: oy + m + 26, width: w * 0.44 - m, height: 33 * mod + 4 + o.blancQr, color: blanc });
   const cote = dessinerQR(page, PL, qrcode, o.qr || `VRM-EXEMPLE-${suivi}`, ox + w - m - 29 * mod, oy + m + 30, mod);
   y = oy + m + 30 + cote - 8;
   T('Expéditeur', ox + m, y, 7, fb, gris); y -= 10;

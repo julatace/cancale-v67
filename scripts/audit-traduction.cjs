@@ -40,7 +40,7 @@ const MIGRES = [
   ['src/i18n/ChoixLangue.jsx', ['*']],
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
-  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes']],
+  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes', 'ImpressionBordereaux', 'nomPapier']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;
@@ -120,7 +120,9 @@ async function principal() {
   const idsNav = [...app.matchAll(/entreeNav\(\{(?:\.\.\.\w+,\s*)?id:'(\w+)'/g)].map((m) => m[1]);
   const groupes = [...app.matchAll(/groupeNav\(\{ cle:'(\w+)'/g)].map((m) => m[1]);
   const navKo = [...idsNav.map((i) => `nav.${i}`), 'nav.journee.court', ...groupes.map((g) => `nav.groupe.${g}`)].filter((k) => !(k in fr));
-  dit(idsNav.length >= 10 && groupes.length >= 3 && !navKo.length, `C2 chaque entrée de navigation a sa clé (${idsNav.length} entrées, ${groupes.length} groupes)`, navKo);
+  // (11 nov., fusion revue-colis) Colis n'est plus une entrée de la barre (« À expédier » est dans Ma journée) :
+  // 9 entrées. Le plancher ne sert qu'à voir une lecture cassée (0 entrée), pas à compter les écrans.
+  dit(idsNav.length >= 9 && groupes.length >= 3 && !navKo.length, `C2 chaque entrée de navigation a sa clé (${idsNav.length} entrées, ${groupes.length} groupes)`, navKo);
   const acc = lire('src/Accueil.jsx');
   const moments = [...acc.matchAll(/\{ id: '(\w+)', capture: '\w+' \}/g)].map((m) => m[1]);
   const momKo = moments.flatMap((id) => ['titre', 'texte', 'alt', 'point1', 'point2'].map((c) => `accueil.moment.${id}.${c}`)).filter((k) => !(k in fr));
