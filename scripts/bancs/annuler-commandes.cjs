@@ -186,7 +186,7 @@ const revCond = (e) => { const m = /data->>rev=eq\.(\d+)/.exec(e.url); return m 
 
     // ── La loupe ─────────────────────────────────────────────────────────────
     const ouvrirLoupe = async () => {
-      if (tel) { const b = pg.locator('button[aria-label="Rechercher une paire"]').first(); if (await b.count()) await b.tap(); }
+      if (tel) { const b = pg.locator('button[data-recherche-loupe]').first(); if (await b.count()) await b.tap(); }
       else { await pg.mouse.click(5, 300); await pg.keyboard.press('Control+K'); }
       return H.attendre(async () => (await pg.locator('[data-recherche-panneau]').count()) > 0, 8000);
     };

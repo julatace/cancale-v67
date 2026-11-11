@@ -320,8 +320,9 @@ async function compte(b, sombre) {
     const carte = pg.locator('[data-nav-compte]').filter({ visible: true }).first();
     const la = await carte.count() > 0;
     dit(la && await carte.evaluate((e) => e.tagName === 'BUTTON'), `${tag} : P5 — la carte du compte est un bouton`);
-    if (la) { await carte.click(); await pg.waitForTimeout(1500); }
-    dit(la && await pg.locator('.vrm-main[data-ecran="settings"]').count() > 0, `${tag} : P5 — la toucher ouvre Paramètres`);
+    // (11 nov., lot DJ6) La carte ouvre le menu du profil, qui porte « Paramètres ».
+    if (la) { await carte.click(); await pg.waitForTimeout(700); await pg.locator('[data-profil-menu="parametres"]').first().click().catch(() => {}); await pg.waitForTimeout(1500); }
+    dit(la && await pg.locator('.vrm-main[data-ecran="settings"]').count() > 0, `${tag} : P5 — la toucher ouvre le profil, puis Paramètres`);
     const av = await pg.evaluate(() => { const el = [...document.querySelectorAll('[data-etat-actions]')].find((e) => e.offsetParent !== null); if (!el) return null; const a = el.querySelector('.vrm-etat-avatar'); return { avatar: !!a, badge: !!(a && a.querySelector('.vrm-etat-point')), w: a ? Math.round(a.getBoundingClientRect().width) : 0 }; });
     dit(!!av && av.avatar && av.badge && av.w >= 22, `${tag} : P6 — un avatar (le point est son badge)`, JSON.stringify(av));
     await capture(pg, `1512-${sombre ? 'sombre' : 'clair'}-entete-compte`);

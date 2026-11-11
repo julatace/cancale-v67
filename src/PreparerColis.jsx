@@ -18,9 +18,9 @@ import { createPortal } from 'react-dom';
 import { ordreDeSeance, indexDeReprise, progression, lireSeancePreparer, ecrireSeancePreparer, oublierSeancePreparer } from './preparerRelais.js';
 
 const PHRASE_NUM = {
-  double: (n) => `Deux paires portent le N°${n} : vérifie le carton avant de fermer le colis.`,
-  'a-verifier': (n) => `Le N°${n} est à vérifier sur son carton.`,
-  litige: (n, c) => `L’e-mail du bordereau disait N°${c.litige ? c.litige.mail : '?'}, la vente dit N°${n} : on garde celui de la vente. Vérifie le carton.`,
+  double: (n) => `Deux articles portent le N°${n} : vérifie là où ils sont rangés avant de fermer le colis.`,
+  'a-verifier': (n) => `Le N°${n} est à vérifier là où l’article est rangé.`,
+  litige: (n, c) => `L’e-mail du bordereau disait N°${c.litige ? c.litige.mail : '?'}, la vente dit N°${n} : on garde celui de la vente. Vérifie là où l’article est rangé.`,
 };
 
 // (10 nov., lot AZ + M) `photoCarton(c)` : le geste « Photo du carton » (facultatif) d'un colis FAIT, rangé avec
