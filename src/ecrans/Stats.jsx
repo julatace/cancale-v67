@@ -10,10 +10,11 @@ import { L } from '../libelles.js';
 import { etapeMotVc, vcVenteAnnulee, montantRecuVc } from '../../api/_lib/vestiaire-regle.js';
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
-import { recuPublieEntre, valeurObjectif } from '../design/carteChiffres.js';
-import { lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from '../objectifMois.js';
+import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/carteChiffres.js';
+import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
+import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, Bouton, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
+import { AUTH, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -35,6 +36,9 @@ import AvisLus from "../AvisVinted.jsx";   // (10 nov., lot BN) les avis Vinted 
 // ⟦← App.jsx #5⟧
 import CarteOffres from "../design/CarteOffres.jsx";
 import { statsOffres } from "../statsOffres.js";
+import { statsParCategorie, stockParFamille, familleDeVente, cleVente, tableFamilles, ecritureCategoriesMain, afficherCategories, FAMILLES_STATS, titreFamille, CLE_CATEGORIES_MAIN } from '../statsCategories.js';   // (11 nov., lot stats-categories)
+import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
+import '../stats-categories.css';
 
 // ⟦← App.jsx #6⟧
 // « Annonces en ligne » : UNE règle d'écriture pour chaque écran qui la montre
@@ -625,6 +629,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix}/>
+      {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
+          (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
+      <div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
@@ -635,7 +642,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
-      <RepliStats id="argent" titre="L’argent depuis le début" phrase="Finalisé par plateforme et par compte, mois par mois, objectif du mois, entre deux dates.">
+      <RepliStats id="argent" titre="L’argent depuis le début" phrase="Finalisé par plateforme et par compte, mois par mois, entre deux dates.">
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
@@ -681,8 +688,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         </div>
         {(CBa.raison === 'achats' || (manquePrix && stockInconnu)) && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
-      {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre. */}
-      <div className="vrm-finance-goal"><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
 
       {/* (16 oct.) Les deux volets repliés vivent dans UNE carte, l'un sous
           l'autre — ils flottaient entre deux cartes avec des marges inégales. */}
@@ -1327,6 +1332,186 @@ function AnnulationsEtNotes({ b, panelOff }) {
     { 'data-sv-carte': 'notes', 'data-sv-etat': N.etat });
   return <div className="vrm-sv-rangee vrm-sv-rangee-2" data-sv-annul-notes="">{annul}{notes}</div>;
 }
+// ── PAR CATÉGORIE (11 nov., lot stats-categories, src/statsCategories.js) ────
+// La catégorie vient de Vinted (catalog_id de l'annonce, reliée par SA
+// transaction) ou de SON choix ; jamais du titre. Le catalogue de Vinted
+// (~550 Ko) n'est lu que si la carte paraît et que sa VERSION (`data->>at`,
+// un scalaire) a changé : la table { catalog_id: famille } est gardée sur
+// l'appareil (`vrm_cat_familles`, quelques Ko). Catalogue illisible et aucune
+// table gardée ⇒ les catégories Vinted sont « pas sues » (rien de deviné).
+const CLE_TABLE_FAMILLES = 'vrm_cat_familles';
+let _tableFamillesEnVol = null;
+const lireTableFamilles = () => {
+  if (_tableFamillesEnVol) return _tableFamillesEnVol;
+  _tableFamillesEnVol = (async () => {
+    let garde = null;
+    try { const g = JSON.parse(localStorage.getItem(CLE_TABLE_FAMILLES) || 'null'); if (g && g.table && typeof g.table === 'object') garde = g; } catch (_) {}
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_catalogue&select=at:data->>at`, { headers: sbAuth() });
+      const j = r.ok ? await r.json() : null;
+      if (!Array.isArray(j)) return garde ? garde.table : null;
+      const at = j[0] && j[0].at ? String(j[0].at) : '';
+      if (!at) return garde ? garde.table : {};   // aucun catalogue rangé : aucune catégorie Vinted traduisible
+      if (garde && garde.at === at) return garde.table;
+      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_catalogue&select=c:data->>corps`, { headers: sbAuth() });
+      const j2 = r2.ok ? await r2.json() : null;
+      const c = Array.isArray(j2) && j2[0] && j2[0].c;
+      const table = c ? tableFamilles(JSON.parse(c)) : null;
+      if (!table) return garde ? garde.table : null;
+      try { localStorage.setItem(CLE_TABLE_FAMILLES, JSON.stringify({ at, table })); } catch (_) {}
+      return table;
+    } catch (_) { return garde ? garde.table : null; }
+    finally { setTimeout(() => { _tableFamillesEnVol = null; }, 60000); }
+  })();
+  return _tableFamillesEnVol;
+};
+// La catégorie lue sur la PAGE de l'annonce (`vinted_item_details[id].catalogId`),
+// pour les annonces dont le dressing ne la porte pas (mesuré le 5 nov. : un
+// dressing non allégé envoie `catalog_id: null`). Projetée clé par clé, un
+// scalaire par annonce (§4.4) ; un lot raté ⇒ null (« pas su »).
+const lireCategoriesFiches = async (ids) => {
+  const uniq = [...new Set((ids || []).map((x) => String(x == null ? '' : x)).filter((x) => /^\d+$/.test(x)))];
+  if (!uniq.length) return {};
+  const lots = []; for (let i = 0; i < uniq.length; i += 80) lots.push(uniq.slice(i, i + 80));
+  try {
+    const res = await Promise.all(lots.map(async (l) => {
+      const sel = l.map((id, i) => `f${i}:data->${encodeURIComponent('"' + id + '"')}->>catalogId`).join(',');
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=${sel}`, { headers: sbAuth() });
+      if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null;
+    }));
+    if (res.some((x) => !x)) return null;
+    const out = {};
+    res.forEach((rows, k) => { const ligne = rows[0]; if (!ligne) return; lots[k].forEach((id, i) => { const v = ligne['f' + i]; if (v != null && String(v).trim() && String(v) !== '0') out[id] = String(v); }); });
+    return out;
+  } catch (_) { return null; }
+};
+const lireCategoriesMain = () => { try { const v = load(CLE_CATEGORIES_MAIN, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } };
+function ParCategorie({ vendu, lp, extras, stock, b }) {
+  const ref = React.useRef(null);
+  const [table, setTable] = React.useState(undefined);
+  const [fiches, setFiches] = React.useState(undefined);
+  const [main] = useLigneSynchro(CLE_CATEGORIES_MAIN, lireCategoriesMain);
+  const [ouvert, setOuvert] = React.useState(false);
+  React.useEffect(() => {
+    let mort = false;
+    const go = () => { lireTableFamilles().then((t) => { if (!mort) setTable(t); }).catch(() => { if (!mort) setTable(null); }); };
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') { go(); return () => { mort = true; }; }
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => { mort = true; io.disconnect(); };
+  }, []);
+  // L'annonce de chaque vente Vinted de la période, par SA transaction.
+  const itemDe = React.useCallback((tx) => { const t = extras && extras.txn ? extras.txn[String(tx)] : null; return t && t.item ? String(t.item) : ''; }, [extras]);
+  const manquent = React.useMemo(() => {
+    if (!Array.isArray(vendu) || !extras) return [];
+    const out = [];
+    for (const l of vendu) if (l && l.plateforme === 'Vinted') { const id = itemDe(l.tx); const it = id && extras.items ? extras.items[id] : null; if (id && !(it && it.cat)) out.push(id); }
+    return out.sort();
+  }, [vendu, extras, itemDe]);
+  const cleManquent = manquent.join(',');
+  React.useEffect(() => {
+    if (table === undefined) return undefined;
+    let mort = false;
+    lireCategoriesFiches(manquent).then((f) => { if (!mort) setFiches(f); });
+    return () => { mort = true; };
+  }, [cleManquent, table]); // eslint-disable-line react-hooks/exhaustive-deps
+  const famDe = React.useCallback((plat, id) => {
+    let cat = null;
+    if (plat === 'Vinted') { const it = itemDe(id); const x = it && extras && extras.items ? extras.items[it] : null; cat = (x && x.cat) || (it && fiches ? fiches[it] : null) || null; }
+    return familleDeVente({ catalogId: cat, table, main, cle: cleVente(plat, id) });
+  }, [itemDe, extras, fiches, table, main]);
+  const pret = table !== undefined && fiches !== undefined && extras !== undefined;
+  const S = React.useMemo(() => {
+    if (!pret || !Array.isArray(vendu)) return null;
+    const stk = stockParFamille(stock && stock.parCatalogue, table);
+    return statsParCategorie({ vendu, releve: lp, famDe, stock: stk });
+  }, [pret, vendu, lp, famDe, stock, table]);
+  const jeVends = React.useMemo(() => { try { return lireReglageJeVends(load(CLE_JE_VENDS, null)).choix; } catch (_) { return 'auto'; } }, []);
+  const montre = afficherCategories(S, jeVends);
+  // Le titre d'une vente sans catégorie : celui du relevé (sa vente) ou de son annonce Vinted.
+  const titres = React.useMemo(() => {
+    const t = {};
+    for (const l of (lp || [])) { const k = cleVente(l.plateforme, l.id); if (k && l.titre) t[k] = l.titre; }
+    if (extras && extras.items) for (const l of (vendu || [])) if (l && l.plateforme === 'Vinted') { const k = cleVente('Vinted', l.tx); const it = extras.items[itemDe(l.tx)]; if (k && !t[k] && it && it.title) t[k] = it.title; }
+    return t;
+  }, [lp, vendu, extras, itemDe]);
+  const pl = (n, s1, p) => `${n} ${n > 1 ? (p || s1 + 's') : s1}`;
+  const jTxt = (j) => (j < 1 ? '< 1 j' : `${String(Math.round(j * 10) / 10).replace('.', ',')} j`);
+  // Pas montré : un repère d'un pixel (un `hidden` ne serait jamais « vu » par l'observateur).
+  if (!montre) return <div ref={ref} data-sv-categories-cache={S ? 'une' : 'attente'} aria-hidden="true" style={{ height: 1 }}/>;
+  const maxN = Math.max(1, ...S.groupes.map((g) => g.n));
+  return (
+    <div ref={ref}>
+      <CarteStatsVitrine k="sv-categories" titre="Par catégorie" droite="ventes · vendu" attrs={{ 'data-sv-carte': 'categories', 'data-sv-etat': 'lu' }} corps={(
+        <div className="vrm-sv-lignes vrm-sv-cats" data-sv-etat="lu">
+          {S.groupes.map((g) => (
+            <div key={g.v} className="vrm-sv-ligne-cat" data-sv-cat={g.v} data-n={g.n} data-eur={Math.round(g.eur * 100)} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-couv={`${g.nCout}/${g.fin}`} data-mediane={g.mediane == null ? '' : g.mediane} data-stock={g.stock == null ? '' : g.stock}>
+              <span className="vrm-sv-nom">{g.titre}</span>
+              <span className="vrm-sv-piste"><span style={{ width: g.n ? `${Math.max(3, g.n / maxN * 100)}%` : 0 }}/></span>
+              <span className="vrm-sv-chiffre vrm-sv-cat-chiffre">{g.n ? `${pl(g.n, 'vente')} · ${fmt(g.eur)}` : 'aucune vente'}</span>
+              <span className="vrm-sv-cat-detail">
+                {g.fin > 0 && <span data-benef-notion="brut" title={`${NOM_BENEFICE_BRUT} : ventes finalisées au prix d’achat connu`}>brut {g.brut == null ? '—' : fmt(g.brut)}{g.nCout < g.fin ? ` · ${pl(g.fin - g.nCout, 'sans prix d’achat', 'sans prix d’achat')}` : ''}</span>}
+                {g.mediane != null && <span title={`délai médian, sur ${pl(g.nDelai, 'vente datée', 'ventes datées')}`}>{jTxt(g.mediane)} pour vendre</span>}
+                {g.stock != null && <span>{g.stock} en ligne</span>}
+              </span>
+            </div>
+          ))}
+          {S.sans.n > 0 && (
+            <div className="vrm-sv-cat-sans" data-sv-cat-sans={S.sans.n}>
+              <span>Sans catégorie ({S.sans.n}) · {fmt(S.sans.eur)}</span>
+              <Bouton variante="discret" data-sv-cat-poser="" onClick={() => setOuvert(true)}>Poser la catégorie</Bouton>
+            </div>
+          )}
+          {S.stockSans > 0 && <div className="vrm-sv-note" data-sv-cat-stock-sans={S.stockSans}>{pl(S.stockSans, 'annonce en ligne', 'annonces en ligne')} sans catégorie lue.</div>}
+        </div>
+      )}/>
+      {ouvert && <PoserCategories cles={S.sans.cles} titres={titres} vendu={vendu} main={main} onClose={() => setOuvert(false)}/>}
+    </div>
+  );
+}
+// La feuille « Poser la catégorie » : les ventes sans catégorie de la période,
+// cochées puis rangées d'UN toucher. SON clic écrit, par l'identifiant de la vente.
+function PoserCategories({ cles, titres, vendu, main, onClose }) {
+  const [coche, setCoche] = React.useState(() => new Set());
+  const [fait, setFait] = React.useState(0);
+  const parCle = React.useMemo(() => { const m = {}; for (const l of (vendu || [])) { const k = l && cleVente(l.plateforme, l.tx); if (k) m[k] = l; } return m; }, [vendu]);
+  const restent = cles.filter((k) => !(main && main[k]));
+  const tous = restent.length > 0 && restent.every((k) => coche.has(k));
+  const basculer = (k) => setCoche((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const ranger = (f) => {
+    const choisies = restent.filter((k) => coche.has(k));
+    if (!choisies.length) return;
+    save(CLE_CATEGORIES_MAIN, ecritureCategoriesMain(lireCategoriesMain(), choisies, f, [], Date.now()));
+    setFait((x) => x + choisies.length); setCoche(new Set());
+  };
+  const date = (ts) => (ts ? new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '');
+  return (
+    <SheetShell onClose={onClose} titre="Poser la catégorie" sousTitre="Coche des ventes, puis choisis." maxWidth={560} data-feuille-categories="">
+      <div className="vrm-cat-feuille">
+        {restent.length === 0
+          ? <p className="vrm-cat-fini" data-cat-fini={fait}>Tout est rangé.</p>
+          : <>
+            {restent.length > 1 && <label className="vrm-cat-ligne vrm-cat-tout"><input type="checkbox" checked={tous} onChange={() => setCoche(tous ? new Set() : new Set(restent))}/> <span>Tout cocher ({restent.length})</span></label>}
+            <div className="vrm-cat-liste">
+              {restent.map((k) => { const l = parCle[k] || {}; return (
+                <label key={k} className="vrm-cat-ligne" data-cat-vente={k}>
+                  <input type="checkbox" checked={coche.has(k)} onChange={() => basculer(k)}/>
+                  <span className="vrm-cat-titre">{titres[k] || `Vente ${l.plateforme || ''}`.trim()}</span>
+                  <span className="vrm-cat-info">{[l.plateforme !== 'Vinted' ? l.plateforme : '', date(l.ts), l.eur != null ? fmt(l.eur) : ''].filter(Boolean).join(' · ')}</span>
+                </label>); })}
+            </div>
+            <div className="vrm-cat-choix" data-cat-cochees={coche.size}>
+              <span className="vrm-cat-choix-lib">{coche.size ? `Ranger ${coche.size} dans :` : 'Coche au moins une vente.'}</span>
+              <div className="vrm-cat-puces">
+                {FAMILLES_STATS.map((f) => <Bouton key={f.v} variante="discret" data-cat-choix={f.v} disabled={!coche.size} onClick={() => ranger(f.v)}>{f.titre}</Bouton>)}
+              </div>
+            </div>
+          </>}
+      </div>
+    </SheetShell>
+  );
+}
 function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
@@ -1601,6 +1786,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
       <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge}/>
+      {/* (11 nov., lot stats-categories) « Par catégorie » : seulement si DEUX familles sont connues (src/statsCategories.js). */}
+      <ParCategorie vendu={Array.isArray(vendu) ? vendu.filter(dansP) : vendu} lp={lp} extras={extras} stock={stock} b={b}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
       <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
@@ -2116,6 +2303,11 @@ function AnalysesStatistiques({panelOff}) {
 // Le bloc « Objectif du mois » de Statistiques (4 nov.) : le MÊME réglage
 // (`useObjectifMois`) et la MÊME valeur que la barre de la carte sombre
 // (`valeurObjectif` sur les sources de la carte) — aucune seconde somme.
+// (11 nov., lot objectifs-mois) LE DÉTAIL, dans Argent : où il en est, ce qui
+// reste et le rythme, ses 3 derniers mois (même règle, `valeurObjectifMois`,
+// contre l'objectif qu'il avait alors), le bilan du mois passé, et le réglage
+// (Vendu · Bénéfice · Ventes, « Viser … » = sa moyenne sur 3 mois).
+const NOMS_MOIS_OBJ = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 function ObjectifDuMois({ liveStats }) {
   const [obj, poser, brut] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
@@ -2125,36 +2317,71 @@ function ObjectifDuMois({ liveStats }) {
   const [saisie, setSaisie] = React.useState('');
   const prog = obj ? progressionObjectif(obj, valeurObjectif(obj, sources, REGLES_CARTE)) : null;
   const lu = lireSaisieObjectif(type, saisie);
-  const eur = prog && prog.type === 'ca';
+  const eur = prog && estEuros(prog.type);
   const montre = (v) => (eur ? fmt(v) : `${v} vente${v > 1 ? 's' : ''}`);
+  const montreCourt = (v) => (eur ? fmt(v) : String(v));
+  const ry = prog ? rythmeObjectif(prog) : null;
+  const bilan = obj || brut ? bilanObjectif(brut, sources, REGLES_CARTE) : null;
+  const poserValeur = (v) => { const n = objectifAEnregistrer(brut, { type, valeur: v }); if (n) { poser(n); setEdit(false); } };
+  const eurT = estEuros(type);
+  // Ses 3 derniers mois, contre l'objectif EN VIGUEUR chaque mois (aucun ⇒ la valeur seule).
+  const passes = obj ? moisPleinsAvant(Date.now(), 3).map((b) => {
+    const x = valeurObjectifMois(obj.type, sources, REGLES_CARTE, b);
+    const o = objectifDuMoisYm(brut, b.ym);
+    const visait = o && o.type === obj.type ? o.valeur : null;
+    return { ...b, x, visait, atteint: visait != null && x && x.valeur != null && x.valeur >= visait };
+  }) : [];
+  const tete = prog ? `${eur ? fmt(prog.objectif) : `${prog.objectif} ventes`} ${(TYPES_OBJECTIF[prog.type] || TYPES_OBJECTIF.ca).ceMois}` : '';
   return (
     <div data-objectif-bloc={obj ? obj.type : ''}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: prog && !edit ? 8 : 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Objectif du mois</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{prog && !edit ? tete : 'Objectif du mois'}</div>
         <Bouton variante={edit ? 'discret' : 'secondaire'} className="vrm-b-petit" data-objectif-modifier="" onClick={() => { setType(obj ? obj.type : 'ca'); setSaisie(obj ? String(obj.valeur).replace('.', ',') : ''); setEdit((e) => !e); }}>{edit ? 'Annuler' : (obj ? 'Modifier' : 'Fixer')}</Bouton>
       </div>
       {edit ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-          <Segmente label="Type d’objectif" value={type} onChange={setType} options={[{ v: 'ca', l: 'CA vendu', data: { 'data-objectif-type': 'ca' } }, { v: 'ventes', l: 'Nombre de ventes', data: { 'data-objectif-type': 'ventes' } }]}/>
+          <Segmente label="Type d’objectif" value={type} onChange={setType} options={Object.entries(TYPES_OBJECTIF).map(([v, d]) => ({ v, l: d.nom, data: { 'data-objectif-type': v } }))}/>
+          <PropositionObjectif type={type} sources={sources} regles={REGLES_CARTE} onViser={poserValeur}/>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input aria-label={type === 'ca' ? 'Objectif en euros' : 'Objectif en nombre de ventes'} type="text" inputMode={type === 'ca' ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={type === 'ca' ? '2 000' : '40'} data-objectif-saisie=""
+            <input aria-label={eurT ? 'Objectif en euros' : 'Objectif en nombre de ventes'} type="text" inputMode={eurT ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={eurT ? '2 000' : '40'} data-objectif-saisie=""
               style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '11px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}/>
-            <span style={{ fontSize: 13, color: C.muted }}>{type === 'ca' ? '€' : 'ventes'}</span>
-            <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { const n = objectifAEnregistrer(brut, { type, valeur: lu }); if (n) { poser(n); setEdit(false); } }}>OK</Bouton>
+            <span style={{ fontSize: 13, color: C.muted }}>{eurT ? '€' : 'ventes'}</span>
+            <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { if (lu != null) poserValeur(lu); }}>OK</Bouton>
           </div>
+          {type === 'benefice' ? <div style={{ fontSize: 13, color: C.muted }}>Seules les ventes au prix d’achat connu comptent.</div> : null}
           {obj ? <Bouton variante="discret" data-objectif-retirer="" onClick={() => { poser(objectifAEnregistrer(brut, null)); setEdit(false); }} style={{ alignSelf: 'flex-start' }}>Retirer</Bouton> : null}
         </div>
       ) : prog ? (
-        <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined}>
+        <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined} data-objectif-rythme={ry ? ry.etat : undefined}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? `Au moins · ${prog.manque.join(', ')} pas lu` : undefined}>{prog.valeur == null ? '—' : montre(prog.valeur)}</span>
-            <span style={{ fontSize: 13, color: C.muted }}>/ {montre(prog.objectif)}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>{prog.partiel ? 'Au moins' : 'Tu en es à'}</span>
+            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? (prog.couverture ? `Prix d’achat connu pour ${prog.couverture} ventes` : `${prog.manque.join(', ')} pas lu`) : undefined}>{prog.valeur == null ? '—' : montreCourt(prog.valeur)}</span>
           </div>
-          <div role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 6, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
+          <div role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 4, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
             {prog.pct ? <div style={{ width: `${prog.pct}%`, height: '100%', background: C.accent, borderRadius: 999, transition: 'width .3s ease' }}/> : null}
           </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '2px 12px', marginTop: 8, fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
+            <span data-objectif-detail-reste="">{phraseResteObjectif(prog, montreCourt)}</span>
+            {ry ? <span data-objectif-detail-rythme={ry.etat} style={{ color: ry.etat === 'avance' ? C.text : C.muted }}>{phraseRythme(ry, prog.type, montreCourt)}</span> : null}
+          </div>
+          {prog.couverture ? <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }} data-objectif-couverture={prog.couverture}>Prix d’achat connu pour {prog.couverture} ventes.</div> : null}
+          {passes.length ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }} data-objectif-passes="">
+              {passes.map((m) => {
+                const v = m.x && m.x.valeur != null && m.x.couvert ? m.x.valeur : null;
+                return (
+                  <div key={m.ym} data-objectif-passe={m.ym} data-objectif-passe-valeur={v == null ? '' : (eur ? String(Math.round(v * 100)) : String(v))} data-objectif-passe-atteint={m.atteint ? '1' : undefined} style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: C.muted }}>{NOMS_MOIS_OBJ[Number(m.ym.slice(5)) - 1]}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{v == null ? '—' : <>{m.x.partiel ? <span style={{ fontSize: 11, fontWeight: 500, color: C.muted }}>≥ </span> : null}{montreCourt(v)}</>}{m.atteint ? ' ✓' : ''}</div>
+                    <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v == null ? (m.x && !m.x.couvert ? 'avant l’historique' : 'pas su') : m.visait != null ? `visé ${montreCourt(m.visait)}` : 'sans objectif'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}
+      {bilan && !edit ? <div className="vrm-objectif-bilan-clair" style={{ marginTop: 12, fontSize: 13, color: C.text }}><BilanObjectif bilan={bilan} fmt={fmt} onVu={() => { const n = objectifAEnregistrer(brut, { bilanVu: bilan.ym }); if (n) poser(n); }}/></div> : null}
     </div>
   );
 }

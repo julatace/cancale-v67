@@ -92,7 +92,10 @@ const charger = async (texte, nom) => {
     dit(M.repliePourSemaine('2026-10-26', '2026-10-26') && !M.repliePourSemaine('2026-10-19', '2026-10-26'), 'replié pour CETTE semaine seulement : la suivante se montre ouverte');
   }
   const A0 = sansCommentaires(APP);
-  dit(/!baseKO && !premierJour && <JournalSemaineCarte liveStats=\{liveStats\}\/>\}\s*\{!baseKO && !premierJour && <NotifsMuettes/.test(A0), 'Ma journée monte le journal en tête (sous la carte sombre)');
+  // (11 nov.) Depuis Ma journée v2 (9 nov., 60febc6f) la semaine passée se touche dans la frise de la tête
+  // (`FriseJournee`, « Semaine du … ») : même règle (`journalSemaine`), plus de carte à part.
+  const frise = (A0.match(/function FriseJournee\([\s\S]*?\n\}\n/) || [''])[0];
+  dit(/<FriseJournee liveStats=\{liveStats\}/.test(A0) && /journalSemaine\(\{ maintenant, vendu, joursBenef: pub, colisFaits, R: \{ \.\.\.REGLES_JOURNAL, semainePassee:/.test(frise), 'Ma journée monte la semaine passée en tête (la frise, par `journalSemaine`)');
   dit(/const REGLES_JOURNAL = \{ semainePassee, bilanLignes, beneficeDesJours, chiffreBrut \};/.test(A0) && /import \{semainePassee\} from '\.\.\/api\/_lib\/bilan-semaine\.js';/.test(A0), 'avec les règles propriétaires (la semaine du bilan, vendu, bénéfice brut)');
   const carte = extraire(A0, 'JournalSemaineCarte');
   dit(carte && !/push|notif|Notification|setTimeout/i.test(carte), 'aucune notification, aucun rappel');
