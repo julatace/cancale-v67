@@ -521,6 +521,8 @@ import ModeDepot from "./ModeDepot.jsx";
 import { colisDepotHorsLigne } from "./modeDepot.js";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
+import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
+import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible } from "./cibleNotif.js";
@@ -2568,6 +2570,8 @@ const SYNC_KEYS = [
   'vrm_visite_vue',
   // (6 nov.) « Masquer le guide » de démarrage (src/guideDemarrage.js) : le même choix sur tous ses appareils.
   'vrm_guide_masque',
+  // (11 nov.) « Quoi de neuf » (src/nouveautes.js) : les nouveautés vues ({ vues: { [id]: iso } }), par compte VRM.
+  CLE_NOUVEAUTES_VUES,
   // (8 nov.) « Plus tard » sur une étape du parcours ou la question de la numérotation : { [cle]: iso }, 7 jours.
   'vrm_parcours_plus_tard',
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
@@ -41683,6 +41687,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (9 nov., Ma journée v2) La carte « Semaine du … » (4 nov.) n'est plus une carte à part : la semaine
                 passée se touche dans la frise de la tête (« Semaine du … »), avec les MÊMES règles
                 (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
+            {/* (11 nov.) « Quoi de neuf » : une ligne discrète après une mise en ligne, jamais une fenêtre. */}
+            {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
             {AF.section}
@@ -51530,6 +51536,39 @@ async function ecrireNoteSatisfaction(data) {
     return Array.isArray(j) && j.length === 1;
   } catch (_) { return false; }
 }
+// (11 nov.) « QUOI DE NEUF » (src/nouveautes.js, src/QuoiDeNeuf.jsx) : ce qui le concerne
+// (ce qu'il vend, Simple/Complet, son statut, arrivé APRÈS son inscription) et pas encore vu.
+// L'état « vu » est une clé de SYNC_KEYS : le même sur tous ses appareils.
+function useQuoiDeNeuf() {
+  const p = useProfilVendeur();
+  const [vues, setVues] = React.useState(() => load(CLE_NOUVEAUTES_VUES, null));
+  React.useEffect(() => onCloudReady(() => setVues(load(CLE_NOUVEAUTES_VUES, null))), []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || k === CLE_NOUVEAUTES_VUES) setVues(load(CLE_NOUVEAUTES_VUES, null)); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  const reg = regimeFiscal();
+  const ctx = { inscritLe: AUTH.user?.created_at || '', mode: p.mode === 'simple' ? 'simple' : 'complet',
+    vend: p.vend || vendActuel() || null, categories: p.categories !== undefined ? p.categories : lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
+    pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
+  const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
+  return { aVoir: nouveautesAVoir(ctx, vues), tout: nouveautesDuCompte(ctx), vues: lireVuesNouveautes(vues), marquer };
+}
+function QuoiDeNeufJournee({ onNav }) {
+  const q = useQuoiDeNeuf();
+  const [ouvert, setOuvert] = React.useState(false);
+  const [liste, setListe] = React.useState(null);   // la liste figée à l'ouverture (« Voir » n'efface pas les autres lignes)
+  if (!ouvert && !q.aVoir.length) return null;
+  const fermer = () => { setOuvert(false); setListe(null); };
+  return <>
+    <QuoiDeNeufCarte aVoir={q.aVoir.length ? q.aVoir : (liste || [])} onOuvrir={() => { setListe(q.aVoir); setOuvert(true); }}/>
+    {ouvert && <QuoiDeNeufFeuille aVoir={liste || q.aVoir} SheetShell={SheetShell} Bouton={Bouton} onFermer={fermer}
+      onVoir={(n) => { q.marquer([n.id]); fermer(); onNav && onNav(n.tab); }}
+      onToutVu={() => { q.marquer((liste || q.aVoir).map((n) => n.id)); fermer(); }}/>}
+  </>;
+}
+export function QuoiDeNeufParametres({ onNav }) {
+  const q = useQuoiDeNeuf();
+  return <QuoiDeNeufReglage liste={q.tout} vues={q.vues} onVoir={(n) => { q.marquer([n.id]); onNav && onNav(n.tab); }}/>;
+}
+export { useQuoiDeNeuf };
 function NoteSatisfactionJournee() {
   const uid = AUTH.user?.id || '';
   if (!uid || !CLOISONNE) return null;
