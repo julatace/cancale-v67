@@ -37,5 +37,5 @@
 .vrm-sp-top-brut { font-size: 15px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-sp-top-note { padding-top: 8px; border-top: 1px solid var(--vrm-line); }
 /* Âge du stock : la tranche des 90 jours et plus en ambre (un geste à faire, §7) seulement si elle n'est pas vide. */
-.vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-piste > span[data-vieux] { background: var(--vrm-ambre, #b25000); }
+.vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-piste > span[data-vieux] { background: var(--vrm-warn); }
 .vrm-stats-vitrine .vrm-sp-age-ligne .vrm-sv-nom { white-space: nowrap; }
