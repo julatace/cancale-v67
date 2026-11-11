@@ -262,3 +262,6 @@ suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 e
   colis en tête, décision DJ3) ; beaucoup d'autres bancs cherchent encore « Plus » / des libellés FRANÇAIS par
   `aria-label` alors que le navigateur du banc est en anglais (lot Traduction : `garde-ecrans`, `iphone-reprise`,
   `menu-range`, `messagerie`, `tous-boutons`…) — à porter par ce lot (juger par classe / data-* / clé du dictionnaire).
+* **Après le départ (21 h 40)** : `colis-colonnes` relancé sur le dernier build : **tout vert** (« sur Vinted ↗ » corrigé).
+  `colis-envoi` lancé avec `BANC_SEUL=390` n'a rien exécuté (« 0 verts » : ce banc attend d'autres noms de vue) — B reste
+  à relancer sans `BANC_SEUL` ; `navigation-tache` J pas relancé.
