@@ -86,3 +86,20 @@ test('les demandes d’e-mail posent la marque (inscription, lien, renvoi, mot d
     assert.match(corps, /noterLienDemande\(localStorage\)/, f);
   }
 });
+
+// (11 nov.) La déconnexion efface aussi le cache des ventes/achats de l'onglet
+// (`sessionStorage`), sinon le vendeur suivant du même onglet le lisait.
+test('déconnexion : le cache des ventes de l’onglet (sessionStorage) et sa copie en mémoire partent', () => {
+  const d = source.indexOf('const wipeLocalData = () => {');
+  const f = source.indexOf('// Mémorise à qui appartiennent', d);
+  assert.ok(d > 0 && f > d);
+  const ss = stockage({ vrm_acct_cache: JSON.stringify({ sold: { ts: Date.now(), items: [{ title: 'paire de A' }] } }) });
+  const ls = stockage({ vrm_x: '1', autre: '2' });
+  ls.length = 2; ls.key = (i) => [...ls._m.keys()][i];
+  const cache = { sold: { items: [1] } };
+  const c = vm.createContext({ localStorage: ls, sessionStorage: ss, KEEP_ON_SWITCH: [], _acctCache: cache, effacerCopies: () => {}, CACHE_QR: 'q', CACHE_PDF: 'p', Object });
+  vm.runInContext(source.slice(d, f) + ';wipeLocalData();', c);
+  assert.equal(ss.getItem('vrm_acct_cache'), null, 'le cache de A reste dans l’onglet');
+  assert.equal(Object.keys(cache).length, 0, 'la copie en mémoire reste');
+  assert.equal(ls.getItem('vrm_x'), null);
+});

@@ -2180,6 +2180,13 @@ const wipeLocalData = () => {
   try { if (typeof caches !== 'undefined') caches.delete(CACHE_PDF).catch(() => {}); } catch (_) {}
   // (10 nov., lot K) Et les listes gardées sur l'appareil (src/copieLignes.js).
   try { effacerCopies(); } catch (_) {}
+  // (11 nov., revue de sécurité) Le cache des ventes/achats de l'onglet vit dans
+  // `sessionStorage` (il survit au `reload` de la connexion) : sans ceci, le
+  // vendeur suivant dans le même onglet voyait, 3 min durant, les ventes et
+  // achats du précédent dans la recherche. Et les empreintes de photos.
+  try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {}
+  try { for (const k of Object.keys(_acctCache)) delete _acctCache[k]; } catch (_) {}
+  try { import('./indexPhotos.js').then((m) => m.oublierIndex()).catch(() => {}); } catch (_) {}
 };
 // Mémorise à qui appartiennent les données présentes dans ce navigateur.
 const OWNER_MARK = 'vrm_local_owner';

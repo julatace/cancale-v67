@@ -115,6 +115,7 @@ function memeToken(a, b) {
 // Transition : un vendeur unique qui n'a pas encore de clé (avant d'avoir rouvert
 // l'app) est servi, sinon son widget tomberait avant qu'il récupère l'adresse.
 // Rend `null` APRÈS avoir répondu lui-même (503/401) quand il faut s'arrêter.
+export const CLE_WIDGET = /^[A-Za-z0-9_-]{16,64}$/;
 async function ownerDuToken(req, res) {
   const cl = await cloisonnee();
   if (cl === null) {
@@ -123,6 +124,10 @@ async function ownerDuToken(req, res) {
   }
   if (!cl) return ''; // une seule boutique : rien ne change
   const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
+  // (11 nov., revue de sécurité) Une clé absente ou mal formée ne déclenche plus
+  // la lecture PAR PAGES de toutes les lignes `main` (travail coûteux offert à
+  // un anonyme). L'app fabrique des clés de 28 signes [A-Za-z0-9].
+  if (!CLE_WIDGET.test(given)) { res.status(401).json({ error: 'cle invalide' }); return null; }
   // (7 nov., audit « 1 000 vendeurs ») L'INDEX DES JETONS (api/_lib/jeton-index.js) :
   //    une ligne lue par sa clé exacte au lieu de TOUTES les lignes `main`.
   //    L'index ne fait jamais foi seul : le jeton est re-comparé (durée
@@ -137,41 +142,29 @@ async function ownerDuToken(req, res) {
     if (idx.etat === 'trouve') return idx.owner;
     if (idx.etat === 'perime') { res.status(401).json({ error: 'cle invalide' }); return null; }
   }
-  // ⚠️ (1er nov., VRM vendu à d'autres — §4.5) SUPABASE PLAFONNE UNE RÉPONSE À
-  //    1 000 LIGNES SANS LE DIRE. Une seule lecture de toutes les lignes `main`
-  //    ne voyait que les 1 000 premiers vendeurs : au-delà, la clé du widget
-  //    n'était « à personne » et le vendeur recevait 401. On lit PAR PAGES
-  //    (`Range`, ordre stable par `owner`) jusqu'à une page incomplète ; une
-  //    page ratée = « pas su » (503), jamais une liste tronquée prise pour
-  //    entière. Seuls deux scalaires sont projetés (§4.4).
-  let mains = [];
-  const PAGE = 1000;
+  // (11 nov., revue de sécurité) Hors de l'index : un FILTRE EXACT sur la clé
+  //    (format vérifié plus haut : aucun caractère à échapper), comme la route
+  //    SMS — plus de lecture par pages de toutes les lignes `main` (jusqu'à
+  //    200 000) déclenchée par n'importe quelle clé inventée. La clé est
+  //    re-comparée en durée constante ; deux vendeurs à la même clé ⇒ on ne
+  //    choisit pas. Seuls deux scalaires sont projetés (§4.4).
+  let lignes = null;
   try {
-    for (let debut = 0; ; debut += PAGE) {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token&order=owner.asc`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` } });
-      const page = (r.ok || r.status === 206) ? await r.json() : null;
-      if (!Array.isArray(page)) { mains = null; break; }
-      mains.push(...page);
-      if (page.length < PAGE) break;
-      if (debut > 200000) { mains = null; break; }   // garde-fou : jamais une liste tronquée prise pour entière
-    }
-  } catch (_) { mains = null; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&data->>vrm_widget_token=eq.${given}&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
+    const j = r.ok ? await r.json() : null; lignes = Array.isArray(j) ? j : null;
+  } catch (_) { lignes = null; }
   // « Pas su lire » ne vaut pas « aucun vendeur » : on ne devine pas, on le dit.
-  if (!Array.isArray(mains)) {
+  if (lignes === null) {
     res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
     return null;
   }
-  // Un vendeur dont la clé est posée : elle doit correspondre à LA SIENNE.
-  const parCle = mains.find((m) => m.vrm_widget_token && memeToken(given, m.vrm_widget_token));
+  const parCle = lignes.length === 1 && lignes[0].owner && memeToken(given, lignes[0].vrm_widget_token) ? lignes[0] : null;
   if (parCle) {
     // Transition : la prochaine fois, l'index (une écriture ratée ne coûte
     // qu'une nouvelle recherche au passage suivant, jamais la réponse).
-    if (parCle.owner) await ecrireIndexJeton({ url: SUPABASE_URL, headers: HEADERS, genre: 'widget', jeton: given, owner: parCle.owner });
-    return parCle.owner || '';
+    await ecrireIndexJeton({ url: SUPABASE_URL, headers: HEADERS, genre: 'widget', jeton: given, owner: parCle.owner });
+    return String(parCle.owner);
   }
-  // Aucune correspondance. Un seul vendeur, pas encore de clé → on le sert
-  // (transition) ; sinon (clé fausse, ou plusieurs vendeurs) → fermé.
-  if (mains.length === 1 && !mains[0].vrm_widget_token) return mains[0].owner || '';
   res.status(401).json({ error: 'cle invalide' });
   return null;
 }
