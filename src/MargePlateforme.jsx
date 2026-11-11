@@ -16,7 +16,7 @@ const NOM = { Vinted: 'Vinted', Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire:
 // liveStats : la coque (vendu) ; releve : les lignes du relevé DÉJÀ bornées à la
 // période (null = pas publié) ; de, a : la période ; onSaisirPrix : la porte de saisie.
 // (11 nov., C11) `lireLignesSites()` → Promise des lignes (id + premier élément), ou null (pas lu).
-export default function MargePlateforme({ liveStats, releve = null, de, a, onSaisirPrix = null, lireLignesSites = null }) {
+export default function MargePlateforme({ sansCompte = false, liveStats, releve = null, de, a, onSaisirPrix = null, lireLignesSites = null }) {
   const [lus, setLus] = React.useState(undefined);   // undefined en cours · null pas su · { plat: bool }
   React.useEffect(() => {
     if (typeof lireLignesSites !== 'function') { setLus(null); return undefined; }
@@ -53,7 +53,7 @@ export default function MargePlateforme({ liveStats, releve = null, de, a, onSai
                 {p.etat === 'lu' ? (
                   <span className="vrm-mp-chiffres">{t.ventes} · {t.vendu} vendu{p.total != null ? <> · {t.total} en tout</> : null}</span>
                 ) : null}
-                <span className="vrm-mp-sur" data-mp-raison={p.etat !== 'lu' ? (p.raison || p.etat) : undefined}>{t.sur}</span>
+                <span className="vrm-mp-sur" data-mp-raison={p.etat !== 'lu' ? (p.raison || p.etat) : undefined}>{sansCompte && p.etat === 'encours' ? 'aucun compte relié' : t.sur}</span>
               </>)}
               {t.manques && t.manques.length ? <span className="vrm-mp-manque">{t.manques.join(' · ')}</span> : null}
             </li>

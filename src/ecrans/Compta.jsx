@@ -32,7 +32,7 @@ import { previsionUrssaf } from '../previsionUrssaf.js';
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
-import { valeurChiffre, raisonCourte } from '../design/carteChiffres.js';
+import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).
@@ -3457,7 +3457,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const { P } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
   const sel = { site: 'toutes', compte: null, periode: null };
-  const v = (id) => valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE);
+  const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });   // « nov. » : le libellé tient sur une ligne au téléphone
   const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
   const aller = (q) => {

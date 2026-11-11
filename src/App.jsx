@@ -27789,9 +27789,12 @@ function useSourcesCarte(liveStats) {
   const [colisARetirer] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
   const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
   const prep = useEnPreparation(CLES_PREPAREES);
+  // (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque : « aucun compte relié », pas « lecture… ».
+  const sansCompte = React.useContext(SansCompteCarte);
   // (6 nov.) Jamais publié mais un écran ouvert le prépare : « lecture… » (src/preparations.js).
   const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') ? 'passu' : 'encours');
   return React.useMemo(() => ({
+    sansCompte: !!sansCompte,
     // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
     // sans ses lignes) = `undefined`, « lecture… » ; `venduPasSu` = `null`, « pas lu ». Avant,
     // les deux disaient « pas lu » : à chaque ouverture, la carte annonçait une panne.
@@ -27801,7 +27804,7 @@ function useSourcesCarte(liveStats) {
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
     enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
-  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep]);
+  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -27847,6 +27850,9 @@ function EcranMaSemaine({ liveStats, onNav, entete }) {
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
 const LiveStatsCarte = React.createContext(null);
+// (11 nov.) `true` seulement quand l'absence de tout compte est PROUVÉE (coque, `sansAucunCompte`).
+const SansCompteCarte = React.createContext(false);
+export const useSansCompte = () => React.useContext(SansCompteCarte);
 const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, beneficeDesJours, debutPeriode, decalerPeriode, fmt };
 // `page` : une clé de PAGES_CARTE ; `sel` : { site, compte: {uid, login, nom} | null, periode } ;
 // `locaux` : les cases propres de la page ({ id → { nom, court, type, valeur, partiel, onClick, attrs, affiche } }) ;
@@ -45194,7 +45200,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </>);
         })()}
       </>)}
-      {curSub==='annonces' && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
+      {/* (11 nov., états vides) Aucun compte Vinted lié : rien à vérifier, la carte « Relier un compte » suffit. */}
+      {curSub==='annonces' && !noAcc && <section className="vrm-ventes-controles" data-annonces-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
         <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
         <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
         <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
@@ -45227,8 +45234,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           (src/filUnique.js, src/ecrans/FilsTous.jsx). Les conversations Vinted y entrent avec LES
           règles de la liste Vinted (compte retiré, écarté, conversation retirée) ; un fil Vinted
           s'ouvre dans LE fil d'ici (`openConversation`, ses envois et ses offres). */}
+      {/* (11 nov., états vides) Aucun compte Vinted lié (liste LUE et vide) : la carte et son geste, et la
+          part Vinted des fils est VIDE (rien à lire), pas « Lecture… » à l'infini. */}
+      {curSub==='messages' && filTous && <NoAcc/>}
       {curSub==='messages' && filTous && <FilsTous
-        vinted={convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>({ c, paire: paireDeConv(String(c._acc.vinted_user_id), c.id, null), compte: accName(c._acc) }))}
+        vinted={noAcc ? [] : convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>({ c, paire: paireDeConv(String(c._acc.vinted_user_id), c.id, null), compte: accName(c._acc) }))}
         vintedOuvert={openConv ? String(openConv.acc?.vinted_user_id||'')+':'+String(openConv.convId) : ''}
         ouvrirVinted={(c)=>openConversation(c)} fermerVinted={()=>setOpenConv(null)} rendreVinted={()=>rendreConversation()}
         lireVinted={async (c)=>{ const r=await fetchVintedConversationDetail(c._acc,c.id); if(!r||!r.ok) return null; return normalizeConversationMessages(r.conversation).filter(m=>m.kind==='message'||m.kind==='offer').map(m=>({ t: m.kind==='offer' ? `Offre ${String(m.offre&&m.offre.montant||'').replace('.',',')} €${m.offre&&m.offre.statut?' · '+m.offre.statut:''}` : m.body, at: m.ts, deMoi: m.kind==='message' ? m.mine===true : (m.offre&&m.offre.sens==='envoyee'?true:m.offre&&m.offre.sens==='recue'?false:null) })); }}/>}
@@ -52815,6 +52825,13 @@ function AppCoeur() {
     s.add('vestiaire');
     return s;
   },[accountsLoaded,vintedAccounts,sitesLus,comptesEbay]);
+  // (11 nov., lot états vides) AUCUN COMPTE RELIÉ, PROUVÉ : la liste des comptes Vinted lue et vide, les
+  // lignes Leboncoin/Vestiaire/eBay lues et absentes, aucun compte eBay au registre. Les cases de la carte
+  // ne disent alors plus « lecture… » à l'infini (rien ne sera jamais lu) mais « aucun compte relié ».
+  // Pas su (base KO, lecture en cours ou ratée) ⇒ `false` : jamais deviné.
+  const sansAucunCompte=!!(accountsLoaded && !baseKO && Array.isArray(vintedAccounts) && vintedAccounts.length===0
+    && sitesLus && !sitesLus.leboncoin && !sitesLus.vestiaire && !sitesLus.ebay
+    && Array.isArray(comptesEbay) && !comptesEbay.some(c=>c && !c.implicite));
   // Le badge de Colis : le nombre PUBLIÉ par l'écran qui a toutes les sources
   // (`vrm_colis_aposter`, §11), s'il a moins de 12 h — sinon AUCUN badge (pas
   // su ≠ 0, et jamais un nombre recalculé ici qui contredirait Colis).
@@ -55038,6 +55055,7 @@ function AppCoeur() {
   );
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
+    <SansCompteCarte.Provider value={sansAucunCompte}>
     <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
@@ -55633,6 +55651,7 @@ function AppCoeur() {
         * { box-sizing: border-box; }
       `}</style>
     </div>
+    </SansCompteCarte.Provider>
     </LiveStatsCarte.Provider>
   );
 }

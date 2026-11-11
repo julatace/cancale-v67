@@ -68,6 +68,7 @@ const titreDe = (x) => {
   // (5 nov., chantier E1) Des ventes sans date de versement : la phrase entière.
   if (x.raison === 'a-dater') return `${x.def ? x.def.nom : ''} : pas su — ${x.aDater} vente${x.aDater > 1 ? 's' : ''} sans date de versement (à dater), dans aucun mois`;
   if (x.valeur != null && x.aDater > 0) return `${x.def ? x.def.nom : ''} daté au versement — sans ${x.aDater} vente${x.aDater > 1 ? 's' : ''} encore à dater`;
+  if (x.raison === 'sansCompte') return `${x.def ? (x.def.nom || x.def.court || '') : ''} : aucun compte relié`;
   if (x.valeur == null && !x.def?.local) return `${x.def ? x.def.nom : ''} : pas su — ${raisonCourte(x)}`;
   if (x.partiel && x.manque && x.manque.length) return `Au moins : ${x.manque.join(', ')} pas lu`;
   if (x.partiel) return `Au moins · ${x.def ? x.def.nom : ''}`;

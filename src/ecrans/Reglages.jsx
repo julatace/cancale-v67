@@ -4333,7 +4333,10 @@ function SecuriteSetting() {
     //    première passe, la seconde heurte la clé → 409 et Postgres annule TOUT
     //    l'envoi (rien n'est écrit). Base fermée : la règle refuse dès la
     //    première → 401/403. Vérifié dans la base : 23505 / 42501, 0 ligne.
-    try {
+    // (11 nov., états vides) Base injoignable (la lecture du 1 n'a pas répondu) ⇒ aucun envoi : rien ne
+    // part vers une base qui ne répond pas, la sonde reste « pas su » (jamais un diagnostic).
+    if (out.colonne === null) out.ecritureSansCompte = null;
+    else try {
       const sonde = { id: '__sonde_droits_ecriture__', data: {} };
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
         method: 'POST',
