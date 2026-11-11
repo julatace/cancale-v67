@@ -91,7 +91,11 @@ const vgJson = (evs) => JSON.stringify({ tracking_events: evs.map((e, i) => ({ i
     dit(l1.priseAt === iso(NOW - 20 * H) && l1.fini === true, 'prise en charge prouvée ⇒ datée et le n° est fermé (plus relu)', JSON.stringify([l1.priseAt, l1.fini]));
     dit(l2.priseAt === l1.priseAt && l3.priseAt === l1.priseAt, 'une lecture plus pauvre (« en préparation ») ou un refus ensuite ne l’efface pas');
     dit(l1.sens === 'sortant' && !('notif' in l1) && !('notifEnAttente' in l1), 'la ligne de départ ne porte aucune notification');
-    dit(fn(D, 'prochainEssaiDepart')(l1) === Infinity, 'fermée ⇒ prochain essai : jamais');
+    // (11 nov., suivi des commandes) Pris en charge, le colis reste suivi jusqu'à la fin : toutes les 6 h ; livré ⇒ jamais.
+    const pe = fn(D, 'prochainEssaiDepart');
+    dit(pe(l1) === Date.parse(l1.essai) + 6 * H, 'pris en charge ⇒ relu dans 6 h (suivi jusqu’à la livraison)', String(pe(l1) - Date.parse(l1.essai)));
+    const l4 = lap(l1, { res: 'ok', etat: 'retire', etatAt: iso(NOW), evenements: [{ at: iso(NOW), code: 'D' }] }, { carrier: 'chronopost', suivi: 'XW000000700TS', maintenant: NOW });
+    dit(l4.clos === true && pe(l4) === Infinity && l4.priseAt === l1.priseAt, 'retiré par l’acheteur ⇒ suivi clos, plus jamais relu', JSON.stringify([l4.clos, l4.priseAt]));
   });
 
   essaie('§5 le cloisonnement : un départ n’est jamais un colis à retirer', () => {
