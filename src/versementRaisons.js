@@ -23,6 +23,7 @@ export const RAISONS_A_DATER = {
   leboncoin: { geste: 'main' },                  // Leboncoin : la date se recopie à la main
   vestiaire: { geste: 'vestiaire' },
   ebay: { geste: null },
+  importee: { geste: 'importer' },              // (11 nov.) importée sans date de versement dans son fichier
 };
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -45,7 +46,8 @@ export function raisonsADater(aDater, { etat, compteDe } = {}) {
   };
   for (const l of (aDater || [])) {
     if (!l || !Number.isFinite(Number(l.eur))) continue;
-    if (l.plateforme === 'Vinted') {
+    if (l.importee) ajoute('importee', l);
+    else if (l.plateforme === 'Vinted') {
       const tx = txDe(l.o);
       const e = typeof etat === 'function' && tx ? etat(tx) : undefined;
       const compte = typeof compteDe === 'function' ? compteDe(l.o) : null;
