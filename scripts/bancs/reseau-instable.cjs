@@ -85,14 +85,17 @@ async function guetter(pg, ms, jusqua) {
 }
 async function ouvrirPrenom(pg, url) {
   await pg.goto(url + '/?tab=settings', { waitUntil: 'domcontentloaded' });
-  await H.attendre(async () => (await pg.getByText('Mon compte', { exact: true }).count()) > 0, 15000);
-  await pg.getByText('Mon compte', { exact: true }).first().click().catch(() => {});
-  return H.attendre(async () => (await pg.locator('[data-reglage-prenom] input').count()) > 0, 8000);
+  await H.attendre(async () => (await pg.locator('[data-vue="compte"]:visible').count()) > 0 || (await pg.locator('text="Mon compte" >> visible=true').count()) > 0, 15000);
+  const seg = pg.locator('[data-vue="compte"]:visible');
+  if (await seg.count()) await seg.first().click().catch(() => {}); else await pg.locator('text="Mon compte" >> visible=true').first().click().catch(() => {});
+  const ok = await H.attendre(async () => (await pg.locator('[data-reglage-prenom] input').count()) > 0, 8000);
+  if (!ok) await pg.screenshot({ path: path.join(CAPT, `echec-ouvrir-prenom-${taille}.png`) }).catch(() => {});
+  return ok;
 }
 const taper = async (pg, v) => { const c = pg.locator('[data-reglage-prenom] input'); await c.fill(v); };
 const champLibre = (pg) => pg.locator('[data-reglage-prenom] input').isEditable().catch(() => false);
 async function ajouterNote(pg, url, num, texte) {
-  await pg.goto(url + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
+  if (url) await pg.goto(url + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
   const sel = `[data-note-paire="ajout"][data-note-num="${num}"]`;
   if (!(await H.attendre(async () => (await pg.locator(sel).count()) > 0, 15000))) return false;
   // (le bouton discret peut être caché par la mise en page : son geste est le même)
@@ -200,21 +203,31 @@ async function uneTaille(nav, srv, w) {
 
   if (joue('E')) {
     await ouvrirPrenom(pg(), srv.url);
-    await A.ctx.setOffline(true);
+    // La 4G faiblit (la saisie part dans le vide), puis le réseau tombe pour de bon :
+    // l'app passe sur son écran hors ligne (règle du 6 nov.), plusieurs relances ratent.
+    A.etat.faute = COUPE;
     await taper(pg(), 'Fay');
-    await pg().waitForTimeout(12000);   // plusieurs relances ratées
+    await pg().waitForTimeout(1500);
+    await A.ctx.setOffline(true);
+    await pg().waitForTimeout(12000);
     dit((await lsPrenom(pg())) === 'Fay' && prenomBase(base) !== 'Fay', 'E : longtemps hors ligne ⇒ gardé, pas en base');
     const n = await mention(pg());
     dit(n >= 1, 'E : « en attente d’envoi » reste dit', String(n));
     await pg().screenshot({ path: path.join(CAPT, `E-hors-ligne${suf}.png`) });
+    A.etat.faute = null;
     await A.ctx.setOffline(false);
     dit(await H.attendre(() => prenomBase(base) === 'Fay', 15000), 'E : retour du réseau ⇒ envoyé', prenomBase(base));
+    await ouvrirPrenom(pg(), srv.url);
   }
 
   if (joue('F')) {
+    // Un second onglet du MÊME appareil, ouvert sur Annonces avant la coupure.
+    const o2 = await A.ouvrir('A'); errs.push(o2.errs);
+    await o2.pg.goto(srv.url + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
+    await H.attendre(async () => (await o2.pg.locator('[data-note-paire="ajout"][data-note-num="2"]').count()) > 0, 15000);
     A.etat.faute = COUPE;
     await taper(pg(), 'Gus');
-    dit(await ajouterNote(pg(), srv.url, 2, 'boîte abîmée'), 'F : note du N°2 saisie pendant la coupure');
+    dit(await ajouterNote(o2.pg, null, 2, 'boîte abîmée'), 'F : note du N°2 saisie pendant la coupure');
     await pg().waitForTimeout(2500);
     // Plus tard, l'AUTRE appareil (en ligne) change le prénom et la ville.
     await pg().waitForTimeout(50);

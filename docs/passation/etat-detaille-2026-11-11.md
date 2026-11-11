@@ -1,0 +1,6 @@
+# Lignes de CLAUDE.md §9 déplacées telles quelles (11 nov.)
+
+CLAUDE.md doit rester sous 59 000 octets : la ligne la plus ancienne de §9 est recopiée ici mot pour mot.
+
+- **11 nov. · Ventes sans date de versement (lot DJ7)** : mesuré, 1 751 sur UN compte, détail de transaction jamais relu ; relevé : 0 vente datable. « Déclarer » : « N datées ✓ · M sans date », une raison par ligne + geste (« Ouvrir Vinted » par compte, Leboncoin à la main) ; jamais devinée (`src/versementRaisons.js`). `docs/passation/2026-11-11-dates-versement.md`. Geste : ouvrir vinted.fr sur ce compte.
+- **11 nov. · Offres auto sûres + republier à la main (lot DJ8, ext. 5.342)** : Messages → Favoris & offres → « Offres auto » (interrupteur, jauge, alerte 40/50, journée calme après un frein, « Tout arrêter » en 2 gestes, aperçu = règle du moteur `audit-offres-sures`, seuils par paire, historique) ; **5.342** : le moteur répond aux offres DEPUIS L'ONGLET vinted.fr (plus de `Bearer` du fond ; sans onglet l'offre attend), lit « 45,5 », se tait sur un compte freiné, s'arrête au 1er refus ; ses clics d'offre/réponse partent de l'onglet s'il est ouvert, sinon comme avant ; Republier à la main en tête, « Vinted ↗ » copie aussi la description (4 → 3 gestes par paire). Étude `2026-11-11-anti-ban.md` ; récit `2026-11-11-offres-sures.md`. Geste : installer 5.342.0.
