@@ -22,11 +22,11 @@ export function LigneVoix({ canal = 'loupe', Pourquoi, vide = false, mobile = fa
   const style = { padding: '6px 2px 0', fontSize: 12, lineHeight: 1.45, color: couleur || 'inherit', display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' };
   if (e.ecoute) {
     return <div data-voix-ecoute="1" data-voix-direct={e.direct || ''} role="status" aria-live="polite" style={style}>
-      <span>{e.direct ? <>J’entends : « <strong data-voix-entendu="">{e.direct}</strong> »</> : 'J’écoute… dis un N° (« cent vingt-quatre », « B 125 ») ou des mots (« Nike rouge 42 »).'}</span>{pq}
+      <span>{e.direct ? <>J’entends : « <strong data-voix-entendu="">{e.direct}</strong> »</> : 'J’écoute… dis un N° (« cent vingt-quatre », « B 125 ») ou des mots (« chemise bleue »).'}</span>{pq}
     </div>;
   }
   const code = e.erreur || (VOIX.refus ? 'refus' : null);
   if (code) return <div data-voix-erreur={code} role="status" style={style}><span>{PHRASES_VOIX[code] || PHRASES_VOIX.autre}</span>{pq}</div>;
   if (!vide) return null;
-  return <div data-voix-aide="" style={style}><span>{mobile ? 'À la voix : touche le micro (ou garde le doigt sur la loupe) et dis un N° ou des mots.' : 'À la voix : touche le micro et dis un N° (« cent vingt-quatre ») ou des mots (« Nike rouge 42 »).'}</span>{pq}</div>;
+  return <div data-voix-aide="" style={style}><span>{mobile ? 'À la voix : touche le micro (ou garde le doigt sur la loupe) et dis un N° ou des mots.' : 'À la voix : touche le micro et dis un N° (« cent vingt-quatre ») ou des mots (« chemise bleue »).'}</span>{pq}</div>;
 }

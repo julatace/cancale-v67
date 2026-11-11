@@ -413,6 +413,7 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 - Une même phrase sur chaque ligne est UNE phrase (dans l'en-tête du groupe) ; le même
   nombre ne s'écrit jamais deux fois sur un écran ; pas de « n/d ».
 - Un nom d'icône absent de `ICON_PATHS` ne dessine rien sans erreur (`audit-icones`).
+- « Quoi de neuf » : chaque lot visible ajoute sa ligne dans `src/nouveautes.js` (titre ≤ 8 mots, écran cible ; `audit-quoi-de-neuf`).
 - Sur ordinateur, les actions du haut sont une île flottante : tout ce qu'un écran pose
   sur sa ligne de titre passe par le slot `right` de `ScreenHead`.
 - Sur iPhone, `-webkit-overflow-scrolling: touch` sur un conteneur crée un contexte

@@ -4954,7 +4954,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       <div className="vrm-ebay-recherche-ligne">
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher (titre, N°, SKU)" aria-label="Chercher une annonce eBay" data-ebay-recherche
           style={{ flex: '1 1 auto', minWidth: 0, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: `1px solid ${E.border}`, background: E.card, color: E.text, fontSize: 13, fontFamily: 'inherit' }} />
-        <MicDictee titre="Chercher à la voix (« numéro 124 », « Nike rouge 42 »)" onDirect={setQ} onText={(t) => setQ(requeteDeLaVoix(t).requete)}/>
+        <MicDictee titre="Chercher à la voix (« numéro 124 », « chemise bleue »)" onDirect={setQ} onText={(t) => setQ(requeteDeLaVoix(t).requete)}/>
         {/* (6 nov.) Les réglages de l'écran, en feuille (règle d'offre, retrait automatique). */}
         <button type="button" className="vrm-icon-control vrm-ebay-reglages-bouton" aria-label="Réglages eBay" title="Réglages eBay" data-ebay-reglages-ouvrir="" data-geste={gesteRegle ? '1' : undefined} onClick={() => setReglagesEbay('liste')}>
           <Icon name="gear" size={20}/>

@@ -39713,7 +39713,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 elles sont ici, à un geste — les mêmes états (`ordSearch`, `periode`). */}
             {sales.items && sales.items.length>0 && <div className="vrm-outils-recherche" data-outils-recherche="" style={{display:'flex',flexDirection:'column',gap:8,padding:'4px 4px 10px'}}>
               <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
-                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:17,background:C.card,color:C.text,outline:'none',minHeight:44}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « Nike rouge 42 »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></div>
+                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:17,background:C.card,color:C.text,outline:'none',minHeight:44}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « chemise bleue »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></div>
               <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes" datation="Date de vente"/>
             </div>}
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
@@ -42988,7 +42988,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {buysBase.length>0 && aFilter!=='attente' && <div className="vrm-achats-filtres">
         {buysBase.length>0 && aFilter!=='attente' && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
-            style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « Nike rouge 42 »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
+            style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « chemise bleue »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
         <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats" datation="Date d’achat"/></div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
