@@ -112,7 +112,7 @@ async function avecSession(nav, l, W, D, cles) {
   await capture(pg, `trad-${l}-${W}-journee`);
   // (11 nov., lot 2) Les écrans migrés : chacun dit au moins une phrase de SON dictionnaire
   // (dans la langue choisie), aucune clé brute, rien ne déborde à droite.
-  const ECRANS_MIGRES = (process.env.ECRANS || 'journee:journee,ventes:ventes,achats:achats,annonces:annonces').split(',').map((x) => x.split(':'));
+  const ECRANS_MIGRES = (process.env.ECRANS || 'journee:journee,ventes:ventes,achats:achats,annonces:annonces,garage:stock').split(',').map((x) => x.split(':'));
   for (const [tab, pref] of ECRANS_MIGRES) {
     if (tab !== 'journee') { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {}); await attendre(2500); }
     const phrases = Object.entries(D).filter(([k, v]) => k.startsWith(pref + '.') && typeof v === 'string' && v.replace(/\{\w+\}/g, '').trim().length >= 6).map(([, v]) => v.split(/\{\w+\}/).sort((a, b) => b.length - a.length)[0].trim()).filter((v) => v.length >= 6);

@@ -8,4 +8,10 @@ export default {
   "commun.actions": "Actions de {title}",
   "commun.actionsEcran": "Actions de cet écran",
   "commun.impossibleChargerCes": "Impossible de charger ces données",
+  // ── App.jsx + ecrans/FilsTous.jsx + ecrans/MessagesLeboncoin.jsx + BilanSynchronisation.jsx + SynchronisationVinted.jsx + OffresAuto.jsx + ActionsClaires.jsx + composants/EtatPanne.jsx + composants/ChampRecherche.jsx + composants/Illustration.jsx
+  "commun.jeAiPu": "Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».",
+  "commun.aucunCompteVinted": "Aucun compte Vinted lié",
+  "commun.relierCompte": "Relier un compte",
+  "commun.dicterRecherche": "Dicter la recherche",
+  "commun.dicter": "Dicter",
 };

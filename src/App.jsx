@@ -15247,9 +15247,9 @@ function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensib
           </span>
         )}
         <span className="vrm-msg-l2">
-          <span className="vrm-msg-extrait" {...(attrsExtrait || {})} style={{color:couleurExtrait||C.muted}}>{toi?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{extrait||''}</span>
+          <span className="vrm-msg-extrait" {...(attrsExtrait || {})} style={{color:couleurExtrait||C.muted}}>{toi?<span className="vrm-msg-toi" style={{color:C.muted}}>{tr('messages.toi')} </span>:null}{extrait||''}</span>
           {apres}
-          {point && <span className="vrm-msg-dot" aria-label="non lu" style={{background:point}}/>}
+          {point && <span className="vrm-msg-dot" aria-label={tr('messages.nonLu')} style={{background:point}}/>}
         </span>
       </span>
     </button>
@@ -18933,7 +18933,7 @@ function FavorisConnectes(props){
   const verifier=async()=>{
     sonderPonts();
     if(__vmrTour)await new Promise(resolve=>{const t=setTimeout(resolve,2500);__vmrAttenteTour.push(()=>{clearTimeout(t);resolve();});});
-    if(__vmrTour||__vmrPlusieurs)return {disponible:false,raison:__vmrPlusieurs?textePlusieurs():'La vérification des extensions est encore en cours.'};
+    if(__vmrTour||__vmrPlusieurs)return {disponible:false,raison:__vmrPlusieurs?textePlusieurs():tr('messages.verificationExtensionsEncore')};
     const id=__vmrPontUnique||__vmrEtat?.ext||__lier?.id||'';
     const mesurer=async()=>{
       let direct=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);
@@ -41121,9 +41121,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     ongletReporte.current = ongletColisVu; onOngletVu(ongletColisVu);
   });
   const NoAcc = () => !noAcc ? null : (baseKO
-    ? <LignePanne>Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».</LignePanne>
-    : <div className="vrm-noacc" style={{marginBottom:12}}>{/* (2 nov.) la carte touchait le sélecteur posé dessous (Messages, Achats) */}<EmptyState icon="link" title="Aucun compte Vinted lié"
-        action={onNav && <Bouton variante="primaire" icone="link" onClick={()=>onNav('vintedaccounts')}>Relier un compte</Bouton>}/></div>
+    ? <LignePanne>{tr('commun.jeAiPu')}</LignePanne>
+    : <div className="vrm-noacc" style={{marginBottom:12}}>{/* (2 nov.) la carte touchait le sélecteur posé dessous (Messages, Achats) */}<EmptyState icon="link" title={tr('commun.aucunCompteVinted')}
+        action={onNav && <Bouton variante="primaire" icone="link" onClick={()=>onNav('vintedaccounts')}>{tr('commun.relierCompte')}</Bouton>}/></div>
   );
   // ── MESSAGES : LE COMPTE DE L'EXTENSION D'ABORD (16 octobre) ─────────────
   // L'extension n'agit qu'au nom du compte connecté dans l'onglet Vinted de ce

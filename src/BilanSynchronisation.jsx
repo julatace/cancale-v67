@@ -1,6 +1,8 @@
 import React from "react";
 import { resumerLecture } from "./bilanSynchronisation.js";
 import "./bilanSynchronisation.css";
+import { tr } from './i18n/index.js';
+import { trj } from './i18n/react.js';
 export default function BilanSynchronisation({ owner, sources, onNav }) {
   const memo = React.useRef({
     owner,
@@ -58,7 +60,7 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
     return (
       <details className="vrm-bilan-sync" data-bilan-synchronisation="" data-bilan-attente="">
         <summary>
-          Données <span>Lecture…</span>
+          {tr('messages.donnees')} <span>{tr('messages.lecture')}</span>
         </summary>
       </details>
     );
@@ -81,30 +83,28 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
   return (
     <details className="vrm-bilan-sync" data-bilan-synchronisation>
       <summary>
-        Données{" "}
+        {tr('messages.donnees')}{" "}
         <span>
           {changements
-            ? `${changements} changement${changements > 1 ? "s" : ""}`
+            ? tr('messages.changements', { n: String(changements) })
             : erreurs
-              ? "À vérifier"
-              : "Voir le détail"}
+              ? tr('journee.verifier')
+              : tr('annonces.voirDetail')}
           {erreurs
-            ? ` · ${erreurs} non confirmée${erreurs > 1 ? "s" : ""}`
+            ? tr('messages.nonConfirmees', { n: String(erreurs) })
             : ""}
         </span>
       </summary>
       <p>
-        Comparaison avec la lecture précédente de cette session. Première
-        lecture : données déjà présentes, sans les compter comme de nouveaux
-        événements. Une liste limitée ne prouve pas une suppression.
+        {tr('messages.comparaisonAvecLecture')}
       </p>
       <time dateTime={new Date(vue.at).toISOString()}>
-        Bilan VRM à{" "}
+        {tr('messages.bilanVrm')}{" "}
         {new Date(vue.at).toLocaleTimeString("fr-FR", {
           hour: "2-digit",
           minute: "2-digit",
         })}{" "}
-        · pas l’heure de capture sur la plateforme
+        {tr('messages.heureCapturePlateforme')}
       </time>
       {lignes.map((l) => (
         <article key={l.source + ":" + l.uid}>
@@ -114,12 +114,12 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
               {l.libelle} ·{" "}
               {l.etat === "erreur"
                 ? l.precedentConserve
-                  ? "Non relu — dernière lecture conservée"
-                  : "Lecture indisponible"
+                  ? tr('messages.nonReluDerniere')
+                  : tr('messages.lectureIndisponible')
                 : l.etat === "initial"
-                  ? `${l.connues} élément${l.connues > 1 ? "s" : ""} à la première lecture`
+                  ? tr('messages.elementsPremiereLecture', { n: String(l.connues) })
                   : `${l.ajouts.length} ajout${l.ajouts.length > 1 ? "s" : ""} · ${l.modifies.length} modification${l.modifies.length > 1 ? "s" : ""}`}
-              {l.partiel ? " · historique limité ou incomplet" : ""}
+              {l.partiel ? tr('messages.historiqueLimiteIncomplet') : ""}
             </small>
           </div>
           {onNav && (
@@ -129,12 +129,12 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
                 onNav(sources.find((s) => s.id === l.source)?.onglet)
               }
             >
-              Voir
+              {tr('ventes.voir')}
             </button>
           )}
           {(l.ajouts?.length > 0 || l.modifies?.length > 0) && (
             <details>
-              <summary>Éléments concernés</summary>
+              <summary>{tr('messages.elementsConcernes')}</summary>
               <ul>
                 {[
                   ...l.ajouts.map((x) => ({ ...x, etat: "Ajouté" })),
@@ -143,13 +143,13 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
                   .slice(0, 30)
                   .map((x) => (
                     <li key={x.id}>
-                      {x.etat} · {x.titre || "Élément sans titre"}{" "}
-                      <small>Réf. {x.id}</small>
+                      {x.etat} · {x.titre || tr('messages.elementSansTitre')}{" "}
+                      <small>{trj('messages.ref', { id: x.id })}</small>
                     </li>
                   ))}
               </ul>
               {l.ajouts.length + l.modifies.length > 30 && (
-                <small>30 premiers éléments affichés.</small>
+                <small>{tr('messages.30PremiersElements')}</small>
               )}
             </details>
           )}

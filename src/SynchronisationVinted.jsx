@@ -1,5 +1,6 @@
 import React from 'react';
 import {lireSynchronisationVinted} from './synchronisationVinted.js';
+import { tr } from './i18n/index.js';
 export default function SynchronisationVinted({comptes,owner,ownerActuel,lire,connexion,ecouter,verifier,relire,onFavoris}){
  const [,maj]=React.useReducer(n=>n+1,0);React.useEffect(()=>ecouter?.(maj),[ecouter]);
  const [etat,setEtat]=React.useState({}),generation=React.useRef(0),busy=React.useRef(false),ouvert=React.useRef(false),recharger=React.useRef(null);
@@ -11,16 +12,16 @@ export default function SynchronisationVinted({comptes,owner,ownerActuel,lire,co
  const vue=etat.cle===cle?etat:{};
  const aVerifier=vue.items?.filter(c=>['messages','favoris'].some(type=>!!c[type].action)).length||0;
  if(!owner||!comptes.length)return null;
- return <details className="vrm-sync-comptes vrm-sync-claire" data-sync-total={vue.items?.length} data-sync-verifier={vue.items?aVerifier:undefined} onToggle={e=>{ouvert.current=e.currentTarget.open;if(ouvert.current)recharger.current?.();}}><summary>Comptes Vinted{vue.charge?' · vérification…':vue.items?` · ${vue.items.length} compte${vue.items.length>1?'s':''}${aVerifier?` · ${aVerifier} à vérifier`:''}`:vue.erreur?' · lecture indisponible':''}</summary>
-  <div className="vrm-sync-commandes">{verifier&&<button type="button" onClick={()=>{verifier();maj();}}>Vérifier la connexion de l’extension</button>}{relire&&<button type="button" onClick={relire}>Mettre à jour les données des comptes</button>}<button type="button" disabled={vue.charge} onClick={charger}>Actualiser l’état</button></div>
+ return <details className="vrm-sync-comptes vrm-sync-claire" data-sync-total={vue.items?.length} data-sync-verifier={vue.items?aVerifier:undefined} onToggle={e=>{ouvert.current=e.currentTarget.open;if(ouvert.current)recharger.current?.();}}><summary>{tr('messages.comptesVinted')}{vue.charge?tr('messages.verification'):vue.items?` · ${vue.items.length} compte${vue.items.length>1?'s':''}${aVerifier?` · ${aVerifier} à vérifier`:''}`:vue.erreur?tr('messages.lectureIndisponible2'):''}</summary>
+  <div className="vrm-sync-commandes">{verifier&&<button type="button" onClick={()=>{verifier();maj();}}>{tr('messages.verifierConnexionExtension')}</button>}{relire&&<button type="button" onClick={relire}>{tr('messages.mettreJourDonnees')}</button>}<button type="button" disabled={vue.charge} onClick={charger}>{tr('messages.actualiserEtat')}</button></div>
   {vue.erreur&&<p role="alert">{vue.erreur}</p>}
   <div className="vrm-sync-lignes">{vue.items?.map(c=>{
     const etat=connexion?.(c.uid);const probleme=['messages','favoris'].some(type=>!!c[type].action);
-    return <article key={c.uid} data-sync-compte={c.uid}><header><strong className="vrm-sensible" data-stream-type="compte">{comptes.find(x=>String(x.uid)===c.uid)?.nom||'Compte Vinted'}</strong><span data-sync-probleme={probleme?'1':'0'}>{probleme?'Lecture à compléter':'Captures reçues'}</span></header>
+    return <article key={c.uid} data-sync-compte={c.uid}><header><strong className="vrm-sensible" data-stream-type="compte">{comptes.find(x=>String(x.uid)===c.uid)?.nom||tr('annonces.compteVinted')}</strong><span data-sync-probleme={probleme?'1':'0'}>{probleme?tr('messages.lectureCompleter'):tr('messages.capturesRecues')}</span></header>
     {etat&&<p className="vrm-sync-connexion"><b>{etat.titre}</b>{etat.action&&<span>{etat.action}</span>}</p>}
-    <dl>{['messages','favoris'].map(type=><div key={type} data-sync-source={type}><dt>{type==='messages'?'Messages':'Favoris'}</dt><dd><span>{c[type].libelle}</span><time dateTime={c[type].date?new Date(c[type].date).toISOString():undefined}>{c[type].date?new Date(c[type].date).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Date indisponible'}</time></dd>{c[type].action&&(type==='favoris'&&onFavoris?<button type="button" onClick={()=>onFavoris(c.uid)}>Compléter les favoris</button>:<a href={type==='messages'?'https://www.vinted.fr/inbox':'https://www.vinted.fr'} target="_blank" rel="noreferrer" aria-label={`Ouvrir Vinted : ${type==='messages'?'messagerie':'favoris'}`}>Ouvrir Vinted ↗</a>)}{c[type].action&&<small>{c[type].action}</small>}</div>)}</dl></article>;
+    <dl>{['messages','favoris'].map(type=><div key={type} data-sync-source={type}><dt>{type==='messages'?tr('nav.messages'):tr('messages.favoris3')}</dt><dd><span>{c[type].libelle}</span><time dateTime={c[type].date?new Date(c[type].date).toISOString():undefined}>{c[type].date?new Date(c[type].date).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):tr('messages.dateIndisponible')}</time></dd>{c[type].action&&(type==='favoris'&&onFavoris?<button type="button" onClick={()=>onFavoris(c.uid)}>{tr('messages.completerFavoris')}</button>:<a href={type==='messages'?'https://www.vinted.fr/inbox':'https://www.vinted.fr'} target="_blank" rel="noreferrer" aria-label={`Ouvrir Vinted : ${type==='messages'?'messagerie':'favoris'}`}>{tr('annonces.ouvrirVinted')}</a>)}{c[type].action&&<small>{c[type].action}</small>}</div>)}</dl></article>;
   })}</div>
-  <details className="vrm-sync-explication"><summary>Comprendre ces dates</summary><p>Dates des captures enregistrées dans VRM, pas des derniers messages. Une capture ne garantit pas la lecture de tout l’historique.</p></details>
-  <a className="vrm-sync-ouvrir" href="https://www.vinted.fr" target="_blank" rel="noreferrer">Ouvrir Vinted pour compléter une lecture ↗</a>
+  <details className="vrm-sync-explication"><summary>{tr('messages.comprendreCesDates')}</summary><p>{tr('messages.datesCapturesEnregistrees')}</p></details>
+  <a className="vrm-sync-ouvrir" href="https://www.vinted.fr" target="_blank" rel="noreferrer">{tr('messages.ouvrirVintedCompleter')}</a>
  </details>;
 }

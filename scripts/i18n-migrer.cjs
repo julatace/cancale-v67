@@ -79,13 +79,13 @@ function lireDicos() {
 function parse(src) { return parser.parse(src, { sourceType: 'module', plugins: ['jsx'], ranges: true }); }
 
 function lister() {
-  const fichier = args[1];
-  const zones = opts('zone');
+  // Plusieurs fichiers dans UN plan : `lister a.jsx b.jsx --zone Fn --zone b.jsx::*` (une zone sans
+  // `fichier::` vise le premier ; `*` = tout le fichier). Les clés sont choisies ensemble : jamais deux fois la même.
+  const fichiers = []; for (let i = 1; i < args.length && !args[i].startsWith('--'); i++) fichiers.push(args[i]);
+  const zonesToutes = opts('zone');
   const prefixe = opt('prefixe');
   const sortie = opt('sortie');
-  if (!fichier || !zones.length || !prefixe || !sortie) { console.log('usage : lister <fichier> --zone Z --prefixe p --sortie plan.json'); process.exit(2); }
-  const src = fs.readFileSync(path.join(R, fichier), 'utf8');
-  const ast = parse(src);
+  if (!fichiers.length || !zonesToutes.length || !prefixe || !sortie) { console.log('usage : lister <fichier…> --zone Z --prefixe p --sortie plan.json'); process.exit(2); }
   const D = lireDicos();
   const fr = D.fr;
   const J = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
@@ -96,6 +96,13 @@ function lister() {
   const toutSrc = tousSrc.join('\n');
   const echap = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const compare = (texte) => { const q = `['"\`]${echap(texte)}['"\`]`; return new RegExp(`(?:[=!]==?\\s*${q}|${q}\\s*[=!]==?|case\\s+${q}|\\.(?:includes|startsWith|endsWith|indexOf)\\(\\s*${q})`).test(toutSrc); };
+
+  const parFichier = [];
+  for (const fichier of fichiers) {
+  const zones = zonesToutes.filter((z) => (z.includes('::') ? z.split('::')[0] === fichier : fichier === fichiers[0])).map((z) => { const x = z.includes('::') ? z.split('::')[1] : z; return x === '*' ? '1-9999999' : x.startsWith('*@') ? '1-9999999@' + x.slice(2) : x; });
+  if (!zones.length) { console.log(`aucune zone pour ${fichier}`); process.exit(2); }
+  const src = fs.readFileSync(path.join(R, fichier), 'utf8');
+  const ast = parse(src);
 
   // Les zones en intervalles [début, fin) d'octets.
   const inter = [];
@@ -291,19 +298,23 @@ function lister() {
     TemplateLiteral(p) { if (p.parentPath.isTaggedTemplateExpression()) return; const c = contexte(p); if (c) lit(p, c); },
   });
 
+  for (const it of items) it.prefixe = prefixeDe(it);
+  parFichier.push({ fichier, zones, items: items.sort((a, b) => a.start - b.start), manuels });
+  }
   // Les clés.
   const nouvelles = {}; const parT = new Map();
-  for (const it of items) {
+  for (const it of parFichier.flatMap((x) => x.items)) {
     const jt = J(it.texte);
     let k = parTexte.get(jt) || parT.get(jt);
-    if (!k) { const base = `${prefixeDe(it)}.${nomCle(typeof it.texte === 'string' ? it.texte : it.texte.other)}`; k = base; let i = 2; while ((k in fr && J(fr[k]) !== jt) || (k in nouvelles && J(nouvelles[k]) !== jt)) k = `${base}${i++}`; nouvelles[k] = it.texte; }
+    if (!k) { const base = `${it.prefixe}.${nomCle(typeof it.texte === 'string' ? it.texte : it.texte.other)}`; k = base; let i = 2; while ((k in fr && J(fr[k]) !== jt) || (k in nouvelles && J(nouvelles[k]) !== jt)) k = `${base}${i++}`; nouvelles[k] = it.texte; }
     parT.set(jt, k); it.cle = k;
   }
-  const plan = { fichier, prefixe, zones, items: items.sort((a, b) => a.start - b.start), nouvelles, manuels };
+  const plan = { fichiers: parFichier, prefixe, zones: zonesToutes, nouvelles };
+  const items = parFichier.flatMap((x) => x.items), manuels = parFichier.flatMap((x) => x.manuels.map((m) => ({ ...m, fichier: x.fichier })));
   fs.writeFileSync(sortie, JSON.stringify(plan, null, 1));
   fs.writeFileSync(sortie + '.tsv', Object.entries(nouvelles).map(([k, v]) => `${k}\t${(typeof v === 'string' ? v : v.one + ' ¦ ' + v.other).replace(/\n/g, '\\n')}`).join('\n') + '\n');
-  console.log(`${fichier} · ${zones.join(', ')} — ${items.length} texte(s), ${Object.keys(nouvelles).length} clé(s) nouvelle(s), ${manuels.length} à la main`);
-  for (const m of manuels) console.log(`  à la main  ${String(m.ligne).padStart(6)}  ${m.pourquoi} : ${String(m.texte).slice(0, 110)}`);
+  console.log(`${fichiers.join(' + ')} · ${zonesToutes.join(', ')} — ${items.length} texte(s), ${Object.keys(nouvelles).length} clé(s) nouvelle(s), ${manuels.length} à la main`);
+  for (const m of manuels) console.log(`  à la main  ${m.fichier.split('/').pop()}:${String(m.ligne).padStart(6)}  ${m.pourquoi} : ${String(m.texte).slice(0, 110)}`);
 }
 
 function appliquer() {
@@ -327,10 +338,13 @@ function appliquer() {
   const vfr = (v) => vars(typeof v === 'string' ? v : v.other);
   const varsKo = Object.keys(plan.nouvelles).filter((k) => trad[k].some((x) => (typeof x === 'string' ? [x] : [x.other]).some((y) => vars(y) !== vfr(plan.nouvelles[k]))));
   if (varsKo.length) { console.log(`variables différentes du français : ${varsKo.map((k) => `${k} [${vfr(plan.nouvelles[k])}] ⇒ ${trad[k].map(vfr).join(' | ')}`).join('\n  ')}`); process.exit(1); }
-  const f = path.join(R, plan.fichier);
+  const lesFichiers = plan.fichiers || [{ fichier: plan.fichier, items: plan.items }];
+  // Tout vérifier AVANT d'écrire quoi que ce soit.
+  for (const pf of lesFichiers) { const t = fs.readFileSync(path.join(R, pf.fichier), 'utf8'); for (const it of pf.items) if (t.slice(it.start, it.end) !== it.brut) { console.log(`${pf.fichier} a changé depuis le plan (ligne ${it.ligne}) : refaire « lister »`); process.exit(1); } }
+  for (const pf of lesFichiers) {
+  const f = path.join(R, pf.fichier);
   let src = fs.readFileSync(f, 'utf8');
-  for (const it of plan.items) if (src.slice(it.start, it.end) !== it.brut) { console.log(`le fichier a changé depuis le plan (ligne ${it.ligne}) : refaire « lister »`); process.exit(1); }
-  const items = [...plan.items].sort((a, b) => b.start - a.start);
+  const items = [...pf.items].sort((a, b) => b.start - a.start);
   for (const it of items) {
     const appel = it.vars && it.vars.length ? `tr('${it.cle}', { ${[...new Map(it.vars.map((v) => [v.nom, v.expr])).entries()].map(([n, e]) => `${n}: String(${e})`).join(', ')} })` : `tr('${it.cle}')`;
     let rempl;
@@ -351,7 +365,7 @@ function appliquer() {
     if (imp) src = src.slice(0, imp.index + imp[0].length) + ligneImp + src.slice(imp.index + imp[0].length);
     else src = ligneImp + src;
   }
-  if (plan.items.some((it) => it.quoi === 'phrase') && !/import\s*\{[^}]*\btrj\b[^}]*\}\s*from\s*['"][./]*(?:\.\.\/)*i18n\/react\.js['"]/.test(src)) {
+  if (pf.items.some((it) => it.quoi === 'phrase') && !/import\s*\{[^}]*\btrj\b[^}]*\}\s*from\s*['"][./]*(?:\.\.\/)*i18n\/react\.js['"]/.test(src)) {
     const rel = path.relative(path.dirname(f), path.join(R, 'src', 'i18n', 'react.js')).replace(/\\/g, '/');
     const spec = rel.startsWith('.') ? rel : './' + rel;
     const imp = [...src.matchAll(/^import [^\n]*\n/gm)].pop();
@@ -359,6 +373,8 @@ function appliquer() {
     src = imp ? src.slice(0, imp.index + imp[0].length) + l + src.slice(imp.index + imp[0].length) : l + src;
   }
   fs.writeFileSync(f, src);
+  console.log(`${pf.fichier} : ${pf.items.length} texte(s) remplacé(s)`);
+  }
   // Les dictionnaires.
   const nouv = Object.entries(plan.nouvelles);
   const ecrire = (v) => (typeof v === 'string' ? JSON.stringify(v) : `{ one: ${JSON.stringify(v.one)}, other: ${JSON.stringify(v.other)} }`);
@@ -369,7 +385,7 @@ function appliquer() {
     const dos = path.join(R, 'src', 'i18n', 'langues', l);
     const d = path.join(dos, `${pf}.js`);
     const lignes = lesNouv.map(([k, v]) => `  ${JSON.stringify(k)}: ${ecrire(i === 0 ? v : trad[k][i - 1])},`).join('\n') + '\n';
-    const sous = `  // ── ${plan.zones.join(', ')} (${plan.fichier})\n`;
+    const sous = `  // ── ${lesFichiers.map((x) => x.fichier.replace(/^src\//, '')).join(' + ')}\n`;
     if (fs.existsSync(d)) { let t = fs.readFileSync(d, 'utf8'); const fin = t.lastIndexOf('};'); t = t.slice(0, fin) + sous + lignes + t.slice(fin); fs.writeFileSync(d, t); }
     else {
       fs.mkdirSync(dos, { recursive: true });
@@ -381,7 +397,7 @@ function appliquer() {
       fs.writeFileSync(m, t);
     }
   }
-  console.log(`${plan.fichier} : ${plan.items.length} texte(s) remplacé(s), ${nouv.length} clé(s) ajoutée(s) aux cinq langues`);
+  console.log(`${nouv.length} clé(s) ajoutée(s) aux cinq langues`);
 }
 
 if (cmd === 'lister') lister();

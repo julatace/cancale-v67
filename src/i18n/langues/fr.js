@@ -10,7 +10,9 @@ import ecran_commun from './fr/commun.js';
 import ecran_achats from './fr/achats.js';
 import ecran_annonces from './fr/annonces.js';
 import ecran_stock from './fr/stock.js';
+import ecran_messages from './fr/messages.js';
 export default {
+  ...ecran_messages,
   ...ecran_stock,
   ...ecran_annonces,
   ...ecran_achats,

@@ -8,4 +8,10 @@ export default {
   "commun.actions": "{title} actions",
   "commun.actionsEcran": "Actions for this screen",
   "commun.impossibleChargerCes": "Couldn’t load this data",
+  // ── App.jsx + ecrans/FilsTous.jsx + ecrans/MessagesLeboncoin.jsx + BilanSynchronisation.jsx + SynchronisationVinted.jsx + OffresAuto.jsx + ActionsClaires.jsx + composants/EtatPanne.jsx + composants/ChampRecherche.jsx + composants/Illustration.jsx
+  "commun.jeAiPu": "I couldn’t read your Vinted accounts — that’s not “no linked account”.",
+  "commun.aucunCompteVinted": "No Vinted account linked",
+  "commun.relierCompte": "Link an account",
+  "commun.dicterRecherche": "Dictate the search",
+  "commun.dicter": "Dictate",
 };

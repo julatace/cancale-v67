@@ -79,6 +79,10 @@ export { PhotoVide } from ${src('composants/PhotoVide.jsx')};
 export { Numero } from ${src('composants/Numero.jsx')};
 export { EtatPanne } from ${src('composants/EtatPanne.jsx')};
 export { BoutonBase, SegmenteBase } from ${src('composants/Bouton.jsx')};
+// (11 nov., traduction) Comme App.jsx au chargement : la partie « app » du français (les composants partagés y lisent leurs phrases).
+import frApp from ${src('i18n/langues/fr.js')};
+import { ajouterSourceApp } from ${src('i18n/index.js')};
+ajouterSourceApp(frApp);
 export const rendre = (el) => renderToStaticMarkup(el);
 export { React };
 `);

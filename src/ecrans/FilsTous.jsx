@@ -19,6 +19,8 @@ import { LogoSite } from '../SelecteurSites.jsx';
 import { FilLeboncoin } from './MessagesLeboncoin.jsx';
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
 import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
+import { tr } from '../i18n/index.js';
+import { trj } from '../i18n/react.js';
 
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
 const lireRelies = () => { try { const v = load(CLE_FILS_RELIES, {}); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; } };
@@ -101,22 +103,22 @@ function FilFusionne({ fil, vintedDe, lireVinted, onRepondre, onDelier, onFermer
     <CadreFil etiquette="Fil de messages" onFermer={onFermer} attrs={{ 'data-fil-fusionne': fil.cle, 'data-fil-n': String(fil.convs.length) }}>
       <TeteFil onFermer={onFermer} nom={nomDe(fil)} titre={fil.num ? `N°${fil.num}` : ''} compte={fil.plateformes.map((p) => NOM_SITE[p]).join(' · ')}/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {parConv === undefined ? <div role="status" data-fil-etat="charge" style={style}>Lecture…</div>
+        {parConv === undefined ? <div role="status" data-fil-etat="charge" style={style}>{tr('messages.lecture')}</div>
           : !messages.length ? <div data-fil-etat="vide" style={style}>—</div>
           : messages.map((m, i) => (
             <BulleConv key={m.conv + ':' + m.rang} moi={m.deMoi === true} qui={m.deMoi === true ? 'Toi' : m.deMoi === false ? "L'autre personne" : ''} texte={m.t} quand={m.at} avecDate
               attrs={{ 'data-fil-msg': m.plateforme, 'data-fil-msg-i': String(i) }}
               apres={<small className="vrm-bulle-note" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.muted, marginTop: 3 }}><LogoSite site={m.plateforme}/>{NOM_SITE[m.plateforme]}</small>}/>
           ))}
-        {ratees.length ? <div data-fil-ratees={ratees.map((e) => e.plateforme).join(',')} style={{ ...style, padding: '4px 0' }}>{ratees.map((e) => NOM_SITE[e.plateforme]).join(', ')} : pas pu lire.</div> : null}
+        {ratees.length ? <div data-fil-ratees={ratees.map((e) => e.plateforme).join(',')} style={{ ...style, padding: '4px 0' }}>{trj('messages.puLire', { x: ratees.map((e) => NOM_SITE[e.plateforme]).join(', ') })}</div> : null}
       </div>
       <div className="vrm-chat-foot" style={{ borderTop: `1px solid ${C.border}`, background: C.card, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {parConv === undefined ? null : via
-          ? <Bouton variante="primaire" data-fil-repondre={via.plateforme} onClick={() => onRepondre(via)}>Répondre sur {NOM_SITE[via.plateforme]}</Bouton>
+          ? <Bouton variante="primaire" data-fil-repondre={via.plateforme} onClick={() => onRepondre(via)}>{trj('messages.repondre', { x: NOM_SITE[via.plateforme] })}</Bouton>
           : <div data-fil-repondre="passu" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {fil.convs.map((e) => <Bouton key={e.cle} variante="secondaire" data-fil-repondre-choix={e.plateforme} onClick={() => onRepondre(e)}>Ouvrir sur {NOM_SITE[e.plateforme]}</Bouton>)}
+              {fil.convs.map((e) => <Bouton key={e.cle} variante="secondaire" data-fil-repondre-choix={e.plateforme} onClick={() => onRepondre(e)}>{trj('messages.ouvrir', { x: NOM_SITE[e.plateforme] })}</Bouton>)}
             </div>}
-        {onDelier ? <button type="button" className="vrm-pied-lien" data-fil-delier="" onClick={onDelier} style={{ minHeight: 44, alignSelf: 'flex-start' }}>Ce n'est pas le même fil : délier</button> : null}
+        {onDelier ? <button type="button" className="vrm-pied-lien" data-fil-delier="" onClick={onDelier} style={{ minHeight: 44, alignSelf: 'flex-start' }}>{tr('messages.memeFilDelier')}</button> : null}
       </div>
     </CadreFil>
   );
@@ -165,11 +167,11 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     if (cleVinted && vuVinted.current === cleVinted && !vintedOuvert) { vuVinted.current = ''; if (via) setVia(''); else setOuvert(''); }
   }, [vintedOuvert, cleVinted]);
   const panneau = () => {
-    if (!choisi) return <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis un fil</span></div>;
+    if (!choisi) return <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{tr('messages.choisisFil')}</span></div>;
     if (!conv) return <FilFusionne key={choisi.cle} fil={choisi} vintedDe={vintedDe} lireVinted={lireVinted} onRepondre={repondre} onFermer={fermer} nomDe={nomDe}
       onDelier={choisi.convs.some((c) => Object.values(relies.liens || {}).some((l) => l && (l.a === c.cle || l.b === c.cle))) ? () => { ecrire(delierFil(relies, choisi.convs.map((c) => c.cle))); setOuvert(''); } : null}/>;
     const fermerConv = () => (via ? (setVia(''), fermerVinted()) : fermer());
-    if (conv.plateforme === 'vinted') return vintedOuvert === conv.compte + ':' + conv.conv ? rendreVinted() : <div className="vrm-chat-empty" data-fil-etat="charge"><span>Lecture…</span></div>;
+    if (conv.plateforme === 'vinted') return vintedOuvert === conv.compte + ':' + conv.conv ? rendreVinted() : <div className="vrm-chat-empty" data-fil-etat="charge"><span>{tr('messages.lecture')}</span></div>;
     if (conv.plateforme === 'leboncoin') return <FilLeboncoin key={conv.cle} conv={conv.conv} nom={conv.compteNom || 'Leboncoin'} envoi={autres.lbc && autres.lbc.envoi} onFerme={fermerConv}/>;
     return <FilVestiaire key={conv.cle} conv={conv.conv} num={conv.num || ''} titre={conv.titre || ''} envoi={autres.vc && autres.vc.envoi} onFerme={fermerConv}/>;
   };
@@ -189,21 +191,21 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: C.text }}>
                   <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: C.warn, flexShrink: 0 }}/>
-                  {p.sorte === 'paire' ? 'Peut-être la même paire ?' : 'Peut-être le même acheteur ?'}
+                  {p.sorte === 'paire' ? tr('messages.peutEtreMeme') : tr('messages.peutEtreMeme2')}
                 </div>
                 <div style={{ ...muted, marginTop: 4 }}>
                   {[A, B].map((f, i) => <div key={f.cle} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><Marques plateformes={f.plateformes}/><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nomDe(f)}{f.num ? ` · N°${f.num}` : ''}</span></div>)}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                  <Bouton variante="secondaire" data-fil-relier="" onClick={() => ecrire(relierFils(relies, p.a, p.b))}>Oui, même fil</Bouton>
-                  <Bouton variante="secondaire" data-fil-refuser="" onClick={() => ecrire(refuserFils(relies, p.a, p.b))}>Non</Bouton>
+                  <Bouton variante="secondaire" data-fil-relier="" onClick={() => ecrire(relierFils(relies, p.a, p.b))}>{tr('messages.ouiMemeFil')}</Bouton>
+                  <Bouton variante="secondaire" data-fil-refuser="" onClick={() => ecrire(refuserFils(relies, p.a, p.b))}>{tr('messages.non')}</Bouton>
                 </div>
               </div>
             );
           })}
-          {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>Encore {propositions.length - 1} question{propositions.length > 2 ? 's' : ''} après celle-ci.</p> : null}
-          {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>Lecture…</div>
-            : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>Aucune conversation lue pour l'instant.</div>
+          {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositions.length - 1} {tr('messages.question')}{propositions.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
+          {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div>
+            : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : <div className="vrm-msg-list" style={{ border: `1px solid ${C.border}`, background: C.card }}>
                 {fils.slice(0, 80).map((f) => {
                   const d = f.dernier || f.convs[f.convs.length - 1];
@@ -216,13 +218,13 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                       quand={f.at} couleurHeure={f.nonLu === true ? C.text : C.muted}
                       titre={titre && titre.titre !== nomDe(f) ? titre.titre : ''} num={f.num || ''}
                       extrait={d ? d.apercu : ''} toi={!!(d && d.apercu && d.deMoi === true)} couleurExtrait={f.nonLu === true ? C.text : C.muted}
-                      apres={<>{f.convs.length > 1 ? <span className="vrm-msg-etat" data-fil-relie="" style={{ color: C.muted, borderColor: C.border }}>{f.convs.length} conv.</span> : null}<Marques plateformes={f.plateformes}/></>}
+                      apres={<>{f.convs.length > 1 ? <span className="vrm-msg-etat" data-fil-relie="" style={{ color: C.muted, borderColor: C.border }}>{trj('messages.conv', { x: f.convs.length })}</span> : null}<Marques plateformes={f.plateformes}/></>}
                       point={f.nonLu === true ? C.accent : null}/>
                   );
                 })}
               </div>}
-          {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{pasLus.map((p) => NOM_SITE[p]).join(', ')} : pas pu lire. Rien n'est perdu.</p> : null}
-          <p data-fils-ebay="" style={{ ...muted, marginTop: 8 }}>eBay : ses messages se lisent dans le filtre eBay.</p>
+          {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
+          <p data-fils-ebay="" style={{ ...muted, marginTop: 8 }}>{tr('messages.ebayMessagesLisent')}</p>
         </div>
         <div className="vrm-chat-column">{panneau()}</div>
       </div>
