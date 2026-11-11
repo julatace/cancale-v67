@@ -105,7 +105,7 @@ async function brancher(ctx, etat) {
   });
   await ctx.route(/supabase\.co\/auth\/v1\//, (route) => {
     if (etat.hors) return route.abort('internetdisconnected');
-    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) });
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ access_token: JETON + 'r' + Date.now(), refresh_token: 'r', expires_in: 3600, user: SESSION.user }) });   // (11 nov.) un jeton NEUF, comme Supabase : la porte refait sa vérification sur la nouvelle session
   });
   // (11 nov.) L'état de l'abonnement est servi : la porte « hors ligne à froid » (9 nov.) ne laisse
   // rouvrir sans réseau qu'un appareil qui CONNAÎT l'abonnement (`vrm_abo_dernier_{uid}`) ; `{}` la fermait.
@@ -232,6 +232,7 @@ async function main() {
         c.etat.hors = false; await c.ctx.setOffline(false);
         await attendre(() => collectesEnBase(c.etat).includes('MR999000111'), 30000, 300);
         dit(collectesEnBase(c.etat).includes('MR999000111'), 'au retour du réseau, « J\'ai retiré » ARRIVE en base', JSON.stringify(collectesEnBase(c.etat)));
+        if (process.env.BANC_DEBUG) console.log('    DEBUG', JSON.stringify(await c.pg.evaluate(() => new Promise((ok) => { try { const rq = indexedDB.open('vrm-gestes', 1); rq.onsuccess = () => { try { const t = rq.result.transaction('registres', 'readonly').objectStore('registres').getAll(); t.onsuccess = () => ok({ reg: (t.result || []).map((r) => (r.gestes || []).map((g) => [g.k, g.etat, g.raison || ''])), url: location.href, hl: !!document.querySelector('[data-hors-ligne]'), pastille: (document.querySelector('[data-gestes-hl]') || {}).outerHTML?.slice(0, 200) }); t.onerror = () => ok('err'); } catch (e) { ok('x ' + e); } }; rq.onerror = () => ok('open err'); } catch (e) { ok('y ' + e); } })).catch((e) => String(e))), JSON.stringify(c.etat.main.ecritures.slice(-5).map((e) => [e.meth, e.resultat])));
         await attendre(async () => (await c.pg.evaluate(() => !document.querySelector('[data-hors-ligne]') && !!document.querySelector('main')).catch(() => false)), 20000);
         await c.pg.waitForTimeout(2500);
         const apres = await c.pg.evaluate(() => ({ hl: document.querySelectorAll('[data-hors-ligne-ligne]').length, file: document.querySelectorAll('[data-file-envoi]').length, f: localStorage.getItem('vrm_file_envoi') })).catch(() => ({ hl: -1 }));

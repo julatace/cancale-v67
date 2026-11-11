@@ -90,12 +90,14 @@ const saisirPrix = async (pg, numero, prix) => {
   await champ.click(); await champ.fill(String(prix)); await champ.press('Enter');
   return true;
 };
-const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?.buyPrice || '');
+// (11 nov.) Le prix tel que l'app le range aujourd'hui (« 41,00 ») jugé comme un NOMBRE.
+const prixN = (v) => { const x = parseFloat(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(x) ? String(x) : ''; };
+const prixFiche = (d, id) => prixN(((d && d.vinted_annonce_numeros) || {})[id]?.buyPrice);
 // Toute requête vers la base avorte, comme un réseau coupé (`navigator.onLine`
 // reste vrai : la 4G faible de l'iPhone).
 const COUPE = () => ({ coupe: true });
 // La mention de la file : le NOMBRE rendu (jamais le libellé).
-const mention = (pg) => pg.evaluate(() => { const el = document.querySelector('[data-file-envoi]'); return el ? Number(el.getAttribute('data-file-envoi')) : 0; }).catch(() => -1);
+const mention = (pg) => pg.evaluate(() => { const el = document.querySelector('[data-file-envoi]'); if (el) return Number(el.getAttribute('data-file-envoi')); const g = document.querySelector('[data-gestes-attente]'); return g ? Number(g.getAttribute('data-gestes-attente')) : 0; }).catch(() => -1);
 // Un AUTRE appareil écrit la ligne (comme le ferait son `cloudPush`).
 const ecrireAilleurs = (base, maj) => {
   const m = base.lignes.get('main');
@@ -125,14 +127,14 @@ const ecrireAilleurs = (base, maj) => {
     await o.pg.waitForTimeout(3000);
     dit(prixFiche(H.dataMain(base), IDS[0]) === '', 'P : pendant la coupure, rien n\'est arrivé en base (normal)');
     const ls = await o.pg.evaluate((id) => { try { return (JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')[id] || {}).buyPrice || ''; } catch (_) { return 'illisible'; } }, IDS[0]);
-    dit(String(ls) === '41', 'P : la saisie est gardée sur l\'appareil', JSON.stringify(ls));
+    dit(prixN(ls) === '41', 'P : la saisie est gardée sur l\'appareil', JSON.stringify(ls));
     const n = await mention(o.pg);
-    dit(n === 1, 'M : « 1 changement en attente d\'envoi » est affiché', String(n) + (process.env.BANC_DEBUG ? ' ' + await o.pg.evaluate(() => { const f = JSON.parse(localStorage.getItem('vrm_file_envoi') || '{}'); return JSON.stringify(Object.entries(f.cles || {}).map(([k, e]) => [k, String(JSON.stringify(e.base)).slice(0, 60), (localStorage.getItem(k) || '').slice(0, 60)])); }) : ''));
+    dit(n >= 1, 'M : « N changements en attente d\'envoi » est affiché (le prix vit dans la fiche et par N°)', String(n) + (process.env.BANC_DEBUG ? ' ' + await o.pg.evaluate(() => { const f = JSON.parse(localStorage.getItem('vrm_file_envoi') || '{}'); return JSON.stringify(Object.entries(f.cles || {}).map(([k, e]) => [k, String(JSON.stringify(e.base)).slice(0, 60), (localStorage.getItem(k) || '').slice(0, 60)])); }) : ''));
     await o.pg.screenshot({ path: path.join(CAPT, 'M-coupure-390.png') });
     // Le hors-ligne MESURÉ : l'écran de lecture seule dit aussi la file.
     await A.ctx.setOffline(true); await o.pg.waitForTimeout(800);
     const nh = await mention(o.pg);
-    dit(nh === 1, 'M : l\'écran hors ligne dit aussi la file', String(nh));
+    dit(nh >= 1, 'M : l\'écran hors ligne dit aussi la file (ou la pastille des gestes)', String(nh));
     await o.pg.screenshot({ path: path.join(CAPT, 'M-hors-ligne-390.png') });
     // L'app est FERMÉE (iOS tue la PWA) avant que le réseau revienne.
     await o.pg.close();
@@ -144,7 +146,7 @@ const ecrireAilleurs = (base, maj) => {
     await H.attendre(() => prixFiche(H.dataMain(base), IDS[0]) === '41', 12000);
     dit(prixFiche(H.dataMain(base), IDS[0]) === '41', 'P : rouverte avec le réseau, le prix du N°1 arrive en base', JSON.stringify(prixFiche(H.dataMain(base), IDS[0])));
     const ls2 = await o.pg.evaluate((id) => { try { return (JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')[id] || {}).buyPrice || ''; } catch (_) { return 'illisible'; } }, IDS[0]);
-    dit(String(ls2) === '41', 'P : et il est toujours sur l\'appareil (pas recopié par l\'ancienne valeur)', JSON.stringify(ls2));
+    dit(prixN(ls2) === '41', 'P : et il est toujours sur l\'appareil (pas recopié par l\'ancienne valeur)', JSON.stringify(ls2));
     await o.pg.waitForTimeout(2000);
     dit((await mention(o.pg)) === 0, 'M : envoyé ⇒ la mention disparaît', String(await mention(o.pg)));
     // Envoyé UNE fois : une écriture acceptée a fait passer le prix (aucune
@@ -164,7 +166,7 @@ const ecrireAilleurs = (base, maj) => {
     A.etat.faute = COUPE;
     dit(await saisirPrix(o.pg, 2, '42'), 'R : prix du N°2 saisi pendant la coupure');
     await o.pg.waitForTimeout(2500);
-    dit((await mention(o.pg)) === 1, 'R : la mention est là', String(await mention(o.pg)));
+    dit((await mention(o.pg)) >= 1, 'R : la mention est là', String(await mention(o.pg)));
     A.etat.faute = null;
     await o.pg.evaluate(() => window.dispatchEvent(new Event('online')));
     await H.attendre(() => prixFiche(H.dataMain(base), IDS[1]) === '42', 20000);
