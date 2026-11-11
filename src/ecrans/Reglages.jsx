@@ -62,7 +62,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // ⟦← App.jsx #4⟧
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
-import { useExemplesVendeur } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
+import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
@@ -3823,10 +3823,12 @@ function ReglagesStream() {
   const sansMot = !regles.marques.length && !regles.prefixes.length && !regles.contient.length;
   const Rp = sansMot ? regleApercu({ ...regles, marques: ['Marque'] }, {}) : R;
   const motPhoto = regles.marques[0] || regles.contient[0] || (regles.prefixes[0] ? regles.prefixes[0] + 'ina' : 'Marque');
-  const photosEx = [`${motPhoto} Air Max 90 · taille 42`, 'Autre paire · taille 41'];
+  // (11 nov., lot DJ2) L'exemple ne parle de basket que chez un vendeur de sneakers.
+  const snEx = vendActuel() === 'sneakers';
+  const photosEx = snEx ? [`${motPhoto} Air Max 90 · taille 42`, 'Autre paire · taille 41'] : [`${motPhoto} article d’exemple`, 'Autre article'];
   const lignes = [
-    `${marque} Air Max 90 · taille 42 · 89,00\u00a0€`,
-    'Vendue sur ton_compte à acheteur_exemple',
+    snEx ? `${marque} Air Max 90 · taille 42 · 89,00\u00a0€` : `${marque} article d’exemple · 89,00\u00a0€`,
+    snEx ? 'Vendue sur ton_compte à acheteur_exemple' : 'Vendu sur ton_compte à acheteur_exemple',
     '8 rue de l’Exemple, 00000 Ville-Test · 06 00 00 00 00',
     'IBAN FR76 3000 6000 0112 3456 7890 189',
     ...(regles.prefixes[0] ? [`${regles.prefixes[0]}ina Runner · 54,00\u00a0€`] : []),

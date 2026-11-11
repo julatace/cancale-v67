@@ -44,6 +44,10 @@ const PERMIS = [
   ['src/ecrans/Ebay.jsx', /^'baskets mode'$/, 'clé de rapprochement des types d’article eBay (jamais affichée)'],
 ];
 const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/i;
+// Les exemples de baskets (S3) et les fichiers qui ne contiennent que des LISTES de lecture
+// (marques, modèles : reconnaître un titre) ou la démo publique de l'accueil (pour Julien).
+const MARQUES_BASKET = /\b(nike|adidas|air ?max|spezial|salomon|gel-lyte|p-6000|jordan|new balance|asics|samba|dunk)\b/i;
+const MARQUES_PERMIS_FICHIERS = ['src/vocabulaireVendeur.js', 'src/etiquetteNumero.js', 'src/ceQuiRapporte.js', 'src/agentEbay.js', 'src/repereEbay.js', 'src/accueil-demo.js', 'src/exempleDonnees.js', 'src/dejaEnStock.js', 'src/remiseEnLigne.js'];
 const sansCom = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split('\n').map((l) => (/^\s*\/\//.test(l) ? '' : l.replace(/(^|[^:'"`\\])\/\/\s.*$/, '$1'))).join('\n');
 const fichiersSrc = (racine) => { const out = []; const w = (d) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) w(p); else if (/\.jsx?$/.test(f.name)) out.push(p); } }; w(path.join(racine, 'src')); return out; };
 
@@ -120,6 +124,38 @@ async function verifier(racine, { muet = false } = {}) {
     });
   }
   dit(!hors.length, 'S1 aucun texte de chaussure hors « Sneakers » (sauf la liste justifiée)', hors);
+  // S3 (11 nov., reprise) : les EXEMPLES de baskets (« ex. salomon xt-6 », « Nike Air Max… »)
+  // sont gardés par « sneakers » ; les listes de marques et de modèles (lecture d'un titre,
+  // jamais affichées comme exemple) sont hors du relevé : un texte, c'est une phrase.
+  const marques = [];
+  const l0 = (f) => sansCom(fs.readFileSync(f, 'utf8'));
+  for (const f of fichiersSrc(racine)) {
+    const rel = path.relative(racine, f).split(path.sep).join('/');
+    if (MARQUES_PERMIS_FICHIERS.includes(rel)) continue;
+    sansCom(fs.readFileSync(f, 'utf8')).split('\n').forEach((l, i) => {
+      const lits = l.match(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`|>[^<>{}\n]+</g) || [];
+      for (const x of lits) {
+        if (!MARQUES_BASKET.test(x) || !/\s/.test(x.trim().slice(1, -1))) continue;   // une phrase, pas un mot-clé
+        if (/(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|nom === 'paire'|\b(?:sn|snEx|sneakers) \?/.test(l)) continue;
+        if (lits.length >= 4 && !/placeholder|titre=|title=|setErreur/.test(l)) continue;   // une liste de lecture (marques, modèles)
+        if (rel === 'src/FacturePro.jsx' && /^'Nike Air Max 90 — taille 42 \(exemple\)'$/.test(x) && /deps\.vendActuel\(\) !== 'sneakers'/.test(l0(f))) continue;   // remplacé hors Sneakers
+        marques.push(`${rel}:${i + 1} ${x.slice(0, 90)}`);
+      }
+    });
+  }
+  dit(!marques.length, 'S3 aucun exemple de basket (Nike, Air Max, Spezial…) hors « Sneakers »', marques);
+  // S4 : les dessins — la basket des états vides et de « Comment marche le Stock ».
+  const ill = sansCom(lire('src/composants/Illustration.jsx'));
+  const appIll = (app0) => (app0.match(/<Illustration\b[^>]*>/g) || []);
+  const app0 = sansCom(lire('src/App.jsx'));
+  const sx = sansCom(lire('src/StockExplication.jsx'));
+  const stx = sansCom(lire('src/ecrans/Stock.jsx'));
+  dit(/n === 'basket' && vend !== 'sneakers' \? 'etiquette' : n/.test(ill) && /const n = dessinDe\(nom, vend\)/.test(ill)
+    && appIll(app0).length > 0 && appIll(app0).every((t) => /vend=\{vendActuel\(\)\}/.test(t) || !/basket|depuisIcone/.test(t)),
+    'S4 la basket des états vides n’est dessinée que pour Sneakers', appIll(app0).filter((t) => !/vend=/.test(t)));
+  dit(/sneakers \? BASKET : ETIQUETTE/.test(sx) && /sneakers \? 'Air Max 90' : 'Article'/.test(sx)
+    && (stx.match(/<StockExplication\b[^>]*>/g) || []).every((t) => /sneakers=\{motsStock\.nom === 'paire'\}/.test(t)),
+    'S5 « Comment marche le Stock » : basket et « Air Max 90 » seulement pour Sneakers');
   dit(!cartons.length, 'S2 aucun texte ne dit que le N° s’écrit « sur le carton » (étagère, bac…)', cartons);
 
   // ── B : le branchement ──
@@ -156,6 +192,10 @@ async function verifier(racine, { muet = false } = {}) {
     ['src/aTrancher.js', '« sur leurs cartons » remis', "à écrire là où ${pl(n, 'l’article est rangé', 'les articles sont rangés')}`", "à écrire sur ${pl(n, 'son carton', 'leurs cartons')}`"],
     ['src/PreparerColis.jsx', '« vérifie sur son carton » remis', '`Le N°${n} est à vérifier là où l’article est rangé.`', '`Le N°${n} est à vérifier sur son carton.`'],
     ['src/ecrans/Stock.jsx', 'Stock : « Paires » pour tous', '<StatBox label={motsStock.noms.charAt(0).toUpperCase() + motsStock.noms.slice(1)} value={counts.all}/>', '<StatBox label="Paires" value={counts.all}/>'],
+    ['src/ebayRecherche.jsx', 'eBay : « ex. salomon xt-6 » pour tous', "placeholder={sn ? 'ex. salomon xt-6' : (exemple || 'ex. lampe vintage').replace(/^ex : /, 'ex. ')}", 'placeholder="ex. salomon xt-6"'],
+    ['src/ecrans/Compta.jsx', 'facture : « Adidas Spezial » pour tous', "placeholder={vendActuel()==='sneakers' ? 'ex: Adidas Spezial bleu marine taille 365' : exemplesActuels().achat}", 'placeholder="ex: Adidas Spezial bleu marine taille 365"'],
+    ['src/composants/Illustration.jsx', 'la basket des états vides pour tous', "return n === 'basket' && vend !== 'sneakers' ? 'etiquette' : n;", 'return n;'],
+    ['src/StockExplication.jsx', '« Air Max 90 » pour tous', "{sneakers ? 'Air Max 90' : 'Article'}", "{'Air Max 90'}"],
     ['src/EmballagesCarte.jsx', '« Boîte à chaussures » pour tous', 'placeholder={exemple} data-emb-champ="nom"', 'placeholder="Boîte à chaussures" data-emb-champ="nom"'],
   ];
   let rates = 0;

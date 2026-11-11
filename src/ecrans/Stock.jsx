@@ -878,7 +878,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   if (!fiches.length && !meubles.length) return (<>
     {elInventaire}
     {blocResume}
-    <StockExplication />
+    <StockExplication sneakers={motsStock.nom === 'paire'} />
     {aa && aa.su && !aa.n && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? 'Aucune annonce lue pour l’instant — une lecture manque (voir plus haut).' : 'Aucune annonce en ligne en ce moment : dès qu’une annonce est en ligne, elle arrive ici, prête à ranger.'}</Card>}
   </>);
 
@@ -924,7 +924,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           type="search" enterKeyHint="search" autoComplete="off"
           placeholder="N°, marque, taille…" aria-label="Retrouver un article dans le stock"
           style={{ width: '100%', boxSizing: 'border-box', padding: `13px ${DICTEE_OK ? 92 : 40}px 13px 40px`, borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 17, outline: 'none', minHeight: 48 }} />
-        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(requeteDeLaVoix(t).requete); setCibles([]); }} /></span>
+        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre={motsStock.nom === 'paire' ? 'Chercher à la voix (« numéro 12 », « nike noire »)' : 'Chercher à la voix (« numéro 12 »)'} onText={(t) => { setQ(requeteDeLaVoix(t).requete); setCibles([]); }} /></span>
         {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
       </div>
       {filtre && (
@@ -988,7 +988,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       onVerifier={() => { retourAnnuel.current = true; setAnnuel(false); setInventaire(true); }}
       onAnnonces={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} }}/> : null}
     {blocCherche}
-    {meubles.length === 0 && <StockExplication />}
+    {meubles.length === 0 && <StockExplication sneakers={motsStock.nom === 'paire'} />}
     {blocVendues}
     {blocPlusEnLigne}
     {blocPasSu}
@@ -1047,7 +1047,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
     <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Ajouter un meuble</button>
     {meubles.length > 0 && (explication
-      ? <StockExplication onFermer={() => setExplication(false)} />
+      ? <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />
       : <button className="vrm-b vrm-b-discret" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)} style={{ alignSelf: 'center' }}>Comment ça marche ?</button>)}
 
     {Modale()}
@@ -1555,6 +1555,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 // ⟦← App.jsx #10⟧
 function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLocate }) {
   const motsStock = useMotsArticle();   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
+  const exemplesInv = useExemplesVendeur();   // (11 nov., lot DJ2) l’exemple de titre suit ce qu’il vend
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all'); // all | online | sold | stock
   const [showAdd, setShowAdd] = useState(false);
@@ -1801,7 +1802,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           <div style={{fontWeight:600,marginBottom:10,color:C.text}}>Nouvel article</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}>
             <input value={addForm.numero} onChange={e=>setAddForm(f=>({...f,numero:e.target.value}))} placeholder="Numéro (ex : 2057)" style={{...inputStyle,width:150}}/>
-            <input value={addForm.title} onChange={e=>setAddForm(f=>({...f,title:e.target.value}))} placeholder="Titre (ex : Adidas Spezial 38)" style={{...inputStyle,flex:1,minWidth:180}}/>
+            <input value={addForm.title} onChange={e=>setAddForm(f=>({...f,title:e.target.value}))} placeholder={motsStock.nom === 'paire' ? 'Titre (ex : Adidas Spezial 38)' : `Titre (${exemplesInv.achat})`} style={{...inputStyle,flex:1,minWidth:180}}/>
             <select value={addForm.status} onChange={e=>setAddForm(f=>({...f,status:e.target.value}))} style={inputStyle}>
               <option value="stock">📦 Stock</option>
               <option value="online">🟢 En ligne</option>

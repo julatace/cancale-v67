@@ -378,7 +378,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   const enregistrer = async () => {
     if (!form || envoi) return;
     const titre = form.title.trim();
-    if (!titre) { setErreur('Donne un nom à cet achat (ex : Nike P-6000 argent 38).'); return; }
+    if (!titre) { setErreur(`Donne un nom à cet achat (${exemplesActuels().achat}).`); return; }
     const prix = prixAchatSaisi(form.price);
     if (prix === null) { setErreur('Le prix payé doit être un montant en euros (ex : 25 ou 25,50).'); return; }
     setEnvoi(true);

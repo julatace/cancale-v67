@@ -14941,7 +14941,7 @@ function PeriodePicker({ value, onChange, titre = 'Période', vide, datation }) 
 
 function EmptyState({ icon, title, desc, action }) {
   return <div className="vrm-empty-state vrm-empty-clair">
-    <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true"><Illustration nom={depuisIcone(icon)} taille={64}/></div>
+    <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true"><Illustration nom={depuisIcone(icon)} taille={64} vend={vendActuel()}/></div>
     <div className="vrm-empty-corps"><h3>{title}</h3>{desc&&<p>{desc}</p>}{action&&<div className="vrm-empty-actions">{action}</div>}</div>
   </div>;
 }
@@ -21703,7 +21703,7 @@ function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte}){
   },[ventes,panelOff]);
   const [gagnes,setGagnes]=React.useState(false);
   return <div style={{padding:16}} data-ebay-achats-onglet="">
-    <RechercheEbay headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
+    <RechercheEbay vend={vendActuel()} exemple={exemplesActuels().achat} headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
     <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
     {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
     <details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
@@ -41360,7 +41360,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
               if (nGestes === 0) return { prochain: null, section: pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
-                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96}/><p>Rien à faire</p></div> };
+                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96} vend={vendActuel()}/><p>Rien à faire</p></div> };
               // (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE sort de la liste : elle se pose EN TÊTE,
               // dans la carte sombre, avant l'argent (Julien : l'ordre = ce qu'il faut faire maintenant, puis
               // l'argent, puis le reste). L'ordre de toujours (le plus pressé d'abord) la désigne ; les
@@ -47065,7 +47065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:2}}>🔍 Vérificateur d'achat</div>
                 <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8}}>Modèle + prix demandé : tes ventes disent si ça vaut le coup.</div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:checker?10:0}}>
-                  <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder="Modèle (ex : gel-lyte, spezial…)"
+                  <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder={vendActuel()==='sneakers' ? 'Modèle (ex : gel-lyte, spezial…)' : exemplesActuels().modele}
                     style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
                   <input value={srcPrice} onChange={e=>setSrcPrice(e.target.value)} placeholder="Prix demandé&nbsp;€" inputMode="decimal"
                     style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
@@ -49933,7 +49933,7 @@ const ecrireReglage = async (id, data) => {
     return r.ok;
   } catch (_) { return false; }
 };
-const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus };
+const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus, vendActuel: () => vendActuel(), exemples: () => exemplesActuels() };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
 async function lireAbonnement() {
   try {
