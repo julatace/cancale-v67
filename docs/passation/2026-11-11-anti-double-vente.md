@@ -76,7 +76,19 @@ avec un résultat honnête par site, et le « peut-être » pour ce qui n'est pa
   lecture complète du site APRÈS. `--prouve` : **18/18 mutations** rouges. Sur `origin/main` :
   règle absente + 6 rouges sur 7.
 - Banc `scripts/bancs/retirer-ailleurs.cjs` (harnais `nouveau-vendeur`, extension et route eBay
-  simulées, port 9676, 390 tactile et 1512) — résultats ci-dessous.
+  simulées, port 9676, 390 tactile et 1512) : **74/74** sur l'arbre fusionné avec `main`.
+  Annuler n'envoie rien ; Confirmer : UNE commande `lbcSupprime` (l'identifiant du N°42, jamais
+  les N°43/44 au même titre) et UN `retirer` eBay sans `auto` ; eBay « retiré ✓ relu » après la
+  synchro ; Leboncoin « pas encore relu » puis « relu » après une lecture complète + « Revérifier » ;
+  sans extension : Leboncoin à la main avec lien ; lectures de 30 h : « peut-être … · vérifier »,
+  aucun bouton ; N° ambigu : rien. Aucun débordement, 44 px, aucun rouge, aucune erreur JS.
+  Captures regardées (carte, confirmation, résultats, Ventes « peut-être »).
+- Audits du lot verts : variables, tdz, coherence (après `git fetch --unshallow` : le clone
+  superficiel rendait l'historique des versions illisible, rouge aussi sur `main`), identite, icones,
+  textes-courts, fonctions-api, secrets, extension-zip, double-vente-ailleurs, en-ligne-deux-fois.
+- Vu au banc, pas changé : la coque pose aussi sa propre alerte « 1 annonce à retirer de
+  Leboncoin / d'eBay » (avec « Supprimer ») à côté de la carte — c'était déjà le cas avec l'ancienne
+  carte « Vendus ailleurs ». À trancher : les fondre en une.
 - `journee-coherence` vert (il avait rougi 4 fois sur une première version : la feuille redisait les
   annonces — corrigé).
 
