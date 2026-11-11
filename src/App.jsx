@@ -43039,7 +43039,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <button key="photos-comptes" type="button" className="vrm-day-task vrm-fu-tache" data-journee-photos-comptes={photosDouble.map((g) => g.id).join(' ')} data-n={String(photosDouble.length)}
                     title={`${t.titre}\n${t.detail}`} aria-label={`${t.titre} — ${t.detail}`} onClick={() => { relireEmpreintes(); setFeuillePhotosJ(true); }}>
-                    <PileVignettes srcs={photosDouble.flatMap((g) => g.annonces.map((a) => a.photo))} n={photosDouble.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="photos" size={20}/>}/>
+                    <PileVignettes srcs={photosDouble.flatMap((g) => g.annonces.map((a) => a.photo))} n={photosDouble.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="image" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="photos-comptes">{t.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
                   </button>
@@ -45786,7 +45786,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        et les données (prix d'achat posés, numéros) restent ; plus rien ne les ouvre. Ne pas les
                        remettre sans sa demande. Les prix d'un achat groupé : Achats → Fournisseurs. */
                     /* (11 nov., lot photos-comptes) La même photo sur deux de ses comptes Vinted : la feuille. */
-                    {k:'photos-comptes', icon:'photos', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
+                    {k:'photos-comptes', icon:'image', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     /* (5 nov., chantier C — revue 2.7) « Compléter les prix d'achat » n'est plus
                        dans ce menu : le bandeau « Prix d'achat · N/M → Compléter », au-dessus de
