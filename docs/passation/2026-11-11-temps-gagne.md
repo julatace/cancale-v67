@@ -36,7 +36,7 @@ compte, pour convaincre — un calculateur simple et honnête.
 - **Poids** : le calculateur est un morceau à part (`React.lazy`, ≈ 6,9 Ko non compressés),
   demandé seulement à l'approche de sa section (IntersectionObserver, marge 60 %). Dans le
   fichier d'entrée n'entrent que les textes (fr-accueil.js) et quelques lignes : +0,14 Ko compressés.
-- **Traduction** : 37 clés `accueil.temps.*` dans `{fr,en,es,it,de}-accueil.js` ;
+- **Traduction** : 30 clés `accueil.temps.*` dans `{fr,en,es,it,de}-accueil.js` ;
   `TempsGagne.jsx` ajouté aux écrans migrés d'`audit-traduction` (aucun texte en dur) et à
   la liste des fichiers publics (clés dans la partie publique).
 
