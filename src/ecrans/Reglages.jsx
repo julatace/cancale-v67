@@ -21,6 +21,7 @@ import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRec
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
 import { PLATEFORMES_COMPTES, etatCompteLie, ageLecture, nomCompteLie, LIBELLE_ETAT } from '../comptesLies.js';
 import { contactEmail, CONTACT_A_VENIR } from '../contact.js';
+import { preuveSuppression, nomFournisseur } from '../../api/_lib/preuve-connexion.js';   // (11 nov., lot suppression-oauth)
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from '../../api/_lib/proprietaire-email.js';
 import { photoACacherSelon, poserReglesStream, normaliserRegles, masquerTexteStream, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM_REGLES } from '../modeStream.js';
 import { noterTicketDiscord } from '../communaute/discordAttente.js';
@@ -31,7 +32,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumero
 const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
 import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
-import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
+import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart } from '../App.jsx';
 
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
@@ -1694,7 +1695,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
   React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
   // (6 nov.) Un conseil ouvre un panneau (« Voir comment ») : `DEMANDE_REGLAGE_SOUS`.
-  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; setVueBrute(id==='appareils'?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
+  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; setVueBrute(id==='appareils'||id==='fermer'?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
   // (6 nov.) La notification « problème signalé » ouvre la liste (propriétaire seul).
   React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setVueBrute('reglages'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
@@ -2595,14 +2596,17 @@ async function lireInventaireSuppression() {
   } catch (_) { return null; }
 }
 const MOT_SUPPRIMER = 'SUPPRIMER';
-// Le compte a-t-il un mot de passe ? (identités de Supabase) — `null` pas dit.
-const aMotDePasse = () => {
-  const u = AUTH.user || {};
-  const p = Array.isArray(u.identities) ? u.identities.map((i) => i && i.provider) : (u.app_metadata && Array.isArray(u.app_metadata.providers) ? u.app_metadata.providers : null);
-  return p ? p.includes('email') : null;
-};
+// (11 nov., lot suppression-oauth) La preuve que l'écran ANNONCE : le même calcul que
+// le serveur (api/_lib/preuve-connexion.js). `AUTH.user` ne porte pas les identités :
+// la fiche (`/auth/v1/user`) d'abord, sinon le jeton (`app_metadata.providers`).
+// Compte sans mot de passe ⇒ jamais de champ mot de passe.
 function FermerCompte({ onExporter }) {
-  const [ouvert, setOuvert] = React.useState(false);
+  const retourReco = AUTH_REDIRECT && AUTH_REDIRECT.reconnexion ? AUTH_REDIRECT : null;
+  const [ouvert, setOuvert] = React.useState(!!retourReco);
+  const [identites, setIdentites] = React.useState(undefined);
+  const [, setTic] = React.useState(0);
+  const [recoErreur, setRecoErreur] = React.useState(retourReco && retourReco.error ? retourReco.error : '');
+  const [recoEnCours, setRecoEnCours] = React.useState('');
   const [info, setInfo] = React.useState(undefined);
   const [tape, setTape] = React.useState('');
   const [mdp, setMdp] = React.useState('');
@@ -2616,13 +2620,27 @@ function FermerCompte({ onExporter }) {
     if (!ouvert) return;
     let mort = false; setInfo(undefined);
     lireInventaireSuppression().then((x) => { if (!mort) setInfo(x); });
+    lireConnexionsOAuth().then((x) => { if (!mort) setIdentites(x); }).catch(() => { if (!mort) setIdentites(null); });
     compterReglesEbay().then((n) => { if (!mort) setReglesEbayN(n); }).catch(() => { if (!mort) setReglesEbayN(null); });
     return () => { mort = true; };
   }, [ouvert, essai]);
   const pareil = tape.trim() === MOT_SUPPRIMER;
-  const avecMdp = aMotDePasse();
+  const preuve = preuveSuppression({ jeton: AUTH.session && AUTH.session.access_token, identites: Array.isArray(identites) ? identites : undefined });
+  const recente = preuve.recente, champMdp = !recente && (preuve.cas === 'mdp' || preuve.cas === 'pas-su');
+  // La fenêtre de 10 min se referme pendant qu'il lit : l'écran suit.
+  React.useEffect(() => {
+    if (!ouvert || !recente) return;
+    const t = setTimeout(() => setTic((x) => x + 1), Math.min(preuve.resteMs + 300, 30000));
+    return () => clearTimeout(t);
+  });
+  const reconnecter = async (p) => {
+    setRecoErreur(''); setRecoEnCours(p);
+    const r = await oauthStart(p, 'reconnexion');
+    if (!r || !r.ok) { setRecoEnCours(''); setRecoErreur((r && r.error) || 'La reconnexion n’a pas pu s’ouvrir. Réessaie.'); }
+  };
+  const peutEnvoyer = pareil && (recente || (champMdp && mdp.length > 0));
   const valider = async () => {
-    if (!pareil || occupe) return;
+    if (!peutEnvoyer || occupe) return;
     setOccupe(true);
     const r = await supprimerMonCompte({ confirmation: tape.trim(), motDePasse: mdp });
     setOccupe(false); setMdp('');
@@ -2688,24 +2706,51 @@ function FermerCompte({ onExporter }) {
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la suppression, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
 
               <div style={titreBloc}>4. Confirme que c’est toi</div>
-              <label style={{ display: 'block', ...txt, marginTop: 4 }}>
-                Tape <b style={{ color: C.text }}>{MOT_SUPPRIMER}</b> en majuscules
-                <input type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={tape} onChange={(e) => setTape(e.target.value)}
-                  data-fermer-confirmation="" aria-label={`Tape ${MOT_SUPPRIMER} pour confirmer`} style={champ}/>
-              </label>
-              <label style={{ display: 'block', ...txt, marginTop: 10 }}>
-                Ton mot de passe VRM{avecMdp === false ? ' (ton compte n’en a pas)' : ''}
-                <input type="password" autoComplete="current-password" value={mdp} onChange={(e) => setMdp(e.target.value)}
-                  data-supprimer-mdp="" style={champ}/>
-              </label>
-              <div style={{ ...txt, fontSize: 12, marginTop: 6 }}>
-                {avecMdp === false
-                  ? 'Google ou Discord : laisse vide si connecté il y a < 10 min, sinon reconnecte-toi.'
-                  : 'Google ou Discord : connexion de moins de 10 min suffit.'}
+              {recoErreur && <div role="alert" data-supprimer-reco-erreur="" style={{ ...txt, color: C.warn, marginTop: 4 }}>{recoErreur}</div>}
+              <div data-supprimer-preuve={preuve.cas}>
+                {recente && (
+                  <div data-supprimer-recent="" style={{ ...txt, color: C.text, marginTop: 4 }}>
+                    {preuve.cas === 'oauth-recent' && preuve.oauth.length === 1 ? `Tu viens de te connecter avec ${nomFournisseur(preuve.oauth[0])}.` : 'Tu viens de te connecter.'} Tape <b>{MOT_SUPPRIMER}</b> pour confirmer.
+                    <div data-supprimer-reste={Math.ceil(preuve.resteMs / 60000)} style={{ ...txt, fontSize: 12, marginTop: 2 }}>Encore {Math.max(1, Math.ceil(preuve.resteMs / 60000))} min. Ensuite, reconnecte-toi.</div>
+                  </div>
+                )}
+                {preuve.cas === 'oauth-ancien' && (
+                  <div data-supprimer-reconnexion="" style={{ ...txt, marginTop: 4 }}>
+                    Ton compte n’a pas de mot de passe. Reconnecte-toi pour confirmer que c’est toi.
+                  </div>
+                )}
+                {!recente && preuve.oauth.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    {preuve.oauth.map((p) => (
+                      <Bouton key={p} variante={preuve.cas === 'oauth-ancien' ? 'primaire' : 'secondaire'} onClick={() => reconnecter(p)} disabled={!!recoEnCours} data-supprimer-reconnecter={p}>
+                        {recoEnCours === p ? 'Ouverture…' : `Me reconnecter avec ${nomFournisseur(p)}`}
+                      </Bouton>
+                    ))}
+                  </div>
+                )}
+                {(recente || champMdp) && (
+                  <label style={{ display: 'block', ...txt, marginTop: 10 }}>
+                    Tape <b style={{ color: C.text }}>{MOT_SUPPRIMER}</b> en majuscules
+                    <input type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={tape} onChange={(e) => setTape(e.target.value)}
+                      data-fermer-confirmation="" aria-label={`Tape ${MOT_SUPPRIMER} pour confirmer`} style={champ}/>
+                  </label>
+                )}
+                {champMdp && (
+                  <>
+                    <label style={{ display: 'block', ...txt, marginTop: 10 }}>
+                      Ton mot de passe VRM
+                      <input type="password" autoComplete="current-password" value={mdp} onChange={(e) => setMdp(e.target.value)}
+                        data-supprimer-mdp="" style={champ}/>
+                    </label>
+                    <div style={{ ...txt, fontSize: 12, marginTop: 6 }}>Pas de mot de passe ? Reconnecte-toi, puis reviens ici.</div>
+                  </>
+                )}
+                {(recente || champMdp) && (
+                  <Bouton variante="danger" onClick={valider} disabled={!peutEnvoyer || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
+                    {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
+                  </Bouton>
+                )}
               </div>
-              <Bouton variante="danger" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
-                {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
-              </Bouton>
             </div>
           )}
         </div>
