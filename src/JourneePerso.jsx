@@ -71,7 +71,7 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
   const origine = estOrigine(r);
   return (
     <div className="vrm-jp" ref={racine} data-jp-editeur="" data-jp-origine={origine ? '1' : '0'}>
-      <p className="vrm-jp-aide">Touche l’interrupteur pour montrer ou cacher une carte, glisse la poignée pour la déplacer. Les alertes urgentes restent toujours affichées.</p>
+      <p className="vrm-jp-aide">Glisse la poignée pour ranger une carte, touche l’interrupteur pour la cacher. Les alertes urgentes restent toujours affichées.</p>
       {ZONES_JOURNEE.map((z) => {
         const ids = ordreJournee(z.id, r);
         return (
@@ -82,7 +82,9 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
                 const c = carteJournee(id); const v = visibiliteCarte(id, { reglage: r, mode });
                 return (
                   <li key={id} className={'vrm-jp-ligne' + (v.choisie ? '' : ' is-cachee') + (glisse === id ? ' is-glisse' : '')} data-jp-ligne={id} data-jp-rang={i} data-jp-montree={v.choisie ? '1' : '0'}>
-                    <button type="button" className="vrm-jp-poignee" data-jp-poignee={id}
+                    {/* `touch-action: none` EN LIGNE : une règle globale hors couche (« manipulation ») l'emporterait sur
+                        la feuille de style, et le doigt ferait défiler la page au lieu de déplacer la carte. */}
+                    <button type="button" className="vrm-jp-poignee" data-jp-poignee={id} style={{ touchAction: 'none' }}
                       aria-label={`Déplacer ${c.nom} (${i + 1}ᵉ sur ${ids.length})`} aria-describedby="vrm-jp-consigne" aria-roledescription="poignée"
                       onKeyDown={(e) => auClavier(e, id, z.id)} onPointerDown={(e) => glisser(e, id, z.id)}>
                       <Poignee/>

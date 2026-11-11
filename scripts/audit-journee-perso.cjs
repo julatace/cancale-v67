@@ -114,7 +114,7 @@ async function controles(T, ok) {
   ok(/import \{ JourneePersoSetting \} from '\.\.\/App\.jsx';/.test(T.reglages || '') && /id:'ma-journee'[^\n]*el:<JourneePersoSetting\/>/.test(T.reglages || ''), 'S6 Paramètres → Affichage → Ma journée : le même éditeur');
   const ed = sansCommentaires(T.editeur || '');
   ok(/e\.key === 'ArrowUp' \? i - 1 : e\.key === 'ArrowDown' \? i \+ 1 : e\.key === 'Home' \? 0 : e\.key === 'End'/.test(ed) && /onKeyDown=\{\(e\) => auClavier\(e, id, z\.id\)\}/.test(ed) && /aria-live="polite"/.test(ed), 'S7 la poignée se déplace au clavier (flèches, Début/Fin), annoncé');
-  ok(/onPointerDown=\{\(e\) => glisser\(e, id, z\.id\)\}/.test(ed) && /setPointerCapture/.test(ed) && /touch-action: none/.test(lire('src/styles-journee-perso.css') || ''), 'S7 la poignée se glisse au doigt (pointeur capté, aucun défilement volé)');
+  ok(/onPointerDown=\{\(e\) => glisser\(e, id, z\.id\)\}/.test(ed) && /setPointerCapture/.test(ed) && /data-jp-poignee=\{id\} style=\{\{ touchAction: 'none' \}\}/.test(ed), 'S7 la poignée se glisse au doigt (pointeur capté, aucun défilement volé)');
   ok(/role="switch" aria-checked=\{v\.choisie\}/.test(ed) && /poser\(revenirOrigine\(\)\)/.test(ed), 'S7 un interrupteur par carte, « Revenir au réglage d’origine »');
 }
 
@@ -142,6 +142,7 @@ const MUTATIONS = {
   cachee_comptee: ['app', (s) => s.replace("const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);", 'const nGestes = nGestesTout;')],
   frise_demontee: ['app', (s) => s.replace("return id === 'phrase' ? null : <div key={id} hidden data-jp-cachee={id}>{blocsTete[id]}</div>;", 'return null;')],
   clavier_muet: ['editeur', (s) => s.replace('onKeyDown={(e) => auClavier(e, id, z.id)} ', '')],
+  defilement_vole: ['editeur', (s) => s.replace(" style={{ touchAction: 'none' }}", '')],
   doigt_muet: ['editeur', (s) => s.replace(' onPointerDown={(e) => glisser(e, id, z.id)}', '')],
   sans_parametres: ['reglages', (s) => s.replace(", el:<JourneePersoSetting/> },", ", el:null },")],
 };

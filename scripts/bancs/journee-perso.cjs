@@ -103,7 +103,7 @@ async function preparer(b, vp, { theme = 'light', reduit = false, urgent = false
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
-    if (route.request().method() !== 'GET') { ecrits.push(route.request().postData() || ''); return j([]); }
+    if (route.request().method() !== 'GET') { ecrits.push(`${route.request().method()} ${u.replace(/^.*\/rest\/v1\//, '').slice(0, 90)} ${route.request().postData() || ''}`); return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
@@ -222,9 +222,13 @@ async function main() {
         // O — enregistré, synchronisé, et toujours là au rechargement.
         await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_journee_perso')); return p && p.choix && p.choix.envoyer === false; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
         const p = await lirePerso(pg);
-        for (let k = 0; k < 40 && !ecrits.some((t) => /vrm_journee_perso/.test(t)); k++) await pg.waitForTimeout(250);
         dit(p && p.choix && p.choix.envoyer === false && Array.isArray(p.ordre) && p.ordre.indexOf('chiffres') < p.ordre.indexOf('frise'), `O ${T} le réglage est enregistré (vrm_journee_perso)`, JSON.stringify(p));
-        dit(ecrits.some((t) => /vrm_journee_perso/.test(t)), `O ${T} et envoyé au nuage (synchronisé par compte)`, String(ecrits.length) + ' écritures');
+        // Cette base est « non cloisonnée » (la sonde `owner` répond 400, comme au banc journee-v2) : l'app n'y
+        // écrit jamais la ligne `main`. La preuve de la synchro est donc la FILE D'ENVOI vers le nuage (où
+        // n'entrent que les clés de SYNC_KEYS, jusqu'à ce que le nuage les accepte) ; le sens nuage → appareil
+        // est prouvé par U (réglage servi par la ligne `main`).
+        const file = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_file_envoi')); } catch (_) { return null; } });
+        dit(!!(file && file.cles && file.cles.vrm_journee_perso), `O ${T} et mis dans la file d'envoi vers le nuage (synchronisé par compte)`, JSON.stringify(file && file.cles ? Object.keys(file.cles) : file));
         await pg.reload({ waitUntil: 'domcontentloaded' }); await attendreJournee(pg);
         const e2 = await etat(pg);
         dit(!e2.cartes.includes('envoyer') && e2.cachees.envoyer === '3', `O ${T} rechargé : toujours cachée`, JSON.stringify(e2.cartes));
