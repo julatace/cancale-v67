@@ -210,7 +210,8 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         for (const [tx, code] of [['7004', 'mail'], ['7005', 'heure'], ['7006', 'montant'], ['7008', 'mails']]) {
           const l = ligneFacture(pg, tx);
           await l.waitFor({ timeout: 4000 });
-          raisons[tx] = { code: await l.locator('[data-fp-vente="pas-prouve"]').getAttribute('data-fp-preuve').catch(() => null), bouton: await l.locator('button').count(), t: (await l.innerText()).replace(/\s+/g, ' ') };
+          // (11 nov., lot DJ1) La ligne porte aussi « Bon de retour » : on compte le bouton de FACTURE.
+          raisons[tx] = { code: await l.locator('[data-fp-vente="pas-prouve"]').getAttribute('data-fp-preuve').catch(() => null), bouton: await l.locator('[data-fp-vente="a-faire"]').count(), t: (await l.innerText()).replace(/\s+/g, ' ') };
           dit(raisons[tx].code === code && raisons[tx].bouton === 0 && /acheteur pas prouvé/.test(raisons[tx].t), `1. ${tx} : PAS de bouton, la ligne dit pourquoi (${code})`, raisons[tx].t);
         }
         dit(/3 h après/.test(raisons['7005'].t) && /e-mail 59,00\s€, Vinted 55,00\s€/.test(raisons['7006'].t), '1. la raison est précise (l’écart d’heure, les deux prix)', raisons['7005'].t + ' | ' + raisons['7006'].t);
@@ -223,7 +224,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         const id = await ouvrirVente(pg, '7004');
         const f = pg.locator(`[id="${id}"] [data-fp-forme="fiche"]`);
         await f.waitFor({ timeout: 6000 });
-        dit(await f.locator('button').count() === 0 && /acheteur pas prouvé/.test(await f.innerText()), '1. fiche de la vente non prouvée : pas de bouton, la raison', (await f.innerText()).replace(/\s+/g, ' '));
+        dit(await f.locator('[data-fp-vente="a-faire"]').count() === 0 && /acheteur pas prouvé/.test(await f.innerText()), '1. fiche de la vente non prouvée : pas de bouton de facture, la raison', (await f.innerText()).replace(/\s+/g, ' '));
         await fermerVente(pg);
       });
       await essaie('7001 : la feuille, puis l’envoi', async () => {
