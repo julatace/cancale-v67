@@ -76,7 +76,7 @@ function phraseEtat(e, { telephone }) {
   if (e.cle === 'configuration') return { ton: 'neutre', texte: e.detail === 'reprendre' ? 'Tes premiers choix sont gardés.' : 'Deux minutes. Tout reste modifiable.' };
   if (e.cle === 'extension') return e.detail === 'pasconnectee' ? { ton: 'neutre', texte: 'Installée. Connecte-la à ce compte VRM.' }
     : e.detail === 'autrecompte' ? { ton: 'passu', texte: 'Connectée à un autre compte VRM.' }
-    : telephone ? null : { ton: 'attente', texte: 'J’attends qu’elle réponde ici.' };
+    : null;   // absente : le guide de ce navigateur (PremiersPas) dit déjà qu'il regarde en direct (§7, une phrase une fois)
   if (e.cle === 'emails') return { ton: 'attente', texte: 'J’attends ton premier e-mail…' };
   if (e.cle === 'vinted') return e.etat === 'attente' ? { ton: 'attente', texte: 'Lecture de ton dressing…' } : { ton: 'neutre', texte: 'Connecte-toi à vinted.fr dans ce navigateur.' };
   if (e.cle === 'premiere') return e.etat === 'passu' ? { ton: 'passu', texte: 'Pas pu vérifier.' } : { ton: 'attente', texte: 'J’attends ta première vente ou ton premier achat…' };
