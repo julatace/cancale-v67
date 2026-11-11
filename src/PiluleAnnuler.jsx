@@ -38,19 +38,31 @@ export function PiluleAnnuler({ gestes, enHaut = false }) {
   }, [suspendre]);
   const v = etat.visible;
   const derniere = React.useRef(null);
+  const zone = React.useRef(null);
+  // (11 nov., lot DJ4) LE FOCUS ET LE SURVOL RÉELS, relus à chaque changement de la pilule.
+  // Un bouton focalisé qui disparaît (« Annuler » remplacé par « Annulé ») ne déclenche aucun
+  // `blur` : la raison « focus » restait vraie, la pause jamais levée, et la pilule (puis celle
+  // du geste suivant, « Annuler » compris) restait affichée pour toujours.
+  const relire = React.useCallback(() => {
+    const z = zone.current; const r = raisons.current;
+    let dedans = false, survol = false;
+    try { dedans = !!(z && document.activeElement && z.contains(document.activeElement)); } catch (_) {}
+    try { survol = !!(z && z.matches(':hover') && window.matchMedia('(hover: hover) and (pointer: fine)').matches); } catch (_) {}
+    r.focus = dedans; r.survol = survol; suspendre();
+  }, [suspendre]);
   React.useEffect(() => {
-    if (v) { derniere.current = v; setSortante(null); return undefined; }
+    if (v) { derniere.current = v; setSortante(null); relire(); return undefined; }
+    raisons.current.survol = false; raisons.current.focus = false; suspendre();
     if (!derniere.current) return undefined;
     setSortante(derniere.current); derniere.current = null;
-    raisons.current.survol = false; raisons.current.focus = false;
     const t = setTimeout(() => setSortante(null), 180);
     return () => clearTimeout(t);
-  }, [v]);
+  }, [v && v.id, v && v.etat, v && v.peutAnnuler]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (typeof document === 'undefined') return null;
   const montree = v || sortante;
   const t = montree ? (TEXTES[montree.etat] || TEXTES.envoi)(montree) : null;
   return createPortal(
-    <div className="vrm-pil-zone" data-pilule-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="true">
+    <div ref={zone} className="vrm-pil-zone" data-pilule-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="true">
       {montree ? (
         <div key={montree.id} className={'vrm-pil' + (v ? '' : ' is-sortie') + (t.alerte ? ' is-alerte' : '')} data-pilule={montree.id} data-pilule-etat={montree.etat}
           onPointerEnter={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = true; suspendre(); } }}
