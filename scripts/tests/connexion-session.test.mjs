@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { lireReconnexion, reconnexionPermise } from "../../src/auth/reconnexion.js";
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source = fs.readFileSync(
@@ -162,6 +163,10 @@ function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
     AUTH: ancienne,
     RECOVERY_PENDING: false,
     lireLiaisonOAuth: () => null,
+    // (relecture du 11 nov., lot suppression-oauth) les vraies règles de la reconnexion.
+    lireReconnexion,
+    lireIntentionOAuth: () => null,
+    reconnexionPermise,
     cleanAuthUrl: () => {
       nettoyee = true;
     },
