@@ -22,6 +22,9 @@ import { embellir, GENRES } from '../api/_lib/notif-belle.js';
 export const ETAT_CENTRE = {
   calme: 'Heures calmes',
   discret: 'Sans sonnerie',
+  // (11 nov., lot `notifs-groupees`) Arrivée dans la fenêtre de regroupement.
+  attente: 'Dans le prochain résumé',
+  groupee: 'Dans un résumé',
   'sans-appareil': 'Aucun appareil',
   serveur: 'Pas envoyée',
   echec: 'Pas reçue',

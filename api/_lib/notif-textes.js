@@ -183,15 +183,71 @@ export function soirALHeure(prefs, t = Date.now()) {
 // Vrai si `t` tombe dans les heures calmes (une plage qui passe minuit compte,
 // 22:00 → 08:00 ; début = fin ne fait rien). Une famille exemptée ⇒ non. Une
 // échéance qui tombe avant 10 h (`echeance`, ISO ou ms) ⇒ non : elle sonne.
-export function dansHeuresCalmes(prefs, cat, t = Date.now(), echeance = null) {
+export function dansHeuresCalmes(prefs, cat, t = Date.now(), echeance = null, { urgent = false } = {}) {
+  if (!cat || cat === 'test') return false;
+  // (11 nov.) Un JOUR calme : seul l'urgent passe (voir `calmePourLeJour`).
+  if (calmePourLeJour(prefs, cat, t, echeance, urgent)) return true;
   const c = reglageCalme(prefs);
-  if (!c.actif || !cat || cat === 'test') return false;
+  if (!c.actif) return false;
   if (c.sauf.includes(familleDe(cat))) return false;
   if (echeance != null && echeancePressante(echeance, t)) return false;
   const d = minutesDe(c.debut), f = minutesDe(c.fin), m = minutesParis(t);
   if (d == null || f == null || m == null || d === f) return false;
   return d < f ? (m >= d && m < f) : (m >= d || m < f);
 }
+// ── LES JOURS CALMES (11 nov., Julien : « en plus des heures calmes, des jours
+// calmes au choix ») ─────────────────────────────────────────────────────────
+// Rangés dans `push_prefs.calme` : `jours: ['sam','dim']` (jours off cochés ; le
+// « week-end calme » = samedi + dimanche) et `conges: { du, au }` (AAAA-MM-JJ,
+// bornes comprises, jours de Paris). Indépendants de l'interrupteur des heures
+// calmes. Pendant un jour calme, SEUL L'URGENT passe :
+//   · une échéance (date limite d'envoi ou de retrait) dans moins de 24 h ;
+//   · `urgent: true` posé par l'émetteur (rappel du matin : colis dus aujourd'hui) ;
+//   · la double vente (un N° vendu deux fois) ;
+//   · une panne (`capture` : un compte qui n'arrive plus ; `signalement`).
+// Le reste est rangé « heures calmes » et part groupé au premier moment non
+// calme (le récapitulatif du réveil, api/_lib/reveil-calme.js). Une seule règle :
+// le serveur (push.js, rappels) et l'écran (Paramètres) lisent celle-ci.
+export const JOURS_SEMAINE = [
+  { id: 'lun', court: 'L', nom: 'lundi' }, { id: 'mar', court: 'M', nom: 'mardi' }, { id: 'mer', court: 'M', nom: 'mercredi' },
+  { id: 'jeu', court: 'J', nom: 'jeudi' }, { id: 'ven', court: 'V', nom: 'vendredi' }, { id: 'sam', court: 'S', nom: 'samedi' }, { id: 'dim', court: 'D', nom: 'dimanche' },
+];
+export const CATS_URGENTES_JOUR = new Set(['doublevente', 'capture', 'signalement']);
+const AAAAMMJJ = /^\d{4}-\d{2}-\d{2}$/;
+export function reglageJours(prefs) {
+  const c = prefs && prefs.calme && typeof prefs.calme === 'object' ? prefs.calme : {};
+  const jours = Array.isArray(c.jours) ? JOURS_SEMAINE.map((j) => j.id).filter((id) => c.jours.includes(id)) : [];
+  const g = c.conges && typeof c.conges === 'object' ? c.conges : null;
+  const conges = g && AAAAMMJJ.test(String(g.du || '')) && AAAAMMJJ.test(String(g.au || '')) && g.du <= g.au ? { du: g.du, au: g.au } : null;
+  return { jours, conges };
+}
+// Le jour de Paris d'un instant : { date: 'AAAA-MM-JJ', id: 'lun'… } ou null.
+export function jourDeParisDe(t = Date.now()) {
+  try {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' }).formatToParts(new Date(t));
+    const v = (k) => (p.find((x) => x.type === k) || {}).value;
+    const ids = { Mon: 'lun', Tue: 'mar', Wed: 'mer', Thu: 'jeu', Fri: 'ven', Sat: 'sam', Sun: 'dim' };
+    const id = ids[v('weekday')];
+    return id ? { date: `${v('year')}-${v('month')}-${v('day')}`, id } : null;
+  } catch (_) { return null; }
+}
+// Vrai si `t` tombe un jour calme (jour coché ou dans les congés).
+export function jourCalme(prefs, t = Date.now()) {
+  const r = reglageJours(prefs);
+  if (!r.jours.length && !r.conges) return false;
+  const j = jourDeParisDe(t);
+  if (!j) return false;
+  if (r.jours.includes(j.id)) return true;
+  return !!(r.conges && j.date >= r.conges.du && j.date <= r.conges.au);
+}
+const echeanceSous24h = (echeance, t) => { const e = typeof echeance === 'number' ? echeance : Date.parse(String(echeance || '')); return Number.isFinite(e) && e > t && e - t <= 24 * 3600e3; };
+// Vrai si la notification doit se taire parce que c'est un jour calme.
+export function calmePourLeJour(prefs, cat, t = Date.now(), echeance = null, urgent = false) {
+  if (!cat || cat === 'test' || !jourCalme(prefs, t)) return false;
+  if (urgent || CATS_URGENTES_JOUR.has(cat) || echeanceSous24h(echeance, t)) return false;
+  return true;
+}
+
 // Regrouper : sur le téléphone, une seule notification PAR GENRE (« 3 bordereaux
 // prêts à imprimer », api/_lib/notif-belle.js). (8 nov.) Allumé par défaut ; un
 // `regrouper: false` posé à la main est gardé.

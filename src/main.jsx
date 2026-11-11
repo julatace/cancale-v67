@@ -10,6 +10,10 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
+// (11 nov., lot traduction) La langue est prête AVANT le premier rendu (src/i18n/index.js) ;
+// la racine se redessine quand elle change (Paramètres → Langue, ou relue du nuage).
+import { tr, preparerLangue } from './i18n/index.js';
+import { useLangue } from './i18n/react.js';
 import { DemarrageVRM } from './Chargement.jsx';
 import { suivreDemarrage } from './demarrage.js';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
@@ -106,22 +110,21 @@ class DernierFilet extends React.Component {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22,
         fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif', background: '#F2F2F7', color: '#1C1C1E' }}>
         <div style={{ maxWidth: 420, width: '100%', background: '#fff', border: '1px solid #E5E5EA', borderRadius: 20, padding: '20px 18px' }}>
-          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>L'application n'a pas pu démarrer</div>
+          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{tr('erreur.demarrage.titre')}</div>
           <div style={{ fontSize: 13, color: '#636366', lineHeight: 1.5, marginBottom: 12 }}>
-            Tes données sont intactes (elles sont dans le nuage, pas dans cette page). Recharge — si l'erreur revient,
-            « Repartir propre » efface seulement les réglages de CE navigateur, puis retélécharge tout depuis ton compte.
+            {tr('erreur.demarrage.texte')}
           </div>
           <div style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', background: '#F2F2F7', border: '1px solid #E5E5EA',
             borderRadius: 12, padding: '9px 11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            <button type="button" style={{ ...btn, border: 'none', background: '#1C1C1E', color: '#fff' }} onClick={() => location.reload()}>Recharger</button>
-            <button type="button" style={btn} onClick={() => { try { navigator.clipboard.writeText(msg); } catch (_) {} }}>📋 Copier l'erreur</button>
+            <button type="button" style={{ ...btn, border: 'none', background: '#1C1C1E', color: '#fff' }} onClick={() => location.reload()}>{tr('erreur.recharger')}</button>
+            <button type="button" style={btn} onClick={() => { try { navigator.clipboard.writeText(msg); } catch (_) {} }}>📋 {tr('erreur.copier')}</button>
             <button type="button" style={btn} onClick={() => {
               // On ne touche QU'AUX clés de l'app, et on garde la session : le
               // nuage est la source de vérité, tout revient au rechargement.
               try { Object.keys(localStorage).forEach(k => { if (/^(vinted_|vrm_)/.test(k) && k !== 'vrm_session') localStorage.removeItem(k); }); } catch (_) {}
               location.reload();
-            }}>Repartir propre</button>
+            }}>{tr('erreur.repartirPropre')}</button>
           </div>
         </div>
       </div>
@@ -153,6 +156,7 @@ if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
 
 const FondApp = DemarrageVRM;
 function Racine() {
+  useLangue();
   const [vue, setVue] = React.useState(() => (versApp() ? 'app' : 'accueil'));
   React.useEffect(() => {
     const f = () => setVue(versApp() ? 'app' : 'accueil');
@@ -174,9 +178,11 @@ function Racine() {
   </>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const monter = () => ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode><DernierFilet><Racine /></DernierFilet></React.StrictMode>
 );
+// Français (la source) : aucune attente. Une autre langue : son morceau d'abord, 2 s au plus.
+preparerLangue().then(monter, monter);
 // (6 nov.) L'écran de démarrage d'index.html part quand la page montre autre chose
 // qu'une attente (src/demarrage.js) — l'écran d'ouverture prêt, l'accueil, la connexion.
 suivreDemarrage();
