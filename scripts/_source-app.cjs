@@ -123,7 +123,10 @@ function sourceApp(racine) {
 // importé n'est gardé qu'à sa PREMIÈRE ligne d'import ; rien d'autre ne change (chemins
 // et ordre intacts ; une ligne vidée disparaît).
 function sansDoublonsImport(texte) {
-  const vus = new Set();
+  // (11 nov., ci-vert) Un nom qu'App.jsx déclare lui-même en paresseux (`const MeilleuresSources =
+  // aLaDemande(() => import('./MeilleuresSources.jsx'))`, hors src/ecrans/) est DÉJÀ déclaré :
+  // l'import du même nom par un écran recollé (Stats.jsx) le déclarerait deux fois (Babel).
+  const vus = new Set([...texte.matchAll(/^const (\w+) = aLaDemande\(/gm)].map((m) => m[1]));
   // (11 nov.) Une ligne suivie d'un commentaire (`; // (10 nov., lot H)`) compte aussi : sans
   // cela DEMANDE_APPAREIL (App.jsx ET Réglages) était déclaré deux fois (Babel).
   return texte.replace(/^import\s+([^'";]*?)\s+from\s+(["'])([^"'\n]+)\2;[ \t]*(?:\/\/[^\n]*)?$/gm, (ligne, specs, q, chemin) => {
