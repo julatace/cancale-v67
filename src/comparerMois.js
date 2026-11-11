@@ -38,7 +38,9 @@ const LIGNES = [
   { cle: 'recu', nom: 'Reçu', type: 'eur' },
   { cle: 'benefice', nom: 'Bénéfice', type: 'eur' },
   { cle: 'ventes', nom: 'Ventes', type: 'n' },
-  { cle: 'achats', nom: 'Achats', type: 'n' },
+  // (11 nov., décision C5 — Julien : « tranche ») Les PAIRES achetées (pièces), pas les achats :
+  // un lot de 3 compte 3. Le nombre d'achats s'écrit en petit à côté (`achats`).
+  { cle: 'paires', nom: 'Paires achetées', type: 'n' },
 ];
 
 const pasSu = (raison) => ({ valeur: null, partiel: false, manque: [], raison });
@@ -89,6 +91,29 @@ export const achatsEntre = (reg, b) => {
   return partiel && !(n > 0) ? { ...pasSu('partiel'), manque } : { valeur: n, partiel, manque, raison: '' };
 };
 
+// (11 nov., décision C5) LES PAIRES d'une ligne du registre des achats :
+//   · achat en gros : SON nombre de paires (saisi par lui, `paires`) ;
+//   · achat hors plateforme : une fiche = une paire ;
+//   · achat Vinted : `nombreDe(ligne)` — la règle des lots de l'écran Achats (src/achatsSourcing.js :
+//     `estLot`/`nombreLot` — titre « Lot 3 … », `items_count` de SA transaction, lot déclaré par lui).
+//     Un lot dont le nombre n'est écrit nulle part ⇒ `null` : compté pour 1 (le minimum sûr), et
+//     le total devient « au moins », le manque nommé (« 1 lot sans nombre »). Jamais deviné.
+export const pairesDeLigne = (l, nombreDe = null) => {
+  if (!l) return null;
+  if (l.gros) { const n = parseInt(String(l.paires || ''), 10); return Number.isInteger(n) && n >= 1 ? n : null; }
+  if (l.plateforme === 'Vinted') { if (typeof nombreDe !== 'function') return 1; const n = nombreDe(l); return n == null ? null : Number.isInteger(n) && n >= 1 ? n : null; }
+  return 1;
+};
+export const pairesEntre = (reg, b, nombreDe = null) => {
+  const A = achatsEntre(reg, b);
+  if (A.valeur == null) return { ...A, achats: null };
+  const lignes = reg.lignes.filter((l) => l && l.ts != null && l.ts >= b.de && l.ts < b.a);
+  let p = 0, sansNombre = 0;
+  for (const l of lignes) { const n = pairesDeLigne(l, nombreDe); if (n == null) { sansNombre += 1; p += 1; } else p += n; }
+  const manque = [...A.manque, ...(sansNombre ? [`${sansNombre} lot${sansNombre > 1 ? 's' : ''} sans nombre`] : [])];
+  return { valeur: p, partiel: manque.length > 0, manque, raison: '', achats: A.valeur };
+};
+
 // → { ymA, ymB, memePoint, bornes, lignes: [{ cle, nom, type, a, b, ecart, pct }] }
 //   a = ce mois, b = le mois d'en face. `recuDe({ de, a, ym, complet })` et
 //   `beneficeDe({ ym, jusqua })` (jusqua : null = le mois entier).
@@ -98,19 +123,20 @@ export function comparerMois({ ymA, mode = 'precedent', ...reste } = {}) {
 }
 // (10 nov., lot BL) Deux mois CHOISIS par lui (deux sélecteurs) ; `achatsDe({ de, a, ym, complet })`
 // rend le registre des achats du mois (facultatif : sans lui, « — »).
-export function comparerDeuxMois({ ymA, ymB, maintenant = Date.now(), vendu, recuDe, beneficeDe, achatsDe, R } = {}) {
+// `nombreDe(ligne)` (facultatif) : le nombre de paires d'un achat Vinted (null = lot sans nombre).
+export function comparerDeuxMois({ ymA, ymB, maintenant = Date.now(), vendu, recuDe, beneficeDe, achatsDe, nombreDe = null, R } = {}) {
   const bornes = bornesComparees(ymA, ymB, maintenant);
   if (!bornes) return null;
   const vA = venduEntre(vendu, bornes.A, R), vB = venduEntre(vendu, bornes.B, R);
   const recu = (ym, b) => cote(recuDe && recuDe({ de: b.de, a: b.a, ym, complet: b.complet }));
   const benef = (ym, b) => cote(beneficeDe && beneficeDe({ ym, jusqua: b.complet ? null : b.a }));
-  const achats = (ym, b) => (typeof achatsDe === 'function' ? achatsEntre(achatsDe({ de: b.de, a: b.a, ym, complet: b.complet }), b) : pasSu('pasSu'));
+  const paires = (ym, b) => (typeof achatsDe === 'function' ? pairesEntre(achatsDe({ de: b.de, a: b.a, ym, complet: b.complet }), b, nombreDe) : { ...pasSu('pasSu'), achats: null });
   const val = {
     ventes: [vA.ventes, vB.ventes],
     vendu: [vA.vendu, vB.vendu],
     recu: [recu(ymA, bornes.A), recu(ymB, bornes.B)],
     benefice: [benef(ymA, bornes.A), benef(ymB, bornes.B)],
-    achats: [achats(ymA, bornes.A), achats(ymB, bornes.B)],
+    paires: [paires(ymA, bornes.A), paires(ymB, bornes.B)],
   };
   const lignes = LIGNES.map((L) => {
     const [a, b] = val[L.cle];

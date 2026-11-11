@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  bilanAnnonce,
   chaineArticle,
   identifiantVinted,
 } from "./outilsArticlesVinted.js";
@@ -12,95 +11,8 @@ const eur = (v) =>
         style: "currency",
         currency: "EUR",
       }).format(v);
-export function AnnoncesACompleter({
-  items,
-  numeros,
-  drafts,
-  ouvrir,
-  charger,
-  charge,
-  PhotoVinted,
-  incomplet = false,
-}) {
-  const [filtre, setFiltre] = React.useState("manque");
-  const lignes = items.map((it) => ({
-    it,
-    b: bilanAnnonce(it, drafts[String(numeros[it.id]?.numero || it.id)]),
-  }));
-  const n = lignes.filter((x) => x.b.manque.length).length;
-  const nInconnu = lignes.filter((x) => x.b.inconnu.length).length;
-  // (30 oct.) Rien à compléter, rien d'illisible, lecture complète : le bloc se tait
-  // (« 0 avec champs manquants » était une ligne de plus avant la recherche).
-  if (!n && !nInconnu && !charge && !incomplet) return null;
-  return (
-    <details className="vrm-outils" data-annonces-completer>
-      <summary>
-        Annonces à compléter <span>{n ? `${n} avec champs manquants` : charge ? "lecture…" : `${nInconnu} à vérifier sur Vinted`}</span>
-      </summary>
-      <p>Un brouillon VRM : l’annonce en ligne ne change pas.</p>
-      {incomplet && <p role="status">Lecture des annonces incomplète : ce bilan porte uniquement sur les données récupérées.</p>}
-      <div className="vrm-outils-actions">
-        <button
-          type="button"
-          aria-pressed={filtre === "manque"}
-          onClick={() => setFiltre("manque")}
-        >
-          Manquants
-        </button>
-        <button
-          type="button"
-          aria-pressed={filtre === "inconnu"}
-          onClick={() => setFiltre("inconnu")}
-        >
-          Données non récupérées
-        </button>
-        <button type="button" disabled={charge} onClick={charger}>
-          Actualiser les annonces
-        </button>
-      </div>
-      <div className="vrm-outils-liste">
-        {lignes
-          .filter((x) =>
-            filtre === "manque" ? x.b.manque.length : x.b.inconnu.length,
-          )
-          .map(({ it, b }) => (
-            <article key={it.id}>
-              {it.photo && PhotoVinted && (
-                <PhotoVinted src={it.photo} alt="" loading="lazy" />
-              )}
-              <div>
-                <strong>{it.title || "Sans titre"}</strong>
-                <small>
-                  {it._acc?.login || it._acc?.username || "Compte Vinted"}
-                  {numeros[it.id]?.numero
-                    ? ` · N°${numeros[it.id].numero}`
-                    : ""}
-                </small>
-                <small>
-                  {filtre === "manque"
-                    ? `À compléter : ${b.manque.join(", ")}`
-                    : `Non récupéré : ${b.inconnu.join(", ")}`}
-                  {b.prepare ? " · Brouillon préparé" : ""}
-                </small>
-              </div>
-              <button type="button" onClick={() => ouvrir(String(it.id))}>
-                Compléter
-              </button>
-            </article>
-          ))}
-      </div>
-      {!lignes.some((x) =>
-        filtre === "manque" ? x.b.manque.length : x.b.inconnu.length,
-      ) && (
-        <p>
-          {charge
-            ? "Lecture en cours…"
-            : "Aucun champ signalé dans les annonces récupérées."}
-        </p>
-      )}
-    </details>
-  );
-}
+// (11 nov., décision C10) L'ancien bloc « Annonces à compléter » est fondu dans la vue d'Annonces
+// « À compléter » (src/AnnoncesACompleter.jsx, règle src/annoncesACompleter.js).
 export function ComparaisonComptesVinted({
   rows,
   periode,

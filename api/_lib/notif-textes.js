@@ -151,6 +151,33 @@ export function echeancePressante(echeance, t = Date.now()) {
   return e - t <= jusqua;
 }
 
+// ── L'HEURE DU RÉSUMÉ DU SOIR (11 nov., décision C8 — Julien : « tranche ») ─────
+// Rangée dans `push_prefs` : `soir: { heure: 18..22 }` (heure de PARIS). Absente ⇒ le
+// défaut d'avant, INCHANGÉ : le cron de Vercel de 18:00 UTC (19 h l'hiver, 20 h l'été).
+// Le serveur part quand l'heure de Paris a atteint SON heure (une fois par soir : le mémo
+// `soir_reminder_dedup`) ; une heure choisie est servie par le passage horaire
+// (`?moment=soir&passage=heure`, .github/workflows/resume-soir-heure.yml).
+export const HEURES_SOIR = Object.freeze([18, 19, 20, 21, 22]);
+export function reglageSoir(prefs) {
+  const s = prefs && prefs.soir && typeof prefs.soir === 'object' ? prefs.soir : {};
+  const h = Number(s.heure);
+  return { heure: HEURES_SOIR.includes(h) && Number.isInteger(s.heure) ? h : null };
+}
+// L'heure (Paris) du défaut, ce jour-là : celle de 18:00 UTC (19 ou 20).
+export function heureSoirDefaut(t = Date.now()) {
+  const d = new Date(t);
+  const m = minutesParis(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 18, 0, 0));
+  return m == null ? 19 : Math.floor(m / 60);
+}
+// Vrai si le résumé peut partir à `t` : pas d'heure choisie ⇒ oui (le cron d'avant décide) ;
+// une heure choisie ⇒ seulement une fois l'heure de Paris atteinte. Heure illisible ⇒ non.
+export function soirALHeure(prefs, t = Date.now()) {
+  const { heure } = reglageSoir(prefs);
+  if (heure == null) return true;
+  const m = minutesParis(t);
+  return m != null && m >= heure * 60;
+}
+
 // Vrai si `t` tombe dans les heures calmes (une plage qui passe minuit compte,
 // 22:00 → 08:00 ; début = fin ne fait rien). Une famille exemptée ⇒ non. Une
 // échéance qui tombe avant 10 h (`echeance`, ISO ou ms) ⇒ non : elle sonne.

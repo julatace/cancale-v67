@@ -10,9 +10,9 @@ import React from 'react';
 import { MANQUES, NOM_PAS_SU, texteManque } from './annoncesACompleter.js';
 import './styles-a-completer.css';
 
-const NOM_FILTRE = { photos: 'Photos', marque: 'Marque', taille: 'Taille', etat: 'État', numero: 'N°', achat: 'Prix d’achat' };
+const NOM_FILTRE = { titre: 'Titre', prix: 'Prix', description: 'Description', photos: 'Photos', marque: 'Marque', taille: 'Taille', etat: 'État', numero: 'N°', achat: 'Prix d’achat' };
 
-export default function AnnoncesACompleter({ res, Photo, onPrixAchat }) {
+export default function AnnoncesACompleter({ res, Photo, onPrixAchat, onBrouillon = null }) {
   const [filtre, setFiltre] = React.useState('');
   if (!res || res.etat === 'encours') return <section className="vrm-qd vrm-ac" data-a-completer="encours"><div className="vrm-qd-vide">…</div></section>;
   if (res.etat === 'passu') return <section className="vrm-qd vrm-ac" data-a-completer="passu"><div className="vrm-qd-vide">— annonces pas lues.</div></section>;
@@ -44,6 +44,8 @@ export default function AnnoncesACompleter({ res, Photo, onPrixAchat }) {
               </span>
               <span className="vrm-ac-gestes">
                 {a.vinted && a.lien ? <a className="vrm-qd-agir vrm-ac-agir" data-ac-modifier={a.id} href={a.lien} target="_blank" rel="noreferrer" aria-label={`Modifier ${a.titre || 'l’annonce'} sur Vinted`}>Modifier ↗</a> : null}
+                {/* (11 nov., C10) Le geste de l'ancien bloc d'Outils : un brouillon VRM (l'annonce en ligne ne change pas). */}
+                {a.brouillon && onBrouillon ? <button type="button" className="vrm-qd-agir vrm-ac-agir" data-ac-brouillon={a.id} onClick={() => onBrouillon(a.id)} aria-label={`Préparer un brouillon de ${a.titre || 'l’annonce'}`}>Brouillon</button> : null}
                 {a.achat && onPrixAchat ? <button type="button" className="vrm-qd-agir vrm-ac-agir" data-ac-prix-achat={a.id} onClick={() => onPrixAchat(a.id)} aria-label={`Saisir le prix d’achat de ${a.titre || 'l’annonce'}`}>Prix d’achat</button> : null}
               </span>
             </li>
