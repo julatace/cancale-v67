@@ -843,7 +843,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     </div>);
   const repliAPart = (cle, titre, liste, rendu, pied = null) => (liste.length ? (
     <details className="vrm-repli vrm-s2d-a-part" data-stock-repli={cle} data-n={liste.length}>
-      <summary><span>{titre} · {liste.length}</span><span aria-hidden="true">›</span></summary>
+      <summary><span>{titre} · {liste.length}</span></summary>
       <div>{liste.slice(0, 60).map(rendu)}{liste.length > 60 ? <p className="vrm-aide" style={{ fontSize: 12, color: C.muted }}>{liste.length - 60} de plus</p> : null}{pied}</div>
     </details>) : null);
   const blocAPart = aa && aa.su && (nAConf || nMasq || gardees.length) ? (
