@@ -939,7 +939,8 @@ async function parrainage(req, res) {
   const [ouvert, code, suivi, filleul] = await Promise.all([parrainageOuvert(), codeDe(u.id), suiviDe(u.id), filleulDe(u.id)]);
   // Tables absentes (027 pas passée) ou base muette : on ne promet rien.
   if (code === undefined || suivi === undefined) return repondre(res, 200, { ok: true, installe: false, ouvert });
-  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes });
+  // (11 nov.) `modeTest` : Stripe en clé de test (ou pas encore branché) — l'écran le DIT.
+  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes, modeTest: !stripePret() || stripeModeTest() });
 }
 
 // ── MES FACTURES ET MA CARTE (onglet « Mon compte », 4 octobre) ─────────────

@@ -441,7 +441,7 @@ import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
-import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, codeParrainDe } from "./abonnement/etatAbonnement.js";
+import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
@@ -1295,7 +1295,7 @@ installerGardeEcriture(SUPABASE_URL);
 installerGardeHorsLigne(SUPABASE_URL);
 // (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
 // compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
-try { const c = codeParrainDe(window.location.search); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}
+try { const c = codeParrainDe(window.location.search) || codeParrainDuChemin(window.location.pathname); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}   // (11 nov.) + le lien court `/r/CODE`
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)

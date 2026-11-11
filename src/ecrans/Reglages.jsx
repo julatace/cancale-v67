@@ -3111,14 +3111,15 @@ function Parrainage() {
     try { await navigator.clipboard.writeText(lien); toast('✓ Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
   };
   return (
-    <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes}
-      pied={`Un mois offert à vous deux à son premier paiement (12 par an max).${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
+    <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-parrainage-test={p.modeTest ? '1' : undefined}
+      pied={`${p.modeTest ? 'Mode test : aucun vrai paiement pour l’instant. ' : ''}Un mois offert à vous deux à son premier paiement (12 par an max).${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
       <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }}>
         <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
         <div className="vrm-abo-actions" style={{ marginTop: 10 }}><button type="button" className="vrm-b vrm-b-secondaire" onClick={copier} data-copier-parrainage="">Partager mon lien</button></div>
       </div>
-      <RangeeIos titre="Amis inscrits" valeur={<span data-chiffre-inscrits="">{s.inscrits}</span>}/>
-      <RangeeIos titre="Ont payé leur premier mois" valeur={<span data-chiffre-payes="">{s.payes}</span>}/>
+      {/* (11 nov., agent2-argent-parrainage) Une phrase : « N personnes venues par toi · M abonnées » — des NOMBRES, jamais qui. */}
+      <RangeeIos titre={<span data-parrainage-phrase="">{s.inscrits} personne{s.inscrits > 1 ? 's' : ''} venue{s.inscrits > 1 ? 's' : ''} par toi · {s.payes} abonnée{s.payes > 1 ? 's' : ''}</span>}
+/>
       <RangeeIos titre="Mois offerts pour toi" detail={s.enAttente ? `${amis(s.enAttente)} : en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{s.moisOfferts}</span>}/>
     </GroupeIos>
   );
