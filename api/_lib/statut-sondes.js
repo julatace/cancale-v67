@@ -399,7 +399,10 @@ export async function passageSondes({ env = process.env, fetcher = fetch, pushPr
   let envoi = null;
   if (typeof alerter === 'function') {
     try { envoi = await alerter(signauxSondes({ aNotifier, muettes }, etat)); } catch (e) { envoi = { fait: false, erreur: String((e && e.message) || e).slice(0, 120) }; }
-  } else if (aNotifier.length) {
+  }
+  // Le journal n'a pas pu écrire (base, propriétaire) : l'incident est déjà marqué
+  // « dit » dans l'état — l'envoi direct d'avant le dit quand même (jamais perdu).
+  if ((typeof alerter !== 'function' || !(envoi && envoi.fait)) && aNotifier.length) {
     const notif = texteIncident(aNotifier, etat);
     if (!proprietaire || typeof envoyer !== 'function') envoi = { envoye: false, raison: 'VRM_OWNER_UID absent : personne à prévenir' };
     else { try { envoi = { envoye: true, r: await envoyer(notif) }; } catch (e) { envoi = { envoye: false, erreur: String((e && e.message) || e).slice(0, 120) }; } }
