@@ -67,18 +67,22 @@ const Pastille = ({ ton }) => <span className="vrm-sd-pastille" data-ton={ton} a
 
 function Ligne({ l }) {
   const valeur = l.etat === 'passu' ? '—' : l.etat === 'lecture' ? '…' : String(l.n);
-  const detail = l.etat === 'rouge' || l.etat === 'geste' ? l.phrase : l.etat === 'passu' ? `pas lu · ${l.raison}` : l.etat === 'lecture' ? 'lecture…' : 'rien à corriger';
+  // « Pas lu » et « À jour » sont dits UNE fois, en tête de leur groupe (§7) : la ligne ne dit que sa raison.
+  const detail = l.etat === 'rouge' || l.etat === 'geste' ? l.phrase : l.etat === 'passu' ? l.raison : l.etat === 'lecture' ? 'lecture…' : '';
   return (
     <div className="vrm-sd-rangee" data-sante-ligne={l.cle} data-sante-etat={l.etat} data-n={Number.isInteger(l.n) ? l.n : ''}>
       <Pastille ton={l.etat}/>
       <div className="vrm-sd-texte">
         <span className="vrm-sd-titre">{l.nom}</span>
-        <span className="vrm-sd-detail">{detail}</span>
+        {detail ? <span className="vrm-sd-detail">{detail}</span> : null}
       </div>
       <span className="vrm-sd-valeur" data-ton={l.etat}>{valeur}</span>
       {l.etat === 'rouge' || l.etat === 'geste'
         ? <button type="button" className="vrm-sd-geste" data-ton={l.etat} data-sante-geste={l.cle} onClick={() => aller(l.geste)}>{l.geste.libelle}</button>
-        : null}
+        : l.etat === 'passu'
+          // Pas lu : la porte vers l'écran qui le compte (l'ouvrir suffit à le recompter) — discrète, jamais ambre.
+          ? <button type="button" className="vrm-lien-action vrm-sd-ouvrir" data-sante-ouvrir={l.cle} onClick={() => aller(l.geste)}>Ouvrir</button>
+          : null}
     </div>
   );
 }
@@ -102,7 +106,7 @@ export function SanteDonnees() {
       </div>
       {aFaire.length ? <GroupeIos titre="À corriger" data-sante-groupe="a-faire">{aFaire.map((l) => <Ligne key={l.cle} l={l}/>)}</GroupeIos> : null}
       {passu.length ? <GroupeIos titre="Pas lu" data-sante-groupe="passu" pied="Rien n’est affirmé pour ces lignes : ouvre l’écran nommé, puis reviens.">{passu.map((l) => <Ligne key={l.cle} l={l}/>)}</GroupeIos> : null}
-      {ok.length ? <GroupeIos titre="À jour" data-sante-groupe="ok">{ok.map((l) => <Ligne key={l.cle} l={l}/>)}</GroupeIos> : null}
+      {ok.length ? <GroupeIos titre="À jour · rien à corriger" data-sante-groupe="ok">{ok.map((l) => <Ligne key={l.cle} l={l}/>)}</GroupeIos> : null}
     </div>
   );
 }

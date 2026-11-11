@@ -23,6 +23,8 @@
 .vrm-sd-resume { font-size: var(--d-t-20, 20px); font-weight: 700; line-height: var(--d-il-titre, 1.25); }
 .vrm-sd-sous { font-size: var(--d-t-13, 13px); line-height: var(--d-il-ligne, 1.4); color: var(--d-gris); }
 .vrm-sd-revoir { flex: 0 0 auto; min-height: 44px; }
+:root body .vrm-sd-ouvrir { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 0; background: transparent; box-shadow: none; padding: 0 4px; color: var(--d-accent-texte); font-weight: 600; }
+:root body .vrm-sd-revoir { border: 0; background: transparent; box-shadow: none; padding: 0 4px; color: var(--d-accent-texte); font-weight: 600; }
 
 .vrm-sd-pastille { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 999px; background: var(--d-gris); opacity: .45; }
 .vrm-sd-pastille[data-ton="geste"] { background: var(--d-point-ambre, #FF9500); opacity: 1; }
@@ -61,4 +63,6 @@
   color: var(--d-encre); font: inherit; text-align: left; cursor: pointer;
 }
 .vrm-sd-compacte-titre { flex: 1 1 auto; min-width: 0; font-size: var(--d-t-17, 17px); }
+/* La valeur compacte : AMBRE (un geste) même quand le rouge est dedans — le rouge reste sur la pastille et sur SA ligne (§7). */
+.vrm-sd-compacte .vrm-sd-valeur[data-ton="rouge"] { color: var(--d-ambre); }
 .vrm-sd-chevron { color: var(--d-gris); opacity: .6; display: inline-flex; }

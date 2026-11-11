@@ -255,6 +255,8 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
     const l = r.lignes.filter((x) => sources.includes(x.cle));
     dit(l.length === sources.length && l.every((x) => x.etat === 'passu' && x.n === null && x.valeur === '—'), `P ${nom} : chaque source jamais publiée (ou muette) dit « — », jamais 0`, l.map((x) => `${x.cle}=${x.valeur}`).join(' '));
     dit(r.aJour === '0' && r.resume !== 'Tout est à jour ✓', `P ${nom} : jamais « Tout est à jour »`, r.resume);
+    const portes = await pg.evaluate(() => [...document.querySelectorAll('[data-sante-ouvrir]')].map((b) => ({ cle: b.getAttribute('data-sante-ouvrir'), h: Math.round(b.getBoundingClientRect().height) })));
+    dit(portes.length === r.lignes.filter((x) => x.etat === 'passu').length && portes.length >= l.length && portes.every((p) => p.h >= 44), `P ${nom} : chaque ligne « pas lu » a sa porte « Ouvrir » (≥ 44 px) vers l'écran qui la compte`, JSON.stringify(portes));
     await shot(pg, 'P-' + nom);
     await ctx.close();
   });
