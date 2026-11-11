@@ -18,7 +18,8 @@ test('le profil publié du vendeur précédent reste invisible au propriétaire 
   const {readFileSync}=await import('node:fs'),{runInNewContext}=await import('node:vm');
   const app=readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
   const a=app.indexOf('function useProfilVendeur() {');
-  const fin=app.indexOf("// Le propriétaire de l'installation",a);
+  // La fonction seule (jusqu'à son accolade de fin) : un bloc rangé après elle ne doit pas entrer dans le test.
+  const fin=app.indexOf('\n}\n',a)+2;
   assert.ok(a>0&&fin>a);
   const profil={uid:'A',plateformes:['ebay'],contexte:{proprietaire:true}};
   const ctx={PROFIL_VENDEUR:profil,AUTH:{user:{id:'B'}},React:{useReducer:()=>[0,()=>{}],useEffect(){}},_ecoutesProfil:new Set()};

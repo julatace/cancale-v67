@@ -29,6 +29,14 @@ export const PHRASES_ECRAN = {
   settings: 'Relie tes comptes et ta boîte e-mail, règle VRM.',
   communaute: 'La carte des revendeurs VRM, et tes groupes.',
 };
+// (11 nov., lot DJ2) Julien : « tout le monde ne vend pas des sneakers ». Les phrases
+// qui disent « paire » ont leur forme « article » (écrite en entier : l'accord change),
+// montrée à tout vendeur qui n'a pas choisi Sneakers seules (`vend` de src/profilVendeur.js).
+export const PHRASES_ECRAN_ARTICLES = {
+  annonces: 'Tes articles en ligne : numéro, prix d’achat, offres.',
+  garage: 'Où est rangé chaque article : cherche un N°.',
+};
+export const phraseEcranPour = (cle, vend) => (vend !== 'sneakers' && PHRASES_ECRAN_ARTICLES[cle] !== undefined && PHRASES_ECRAN[cle] ? PHRASES_ECRAN_ARTICLES[cle] : PHRASES_ECRAN[cle]);
 export const MOTS_MAX_PHRASE = 10;
 // Les mots de la machine, pas de la personne (D2/D3).
 export const JARGON = /\b(capt[ée]e?s?|captur\w*|harvest|payload|sync\w*|synchro\w*|relu[es]?|relire|moisson\w*|scrap\w*|fetch\w*|api)\b/i;
