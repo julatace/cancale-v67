@@ -21,6 +21,7 @@
 //    ligne de la base qui le note. Une ligne sans preuve ne sort pas d'ici.
 
 import { createHash } from 'node:crypto';
+import { evenementsJournalModeration, SELECT_MODERATION } from '../../src/moderationVinted.js';   // (11 nov., 5.350)
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -136,6 +137,11 @@ export const TYPES_JOURNAL = {
   offre_refusee: 'Offre refusée',
   offre_faite: 'Offre envoyée',
   message_envoye: 'Message envoyé',
+  // (11 nov., 5.350) constatés chez Vinted (src/moderationVinted.js)
+  moderation_masquee: 'Annonce masquée par Vinted',
+  moderation_disparue: 'Annonce disparue · peut-être retirée par Vinted',
+  moderation_banni: 'Compte fermé par Vinted',
+  moderation_restreint: 'Compte limité par Vinted',
 };
 // (8 nov.) LA PREUVE de chaque ligne : la ligne de SA base qui la note. Une
 // source absente d'ici ⇒ l'événement n'est pas rendu (audit-confiance).
@@ -147,6 +153,8 @@ export const PREUVES_JOURNAL = {
   bordereaux: 'Le bordereau est rangé dans ta base',
   relais: 'Résultat écrit par l’extension dans la commande',
   extension: 'Noté par l’extension au moment du geste',
+  // (11 nov., 5.350) Ce que VINTED a fait, constaté par l'extension (jamais un geste de VRM).
+  moderation: 'Constaté par l’extension en relisant ton dressing ou ton profil Vinted',
 };
 // Ce qu'aucune ligne de la base ne note — dit tel quel à l'écran.
 export const NON_JOURNALISE = [
@@ -219,6 +227,8 @@ export function evenementsJournal(sources) {
     if (duTelephone.some((r) => r.type === ev.type && String(r.compte || '') === String(ev.compte || '') && (r.cle.tx || null) === (ev.cle.tx || null) && Math.abs((r.at || 0) - ev.at) <= 15 * 60000)) continue;
     out.push(ev);
   }
+  // (11 nov., 5.350) Ce que Vinted a masqué, fait disparaître ou limité (`moderation_vinted_{uid}`).
+  for (const ev of evenementsJournalModeration(s.moderation)) out.push(ev);
   // La preuve, posée ici pour TOUS : une source sans preuve connue ne sort pas.
   return out.filter((e) => PREUVES_JOURNAL[e.source]).map((e) => ({ ...e, preuve: PREUVES_JOURNAL[e.source] }))
     .sort((a, b) => (b.at || Infinity) - (a.at || Infinity));
@@ -321,5 +331,7 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   await lignes('relais', 'app_data?id=like.cmd_relais_*&select=cmd:data->>cmd,etat:data->>etat,demandeLe:data->>demandeLe,prisLe:data->>prisLe,finiLe:data->>finiLe,uid:data->args->>uid,tx:data->args->>tx,lbc:data->args->>id,methode:data->args->>method,endpoint:data->args->>endpoint&order=id.desc&limit=300', (r) => r);
   // (10 nov., lot G) Les gestes notés par l'extension 5.337 : `e` seulement (jamais `data`).
   await lignes('extension', 'app_data?id=like.journal_vrm_*&select=id,e:data->e&limit=200', (r) => r);
+  // (11 nov., 5.350) Les alertes de modération : `e` seulement.
+  await lignes('moderation', `app_data?id=like.moderation_vinted_*&select=${SELECT_MODERATION}&limit=100`, (r) => r);
   return { evenements: evenementsJournal(sources), pasLu, nonJournalise: NON_JOURNALISE.map(([id, texte]) => ({ id, texte })) };
 }

@@ -98,6 +98,7 @@ const COUPLES = {
   'src/profilFiscal.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la fiche officielle du statut (Ma configuration)'],
   'src/profilFiscal.js|www.autoentrepreneur.urssaf.fr': ['lien', LIEN + ' — le site de l’URSSAF (Ma configuration)'],
   'src/ModeVacances.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvre vinted.fr sur ce compte » (mode vacances, sur SON clic)'],
+  'src/moderationVinted.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvre l’annonce sur Vinted » / « Vérifie tes messages Vinted » (alerte « Vinted a agi », sur SON clic)'],
   'src/modeVacances.js|www.leboncoin.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|www.ebay.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|fr.vestiairecollective.com': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],

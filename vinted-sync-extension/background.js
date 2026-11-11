@@ -5217,11 +5217,270 @@ function noterEtatCompte(uid, json) {
       const ok = await supabaseUpsert('app_data', [{ id: ETAT_COMPTE_ROW, data: { comptes, majAt: new Date(maintenant).toISOString() } }], 'id');
       noterDiag(ok === false ? 'etat_compte_ecriture_ratee' : `etat_compte_${etat}`);
       if (ok !== false && (!avant || avant.etat !== etat || proChange)) { try { notifierApp({ type: 'maj', quoi: 'etatcompte', uid: k }); } catch (_) {} }
+      // 5.350 : l'alerte « Vinted a fermé le compte » (une fois par fermeture) ; rouvert ⇒ elle se ferme.
+      if (ok !== false && etat === 'banni' && !etatGarde && (!avant || avant.etat !== 'banni')) noterCompteModeration(k, 'banni', {});
+      if (ok !== false && etat === 'actif' && avant && avant.etat === 'banni') noterCompteModeration(k, 'actif', {});
       return ok !== false;
     } catch (_) { return false; }
   });
   chaineEtatCompte = fait.catch(() => false);
   return fait;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QUAND VINTED CACHE, SUPPRIME OU RESTREINT (11 nov., 5.350)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien veut être prévenu TOUT DE SUITE. Aucune requête Vinted de plus : on
+// compare ce que l'extension lit DÉJÀ —
+//   · deux lectures COMPLÈTES du dressing de SON compte (moisson active, toutes
+//     les pages : `dressingCompletFaitFoi`) — jamais une capture passive, qui
+//     peut être une page filtrée ;
+//   · son profil (`noterEtatCompte` : banni) ;
+//   · un refus « restricted / suspended » de Vinted (`poserFreinRepub`).
+// La règle (masquée, disparue, compte) est recopiée de src/moderationVinted.js
+// (`node scripts/audit-alerte-moderation.cjs --recopie`), jamais réécrite ici.
+// La dernière lecture complète de chaque compte (états seulement : o/r/h/s/c/d)
+// reste dans CE Chrome (`vrmModerationVu`) ; elle n'avance QUE si ce qu'elle a
+// trouvé est rangé (sinon la lecture suivante le retrouve). Une lecture ratée
+// de la ligne n'écrit rien (§5).
+// La notification part du serveur (`/api/push`, action `moderation`) : il relit
+// les lignes lui-même, regroupe, respecte les heures calmes et ne notifie
+// jamais deux fois le même événement (sa mémoire `vrm_moderation_notifie`).
+// Banni ou restreint ⇒ le frein de 24 h du compte (republication, baisses de
+// prix, offres automatiques — tout ce qui lit `lireFreinRepub`).
+// Exécuté par scripts/audit-alerte-moderation.cjs (le vrai fichier, dans un vm).
+// <moderation-regle>
+const MODERATION_LIGNE = 'moderation_vinted_';
+const MODERATION_MAX = 200;
+const MODERATION_JOURS = 90;
+const MODERATION_RESTREINT_MS = 24 * 3600 * 1000;
+const MODERATION_SORTES = ['masquee', 'disparue', 'banni', 'restreint'];
+const RE_ID_MODERATION = /^\d{4,15}$/;
+// L'état d'une annonce dans un dressing : o en ligne · r réservée · h masquée ·
+// s vendue · c fermée · d brouillon. `null` = pas une annonce.
+function etatArticleModeration(it) {
+  if (!it || typeof it !== 'object' || it.id == null || !RE_ID_MODERATION.test(String(it.id))) return null;
+  if (it.is_draft === true) return 'd';
+  if (it.is_closed === true) return /sold/i.test(String(it.item_closing_action || '')) ? 's' : 'c';
+  if (it.is_hidden === true) return 'h';
+  if (it.is_reserved === true) return 'r';
+  return 'o';
+}
+function etatsDressingModeration(items) {
+  const out = {};
+  for (const it of Array.isArray(items) ? items : []) {
+    const e = etatArticleModeration(it);
+    if (e) out[String(it.id)] = e;
+  }
+  return out;
+}
+// `avant` / `apres` : { at (ms), etats } — deux lectures COMPLÈTES du même compte.
+// `supprimees` : { [id]: date } de SES suppressions (`null` = pas su).
+// `vacances` : true · false · null (son profil).
+function evenementsDressingModeration({ avant, apres, supprimees, vacances } = {}) {
+  const rien = (raison) => ({ evenements: [], raison });
+  if (!apres || !apres.etats || typeof apres.etats !== 'object' || !Number.isFinite(Number(apres.at))) return rien('lecture');
+  if (!avant || !avant.etats || typeof avant.etats !== 'object' || !Number.isFinite(Number(avant.at))) return rien('premiere-lecture');
+  const at = Number(apres.at), av = Number(avant.at);
+  if (!(at > av)) return rien('ordre');
+  const A = avant.etats, B = apres.etats;
+  const ouverts = Object.keys(A).filter((id) => A[id] === 'o' || A[id] === 'r');
+  let masquees = ouverts.filter((id) => B[id] === 'h');
+  const raisons = [];
+  if (vacances === true && masquees.length) { masquees = []; raisons.push('vacances'); }
+  if (masquees.length >= 3 && masquees.length === ouverts.length) { masquees = []; raisons.push('tout-masque'); }
+  let disparues = Object.keys(A).filter((id) => (A[id] === 'o' || A[id] === 'h') && !Object.prototype.hasOwnProperty.call(B, id));
+  if (disparues.length && (supprimees === null || supprimees === undefined || typeof supprimees !== 'object')) { disparues = []; raisons.push('suppressions-pas-sues'); }
+  else disparues = disparues.filter((id) => !(supprimees[id] != null && supprimees[id] !== ''));
+  const restants = Object.keys(B).filter((id) => B[id] === 'o' || B[id] === 'h' || B[id] === 'r');
+  if (disparues.length >= 3 && !restants.length) { disparues = []; raisons.push('tout-disparu'); }
+  const evenements = [];
+  for (const id of masquees.sort()) evenements.push({ k: `masquee:${id}:${at}`, s: 'masquee', t: at, a: id, av });
+  for (const id of disparues.sort()) evenements.push({ k: `disparue:${id}:${at}`, s: 'disparue', t: at, a: id, av });
+  return { evenements, raison: raisons.join(',') };
+}
+// Un événement du COMPTE (banni, restreint) — `null` si la sorte est inconnue.
+function evenementCompteModeration(sorte, at, { raison = '', jusqua = null } = {}) {
+  const t = Number(at);
+  if ((sorte !== 'banni' && sorte !== 'restreint') || !Number.isFinite(t)) return null;
+  const e = { k: `${sorte}:${t}`, s: sorte, t };
+  const j = Number(jusqua);
+  if (jusqua != null && Number.isFinite(j) && j > t) e.j = j;
+  const r = String(raison || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  if (r) e.r = r;
+  return e;
+}
+// Rebâtit une entrée (jamais un champ inconnu) — `null` si elle ne tient pas.
+function nettoyerModeration(e) {
+  if (!e || typeof e !== 'object' || !MODERATION_SORTES.includes(e.s)) return null;
+  const t = Number(e.t);
+  if (!Number.isFinite(t) || t <= 0 || typeof e.k !== 'string' || !e.k || e.k.length > 80) return null;
+  const o = { k: e.k, s: e.s, t };
+  if (e.s === 'masquee' || e.s === 'disparue') { if (!RE_ID_MODERATION.test(String(e.a || ''))) return null; o.a = String(e.a); }
+  const av = Number(e.av); if (e.av != null && Number.isFinite(av) && av > 0 && av < t) o.av = av;
+  const j = Number(e.j); if (e.j != null && Number.isFinite(j) && j > t) o.j = j;
+  const f = Number(e.f); if (e.f != null && Number.isFinite(f) && f >= t) o.f = f;
+  const r = typeof e.r === 'string' ? e.r.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+  if (r) o.r = r;
+  return o;
+}
+// Ajoute les nouveaux événements à la liste rangée (jamais deux fois) et ferme
+// ceux que la lecture contredit. `etats` : les états de la lecture complète qui
+// vient d'arriver (ou null) ; `compte` : 'actif' quand le profil vient de le dire.
+// Rend { liste, ajoutes, change }.
+function fusionnerModeration(liste, nouveaux, { etats = null, compte = null, at = Date.now(), maintenant = Date.now() } = {}) {
+  let change = false;
+  const l = [];
+  for (const x of Array.isArray(liste) ? liste : []) { const e = nettoyerModeration(x); if (e) l.push(e); else change = true; }
+  const fin = Number(at);
+  if (etats && typeof etats === 'object') {
+    for (const e of l) {
+      if (e.f || !e.a || !(e.t < fin)) continue;
+      const st = etats[e.a];
+      if (e.s === 'masquee' && st && st !== 'h') { e.f = fin; change = true; }
+      else if (e.s === 'disparue' && st) { e.f = fin; change = true; }
+    }
+  }
+  if (compte === 'actif') for (const e of l) if (e.s === 'banni' && !e.f && e.t < fin) { e.f = fin; change = true; }
+  const ajoutes = [];
+  for (const x of Array.isArray(nouveaux) ? nouveaux : []) {
+    const n = nettoyerModeration(x);
+    if (!n || n.f) continue;
+    const meme = (e) => e.s === n.s && (n.a ? e.a === n.a : !e.a);
+    // Un « limité » n'est ouvert que jusqu'à sa fin (`j`, sinon 24 h) : une nouvelle
+    // limite des semaines plus tard est un nouvel événement.
+    const ouvert = (e) => !e.f && !(e.s === 'restreint' && Number(e.j || (e.t + MODERATION_RESTREINT_MS)) <= n.t);
+    if (l.some((e) => e.k === n.k)) continue;
+    if (l.some((e) => meme(e) && ouvert(e))) continue;                               // déjà ouvert
+    if (n.s === 'restreint' && l.some((e) => meme(e) && Math.abs(n.t - e.t) < MODERATION_RESTREINT_MS)) continue;
+    l.push(n); ajoutes.push(n); change = true;
+  }
+  const lim = Number(maintenant) - MODERATION_JOURS * 864e5;
+  const gardes = l.filter((e) => e.t > lim).sort((p, q) => p.t - q.t).slice(-MODERATION_MAX);
+  if (gardes.length !== l.length) change = true;
+  return { liste: gardes, ajoutes, change };
+}
+// </moderation-regle>
+const MODERATION_VU = 'vrmModerationVu';
+const MODERATION_A_SIGNALER = 'vrmModerationASignaler';
+const VACANCES_VUES = 'vrmVacancesVues';
+let _chaineModeration = Promise.resolve();
+function unModerationALaFois(fn) {
+  const suite = _chaineModeration.then(() => fn(), () => fn());
+  _chaineModeration = suite.then(() => {}, () => {});
+  return suite;
+}
+// Le mode vacances lu dans SON profil (aucune lecture de plus) : true · false · null.
+async function noterVacancesVues(uid, v) {
+  if (typeof v !== 'boolean' || !/^\d{1,20}$/.test(String(uid || ''))) return;
+  try { const m = (await chrome.storage.local.get(VACANCES_VUES))[VACANCES_VUES] || {}; if (!m[uid] || m[uid].v !== v) { m[uid] = { v, at: Date.now() }; await chrome.storage.local.set({ [VACANCES_VUES]: m }); } } catch (_) {}
+}
+async function vacancesVues(uid) {
+  try { const m = (await chrome.storage.local.get(VACANCES_VUES))[VACANCES_VUES] || {}; const e = m[String(uid)]; return e && typeof e.v === 'boolean' ? e.v : null; } catch (_) { return null; }
+}
+// SES suppressions (rangées + encore en file dans ce Chrome). `null` = pas su.
+async function suppressionsModeration(uid) {
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_supprimees&select=ids:data->ids`);
+  if (rows === null || !Array.isArray(rows)) return null;
+  const ids = Object.assign({}, (rows[0] && rows[0].ids && typeof rows[0].ids === 'object') ? rows[0].ids : {});
+  try {
+    const file = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || [];
+    for (const e of file) if (e && String(e.uid) === String(uid) && e.id && !ids[e.id]) ids[e.id] = e.at || true;
+  } catch (_) { return null; }
+  return ids;
+}
+// Lire-fusionner-réécrire la ligne du compte. Rend { ajoutes, ouverts } ou null (pas su / pas écrit).
+async function rangerModeration(uid, nouveaux, opts) {
+  const id = `${MODERATION_LIGNE}${uid}`;
+  const rows = await sbGet(`app_data?id=eq.${id}&select=e:data->e`);
+  if (rows === null || !Array.isArray(rows)) { noterDiag('moderation_lecture_ratee'); return null; }
+  const f = fusionnerModeration((rows[0] && rows[0].e) || [], nouveaux, { ...(opts || {}), maintenant: Date.now() });
+  if (f.change) {
+    const ok = await supabaseUpsert('app_data', [{ id, data: { uid: String(uid), v: CODE_VERSION, majAt: new Date().toISOString(), e: f.liste } }], 'id');
+    if (ok === false) { noterDiag('moderation_ecriture_ratee'); return null; }
+    noterDiag(f.ajoutes.length ? 'moderation_alerte_rangee' : 'moderation_fermee');
+    try { notifierApp({ type: 'maj', quoi: 'moderation', uid: String(uid) }); } catch (_) {}
+  }
+  if (f.ajoutes.length) await signalerModeration(true);
+  return { ajoutes: f.ajoutes, ouverts: f.liste.filter((e) => !e.f && e.a).map((e) => e.a) };
+}
+// Le frein de 24 h posé sans refus (compte fermé par Vinted) : mêmes gestes arrêtés.
+async function poserFreinCompte(uid) {
+  try {
+    const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {};
+    const f = { jusqua: Date.now() + FREIN_RESTREINT_MS, restreint: true, status: 0, at: Date.now(), banni: true };
+    const cur = m[String(uid)];
+    if (!(cur && Number(cur.jusqua) > f.jusqua)) { m[String(uid)] = f; await chrome.storage.local.set({ [FREIN_REPUB]: m }); }
+  } catch (_) {}
+}
+// Une lecture COMPLÈTE du dressing de `uid` vient d'être rangée.
+function guetterDressing(uid, items, at) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  return unModerationALaFois(async () => {
+    try {
+      const etats = etatsDressingModeration(items);
+      const memo = (await chrome.storage.local.get(MODERATION_VU))[MODERATION_VU] || {};
+      const avant = memo[u] && memo[u].etats ? memo[u] : null;
+      // Les lectures passent une à une (la chaîne) : celle-ci est APRÈS la précédente, même à la même milliseconde.
+      const t = Math.max(Number(at) || Date.now(), avant && Number.isFinite(Number(avant.at)) ? Number(avant.at) + 1 : 0);
+      const vacances = await vacancesVues(u);
+      let r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: {}, vacances });
+      // Les suppressions ne se lisent QUE s'il y a une disparue à juger (égress).
+      if (r.evenements.some((e) => e.s === 'disparue')) r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: await suppressionsModeration(u), vacances });
+      if (r.raison) noterDiag(`moderation_rien_${r.raison.split(',')[0]}`);
+      const ouverts = (avant && Array.isArray(avant.ouverts)) ? avant.ouverts : [];
+      const aFermer = ouverts.some((a) => etats[a] && etats[a] !== 'h');
+      let ouvertsApres = ouverts;
+      if (r.evenements.length || aFermer) {
+        const rg = await rangerModeration(u, r.evenements, { etats, at: t });
+        if (rg === null) return null;            // pas rangé : le point de départ n'avance pas
+        ouvertsApres = rg.ouverts;
+      }
+      const m2 = (await chrome.storage.local.get(MODERATION_VU))[MODERATION_VU] || {};
+      m2[u] = { at: t, etats, ouverts: ouvertsApres.slice(-MODERATION_MAX) };
+      await chrome.storage.local.set({ [MODERATION_VU]: m2 });
+      return r.evenements.length;
+    } catch (_) { return null; }
+  });
+}
+// Un événement du COMPTE (banni, restreint, ou le compte redevenu actif).
+function noterCompteModeration(uid, sorte, { raison = '', jusqua = null } = {}) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  return unModerationALaFois(async () => {
+    try {
+      if (sorte === 'actif') return await rangerModeration(u, [], { compte: 'actif', at: Date.now() });
+      const e = evenementCompteModeration(sorte, Date.now(), { raison, jusqua });
+      if (!e) return null;
+      if (sorte === 'banni') await poserFreinCompte(u);
+      return await rangerModeration(u, [e], { at: e.t });
+    } catch (_) { return null; }
+  });
+}
+// La notification : le serveur relit tout (le corps ne dit rien). Une marque
+// locale tient l'envoi tant qu'il n'a pas abouti (réessayé au prochain passage).
+async function signalerModeration(neuf) {
+  try {
+    if (neuf) await chrome.storage.local.set({ [MODERATION_A_SIGNALER]: Date.now() });
+    const en = Number((await chrome.storage.local.get(MODERATION_A_SIGNALER))[MODERATION_A_SIGNALER] || 0);
+    if (!en) return false;
+    if (Date.now() - en > 3 * 864e5) { await chrome.storage.local.remove(MODERATION_A_SIGNALER); return false; }   // le cron du serveur l'a fait depuis
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('moderation_push_sans_session'); return false; }
+    let status = 0;
+    try {
+      const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(COMPTE_PUSH_URL, { method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+        body: JSON.stringify({ action: 'moderation' }) });
+      clearTimeout(tm); status = r.status;
+    } catch (_) { status = 0; }
+    const fini = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 429);
+    if (fini) await chrome.storage.local.remove(MODERATION_A_SIGNALER);
+    noterDiag(status >= 200 && status < 300 ? 'moderation_push_envoye' : `moderation_push_${fini ? 'refus' : 'ko'}_${status || 'reseau'}`);
+    return fini && status < 300;
+  } catch (_) { return false; }
 }
 
 async function noterUrlLabel(url, ok) {
@@ -8364,7 +8623,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
   verifFormeObjet(type, brut, '');
-  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); }   // 5.181 : actif / banni ; 5.191 : login
+  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); try { await noterVacancesVues(String(uid), vacancesDuProfil(brut)); } catch (_) {} }   // 5.181 : actif / banni ; 5.191 : login ; 5.350 : vacances (alerte modération)
   payload = alleger(type, payload);
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
@@ -8441,6 +8700,8 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // 5.294 : la date de la dernière lecture COMPLÈTE du dressing de ce compte,
   // RANGÉE (le rattrapage au retour sur Vinted la lit : `retourSurVinted`).
   if (capturePrevue && ecritRow !== false) await noterCaptureComplete(uid);
+  // 5.350 : deux lectures COMPLÈTES comparées (masquée / disparue) — aucune requête Vinted de plus.
+  if (capturePrevue && ecritRow !== false && type === 'listings') { try { await guetterDressing(uid, (brut && brut.items) || [], Date.parse(maintenant)); } catch (_) {} }
   if (fenetreCmd && ecritRow !== false) await noterFenetreRangee(`harvest_${uid}_${type}`, fenetreCmd);
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
@@ -10181,6 +10442,7 @@ async function visiteVinted() {
     await envoyerNotifsRetrait();
     // 5.331 : un « compte relié » resté en attente (réseau, session absente) repart ici.
     await envoyerComptesSignales();
+    await signalerModeration(false);   // 5.350 : une alerte de modération dont l'envoi a échoué repart
     await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -10786,6 +11048,8 @@ async function poserFreinRepub(uid, rc) {
   const f = { jusqua: Date.now() + (restreint ? FREIN_RESTREINT_MS : FREIN_REPUB_MS), restreint, status: st, at: Date.now() };
   try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const cur = m[String(uid)]; if (!(cur && Number(cur.jusqua) > f.jusqua)) m[String(uid)] = f; await chrome.storage.local.set({ [FREIN_REPUB]: m }); } catch (_) {}
   noterDiag(restreint ? 'frein_repub_restreint' : 'frein_repub_refus');
+  // 5.350 : « Vinted limite le compte » — une alerte (pas deux dans les 24 h), la raison si Vinted la donne.
+  if (restreint) { try { await noterCompteModeration(uid, 'restreint', { raison: raisonRefusVinted(rc), jusqua: f.jusqua }); } catch (_) {} }
   return f;
 }
 function phraseFreinRepub(f) {
