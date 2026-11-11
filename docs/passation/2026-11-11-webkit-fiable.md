@@ -106,3 +106,24 @@ ventes) — changer de profil change leurs mesures, à faire banc par banc.
 Non, et c'est voulu : le job n'a pas encore été vu vert sous WebKit (aucun WebKit ici). La session
 principale le rendra bloquant (retirer `continue-on-error: true` du job `bancs-webkit` de
 `.github/workflows/verifier.yml`) après trois passages verts sur GitHub sans changement.
+
+## 5. Le passage de la CI sur cette branche (run 43033213621, 11 nov. 13 h 53)
+
+Déclenché à la main (`workflow_dispatch`) sur `13a774e` pour avoir enfin un verdict WebKit.
+**Pas de verdict** : le job « Bancs sous WebKit » est resté bloqué à l'étape « Installer
+WebKit » (`npx playwright install --with-deps webkit`) plus de 70 min — elle prenait 31 s au
+run 114 — et tombe sur sa borne de 75 min sans avoir lancé un banc. Rien de ce lot ne touche
+cette étape (même commande qu'avant) : à relancer tel quel. Si elle se bloque encore, borner
+l'étape (`timeout-minutes: 10` sur elle).
+
+## 6. Ce qui reste
+
+- **Le verdict WebKit des huit bancs** : au prochain passage de la CI (la session principale le lit).
+- Audits rouges sur `origin/main` hors de ce lot (vérifiés rouges dans un arbre propre
+  d'origin/main) : `audit-colis-envoi`, `audit-photos-vinted`, `audit-relier-compte`,
+  `audit-rouge-doublon`, `audit-violet` ; `audit-coherence` et `audit-preuve-vente` demandent
+  l'historique git complet. `audit-safari` : vert (5/5, `--prouve` 16/16).
+- Bancs rouges sous Chromium avant ce lot, non entrés dans le job : `facture-pro` (3),
+  `coque-parametres` (16), `achats-retraits` (8).
+- Le 1er commit de la branche (`f03c9d8`) porte par erreur le lien de session d'une autre session
+  dans son pied ; la réécriture a été refusée (pas de push forcé). Les suivants sont justes.
