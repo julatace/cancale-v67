@@ -223,7 +223,7 @@ export function manquesNommes(R) {
     if (R.pseudosLus === false) out.push({ cle: 'pseudos', n: 0, texte: 'Pseudos des acheteurs pas lus : « Particulier » partout', geste: '' });
   } else {
     const sm = R.sansMontant; if (sm) out.push({ cle: 'montant', n: sm, texte: `${pl(sm, 'achat', 'achats')} sans prix`, geste: 'achats' });
-    if (R.articleSeul) out.push({ cle: 'article-seul', n: R.articleSeul, texte: `${pl(R.articleSeul, 'achat', 'achats')} sans port ni frais (reçu pas relié)`, geste: 'achats' });
+    if (R.articleSeul) out.push({ cle: 'article-seul', n: R.articleSeul, texte: `${pl(R.articleSeul, 'achat', 'achats')} sans port ni frais lus`, geste: 'achats' });
     const fo = compte('fournisseur'); if (fo) out.push({ cle: 'fournisseur', n: fo, texte: `${pl(fo, 'achat', 'achats')} sans fournisseur`, geste: 'achats' });
     const reg = compte('reglement'); if (reg) out.push({ cle: 'reglement', n: reg, texte: `${pl(reg, 'achat', 'achats')} sans mode de paiement`, geste: 'fichier' });
     const pc = compte('piece'); if (pc) out.push({ cle: 'piece', n: pc, texte: `${pl(pc, 'achat', 'achats')} sans pièce justificative`, geste: 'achats' });

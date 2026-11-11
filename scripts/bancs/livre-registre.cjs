@@ -231,7 +231,7 @@ const CAP=process.env.BANC_CAPTURE||'';
         const l2=await ligneTxt(pg,'vinted:91002'), l3=await ligneTxt(pg,'vinted:91003');
         dit(l2&&/Société inventée/.test(l2)&&/Facture F2026-0009/.test(l2),'client et pièce : la facture Pro de CETTE vente',l2);
         dit(l3&&/acheteur_91003/.test(l3)&&/Paiement via Vinted/.test(l3)&&/Transaction Vinted 91003/.test(l3)&&!/Société/.test(l3),'sans facture : le pseudo lu dans SA transaction, le règlement, la référence',l3);
-        dit((opts.lusIn||[]).length>0&&(opts.lusIn||[]).every(u=>/select=id,tx:data->payload->transaction->>id/.test(u)&&!/select=data(&|$)/.test(u)),'pseudos lus en projection, jamais select=data',(opts.lusIn||[])[0]);
+        dit((opts.lusIn||[]).some(u=>/select=id,tx:data->payload->transaction->>id,side:/.test(u))&&(opts.lusIn||[]).every(u=>!/select=([^&]*,)?data(,|&|$)/.test(u)),'pseudos lus en projection, jamais select=data',(opts.lusIn||[])[0]);
         await pg.fill('[data-registres-vue-q]','91003'); await pg.waitForTimeout(300);
         const F=await vue(pg);
         dit(F&&F.filtrees==='1'&&(await pg.locator('[data-registre-ligne]').count())===1,'la recherche filtre les lignes',F&&F.filtrees);

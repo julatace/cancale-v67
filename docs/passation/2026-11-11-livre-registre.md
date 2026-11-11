@@ -84,8 +84,15 @@ Le mot « conforme » n'est jamais écrit (audit M8).
   règlement inventé, source dite vérifiée, nom sans horodatage, montant texte dans l'Excel, reçu
   d'un autre achat, trimestres absents, `select=data`, filtre inopérant). Excel relu par openpyxl,
   PDF par pdf.js.
-- Banc `scripts/bancs/livre-registre.cjs` (1512 sombre, 390 clair tactile, locale fr-FR) : voir
-  le résultat ci-dessous ; captures et PDF regardés.
+- Banc `scripts/bancs/livre-registre.cjs` (1512 sombre, 390 clair tactile, locale fr-FR) :
+  **48 verts** — recettes du mois = ventes versées (lignes, total, groupe du mois), « à dater »
+  à part et nommée, client par facture Pro / pseudo, projection des transactions, recherche,
+  sources « à vérifier », PDF/CSV/Excel horodatés relus = l'écran, achats (pseudo vendeur,
+  photo du ticket par identité, « à compléter » sur la ligne, filtre « À compléter »), 44 px,
+  aucun débordement, aucune erreur. Rouge sur `origin/main` par construction (aucun bouton
+  « Voir »). Captures 390/1512 et PDF regardés. Le Segmenté (36 px, composant commun) est hors
+  de la mesure des 44 px.
+- Remarque : un navigateur en anglais voit la feuille en anglais (`tr`) ; le banc fixe fr-FR.
 - Banc `registres.cjs` : 112 verts (nom de fichier horodaté exigé).
 - Audits communs : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api,
   secrets, quoi-de-neuf, traduction, registres : verts.
