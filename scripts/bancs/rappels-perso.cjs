@@ -88,9 +88,10 @@ const sansErreur = (journal, quoi) => dit(!journal.erreurs.length && !journal.ht
       // ── V. La fiche d'une vente ───────────────────────────────────────────
       if (PARTIES.includes('V')) {
         const b = base();
-        const { ctx, pg, journal } = await NV.ouvrir(nav, { W, sombre, base: b, tab: 'ventes' });
-        await pg.waitForSelector('[data-tx="62001"] .vrm-ledger-sale-toggle', { timeout: 15000 }).catch(() => {});
-        await pg.click('[data-tx="62001"] .vrm-ledger-sale-toggle').catch((e) => dit(false, `V ${tag} : la vente 62001 s'ouvre`, e.message.split('\n')[0]));
+        const { ctx, pg, journal } = await NV.ouvrir(nav, { W, sombre, base: b, tab: 'cat_ventes' });
+        await pg.goto(`http://localhost:${NV.PORT}/?tab=cat_ventes&site=vinted`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('.vrm-sale-row[data-tx="62001"] .vrm-ledger-sale-toggle', { timeout: 20000 }).catch(() => {});
+        await pg.locator('.vrm-sale-row[data-tx="62001"] .vrm-ledger-sale-toggle').first().click({ timeout: 10000 }).catch((e) => dit(false, `V ${tag} : la vente 62001 s'ouvre`, e.message.split('\n')[0]));
         await pg.waitForSelector('[data-recap-vente] [data-rappel-bouton]', { timeout: 8000 }).catch(() => {});
         const bouton = await pg.evaluate(() => { const x = document.querySelector('[data-recap-vente] [data-rappel-bouton]'); return x ? { etat: x.getAttribute('data-rappel-bouton'), h: Math.round(x.getBoundingClientRect().height) } : null; });
         dit(bouton && bouton.etat === 'neuf', `V ${tag} : la fiche de la vente porte « Me le rappeler »`, JSON.stringify(bouton));
@@ -102,7 +103,7 @@ const sansErreur = (journal, quoi) => dit(!journal.erreurs.length && !journal.ht
         dit(f.note === 'Vérifier le colis' && f.jour === ajout(AUJ, 7) && !f.deborde, `V ${tag} : la feuille : « Dans 7 jours » + la note rapide`, JSON.stringify(f));
         await capture(pg, `V-${tag}-feuille`);
         const ecrAvant = b.ecritures;
-        await pg.click('[data-rappel-enregistrer]');
+        await pg.click('[data-rappel-enregistrer]', { timeout: 8000 }).catch(() => {});
         await attendre(900);
         const loc = await lireLocal(pg);
         const poses = Object.values(loc || {}).filter((r) => r && r.sorte === 'vente');
@@ -130,6 +131,7 @@ const sansErreur = (journal, quoi) => dit(!journal.erreurs.length && !journal.ht
         dit(loc && loc[rX.id] && loc[rX.id].etat === 'fait' && !(await pg.$(`[data-rappel-bandeau="${rX.id}"]`)), `N ${tag} : « Fait » depuis le bandeau`, JSON.stringify(loc && loc[rX.id]));
         await pg.goto(`http://localhost:${NV.PORT}/?tab=ventes&site=vinted&cible=vente&tx=62001&rappel=${rV.id}`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector(`[data-rappel-bandeau="${rV.id}"]`, { timeout: 15000 }).catch(() => {});
+        await pg.waitForSelector('[data-cible~="vente:62001"]', { timeout: 20000 }).catch(() => {});
         const v = await pg.evaluate((id) => ({ bandeau: !!document.querySelector(`[data-rappel-bandeau="${id}"]`), vente: !!document.querySelector('[data-cible~="vente:62001"]') }), rV.id);
         dit(v.bandeau && v.vente, `N ${tag} : la notification d'une vente ouvre Ventes sur CETTE vente, avec le bandeau du rappel`, JSON.stringify(v));
         await capture(pg, `N-${tag}-vente`);
