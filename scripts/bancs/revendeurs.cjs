@@ -321,15 +321,18 @@ async function brancher(p){
   await p.waitForFunction(()=>[...document.querySelectorAll('.vrm-sale-row')].filter(e=>e.getClientRects().length>0).length===2);
   check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='', 'réinitialiser retrouve toutes les ventes');
   await p.goto(base+'/?tab=plat_ebay');
-  const photo=p.getByRole('button',{name:/^Agrandir la photo de Paire eBay( · \d+ articles)?$/});
+  // (11 nov., clics-directs) La photo d'une vente s'ouvre directement dans LA visionneuse de l'app
+  // (plus de loupe ni de panneau à part) : bouton « Voir la photo de … en grand », la visionneuse
+  // porte le nom de la paire (aria-label = son titre).
+  const photo=p.getByRole('button',{name:/^Voir la photo de Paire eBay( · \d+ articles)? en grand$/});
   // (20 oct.) La photo agrandissable vit dans la vente ouverte (ventes « une ligne »).
   await p.getByRole('button',{name:/Ouvrir les actions : Paire eBay/}).first().click();
   await photo.click();
-  check(await p.getByRole('dialog',{name:/^Photo de Paire eBay( · \d+ articles)?$/}).isVisible(), 'photo de vente agrandie dans une fenêtre dédiée');
-  await p.waitForFunction(()=>{const i=document.querySelector('.vrm-photo-panel img');return i&&i.complete&&i.naturalWidth>0;});
-  check(await p.getByRole('dialog',{name:/^Photo de Paire eBay( · \d+ articles)?$/}).locator('img').getAttribute('alt').then(a=>/^Paire eBay( · \d+ articles)?$/.test(a)), 'image agrandie chargée avec le nom exact de la paire');
+  check(await p.getByRole('dialog',{name:/^Paire eBay( · \d+ articles)?$/}).isVisible(), 'photo de vente agrandie dans la visionneuse');
+  await p.waitForFunction(()=>{const i=document.querySelector('[data-visionneuse="ouverte"] [data-visionneuse-img]');return i&&i.complete&&i.naturalWidth>0;});
+  check(await p.locator('[data-visionneuse="ouverte"]').getAttribute('data-stream-article').then(a=>/^Paire eBay( · \d+ articles)?$/.test(String(a))), 'image agrandie chargée avec le nom exact de la paire');
   await p.keyboard.press('Escape');
-  check(await p.getByRole('dialog',{name:/^Photo de Paire eBay( · \d+ articles)?$/}).count()===0, 'Échap ferme la photo');
+  check(await p.getByRole('dialog',{name:/^Paire eBay( · \d+ articles)?$/}).count()===0, 'Échap ferme la photo');
   check(await photo.evaluate(e=>e===document.activeElement), 'fermeture de photo rend le focus à la miniature');
   // La photo fermée retire son entrée d'historique (« retour » ferme d'abord la
   // feuille, 18 oct.) : on laisse ce retour se faire avant de changer d'adresse —

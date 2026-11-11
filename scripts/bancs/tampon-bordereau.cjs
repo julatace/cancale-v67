@@ -320,7 +320,7 @@ async function libre(pg, pdfs) {
   {
     const CH7 = { vx: 0.62, vy: 0.86, vw: 0.3, v: 0 };
     const r7 = await imprimer('a4-quart', false, { choix: CH7 });
-    const men = r7.items.filter((x) => /Créé par VRM/.test(x.s)), k = attenduN(r7, CH7).k;
+    const men = r7.items.filter((x) => /Créé par vrm\.center/.test(x.s)), k = attenduN(r7, CH7).k;
     const cad = { x: CH7.vx * r7.W, y: CH7.vy * r7.H, w: r7.cw * k, h: r7.ch * k };
     dit(r7.r0 && r7.r0.tampons[0] === 'libre' && men.length === 1, 'tampon libre : la mention est posée dans une autre zone libre', `${men.length} mention(s)`);
     const loin = men.every((m) => { const dx = Math.max(0, cad.x - (m.x + m.l), m.x - (cad.x + cad.w)), dy = Math.max(0, cad.y - m.y, (m.y - m.t) - (cad.y + cad.h)); return Math.hypot(dx, dy) >= 20 * 72 / 25.4; });
@@ -370,9 +370,9 @@ async function juger(pg, nom, b64, thermique, attendu) {
   // sur l'étiquette à découper ni sur une page-étiquette (100×150), seulement
   // en zone libre. Les zones gardées (code, QR, adresse, suivi) : contrôle 3.
   {
-    const men = z.pages.flatMap((p, i) => p.items.filter((x) => /Créé par VRM/.test(x.s)).map((x) => ({ ...x, page: i, pw: p.w, ph: p.h })));
+    const men = z.pages.flatMap((p, i) => p.items.filter((x) => /Créé par vrm\.center/.test(x.s)).map((x) => ({ ...x, page: i, pw: p.w, ph: p.h })));
     const att = thermique ? (issue === 'blanc' ? null : false) : MENTION_ATTENDUE[nom];
-    if (att === true) dit(men.length === 1, `${t} : la mention « Créé par VRM » est posée (place sûre)`, `${men.length} mention(s)`);
+    if (att === true) dit(men.length === 1, `${t} : la mention « Créé par vrm.center » est posée (place sûre)`, `${men.length} mention(s)`);
     if (att === false) dit(men.length === 0, `${t} : pas de place sûre ⇒ aucune mention`, `${men.length} mention(s)`);
     dit(men.length <= 1 && men.every((m) => m.page === 0 && issue === 'blanc'), `${t} : la mention n'existe qu'en zone libre, page 1, une fois`, men.map((m) => `p${m.page + 1}`).join(' ') || 'aucune');
     dit(men.every((m) => !(Math.abs(m.pw - 283.46) < 2 && Math.abs(m.ph - 425.2) < 2)), `${t} : jamais de mention sur une page-étiquette 100×150`);

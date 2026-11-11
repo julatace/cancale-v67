@@ -1,7 +1,12 @@
 import { PlateformesSetting } from '../App.jsx';
+import { signalDelai } from '../compatSafari.js';
+import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
+import { RappelsSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
 import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
+import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrière après une mauvaise manipulation
+import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -49,6 +54,7 @@ import { VerifierInstallationApp } from '../App.jsx';
 import SuiviComptes from '../SuiviComptes.jsx';
 // (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
 import { ToutVaBien } from '../ToutVaBien.jsx';
+import { SanteDonnees } from '../SanteDonnees.jsx';
 import HistoriqueVinted from '../ImportDepart.jsx';   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
@@ -126,7 +132,7 @@ const nomAppareilPris = (nom, verifies) => {
 // ⟦← App.jsx #18⟧
 
 const lireConnexionsOAuth = async()=>{
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
 };
 // (11 nov., lot DJ6) « Délier » Google/Discord : sur son clic, confirmé ; jamais la dernière façon de se connecter.
 const oauthDelier = async (provider, id, nbIdentites) => {
@@ -134,7 +140,7 @@ const oauthDelier = async (provider, id, nbIdentites) => {
  if(nbIdentites<2)return{ok:false,error:`${nom} est ta seule façon de te connecter : ajoute d’abord un mot de passe (Changer mon mot de passe).`};
  if(!id)return{ok:false,error:'Je n’ai pas pu lire cette liaison. Recharge la page.'};
  if(!(await askConfirm({title:`Délier ${nom} ?`,desc:`Tu ne pourras plus te connecter avec ${nom}. Ton compte VRM ne change pas.`,ok:'Délier',cancel:'Annuler'})))return{ok:false};
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});
   if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:/single.identity|last.identity|at least/i.test(String(j?.msg||j?.message||j?.error_code||''))?`${nom} est ta seule façon de te connecter.`:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
   try{relireFiche(AUTH.user?.id);}catch(_){}return{ok:true};
  }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
@@ -1838,6 +1844,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'comptes', titre:tr('reglages.groupe.comptes'), items:[
       // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
       { id:'toutvabien', type:'panneau', ic:'heart', lib:tr('reglages.toutvabien.lib'), desc:tr('reglages.toutvabien.desc'), data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
+      // (11 nov., lot sante-donnees) Tout ce qui cloche dans tes données, le plus grave d'abord, un bouton par ligne (src/SanteDonnees.jsx).
+      { id:'sante', type:'panneau', ic:'check', lib:tr('reglages.sante.lib'), desc:tr('reglages.sante.desc'), data:{ 'data-reglage-sante':'' }, el:<SanteDonnees/> },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
@@ -1864,6 +1872,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'push', type:'panneau', ic:'bell2', lib:tr('reglages.push.lib'), titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{tr('reglages.push.muets', { n: nMuetsPush })}</span> : tr('reglages.push.desc'),
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
+      // (11 nov.) « Me le rappeler » : les rappels qu'il a posés sur un article, une vente, un achat (api/_lib/rappels-perso.js).
+      { id:'rappels', type:'panneau', ic:'clock', lib:tr('reglages.rappels.lib'), desc:tr('reglages.rappels.desc'), data:{ 'data-reglage-rappels':'' }, el:<RappelsSetting/> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
@@ -1937,7 +1947,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'sauvegarde', titre:tr('reglages.groupe.sauvegarde'), items:[
       { id:'securite', type:'panneau', ic:'shield', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:tr('reglages.donnees.lib'), desc:tr('reglages.donnees.desc'), onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
+      // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
+      { id:'importer', type:'panneau', nu:true, ic:'box', lib:tr('reglages.importer.lib'), desc:tr('reglages.importer.desc'), data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
       { id:'export', type:'action', ic:'archive', lib:tr('reglages.export.lib'), desc:tr('reglages.export.desc'), onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      // (11 nov.) Revenir en arrière : des points posés tout seuls (avant une action en série, un
+      // import, chaque jour) ou une sauvegarde complète ⇒ aperçu précis ⇒ choisir quoi ⇒ confirmer (src/restauration.js).
+      { id:'revenir', type:'panneau', nu:true, ic:'undo', lib:tr('reglages.revenir.lib'), desc:tr('reglages.revenir.desc'), data:{ 'data-reglage-revenir':'' }, el:<RevenirEnArriere/> },
       // (10 nov., lot Y) Ce qu'il a supprimé DANS VRM, restaurable 30 jours (src/corbeille.js).
       { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:tr('reglages.corbeille.lib'), desc:tr('reglages.corbeille.desc'), val:String(lireListeCorbeille().length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
       { id:'restaurer', type:'action', ic:'restore', lib:tr('reglages.restaurer.lib'), desc:tr('reglages.restaurer.desc'), onClick:onImport },
@@ -1959,6 +1974,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'conseils-revoir', type:'action', ic:'sync', lib:tr('reglages.conseils-revoir.lib'), desc:tr('reglages.conseils-revoir.desc'), onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? tr('reglages.conseils.reviendront') : tr('commun.pasPuEnregistrer'))); }, data:{ 'data-reglage-conseils-revoir':'' } },
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
+      // (11 nov.) « Quoi de neuf » : les nouveautés qui le concernent depuis son inscription (src/nouveautes.js).
+      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'spark', lib:tr('reglages.quoi-de-neuf.lib'), desc:tr('reglages.quoi-de-neuf.desc'), data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
       // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
       { id:'centre-aide', type:'action', ic:'search', lib:tr('reglages.centre-aide.lib'), desc:tr('reglages.centre-aide.desc'), onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
@@ -2123,7 +2140,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} className="vrm-set-recherche" data-recherche-reglages=""/>}
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
           return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: filtres.reduce((n,g)=>n+g.items.length,0) })}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q: rechercheReglage.trim() })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>;
@@ -2456,7 +2473,7 @@ function DoubleVerification({ onEtat } = {}) {
 // « Se déconnecter partout », « Appareils connectés », « Ce que VRM a fait ».
 const appelSecurite = async (mode, init) => {
   try {
-    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(20000) });
+    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: signalDelai(20000) });
     const j = await r.json().catch(() => null);
     return { status: r.status, j };
   } catch (_) { return { status: 0, j: null }; }
@@ -3203,6 +3220,15 @@ function DiscordCompte() {
   );
 }
 
+// (11 nov.) VRM n'envoie aucun e-mail d'invitation : le vendeur PARTAGE ce
+// message (feuille de partage du téléphone, sinon copié). Il ne porte aucun
+// secret : l'accès se prouve par l'adresse confirmée, jamais par le lien.
+const texteInvitationEquipe = (email) => `Je t'invite à préparer mes colis sur VRM.\nCrée ton compte sur https://vrm.center avec ${email}.\nConfirme ton e-mail, puis touche « Accepter ».`;
+async function partagerInvitationEquipe(email) {
+  const text = texteInvitationEquipe(email);
+  try { if (navigator.share) { await navigator.share({ text }); return 'partage'; } } catch (e) { if (e && e.name === 'AbortError') return 'annule'; }
+  try { await navigator.clipboard.writeText(text); return 'copie'; } catch (_) { return 'montre'; }
+}
 function EquipeSetting() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const proprio = useEstProprietaire();
@@ -3210,6 +3236,7 @@ function EquipeSetting() {
   const [email, setEmail] = React.useState('');
   const [occupe, setOccupe] = React.useState('');
   const [msg, setMsg] = React.useState('');
+  const [montre, setMontre] = React.useState('');
   const relire = React.useCallback(() => { lireEquipe().then(setLu); }, []);
   React.useEffect(() => { relire(); }, [relire]);
   const agir = async (cle, action, extra, ok) => {
@@ -3236,7 +3263,7 @@ function EquipeSetting() {
       <div>{EQUIPE_NON_INSTALLE_TXT}</div>
       <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
         {proprio
-          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base (Supabase).</>
+          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base.<br/>Supabase → SQL Editor → colle <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</>
           : <>Rien à faire : bientôt, tu inviteras ici ton aide par e-mail.</>}
       </div>
       <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
@@ -3246,7 +3273,7 @@ function EquipeSetting() {
   const inviter = async () => {
     const e = email.trim();
     if (!e) { setMsg("Tape l'adresse e-mail de la personne qui t'aide."); return; }
-    await agir('inviter', 'inviter', { email: e }, (r) => { setEmail(''); setMsg(r.deja ? 'Cette personne est déjà invitée.' : ''); });
+    await agir('inviter', 'inviter', { email: e }, (r) => { setEmail(''); setMsg(r.deja ? 'Cette personne est déjà invitée.' : 'Invitée. Envoie-lui le message.'); });
   };
   return (
     <div data-equipe-reglage="lu" style={{ fontSize: 13, color: C.text }}>
@@ -3256,13 +3283,17 @@ function EquipeSetting() {
           style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }}/>
         <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} className="vrm-b vrm-b-primaire">{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
       </div>
-      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>Aucun e-mail n'est envoyé : préviens-la. Elle crée son compte VRM avec cette adresse.</div>
+      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>VRM n'envoie aucun e-mail. Touche « Envoyer l'invitation ».</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
-            <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée, pas encore acceptée'}</span></span>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée'}</span></span>
+            <span style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
+            {x.statut !== 'actif' && <button type="button" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }} className="vrm-b vrm-b-secondaire">Envoyer l'invitation</button>}
             <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} className="vrm-b vrm-b-discret">Retirer</button>
+            </span>
+            {montre === x.id && <div data-equipe-message={x.id} style={{ flex: '1 1 100%', whiteSpace: 'pre-line', userSelect: 'text', WebkitUserSelect: 'text', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', color: C.text }}>{texteInvitationEquipe(x.email)}</div>}
           </div>
         ))}
       </div>}
@@ -4599,7 +4630,6 @@ function EmailsSetting({onComptes}) {
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
-  const proprioEmails = useEstProprietaire();
   const [rubriqueEmail,setRubriqueEmail]=useState(()=>DEMANDE_ADRESSES.on?(DEMANDE_ADRESSES.vers||'adresses'):'reception');
   const [journalFiltre,setJournalFiltre]=useState(()=>DEMANDE_ADRESSES.vers==='journal'?DEMANDE_ADRESSES.filtre:'');
   // (2 nov.) L'Aperçu ouvre le journal sur un état OU un type (« 2 bordereaux ajoutés à Colis » → les bordereaux).
@@ -4991,7 +5021,7 @@ function EmailsSetting({onComptes}) {
       {enAttente.length > 0 && (
         <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{enAttente.length} email{enAttente.length>1?'s':''} conservé{enAttente.length>1?'s':''}</div>
-          <ChampRecherche className="vrm-email-recherche-champ" valeur={rechercheRattachement} onChange={v=>{setRechercheRattachement(v);setLimiteRattachement(10);}} label="Rechercher dans les e-mails à rattacher" placeholder="Sujet ou motif" voix="brut"/>
+          <ChampRecherche className="vrm-email-recherche-champ" valeur={rechercheRattachement} onChange={v=>{setRechercheRattachement(v);setLimiteRattachement(10);}} label="Rechercher dans les e-mails à rattacher" placeholder="Sujet ou motif" micro voix="brut"/>
           {motsRattachement&&<p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} · recherche appliquée</p>}
           {/* (30 oct.) Un parcours : où j'en suis, une barre, combien. */}
           {lot ? <Avancement titre={`Email ${Math.min(lot.fait + 1, lot.total)} sur ${lot.total}`} part={lot.total ? lot.fait / lot.total : 0}

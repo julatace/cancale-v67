@@ -16,14 +16,13 @@
   --at-ombre: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10));
   --at-ambre-fond: rgba(255,149,0,.14);
   --at-ambre: #A35200;
-  --at-rouge-fond: rgba(255,59,48,.12);
-  --at-rouge: #D70015;
+  --at-double-fond: color-mix(in srgb, var(--vrm-doublon) 12%, transparent);
+  --at-double: var(--vrm-doublon);
 }
 :root[data-theme="dark"] {
   --at-ambre-fond: rgba(255,159,10,.20);
   --at-ambre: #FFB340;
-  --at-rouge-fond: rgba(255,69,58,.20);
-  --at-rouge: #FF6961;
+  --at-double-fond: color-mix(in srgb, var(--vrm-doublon) 20%, transparent);
 }
 
 @layer vrm-premium {
@@ -64,13 +63,13 @@
 }
 :root:root body .vrm-at .vrm-at-tuile small { font: 700 12px/1.2 var(--vrm-police, system-ui, sans-serif); color: var(--at-gris); letter-spacing: 0; }
 :root:root body .vrm-at .vrm-at-tuile b { font: 800 32px/1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.03em; }
-:root:root body .vrm-at .vrm-at-tuile[data-ton="rouge"] { background: var(--at-rouge-fond); color: var(--at-rouge); }
+:root:root body .vrm-at .vrm-at-tuile[data-ton="rouge"] { background: var(--at-double-fond); color: var(--at-double); }
 :root:root body .vrm-at .vrm-at-tuile[data-a-trancher-sans-photo] { color: var(--at-gris); }
 
 /* Le texte : le N° en grand, une question. */
 :root:root body .vrm-at .vrm-at-textes { display: flex !important; flex-direction: column !important; gap: 3px !important; min-width: 0 !important; }
 :root:root body .vrm-at .vrm-at-num { font: 800 20px/1.1 var(--vrm-police, system-ui, sans-serif); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--at-encre); }
-:root:root body .vrm-at .vrm-at-num[data-ton="rouge"] { color: var(--at-rouge); }
+:root:root body .vrm-at .vrm-at-num[data-ton="rouge"] { color: var(--at-double); }
 :root:root body .vrm-at .vrm-at-question { font: 600 16px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--at-encre); letter-spacing: -.01em; overflow-wrap: anywhere; }
 :root:root body .vrm-at .vrm-at-noms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 :root:root body .vrm-at .vrm-at-nom { padding: 3px 9px; border-radius: 10px; background: var(--at-fond-tuile); font: 600 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--at-gris); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -90,7 +89,7 @@
    (le geste qui tranche ici même) est rempli d'ambre. */
 :root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="geste"] { color: var(--at-ambre) !important; }
 :root:root body .vrm-at button.vrm-at-b[data-role="oui"] { background: var(--at-ambre-fond) !important; color: var(--at-ambre) !important; }
-:root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="rouge"] { background: var(--at-rouge-fond) !important; color: var(--at-rouge) !important; }
+:root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="rouge"] { background: var(--at-double-fond) !important; color: var(--at-double) !important; }
 :root:root body .vrm-at button.vrm-at-b:focus-visible, :root:root body .vrm-at .vrm-at-autres:focus-visible { outline: 3px solid var(--w-accent, #0071E3) !important; outline-offset: 2px !important; }
 :root:root body .vrm-at .vrm-at-chevron { flex: 0 0 auto; opacity: .7; }
 
@@ -106,4 +105,14 @@
 :root:root body .vrm-at .vrm-at-vide { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 14px !important; padding: 48px 16px 40px !important; text-align: center !important; background: var(--at-carte) !important; border-radius: 24px !important; box-shadow: var(--at-ombre) !important; border: 0 !important; }
 :root:root body .vrm-at .vrm-at-vide-dessin { color: var(--at-gris); }
 :root:root body .vrm-at .vrm-at-vide-titre { margin: 0 !important; font: 800 22px/1.2 var(--vrm-police, system-ui, sans-serif) !important; letter-spacing: -.02em !important; color: var(--at-encre) !important; }
+/* (11 nov., lot DJ4) « L’enlever du stock ? » : la réponse principale en premier, pleine largeur,
+   puis « Non, je l’ai » et « Plus tard ». Toutes ≥ 44 px. */
+:root:root body .vrm-at .vrm-at-gestes.is-trois { display: grid !important; grid-template-columns: 1fr 1fr !important; }
+:root:root body .vrm-at .vrm-at-gestes.is-trois button.vrm-at-b[data-role="non"] { grid-column: 1 / -1 !important; background: var(--at-ambre-fond) !important; color: var(--at-ambre) !important; }
+:root:root body .vrm-at .vrm-at-gestes.is-trois button.vrm-at-b[data-role="oui"] { background: var(--at-fond-tuile) !important; color: var(--at-encre) !important; }
+:root:root body .vrm-at .vrm-at-gestes.is-trois button.vrm-at-b[data-role="plus-tard"] { color: var(--at-gris) !important; }
+:root:root body .vrm-at .vrm-at-ensuite { margin: 0; padding: 4px 16px; font: 600 14px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--at-gris); text-align: center; }
+/* La carte de Ma journée : ouverte en place, le résumé n'est pas redit. */
+:root:root body .vrm-at-journee { margin-bottom: 14px; }
+:root:root body .vrm-at-journee-corps { margin-top: 12px; }
 }

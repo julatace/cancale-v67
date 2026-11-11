@@ -134,7 +134,7 @@ export function ParcoursArrivee({ etat, montree, succes = '', gestes = {}, detai
 }
 
 // La petite carte de Ma journée. `mode` : 'etape' · 'reprendre' · 'pret' (src/parcoursArrivee.js).
-export function CarteParcours({ etat, mode, onContinuer, onPlusTard, onOk, onMasquer = null, onExemple = null, attrsContinuer = {}, attrsCarte = {}, libelleContinuer = 'Continuer' }) {
+export function CarteParcours({ etat, mode, onContinuer, onPlusTard, onOk, onMasquer = null, onExemple = null, onImporter = null, attrsContinuer = {}, attrsCarte = {}, libelleContinuer = 'Continuer' }) {
   if (!etat || !mode || mode === 'cachee') return null;
   const c = etat.etapes.find((x) => x.cle === etat.courante) || null;
   const i = c ? etat.etapes.indexOf(c) : -1;
@@ -176,6 +176,11 @@ export function CarteParcours({ etat, mode, onContinuer, onPlusTard, onOk, onMas
           ))}
         </ol>
       </details>
+      {/* (11 nov.) FACULTATIF, hors des étapes comptées : il arrive d'un tableur ou d'un autre logiciel. */}
+      {onImporter && mode !== 'pret' ? (
+        <p className="vrm-pa-carte-note" data-guide-importer="">Tu arrives d’un tableur ou d’un autre logiciel&nbsp;?{' '}
+          <button type="button" className="vrm-b vrm-b-discret" data-guide-importer-geste="" onClick={onImporter}>Importer mon stock</button></p>
+      ) : null}
       {onExemple || onMasquer ? (
         <div className="vrm-pa-carte-pied">
           {onExemple ? <button type="button" className="vrm-b vrm-b-discret" data-exemple-entrer="" onClick={onExemple}>Voir VRM avec des exemples</button> : null}

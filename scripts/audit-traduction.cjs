@@ -124,7 +124,7 @@ async function principal() {
   const acc = lire('src/Accueil.jsx');
   const moments = [...acc.matchAll(/\{ id: '(\w+)', capture: '\w+' \}/g)].map((m) => m[1]);
   const momKo = moments.flatMap((id) => ['titre', 'texte', 'alt', 'point1', 'point2'].map((c) => `accueil.moment.${id}.${c}`)).filter((k) => !(k in fr));
-  dit(moments.length === 4 && !momKo.length, `C3 les ${moments.length} moments de l'accueil ont leurs cinq clés`, momKo);
+  dit(moments.length >= 4 && !momKo.length, `C3 les ${moments.length} moments de l'accueil ont leurs cinq clés`, momKo);
 
   // ── F. pas de français en dur dans les écrans migrés ──
   console.log('\n── F. aucun texte en dur dans les écrans migrés');

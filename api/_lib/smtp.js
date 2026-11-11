@@ -20,6 +20,32 @@
 import net from 'net';
 import tls from 'tls';
 import crypto from 'crypto';
+import dns from 'dns';
+
+// (11 nov., revue de sécurité) Un NOM qui passe `hoteValide` peut encore
+// désigner une adresse interne (« 127.0.0.1.nip.io », un nom posé chez soi) :
+// le serveur d'envoi choisi par le vendeur est RÉSOLU puis refusé s'il tombe
+// sur une adresse privée, locale ou réservée ; la connexion part vers l'adresse
+// vérifiée (jamais une 2e résolution), le certificat reste vérifié sur le NOM.
+const INTERNES = new net.BlockList();
+for (const [a, n] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 3]]) INTERNES.addSubnet(a, n, 'ipv4');
+for (const [a, n] of [['::', 127], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8], ['64:ff9b::', 96], ['2001:db8::', 32]]) INTERNES.addSubnet(a, n, 'ipv6');
+export function adressePublique(ip) {
+  const x = String(ip || '');
+  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(x);
+  if (v4) return adressePublique(v4[1]);
+  const f = net.isIP(x);
+  if (!f) return false;
+  return !INTERNES.check(x, f === 4 ? 'ipv4' : 'ipv6');
+}
+export const _resolution = { lookup: (h) => dns.promises.lookup(h, { all: true, verbatim: true }) };
+async function adresseSure(hote) {
+  const liste = await _resolution.lookup(hote);
+  const ips = (Array.isArray(liste) ? liste : []).map((x) => x && x.address).filter(Boolean);
+  if (!ips.length) throw new Error('serveur introuvable');
+  if (!ips.every(adressePublique)) throw new Error('adresse interne refusée');
+  return ips[0];
+}
 
 const CRLF = '\r\n';
 const DELAI_MS = Number(process.env.SMTP_DELAI_MS) || 20000;
@@ -150,12 +176,15 @@ export async function envoyerSmtp({ seulementConnexion = false, hote, port, util
   const refus = (etape, r) => ({ issue: 'refuse', etape, code: r && r.code, message: r ? raison(r) : '' });
   try {
     if (_banc.tlsOptions) tlsOptions = { ...tlsOptions, ..._banc.tlsOptions };
-    const ouvrir = connecter || _banc.connecter || ((o) => new Promise((ok, ko) => {
-      const s = o.securise
-        ? tls.connect({ host: o.hote, port: o.port, servername: o.hote, ...tlsOptions }, () => ok(s))
-        : net.connect({ host: o.hote, port: o.port }, () => ok(s));
-      s.once('error', ko); s.setTimeout(DELAI_MS, () => s.destroy(new Error('délai dépassé')));
-    }));
+    const ouvrir = connecter || _banc.connecter || (async (o) => {
+      const ip = await adresseSure(o.hote);
+      return await new Promise((ok, ko) => {
+        const s = o.securise
+          ? tls.connect({ host: ip, port: o.port, servername: o.hote, ...tlsOptions }, () => ok(s))
+          : net.connect({ host: ip, port: o.port }, () => ok(s));
+        s.once('error', ko); s.setTimeout(DELAI_MS, () => s.destroy(new Error('délai dépassé')));
+      });
+    });
     sock = await ouvrir({ hote, port: Number(port), securise });
     brancher(sock);
     let r = await lire(); if (r.code !== 220) return refus('connexion', r);

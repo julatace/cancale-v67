@@ -58,6 +58,8 @@ import { streamAllume } from './modeStream.js';
 import { prendreDemande, DEMANDE_RECHERCHE } from './rechercheEcran.js';
 import './boite-emails.css';
 import {CompteEmailAVerifier} from './ActionsClaires.jsx';
+import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from './composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
+import { trierSerie, resumeSerie } from './selectionSerie.js';
 
 const PAR_PAGE = 50;
 const formeListe = (j) => j && j.ok === true && Array.isArray(j.emails) && j.compteurs && typeof j.compteurs.sur === 'number';
@@ -263,7 +265,9 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
     })();
     return () => { vivant = false; };
   }, [id, entetes, essai, stream]);
-  useEffect(() => { if (m && m.email && titre.current) { try { titre.current.focus({ preventScroll: true }); } catch (_) {} } }, [m]);
+  // (11 nov.) Sur ordinateur, le focus reste sur la ligne choisie : ↑ ↓ passent à l'e-mail voisin
+  // tout de suite, comme dans Mail. Au téléphone (feuille plein écran), le titre le prend.
+  useEffect(() => { if (plein && m && m.email && titre.current) { try { titre.current.focus({ preventScroll: true }); } catch (_) {} } }, [m, plein]);
   const e = m && m.email;
   const lecture = e ? ceQueVrmAFait(e, delies) : null;
   const t = e ? titreSimple(e, delies) : null;
@@ -340,7 +344,7 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
 // droite, le code de retrait en grand (copiable) ou la photo de la paire.
 // Au doigt, glisser vers la droite bascule lu / non lu (rien n'est caché).
 const SEUIL_GLISSE = 76;
-const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu, maintenant }) {
+const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu, maintenant, attrsSerie = null, caseSerie = null }) {
   const r = rubriqueEmail(e);
   const t = titreSimple(e, delies);
   const l = ligneEmail(e, delies, maintenant);
@@ -371,7 +375,8 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
     setTimeout(() => { glisse.current = false; }, 0);
     setTimeout(() => setFondVu(false), reduitMvt() ? 0 : 360);
   };
-  return <li className="vrm-boite-item" data-pas-lu={pasLu ? '1' : undefined}>
+  return <li {...(attrsSerie || {})} className="vrm-boite-item" data-pas-lu={pasLu ? '1' : undefined}>
+    {caseSerie}
     {fondVu && lu !== null && <span ref={fond} className="vrm-boite-glisse-fond" aria-hidden="true" data-actif="0">{Ic.lu}<span>{pasLu ? 'Lu' : 'Non lu'}</span></span>}
     <button ref={ref} type="button" className="vrm-boite-ligne" data-boite-email={e.id} data-rubrique={r} data-etat={e.etat} data-lu={lu === null ? undefined : lu ? '1' : '0'}
       data-boite-geste={g ? g.k : undefined} data-boite-proche={g && g.proche ? '1' : undefined} data-boite-rien={l.rien ? '1' : undefined} data-boite-a-code={code ? '1' : undefined} data-boite-a-photo={photo ? '1' : undefined}
@@ -614,16 +619,74 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     // rognée par le <main> et la suite ne venait jamais à 1512 px — mesuré au banc).
     let racine = null;
     for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (o === 'auto' || o === 'scroll') { racine = p; break; } }
-    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { root: racine, rootMargin: '900px 0px' });
+    // (11 nov.) Sur ordinateur, la colonne de la liste défile seule et ses lignes sont plus
+    // basses : 900 px d'avance y chargeaient la page suivante d'emblée ; 400 suffisent.
+    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { root: racine, rootMargin: large ? '400px 0px' : '900px 0px' });
     io.observe(n);
     return () => io.disconnect();
-  }, [pages, lecture]);
+  }, [pages, lecture, large]);
   const photoLigne = useCallback((e) => (photoDe ? photoDe(e) : null), [photoDe]);
-  const rendreEmail = (e) => <Ligne key={e.id} e={e} delies={delies} ouvert={ouvert === e.id} lu={luDe(e)} photo={photoLigne(e)} onOuvrir={ouvrir} onLu={onLu} maintenant={maintenant}/>;
+  // (11 nov., « tout fait trop gros, surtout sur ordi ») Sur ordinateur, la boîte est UN
+  // panneau à deux colonnes qui remplit la fenêtre, comme Mail : la liste et la lecture
+  // défilent chacune de leur côté. Sa hauteur = la hauteur visible sous ce qui la précède
+  // (titre, onglets), relue au redimensionnement et quand le haut de l'écran change.
+  const corpsRef = useRef(null);
+  const lectureCol = useRef(null);
+  useEffect(() => {
+    const n = corpsRef.current;
+    if (!large || !n) return undefined;
+    let defile = null;
+    for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (o === 'auto' || o === 'scroll') { defile = p; break; } }
+    let raf = 0;
+    const maj = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const hautFen = defile ? defile.getBoundingClientRect().top : 0;
+        const hFen = defile ? defile.clientHeight : window.innerHeight;
+        const dec = (defile ? defile.scrollTop : window.scrollY) + n.getBoundingClientRect().top - hautFen;
+        n.style.setProperty('--bx-panneau-h', `${Math.max(460, Math.round(hFen - dec - 16))}px`);
+      });
+    };
+    maj();
+    window.addEventListener('resize', maj);
+    let ro = null;
+    try { let c = n; while (defile && c.parentElement && c.parentElement !== defile) c = c.parentElement; ro = new ResizeObserver(maj); ro.observe(defile ? c : document.body); } catch (_) {}
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', maj); if (ro) ro.disconnect(); n.style.removeProperty('--bx-panneau-h'); };
+  }, [large]);
+  useEffect(() => { if (large && lectureCol.current) lectureCol.current.scrollTop = 0; }, [ouvert, large]);
+  // Le clavier, comme Mail (ordinateur) : ↓ / ↑ ouvrent l'e-mail voisin, Échap ferme la lecture.
+  // Seulement quand le focus est sur une ligne de la liste (jamais dans un champ).
+  const auClavier = (ev) => {
+    if (!large || ev.altKey || ev.metaKey || ev.ctrlKey) return;
+    const ligne = ev.target && ev.target.closest ? ev.target.closest('.vrm-boite-ligne') : null;
+    if (ev.key === 'Escape' && ouvert && !/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName || '')) { ev.preventDefault(); setOuvert(''); return; }
+    if (!ligne || (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp')) return;
+    const toutes = [...ev.currentTarget.querySelectorAll('.vrm-boite-ligne[data-boite-email], .vrm-boite-ligne[data-boite-pile-tete]')];
+    const i = toutes.indexOf(ligne);
+    const suiv = toutes[i + (ev.key === 'ArrowDown' ? 1 : -1)];
+    if (i < 0 || !suiv) return;
+    ev.preventDefault();
+    try { suiv.focus({ preventScroll: true }); suiv.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+    const id = suiv.getAttribute('data-boite-email');
+    const e = id && pages && pages.emails.find((x) => x.id === id);
+    if (e) ouvrir(e);
+  };
+  // (11 nov., lot actions-serie) Plusieurs e-mails, « Lu » / « Non lu » une fois : le geste
+  // de la ligne (`onLu` → `ecrireLus`, les mêmes gestes { k:'lu'|'nonlu', id, at }), en UNE écriture.
+  const ordreSerie = useMemo(() => ((pages && pages.emails) || []).map((e) => String(e.id)), [pages]);
+  const serie = useSelectionSerie(ordreSerie, { nom: 'emails' });
+  const actionsSerie = [true, false].map((valeur) => ({ k: valeur ? 'lu' : 'nonlu', libelle: valeur ? 'Lu' : 'Non lu', variante: valeur ? 'primaire' : 'secondaire', faire: (cles) => {
+    const parId = new Map(((pages && pages.emails) || []).map((e) => [String(e.id), e]));
+    const { ok, pasFaits } = trierSerie(cles.map((k) => parId.get(k)).filter(Boolean), (e) => luDe(e) === valeur ? (valeur ? 'déjà lu' : 'déjà non lu') : true);
+    if (ok.length) poserLu(ok, valeur, ok.map((e) => ({ k: valeur ? 'lu' : 'nonlu', id: e.id, at: e.at })));
+    return resumeSerie({ faits: ok, pasFaits }, valeur ? { un: 'marqué lu', plusieurs: 'marqués lus' } : { un: 'marqué non lu', plusieurs: 'marqués non lus' });
+  } }));
+  const rendreEmail = (e) => <Ligne key={e.id} e={e} delies={delies} ouvert={ouvert === e.id} lu={luDe(e)} photo={photoLigne(e)} onOuvrir={ouvrir} onLu={onLu} maintenant={maintenant}
+    attrsSerie={serie.ligne(String(e.id))} caseSerie={serie.actif ? <CaseSerie serie={serie} cle={String(e.id)} etiquette={e.subject || 'cet e-mail'}/> : null}/>;
   const nPastille = (id) => (filtre || !complet ? null : Number.isFinite(parR[id]) ? parR[id] : null);
   return (
-    <div className="vrm-boite-corps-ecran" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'}>
-      <div className="vrm-boite-liste-col">
+    <div ref={corpsRef} className="vrm-boite-corps-ecran" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'} onKeyDown={auClavier}>
+      <div className="vrm-boite-liste-col" data-boite-liste-col="">
         {tete}
         <div className="vrm-boite-filtres">
           <label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
@@ -679,6 +742,8 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
           gestes={[rubrique ? { k: 'tout', mot: 'Voir toutes les rubriques', f: () => setRubrique('') } : { k: 'relier', mot: 'Relier ma boîte', f: onRelier }, { k: 'comptes', mot: 'Tous les comptes', f: () => setAdresse('') }]}/>}
         {vide && !filtre && !adresse && rubrique && <Etat k="rubrique-vide" titre={`Aucun e-mail dans « ${motRubrique} »`} texte="Ils arriveront ici dès que tes e-mails en parleront." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setRubrique('') }]}/>}
         {vide && !filtre && !adresse && !rubrique && <Etat k="vide" dessin="relier" titre="Ta boîte VRM est vide" texte="Relie ta boîte : chaque e-mail de Vinted, des transporteurs ou des autres sites que tu transfères à VRM arrivera ici, déjà rangé." gestes={[{ k: 'relier', mot: 'Relier ma boîte', f: onRelier }]}/>}
+        {groupes.length > 0 && ordreSerie.length > 1 && <div className="vrm-serie-entree" style={{ display: 'flex', justifyContent: 'flex-end' }}><OuvrirSerie serie={serie}/></div>}
+        <BarreSerie serie={serie} actions={actionsSerie} unite={{ un: 'e-mail sélectionné', plusieurs: 'e-mails sélectionnés' }}/>
         {groupes.length > 0 && <div className="vrm-boite-liste" data-boite-liste="">
           {groupes.map((g) => <section key={g.cle} className="vrm-boite-jour" data-boite-jour={g.mot} aria-label={g.mot}>
             <h2 className="vrm-boite-jour-titre">{g.mot}</h2>
@@ -694,7 +759,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
         {pages && pages.suite && !pages.suiteKO && <button type="button" className="vrm-boite-plus" data-boite-plus="" disabled={lecture} onClick={() => charger((pages.page || 0) + 1)}>{lecture ? 'Lecture…' : 'Voir plus'}</button>}
         {pages && !pages.suite && pages.emails.length > 0 && <p className="vrm-boite-fin" data-boite-fin="">{pages.emails.length} e-mail{pages.emails.length > 1 ? 's' : ''}{filtre || rubrique || adresse ? ' dans cette vue' : ''} · c’est tout</p>}
       </div>
-      {large && <div className="vrm-boite-lecture-col">
+      {large && <div ref={lectureCol} className="vrm-boite-lecture-col">
         {ouvert ? <Lecture onRelier={onRelier} key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={onAller} onNum={onNum} plein={false} lu={(() => { const e = pages && pages.emails.find((x) => x.id === ouvert); return e ? luDe(e) : null; })()} onLu={onLu} photoDe={photoDe}/>
           : <div className="vrm-boite-vide-lecture" data-boite-vide-lecture=""><Dessin k="vide"/><p>Choisis un e-mail pour le lire.</p></div>}
       </div>}

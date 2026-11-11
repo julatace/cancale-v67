@@ -1,4 +1,5 @@
 require('./_porte-banc.cjs');
+const { ecranPret } = require('./_ecran-pret.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « NOUVEAU VENDEUR » — de l'inscription à un compte qui vit (2 nov.).
 //  Julien : « tu te mets à la place d'une personne qui crée son compte, tu
@@ -162,7 +163,10 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee', bienvenue = true 
 
 // Ce que la personne VOIT : les défauts mesurables d'un écran.
 const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
-  const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05; };
+  // (11 nov.) Un texte « pour lecteur d'écran seulement » (lot P, `.vrm-sr-seul` : boîte de 1 px rognée par
+  // `clip`/`clip-path`) ne se VOIT pas : il n'est pas une ligne à l'écran (il faisait « · mois : … » en tête de ligne).
+  const rogne = (e) => { for (let p = e; p && p !== document.body; p = p.parentElement) { const s = getComputedStyle(p); if (s.clipPath === 'inset(50%)' || /rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)/.test(s.clip)) { const r = p.getBoundingClientRect(); if (r.width <= 1 && r.height <= 1) return true; } } return false; };
+  const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05 && !rogne(e); };
   const texte = document.body.innerText || '';
   const mauvais = [];
   for (const re of [/\bNaN\b/, /\bundefined\b/, /Invalid Date/i, /\[object Object\]/, /(^|[\s:(«])null([\s).,»]|$)/m, /\bInfinity\b/]) { const m = re.exec(texte); if (m) mauvais.push(texte.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, ' ')); }
@@ -278,11 +282,11 @@ async function tournee(nav, { W, sombre, scenario, base }) {
   for (const [ecran, nom] of ECRANS) {
     const [tab, sous] = ecran.split(':');
     await o.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
-    await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
-    await o.pg.waitForTimeout(2800);
+    // (11 nov., webkit-fiable) l'écran PRÊT (monté, chargé, DOM calme), plus 2,8 s fixes (§6.5).
+    await ecranPret(o.pg, '', { max: 20000 });   // (un lien peut mener à un autre écran : aucun nom exigé)
     if (sous) {
       const choix = o.pg.locator(`[data-colis-onglet-choix="${sous}"]`).first();
-      if (await choix.count()) { await choix.click(); await o.pg.waitForTimeout(1500); }
+      if (await choix.count()) { await choix.click(); await ecranPret(o.pg, '', { max: 10000 }); }
       else if (scenario === 'jeu') dit(false, `${T} ${nom} : l'onglet existe`, sous);
     }
     if (process.env.BANC_SONDE) await o.pg.evaluate(() => { window.__bancSonde = 1; });

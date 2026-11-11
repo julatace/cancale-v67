@@ -304,7 +304,10 @@ const TAILLE_SEULE = `${TAILLE_TXT}${PRIX_SUIT}`;
 // Un nombre suivi de « jours » / « j » n'est JAMAIS un prix (« depuis moins de 10 jours »).
 const PAS_JOURS = '(?!\\d|[.,]\\d)(?!\\s*(?:€|euros?|eur|e)?\\s*(?:jours?|j)\\b)';
 // Ponctuation qui n'est pas une décimale : « Nike, Adidas » · « les Adidas. »
-const sansPonctuation = (s) => String(s).replace(/(?<!\d)[,.;!?:]|[,.;!?:](?!\d)/g, ' ');
+// (11 nov.) Sans « lookbehind » (Safari < 16.4 refuse de lire tout le fichier) : la
+// ponctuation reste seulement entre deux chiffres (« 4.5 »), comme avant.
+const chiffre = (c) => c >= '0' && c <= '9';
+const sansPonctuation = (s) => String(s).replace(/[,.;!?:]/g, (c, i, t) => (chiffre(t[i - 1] || '') && chiffre(t[i + 1] || '') ? c : ' '));
 const normMarque = (s) => sansPonctuation(normTexte(s).replace(/[’'"«»]/g, ' ')).replace(/\s+/g, ' ').trim();
 const VIDES = new Set(['publie', 'publier', 'publies', 'poste', 'poster', 'mets', 'met', 'mettre', 'les', 'des', 'mes', 'mon', 'ma', 'ta', 'tes', 'en', 'a', 'au', 'aux', 'de', 'du', 'd', 'l', 'la', 'le', 'plus', 'moins', 'paire', 'paires', 'article', 'articles', 'toutes', 'tous', 'tout', 'sur', 'ebay', 'celles', 'ceux', 'qui', 'et', 'ou', 'que', 'je', 'veux', 'voudrais', 'chaussures', 'baskets', 'basket', 'sneakers', 'prix', 'euros', 'euro', 'eur', 'stp', 'merci', 'uniquement', 'seulement', 'avec', 'pour', 'mais', 'pas', 'les', 'une', 'un', 'cher', 'cheres', 'chers', 'vinted', 'compte', 'comptes', 'annonce', 'annonces', 'en', 'ligne', 'depuis', 'jours', 'jour', 'par', 'maximum', 'max', 'minimum', 'min', 'taille', 'tailles', 'pointure', 'pointures', 'entre', 'dessus', 'dessous', 'partir', 'jusqu', 'sous', 'meme', 'cochees', 'cochee', 'qu', 's', 'y', 'il', 'elle', 'on', 'ne']);
 

@@ -2,6 +2,12 @@
 // LA PAGE D'ACCUEIL PUBLIQUE — ce que voit quelqu'un qui ne connaît pas VRM
 // ══════════════════════════════════════════════════════════════════════════
 // (8 nov., refaite pour VENDRE — calme, premium, style Apple de VRM.)
+// (11 nov., lot accueil-public) Pour TOUT revendeur (pas que des sneakers) :
+// « pour qui » au-dessus de la promesse, cinq moments (Messages et offres en
+// plus), les captures en catalogue MÉLANGÉ (mode exemple `varie`), deux cartes
+// de prix Solo / Pro (noms et phrases : OFFRES, montants : accueil-reglages,
+// comparés aux CGV par les audits), la FAQ en vraies questions/réponses, et
+// l'image de partage (public/og-vrm.jpg, scripts/accueil-og.cjs).
 // La promesse en une phrase : « Tes ventes, tes colis et ta compta, au même
 // endroit. » Puis la journée d'un revendeur, en quatre moments, montrée par de
 // VRAIES captures de l'app (mode exemple, scripts/accueil-captures.cjs) : le
@@ -59,16 +65,47 @@ const MOMENTS = [
   { id: 'matin', capture: 'journee' },
   { id: 'colis', capture: 'retirer' },
   { id: 'numeros', capture: 'numeros' },
+  { id: 'messages', capture: 'messages' },
   { id: 'compta', capture: 'compta' },
 ];
 const texteMoment = (m, champ) => tr(`accueil.moment.${m.id}.${champ}`);
-const pointsMoment = (m) => [texteMoment(m, 'point1'), texteMoment(m, 'point2')];
+const pointsMoment = (m) => [texteMoment(m, 'point1'), texteMoment(m, 'point2')];;
+
+// ── Les questions : une question (h3), sa réponse. Une réponse ne promet que
+//    ce que le code fait ; `si` cache une question quand elle n'a plus lieu d'être.
+// (11 nov., lot traduction) Les questions : `accueil.faq.<id>.q` et ses réponses dans les dictionnaires.
+const FAQ = [
+  { id: 'extension', r: () => [<>{tr('accueil.faq.extension.r')}<a href="/aide/extension">{tr('accueil.faq.extension.lien')}</a>.</>] },
+  { id: 'blocage', r: () => [tr('accueil.faq.blocage.r1'), tr('accueil.faq.blocage.r2')] },
+  { id: 'securite', r: () => [tr('accueil.faq.securite.r1'), <a key="c" href="/legal/confidentialite.html">{tr('accueil.faq.securite.lien')}</a>] },
+  { id: 'arret', r: () => [tr('accueil.faq.arret.r1'), tr('accueil.faq.arret.r2')] },
+  { id: 'telephone', r: () => [tr('accueil.faq.telephone.r1'), tr('accueil.faq.telephone.r2')] },
+  { id: 'comptes', r: () => [tr('accueil.faq.comptes.r1'), tr('accueil.faq.comptes.r2'), tr('accueil.faq.comptes.r3')] },
+  { id: 'baskets', r: () => [tr('accueil.faq.baskets.r')] },
+  { id: 'vestiaire', si: () => !VESTIAIRE_BRANCHE, r: () => [tr('accueil.faq.vestiaire.r')] },
+  { id: 'autre', r: () => [<><a href="/aide">{tr('accueil.faq.autre.aide')}</a> ; <a href="/statut">{tr('accueil.faq.autre.statut')}</a>.</>] },
+];;
 
 const LEGAL = [
   ['legal.cgv', '/legal/cgv.html'], ['legal.cgu', '/legal/cgu.html'], ['legal.confidentialite', '/legal/confidentialite.html'],
   ['legal.mentions', '/legal/mentions-legales.html'], ['legal.cookies', '/legal/cookies.html'],
 ];
 
+// ⚠️ Les commentaires vivent ICI, pas dans la chaîne (elle est envoyée telle quelle
+//    au navigateur, dans le fichier d’entrée au budget compté par le banc). Dans l’ordre :
+//   · La barre : le fond de la page dès qu'on défile, rien de plus.
+//   · Les boutons : une forme (pilule), deux poids.
+//   · Le haut de page : la promesse, centrée — le seul moment centré de la page.
+//   · La scène du haut : l'ordinateur et le téléphone, de vraies captures.
+//   · La journée : sur ordinateur, le téléphone reste fixe et change d'écran.
+//   · Les comptes et l'installation : une bande grise, deux colonnes de texte.
+//   · Le prix : deux cartes côte à côte ; Pro porte la carte sombre, signature de VRM.
+//   · Les questions : du texte qu'on lit, sans accordéon.
+//   · La fin : une phrase, un geste.
+//   · Le pied : la marque revient, puis les liens utiles.
+//   · Apparition au défilement : une fois, en montée courte ; jamais caché sans observateur.
+//   · Tablette et petit ordinateur.
+//   · Téléphone.
 const CSS = `
 .av{--fond:#FFFFFF;--fond2:#F5F5F7;--encre:#1D1D1F;--gris:#6E6E73;--accent:#0071E3;--accent-texte:#0066CC;--nuit:#1D1D1F;--nuit-encre:#F5F5F7;--nuit-gris:#A1A1A6;--cadre:#1D1D1F;--ombre:0 1px 2px rgba(0,0,0,.06),0 24px 48px -12px rgba(0,0,0,.18);
   position:relative;background:var(--fond);color:var(--encre);min-height:100vh;overflow-x:clip;
@@ -84,8 +121,6 @@ const CSS = `
 :where(.av) :where(h1,h2,h3,p,ol,ul,figure){margin:0}
 .av-in{max-width:1180px;margin:0 auto;padding:0 24px}
 .av-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
-
-/* La barre : le fond de la page dès qu'on défile, rien de plus. */
 .av-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:transparent;transition:background-color 200ms ease}
 .av-nav.defile{background:var(--fond)}
 .av-nav .av-in{display:flex;align-items:center;gap:8px;height:56px}
@@ -96,8 +131,6 @@ const CSS = `
 .av-liens a{font-size:14px;color:var(--gris);text-decoration:none;padding:12px 10px;border-radius:8px;transition:color 150ms ease}
 @media (hover:hover) and (pointer:fine){.av-liens a:hover{color:var(--encre)}}
 .av-droite{margin-left:auto;display:flex;align-items:center;gap:4px}
-
-/* Les boutons : une forme (pilule), deux poids. */
 .av .av-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 24px;border-radius:999px;border:none;cursor:pointer;font:inherit;font-size:17px;font-weight:600;letter-spacing:-.01em;text-decoration:none;white-space:nowrap;background:var(--accent);color:#FFFFFF;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease}
 .av .av-btn:active{transform:scale(.97)}
 @media (hover:hover) and (pointer:fine){.av .av-btn:hover{background:#0077ED}}
@@ -107,9 +140,8 @@ const CSS = `
 .av-nav .av-btn{min-height:36px;padding:0 16px;font-size:14px;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity 160ms ease,transform 160ms ease}
 .av-nav .av-btn.la{opacity:1;pointer-events:auto;transform:none}
 .av-nav .av-lien{font-size:14px}
-
-/* Le haut de page : la promesse, centrée — le seul moment centré de la page. */
 .av-hero{padding:72px 0 0;text-align:center}
+.av-pour{font-size:clamp(15px,1.2vw,17px);font-weight:600;color:var(--gris);margin:0 auto 14px;max-width:30em;text-wrap:balance}
 .av-h1{font-size:clamp(36px,5.2vw,76px);line-height:1.04;letter-spacing:-.035em;font-weight:700;max-width:16em;margin:0 auto;text-wrap:balance}
 .av-sous{font-size:clamp(19px,1.7vw,24px);line-height:1.4;color:var(--gris);max-width:34em;margin:24px auto 0;text-wrap:balance;letter-spacing:-.015em}
 .av-actions{display:flex;align-items:center;justify-content:center;gap:12px 20px;margin-top:32px;flex-wrap:wrap}
@@ -117,8 +149,6 @@ const CSS = `
 .av-prix-ligne b{color:var(--encre);font-weight:600}
 .av-prix-ligne .nw{white-space:nowrap}
 .av-prereq{margin:6px auto 0;font-size:15px;color:var(--gris);max-width:40em;line-height:1.5}
-
-/* La scène du haut : l'ordinateur et le téléphone, de vraies captures. */
 .av-scene{position:relative;margin:56px auto 0;max-width:1100px;padding:0 24px}
 .av-ecran-bureau{display:block;border-radius:14px;overflow:hidden;background:var(--fond2);box-shadow:var(--ombre)}
 .av-ecran-bureau img,.av-tel img{display:block;width:100%;height:auto}
@@ -127,8 +157,6 @@ const CSS = `
 .av-scene .av-tel{position:absolute;right:-8px;bottom:-56px;width:230px}
 .av-legende{font-size:13px;color:var(--gris);margin-top:16px;text-align:left}
 .av-scene .av-legende{margin-top:72px;text-align:center}
-
-/* La journée : sur ordinateur, le téléphone reste fixe et change d'écran. */
 .av-journee{padding:160px 0 40px}
 .av-journee-tete{max-width:780px}
 .av-h2{font-size:clamp(30px,3.6vw,48px);line-height:1.08;letter-spacing:-.03em;font-weight:700;text-wrap:balance}
@@ -147,9 +175,6 @@ const CSS = `
 .av-moment li{position:relative;padding-left:20px;font-size:16px;color:var(--gris);line-height:1.45}
 .av-moment li:before{content:"";position:absolute;left:2px;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--gris)}
 .av-moment .av-tel-seul{display:none}
-.av-moment[data-actif] h3{color:var(--encre)}
-
-/* Les comptes et l'installation : une bande grise, deux colonnes de texte. */
 .av-bande{background:var(--fond2);padding:128px 0;margin-top:120px}
 .av-deux{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:96px;align-items:start}
 .av-bande p{font-size:17px;line-height:1.55;margin-top:16px;max-width:34em}
@@ -160,39 +185,36 @@ const CSS = `
 .av-etapes h3{font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3}
 .av-etapes p{margin-top:4px;font-size:16px;color:var(--gris)}
 .av-note{font-size:15px!important;color:var(--gris)}
-
-/* Le prix : la carte sombre, signature de VRM. */
 .av-prix{padding:160px 0 0}
-.av-carte-prix{background:var(--nuit);color:var(--nuit-encre);border-radius:28px;padding:64px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:end}
-.av-carte-prix .av-h2{color:var(--nuit-encre)}
-.av-montant{display:flex;align-items:baseline;gap:12px;margin-top:28px;font-variant-numeric:tabular-nums}
-.av-montant b{font-size:clamp(64px,8vw,112px);font-weight:700;letter-spacing:-.045em;line-height:.95}
-.av-montant span{white-space:nowrap;font-size:21px;color:var(--nuit-gris)}
-.av-carte-prix p{font-size:17px;line-height:1.55;color:var(--nuit-encre);max-width:30em}
-.av-carte-prix p + p{margin-top:14px}
-.av-carte-prix .petit{font-size:15px;color:var(--nuit-gris)}
-.av-carte-prix .petit a{color:var(--nuit-encre);text-underline-offset:3px}
-.av-carte-prix .av-btn{margin-top:28px}
-.av-offert{display:inline-block;margin-top:20px;font-size:15px;font-weight:600;color:var(--nuit-encre)}
-
-/* Les questions : du texte qu'on lit, sans accordéon. */
+.av-prix-tete{max-width:780px}
+.av-offres{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;margin-top:56px}
+.av-offre{background:var(--fond2);border-radius:28px;padding:48px;display:flex;flex-direction:column}
+.av-offre h3{font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.av-offre p{margin-top:20px;font-size:17px;line-height:1.55;max-width:30em}
+.av-offre-pro{background:var(--nuit);color:var(--nuit-encre)}
+.av-montant{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin-top:16px;font-variant-numeric:tabular-nums}
+.av-montant b{font-size:clamp(56px,6vw,88px);font-weight:700;letter-spacing:-.045em;line-height:.95}
+.av-montant span{white-space:nowrap;font-size:19px;color:var(--gris)}
+.av-offre-pro .av-montant span{color:var(--nuit-gris)}
+.av-prix-pied{margin-top:40px;max-width:40em}
+.av-prix-pied p{font-size:17px;line-height:1.55}
+.av-prix-pied p + p{margin-top:10px}
+.av-prix-pied .petit{font-size:15px;color:var(--gris)}
+.av-prix-pied .petit a{color:var(--accent-texte);text-underline-offset:3px}
+.av-prix-pied .av-btn{margin-top:28px}
+.av-offert{font-weight:600}
 .av-faq{padding:160px 0 0}
 .av-faq-grille{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,8fr);gap:64px;align-items:start}
 .av-faq-texte{columns:2;column-gap:56px}
 .av-faq-texte p{break-inside:avoid;margin:0 0 24px;font-size:16px;line-height:1.55;color:var(--gris)}
-.av-faq-texte p b{color:var(--encre);font-weight:600}
 .av-faq-q{break-inside:avoid;margin:0 0 24px}
-.av-faq-q>b{display:block;font-size:16px;line-height:1.55;color:var(--encre);font-weight:600}
+.av-faq-q>h3{font-size:16px;line-height:1.55;color:var(--encre);font-weight:600}
 .av-faq-texte .av-faq-q p{margin:0}
 .av-auto{margin:8px 0 0;padding-left:1.2em;font-size:17px;line-height:1.55;max-width:34em}
 .av-faq-texte a{color:var(--accent-texte);text-underline-offset:3px}
-
-/* La fin : une phrase, un geste. */
 .av-fin{padding:200px 0 160px;text-align:left}
 .av-fin p{font-size:clamp(24px,2.4vw,32px);line-height:1.25;letter-spacing:-.022em;font-weight:600;max-width:24em;text-wrap:balance}
 .av-fin .av-actions{justify-content:flex-start;margin-top:28px}
-
-/* Le pied : la marque revient, puis les liens utiles. */
 .av-pied{background:var(--fond2);padding:56px 0 calc(40px + env(safe-area-inset-bottom));font-size:13px;color:var(--gris)}
 .av-pied .av-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:start}
 .av-pied .av-langue{grid-column:1/-1;justify-self:end;color:var(--gris);font-size:13px}
@@ -200,8 +222,6 @@ const CSS = `
 .av-pied nav a,.av-pied nav span{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;text-decoration:none;color:var(--gris)}
 @media (hover:hover) and (pointer:fine){.av-pied nav a:hover{color:var(--encre);text-decoration:underline;text-underline-offset:3px}}
 .av-pied .marque{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--encre);display:block;margin-bottom:8px}
-
-/* Apparition au défilement : une fois, en montée courte ; jamais caché sans observateur. */
 @media (prefers-reduced-motion:no-preference){
   .av-hero > .av-in > *{animation:avMonte 520ms cubic-bezier(.23,1,.32,1) both}
   .av-hero .av-sous{animation-delay:70ms}.av-hero .av-actions{animation-delay:140ms}.av-hero .av-prix-ligne,.av-hero .av-prereq{animation-delay:200ms}
@@ -212,18 +232,15 @@ const CSS = `
 }
 @keyframes avMonte{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.av *{animation:none!important;transition:none!important}}
-
-/* Tablette et petit ordinateur. */
 @media (max-width:1023px){
   .av-split{grid-template-columns:1fr;gap:0;margin-top:32px}
   .av-plateau{display:none}
   .av-moment{min-height:0;padding:56px 0 0}
   .av-moment .av-tel-seul{display:block;width:min(300px,78vw);margin:32px auto 0}
-  .av-deux,.av-carte-prix,.av-faq-grille{grid-template-columns:1fr;gap:40px}
-  .av-carte-prix{padding:48px 32px}
+  .av-deux,.av-faq-grille{grid-template-columns:1fr;gap:40px}
+  .av-offre{padding:40px 32px}
   .av-liens{display:none}
 }
-/* Téléphone. */
 @media (max-width:759px){
   .av-in{padding:0 20px}
   .av-hero{padding-top:40px}
@@ -238,7 +255,8 @@ const CSS = `
   .av-moment p{font-size:17px}
   .av-bande{padding:88px 0;margin-top:96px}
   .av-prix,.av-faq{padding-top:104px}
-  .av-carte-prix{padding:40px 24px;border-radius:24px}
+  .av-offres{grid-template-columns:1fr;gap:16px;margin-top:40px}
+  .av-offre{padding:32px 24px;border-radius:24px}
   .av-faq-texte{columns:1}
   .av-fin{padding:120px 0 104px}
   .av-fin .av-actions{align-items:flex-start}
@@ -264,7 +282,7 @@ export default function Accueil({ onEntrer }) {
     return () => { try { mq && mq.removeEventListener && mq.removeEventListener('change', poser); } catch (_) {} document.body.style.background = avant; document.title = titre; };
   }, [langue]);
 
-  // La barre : le fond dès 8 px ; « Créer mon compte » n'y paraît que quand le
+  // La barre : le fond dès 8 px ; « Essayer gratuitement » n'y paraît que quand le
   // bouton du haut est sorti de l'écran (un seul bouton principal à la fois).
   const sentinelle = React.useRef(null), ctaHaut = React.useRef(null);
   const [defile, setDefile] = React.useState(false);
@@ -324,7 +342,7 @@ export default function Accueil({ onEntrer }) {
   // ⚠️ Des fonctions qui RENDENT un bouton, pas des composants déclarés ici
   //    (un composant redéfini à chaque rendu perdrait le focus clavier).
   const creer = (extra) => (
-    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>{tr('auth.bouton.creer')}</a>
+    <a href="/?inscription" className="av-btn" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')} {...extra}>{tr('accueil.cta.essayer')}</a>
   );
   const connexion = (extra) => (
     <a href="/?connexion" className="av-lien" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')} {...extra}>{tr('auth.titre.in')}<span aria-hidden="true">›</span></a>
@@ -332,10 +350,10 @@ export default function Accueil({ onEntrer }) {
   const ligneEssai = tr('accueil.essai', { n: ESSAI_JOURS });
   // La liste des navigateurs : la phrase française de la règle (« … ou Vivaldi ») ; ailleurs, la
   // même liste jointe dans la langue (Intl.ListFormat), les noms jamais traduits.
+  const navsOrdi = langue === 'fr' ? NAVS_ORDI : listeDansLaLangue(SERVIS.ordinateur, langue);
   // Le prix : la valeur des CGV (« 16,99 », src/accueil-reglages.js) écrite telle quelle en
   // français, et dans le format de la langue ailleurs (« €16.99 ») — jamais une autre valeur.
   const prixLu = (p) => (langue === 'fr' ? <>{p}&nbsp;€</> : monnaie(Number(String(p).replace(',', '.'))));
-  const navsOrdi = langue === 'fr' ? NAVS_ORDI : listeDansLaLangue(SERVIS.ordinateur, langue);
 
   return (
     <div className="av" data-accueil="">
@@ -354,7 +372,7 @@ export default function Accueil({ onEntrer }) {
             <a href="/aide">{tr('accueil.nav.aide')}</a>
           </nav>
           <div className="av-droite">
-            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>{tr('auth.bouton.creer')}</a>
+            <a href="/?inscription" className={`av-btn${ctaNav ? ' la' : ''}`} data-cta-nav="inscription" tabIndex={ctaNav ? 0 : -1} aria-hidden={ctaNav ? undefined : 'true'} onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>{tr('accueil.cta.essayer')}</a>
             <a href="/?connexion" className="av-lien" data-cta-nav="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>{tr('auth.titre.in')}</a>
           </div>
         </div>
@@ -363,6 +381,7 @@ export default function Accueil({ onEntrer }) {
       <main>
         <section className="av-hero" data-section="hero">
           <div className="av-in">
+            <p className="av-pour" data-pour-qui="">{tr('accueil.hero.pour')}</p>
             <h1 className="av-h1" data-definition="">{tr('accueil.hero.titre')}</h1>
             <p className="av-sous">{tr('accueil.hero.sous')}</p>
             <div className="av-actions">
@@ -448,26 +467,30 @@ export default function Accueil({ onEntrer }) {
 
         <section className="av-prix" id="prix" data-section="prix">
           <div className="av-in">
-            <div className="av-carte-prix" data-reveil="">
-              <div>
-                <h2 className="av-h2">{tr('accueil.offres.titre')}</h2>
-                {ACCES_OFFERT && <span className="av-offert" data-acces-offert="">{tr('accueil.gratuit')}</span>}
-                <div className="av-montant" data-prix="" data-offre="solo"><b>{prixLu(PRIX_MOIS)}</b><span>{tr('accueil.prix.parMois')} · {OFFRES.solo.nom}</span></div>
-                <div className="av-montant" data-prix-pro="" data-offre="pro"><b>{prixLu(PRIX_PRO_MOIS)}</b><span>{tr('accueil.prix.parMois')} · {OFFRES.pro.nom}{PRO_OUVERT ? '' : tr('accueil.offres.bientot')}</span></div>
-              </div>
-              <div>
-                {/* La phrase de chaque offre : en français, CELLE du serveur (OFFRES, api/_lib/plan-regle.js) ;
-                    ailleurs sa traduction (audit-traduction : la clé française = la phrase du serveur). */}
-                <p data-offre-phrase="solo"><b>{OFFRES.solo.nom}</b>{tr('commun.deuxPoints')}{langue === 'fr' ? OFFRES.solo.phrase : tr('accueil.offre.solo.phrase')}</p>
-                <p data-offre-phrase="pro"><b>{OFFRES.pro.nom}</b>{tr('commun.deuxPoints')}{langue === 'fr' ? OFFRES.pro.phrase : tr('accueil.offre.pro.phrase')}{PRO_OUVERT ? '' : tr('accueil.offres.ouverture')}</p>
-                <p>{tr('accueil.offres.toutes')}</p>
-                <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>{tr('accueil.offres.essai')}</p>
-                <p className="petit">
-                  {ACCES_OFFERT && tr('accueil.offres.gratuit')}
-                  {tr('accueil.offres.paiement')}<a href="/legal/cgv.html">{tr('accueil.offres.cgv')}</a>.
-                </p>
-                {creer()}
-              </div>
+            <div className="av-prix-tete" data-reveil="">
+              <h2 className="av-h2">{tr('accueil.offres.titre')}</h2>
+              <p className="av-chapo">{tr('accueil.offres.chapo')}</p>
+            </div>
+            <div className="av-offres" data-reveil="">
+              {/* Les noms et les phrases : OFFRES (api/_lib/plan-regle.js, la phrase
+                  des Paramètres et du serveur). Les montants : PRIX_MOIS / PRIX_PRO_MOIS
+                  (src/accueil-reglages.js), comparés aux CGV et au serveur par
+                  scripts/audit-plans-solo-pro.cjs et le banc accueil. */}
+              {[['solo', PRIX_MOIS, true], ['pro', PRIX_PRO_MOIS, PRO_OUVERT]].map(([cle, prix, ouvert]) => (
+                <article key={cle} className={`av-offre av-offre-${cle}`} data-offre={cle} data-prix-offre={prix}>
+                  <h3>{OFFRES[cle].nom}</h3>
+                  <div className="av-montant"><b>{prixLu(prix)}</b><span>{tr('accueil.prix.parMois')}{ouvert ? '' : tr('accueil.offres.bientot')}</span></div>
+                  {/* La phrase : en français CELLE du serveur (OFFRES) ; ailleurs sa traduction
+                      (audit-traduction D9 : la clé française = la phrase du serveur). */}
+                  <p data-offre-phrase={cle}>{langue === 'fr' ? OFFRES[cle].phrase : tr(`accueil.offre.${cle}.phrase`)}{ouvert ? '' : tr('accueil.offres.ouverture')}</p>
+                </article>
+              ))}
+            </div>
+            <div className="av-prix-pied" data-reveil="">
+              {ACCES_OFFERT && <p className="av-offert" data-acces-offert="">{tr('accueil.offres.gratuitLong')}</p>}
+              <p><span data-essai={ESSAI_JOURS}>{ligneEssai}</span>{tr('accueil.offres.essai')}</p>
+              <p className="petit">{tr('accueil.offres.paiement')}<a href="/legal/cgv.html">{tr('accueil.offres.cgv')}</a>.</p>
+              {creer()}
             </div>
           </div>
         </section>
@@ -476,15 +499,12 @@ export default function Accueil({ onEntrer }) {
           <div className="av-in av-faq-grille">
             <h2 className="av-h2">{tr('accueil.faq.titre')}</h2>
             <div className="av-faq-texte">
-              <div className="av-faq-q"><b>{tr('accueil.faq.extension.q')}</b><p>{tr('accueil.faq.extension.r')}<a href="/aide/extension">{tr('accueil.faq.extension.lien')}</a>.</p></div>
-              <div className="av-faq-q"><b>{tr('accueil.faq.blocage.q')}</b><p>{tr('accueil.faq.blocage.r1')}</p><p>{tr('accueil.faq.blocage.r2')}</p></div>
-              <div className="av-faq-q"><b>{tr('accueil.faq.securite.q')}</b><p>{tr('accueil.faq.securite.r1')}</p><p><a href="/legal/confidentialite.html">{tr('accueil.faq.securite.lien')}</a>.</p></div>
-              <div className="av-faq-q"><b>{tr('accueil.faq.arret.q')}</b><p>{tr('accueil.faq.arret.r1')}</p><p>{tr('accueil.faq.arret.r2')}</p></div>
-              <div className="av-faq-q"><b>{tr('accueil.faq.telephone.q')}</b><p>{tr('accueil.faq.telephone.r1')}</p><p>{tr('accueil.faq.telephone.r2')}</p></div>
-              <div className="av-faq-q"><b>{tr('accueil.faq.comptes.q')}</b><p>{tr('accueil.faq.comptes.r1')}</p><p>{tr('accueil.faq.comptes.r2')}</p><p>{tr('accueil.faq.comptes.r3')}</p></div>
-              <p><b>{tr('accueil.faq.baskets.q')}</b> {tr('accueil.faq.baskets.r')}</p>
-              {!VESTIAIRE_BRANCHE && <p><b>{tr('accueil.faq.vestiaire.q')}</b> {tr('accueil.faq.vestiaire.r')}</p>}
-              <p><b>{tr('accueil.faq.autre.q')}</b> <a href="/aide">{tr('accueil.faq.autre.aide')}</a> ; <a href="/statut">{tr('accueil.faq.autre.statut')}</a>.</p>
+              {FAQ.filter((q) => !q.si || q.si()).map((q) => (
+                <div key={q.id} className="av-faq-q" data-question="">
+                  <h3>{tr(`accueil.faq.${q.id}.q`)}</h3>
+                  {q.r().map((x, i) => <p key={i}>{x}</p>)}
+                </div>
+              ))}
             </div>
           </div>
         </section>

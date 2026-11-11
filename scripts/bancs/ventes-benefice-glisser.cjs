@@ -184,7 +184,7 @@ async function main() {
       // Une vente finalisée ne se glisse pas.
       await glisser(pg, '[data-tx="9202"]');
       await pg.waitForTimeout(800);
-      const g2 = await pg.evaluate(() => document.querySelector('[data-tx="9202"]').hasAttribute('data-glisse-depose'));
+      const g2 = await pg.evaluate(() => document.querySelector('[data-tx="9202"]').hasAttribute('data-lg'));
       dit(!g2 && !(await pg.$('[data-depose-barre]')), '390px une vente finalisée ne se glisse pas', String(g2));
       dit(!errs.length, 'B aucune erreur d’app', errs[0]);
       await ctx.close();
