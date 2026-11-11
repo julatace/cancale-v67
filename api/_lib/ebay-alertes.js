@@ -95,7 +95,8 @@ export function aRelireMaintenant(etat, veilles, t) {
     if (!cr.ok) { refusees.push({ id: v.id, error: cr.error }); continue; }
     const sig = signatureCriteres(cr.c);
     const r = e.recherches[v.id];
-    const at = r && r.sig === sig ? Date.parse(r.at || '') : NaN;
+    // `lu` : la signature de la dernière TENTATIVE (réussie ou non) — un échec attend aussi.
+    const at = r && (r.sig === sig || r.lu === sig) ? Date.parse(r.at || '') : NaN;
     if (Number.isFinite(at) && t - at < INTERVALLE_MS) continue;
     dues.push({ v, c: cr.c, sig, depuis: Number.isFinite(at) ? at : 0 });
   }
@@ -127,7 +128,7 @@ export function integrer(d, { v, sig, items, t }) {
     });
   }
   e.vus[v.id] = [...new Set([...(premiere ? [] : e.vus[v.id]), ...ids])].slice(-MAX_VUS);
-  e.recherches[v.id] = { sig, at, n: ids.length, echec: null, premiere: premiere ? at : ((r && r.premiere) || at) };
+  e.recherches[v.id] = { sig, lu: sig, at, n: ids.length, echec: null, premiere: premiere ? at : ((r && r.premiere) || at) };
   e.dits = [...e.dits, ...nouvelles.map((n) => n.itemId)].slice(-MAX_DITS);
   e.nouvelles = garder([...e.nouvelles, ...nouvelles], t);
   compterHeure(e, t);
@@ -138,8 +139,9 @@ export function integrer(d, { v, sig, items, t }) {
 export function marquerEchec(d, { v, sig, t, raison }) {
   const e = etatNormal(d);
   const r = e.recherches[v.id] || {};
-  e.recherches[v.id] = { ...r, sig: r.sig === sig ? sig : (r.sig || null), at: iso(t), echec: String(raison || 'ebay').slice(0, 40) };
-  if (r.sig !== sig) e.recherches[v.id].sig = null;   // critères neufs pas encore lus : la prochaine lecture sera la première
+  // `sig` reste celle de la dernière lecture RÉUSSIE (critères neufs pas encore lus : la
+  // prochaine réussite sera une première lecture) ; `lu` date la tentative.
+  e.recherches[v.id] = { ...r, sig: r.sig === sig ? sig : null, lu: sig, at: iso(t), echec: String(raison || 'ebay').slice(0, 40) };
   compterHeure(e, t);
   return e;
 }
