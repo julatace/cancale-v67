@@ -345,6 +345,8 @@ répondu n'est pas un feu vert ».
   - Après : **pas de facture espagnole émise par VRM** sans un chantier Verifactu dédié.
 - **DE** : vente à un particulier ⇒ Kleinbetragsrechnung ≤ 250 € et mention §19 ou §25a. C'est
   le pays où la Facture Pro se transpose le plus facilement, une fois le §14 Abs.4 relu.
+  ⛔ Décision du 11 nov. : **le seul pays retenu pour la Facture Pro, et seulement sur le papier**
+  tant qu'un Steuerberater n'a pas relu les mentions. Aucune facture allemande n'est émise par VRM d'ici là.
 - **Langue** : la facture française reste bilingue (loi Toubon, `src/facturePro/anglais.js`).
   Pour un vendeur étranger, la facture est dans **sa** langue, avec les mentions de **son**
   pays, traduites une fois et **sans IA** (§2.9).
@@ -390,7 +392,7 @@ répondu n'est pas un feu vert ».
 | **P3 · Allemagne Kleinunternehmer + §25a** | jauge 25 000 / 100 000 €, TVA sur marge par paire, mention de facture, Kleinbetragsrechnung | DE relus | moyenne à haute |
 | **P4 · export comptable par pays** | libellés, date retenue, format décimal | — | moyenne |
 | **P5 · Espagne** | datation à la vente, IVA REBU, modelo 130 en « au moins », dates 303/130 ; RETA tue | ES relus | moyenne, la plus risquée |
-| **P6 · factures étrangères** | DE d'abord ; IT par fichier pour l'intermédiaire SdI ; ES gelé jusqu'à une décision Verifactu | — | à décider |
+| **P6 · factures étrangères** | ⛔ **tranché le 11 nov.** : Allemagne SEULE, et seulement dans l'étude — **rien de branché dans l'app tant qu'un expert local (Steuerberater) n'a pas relu** les mentions (§14 Abs.4, §19, §25a, Kleinbetragsrechnung). IT (SdI) et ES (Verifactu) : pas de facture | — | gelé jusqu'à la relecture |
 | **P7 · Irlande** | marge, jauge 85 000 € ; impôt tu | IE relus | faible (peu de Vinted IE) |
 
 ---
@@ -425,6 +427,7 @@ et le moins risqué.
 - **Autoriser les hôtes officiels** du §0 dans le réseau de l'environnement, pour que la
   session P0 relise les sources.
 - **Confirmer** que la décision du 11 nov. remplace la ligne « International » du §3.
-- **Trancher** :
-  - le Royaume-Uni : interface en anglais seulement, sans compta ?
-  - la Facture Pro hors de France : DE seulement au début ?
+- **Trancher** : le Royaume-Uni (interface en anglais seulement, sans compta ?).
+- ✅ **Tranché le 11 nov.** (la session qui pilote ce lot, sur délégation de Julien) : la Facture Pro
+  hors de France commence par l'**Allemagne seule**, et **uniquement dans l'étude**. Rien n'est
+  branché dans l'app tant qu'un expert local n'a pas relu les mentions (§6.5, lot P6).
