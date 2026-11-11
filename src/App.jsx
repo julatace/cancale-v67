@@ -64,6 +64,8 @@ import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
 // (9 nov., soir) Colis et Ventes tout de suite : la même règle d'instantané (src/instantaneEcran.js).
 import { ColisInstantane, VentesInstantanee } from './ColisVentesInstantanes.jsx';
+import { AnnoncesInstantanee } from './AnnoncesInstantanee.jsx';   // (11 nov., ouverture-legere-2)
+import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } from './annoncesInstantanee.js';
 import { capturerColis, capturerVentes, ecrireInstantaneColis, ecrireInstantaneVentes, lireInstantaneColis, lireInstantaneVentes } from './colisVentesInstantanes.js';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
@@ -51441,6 +51443,10 @@ function CaptureColis({ uid }) {
 function CaptureVentes({ uid }) {
   return <CaptureInstantane uid={uid} ecran="ventes" racine={() => racineEcranPret('ventes', 'section.vrm-tache[data-tache="ventes"]')} capturer={capturerVentes} ecrire={ecrireInstantaneVentes}/>;
 }
+// (11 nov., ouverture-legere-2) Annonces · Vinted, compte « Tous », recherche vide (src/annoncesInstantanee.js).
+function CaptureAnnonces({ uid }) {
+  return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
+}
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
@@ -54161,12 +54167,17 @@ function AppCoeur() {
   const snapColis = React.useMemo(() => (vueColisOuverture && uidInstantane ? lireInstantaneColis(uidInstantane) : null), [vueColisOuverture, uidInstantane]);
   const vueVentesTous = tab === 'ventes' && siteDeTache('ventes', platSub) === 'toutes';
   const snapVentes = React.useMemo(() => (vueVentesTous && uidInstantane ? lireInstantaneVentes(uidInstantane) : null), [vueVentesTous, uidInstantane]);
+  // (11 nov.) Annonces : sur sa vue d'ouverture (Vinted · Annonces) et le compte « Tous » (rien de choisi d'autre).
+  const vueAnnoncesOuverture = tab === 'annonces' && siteDeTache('annonces', platSub) === 'vinted' && sectionDeTache('annonces', platSub) === 'annonces'
+    && compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u)) === '';
+  const snapAnnonces = React.useMemo(() => (vueAnnoncesOuverture && uidInstantane ? lireInstantaneAnnonces(uidInstantane) : null), [vueAnnoncesOuverture, uidInstantane]);
   const instantanePermis = !baseKO && !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
   const instantaneEcranIci = !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueColisOuverture && snapColis && (!ongletColis || ongletColis === snapColis.onglet) && (platSub !== 'retirer' || snapColis.onglet === 'retirer')
       ? <ColisInstantane snap={snapColis} Icon={Icon} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
+    : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
     : null;
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
@@ -54992,6 +55003,7 @@ function AppCoeur() {
         {tab==='journee'&&uidInstantane&&<CaptureJournee uid={uidInstantane}/>}
         {tab==='cat_bord'&&uidInstantane&&<CaptureColis uid={uidInstantane}/>}
         {tab==='ventes'&&uidInstantane&&<CaptureVentes uid={uidInstantane}/>}
+        {tab==='annonces'&&uidInstantane&&<CaptureAnnonces uid={uidInstantane}/>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}

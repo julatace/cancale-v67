@@ -274,7 +274,7 @@ function repondre(url, rangeHeader, { rows, main, accounts }) {
   if (mr) { from = Number(mr[1]); to = Math.min(Number(mr[2]), from + 999, total - 1); }
   let page = L.slice(from, to + 1);
   if (limit != null) page = page.slice(0, limit);
-  return { status: 200, body: page.map((r) => projette(r, select)), headers: { 'content-range': `${from}-${from + page.length - 1}/${total}` } };
+  return { status: 200, body: page.map((r) => projette(r, select)), headers: { 'content-range': `${from}-${from + page.length - 1}/${total}`, 'access-control-expose-headers': 'Content-Range' } };   // (11 nov.) Supabase expose `Content-Range` au navigateur (CORS)
 }
 
 module.exports = { fabriquer, repondre, projette };
