@@ -1,5 +1,6 @@
 import './_lib/sans-bruit.js';
 import {routeProfilAvatar,routeAvatarPublic} from './_lib/profil-avatar.js';
+import { avatarPublicVerifie } from './_lib/avatar-discord.js';
 import {configurationAuthPublique} from './_lib/auth-public.js';
 import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
@@ -1308,11 +1309,15 @@ async function discordDeja(req, res) {
     const did = String((ident.identity_data && (ident.identity_data.provider_id || ident.identity_data.sub)) || ident.id || '');
     const pseudo = String((ident.identity_data && (ident.identity_data.name || ident.identity_data.full_name)) || '').replace(/#0$/, '').toLowerCase();
     const h = sbCle(SERVICE);
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_discord&data->>verifie=eq.true&select=owner,discord:data->>discord,avatar:data->>avatar&limit=1000`, { headers: h, signal: AbortSignal.timeout(8000) });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_discord&data->>verifie=eq.true&select=owner,discord:data->>discord,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar&limit=1000`, { headers: h, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return repondre(res, 200, { trouve: null });
     const rows = await r.json();
     if (!Array.isArray(rows)) return repondre(res, 200, { trouve: null });
-    const meme = rows.find(x => x && x.owner !== u.id && ((/^\d{5,25}$/.test(did) && String(x.avatar || '').includes(`/avatars/${did}/`)) || (pseudo && String(x.discord || '').toLowerCase() === pseudo)));
+    // (11 nov., revue de sécurité) La ligne `vrm_discord` peut être écrite par le
+    // navigateur (RLS) : seule une ligne SIGNÉE par le serveur (signature de
+    // l'avatar : propriétaire + pseudo + photo, api/_lib/avatar-discord.js) fait
+    // foi — sinon n'importe qui « portait » le Discord d'un autre.
+    const meme = rows.find(x => x && x.owner !== u.id && avatarPublicVerifie(x.owner, x) && ((/^\d{5,25}$/.test(did) && String(x.avatar || '').includes(`/avatars/${did}/`)) || (pseudo && String(x.discord || '').toLowerCase() === pseudo)));
     if (!meme) return repondre(res, 200, { trouve: false });
     const ra = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(meme.owner)}`, { headers: h, signal: AbortSignal.timeout(8000) });
     const a = ra.ok ? await ra.json() : null;

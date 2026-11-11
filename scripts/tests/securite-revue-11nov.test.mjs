@@ -134,3 +134,36 @@ test('CSP : jsDelivr n’est permis qu’aux paquets figés que l’app charge',
       assert.ok(!permis(l, u), `permis par la CSP : ${u}`);
   }
 });
+
+// (11 nov.) « Ce Discord est déjà sur ton compte VRM … » : la ligne `vrm_discord`
+// que le navigateur peut écrire (RLS) ne fait plus foi — seule une ligne signée
+// par le serveur. Avant : n'importe qui « portait » le Discord d'un autre (écran
+// trompeur qui propose de supprimer le compte neuf, début d'e-mail d'un tiers).
+test('/api/compte?mode=discord-deja : une ligne vrm_discord plantée par un tiers ne désigne personne', async () => {
+  process.env.DISCORD_CLIENT_SECRET = 'secret-discord-fictif';
+  const { default: compte } = await import('../../api/compte.js');
+  const { signerAvatarPublic } = await import('../../api/_lib/avatar-discord.js');
+  const DID = '123456789012345678', AV = `https://cdn.discordapp.com/avatars/${DID}/${'a'.repeat(32)}.png?size=96`;
+  const B = '22222222-2222-4222-8222-222222222222';
+  const jouer = async (rows) => {
+    const admin = [];
+    const avant = globalThis.fetch;
+    globalThis.fetch = async (url, opts = {}) => {
+      const u = String(url);
+      if (u.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: A, identities: [{ provider: 'discord', identity_data: { provider_id: DID, name: 'victime' } }] }), { status: 200 });
+      if (u.includes('/auth/v1/admin/users/')) { admin.push(u); return new Response(JSON.stringify({ email: 'tiers@attaquant.example' }), { status: 200 }); }
+      if (u.includes('id=eq.vrm_discord')) return new Response(JSON.stringify(rows), { status: 200 });
+      return new Response('[]', { status: 200 });
+    };
+    try {
+      const r = reponse();
+      await compte({ method: 'GET', query: { mode: 'discord-deja' }, headers: { authorization: `Bearer ${SESSION_A}` } }, r);
+      return { corps: r.corps, admin };
+    } finally { globalThis.fetch = avant; }
+  };
+  const plantee = await jouer([{ owner: B, discord: 'victime', avatar: AV, pid: '', signatureAvatar: '' }, { owner: B, discord: 'victime', avatar: AV, pid: '', signatureAvatar: 'f'.repeat(64) }]);
+  assert.equal(plantee.corps && plantee.corps.trouve, false, 'ligne non signée prise pour une preuve');
+  assert.equal(plantee.admin.length, 0, 'e-mail d’un tiers lu');
+  const vraie = await jouer([{ owner: B, discord: 'victime', avatar: AV, pid: '', signatureAvatar: signerAvatarPublic(B, 'victime', '', AV) }]);
+  assert.equal(vraie.corps && vraie.corps.trouve, true, 'la vraie ligne signée n’est plus reconnue');
+});
