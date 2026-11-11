@@ -4,24 +4,24 @@
    l'ambre seulement pour un geste à faire (« ouvre vinted.fr sur ce compte »).
    ═══════════════════════════════════════════════════════════════════════════ */
 .vrm-imp { display: flex; flex-direction: column; gap: 10px; }
-.vrm-imp-journee { margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--vrm-card, #FFFFFF);
-  border: 0.5px solid var(--vrm-line, rgba(60,60,67,.14)); }
-.vrm-imp-titre { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-imp-journee { margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--d-carte, #FFFFFF);
+  border: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
+.vrm-imp-titre { font-size: 13px; font-weight: 600; color: var(--d-gris, #6E6E73); }
 .vrm-imp-compte { display: flex; flex-direction: column; gap: 6px; }
-.vrm-imp-compte + .vrm-imp-compte { padding-top: 10px; border-top: 0.5px solid var(--vrm-line, rgba(60,60,67,.14)); }
+.vrm-imp-compte + .vrm-imp-compte { padding-top: 10px; border-top: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
 .vrm-imp-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
-.vrm-imp-nom { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
-.vrm-imp-phrase { font-size: 14px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-imp-nom { font-size: 15px; font-weight: 600; color: var(--d-encre, #1D1D1F); }
+.vrm-imp-phrase { font-size: 14px; line-height: 1.4; color: var(--d-gris, #6E6E73); overflow-wrap: anywhere; }
 .vrm-imp-phrase[data-ton="geste"] { color: var(--vrm-warn, #B25000); }
 .vrm-imp-type { display: flex; flex-direction: column; gap: 4px; }
-.vrm-imp-type-l { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--vrm-ink, #1D1D1F); }
-.vrm-imp-chiffre { font-variant-numeric: tabular-nums; color: var(--vrm-muted, #6E6E73); white-space: nowrap; }
-.vrm-imp-barre { height: 4px; border-radius: 999px; background: var(--vrm-surface, rgba(118,118,128,.12)); overflow: hidden; }
-.vrm-imp-barre > i { display: block; height: 100%; border-radius: 999px; background: var(--vrm-ink, #1D1D1F); opacity: .5;
+.vrm-imp-type-l { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--d-encre, #1D1D1F); }
+.vrm-imp-chiffre { font-variant-numeric: tabular-nums; color: var(--d-gris, #6E6E73); white-space: nowrap; }
+.vrm-imp-barre { height: 4px; border-radius: 999px; background: var(--d-remplir, rgba(118,118,128,.12)); overflow: hidden; }
+.vrm-imp-barre > i { display: block; height: 100%; border-radius: 999px; background: var(--d-encre, #1D1D1F); opacity: .5;
   transition: width .4s cubic-bezier(.23,1,.32,1); }
 @media (prefers-reduced-motion: reduce) { .vrm-imp-barre > i { transition: none; } }
-.vrm-imp-note { margin: 0 4px; font-size: 14px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-imp-note { margin: 0 4px; font-size: 14px; line-height: 1.4; color: var(--d-gris, #6E6E73); overflow-wrap: anywhere; }
 .vrm-imp-geste { color: var(--vrm-warn, #B25000); }
-.vrm-imp-ligne { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-card, #FFFFFF);
-  border: 0.5px solid var(--vrm-line, rgba(60,60,67,.14)); }
+.vrm-imp-ligne { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--d-carte, #FFFFFF);
+  border: 0.5px solid var(--d-filet, rgba(60,60,67,.14)); }
 .vrm-imp-ligne > .vrm-b { min-height: 44px; margin-top: 4px; }
