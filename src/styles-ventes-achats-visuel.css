@@ -16,6 +16,9 @@
    Mesuré par scripts/bancs/ventes-achats-visuel.cjs.
    ════════════════════════════════════════════════════════════════════════════ */
 
+/* La hauteur d'une action compacte : 44 px au doigt (§7), 36 px à la souris (ordinateur). */
+@media (min-width: 1024px) and (pointer: fine) { :root { --vav-bouton: 36px; } }
+
 /* ── 1. LA FRISE ─────────────────────────────────────────────────────────── */
 html body .vrm-fu-frise {
   display: grid !important; grid-template-columns: repeat(var(--fu-n, 4), minmax(0, 1fr)) !important;
@@ -87,10 +90,11 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
   flex: 0 1 auto !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; padding: 0 !important;
   background: none !important; border: 0 !important; color: var(--fu-gris, #6e6e73) !important; font: 500 12px/1.2 var(--vrm-police, sans-serif) !important;
 }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > .vrm-puce-transp :is(svg, img) { width: 20px !important; height: 20px !important; flex: none !important; border-radius: 5px !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > .vrm-puce-transp :is(svg, img, [data-transporteur-logo]) { width: 20px !important; height: 20px !important; min-width: 20px !important; flex: none !important; border-radius: 5px !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > :not(.vrm-puce-transp) { flex: none !important; width: auto !important; min-width: 0 !important; max-width: none !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > [data-bouton-bord]:not([data-bouton-bord="pdf"]) { display: inline-flex !important; flex-direction: row !important; align-items: center !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > [data-bouton-bord] > :not(button) { display: none !important; }
+/* « Générer le bordereau » (l'extension) : le bouton, puis sa raison et le repli « sur Vinted ↗ » dessous, à droite — rien de caché. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > [data-bouton-bord]:not([data-bouton-bord="pdf"]) { display: inline-flex !important; flex-direction: column !important; align-items: flex-end !important; gap: 4px !important; text-align: right !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord > [data-bouton-bord] > :not(button) { font-size: 12px !important; max-width: 260px !important; }
 
 /* La carte d'un colis (« À expédier ») : l'action garde sa place en haut à droite, grise ; icône seule au doigt. */
 @media (max-width: 1023px) {
@@ -99,7 +103,7 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
 }
 @media (min-width: 1024px) {
   :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord > :not(.vrm-puce-transp) { width: auto !important; }
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; font-size: 13px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) { height: var(--vav-bouton, 44px) !important; min-height: var(--vav-bouton, 44px) !important; padding: 0 12px !important; font-size: 13px !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child { padding-right: 130px !important; }
 }
 
@@ -146,8 +150,8 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-achat { display: none !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus { display: none !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord { grid-column: 2 !important; grid-row: 1 !important; justify-self: end !important; }
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord :is(button, a) { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; font-size: 13px !important; }
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-fu-plus-vente { position: static !important; grid-column: 3 !important; grid-row: 1 !important; width: 36px !important; height: 36px !important; min-height: 36px !important; justify-self: end !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord :is(button, a) { height: var(--vav-bouton, 44px) !important; min-height: var(--vav-bouton, 44px) !important; padding: 0 12px !important; font-size: 13px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-fu-plus-vente { position: static !important; grid-column: 3 !important; grid-row: 1 !important; width: var(--vav-bouton, 44px) !important; height: var(--vav-bouton, 44px) !important; min-height: var(--vav-bouton, 44px) !important; justify-self: end !important; }
   /* Ce qui suit la ligne (note, gestes ouverts par « … », « Déposé », facture, bon de retour, remise en vente) : dessous, aligné sur le titre. */
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > :not(button.vrm-ledger-sale-toggle):not(.vrm-rangee-bord):not(.vrm-fu-plus-vente):not(.vrm-ledger-drawer-host) { grid-column: 1 / -1 !important; margin-left: 72px !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fp-ligne :is(button, a, .vrm-b) { min-height: 32px !important; height: auto !important; padding: 6px 12px !important; font-size: 13px !important; width: auto !important; }
@@ -183,7 +187,7 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
 @media (min-width: 1024px) {
   /* Ordinateur : la même action, avec son mot (« Imprimer »), compacte. */
   :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] {
-    width: auto !important; height: 36px !important; min-height: 36px !important; padding: 0 12px !important; border-radius: 12px !important;
+    width: auto !important; height: var(--vav-bouton, 44px) !important; min-height: var(--vav-bouton, 44px) !important; padding: 0 12px !important; border-radius: 12px !important;
     font-size: 13px !important; gap: 6px !important;
   }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a).vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] .vrm-lib-court.vrm-lib-court.vrm-lib-court { display: inline !important; font-size: 13px !important; }
