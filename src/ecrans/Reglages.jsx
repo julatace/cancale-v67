@@ -65,6 +65,7 @@ import { useProfilFiscal } from '../App.jsx';
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
+import {fenetreGroupe,FENETRES as FENETRES_GROUPE,HEURES_SOIR,heureSoir} from '../../api/_lib/notif-groupe.js';
 // ⟦← App.jsx #5⟧
 import GuideIphone, { useGuideIphone } from '../GuideIphone.jsx';
 // (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
@@ -1391,6 +1392,8 @@ function PushPrefsSetting({ comptes, onMuets }) {
   const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
   // (8 nov.) Allumé par défaut (api/_lib/notif-textes.js, `regrouper`) : seul un `false` posé l'éteint.
   const regroupe = !(prefs && prefs.regrouper === false);
+  const fenetre = fenetreGroupe(prefs || {});
+  const soir = heureSoir(prefs || {});
   const n = prefs ? PUSH_FAMILLES.filter(actif).length : 0;
   return (
     <>
@@ -1445,9 +1448,19 @@ function PushPrefsSetting({ comptes, onMuets }) {
           <Interrupteur on={calme.sauf.includes('doublevente')} onClick={()=>poserCalme({ sauf: calme.sauf.includes('doublevente') ? calme.sauf.filter((x)=>x!=='doublevente') : [...calme.sauf, 'doublevente'] })} disabled={!prefs||busy} label="La double vente sonne pendant les heures calmes"/>
         </div>
       )}
-      <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
-        <span className="vrm-np-lib">Regrouper<small>« 3 bordereaux prêts à imprimer » au lieu de trois notifications.</small></span>
-        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper : ${regroupe?'activé':'désactivé'}`}/>
+      {/* (11 nov., lot `notifs-groupees`) La fenêtre du résumé (api/_lib/notif-groupe.js) :
+          la première sonne, les suivantes partent ensemble. L'urgent passe tout de suite. */}
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-regrouper={regroupe?'on':'off'} data-np-fenetre={fenetre}>
+        <span className="vrm-np-lib">Regrouper<small>{regroupe ? `Une notification, puis un résumé toutes les ${fenetre >= 60 ? 'heures' : `${fenetre} min`}. L’urgent sonne tout de suite.` : 'Chaque notification sonne seule.'}</small></span>
+        <Segmente label="Regrouper" plein value={regroupe ? String(fenetre || FENETRES_GROUPE[0]) : 'non'} disabled={!prefs||busy}
+          onChange={(v)=>ecrirePrefs(v==='non' ? { ...(prefs || {}), regrouper: false } : { ...(prefs || {}), regrouper: true, groupe: { ...((prefs && prefs.groupe) || {}), fenetre: Number(v) } }, 'Le regroupement')}
+          options={[{ v: 'non', l: 'Non' }, ...FENETRES_GROUPE.map((f) => ({ v: String(f), l: f >= 60 ? '1 h' : `${f} min` }))].map((o) => ({ ...o, data: { 'data-np-fenetre-choix': o.v } }))}/>
+      </div>
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-soir={soir || 'auto'}>
+        <span className="vrm-np-lib">Résumé du soir<small>Ce qu’il y a à faire demain. Auto : en début de soirée.</small></span>
+        <Segmente label="Heure du résumé du soir" plein value={soir || 'auto'} disabled={!prefs||busy}
+          onChange={(v)=>{ const { resumeSoir: _x, ...reste } = prefs || {}; ecrirePrefs(v==='auto' ? reste : { ...reste, resumeSoir: v }, 'L’heure du résumé'); }}
+          options={[{ v: 'auto', l: 'Auto' }, ...HEURES_SOIR.map((h) => ({ v: h, l: `${Number(h.slice(0, 2))} h` }))].map((o) => ({ ...o, data: { 'data-np-soir-choix': o.v } }))}/>
       </div>
       <div className="vrm-np-ligne">
         <Bouton variante="secondaire" data-np-voir-centre="" onClick={()=>{ try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }}>Voir les notifications envoyées</Bouton>

@@ -91,3 +91,6 @@ button.vrm-cn-ligne:active { background: var(--fu-remplir); }
 .vrm-np-relance { font: 400 13px/1.45 var(--vrm-police); color: var(--fu-gris2); }
 .vrm-np-relance code { font: 500 12px/1.4 var(--vrm-police-mono); color: var(--fu-encre); overflow-wrap: anywhere; }
 .vrm-np-relance b { color: var(--fu-encre); font-weight: 600; }
+/* (11 nov., lot `notifs-groupees`) Regrouper et l'heure du soir : le libellé, puis le choix sur toute la largeur. */
+.vrm-np-ligne.vrm-np-ligne-col { flex-direction: column; align-items: stretch; gap: 8px; }
+.vrm-np-ligne.vrm-np-ligne-col > .vrm-seg { width: 100%; }
