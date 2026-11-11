@@ -118,8 +118,9 @@ const marquer = (pg, tab, v) => pg.evaluate(([t, x]) => { const e = document.que
 const repere = (pg, tab) => pg.evaluate((t) => { const e = document.querySelector(`[data-attente-ecran="${t}"]`); return e ? (e.__repere || null) : 'absent'; }, tab);
 
 async function versReglages(pg) {
-  await pg.locator('.vrm-tabbar .vrm-nav-more').click();
-  await pg.locator('[data-nav-entree="settings"]').first().click();
+  // (11 nov., lot DJ6) Paramètres s'ouvre par la photo du profil (en-tête), puis « Paramètres ».
+  await pg.locator('[data-profil-tete]').first().click();
+  await pg.locator('[data-profil-menu="parametres"]').first().click();
   await ecranPret(pg, 'settings');
 }
 async function signaux(pg) {

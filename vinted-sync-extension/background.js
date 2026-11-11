@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.340.0';
+const CODE_VERSION = '5.342.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8921,7 +8921,7 @@ function alarmeSiAbsente(nom, opts) {
 // ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
 // 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
 // Rien ne part sans session VRM (voir `relaisTick`).
-const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1, 'vrm-transp': 30 };
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1, 'vrm-transp': 30, 'vrm-versement': 20 };
 function surAlarme(a) {
   if (a.name === 'cancale-sync') captureAllAccounts();
   else if (a.name === 'cancale-active') runActive();
@@ -8932,6 +8932,8 @@ function surAlarme(a) {
   else if (a.name === 'vrm-offres') offresTick();
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') transpTick('alarme');
+  // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
+  else if (a.name === 'vrm-versement') tickVersements();
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
   // une longue période calme attendrait la prochaine capture pour être écrit.
@@ -9828,6 +9830,15 @@ function offreGardeDit(garde, item, maintenant) {
   return null;
 }
 // </offres-garde-regle>
+// Un seuil posé par LUI : nombre, « 45.5 » ou « 45,5 » (espaces et « € » tolérés).
+// Vide, 0, illisible ⇒ null (aucune règle) — jamais un nombre inventé.
+function seuilOffreLu(v) {
+  if (v == null || typeof v === 'object' || typeof v === 'boolean') return null;
+  const t = String(v).replace(/\s|€/g, '').replace(',', '.');
+  if (!t) return null;
+  const n = Number(t);
+  return isFinite(n) && n > 0 ? n : null;
+}
 async function offreAutoReglages() {
   const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offres_garde']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
@@ -9835,8 +9846,9 @@ async function offreAutoReglages() {
   const nums = m.vinted_annonce_numeros || {};
   const mins = {}, refuses = {};
   for (const k in nums) {
-    const n = Number(nums[k] && nums[k].min); if (isFinite(n) && n > 0) mins[String(k)] = n;
-    const rf = Number(nums[k] && nums[k].refuse); if (isFinite(rf) && rf > 0) refuses[String(k)] = rf;   // seuil de refus posé par LUI
+    // (5.342, P4) « 45,5 » (clavier français) se lit 45,5 comme à l'écran — avant : NaN, mini ignoré sans un mot.
+    const n = seuilOffreLu(nums[k] && nums[k].min); if (n != null) mins[String(k)] = n;
+    const rf = seuilOffreLu(nums[k] && nums[k].refuse); if (rf != null) refuses[String(k)] = rf;   // seuil de refus posé par LUI
   }
   // Le message de refus est SON texte (jamais inventé) ; vide ⇒ on refuse sans écrire.
   const msgRefus = String(m.vinted_offre_refus_msg || '').trim();
@@ -9881,11 +9893,20 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
   const stop = await garde(uid, acc); if (stop) return stop;          // anti-blocage : compte de l'onglet + plafond horaire + pause
-  let r;
-  if (quoi === 'accept') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, null);
-  else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
-  else return { ok: false, error: 'action inconnue' };
+  if (quoi !== 'accept' && quoi !== 'reject') return { ok: false, error: 'action inconnue' };
+  // ⚠️⚠️ 5.342 (étude « ne jamais être banni », P1) : la réponse part de l'ONGLET
+  //    vinted.fr (cookies du site, jeton csrf de la page, aucun `Authorization`),
+  //    comme Republier et les favoris depuis la restriction d'angeled92. Avant :
+  //    le service worker (`Bearer`, `credentials:'omit'`), la forme retirée partout
+  //    ailleurs. Sans onglet Vinted : RIEN ne part, l'offre attend (pas « faite »).
+  const chemin = quoi === 'accept' ? `/api/v2/transactions/${tx}/offer_requests/${oid}/accept` : `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`;
+  const r = await vintedPage(acc, 'PUT', chemin, null, { timeoutMs: 12000 });
+  if (r.sansPage) { noterDiag('offre_auto_sans_onglet'); return { ok: false, status: 0, code: 'onglet-vinted', sansPage: r.sansPage, error: 'ouvre vinted.fr dans ce Chrome : rien n\'est parti' }; }
   noterDiag(r.ok ? `offre_auto_${quoi}` : `offre_auto_${quoi}_refuse_${r.status}`);
+  // (5.342, P3) Vinted dit « restreint / suspendu » sur une offre ⇒ le compte est
+  // freiné 24 h (même frein que Republier, relu par le moteur) ; un refus ordinaire
+  // (offre expirée…) arrête seulement ce passage du moteur.
+  if (!r.ok && !r.pause && refusRestreint(r)) await poserFreinRepub(uid, r);
   // Refus : si LE VENDEUR a écrit un message (jamais inventé), on l'envoie APRÈS
   // le refus réussi — même file « une requête à la fois », vide ⇒ rien n'est écrit.
   // ⚠️ 2 nov. (audit « plateformes » P11) : le message est une SECONDE requête chez
@@ -9895,7 +9916,7 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     try {
-      const rm = await vintedSend(acc, 'POST', `/api/v2/conversations/${conv}/replies`, { message: String(msg) });
+      const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, { message: String(msg) }, { timeoutMs: 12000 });
       noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
     } catch (_) {}
   }
@@ -9910,6 +9931,8 @@ async function autoAccepterOffres(uid) {
     const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
     if (await garde(uid, acc)) return 0;               // compte de l'onglet, plafond, pause
+    // (5.342) Vinted a freiné CE compte (refus, « restreint ») : aucun geste automatique.
+    if (await lireFreinRepub(uid)) { noterDiag('offre_auto_frein'); return 0; }
     const offres = await offresEnAttente(uid);
     if (!offres.length) return 0;
     const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
@@ -9955,6 +9978,17 @@ async function autoAccepterOffres(uid) {
       if (pv[o.oid].at > Date.now()) continue;
       if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux gestes
       const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? reg.msgRefus : null });
+      // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
+      if (r && r.sansPage) {
+        const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
+        if (!dits[o.oid]) {
+          dits[o.oid] = Date.now();
+          for (const k in dits) if (dits[k] < Date.now() - 7 * 86400000) delete dits[k];
+          await chrome.storage.local.set({ vrmOffresOngletDit: dits });
+          logActivity(`⏸ Offre de ${o.prix.toFixed(2)} € pas encore traitée : VRM répond depuis l'onglet vinted.fr, ouvre-le dans Chrome`);
+        }
+        break;
+      }
       st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
       await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv });   // écrit AVANT de boucler : un worker tué ne retraite pas
       if (r && r.ok) {
@@ -9963,7 +9997,7 @@ async function autoAccepterOffres(uid) {
         if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
         else logActivity(`↩️ Offre de ${o.prix.toFixed(2)} € refusée automatiquement (ton seuil : ${refuse} €)${reg.msgRefus ? ' + ton message' : ''}`);
         notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
-      } else if (r && r.code) { break; }                // garde-fou atteint (pause/plafond/autre compte) : on arrête le lot
+      } else { break; }                                 // garde-fou atteint ou refus de Vinted : on arrête le lot (pas de refus en série)
     }
     if (pvChange) await chrome.storage.local.set({ vrmOffresPrevues: pv });
     if (faites) noterDiag(`offres_auto_traitees_${faites}`);
@@ -13072,7 +13106,7 @@ const LECTURES_DUES_VALIDITE_MS = 60 * 60 * 1000;
 //    route, et le code d'un colis arrivé au point relais n'était plus lu (mesuré
 //    au banc : 0 lecture de sa conversation). Il a sa classe « suivi » : sous
 //    l'argent et les colis (comme la relecture), et 6 lectures par heure au plus.
-const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE });
+const lecteursPrioritaires = () => ({ versement: VERSEMENT_PART_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE });
 // ⚠️⚠️ REVUE DE LA 5.167 — LA RELECTURE PUBLIQUE ÉTAIT DANS LA CLASSE DES PHOTOS.
 //    Après une republication (30 annonces neuves dont il manque les photos),
 //    `tickPhotos` vidait le budget à la minute 0, et les autres comptes attendaient
@@ -13083,14 +13117,30 @@ const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, relev
 //    deux réserves). La relecture note elle aussi ce qui lui reste
 //    (`noterLecturesDues(uid, 'enligne', …)`) ; « pas su » garde sa réserve.
 const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE });
-async function noterLecturesDues(uid, quoi, reste) {
+async function noterLecturesDues(uid, quoi, reste, plus) {
   try {
     const cur = (await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {};
     const u = cur[String(uid)] || {};
-    u[quoi] = { reste: Math.max(0, Number(reste) || 0), at: Date.now() };
+    u[quoi] = Object.assign({}, plus || {}, { reste: Math.max(0, Number(reste) || 0), at: Date.now() });
     cur[String(uid)] = u;
     await chrome.storage.local.set({ [LECTURES_DUES]: cur });
   } catch (_) {}
+}
+// 5.341 : la réserve des AUTRES lecteurs prioritaires (codes, preuves, relevés)
+// — ce que le rattrapage des dates de versement leur laisse toujours. « Pas su »
+// (jamais noté, noté il y a plus d'une heure, stockage muet) ⇒ réserve entière.
+async function reserveAutresQueVersement(uid) {
+  const max = lecteursPrioritaires();
+  delete max.versement;
+  let dues = {};
+  try { dues = ((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}; } catch (_) {}
+  let r = 0;
+  for (const k of Object.keys(max)) {
+    const d = dues[k];
+    const connu = d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS;
+    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : max[k];
+  }
+  return r;
 }
 async function reserveLectures(uid, classe = 'photos') {
   const max = Object.assign({}, lecteursPrioritaires(), classe === 'photos' ? lecteursAvantPhotos() : {});
@@ -13112,7 +13162,7 @@ async function reserveLectures(uid, classe = 'photos') {
 // 'enligne' (la relecture des autres comptes) s'arrête avant la réserve de
 // l'argent et des colis ; 'photos' (le défaut) avant celle-ci ET celle de la
 // relecture.
-async function gardeLecture(uid, acc, classe = 'photos') {
+async function gardeLecture(uid, acc, classe = 'photos', plafondMax = LECTURES_MAX_HEURE) {
   const p = await pauseVinted();
   if (p) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(p) };
   const actif = await compteConnecte(acc && acc.domain);
@@ -13123,7 +13173,9 @@ async function gardeLecture(uid, acc, classe = 'photos') {
   const prioritaire = classe === 'argent' || classe === 'colis' || classe === 'clic';
   // 'suivi' (le suivi Vinted des achats) : sous la réserve de l'argent et des
   // colis, comme la relecture — jamais à leur place.
-  const plafond = prioritaire ? LECTURES_MAX_HEURE : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi') ? 'enligne' : 'photos'));
+  // 5.341 : `plafondMax` — le rattrapage des dates de versement s'arrête AVANT la
+  // réserve des autres lecteurs prioritaires (`reserveAutresQueVersement`).
+  const plafond = prioritaire ? Math.min(LECTURES_MAX_HEURE, Number(plafondMax) || LECTURES_MAX_HEURE) : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi') ? 'enligne' : 'photos'));
   const c = await compterLecture(String(uid), plafond);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) return prioritaire
@@ -13247,7 +13299,14 @@ async function executerPourApp(msg, sender) {
     if(permis.favorisOuvrir)return ouvrirFavoriNatif(msg.uid,acc,msg.body);
     if(permis.favorisListe)return lirePageFavoris(msg.uid,acc,msg.body);
     if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body);
-    return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);
+    if (methode === 'GET') return vintedGet(acc, msg.endpoint);
+    // (5.342, P1) Son geste part de l'onglet vinted.fr quand il est ouvert (comme le
+    // site). Sans onglet (téléphone, autre navigateur) : son clic part comme avant —
+    // c'est un geste humain, un à la fois. Un onglet qui a quitté Vinted : rien ne part.
+    const rp = await vintedPage(acc, methode, msg.endpoint, msg.body, { timeoutMs: 12000 });
+    if (rp && rp.horsVinted) return { status: 0, ok: false, json: { message: "l'onglet Vinted a changé de page — rien n'est parti, réessaie" } };
+    if (rp && rp.sansPage && !rp.pause) return vintedSend(acc, methode, msg.endpoint, msg.body);
+    return rp;
   });
   if (arret) return arret;
   // (5.337) Le journal « ce que VRM a fait » : seulement un geste ACCEPTÉ par Vinted ;
@@ -13767,6 +13826,8 @@ async function etatSite(url,tabId) {
     // 5.191 : le login de la base, sinon celui lu dans `users/current` ; et le
     // choix fait dans CE Chrome (`oui` · `non` · `null` = jamais répondu).
     site = uid ? { id: String(uid), nom: (await loginDe(String(uid))) || (await loginVu(String(uid))), choix: await choixCompte(String(uid)) } : { id: null, nom: '' };
+    // 5.341 : les dates de versement encore à lire sur CE compte (pas su ⇒ null).
+    if (uid) site.dates = await datesPourCarte(String(uid));
   } else if (plateforme === 'leboncoin') {
     const vu=local.vrmLbcTransport?.[tabId];
     const connu=local.vrmLbcCompte;
@@ -15348,9 +15409,71 @@ async function capterSuivisAchats(uid) {
 // par visite, pas de nouvel essai avant 24 h. Rien n'est décidé ici.
 // ⚠️ « Pas su » ne vaut pas « rien » : ventes ou détails illisibles ⇒ on ne
 // redemande RIEN (sinon une lecture ratée relancerait tout l'historique).
-const VERSEMENT_MAX_PAR_VISITE = 5;
+// ══ 5.341 (11 nov.) — LES DATES ARRIVENT VITE, SANS RISQUE DE PLUS ═════════
+// Mesuré le 11 nov. : 1 751 ventes de son grand compte sans date de versement —
+// le détail de la transaction n'avait JAMAIS été relu (≈ 10 par jour ⇒ 6 mois).
+// Ce qui change, et SEULEMENT ça :
+//  · jusqu'à 10 détails par passage (5 avant) ;
+//  · un PASSAGE DE FOND (`tickVersements`, alarme `vrm-versement`, 20 min) quand
+//    un onglet vinted.fr est ouvert, sans qu'il navigue — toujours le compte du
+//    cookie de l'onglet (`gardeLecture`), rien pendant une pause 429/403 ;
+//  · au plus 15 lectures/h pour l'argent (`VERSEMENT_MAX_HEURE`), DANS le budget
+//    de lecture de 20/h (jamais au-dessus) ;
+//  · au-delà de la part ordinaire (5 par visite, comme avant ; 0 pour le passage
+//    de fond), une lecture ne prend JAMAIS la place réservée aux codes de
+//    retrait, preuves de vente et relevés (`reserveAutresQueVersement` : « pas
+//    su » ⇒ réserve entière) — « quand rien d'autre n'attend » ;
+//  · une pause aléatoire de 2 à 5 s entre deux détails (`pauseLectureArgent`) ;
+//    la file Vinted reste une requête à la fois (`vintedGet` → `requeteVinted`),
+//    et un seul passage à la fois (`_versementEnCours`) ;
+//  · un 429/403 pose la pause (`requeteVinted`) et ARRÊTE la série
+//    (`memoApresEchec`) ; rien n'est écrit chez Vinted (des GET seulement).
+// L'ORDRE : la vente la plus RÉCENTE d'abord — l'année en cours, puis 2025.
+// C'est l'année qu'il déclare encore (URSSAF au mois ou au trimestre) ; le mois
+// qu'il va déclarer se complète en premier. Sans date lisible : en dernier.
+const VERSEMENT_MAX_PAR_VISITE = 10;
+const VERSEMENT_PART_VISITE = 5;                  // la part ordinaire d'une visite (et la réserve des photos)
+const VERSEMENT_MAX_HEURE = 15;                   // DANS les 20 lectures/h, jamais en plus
 const VERSEMENT_RETRY_MS = 24 * 60 * 60 * 1000;
+const VERSEMENT_PAUSE_MS = [2000, 5000];
+const VERSEMENT_LUS = 'vrmVersementLus';          // { [uid]: [ms, …] } — les lectures d'argent de l'heure (§4.9)
+function pauseLectureArgent() {
+  const p = VERSEMENT_PAUSE_MS;
+  const ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['versement', ms]); } catch (_) {}
+  return new Promise((ok) => setTimeout(ok, ms));
+}
+// Les lectures d'argent dans l'heure : `null` = stockage muet (⇒ on ne lit pas).
+async function versementsLusHeure(uid) {
+  try {
+    const cur = (await chrome.storage.local.get(VERSEMENT_LUS))[VERSEMENT_LUS] || {};
+    return (cur[String(uid)] || []).filter((x) => x > Date.now() - 3600000);
+  } catch (_) { return null; }
+}
+async function noterVersementLu(uid) {
+  try {
+    const cur = (await chrome.storage.local.get(VERSEMENT_LUS))[VERSEMENT_LUS] || {};
+    const t = Date.now();
+    const list = (cur[String(uid)] || []).filter((x) => x > t - 3600000);
+    list.push(t); cur[String(uid)] = list;
+    await chrome.storage.local.set({ [VERSEMENT_LUS]: cur });
+  } catch (_) {}
+}
+// La plus récente d'abord ; sans date lisible, en dernier (ordre d'arrivée gardé).
+function ordreVersements(liste) {
+  const d = (o) => { const t = Date.parse((o && (o.date || o.created_at)) || ''); return Number.isFinite(t) ? t : -Infinity; };
+  return liste.map((o, i) => [o, i]).sort((a, b) => ((d(b[0]) - d(a[0])) || 0) || (a[1] - b[1])).map((x) => x[0]);
+}
+let _versementEnCours = null;
+// `opts.fond` : le passage de fond — aucune part ordinaire, tout est rattrapage
+// (sous la réserve des autres lecteurs).
 async function capterDatesVersement(uid) {
+  const opts = arguments[1] || {};
+  if (_versementEnCours) { try { noterDiag('versement_deja_en_cours'); } catch (_) {} return 0; }
+  _versementEnCours = capterDatesVersementUn(uid, opts).finally(() => { _versementEnCours = null; });
+  return _versementEnCours;
+}
+async function capterDatesVersementUn(uid, opts) {
   try {
     if (!uid) return 0;
     const accts = await getStoredAccounts();
@@ -15359,9 +15482,9 @@ async function capterDatesVersement(uid) {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
     if (!Array.isArray(rows)) return 0;                                   // pas su
     const ventes = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
-    const finalisees = ventes.filter(o => o && o.transaction_id != null
-      && /finalis/i.test(String(o.status || '')) && !/annul|cancel|refus|rembours|retour|suspend/i.test(String(o.status || '')));
-    if (!finalisees.length) { await noterLecturesDues(uid, 'versement', 0); return 0; }
+    const finalisees = ordreVersements(ventes.filter(o => o && o.transaction_id != null
+      && /finalis/i.test(String(o.status || '')) && !/annul|cancel|refus|rembours|retour|suspend/i.test(String(o.status || ''))));
+    if (!finalisees.length) { await noterLecturesDues(uid, 'versement', 0, { nonDatees: 0 }); return 0; }
     const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,s:meta->>status,su:meta->>status_updated_at`);
     if (det === null) return 0;                                           // pas su
     const datees = new Set();
@@ -15377,15 +15500,29 @@ async function capterDatesVersement(uid) {
       if (!/^\d+$/.test(tx) || datees.has(tx)) return false;
       return !(memo[tx] && Date.now() - Number(memo[tx]) < VERSEMENT_RETRY_MS);
     };
+    const part = opts.fond ? 0 : VERSEMENT_PART_VISITE;
     let n = 0, ecrites = 0;
     for (const o of finalisees) {
       if (n >= VERSEMENT_MAX_PAR_VISITE) break;
       if (!aLire(o)) continue;
       const tx = String(o.transaction_id);
+      // 5.341 : au plus 15 lectures d'argent dans l'heure (stockage muet ⇒ rien).
+      const lus = await versementsLusHeure(uid);
+      if (lus === null) { noterDiag('versement_compteur_muet'); break; }
+      if (lus.length >= VERSEMENT_MAX_HEURE) { noterDiag('versement_plafond_heure'); break; }
+      // Au-delà de la part ordinaire : jamais la place des codes, preuves, relevés.
+      const rattrapage = n >= part;
+      const plafond = rattrapage ? LECTURES_MAX_HEURE - (await reserveAutresQueVersement(uid)) : LECTURES_MAX_HEURE;
+      if (n > 0) await pauseLectureArgent();
       // 5.162 : lire le détail de SA vente est une LECTURE — budget de lecture,
       // priorité argent (c'est le CA qu'il déclare).
-      const refus = await gardeLecture(uid, acc, 'argent');
-      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Dates de versement non lues : ${refus.error}`); break; }
+      const refus = await gardeLecture(uid, acc, 'argent', plafond);
+      if (refus) {
+        if (rattrapage && refus.code === 'trop-de-lectures') noterDiag('versement_laisse_la_place');
+        else if (refus.code !== 'vinted-pause') logActivity(`⚠️ Dates de versement non lues : ${refus.error}`);
+        break;
+      }
+      await noterVersementLu(uid);
       memo[tx] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
@@ -15398,17 +15535,52 @@ async function capterDatesVersement(uid) {
       // Notre base refuse : la date n'est PAS rangée — relue à la visite suivante
       // (pas dans 24 h), et on s'arrête (la suivante échouerait aussi).
       if (ok === false) { noterDiag('versement_ecriture_ratee'); delete memo[tx]; break; }
-      if (String(t.status) === '450' && t.status_updated_at) { ecrites++; noterDiag('versement_date_ecrit'); }
+      if (String(t.status) === '450' && t.status_updated_at) { ecrites++; datees.add(tx); noterDiag('versement_date_ecrit'); }
       else noterDiag(`versement_statut_${String(t.status).slice(0, 8)}`);
     }
     await chrome.storage.local.set({ vrmVersementFaits: memo });
-    await noterLecturesDues(uid, 'versement', finalisees.filter(aLire).length);
+    // `nonDatees` : toutes les finalisées sans date (ce que la carte dit) ;
+    // `reste` : celles à lire maintenant (la réserve).
+    const nonDatees = finalisees.filter((o) => /^\d+$/.test(String(o.transaction_id)) && !datees.has(String(o.transaction_id))).length;
+    await noterLecturesDues(uid, 'versement', finalisees.filter(aLire).length, { nonDatees });
     if (ecrites) {
       logActivity(`💶 ${ecrites} date${ecrites > 1 ? 's' : ''} de versement récupérée${ecrites > 1 ? 's' : ''}`);
       notifierApp({ type: 'maj', quoi: 'versements', uid: String(uid) });
     }
     return n;
   } catch (_) { return 0; }
+}
+// Le passage de fond (alarme `vrm-versement`, 20 min) : seulement avec un onglet
+// vinted.fr ouvert, le compte de son cookie, une session VRM, aucune pause, une
+// base qui répond, un compte capté ; et seulement s'il reste des dates à lire
+// (noté il y a moins d'une heure ; « pas su » ⇒ on regarde).
+async function tickVersements() {
+  try {
+    const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*'] });
+    if (!tabs || !tabs.length) return 0;
+    const uid = await activeUidForDomain('www.vinted.fr');
+    if (!uid) return 0;
+    if (await pauseVinted()) return 0;
+    if (await sansSessionPourEcrire()) return 0;
+    if (await reculBase()) return 0;
+    if (await compteNonCapte(uid)) return 0;
+    let d = null;
+    try { d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement || null; } catch (_) { return 0; }
+    if (d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(d.reste) > 0)) return 0;
+    return await capterDatesVersement(uid, { fond: true });
+  } catch (_) { return 0; }
+}
+// Ce que la carte dit (5.341) : les dates encore à lire sur CE compte, et une
+// estimation « Vinted ouvert » (≈ 12 lectures/h en fond : 20 moins la réserve
+// des codes, preuves et relevés). Noté il y a plus de 24 h, ou jamais ⇒ null.
+const VERSEMENT_PAR_JOUR_ESTIME = 12 * 24;
+async function datesPourCarte(uid) {
+  try {
+    const d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement;
+    if (!d || !(Date.now() - Number(d.at || 0) < 24 * 3600000) || typeof d.nonDatees !== 'number') return null;
+    const n = Math.max(0, Math.round(d.nonDatees));
+    return { reste: n, jours: n ? Math.max(1, Math.ceil(n / VERSEMENT_PAR_JOUR_ESTIME)) : 0 };
+  } catch (_) { return null; }
 }
 
 // ═══ LA PREUVE DE VENTE, RANGÉE (5.169, 11 octobre) ════════════════════════

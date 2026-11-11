@@ -81,7 +81,7 @@ srv.listen(PORT);
       // (31 oct.) La recherche est EN PLACE : la loupe ouvre le champ dans
       // l'en-tête (téléphone), le champ de la barre se tape directement
       // (ordinateur). « Ouverte » = le panneau des résultats est déplié.
-      const RECH = tactile ? 'button[aria-label="Rechercher une paire"]' : '[data-recherche-champ]';
+      const RECH = tactile ? 'button[data-recherche-loupe]' : '[data-recherche-champ]';
       const ouverte = () => pg.$('[data-recherche-panneau]').then(e => !!e);
       const fermerX = async () => { if (tactile) await pg.click('button[aria-label="Fermer la recherche"]'); else await pg.keyboard.press('Escape'); };
       if (await pg.$(RECH)) {

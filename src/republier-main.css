@@ -143,3 +143,20 @@ html body .vrm-fs.vrm-rm-feuille .vrm-b { min-height: 44px !important; }
 html body button.vrm-rm-photo-une { position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 999px; border: 0; display: grid; place-items: center; cursor: pointer; color: #fff; background: rgba(0,0,0,.55); -webkit-tap-highlight-color: transparent; }
 html body button.vrm-rm-photo-une[data-main-photo-une-fait] { background: var(--vrm-accent, #0071E3); }
 html body button.vrm-rm-photo-une:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+
+/* (11 nov., lot DJ8 — « que tout soit parfait ») Le kit : les gestes NUMÉROTÉS dans l'ordre où il
+   les fait (1 photos · 2 Vinted · 3 coller N° et description), une rangée chacun au téléphone. */
+.vrm-kit-etapes { list-style: none; margin: 0; padding: 0; counter-reset: kit; display: flex; flex-direction: column; gap: 8px; }
+.vrm-kit-etapes > li { counter-increment: kit; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vrm-kit-etapes > li::before { content: counter(kit); flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font: 600 12px/1 var(--vrm-police, system-ui); color: var(--vrm-muted, #6E6E73); background: var(--w-remplir, rgba(118,118,128,.12)); }
+.vrm-kit-etapes > li > .vrm-b { flex: 1 1 auto; min-width: 0; }
+.vrm-kit-coller { flex-wrap: nowrap; }
+.vrm-kit-coller > .vrm-b, .vrm-kit-coller > .vrm-kit-sans { flex: 1 1 0; min-width: 0; }
+@media (min-width: 700px) {
+  .vrm-kit-etapes { flex-direction: row; flex-wrap: wrap; }
+  .vrm-kit-etapes > li { flex: 1 1 160px; }
+  .vrm-kit-etapes > li.vrm-kit-coller { flex: 2 1 280px; }
+}
+/* Feuille « Actions » : « Republier à la main » conseillé, AVANT les tuiles. */
+.vrm-act-main.vrm-act-main-conseil { padding: 8px 10px; margin: 0 0 10px; border-radius: 14px; background: var(--vrm-b-teinte, rgba(0,113,227,.08)); gap: 4px 10px; }

@@ -1,0 +1,31 @@
+/* (11 nov., lot DJ6) Le profil : la pastille ronde (photo ou initiale), le bouton de l'en-tête du
+   téléphone et le menu (feuille) — style DA6 : groupes arrondis, lignes de 44 px, chevrons. */
+.vrm-profil-pastille {
+  display: inline-grid; place-items: center; flex: 0 0 auto; border-radius: 50%; overflow: hidden;
+  background: var(--vrm-hair, rgba(0,0,0,.06)); color: var(--vrm-ink, inherit);
+  font-weight: 600; line-height: 1; box-sizing: border-box;
+}
+.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-avatar.vrm-profil-pastille { overflow: hidden; }
+.vrm-app-shell .vrm-hdr-profil { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
+.vrm-app-shell .vrm-hdr-profil .vrm-profil-pastille { box-shadow: 0 0 0 .5px var(--vrm-line, rgba(0,0,0,.12)); }
+.vrm-profil-menu { display: grid; gap: 14px; padding: 2px 0 6px; color: var(--vrm-ink); }
+.vrm-profil-tete { display: flex; align-items: center; gap: 14px; padding: 4px 2px; min-width: 0; }
+.vrm-profil-photo { border: 0; padding: 0; background: transparent; border-radius: 50%; cursor: pointer; min-width: 64px; min-height: 64px; position: relative; }
+.vrm-profil-photo:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 2px; }
+.vrm-profil-nom { font-size: 18px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-profil-mail { font-size: 13px; color: var(--vrm-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-profil-offre { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--vrm-hair); color: var(--vrm-ink); }
+.vrm-profil-choix-photo { padding: 0 2px; }
+.vrm-profil-groupe { border-radius: 14px; background: var(--vrm-surface); box-shadow: 0 0 0 .5px var(--vrm-line); overflow: hidden; }
+.vrm-profil-ligne {
+  display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 14px !important;
+  border: 0 !important; background: transparent !important; color: var(--vrm-ink) !important; font: inherit; font-size: 16px;
+  text-align: left; cursor: pointer; box-sizing: border-box; box-shadow: none !important; border-radius: 0 !important;
+}
+.vrm-profil-ligne + .vrm-profil-ligne { border-top: .5px solid var(--vrm-line) !important; }
+.vrm-profil-ligne:hover { background: var(--vrm-hair) !important; }
+.vrm-profil-ligne:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; }
+.vrm-profil-ligne-ic { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--vrm-hair); color: var(--vrm-ink); flex: 0 0 auto; }
+.vrm-profil-ligne-lib { flex: 1; min-width: 0; }
+.vrm-profil-ligne-fin { color: var(--vrm-faint, var(--vrm-muted)); display: flex; }
+.vrm-profil-bascule input[type=checkbox] { width: 44px; height: 26px; accent-color: var(--vrm-accent); cursor: pointer; margin: 0; }

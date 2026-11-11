@@ -26,7 +26,7 @@ function useFaits(lireFaits) {
   return useMemo(() => { try { return lireFaits(); } catch (_) { return null; } }, [n]);
 }
 
-function FeuilleEmballage({ type, onClose, onEnregistrer, onRetirer, Feuille }) {
+function FeuilleEmballage({ type, onClose, onEnregistrer, onRetirer, Feuille, exemple = 'Carton moyen' }) {
   const [nom, setNom] = useState(type ? type.nom : '');
   const [n, setNbr] = useState(type && type.restant != null ? String(Math.max(0, type.restant)) : '');
   const [cout, setCout] = useState(type ? type.cout : '');
@@ -41,7 +41,7 @@ function FeuilleEmballage({ type, onClose, onEnregistrer, onRetirer, Feuille }) 
   };
   const corps = (
     <form className="vrm-emb2-form" onSubmit={valider} data-emballage-feuille={type ? type.id : 'nouveau'}>
-      <label><span>Nom</span><input autoFocus={!type} value={nom} maxLength={32} placeholder="Boîte à chaussures" data-emb-champ="nom" onChange={(e) => { setNom(e.target.value); setErr(''); }}/></label>
+      <label><span>Nom</span><input autoFocus={!type} value={nom} maxLength={32} placeholder={exemple} data-emb-champ="nom" onChange={(e) => { setNom(e.target.value); setErr(''); }}/></label>
       <label><span>J’en ai</span><input inputMode="numeric" value={n} placeholder="40" data-emb-champ="n" onChange={(e) => { setNbr(e.target.value); setErr(''); }}/></label>
       <label><span>Coût d’un emballage</span><span className="vrm-calc-saisie"><input inputMode="decimal" value={cout} placeholder="facultatif" data-emb-champ="cout" onChange={(e) => { setCout(e.target.value); setErr(''); }}/><span aria-hidden="true">€</span></span></label>
       <label><span>Préviens-moi à</span><input inputMode="numeric" value={seuil} placeholder="5" data-emb-champ="seuil" onChange={(e) => { setSeuil(e.target.value); setErr(''); }}/></label>
@@ -57,7 +57,8 @@ function FeuilleEmballage({ type, onClose, onEnregistrer, onRetirer, Feuille }) 
 
 // La carte du Stock. `reglage` : `vrm_emballages` ; `ecrire(r)` : SON clic seulement ;
 // `lireFaits()` : les « Colis fait » datés (`colisFaits`).
-export function EmballagesCarte({ reglage, ecrire, lireFaits, Feuille }) {
+// (11 nov., lot DJ2) `exemple` : le nom d'emballage proposé selon ce qu'il vend (src/vocabulaireVendeur.js).
+export function EmballagesCarte({ reglage, ecrire, lireFaits, Feuille, exemple }) {
   const faits = useFaits(lireFaits);
   const etat = useMemo(() => etatEmballages(reglage, faits || []), [reglage, faits]);
   const [ouvert, setOuvert] = useState(null);   // null · 'nouveau' · id
@@ -70,7 +71,7 @@ export function EmballagesCarte({ reglage, ecrire, lireFaits, Feuille }) {
         <span>Emballages</span>
         <button type="button" className="vrm-emb2-ajout" data-emb-ajouter="" onClick={() => setOuvert('nouveau')}>Ajouter</button>
       </div>
-      {!etat.types.length ? <p className="vrm-emb2-vide" data-emb-vide="">Note tes cartons et sacs : chaque colis fait en retire un.</p> : (
+      {!etat.types.length ? <p className="vrm-emb2-vide" data-emb-vide="">Note tes emballages (cartons, sacs) : chaque colis fait en retire un.</p> : (
         <ul className="vrm-emb2-liste">
           {etat.types.map((t) => (
             <li key={t.id}>
@@ -96,7 +97,7 @@ export function EmballagesCarte({ reglage, ecrire, lireFaits, Feuille }) {
       ) : null}
       {etat.sansType ? <p className="vrm-emb2-note" data-emb-sans-type={etat.sansType}>{etat.sansType} colis sans emballage choisi : pas décomptés.</p> : null}
       {etat.types.length ? <p className="vrm-emb2-note">Les colis eBay ne sont pas décomptés.</p> : null}
-      {ouvert ? <FeuilleEmballage key={ouvert} type={typeOuvert} Feuille={Feuille} onClose={() => setOuvert(null)} onEnregistrer={enregistrer}
+      {ouvert ? <FeuilleEmballage key={ouvert} type={typeOuvert} Feuille={Feuille} exemple={exemple} onClose={() => setOuvert(null)} onEnregistrer={enregistrer}
         onRetirer={(id) => ecrire(retirerType(reglage, id).reglage)}/> : null}
     </section>
   );
