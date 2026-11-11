@@ -117,8 +117,9 @@ const guide = (pg) => pg.evaluate(() => {
   const g = document.querySelector('[data-guide-demarrage]');
   if (!g) return null;
   return { faites: g.getAttribute('data-guide-faites'), courante: g.getAttribute('data-guide-courante'),
-    etats: Object.fromEntries([...g.querySelectorAll('[data-guide-etape]')].map((e) => [e.getAttribute('data-guide-etape'), e.getAttribute('data-etat')])),
-    pourquoi: !!(g.querySelector('[data-courante="1"] .vrm-guide-pourquoi') || {}).textContent,
+    // (11 nov.) La carte du parcours d'arrivée : six étapes en repli, l'étape courante ouverte.
+    etats: Object.fromEntries([...g.querySelectorAll('[data-parcours-rang]')].map((e) => [e.getAttribute('data-parcours-rang'), e.getAttribute('data-etat')])),
+    pourquoi: !!(g.querySelector('[data-courante="1"] .vrm-pa-carte-texte span') || {}).textContent,
     carteDansCarte: g.querySelectorAll('.vrm-card').length, exemple: !!g.querySelector('[data-exemple-entrer]') };
 });
 const taille = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { w: r.width, h: r.height, top: r.top, bottom: r.bottom, vis: r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden' }; }, sel);
@@ -133,7 +134,7 @@ async function parcoursExemple(nav, W, theme) {
   // E1
   const g = await guide(o.pg);
   dit(!!g, `${T} E1 le guide de démarrage s'affiche pour un vendeur neuf`);
-  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'extension', `${T} E1 seul le compte est prouvé : 1 sur 5, on continue par l'extension`, JSON.stringify(g));
+  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'configuration', `${T} E1 seul le compte est prouvé : 1 sur 6, on continue par la configuration`, JSON.stringify(g));
   dit(g && g.pourquoi, `${T} E1 l'étape courante dit pourquoi`);
   dit(g && g.carteDansCarte === 0, `${T} E1 une seule carte (pas de carte dans la carte)`, g && g.carteDansCarte);
   const bt = await taille(o.pg, '[data-exemple-entrer]');
@@ -202,22 +203,23 @@ async function parcoursGuide(nav, W, theme) {
   const sombre = theme === 'sombre', T = `[guide ${W}px ${theme}]`;
   const NUMS = { 51000: { numero: '1' }, 51001: { numero: '2' } };
   const COMPTE = [{ id: 1, vinted_user_id: '9001', login: 'compte_banc', domain: 'www.vinted.fr', owner: UID, updated_at: iso(0), created_at: iso(3) }];
-  const main = (extra) => ({ id: 'main', owner: UID, data: { vrm_bienvenue_vue: { at: iso(0) }, vrm_visite_vue: { at: iso(0) }, ...extra } });
+  const main = (extra) => ({ id: 'main', owner: UID, data: { vrm_bienvenue_vue: { at: iso(0) }, vrm_visite_vue: { at: iso(0) }, vrm_configuration: { etat: 'fait', at: iso(1), statut: null, version: 1 }, ...extra } });
+  const DRESSING = { id: 'harvest_9001_listings', owner: UID, data: { type: 'listings', uid: '9001', capturedAt: iso(0), nItems: 0, payload: { items: [] } } };
   const RECEPTION = { id: 'email_reception_00aa11bb22cc33dd', owner: UID, data: { at: iso(1), adresses: ['boite@exemple.test'] } };
   // G1
   { const base = { lignes: [main({ vinted_annonce_numeros: NUMS }), RECEPTION], comptes: [], requetes: [], phase: 'g1' };
     const o = await ouvrir(nav, { W, sombre, base }); await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {}); await o.pg.waitForTimeout(2000);
     const g = await guide(o.pg);
-    dit(g && g.faites === '2' && g.etats.emails === 'fait' && g.etats.compte === 'fait' && g.courante === 'extension', `${T} G1 compte et e-mails prouvés, aucun compte Vinted : 2 sur 5, on continue par l'extension`, JSON.stringify(g));
+    dit(g && g.faites === '3' && g.etats.emails === 'fait' && g.etats.compte === 'fait' && g.courante === 'extension', `${T} G1 compte, configuration et e-mails prouvés, aucun compte Vinted : on continue par l'extension`, JSON.stringify(g));
     await capture(o.pg, `ex-${W}-${theme}-3-guide-g1`);
     await o.ctx.close(); }
   // G2
   { const base = { lignes: [main({})], comptes: COMPTE, requetes: [], phase: 'g2' };
     const o = await ouvrir(nav, { W, sombre, base }); await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {}); await o.pg.waitForTimeout(2000);
     const g = await guide(o.pg);
-    dit(g && g.etats.extension === 'fait' && g.etats.vinted === 'fait' && g.courante === 'emails' && !g.exemple, `${T} G2 un compte relié : extension et Vinted cochés, étape courante « boîte e-mail », plus d'exemple proposé`, JSON.stringify(g));
-    const geste = await taille(o.pg, '[data-guide-geste="emails"]');
-    dit(geste && geste.vis && (!o.tel || geste.h >= 43.5), `${T} G2 le geste « Relier ma boîte » est là`, JSON.stringify(geste));
+    dit(g && g.etats.extension === 'fait' && g.etats.vinted !== 'fait' && g.courante === 'emails' && !g.exemple, `${T} G2 un compte relié : extension cochée, Vinted attend la lecture du dressing, étape courante « e-mails », plus d'exemple proposé`, JSON.stringify(g));
+    const geste = await taille(o.pg, '[data-guide-demarrage] [data-parcours-continuer]');
+    dit(geste && geste.vis && (!o.tel || geste.h >= 43.5), `${T} G2 le geste « Continuer » est là`, JSON.stringify(geste));
     await capture(o.pg, `ex-${W}-${theme}-4-guide-g2`);
     if (await o.pg.$('[data-guide-masquer]')) {
       await o.pg.click('[data-guide-masquer]'); await o.pg.waitForTimeout(1500);
@@ -233,7 +235,7 @@ async function parcoursGuide(nav, W, theme) {
     dit(g && g.etats.emails === 'passu' && g.courante === 'emails', `${T} G3 lecture des e-mails en panne : ni cochée ni « à faire » (pas su), l'étape reste (« pas pu vérifier »)`, JSON.stringify(g));
     await o.ctx.close(); }
   // G4
-  { const base = { lignes: [main({ vinted_annonce_numeros: NUMS }), RECEPTION, { id: 'harvest_9001_orders_sold', owner: UID, data: { type: 'orders_sold', uid: '9001', capturedAt: iso(0), nItems: 5, payload: { my_orders: [] } } }], comptes: COMPTE, requetes: [], phase: 'g4' };
+  { const base = { lignes: [main({ vinted_annonce_numeros: NUMS }), RECEPTION, DRESSING, { id: 'harvest_9001_orders_sold', owner: UID, data: { type: 'orders_sold', uid: '9001', capturedAt: iso(0), nItems: 5, payload: { my_orders: [] } } }], comptes: COMPTE, requetes: [], phase: 'g4' };
     const o = await ouvrir(nav, { W, sombre, base }); await o.pg.waitForTimeout(4500);
     const g = await guide(o.pg);
     dit(!g, `${T} G4 tout est prouvé : aucun guide`, JSON.stringify(g));
