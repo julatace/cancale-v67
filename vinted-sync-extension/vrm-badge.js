@@ -100,7 +100,7 @@
   .btn:active { transform: scale(.94); }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.34); }
   .btn:focus-visible, .b:focus-visible, .fermer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .btn img { width: 100%; height: 100%; border-radius: 10px; display: block; }
+  .btn img { width: 100%; height: 100%; border-radius: 10px; display: block; -webkit-user-drag: none; user-select: none; pointer-events: none; }
   .btn .txt { color: #E8ECF2; font-weight: 800; font-size: 12px; letter-spacing: .04em; line-height: 42px; text-align: center; display: block; }
   .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: var(--ambre); border: 2px solid #000; display: none; }
   .pt.on { display: block; }
@@ -256,6 +256,10 @@
   // charge pas : « VRM » en texte, jamais une image cassée.
   const img = document.createElement('img');
   img.alt = 'VRM';
+  // 5.351 : l'image ne se « tire » pas comme un fichier (sinon le navigateur annule
+  // le glisser du logo par un `pointercancel`).
+  img.draggable = false;
+  img.addEventListener('dragstart', (ev) => ev.preventDefault());
   img.addEventListener('error', () => { img.remove(); const t = document.createElement('span'); t.className = 'txt'; t.textContent = 'VRM'; btn.appendChild(t); });
   try { img.src = chrome.runtime.getURL('logo-vrm-96.png'); } catch (_) {}
   btn.appendChild(img);
