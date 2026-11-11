@@ -90,7 +90,7 @@ const URL_PRIX = `https://api.leboncoin.fr/api/adeditor/v1/classifieds/${AD}/pri
         const q = r.request(); const u = q.url();
         recues.push({ methode: q.method(), url: u, entetes: q.headers(), corps: q.postData() });
         let body = {};
-        if (/\/api\/account\/v1\/members\/me\/account$/.test(u)) body = { account: { account_id: compte, type: 'private', email: 'moi@exemple.test' }, member: { account_id: compte } };
+        if (/\/api\/account\/v1\/members\/me\/account$/.test(u)) body = { account: { account_id: compte, type: 'private', email: 'moi@exemple.test' }, member: { account_id: compte, nickname: { value: 'Banc' } } };
         else if (/\/price$/.test(u) && /^(PUT|PATCH|POST)$/.test(q.method())) { let j = {}; try { j = JSON.parse(q.postData() || '{}'); } catch (_) {} body = { list_id: Number(AD), price: j.price || null }; }
         else body = { ok: true };
         return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://www.leboncoin.fr', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) });
