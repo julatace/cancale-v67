@@ -145,6 +145,10 @@ async function contexte(b, vp, sombre, etat) {
 // (11 nov., rouges A) « Une nouvelle ouverture de l'app » : depuis le 9 nov. (vitesse), le cache
 // d'écran est écrit QUAND LA PAGE EST QUITTÉE (`pagehide`) — l'effacer avant `goto` ne suffit plus,
 // la page qui part le réécrit. On l'efface aussi après elle (écouteur posé après celui de l'app).
+// (11 nov., rouges A) « Oui, c'est elle » : sous charge, la feuille de confirmation glisse encore
+// quand le clic part ; si le clic a fini par passer, la feuille est fermée et le repli « clic en JS »
+// attendait 30 s un bouton parti (« le parcours s'arrête »). Le repli ne joue que si le bouton est
+// encore là ; c'est `[data-main-lie]` qui juge ensuite que SON clic a relié.
 const nouvelleOuverture = (pg) => pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); window.addEventListener('pagehide', () => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} }); } catch (_) {} });
 const clic = async (pg, sel) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); await l.click({ timeout: 4000 }).catch(async () => { await pg.$eval(sel, (x) => x.click()); }); };
 const fermerFeuille = async (pg, dans) => { const x = pg.locator(`${dans} button[aria-label="Fermer"]`).first(); if (await x.count()) await x.click(); else await pg.keyboard.press('Escape'); await pg.waitForTimeout(250); };
@@ -266,7 +270,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           dit(cands.includes('9120') && !cands.includes('9301') && !cands.includes('9102') && !cands.includes('9103'), `M ${T} proposées : la nouvelle du MÊME compte ; jamais celle de même titre de l’autre compte, ni l’ancienne, ni une numérotée`, cands.join(','));
           await pg.screenshot({ path: nomF('main') });
           await clic(pg, '[data-main-lier="9120"]');
-          { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }); await oui.click({ timeout: 4000 }).catch(() => oui.evaluate((x) => x.click())); }
+          { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }); await oui.click({ timeout: 4000 }).catch(async () => { if (await oui.count()) await oui.evaluate((x) => x.click(), null, { timeout: 4000 }).catch(() => {}); }); }
           await pg.waitForSelector('[data-main-lie="9120"]', { timeout: 4000 }).catch(() => {});
           dit(await pg.locator('[data-main-lie="9120"]').count() > 0, `M ${T} SON clic relie la nouvelle annonce (confirmée)`);
           const sheet = await pg.$('[data-main-lie]');
@@ -296,7 +300,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           const candsM = await pg.$$eval('[data-main-candidat]', (l) => l.map((x) => x.getAttribute('data-main-candidat')));
           dit(candsM.includes('9121') && !candsM.includes('9120'), `K ${T} masquée : la nouvelle 9121 proposée, jamais 9120 (déjà la nouvelle d’une autre)`, candsM.join(','));
           await clic(pg, '[data-main-lier="9121"]');
-          { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }); await oui.click({ timeout: 4000 }).catch(() => oui.evaluate((x) => x.click())); }
+          { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }); await oui.click({ timeout: 4000 }).catch(async () => { if (await oui.count()) await oui.evaluate((x) => x.click(), null, { timeout: 4000 }).catch(() => {}); }); }
           await pg.waitForSelector('[data-main-lie="9121"]', { timeout: 4000 }).catch(() => {});
           dit(await pg.locator('[data-main-lie="9121"]').count() > 0, `K ${T} masquée : SON clic relie 9121 (confirmée)`);
           // La sauvegarde de l'appareil part après un court délai (`save`) : on l'attend avant de recharger.
