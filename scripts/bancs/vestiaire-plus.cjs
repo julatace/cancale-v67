@@ -149,7 +149,7 @@ const sain = async (pg, ecran) => {
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-vc-offre-journee]', { timeout: 25000 });
         await pg.waitForTimeout(500);
-        const l = await pg.evaluate(() => [...document.querySelectorAll('[data-vc-offre-journee]')].map((x) => ({ id: x.getAttribute('data-vc-offre-journee'), b: x.getAttribute('data-vc-offre-bientot'), t: x.innerText })));
+        const l = await pg.evaluate(() => [...document.querySelectorAll('[data-vc-offre-journee]')].map((x) => ({ id: x.getAttribute('data-vc-offre-journee'), b: x.getAttribute('data-vc-offre-bientot'), t: (x.getAttribute('title') || '') + ' ' + x.innerText })));
         dit(l.map((x) => x.id).join(',') === '170000002,170000001,170000003', 'A · une ligne par offre, celle qui expire le plus tôt d’abord (2 h, 30 h, sans échéance)', JSON.stringify(l.map((x) => x.id)));
         dit(l[0] && l[0].b === '1' && l[1] && l[1].b == null, 'A · « expire dans 2 h » marqué bientôt (ambre), l’autre non', JSON.stringify(l.map((x) => x.b)));
         dit(l[0] && /Répondre/.test(l[0].t) && /120\s?€/.test(l[0].t) && /expire dans/.test(l[0].t) && l[2] && /échéance non dite/.test(l[2].t), 'A · le prix, l’échéance (ou « échéance non dite ») et le geste « Répondre »', JSON.stringify(l.map((x) => x.t.replace(/\s+/g, ' '))));
@@ -184,7 +184,8 @@ const sain = async (pg, ecran) => {
         await pg.keyboard.press('Escape').catch(() => {});
       });
       await essaie('C. Photos avant Préparer', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' });
+        // Le récapitulatif qui se ferme peut interrompre la navigation (ERR_ABORTED) : refaite une fois.
+        await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' }).catch(() => pg.waitForTimeout(600).then(() => pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' })));
         await pg.waitForSelector('[data-vc-photos="7001"]', { timeout: 20000 });
         const m0 = await pg.evaluate(() => document.querySelector('[data-vc-photos="7001"]').getAttribute('data-vc-photos-manque'));
         dit(/etiquette2/.test(m0) && /nombre/.test(m0), 'C · « Photos Vestiaire » : l’étiquette pas choisie et trop peu de photos (2, au moins 4) MANQUENT', m0);
@@ -232,6 +233,8 @@ const sain = async (pg, ecran) => {
         const c = await pg.evaluate(() => ({ cmds: window.__cmds.filter((x) => x.cmd === 'vcPrix'), vu: (document.querySelector('[data-bp-ligne="71000001"]') || { getAttribute: () => '' }).getAttribute('data-bp-prix-vu'), etat: (document.querySelector('[data-bp-ligne="71000001"]') || { getAttribute: () => '' }).getAttribute('data-bp-etat'), autre: (document.querySelector('[data-bp-ligne="71000002"]') || { getAttribute: () => '' }).getAttribute('data-bp-etat') }));
         dit(c.cmds.length === 1 && c.cmds[0].produit === '71000001' && c.cmds[0].avantCents === 22000 && c.cmds[0].apresCents === 21500, 'D · UNE commande `vcPrix` : l’article, le prix LU avant (22 000 c) et le nouveau (21 500 c)', JSON.stringify(c.cmds));
         dit(c.etat === 'fait' && c.vu === '215' && !c.autre, 'D · « fait » au prix RELU (215 €) ; la décochée n’est pas partie', JSON.stringify(c));
+        const gel = await pg.evaluate(() => ({ f: !!document.querySelector('[data-suivi-travail="baisse-prix-vestiaire"]'), t: (document.querySelector('[data-suivi-travail]') || { innerText: '' }).innerText }));
+        dit(gel.f && /Vestiaire/.test(gel.t), 'D · VRM figé pendant la série : la feuille commune « VRM travaille » (suiviTravail) suit la baisse Vestiaire', gel.t.slice(0, 120));
         await capture(pg, `baisse-fini-${nomVp}`);
         await sain(pg, 'Baisser des prix');
       });
