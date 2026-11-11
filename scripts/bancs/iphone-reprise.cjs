@@ -241,8 +241,8 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await capture(pg, `plus-${mode}-${sombre ? 'sombre' : 'clair'}`);
         dit(!!p && p.plusOuvert === 'true', `B3 ${qui} : « Plus » ouvert le dit (aria-expanded)`);
         dit(!!p && p.bas <= p.navHaut + 1, `B3 ${qui} : le panneau ne recouvre pas la barre`, JSON.stringify(p && { bas: p.bas, navHaut: p.navHaut }));
-        // (11 nov.) 8 entrées depuis le lot AO (10 nov.) : « Argent » remplace Statistiques et Compta.
-        dit(!!p && p.entrees.length >= 8 && p.entrees.every((e) => e.visible) && !p.defile, `B3 ${qui} : toutes les entrées visibles sans défiler`, JSON.stringify(p && { horsVue: p.entrees.filter((e) => !e.visible).map((e) => e.id), defile: p.defile }));
+        // (11 nov.) 7 entrées : « Argent » remplace Statistiques et Compta (lot AO, 10 nov.) ; Paramètres derrière le profil (lot DJ6).
+        dit(!!p && p.entrees.length >= 7 && p.entrees.every((e) => e.visible) && !p.defile, `B3 ${qui} : toutes les entrées visibles sans défiler`, JSON.stringify(p && { horsVue: p.entrees.filter((e) => !e.visible).map((e) => e.id), defile: p.defile }));
         dit(!!p && p.entrees.every((e) => e.h >= 44 && e.touche && !e.coupe), `B3 ${qui} : entrées ≥ 44 px, touchables, libellés entiers`, JSON.stringify(p && p.entrees.filter((e) => !(e.h >= 44 && e.touche && !e.coupe))));
         // B4 · retour avec « Plus » ouvert
         await pg.goBack({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(800);
@@ -268,12 +268,12 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(m6.entrees.every((e) => !e.coupe), `B6 ${qui} : son libellé n'est pas coupé`, JSON.stringify(m6.entrees.filter((e) => e.coupe)));
         // Chaque écran de « Plus » : la 5ᵉ place le dit, libellé entier.
         const vus = [];
-        for (const id of ['messages', 'trancher', 'garage', 'achats', 'emails', 'communaute', 'settings']) {   // (11 nov.) plus de `dashboard` à part (lot AO : dans Argent) ; chaque entrée de « Plus »
+        for (const id of ['messages', 'trancher', 'garage', 'achats', 'emails', 'communaute']) {   // Paramètres : derrière le profil (lot DJ6)   // (11 nov.) plus de `dashboard` à part (lot AO : dans Argent) ; chaque entrée de « Plus »
           await toucher(pg, PLUS); await toucher(pg, `.vrm-sheet [data-nav-entree="${id}"]`);
           const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
           vus.push({ id, ...x });
         }
-        dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : Messages, À trancher, Stock, Achats, E-mails, Communauté, Paramètres — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
+        dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : Messages, À trancher, Stock, Achats, E-mails, Communauté — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
         // B7 · balayages
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
         // Le milieu de l'écran, HORS d'une commande : un geste qui part d'un bouton, d'un lien,
