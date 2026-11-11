@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { messageErreurOAuth } from "../../src/auth/erreursOAuth.js";
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source = fs.readFileSync(
@@ -162,6 +163,11 @@ function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
     AUTH: ancienne,
     RECOVERY_PENDING: false,
     lireLiaisonOAuth: () => null,
+    // (11 nov., lot connexions-oauth) les vraies règles importées par App.jsx.
+    lireIntentionOAuth: () => null,
+    messageErreurOAuth,
+    toast() {},
+    setTimeout,
     cleanAuthUrl: () => {
       nettoyee = true;
     },
@@ -195,7 +201,9 @@ test("retour OAuth : erreur déjà décodée avec % ne fait pas disparaître le 
   const b = retourAvec({
     search: "?error_description=Action%20100%25%20refus%C3%A9e",
   });
-  assert.equal((await b.retour()).error, "Action 100% refusée");
+  // (11 nov.) Le message ne disparaît pas — mais jamais le texte brut du fournisseur :
+  // la phrase française de src/auth/erreursOAuth.js.
+  assert.match((await b.retour()).error, /n’a pas pu aboutir/);
   assert.equal(b.nettoyee, true);
   assert.equal(b.session, null);
 });

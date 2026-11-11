@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.342.0';
+const CODE_VERSION = '5.346.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1016,7 +1016,7 @@ async function oauthRetour(msg, sender) {
   if (neuf && (await annulerCompteNeufOAuth(j.access_token)) === true) {
     const message = `Aucun compte VRM n’est relié à ce ${nom}. Rien n’a été créé. Connecte-toi sur vrm.center avec ton e-mail. Puis relie ${nom} dans ton profil.`;
     await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message, sansCompte: true }, enPlus));
-    fermer();
+    // Comme tout refus : la page de retour reste ouverte et DIT la phrase (rien fermé).
     return rendre({ ok: false, code: 'sans-compte', message });
   }
   const email = String(j.user.email || emailDuJwt(j.access_token) || '');
