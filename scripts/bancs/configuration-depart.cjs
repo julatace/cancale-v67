@@ -203,12 +203,12 @@ async function neuf(nav, W, theme) {
   dit(await attendre(o.pg, async () => (ligneMain(base).vrm_affichage || {}).choix === 'simple'), `${T} affichage Simple écrit`);
   await attendre(o.pg, async () => { const x = await etat(o.pg); return x && x.cartes.some((c) => c.cle.startsWith('notif:')); }, 5000);
   e = await etat(o.pg);
-  dit(e && e.etape === 'notifs' && e.cartes.filter((c) => c.cle.startsWith('notif:')).length === 8 && e.cartes.every((c) => c.coche), `${T} notifications : les 8 familles lues, toutes allumées`, JSON.stringify(e));
+  dit(e && e.etape === 'notifs' && e.cartes.filter((c) => c.cle.startsWith('notif:')).length === 9 && e.cartes.every((c) => c.coche), `${T} notifications : les 9 familles lues, toutes allumées`, JSON.stringify(e));
   await choisir(o.pg, 'notif:offres');
   await capture(o.pg, `cfg-${W}-${theme}-5-notifs`, true);
   e = await continuer(o.pg);
   dit(await attendre(o.pg, async () => { const p = ligne(base, 'push_prefs'); return p && p.familles && p.familles.offres === false && p.calme && p.calme.actif === true; }), `${T} « Offres » coupées dans la ligne push_prefs, heures calmes gardées`, JSON.stringify(ligne(base, 'push_prefs')));
-  dit(e && e.etape === 'recap' && /Autre chose/.test(e.recap.vends || '') && /Leboncoin/.test(e.recap.plateformes || '') && /13,4/.test(e.recap.micro || '') && /description, titre/.test(e.recap.numero || '') && /7 sur 8/.test(e.recap.notifs || ''), `${T} le récap redit chaque choix`, JSON.stringify(e && e.recap));
+  dit(e && e.etape === 'recap' && /Autre chose/.test(e.recap.vends || '') && /Leboncoin/.test(e.recap.plateformes || '') && /13,4/.test(e.recap.micro || '') && /description, titre/.test(e.recap.numero || '') && /8 sur 9/.test(e.recap.notifs || ''), `${T} le récap redit chaque choix`, JSON.stringify(e && e.recap));
   await capture(o.pg, `cfg-${W}-${theme}-6-recap`, true);
   dit(!(await deborde(o.pg)), `${T} rien ne déborde`);
   await o.pg.click('[data-configuration-fin]');
