@@ -7764,7 +7764,9 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     const t = Date.parse(e.creationDate || '');
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
-    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
+    // (11 nov., export comptable) Les frais eBay LUS (`totalMarketplaceFee`, en euros : `montantRecuEbay` l'a vérifié).
+    const frais = Math.round(Number(e.totalMarketplaceFee.value) * 100) / 100;
+    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false };
     if (garde(l)) lignes.push(place(l));
   }
   // (1er nov., audit A2) VESTIAIRE : une vente compte si son montant REÇU est
