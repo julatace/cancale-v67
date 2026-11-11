@@ -208,9 +208,11 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
         const theme = await pg.evaluate(() => document.documentElement.getAttribute('data-theme') || '');
         dit(theme === (sombre ? 'dark' : 'light'), `${t} : le thème demandé est rendu`, theme);
         // A — les chiffres en tête.
-        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (!el) return null; return { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), ac: el.getAttribute('data-stock-a-confirmer'), ma: el.getAttribute('data-stock-masquees'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' ') }; });
+        const tete = await dansPop(pg, '[data-stock-actuelles]', () => { const el = document.querySelector('[data-stock-actuelles]'); const pop = document.querySelector('[data-popup-corps]'); if (!el) return null; return { n: el.getAttribute('data-stock-actuelles'), am: el.getAttribute('data-stock-au-moins'), ac: el.getAttribute('data-stock-a-confirmer'), ma: el.getAttribute('data-stock-masquees'), txt: (el.innerText + ' ' + (pop ? pop.innerText : '')).replace(/\s+/g, ' '), noms: ((pop || el).querySelector('[data-stock-a-confirmer-noms]') || {}).textContent || '' }; });
         dit(!!tete && tete.n === '7' && tete.am === '0', `${t} : A/V1 — 7 annonces actuelles (N°2 sur deux sites, N°9 Vinted+Vestiaire : une fois chacune ; N°41 Vestiaire seul), pas « au moins »`, JSON.stringify(tete));
-        dit(!!tete && tete.ac === '1' && /compte_beta/.test(tete.txt) && /à confirmer/.test(tete.txt), `${t} : A — dont 1 « à confirmer », le compte NOMMÉ`, tete && tete.txt);
+        // (11 nov., rouges A) Le nom se lit dans la phrase « dont N à confirmer (…) » : le texte entier porte aussi
+        // les pastilles du filtre de compte (« compte_beta »), qui le rendaient vrai même sans nom (mutation).
+        dit(!!tete && tete.ac === '1' && /compte_beta/.test(tete.noms) && /à confirmer/.test(tete.txt), `${t} : A — dont 1 « à confirmer », le compte NOMMÉ`, tete && tete.txt);
         dit(!!tete && tete.ma === '1' && /masquée/.test(tete.txt), `${t} : A — dont 1 masquée par Vinted, comptée parmi les présentes`, tete && tete.txt);
         // B — la liste.
         const liste = await pg.evaluate(() => [...document.querySelectorAll('[data-stock-annonce]')].map((el) => ({ k: el.getAttribute('data-stock-annonce'), e: el.getAttribute('data-stock-annonce-etat'), p: el.getAttribute('data-stock-annonce-plats'), o: el.getAttribute('data-stock-annonce-place') })));
