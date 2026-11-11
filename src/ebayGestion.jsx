@@ -1,5 +1,6 @@
 import {formaterMontantEbay as montant} from './montantsEbay.js';
 import {appelerEbay} from './ebayRequetes.js';
+import { AlerteArnaque } from './AlerteArnaque.jsx';
 import {useReponseIncertaine} from './ebayEtatIncertain.js';
 import {lireBrouillon,sauverBrouillon,effacerBrouillonSiIdentique} from './brouillonsMessages.js';
 import {bilanCommandeEbay,codesRetraitEbay} from './ebayParcours.js';
@@ -163,6 +164,8 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
     <div style={{padding:'0 16px 8px',flexShrink:0}}><input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={S.input}/></div>
     {groupeSel && groupeSel.questions.length>1 && <div className="vrm-seg vrm-ebay-q-nav" role="group" aria-label="Questions de cette annonce" data-q-nav={groupeSel.questions.length} style={{margin:'0 16px 8px'}}>{groupeSel.questions.map((q,i)=><button key={q.id} type="button" className="vrm-seg-btn" aria-pressed={q.id===selected.id} data-q-aller={q.id} data-q-sans-reponse={messageEbayNonLu(q)?'1':undefined} onClick={()=>selectMessage(q)}>{i+1}</button>)}</div>}
     <div className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
+     {/* (11 nov., anti-arnaque) Le message lu n'est PROUVÉ de l'acheteur que pour une question d'acheteur ; ses réponses ne sont jamais lues. */}
+     <AlerteArnaque site="ebay" lien={selected.itemId?`https://www.ebay.fr/itm/${encodeURIComponent(selected.itemId)}`:''} messages={[{t:corpsLisible(selected.body),deMoi:estQuestion(selected)?false:null},...(selected.responses || []).map(r=>({t:corpsLisible(r),deMoi:true}))]}/>
      {corpsLisible(selected.body).toLowerCase().includes(q) && <BulleConv moi={false} qui="L’acheteur" texte={corpsLisible(selected.body)} quand={Date.parse(selected.date || '') || null} avecDate traduire={corpsLisible(selected.body)}/>}
      {historySearch && ![selected.body,...(selected.responses || [])].some(r=>corpsLisible(r).toLowerCase().includes(q)) && <p style={{fontSize:12,color:C.muted}}>Aucun message ne correspond à cette recherche.</p>}
      {(selected.responses || []).filter(r=>corpsLisible(r).toLowerCase().includes(q)).map((r,i)=><BulleConv key={i} moi qui="Toi" texte={corpsLisible(r)}/>)}

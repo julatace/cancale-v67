@@ -16,6 +16,8 @@
 import React from 'react';
 import { C, Icon, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc } from '../App.jsx';
 import { LogoSite } from '../SelecteurSites.jsx';
+import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
+import { motifDeLApercu } from '../antiArnaque.js';
 import { FilLeboncoin } from './MessagesLeboncoin.jsx';
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
 import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
@@ -101,6 +103,7 @@ function FilFusionne({ fil, vintedDe, lireVinted, onRepondre, onDelier, onFermer
     <CadreFil etiquette="Fil de messages" onFermer={onFermer} attrs={{ 'data-fil-fusionne': fil.cle, 'data-fil-n': String(fil.convs.length) }}>
       <TeteFil onFermer={onFermer} nom={nomDe(fil)} titre={fil.num ? `N°${fil.num}` : ''} compte={fil.plateformes.map((p) => NOM_SITE[p]).join(' · ')}/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {parConv ? <AlerteArnaque site={fil.plateformes.length === 1 ? fil.plateformes[0] : ''} messages={messages}/> : null}
         {parConv === undefined ? <div role="status" data-fil-etat="charge" style={style}>Lecture…</div>
           : !messages.length ? <div data-fil-etat="vide" style={style}>—</div>
           : messages.map((m, i) => (
@@ -204,7 +207,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>Encore {propositions.length - 1} question{propositions.length > 2 ? 's' : ''} après celle-ci.</p> : null}
           {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>Lecture…</div>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>Aucune conversation lue pour l'instant.</div>
-            : <div className="vrm-msg-list" style={{ border: `1px solid ${C.border}`, background: C.card }}>
+            : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/><div className="vrm-msg-list" style={{ border: `1px solid ${C.border}`, background: C.card }}>
                 {fils.slice(0, 80).map((f) => {
                   const d = f.dernier || f.convs[f.convs.length - 1];
                   const titre = f.convs.find((c) => c.titre);
@@ -216,11 +219,11 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                       quand={f.at} couleurHeure={f.nonLu === true ? C.text : C.muted}
                       titre={titre && titre.titre !== nomDe(f) ? titre.titre : ''} num={f.num || ''}
                       extrait={d ? d.apercu : ''} toi={!!(d && d.apercu && d.deMoi === true)} couleurExtrait={f.nonLu === true ? C.text : C.muted}
-                      apres={<>{f.convs.length > 1 ? <span className="vrm-msg-etat" data-fil-relie="" style={{ color: C.muted, borderColor: C.border }}>{f.convs.length} conv.</span> : null}<Marques plateformes={f.plateformes}/></>}
+                      apres={<>{f.convs.length > 1 ? <span className="vrm-msg-etat" data-fil-relie="" style={{ color: C.muted, borderColor: C.border }}>{f.convs.length} conv.</span> : null}<PastilleArnaque motif={d ? motifDeLApercu(d.apercu, d.deMoi) : null}/><Marques plateformes={f.plateformes}/></>}
                       point={f.nonLu === true ? C.accent : null}/>
                   );
                 })}
-              </div>}
+              </div></>}
           {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{pasLus.map((p) => NOM_SITE[p]).join(', ')} : pas pu lire. Rien n'est perdu.</p> : null}
           <p data-fils-ebay="" style={{ ...muted, marginTop: 8 }}>eBay : ses messages se lisent dans le filtre eBay.</p>
         </div>

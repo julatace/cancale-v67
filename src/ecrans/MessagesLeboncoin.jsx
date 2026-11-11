@@ -4,6 +4,10 @@ import { STYLE_FLOU, lbcFloute } from '../flouCompte.js';
 import React, { useState, useEffect } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
+import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
+import { motifDeLApercu } from '../antiArnaque.js';
+// (11 nov., anti-arnaque) L'aperçu d'un fil Leboncoin : son auteur se lit dans `dernierDeMoi` (texte ⇒ « true »/« false »).
+const deMoiMeta = (v) => (v === 'true' || v === true ? true : v === 'false' || v === false ? false : null);
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 
 
@@ -79,7 +83,10 @@ function FilLeboncoin({ conv, nom, envoi, onFerme }) {
   return (
     <CadreFil etiquette="Conversation Leboncoin" onFermer={onFerme} attrs={{ 'data-lbc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={nom || 'Leboncoin'} titre="" compte="Leboncoin"/>
-      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}</div>
+      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {fil && fil.messages ? <AlerteArnaque site="leboncoin" lien={lien} messages={fil.messages}/> : null}
+        {corps}
+      </div>
       {pied}
     </CadreFil>
   );
@@ -209,6 +216,7 @@ function ConversationsLeboncoin() {
               (§7) — pas sur chaque ligne. */}
           {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension.</div> : null}
           {/* (3 nov., 5.318) Les conversations LUES par l'extension : texte, date, « de toi ». */}
+          {fils.length ? <CompteurArnaque n={fils.filter((f) => motifDeLApercu(f.ap, deMoiMeta(f.dm))).length} style={{ marginTop: 10 }}/> : null}
           {fils.length ? (
             <div className="vrm-msg-list" data-lbc-convs={fils.length} style={{ marginTop: 10 }}>
               {fils.slice(0, 40).map((f) => {
@@ -217,7 +225,7 @@ function ConversationsLeboncoin() {
                   <div key={f.conv} data-lbc-conv={f.conv} data-flou={flou ? '1' : '0'} style={flou && ouvertConv !== f.conv ? STYLE_FLOU : undefined}>
                     <LigneConv actif={ouvertConv === f.conv} onClick={() => { setOuvert(''); setOuvertConv(f.conv); }} ariaLabel={`Ouvrir la conversation Leboncoin de ${nomDe(f.compte)}`}
                       nom={nomDe(f.compte)} compte={typeDe(f.compte)} quand={isFinite(t) ? t : null} couleurHeure={C.muted}
-                      extrait={f.ap || ''} toi={!!f.ap && f.dm === 'true'} couleurExtrait={C.muted}/>
+                      extrait={f.ap || ''} toi={!!f.ap && f.dm === 'true'} couleurExtrait={C.muted} apres={<PastilleArnaque motif={motifDeLApercu(f.ap, deMoiMeta(f.dm))}/>}/>
                   </div>
                 );
               })}
