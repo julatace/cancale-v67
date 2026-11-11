@@ -34,7 +34,8 @@ import {
 } from './facturePro/regle.js';
 import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/rattachement.js';
 import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriode, trousNumerotation, csvRegistre, totauxRegistre, nomZip } from './facturePro/registre.js';
-import { useRechercheEntreprise, CarteVerifEntreprise } from './RechercheEntreprise.jsx';
+import { useRechercheEntreprise, CarteVerifEntreprise, CarteMentionsForme } from './RechercheEntreprise.jsx';
+import { comptesConnus, avecCompte } from './facturePro/comptes.js';
 
 const ID_CFG = 'vrm_pro_facture';
 const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true, envoiAuto: false };
@@ -70,6 +71,21 @@ function migrerAncienne(d) {
 // ── L'état de l'envoi (serveur) : une lecture partagée, relue sur demande ────
 // Trois états : undefined en cours · null pas su · l'objet du serveur.
 const _ecoutesEtat = new Set(); let _etat; let _etatEnCours = null;
+// (11 nov., lot DJ1) Écrire quelques champs de la fiche HORS de « Ma facture » (le choix
+// d'un compte professionnel, sur une vente) : relue juste avant, fusionnée ; une lecture
+// ratée n'écrit RIEN. `patch` : un objet, ou une fonction (fiche fraîche) → objet.
+export async function ecrireChampsFiche(deps, patch) {
+  try {
+    const frais = await deps.lireReglage(ID_CFG);
+    if (frais === null || frais === undefined) return false;
+    const p = typeof patch === 'function' ? patch(frais || {}) : patch;
+    const fusion = { ...(frais || {}), ...(p || {}) };
+    const ok = await deps.ecrireReglage(ID_CFG, fusion);
+    if (ok) poserCfg({ ...VIDE, ...migrerAncienne(fusion) });
+    return !!ok;
+  } catch (_) { return false; }
+}
+
 export function relireEtatEnvoi(deps) {
   if (_etatEnCours) return _etatEnCours;
   _etatEnCours = route(deps).then((r) => { _etat = r.code === 200 ? r.j : null; _etatEnCours = null; _ecoutesEtat.forEach((f) => { try { f(_etat); } catch (_) {} }); return _etat; });
@@ -235,7 +251,9 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   // sans son « C'est bon », un champ qu'il a rempli n'est jamais écrasé sans son accord
   // (src/RechercheEntreprise.jsx, la même règle que « Ma configuration »). Avant, le nom
   // et l'adresse se posaient seuls dans les champs vides.
-  const recherche = useRechercheEntreprise(deps.chercherEntreprise, cfg ? cfg.siret : '');
+  const recherche = useRechercheEntreprise(deps.chercherEntreprise, cfg ? (cfg.siret || '') : null);
+  // (11 nov., lot DJ1) « Pareil lorsqu'on choisit le statut » : la forme choisie montre ses mentions.
+  const [formeVue, setFormeVue] = React.useState('');
   const allerAuChamp = (k) => { const el = document.querySelector(`[data-fp-champ="${k}"] input, [data-fp-champ="${k}"] select`); if (el) { try { el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'center' }); } catch (_) {} } };
 
   React.useEffect(() => { if (focus && cfg) { const el = document.querySelector(`[data-fp-champ="${focus}"] input, [data-fp-champ="${focus}"] select, [data-fp-champ="${focus}"] button`); if (el) { try { el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'center' }); } catch (_) {} } } }, [focus, !!cfg]);
@@ -272,15 +290,24 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
 
         <section className="vrm-fp-section">
           <h3>Ton entreprise</h3>
-          {champ({ k: 'siret', label: 'SIRET', mode: 'numeric', placeholder: '14 chiffres', aide: 'Sur ton avis de situation INSEE. VRM cherche ton entreprise au registre public, puis te demande de vérifier.' })}
+          {/* (11 nov., lot DJ1) La recherche part à la VALIDATION : Entrée, sortie du champ, ou « Rechercher ». */}
+          <label className="vrm-fp-champ" data-fp-champ="siret" data-fp-manque={champManque.has('siret') ? '1' : undefined}>
+            <span>SIRET</span>
+            <input type="text" value={cfg.siret || ''} placeholder="14 chiffres" inputMode="numeric" autoComplete="off" enterKeyHint="search" data-fp-siret=""
+              onChange={(e) => upd('siret', e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); recherche.lancer(); } }}
+              onBlur={() => recherche.lancerUneFois()}/>
+            <small>Sur ton avis de situation INSEE. Valide : VRM cherche ton entreprise.</small>
+          </label>
           <CarteVerifEntreprise recherche={recherche} actuel={cfg} onModifier={allerAuChamp} onEcrire={(patch) => { updPlusieurs(patch); return true; }} data={{ 'data-fp-registre': '' }}/>
           <div className="vrm-fp-champ" data-fp-champ="forme" data-fp-manque={champManque.has('forme') ? '1' : undefined}>
             <span>Forme de l'entreprise</span>
-            <select value={cfg.forme || ''} onChange={(e) => upd('forme', e.target.value)} aria-label="Forme de l'entreprise">
+            <select value={cfg.forme || ''} onChange={(e) => { upd('forme', e.target.value); setFormeVue(e.target.value); }} aria-label="Forme de l'entreprise">
               <option value="">Choisir…</option>
               {FORMES.map((f) => <option key={f.v} value={f.v}>{f.l}</option>)}
             </select>
           </div>
+          {formeVue && formeVue === cfg.forme ? <CarteMentionsForme forme={cfg.forme} cfg={cfg} onModifier={allerAuChamp} onEcrire={(patch) => updPlusieurs(patch)} fermer={() => setFormeVue('')}/> : null}
           {champ({ k: 'nom', label: cfg.forme === 'EI' || !cfg.forme ? 'Nom et prénom (ou nom commercial)' : 'Raison sociale', auto: 'organization', aide: cfg.forme === 'EI' ? '« EI » est ajouté après ton nom sur la facture (obligatoire).' : null })}
           {champ({ k: 'adresse', label: 'Adresse', auto: 'street-address', large: true })}
           <div className="vrm-fp-rangee">
@@ -311,6 +338,21 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
               <option value="">Choisir…</option>{TAUX_TVA.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')}&nbsp;%</option>)}
             </select></div> : null}
           {cfg.tva_regime === 'normal' || cfg.tva_regime === 'marge' ? champ({ k: 'tva', label: 'N° de TVA intracommunautaire', placeholder: 'FR12345678901', majuscules: true }) : null}
+        </section>
+
+        {/* (11 nov., lot DJ1) « que sur compte professionnel, ou alors on demande au vendeur sur quel compte » */}
+        <section className="vrm-fp-section" data-fp-comptes="">
+          <h3>Sur quels comptes ?</h3>
+          <p className="vrm-fp-muet">Vinted : tes comptes Pro, ceux que Vinted dit professionnels.</p>
+          {comptesConnus(cfg).length ? <div className="vrm-fp-comptes">
+            {comptesConnus(cfg).map((c) => (
+              <label key={c.cle} className="vrm-fp-compte" data-fp-compte={c.cle} data-fp-compte-oui={c.oui ? '1' : '0'}>
+                <input type="checkbox" checked={c.oui} onChange={(e) => upd('comptesFacture', avecCompte(cfg, c.plateforme, c.compte, e.target.checked))}/>
+                <span><b className="vrm-sensible" data-stream-type="compte">{c.compte}</b><small>{c.plateforme === 'ebay' ? 'eBay' : c.plateforme === 'vestiaire' ? 'Vestiaire' : 'Leboncoin'}</small></span>
+              </label>
+            ))}
+          </div> : null}
+          <p className="vrm-fp-muet">Leboncoin, eBay, Vestiaire : VRM te demande à la première vente de chaque compte.</p>
         </section>
 
         <section className="vrm-fp-section">
@@ -501,6 +543,18 @@ export function BoiteEnvoi({ deps, cfg, upd }) {
 // pour tout l'écran, en scalaires (§4.4 : jamais le formulaire de retour, jamais
 // l'instantané entier dans une liste).
 let _donnees; const _ecoutesDonnees = new Set(); let _enCours = null;
+// (11 nov., lot DJ1 — « je viens de faire une vente sur mon compte Pro, et je n'ai pas le
+// bouton ») Ces lectures étaient faites UNE fois par chargement : l'app restée ouverte
+// (iPhone) ne voyait jamais l'e-mail de vente Pro arrivé ensuite ⇒ pas de bouton. Elles
+// sont relues quand elles ont plus de `FACTURES_FRAICHES_MS` : au retour sur l'app, à
+// l'ouverture d'une ligne, et quand une vente d'un compte Pro n'a pas encore son e-mail.
+let _luA = 0;
+export const FACTURES_FRAICHES_MS = 60 * 1000;
+const factures_perimees = () => _donnees === undefined || Date.now() - _luA > FACTURES_FRAICHES_MS;
+if (typeof document !== 'undefined') {
+  try { document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && _ecoutesDonnees.size && factures_perimees() && _depsDonnees) relireFactures(_depsDonnees); }); } catch (_) {}
+}
+let _depsDonnees = null;
 export function relireFactures(deps) {
   if (_enCours) return _enCours;
   _enCours = (async () => {
@@ -528,15 +582,17 @@ export function relireFactures(deps) {
         toutes: factures.filter(Boolean),
       };
     })() : null;
-    _donnees = v; _enCours = null;
-    _ecoutesDonnees.forEach((f) => { try { f(v); } catch (_) {} });
-    return v;
+    // Une relecture ratée ne remplace pas une lecture réussie (« rien lu » ne vaut pas « rien »).
+    if (v || _donnees === undefined) _donnees = v;
+    _enCours = null; _luA = Date.now();
+    _ecoutesDonnees.forEach((f) => { try { f(_donnees); } catch (_) {} });
+    return _donnees;
   })();
   return _enCours;
 }
 function useFactures(deps) {
   const [d, setD] = React.useState(_donnees);
-  React.useEffect(() => { _ecoutesDonnees.add(setD); if (_donnees === undefined) relireFactures(deps); return () => { _ecoutesDonnees.delete(setD); }; }, [deps]);
+  React.useEffect(() => { _depsDonnees = deps; _ecoutesDonnees.add(setD); if (factures_perimees()) relireFactures(deps); else if (_donnees !== d) setD(_donnees); return () => { _ecoutesDonnees.delete(setD); }; }, [deps]); // eslint-disable-line react-hooks/exhaustive-deps
   return d;
 }
 async function lireContenu(deps, id) {
@@ -599,6 +655,10 @@ export function FactureRaisonsTete({ ventes, deps }) {
 export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
   const d = useFactures(deps);
   const [ouverte, setOuverte] = React.useState(false);
+  // (11 nov., lot DJ1) Une vente d'un compte Pro dont l'e-mail de vente n'est pas (encore)
+  // lu : on relit les e-mails (au plus une fois par minute) — il arrive ~1 min après la vente.
+  const sansMail = !!(d && vente && vente.tx && vente.uid != null && d.comptesPro.get(String(vente.uid)) === true && !(d.ventesPro.get(String(vente.tx)) || []).length && !d.factures.get(String(vente.tx)));
+  React.useEffect(() => { if (sansMail && factures_perimees()) relireFactures(deps); }, [sansMail, deps]);
   if (!vente || !vente.tx || !d) return d === null && !ligne && vente && vente.tx ? <p className="vrm-fp-muet">Les factures n'ont pas pu être lues — réessaie dans un instant.</p> : null;
   const tx = String(vente.tx);
   const mails = d.ventesPro.get(tx) || [];
@@ -623,15 +683,58 @@ export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
   } else {
     preuve = preuveAcheteur({ tx, mails, commandes: vente.commandes || [], brouillon: f, adresseLisible: adresseVintedLisible });
     // Le même refus sur d'autres lignes affichées : dit une fois en tête (`FactureRaisonsTete`).
-    if (ligne && groupe && !preuve.prouve) { const r = refusDeLigne(vente, d); if (r && refusCommuns(groupe, d).has(r.cle)) return null; }
+    // Le bon de retour reste, lui, à côté de la vente.
+    if (ligne && groupe && !preuve.prouve) { const r = refusDeLigne(vente, d); if (r && refusCommuns(groupe, d).has(r.cle)) return <div className="vrm-fp-ligne" data-fp-tx={tx} data-fp-forme="ligne"><BonRetour vente={vente} preuve={preuve} facture={f} deps={deps} ligne/></div>; }
     corps = preuve.prouve
       ? <button type="button" className={`vrm-b vrm-b-secondaire${ligne ? ' vrm-fp-ligne-bouton' : ' vrm-b-plein'}`} data-fp-vente="a-faire" data-fp-preuve="ok" data-sans-glisse="" onClick={() => setOuverte(true)}>Envoyer la facture</button>
       : <p className={ligne ? 'vrm-fp-ligne-raison' : 'vrm-fp-muet vrm-fp-raison'} data-fp-vente="pas-prouve" data-fp-preuve={preuve.code}>Facture : {phraseRefus(preuve)}.</p>;
   }
   return <div className={ligne ? 'vrm-fp-ligne' : 'vrm-fp-vente'} data-fp-tx={tx} data-fp-forme={ligne ? 'ligne' : 'fiche'}>
     {corps}
+    <BonRetour vente={vente} preuve={preuve} facture={f} deps={deps} ligne={ligne}/>
     {ouverte ? <FeuilleFactureVente vente={vente} preuve={preuve} facture={f} avoir={av} deps={deps} fermer={() => setOuverte(false)}/> : null}
   </div>;
+}
+
+// ── LE BON DE RETOUR (11 nov., lot DJ1) ─────────────────────────────────────
+// « à côté de chaque vente le bon de retour pour toutes les ventes sur un compte
+// professionnel » : le formulaire de retour que Vinted a joint à l'e-mail de CETTE
+// vente (rangé avec le brouillon `email_invoice_tx{n°}`, lu seulement au clic — jamais
+// dans une liste, §4.4) ; sinon un bon dessiné par VRM pour cette vente
+// (src/facturePro/bonRetour.js), avec l'adresse de retour de « Ma facture ».
+async function ouvrirOctetsPdf(deps, octets, nom, titre) {
+  const blob = new Blob([octets], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  if (deps.ouvrirPdfOnglet && deps.ouvrirPdfOnglet(url, nom, titre)) return;
+  const a = document.createElement('a'); a.href = url; a.download = nom; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+function BonRetour({ vente, preuve, facture, deps, ligne }) {
+  const cfg = useFicheFacturation(deps);
+  const [occupe, setOccupe] = React.useState(false);
+  const tx = String(vente.tx);
+  const deVinted = !!(facture && facture.retour);
+  const ouvrir = async () => {
+    setOccupe(true);
+    try {
+      if (deVinted) {
+        const r = await deps.lireTout(`id=eq.${encodeURIComponent('email_invoice_tx' + tx)}&select=b64:data->>retourB64,nom:data->>retourNom`, { strict: true }).catch(() => null);
+        const b64 = Array.isArray(r) && r[0] && typeof r[0].b64 === 'string' ? r[0].b64 : '';
+        if (b64.length > 100) {
+          const bin = atob(b64); const o = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i);
+          await ouvrirOctetsPdf(deps, o, (r[0].nom || `Formulaire-retour-${tx}.pdf`).replace(/[^\w.-]/g, '-'), 'Bon de retour');
+          return;
+        }
+        if (r === null) { deps.toast("Le bon de retour n'a pas pu être lu — réessaie dans un instant."); return; }
+      }
+      const { contenuBonRetour, pdfBonRetour, nomFichierBonRetour } = await import('./facturePro/bonRetour.js');
+      const c = contenuBonRetour(cfg || {}, { tx, designation: (preuve && preuve.designation) || vente.titre, venteLe: (preuve && preuve.venteLe) || vente.venteLe });
+      if (!c.ok) { deps.toast(`Bon de retour : il manque ${c.manque.join(', ')} (Argent → Factures → Ma facture).`); return; }
+      await ouvrirOctetsPdf(deps, await pdfBonRetour(c), nomFichierBonRetour(c), 'Bon de retour');
+    } catch (_) { deps.toast("Le bon de retour n'a pas pu être préparé — réessaie."); } finally { setOccupe(false); }
+  };
+  return <button type="button" className={`vrm-b vrm-b-secondaire${ligne ? ' vrm-fp-ligne-bouton' : ' vrm-b-plein'}`} data-fp-bon-retour={deVinted ? 'vinted' : 'vrm'} data-sans-glisse="" disabled={occupe} onClick={ouvrir}>{occupe ? 'Un instant…' : 'Bon de retour'}</button>;
 }
 
 function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {

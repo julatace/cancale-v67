@@ -1325,3 +1325,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Textes courts, 4e série** : Favoris (« Aucune garantie contre un blocage Vinted » et le rythme restent À L'ÉCRAN, le reste sous « Pourquoi ? »), Organisation, Communauté, Accompagnement, fil eBay, inventaire, studio, configuration, connexion et installation de l'extension : une phrase + `src/composants/PourquoiReplie.jsx` ; audit `textes-courts` (relevé statique), banc `popups-propre` + favoris/organisation/communauté. `docs/passation/2026-11-10-textes-courts-4.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ1)
+## Déplacé de CLAUDE.md §9 (11 nov., extension 5.341)
+- **10 nov. · Clavier + lecteur d'écran (lot P)** : ordinateur : « g » + lettre (j a v c m h s r t e p) ⇒ l'écran, « n » ⇒ Nouvel achat VIDE, « ? » ⇒ la liste (feuille, focus gardé), aussi Paramètres → « Raccourcis clavier » ; jamais dans un champ, ni sous une feuille, ni ⌘/Ctrl/Alt ; seulement naviguer/ouvrir (`src/raccourcisClavier.js`, `vrm:aller`). VoiceOver : bouton icône seule nommé à la racine (`BoutonBase`/`Segmente`/`Btn`), widgets lus « libellé : valeur » (« pas su » pour —), « Détails et gestes » dit sa paire. `docs/passation/2026-11-10-clavier-voiceover.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+- **10 nov. (soir) · « Ton adresse VRM » en UN parcours** : en tête d'E-mails → Relier ma boîte (Paramètres → Mon adresse VRM : la même pièce en feuille) — barre 1·2·3·✓ avec reprise, adresse en grand, compte en puces, messagerie détectée par le domaine (une tuile, 3 pas, bouton vers la bonne page), relais Apple = liste des boîtes reliées, code Gmail affiché seul + « Confirmer dans Gmail » (son clic), essai « Reçu ✓ » ; plus de roue infinie ; adresses sans compte en une ligne (`src/AdresseReception.jsx`). `docs/passation/2026-11-10-adresse-vrm-simple.md`. Geste : aucun.
