@@ -3416,6 +3416,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // pour le compte du COOKIE de l'onglet qui demande (jamais un autre compte
     // nommé par le message) — c'est la règle « garde » de l'extension.
     // 5.344 : « Tout récupérer » depuis la carte du logo — le compte de l'onglet seulement.
+    // 5.354 : « Masquer / Afficher le résumé du mois » — un réglage de CE navigateur.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'resumeMasque') {
+      poserMoisMasque(msg.masque === true).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'importTout') {
       (async () => {
         let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
@@ -14265,6 +14270,121 @@ async function lbcARetirerPourCarte() {
   }
   return c && c.data ? c.data : null;
 }
+// ── LE MINI-RÉSUMÉ DU MOIS DANS LA CARTE (5.354, lot extension-resume) ───────
+// « Ce mois : 1 340 € vendus · 42 ventes · 3 à expédier », replié sous une ligne
+// discrète. L'extension ne recalcule RIEN (§5) : elle LIT ce que l'app publie déjà
+// pour le widget de l'iPhone (`widget_stats` : caMois, ventesMois,
+// caMoisNonComptees, updatedAt, et `aExpedier` recopié du badge de Colis —
+// src/resumeCarte.js). Une lecture PROJETÉE (§4.4, aucun `select=data`), au plus
+// une TENTATIVE toutes les 15 min (réussie ou non), jamais plus d'1,2 s d'attente
+// pour la carte ; aucune requête vers Vinted. « Pas su » ⇒ null (la carte dit
+// « — », jamais 0). La copie est celle d'UN compte VRM (`u`).
+// Rien n'est montré si le compte de l'ONGLET n'est pas PROUVÉ à ce compte VRM
+// (`ongletDuVendeur`) : Vinted = un compte de SA liste (`vrmLogins` de cette
+// session, jamais « ignoré ») ; Leboncoin = un compte de SON `lbc_accounts` vu sur
+// une page « moi » ; Vestiaire = un compte de SON `vc_session` ; eBay = pas su.
+// Masqué (son choix, ce navigateur : `vrmResumeMasque`) ⇒ aucune lecture du tout.
+const MOIS_CARTE_RELU_MS = 15 * 60e3;
+const MOIS_CARTE_CACHE = 'vrmResumeCarte';
+const MOIS_CARTE_MASQUE = 'vrmResumeMasque';
+const MOIS_COLIS_MAX_MS = 12 * 3600e3;   // la fraîcheur du badge de Colis (publicationColisFraiche)
+const MOIS_CARTE_REQUETE = 'app_data?id=in.(widget_stats,lbc_accounts,vc_session)&select=id,ca:data->caMois,nv:data->ventesMois,nc:data->caMoisNonComptees,ae:data->aExpedier,maj:data->>updatedAt,la:data->accounts,vcc:data->comptes';
+function moisParis(ms) {
+  try {
+    const p = {}; for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).formatToParts(new Date(ms))) p[x.type] = x.value;
+    return p.year && p.month ? `${p.year}-${p.month}` : null;
+  } catch (_) { return null; }
+}
+const nombreOuNull = (x) => (typeof x === 'number' && Number.isFinite(x) ? x : (typeof x === 'string' && x.trim() !== '' && Number.isFinite(Number(x)) ? Number(x) : null));
+// Les lignes lues ⇒ ce que la carte peut dire. Rien n'est calculé : chaque chiffre
+// est celui de l'app, ou null (pas su) — mois d'avant, champ absent, colis trop vieux.
+function resumeMoisCarte(rows, maintenant) {
+  const now = Number(maintenant) || Date.now();
+  const w = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'widget_stats') || null;
+  const lbc = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'lbc_accounts') || null;
+  const vc = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'vc_session') || null;
+  const lbcIds = [];
+  if (lbc && lbc.la && typeof lbc.la === 'object') for (const [k, a] of Object.entries(lbc.la)) {
+    if (a && typeof a === 'object' && (a.session === true || a.sessionAt || (a.source && !LBC_URL_AUTRUI.test(String(a.source))))) lbcIds.push(idCompteLbc(k));
+  }
+  const vcIds = vc && vc.vcc && typeof vc.vcc === 'object' ? Object.keys(vc.vcc).map(String).slice(0, 20) : [];
+  const majMs = w && w.maj ? Date.parse(String(w.maj)) : NaN;
+  const ceMois = Number.isFinite(majMs) && moisParis(majMs) != null && moisParis(majMs) === moisParis(now);
+  const ca = ceMois ? nombreOuNull(w.ca) : null;
+  const ventes = ceMois ? nombreOuNull(w.nv) : null;
+  const nc = ceMois ? nombreOuNull(w.nc) : null;
+  const ae = w && w.ae && typeof w.ae === 'object' ? w.ae : null;
+  const aeAt = ae ? nombreOuNull(ae.at) : null;
+  const aeFrais = aeAt != null && now - aeAt >= 0 && now - aeAt < MOIS_COLIS_MAX_MS;
+  const aExpedier = ae && aeFrais && nombreOuNull(ae.n) != null ? Math.max(0, Math.round(nombreOuNull(ae.n))) : null;
+  return {
+    ca: ca == null ? null : Math.round(ca), caAuMoins: ca != null && nc != null && nc > 0,
+    ventes: ventes == null ? null : Math.round(ventes),
+    aExpedier, aExpedierAuMoins: aExpedier != null && ae.auMoins === true,
+    maj: Number.isFinite(majMs) ? majMs : null,
+    raison: !w ? 'jamais' : !ceMois ? 'mois' : null,
+    lbcIds: [...new Set(lbcIds)].slice(0, 20), vcIds,
+  };
+}
+// Le compte de l'onglet appartient-il à CE compte VRM ? true · false · null (pas su).
+function ongletDuVendeur({ plateforme, site, logins, u, resume, vcOnglet }) {
+  if (plateforme === 'vinted') {
+    if (!site || !site.id) return null;
+    if (site.choix === 'non') return false;
+    if (!logins || logins.owner !== u || !logins.map) return null;
+    if (Object.prototype.hasOwnProperty.call(logins.map, String(site.id))) return true;
+    return Date.now() - Number(logins.at || 0) < 300000 ? false : null;
+  }
+  if (plateforme === 'leboncoin') {
+    if (!site || !site.id || !resume) return null;
+    return resume.lbcIds.includes(idCompteLbc(site.id)) ? true : null;
+  }
+  if (plateforme === 'vestiaire') {
+    if (!vcOnglet || !resume) return null;
+    return resume.vcIds.includes(String(vcOnglet)) ? true : null;
+  }
+  return null;
+}
+async function moisPourCarte(plateforme, site, tabId) {
+  let local = {};
+  try { local = await chrome.storage.local.get([MOIS_CARTE_MASQUE, MOIS_CARTE_CACHE, 'vrmLogins', VC_ONGLETS]); } catch (_) { return null; }
+  if (local[MOIS_CARTE_MASQUE] === true) return { masque: true };
+  if (plateforme !== 'vinted' && plateforme !== 'leboncoin' && plateforme !== 'vestiaire') return null;
+  let u = '';
+  try { const s = await loadSession(); u = String((s && (s.user_id || subDuJwt(s.access_token))) || ''); } catch (_) { u = ''; }
+  if (!u) return null;
+  // Vinted : la preuve se lit SANS réseau ; un compte d'un autre ne déclenche aucune lecture.
+  if (plateforme === 'vinted' && ongletDuVendeur({ plateforme, site, logins: local.vrmLogins, u }) !== true) return null;
+  let c = local[MOIS_CARTE_CACHE] || null;
+  if (c && c.u !== u) c = null;
+  if (!c || !(Date.now() - Number(c.tente || 0) < MOIS_CARTE_RELU_MS) || Date.now() < Number(c.tente || 0)) {
+    const avant = c;
+    const lire = (async () => {
+      const marque = { u, tente: Date.now(), rows: avant ? avant.rows : null, lu: avant ? avant.lu : 0 };
+      try { await chrome.storage.local.set({ [MOIS_CARTE_CACHE]: marque }); } catch (_) {}
+      const rows = await sbGet(MOIS_CARTE_REQUETE);
+      if (rows === null || !Array.isArray(rows)) return marque;        // lecture ratée : la dernière connue reste
+      const v = { u, tente: marque.tente, lu: Date.now(), rows: rows.slice(0, 3).map((r) => ({ id: r.id, ca: r.ca, nv: r.nv, nc: r.nc, ae: r.ae, maj: r.maj, la: r.la, vcc: r.vcc })) };
+      try { await chrome.storage.local.set({ [MOIS_CARTE_CACHE]: v }); } catch (_) {}
+      return v;
+    })();
+    const r = await avecDelai(lire, 1200, null).catch(() => null);
+    if (r) c = r;
+  }
+  if (!c || !c.rows) return null;
+  const resume = resumeMoisCarte(c.rows, Date.now());
+  const vcOnglet = plateforme === 'vestiaire' && tabId != null ? ((local[VC_ONGLETS] || {})[String(tabId)] || {}).compte : null;
+  if (ongletDuVendeur({ plateforme, site, logins: local.vrmLogins, u, resume, vcOnglet }) !== true) return null;
+  const { lbcIds, vcIds, ...dire } = resume;
+  return Object.assign(dire, { lu: Number(c.lu) || null });
+}
+async function poserMoisMasque(masque) {
+  try {
+    if (masque) await chrome.storage.local.set({ [MOIS_CARTE_MASQUE]: true });
+    else await chrome.storage.local.remove(MOIS_CARTE_MASQUE);
+    return { ok: true, masque: !!masque };
+  } catch (_) { return { ok: false }; }
+}
 async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
@@ -14321,7 +14441,9 @@ async function etatSite(url,tabId) {
   const aRetirer = aRetirerBrut ? { at: aRetirerBrut.at, liste: aRetirerProuveCarte(aRetirerBrut.liste, lectureLbc, Date.now()) } : null;
   const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now() }) : null;
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
+  // 5.354 : le mini-résumé du mois (connecté seulement ; compte de l'onglet prouvé).
+  const mois = vrm && vrm.connecte === true ? await moisPourCarte(plateforme, site, tabId).catch(() => null) : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,

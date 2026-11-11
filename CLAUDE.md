@@ -532,6 +532,7 @@ sans la fonction.
 | `importdepart` | `importerHistorique` | **5.344.0** (11 nov.) | « Ton historique Vinted · 400 sur 1 250 » : tout l'historique (ventes, achats) du compte de l'onglet, 20 lectures/h, reprise ; `import_vinted_{uid}` |
 | `moderation` | `guetterDressing` | **5.350.0** (11 nov.) | « Vinted a masqué / fait disparaître / limite » : deux lectures COMPLÈTES comparées, aucune requête de plus ; `moderation_vinted_{uid}` |
 | `verifdepot` | `alertesDepotVinted` | **5.353.0** (11 nov.) | sur le formulaire de dépôt vinted.fr : encart discret « N° absent / déjà en ligne / prix sous l'achat », base VRM seulement, jamais une garde |
+| `resumemois` | `moisPourCarte` | **5.354.0** (11 nov.) | « Ce mois : … vendus · … ventes · … à expédier » dans la carte du logo : lu dans `widget_stats`, compte de l'onglet prouvé, « — » si pas su, masquable |
 
 ---
 
