@@ -51,3 +51,23 @@ export function gardeRefuse(garde, item, maintenant = Date.now()) {
   if (item == null || garde.items.includes(String(item))) return 'vendue-ailleurs';
   return null;
 }
+
+// ── ACCEPTER À LA MAIN (11 nov., revue robustesse) ──────────────────────────
+// « Accepter » dans Messages ne regardait pas la garde (elle n'existait que pour
+// le moteur automatique) : une paire vendue sur eBay, Leboncoin ou Vestiaire
+// pouvait être vendue une 2e fois sur un clic. La MÊME règle (`gardeRefuse`) :
+//   • vendue ailleurs (prouvé par identité, même si un AUTRE site n'est pas relu) ⇒
+//     { bloque, texte } : rien ne part ;
+//   • garde absente / périmée / incomplète ⇒ { pasSu, texte } : on le DIT dans la
+//     confirmation (« pas su » ne vaut pas « oui »), c'est son clic qui décide ;
+//   • sinon null.
+export function avisAcceptationManuelle(garde, item, maintenant = Date.now()) {
+  if (item == null || item === '') return { pasSu: true, texte: "VRM ne sait pas quelle annonce c'est : vérifie qu'elle n'est pas vendue ailleurs." };
+  // Une vente AILLEURS déjà prouvée bloque même si un autre site n'est pas relu
+  // (banc robustesse-metier A1 : eBay pas relu masquait une vente Leboncoin connue).
+  const connue = !!(garde && garde.v === GARDE_OFFRES_VERSION && Array.isArray(garde.items) && garde.items.includes(String(item)));
+  const r = connue ? 'vendue-ailleurs' : gardeRefuse(garde, item, maintenant);
+  if (r == null) return null;
+  if (r === 'vendue-ailleurs') return { bloque: true, texte: "Déjà vendue sur un autre site : je n'accepte pas. Retire l'annonce Vinted." };
+  return { pasSu: true, texte: "VRM n'a pas pu vérifier tes autres sites : vérifie qu'elle n'y est pas vendue." };
+}
