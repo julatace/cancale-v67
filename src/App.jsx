@@ -507,6 +507,8 @@ import CarteStats from "./design/CarteStats.jsx";
 import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche } from "./design/carteChiffres.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
+import { detailFraisFiche } from "./coutPlateformes.js";
+import { PrevisionLigne } from "./ArgentPlus.jsx";
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { useValeurStock as useValeurStockCarte } from "./CascadeVente.jsx";   // (11 nov., lot stats-plus) la case « Valeur du stock »
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
@@ -37119,6 +37121,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
       const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
         montant: montantCommandeLu, achat: (o) => achatDe(entreeVenteLot(o, effEntry(o))), frais: (o) => chargesVente(effEntry(o)),
+        fraisDetail: (o) => detailFraisFiche(effEntry(o)),   // (11 nov.) [11] : boost, port, commission (src/coutPlateformes.js)
         // (11 nov., lot ventes-lot) Les articles d'un lot, chacun à SA part du prix (src/venteLot.js).
         articles: (o) => { const l = lotDeVente(o); return l && l.lu ? l.articles.map((a) => [a.titre, a.num || '', a.part, a.achat, a.item || '']) : null; },
         compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
@@ -42611,6 +42614,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 passée se touche dans la frise de la tête (« Semaine du … »), avec les MÊMES règles
                 (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
             {/* (11 nov.) « Quoi de neuf » : une ligne discrète après une mise en ligne, jamais une fenêtre. */}
+            {/* (11 nov., agent2-argent-parrainage) « À ce rythme, novembre finira vers … » : une ligne, seulement quand c'est su (src/ArgentPlus.jsx). */}
+            {!baseKO && !premierJour && <PrevisionLigne liveStats={liveStats} onOuvrir={onNav ? () => onNav('dashboard') : null}/>}
             {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 

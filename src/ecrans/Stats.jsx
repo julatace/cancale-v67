@@ -14,7 +14,7 @@ import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/c
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
+import { AUTH, chargeAbonnement, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -24,6 +24,7 @@ import { texteValeurStock } from '../coutVente.js';
 import {comparerDeuxMois,ymEnFace,bornesMois} from '../comparerMois.js';
 import { estLot as estLotAchat, nombreLot } from '../achatsSourcing.js';   // (11 nov., C5) la règle des lots de l'écran Achats
 import '../styles-mois-boucle.css';
+import { PrevisionMoisCarte, CoutPlateformes } from '../ArgentPlus.jsx';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
@@ -637,13 +638,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
       <div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
+      {/* (11 nov., agent2-argent-parrainage) « Fin de novembre, à ce rythme » : le vendu prouvé du mois prolongé (src/previsionMois.js). */}
+      <PrevisionMoisCarte liveStats={liveStats} onSaisirPrix={versSaisiePrix}/>
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
       {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine) : un lien, rien de recalculé ici. */}
       {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>Ma semaine <span aria-hidden="true">›</span></button> : null}
       <ComparerMoisCarte liveStats={liveStats} panelOff={panelOff}/>
-      <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
+      {/* (11 nov., agent2-argent-parrainage) « Frais par site » sur la période OU mois par mois, une vue à la fois (src/ArgentPlus.jsx). */}
+      <CoutSitesCarte periode={periodeStats} ebayCommandes={ebayCommandes} parPeriode={<FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -2291,6 +2295,17 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
 // (`vrm_stats_ventes`, frais saisis sur les fiches), les commandes eBay
 // (`totalMarketplaceFee`), les packs et options de Comptabilité. La couverture
 // est dite là où le site a une commission à lire.
+// (11 nov., agent2-argent-parrainage) La même carte, ou mois par mois côte à côte (src/coutPlateformes.js) :
+// le relevé de Ventes, les Dépenses (packs, abonnements) et les commandes eBay arrivent en props.
+function CoutSitesCarte({ periode, ebayCommandes, parPeriode }) {
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const excluAutre = useExcluAutre();
+  const R = React.useMemo(() => ({ commandeEbayEngagee }), []);
+  const chargeAbo = React.useCallback((a, ym) => chargeAbonnement(a, (m) => m === ym, ym), []);
+  return <CoutPlateformes parPeriode={parPeriode} releve={releve ? releve.l : null} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null}
+    compta={compta} excluAutre={excluAutre} R={R} chargeAbo={chargeAbo} Segmente={Segmente}/>;
+}
 const lireReleveFrais = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
 function FraisParSiteCarte({ periode, ebayCommandes }) {
   const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
