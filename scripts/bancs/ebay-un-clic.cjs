@@ -37,6 +37,9 @@ async function scenario(b, avecCategorie) {
     if(/id=eq\.vinted_catalogue/.test(u)) return j([{ c: CATALOGUE }]);
     if(/id=eq\.vinted_item_details/.test(u)) return j(fichesDePage(u, DETAILS));
     if(/id=eq\.harvest_u1_listings/.test(u)) return j([LISTINGS]);
+    // (11 nov., ebay-rouges) Le registre des comptes eBay, forme réelle (`select=comptes:data->comptes`) :
+    // depuis le 8 nov., eBay n'est montré qu'à un vendeur dont le registre PROUVE un compte relié.
+    if(/id=eq\.ebay_comptes/.test(u)) return j([{ comptes: [{ principal:true, pseudo:'vendeur_banc', type:'particulier', site:'FR' }] }]);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   await pg.route('**/api/ebay**', route=>{ const req=route.request(); const j=d=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(d)});
@@ -56,9 +59,15 @@ async function scenario(b, avecCategorie) {
         { nom:'Type', requis:true, mode:'SELECTION_ONLY', valeurs:['Baskets','Bottes','Sandales'] },
       ], attributsObligatoires:['Marque','Pointure EU','Couleur','Département','Type'] });
     return j({ ok:true }); });
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`,{waitUntil:'domcontentloaded'});
-  await pg.waitForTimeout(2500);
-  try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
+  // (11 nov., ebay-rouges) Depuis la navigation par tâche (31 oct.), `?tab=plat_ebay` ouvre Ventes · eBay, et
+  //  « Annonces » de la barre rouvre Annonces sur SON dernier filtre (Vinted par défaut) : le banc touchait
+  //  la barre et cherchait le publieur eBay dans Annonces · Vinted. Le lien d'Annonces · eBay est
+  //  `?tab=annonces&site=ebay` ; on attend l'écran MONTÉ sur eBay (data-*), et ne pas y arriver est rouge.
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`,{waitUntil:'domcontentloaded'});
+  let surEbay = false; try { await pg.waitForSelector('[data-tache="annonces"][data-tache-site="ebay"]', { timeout: 15000 }); surEbay = true; } catch (_) {}
+  await pg.waitForTimeout(1500);
+  surEbay = surEbay && !!(await pg.$('[data-tache="annonces"][data-tache-site="ebay"]'));
+  dit(surEbay, `${avecCategorie ? 'A' : 'B'} · le lien d'Annonces · eBay ouvre Annonces filtrée sur eBay (et y reste)`);
   const ouvrir = await pg.$('text=Vendre un article sur eBay'); if (ouvrir) await ouvrir.click();
   await pg.waitForTimeout(500);
   const btn = await pg.$('[data-publier-un-clic="401"]');

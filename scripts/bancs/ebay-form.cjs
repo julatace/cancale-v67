@@ -45,6 +45,12 @@ const envoisEbay = []; let avertir = false;
     if(/id=eq\.vinted_item_details/.test(u)) return j(fichesDePage(u, DETAILS));
     if(/id=eq\.harvest_u1_listings/.test(u)) return j([LISTINGS]);
     if(/id=like\.coffre_/.test(u)) return j(COFFRE);
+    // (11 nov., ebay-rouges) LE REGISTRE DES COMPTES eBAY, dans sa forme réelle
+    // (`select=comptes:data->comptes`) : depuis le 8 nov. (plateformes affichées), eBay
+    // n'est montré qu'à un vendeur dont le registre PROUVE un compte relié (le compte
+    // « implicite » ne prouve rien). Sans lui, le banc décrivait un eBay « connecté »
+    // que l'app ne pouvait pas croire : les liens `site=ebay` retombaient sur « Tous ».
+    if(/id=eq\.ebay_comptes/.test(u)) return j([{ comptes: [{ principal:true, pseudo:'vendeur_banc', type:'particulier', site:'FR' }] }]);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   // IA de rédaction (api/ai) : disponible, et renvoie un titre optimisé.

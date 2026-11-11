@@ -55482,7 +55482,10 @@ function AppCoeur() {
     try { const m = load('vrm_meubles', []); meubles = (Array.isArray(m) && m.length > 0) || Object.keys(load('vrm_slots', {}) || {}).length > 0; } catch (_) { meubles = null; }
     try { const r = load('vrm_repub_main', {}); repub = !!localStorage.getItem(JOURNAL_REPUB) || (r && typeof r === 'object' && Object.keys(r).length > 0); } catch (_) { repub = null; }
     const usage = { stock: meubles ? true : pret ? false : null, republier: repub ? true : pret ? false : null };
-    const ebayRelie = !Array.isArray(comptesEbay) || !sitesLus ? null : (comptesEbay.some((c) => !c.implicite) || !!sitesLus.ebay);
+    // (11 nov., ebay-rouges) Un compte eBay RELIÉ au registre est une preuve à lui seul : la sonde des
+    // lignes rangées (`sitesLus`) qui ne répond pas ne l'efface plus (avant : `null` ⇒ eBay retiré des
+    // filtres, et Annonces · eBay retombait sur Vinted pendant une panne de lecture, lien compris).
+    const ebayRelie = Array.isArray(comptesEbay) && comptesEbay.some((c) => !c.implicite) ? true : (!Array.isArray(comptesEbay) || !sitesLus ? null : !!sitesLus.ebay);
     const relies = { vinted: accountsLoaded && Array.isArray(vintedAccounts) ? vintedAccounts.length > 0 : null, leboncoin: sitesLus ? !!sitesLus.leboncoin : null, vestiaire: sitesLus ? !!sitesLus.vestiaire : null, ebay: ebayRelie };
     poserProfilVendeur({ uid: AUTH.user?.id || '', mode: aff.mode, auto: aff.auto, vend: vd.vend, vendAuto: vd.auto, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories, usage, relies, plateformes: pret ? plateformesAffichees(load(CLE_PLATEFORMES, null), relies) : null, contexte });
   }, [liveStatsVus, proprioProfil, accountsLoaded, vintedAccounts, sitesLus, comptesEbay, profilTick, nuagePret]);
