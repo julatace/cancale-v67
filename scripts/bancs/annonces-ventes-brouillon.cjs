@@ -81,7 +81,7 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     lignesComptes:vis(document.querySelector('[data-comptes-annonces]')),
     titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)),
     titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
-    recusTop:top(document.querySelector('[data-recus-email]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
+    recusTop:top(document.querySelector('[data-recus-email]')),sourcesTop:top(document.querySelector('[data-achats-sources]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
     colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),convEcart:(()=>{const a=document.querySelector('.vrm-messages-sections'),b=document.querySelector('.vrm-msg-search');return a&&b?Math.round(b.getBoundingClientRect().top-a.getBoundingClientRect().bottom):null;})(),
     chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
     dateCap:(()=>{const d=document.querySelector('.vrm-day-greeting .vrm-day-date');return d&&d.getBoundingClientRect().height>0?getComputedStyle(d).textTransform:null;})(),
@@ -124,6 +124,8 @@ if(sub==='ventes'){
   else console.log(`    [${W}] mesuré : 1re vente à ${T.top} px (écran ${vp.height})`);
 } else if(sub==='achats'){
   dit(m.titres.filter(t=>/^Achats$/.test(t)).length<=1,`[${W}] un seul titre « Achats »`,JSON.stringify(m.titres));
+  // (11 nov., intégration colis — demande g) « Tes meilleures sources » vient APRÈS la liste d'Achats (jamais au-dessus des étapes et de leurs colis).
+  dit(m.sourcesTop==null||(m.ongletsTop!=null&&m.sourcesTop>m.ongletsTop&&(m.recusTop==null||m.sourcesTop<=m.recusTop)),`[${W}] « Tes meilleures sources » après la liste d'Achats`,`${m.sourcesTop} / ${m.ongletsTop} / ${m.recusTop}`);
   dit(m.recusTop!=null&&m.ongletsTop!=null&&m.recusTop>m.ongletsTop,`[${W}] les reçus par email passent sous la liste, plus en tête`,`${m.recusTop} / ${m.ongletsTop}`);
   // (11 nov., restes) Sous la carte « Dépensé » (maquette du 2 nov.) : sur ordinateur dans le premier écran ; téléphone rapporté.
   if(W>=600) dit(m.colis0!=null&&m.colis0+44<=950,`[${W}] les étapes des achats sont dans le premier écran`,String(m.colis0));
