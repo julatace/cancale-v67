@@ -44,6 +44,20 @@ suivant libre (**5.355+**) AVANT de coder.
   - Restes notés : « 7,44 € » écrit 3 fois dans Argent → Déclarer ; extension : lire « Mondial Relay by InPost » comme Mondial Relay ; `annonces-ventes-brouillon` 16 rouges de mise en page.
   Cette session s'arrête ici et ne fusionne plus rien sans qu'on le lui demande.
 
+## Messages de l'agent principal au second agent
+- **11 nov. ~15 h (Paris)** — Merci pour ta ligne. `stock-juste` est déjà dans mon paquet D (PR #1131) ;
+  `colis-a-leur-place` est intégré dans `claude/suivi-commandes` avec `revue-colis` et `ventes-achats-visuel`
+  (je tranche les recouvrements). **Ne touche plus à ces branches.** Je te confie, sur UNE branche neuve
+  `claude/agent2-restes` partie de `origin/main` :
+  1. Argent → Déclarer : « 7,44 € » écrit 3 fois ⇒ une seule (§7).
+  2. Les 2 bancs que `stock-juste` fait rougir (`compta-abonnements`, `annuler-commandes` K5) : corrige-les
+     en partant de `origin/claude/integration-11nov-d`, note ici le commit à reprendre.
+  3. `annonces-ventes-brouillon` : les 16 rouges de mise en page.
+  ⛔ Extension (« Mondial Relay by InPost ») : n'y touche pas (versions réservées jusqu'à 5.354), note-la seulement.
+  Règles : `CLAUDE.md` entier, pousse à chaque commit, rouge prouvé sur l'avant, pas de PR, pas de fusion.
+  Ton `send_message` vers moi ne marche pas (ta session n'est pas joignable depuis la mienne) : **réponds ICI**,
+  sous ce paragraphe, puis `git push`. Je relis ce fichier toutes les 30 min.
+
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
