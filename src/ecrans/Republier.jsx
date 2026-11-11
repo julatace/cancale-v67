@@ -3,6 +3,10 @@
 import { problemesLot } from '../verifAnnonce.js';
 import { centimes } from '../beneficePaire.js';
 import React, { useState, useEffect, useRef } from 'react';
+import { ProgrammerRepub, noterPasPartie, ctxLigne } from '../RepubProgramme.jsx';
+import { LigneHistoriqueRepub } from '../HistoriqueRepub.jsx';
+import { pairesAuDepart, modifierProgrammes, marquerFinie } from '../repubProgramme.js';
+import { tr, heure as heureLoc, date as dateLoc } from '../i18n/index.js';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
@@ -1325,7 +1329,9 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
   );
 }
 // ⟦← App.jsx #8⟧
-function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null }) {
+function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null, programme = null, programmeMode = null, progsRepub = null, onProgrammeFait = null }) {
+  // (11 nov., lot republier-programme) Une programmation : SES réglages figés (src/repubProgramme.js).
+  const PR = programme && programme.reglages ? programme.reglages : null;
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
   // (28 oct., sa demande) Seules les paires du compte Vinted OUVERT DANS CHROME
   // (cookie lu par l'extension, `vintedDeChrome`) : c'est le seul au nom duquel
@@ -1344,7 +1350,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const recree = action === 'recreer' || action === 'versBrouillon';   // une nouvelle annonce / un brouillon : favoris perdus
   // (5 nov.) Ouvert depuis « Actions possibles » : le choix est fait (sa sélection),
   // on commence à l'étape d'après — « Retour » ramène au choix, rien n'est perdu.
-  const [etape, setEtape] = useState(() => (depart && Array.isArray(reprise) && reprise.length ? depart : 'choix'));
+  const [etape, setEtape] = useState(() => (programme ? 'envoi' : depart && Array.isArray(reprise) && reprise.length ? depart : 'choix'));
   const [sel, setSel] = useState(() => new Set(Array.isArray(reprise) ? reprise.map(String) : []));
   const [q, setQ] = useState('');
   // (6 nov.) Les réglages (photos, prix, titre, lettre) de « Republier » et « En ligne →
@@ -1353,9 +1359,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (29 oct., et décision du 6 nov.) Rien ne baisse sans son clic : le PRIX et le TITRE
   // repartent de « Garder » / « Ne pas changer » à CHAQUE ouverture, jamais gardés.
   // « Modifier prix ou titre » a des réglages à lui, tous neutres à chaque ouverture.
-  const partage = action === 'recreer' || action === 'versBrouillon';
+  // Une programmation rouverte (départ ou modification) part de SES réglages figés, jamais des réglages du moment.
+  const partage = (action === 'recreer' || action === 'versBrouillon') && !PR;
   const [regsP, poserRegsP] = useReglagesRepub();
-  const [regsL, setRegsL] = useState(() => lireReglagesRepub(null));
+  const [regsL, setRegsL] = useState(() => lireReglagesRepub(PR ? PR.regs : null));
   const regsLRef = React.useRef(regsL);
   const regs = partage ? regsP : regsL;
   const poserR = partage ? poserRegsP : (patch) => { const c = regsLRef.current; const n = lireReglagesRepub({ ...c, ...(typeof patch === 'function' ? patch(c) : patch) }); regsLRef.current = n; setRegsL(n); };
@@ -1369,20 +1376,21 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const setPCommun = (v) => poserR((c) => ({ prix: { ...c.prix, commun: v } }));
   const setPArr = (v) => poserR((c) => ({ prix: { ...c.prix, arrondi: v } }));
   const setPFin = (v) => poserR((c) => ({ prix: { ...c.prix, fin: v } }));
-  const [esp, setEsp] = useState(REPUB_ESP_DEFAUT);
+  const [esp, setEsp] = useState(() => (PR && PR.esp && Number(PR.esp.fixe) > 0 ? Number(PR.esp.fixe) : REPUB_ESP_DEFAUT));
   // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
   // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
   const espMem = (() => { const v = load('vrm_republier_esp', null); return v && typeof v === 'object' ? v : {}; })();
-  const [espMode, setEspMode] = useState(espMem.mode === 'aleatoire' || espMem.mode === 'fixe' ? espMem.mode : 'vintex');
-  const [espMin, setEspMin] = useState(Number(espMem.min) > 0 ? Number(espMem.min) : 1);
-  const [espMax, setEspMax] = useState(Number(espMem.max) > 0 ? Number(espMem.max) : 3);
+  const espSrc = PR && PR.esp ? PR.esp : espMem;
+  const [espMode, setEspMode] = useState(espSrc.mode === 'aleatoire' || espSrc.mode === 'fixe' ? espSrc.mode : 'vintex');
+  const [espMin, setEspMin] = useState(Number(espSrc.min) > 0 ? Number(espSrc.min) : 1);
+  const [espMax, setEspMax] = useState(Number(espSrc.max) > 0 ? Number(espSrc.max) : 3);
   const [prochaine, setProchaine] = useState(null);  // { at, s } : la prochaine paire part à `at`
   const [, setTic] = useState(0);
   const minutesOk = (v) => { const n = Number(String(v).replace(',', '.')); return isFinite(n) && n > 0 ? Math.min(60, Math.round(n * 10) / 10) : 1; };
   const bornesAlea = () => { const a = fileClamp(minutesOk(espMin) * 60), b = fileClamp(minutesOk(espMax) * 60); return [Math.min(a, b), Math.max(a, b)]; };
-  React.useEffect(() => { save('vrm_republier_esp', { mode: espMode, min: espMin, max: espMax }); }, [espMode, espMin, espMax]);   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (!PR) save('vrm_republier_esp', { mode: espMode, min: espMin, max: espMax }); }, [espMode, espMin, espMax]);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { if (!prochaine) return undefined; const t = setInterval(() => setTic((n) => n + 1), 1000); return () => clearInterval(t); }, [prochaine]);
-  const [ok, setOk] = useState(false);
+  const [ok, setOk] = useState(() => !!(programme && programmeMode === 'depart'));
   const [mode, setMode] = useState('idle');          // idle | run | pause | fini
   const [st, setSt] = useState({});                  // id → { etat, raison, ancien, nouveau }
   // (28 oct., sa demande : « une barre de progression ») L'étape en cours de
@@ -1403,7 +1411,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (relancer tout de suite se ferait refuser à son tour). Le délai vient du message.
   const [arretJusqua, setArretJusqua] = useState(0);
   React.useEffect(() => { if (!(arretJusqua > Date.now())) return undefined; const t = setInterval(() => setTic((n) => n + 1), 15000); return () => clearInterval(t); }, [arretJusqua]);
-  const [ordre, setOrdre] = useState(null);          // null = l'ordre de sa sélection
+  const [ordre, setOrdre] = useState(() => (PR && Array.isArray(PR.ordre) ? PR.ordre.map(String) : null));          // null = l'ordre de sa sélection
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
   // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
   const reg = regs.photo;
@@ -1416,11 +1424,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const setLettreOn = (v) => poserR({ lettre: !!v });
   // (28 oct., sa demande : « ça met en brouillon puis ça publie ») Allumé par défaut
   // quand l'extension sait le faire ; il peut repasser à la création directe.
-  const [viaBrouillonChoix, setViaBrouillon] = useState(true);
+  const [viaBrouillonChoix, setViaBrouillon] = useState(() => (PR && PR.viaBrouillon === false ? false : true));
   // (29 oct., revue) Depuis la 5.277 l'extension passe TOUJOURS par un brouillon (comme Vintex) :
   // décocher la case annonçait « créée directement en ligne » et figeait la file Vinted 1 à 3 min.
   const viaBrouillon = extSait('republierpage') === 'ok' ? true : viaBrouillonChoix;
-  const [lettres, setLettres] = useState({});
+  const [lettres, setLettres] = useState(() => (PR && PR.lettres && typeof PR.lettres === 'object' ? { ...PR.lettres } : {}));
   const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = tirerLettre(); }); setLettres(o); };
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
   const regNeutre = photoNeutre(reg);
@@ -1469,10 +1477,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const aFaire = mode !== 'idle' && figee ? figee : aFaireCalc;
   // (3 nov.) Vérifier avant de republier (`src/verifAnnonce.js`) : le titre et le
   // prix qui PARTIRONT (l'aperçu), les photos, la taille et la marque lues.
-  const lancerFile = async () => {
-    const lot = aFaireCalc.map((a) => { const x = action === 'enLigne' ? {} : apercu(a); return { numero: a.numero, titre: x.titre || a.titre, prix: x.prix != null ? x.prix : a.prix, achat: a.floor,
+  const lotVerif = () => aFaireCalc.map((a) => { const x = action === 'enLigne' ? {} : apercu(a); return { numero: a.numero, titre: x.titre || a.titre, prix: x.prix != null ? x.prix : a.prix, achat: a.floor,
       ...(a.nPhotos != null ? { nPhotos: a.nPhotos } : {}), ...(a.taille !== undefined ? { taille: a.taille, famille: a.famille || '' } : {}), ...(a.marque !== undefined ? { marque: a.marque } : {}) }; });
-    if (!(await verifierAvantPublication(problemesLot(lot, 'vinted'), { site: 'vinted' }))) return;
+  const verifierLot = () => verifierAvantPublication(problemesLot(lotVerif(), 'vinted'), { site: 'vinted' });
+  // (11 nov., lot republier-programme) Ce que « Programmer » fige : ses réglages TELS QU'À L'ÉCRAN.
+  const reglagesFiges = () => ({ regs, esp: { mode: espMode, min: espMin, max: espMax, fixe: esp }, plan, lettres, ordre: aFaireCalc.map((a) => a.id), viaBrouillon: viaBrouillonChoix });
+  const absentesProg = React.useRef([]);
+  const lancerFile = async () => {
+    if (!(await verifierLot())) return false;
     setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run');
     // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL de tout ce que VRM fait et une BARRE ») La
     // feuille « VRM travaille » suit la file : ses deux gestes reviennent ici (pause, arrêt, reprise).
@@ -1489,7 +1501,32 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           setMode('run');
         }
       } });
+    // (11 nov.) Un départ programmé le dit en tête du journal, et nomme les paires qui ne sont plus en ligne.
+    if (programme && programmeMode === 'depart' && suiviRef.current) {
+      suiviRef.current.noter(tr('rp.depart.journal', { heure: heureLoc(programme.at) }));
+      if (absentesProg.current.length) suiviRef.current.noter(tr('rp.depart.absentes', { n: absentesProg.current.length }), null, 'pause');
+    }
+    return true;
   };
+  // (11 nov., lot republier-programme) C'EST L'HEURE : le départ a été pris par CET appareil (conditions
+  // vérifiées). L'atelier part avec SES réglages ; la liste vivante pas encore lue ⇒ on l'attend (90 s au
+  // plus) ; aucune paire encore en ligne ⇒ rien ne part, et c'est dit (« pas partie »).
+  const lanceProg = React.useRef(false);
+  const departProg = !!(programme && programmeMode === 'depart');
+  React.useEffect(() => {
+    if (!departProg || lanceProg.current || mode !== 'idle' || !toutes.length) return;
+    lanceProg.current = true;
+    const { partent, absentes } = pairesAuDepart(programme, aFaireCalc);
+    if (!partent.length) { noterPasPartie(programme, [{ cle: 'vide' }]); return; }
+    absentesProg.current = absentes;
+    lancerFile().then((parti) => { if (!parti) noterPasPartie(programme, [{ cle: 'verif' }]); });
+  }, [departProg, toutes.length, cleChoisies]);   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (!departProg) return undefined;
+    const t = setTimeout(() => { if (!lanceProg.current) { lanceProg.current = true; noterPasPartie(programme, [{ cle: 'liste' }]); } }, 90000);
+    return () => clearTimeout(t);
+  }, [departProg]);   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (departProg && mode === 'fini') modifierProgrammes((d) => marquerFinie(d, programme.uid, programme.id), ctxLigne()); }, [departProg, mode]);   // eslint-disable-line react-hooks/exhaustive-deps
   // La paire suivante, dont le bloc d'avancée dit le temps : sa ligne ne le redit pas (§7).
   const idAnnoncee = mode === 'run' ? ((aFaire.find((a) => !st[a.id]) || {}).id || null) : null;
   const melanger = () => {
@@ -1502,9 +1539,12 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // chaque ligne (« +1 min 23 s ») : il voit ce qui va se passer. « Tirer
   // d'autres temps » les refait. La première paire part tout de suite.
   const tirerTemps = () => { const [a, b] = espMode === 'vintex' ? REPUB_ESP_VINTEX : bornesAlea(); return a + Math.floor(Math.random() * (b - a + 1)); };
-  const [plan, setPlan] = useState({});
+  const [plan, setPlan] = useState(() => (PR && PR.plan && typeof PR.plan === 'object' ? { ...PR.plan } : {}));
   const clePlan = aFaire.map((a) => a.id).join(',') + '|' + espMode + '|' + espMin + '|' + espMax + '|' + esp;
-  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { o[a.id] = i === 0 ? 0 : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
+  // (11 nov., lot republier-programme) Les temps tirés d'une programmation sont CEUX qu'il a vus : gardés
+  // paire par paire tant que l'espacement n'a pas changé (une paire partie entre-temps ne décale rien).
+  const espFige = !!(PR && PR.esp && PR.plan && espMode === PR.esp.mode && String(espMin) === String(PR.esp.min) && String(espMax) === String(PR.esp.max) && String(esp) === String(PR.esp.fixe));
+  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { const g = espFige ? Number(PR.plan[a.id]) : NaN; o[a.id] = i === 0 ? 0 : Number.isFinite(g) && g > 0 ? g : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
   React.useEffect(() => { if (mode === 'idle') refaitPlan(); }, [clePlan]);   // eslint-disable-line react-hooks/exhaustive-deps
   const duree = (sec) => sec >= 60 ? `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s` : `${sec} s`;
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
@@ -1737,6 +1777,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                     {/* Le compte n'est plus redit sur chaque ligne : ce sont toutes celles du compte ouvert dans Chrome (§7). */}
                     <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{action === 'enLigne' ? <>compte <b style={{ color: C.text, fontWeight: 600 }}>{a.compte || a.uid || 'inconnu'}</b> · </> : null}{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${s2(a.vues, 'vue')}` : ''}{a.favoris != null ? ` · ${s2(a.favoris, 'favori')}` : ''}</span>
                     {recree && recente(a) && <span data-republier-recente={a.id} style={{ display: 'block', fontSize: 12, color: C.warn }}>déjà recréée il y a {ilYa(a.recreeAt)} — attends 2 jours</span>}
+                    {a.histo ? <LigneHistoriqueRepub r={a.histo} id={a.id} /> : null}
                     {a.note && <span data-republier-note={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.note}</span>}
                     {a.bloque && <span data-republier-bloque-raison={a.id} style={{ display: 'block', fontSize: 12, color: C.muted }}>{a.bloque}</span>}
                   </span>
@@ -1850,6 +1891,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </div>
           </>}
           {etape === 'envoi' && <>
+            {programme && programmeMode === 'modifier' && mode === 'idle' ? <div data-rp-modif={programme.id} style={{ fontSize: 13, color: C.text }}>{tr('rp.modif.titre', { quand: `${dateLoc(programme.at, { weekday: 'long', day: 'numeric', month: 'long' })} · ${heureLoc(programme.at)}` })}</div> : null}
             {/* (28 oct.) Après un passage, les anciennes annonces sont supprimées de Vinted :
                 elles sortent de la liste et la phrase disait « 0 annonce à supprimer ». */}
             {!aFaire.length && <div data-republier-vide style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'Aucun article dans cette file.'}</div>}
@@ -1927,6 +1969,13 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   ); })()}
                 </div>); })}
             </div>
+            {/* (11 nov., lot republier-programme) « Lancer plus tard » : SON heure, ses réglages figés tels qu'à l'écran. */}
+            {mode === 'idle' && !departProg && !!aFaire.length && ok && (
+              <ProgrammerRepub uid={compteUid} compte={nomCompte} action={action} ids={aFaireCalc.map((a) => a.id)} reglages={reglagesFiges} verifier={verifierLot}
+                existante={programme && programmeMode === 'modifier' && programme.etat === 'attente' ? programme : null}
+                actuelle={progsRepub && compteUid ? progsRepub[compteUid] || null : null}
+                onFait={() => { if (onProgrammeFait) onProgrammeFait(); }} />
+            )}
           </>}
         </div>
         <div className="vrm-b-rangee" style={{ padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'nowrap' }}>

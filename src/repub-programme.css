@@ -1,0 +1,32 @@
+/* ── REPUBLIER PROGRAMMÉ ET HISTORIQUE (11 nov., src/RepubProgramme.jsx, src/HistoriqueRepub.jsx) ──
+   DA Apple : neutre ; l'accent seulement sur le bouton principal ; l'AMBRE pour « pas partie »
+   (un geste à faire) ; jamais de rouge (§7). Cibles 44 px. */
+.vrm-rp { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-card, #fff); min-width: 0; }
+.vrm-rp-titre { margin: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1d1d1f); }
+.vrm-rp-champ { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--vrm-muted, #6e6e73); }
+.vrm-rp-champ input { min-height: 44px; font-size: 16px; padding: 8px 10px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 10px; background: var(--vrm-bg, #fff); color: var(--vrm-ink, #1d1d1f); font-family: inherit; max-width: 100%; box-sizing: border-box; }
+.vrm-rp-cond { font-size: 13px; color: var(--vrm-muted, #6e6e73); }
+.vrm-rp-cond p { margin: 0 0 4px; }
+.vrm-rp-cond ul { margin: 0 0 4px; padding-left: 18px; color: var(--vrm-ink, #1d1d1f); }
+.vrm-rp-cond li { margin: 2px 0; overflow-wrap: anywhere; }
+.vrm-rp-note { margin: 0; font-size: 13px; color: var(--vrm-muted, #6e6e73); }
+.vrm-rp-erreur { margin: 0; font-size: 13px; color: var(--vrm-warn, #b25000); }
+.vrm-rp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-rp-principal, .vrm-rp-second, .vrm-rp-ouvrir { min-height: 44px; padding: 0 16px; border-radius: 12px; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1; cursor: pointer; }
+.vrm-rp-principal { border: 0; background: var(--vrm-accent, #0071e3); color: var(--vrm-on-accent, #fff); }
+.vrm-rp-principal:disabled, .vrm-rp-ouvrir:disabled { opacity: .45; cursor: default; }
+.vrm-rp-second, .vrm-rp-ouvrir { border: 1px solid var(--vrm-line, #e5e5ea); background: transparent; color: var(--vrm-ink, #1d1d1f); }
+.vrm-rp-cartes { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+.vrm-rp-carte { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--vrm-line, #e5e5ea); border-radius: 12px; background: var(--vrm-card, #fff); min-width: 0; }
+.vrm-rp-carte-ambre { border-color: var(--vrm-warn, #b25000); }
+.vrm-rp-carte-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.vrm-rp-carte-txt b { font-size: 14px; color: var(--vrm-ink, #1d1d1f); }
+.vrm-rp-carte-ambre .vrm-rp-carte-txt b { color: var(--vrm-warn, #b25000); }
+.vrm-rp-carte-txt small { font-size: 12px; color: var(--vrm-muted, #6e6e73); overflow-wrap: anywhere; }
+.vrm-rp-carte-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.vrm-rh-ligne { display: block; font-size: 12px; color: var(--vrm-muted, #6e6e73); }
+.vrm-rh { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.vrm-rh h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--vrm-ink, #1d1d1f); }
+.vrm-rh ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.vrm-rh li { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--vrm-ink, #1d1d1f); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.vrm-rh li span:last-child { color: var(--vrm-muted, #6e6e73); }
