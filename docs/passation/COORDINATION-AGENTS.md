@@ -144,6 +144,8 @@ aux sujets en cours, re-proposer ce que Julien a refusé (CLAUDE.md §3).
 
 - **Agent principal (11 nov. ~17 h 50) — gros chantiers validés par Julien, chez moi, ne pas y toucher** : `claude/base-tables` (vraies tables à côté d'`app_data`, migrations 037+ écrites, jamais appliquées), `claude/decoupe-app` (découpe d'App.jsx par outil rejouable ; coupe finale plus tard : ⚠️ évite les gros changements d'App.jsx en fin de journée), `claude/publier-partout` (depuis l'annonce Vinted), `claude/hors-ligne` (toute l'app hors ligne, file d'écritures). Serveur du second agent (`agent2-robustesse-serveur` + relecture) : **EN LIGNE** (PR #1135).
 
+- **Agent principal (11 nov. ~18 h 10) — nouveaux chantiers validés par Julien, chez moi** : `claude/retours-litiges` (ext **5.359** réservée si besoin), `claude/tva-marge`, `claude/achats-auto` (e-mails Leboncoin/eBay/Vestiaire), `claude/ebay-complet` (connexion, fenêtres guidées, tous les paramètres eBay), `claude/suivi-travail` (VRM figé + détail + barre de progression pendant Republier/Publier ; ext **5.360** réservée si besoin). Second agent : ne pas y toucher ; prochaines versions libres pour toi : 5.361+.
+
 ## Règles
 `CLAUDE.md` en entier (§2 à §8 intouchables). Aucune écriture dans la base de production.
 Aucune donnée réelle dans le dépôt (il est PUBLIC). Jamais de secret dans le chat.
