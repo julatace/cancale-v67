@@ -119,11 +119,12 @@ const projette = (row, sel) => {
     const bouton = await pg.$('[data-lot] button[data-lot-imprimer]');   // (5 nov., chantier D) la feuille est un portail : le premier « data-imprime » de la page est une carte
     dit(!!bouton && (await bouton.getAttribute('data-lot-imprimer')) === '3', 'le bouton imprime EXACTEMENT les cochés (3)', bouton ? await bouton.getAttribute('data-lot-imprimer') : 'absent');
     if (bouton) {
-      await pg.locator('[data-lot-ligne="9001"] input').nth(1).check();
-      dit(await pg.getByText('2 · 1/3 article(s) contrôlé(s)',{exact:true}).isVisible(),'le contrôle physique est distinct de la sélection');
+      // (11 nov., Julien : « inadmissible ») Plus de case « Contrôlé » ni de confirmation à chaque impression : le N° et
+      // la photo sont sur chaque ligne ; « Imprimer » part directement (le contexte reste vérifié au lancement).
+      dit(await pg.locator('[data-lot] .vrm-preparation-controle input').count() === 0, 'plus de case « Contrôlé » par ligne');
       await bouton.click();
-      const continuer=pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true});
-      await continuer.waitFor();dit(true,'les articles non contrôlés sont signalés avant le PDF');await continuer.click();
+      const confirme = await pg.getByRole('button', { name: 'Préparer quand même les PDF', exact: true }).waitFor({ timeout: 2500 }).then(() => true).catch(() => false);
+      dit(!confirme, 'aucune fenêtre « Préparer quand même » : un clic imprime');
       // (4 nov.) Le type de ces bordereaux n'a pas de place gardée : la feuille du tampon s'ouvre UNE fois, « Imprimer ».
       const feuille = await pg.waitForSelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"])', { timeout: 20000 }).then(() => true).catch(() => false);
       const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-placeur-tampon]').length);

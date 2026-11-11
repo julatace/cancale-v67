@@ -55,3 +55,6 @@
 html[data-theme="dark"] .vrm-maj, html[data-theme="dark"] .vrm-inst { background: #1C1C1E; border-color: rgba(255,255,255,.1); box-shadow: 0 12px 40px rgba(0,0,0,.6); }
 @media (min-width: 900px) { .vrm-maj { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { .vrm-maj, .vrm-inst { animation: none; } }
+/* (11 nov., capture de Julien : la pilule couvrait la liste et le pied de « Bordereaux à imprimer »)
+   Une feuille ou une fenêtre est ouverte ⇒ la pilule se range ; elle revient à la fermeture. */
+body:has([data-feuille-cadre], [role="dialog"][aria-modal="true"]) .vrm-maj { display: none; }

@@ -22060,12 +22060,12 @@ function relireTransporteursSiVieux({ force = false } = {}) {
 // (commodité d'appareil) ; refus ⇒ recul. Une étiquette lue ⇒ `vrm:etiquettes-lues` (Colis,
 // Ventes, Ma journée relisent leurs bordereaux). Le serveur décide (même règle que le cron).
 const etiquetteALire = (b) => {
-  if (!b || !b.hasPdf || b.pdfLu != null && b.pdfLu !== '' && b.pdfLu !== 'None') return false;
+  if (!b || !b.hasPdf || b.pdfLu != null && b.pdfLu !== '' && b.pdfLu !== 'None' && b.pdfLu !== 'aucun') return false;   // (11 nov.) « aucun » d'avant le code « 56… » : relu
   if (b.transporteurPdf || (b.transporteur && String(b.suivi || '').trim())) return false;   // la règle de `candidatsPdf`
   const tx = String(b.transaction || '');
   if (!tx) return false;
   const et = pdfEtiquettesParTx(), vus = pdfVusParTx();
-  return !(et && et[tx]) && !(vus && vus[tx]);
+  return !(et && et[tx]) && !(vus && vus[tx] && !(vus[tx].r === 'aucun' && vus[tx].v !== 2));
 };
 let _etiquettesVol = null;
 function lireEtiquettesManquantes(bords) {
@@ -40236,8 +40236,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for(const [cle,empreinte] of empreintes){const l=actuelles.get(cle);if(!l||lotActuel.current.sig(l)!==empreinte)throw Error('Un article, son numéro ou son état a changé. Vérifie la sélection avant de préparer les PDF.');}
     };
     setBatchBusy(true);
-    const controle=controlePreparation(aImprimer.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),new Set(aImprimer.map(l=>l.cle)),lot?.verifications||{});
-    if(controle.reste && !await askConfirm({title:'Vérifier les articles avant impression',desc:`${controle.verifies} sur ${controle.selection} article(s) contrôlé(s). Vérifie la photo, le numéro et le bon compte avant de préparer les PDF. Cette action ne marque aucun colis expédié.`,ok:'Préparer quand même les PDF',cancel:'Revenir aux articles'})){setBatchBusy(false);libererOngletPdf();return;}
+    // (11 nov., Julien) Plus de confirmation « N sur M contrôlés » à chaque impression : le N° et la photo sont sur
+    // chaque ligne de la feuille ; `verifierContexte` refuse toujours un lot dont un article a changé.
     const echecs = [], faits = [];let documentPrepare=false;
     if(choisis)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,erreur:''}:x);
     setBatchBusy(true);setProgressionLot({etape:'lecture',fait:0,total:aImprimer.length});
@@ -47041,7 +47041,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {lot && (()=>{
                   const L = lot.lignes || lignesLotTous();
                   const nb=L.filter(l=>lot.coches.has(l.cle)).length;
-                  const controle=controlePreparation(L.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),lot.coches,lot.verifications||{});
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
                   return (
@@ -47049,25 +47048,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        titre, croix de 44 px, retour du navigateur) au lieu d'un calque fait main. */
                     <SheetShell onClose={()=>setLot(null)} maxWidth={560} z={9000} className="vrm-lot" data-noswipe="1" data-lot={L.length} aria-label="Bordereaux à imprimer"
                       titre={lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}>
-                        <>{lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont repris.</p>}</><div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
+                        {/* (11 nov., capture de Julien : « inadmissible ») La feuille dit l'essentiel, une fois : plus d'étapes
+                            « 1 · 2 · 3 », plus de récapitulatif qui redisait « 7 sélectionnés » quatre fois, plus de
+                            case « Contrôlé » par ligne ni de confirmation à chaque impression. Le N° et la photo de
+                            chaque ligne SONT la vérification ; le contexte (même compte, même N°, même état) reste
+                            vérifié au lancement (`verifierContexte`). */}
+                        {lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont repris.</p>}
                         {lot.erreur&&<p className="vrm-preparation-note" role="alert" data-lot-erreur="">{lot.erreur}</p>}
-                        <RecapSelection lignes={L} coches={lot.coches}/>
-                        <p className="vrm-preparation-note">Compare le N° et la photo avec l’article. « Contrôlé » ≠ expédié.</p>
                         {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
-                        <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 0',fontSize:12,color:C.muted,alignItems:'center'}} className="vrm-lot-outils">
-                          <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
-                          <span>Décocher ne supprime aucun bordereau.</span>
-                        </div>
+                        {L.length>1&&(()=>{ const cochables=L.filter(l=>l.cochable!==false); const tout=cochables.length>0&&cochables.every(l=>lot.coches.has(l.cle));
+                          return <div className="vrm-lot-outils" style={{display:'flex',gap:12,padding:'4px 0 8px',fontSize:13,color:C.muted,alignItems:'center',justifyContent:'space-between'}}>
+                            <span role="status" data-lot-selection={nb}>{nb} sur {L.length}</span>
+                            <Bouton variante="discret" disabled={batchBusy} data-lot-tout={tout?'decocher':'cocher'} onClick={()=>setLot(x=>({...x,coches:tout?new Set():new Set(cochables.map(l=>l.cle))}))}>{tout?'Tout décocher':'Tout sélectionner'}</Bouton>
+                          </div>; })()}
                         <div className="vrm-lot-liste" style={{padding:'4px 0'}}>
                           {L.map((l, il) => {
                             const o = l.e ? l.e.o : null, coche = lot.coches.has(l.cle);
                             const num = l.num || '';
                             const photo = l.photo || null;
-                            let emplacement='Emplacement non vérifié';
+                            let emplacement='';   // dit seulement quand il est CONNU (plus « non vérifié » sur chaque ligne)
                             if(num){try{const plan=load('vrm_room_plan',null),place=plan?ouEstNumero(normalizePlan(plan),num):null;if(place)emplacement=[place.roomName,place.itemName,place.nom].filter(Boolean).join(' · ');}catch(_){}}
-                            const verifie=lot.verifications?.[l.cle]===sigLigneLot(l);
                             // (3 nov.) Un en-tête par transporteur, dans l'ordre du PDF (celui des groupes de l'écran).
                             const ouvreT = il === 0 || L[il-1].trNom !== l.trNom;
                             return (
@@ -47079,15 +47079,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                 <span style={{flex:1,minWidth:0}}>
                                   <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{l.titre}</span>
                                   <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>
-                                    {l.sous}{l.site === 'vinted' ? ` · vendue le ${fmtD(o)}` : ''}
+                                    <span style={{display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.sous}{l.site === 'vinted' ? ` · ${fmtD(o)}` : ''}</span>
                                     {l.pdf === false && l.cochable !== false ? <b data-lot-sans-bordereau="1" style={{color:C.warn,fontWeight:600}}> · Sans bordereau</b> : null}
                                     {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
                                     {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
                                     {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
-                                    <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
+                                    {num ? (emplacement ? <span style={{display:'block',marginTop:2}} data-lot-emplacement="">{emplacement}</span> : null) : <span style={{display:'block',marginTop:2,color:C.warn,fontWeight:600}} data-lot-sans-num="">Sans N° : vérifie avec la photo</span>}
                                   </span>
                                 </span>
-                                {l.cochable === false ? <span className="vrm-preparation-controle" data-lot-ebay="1" style={{fontSize:12,color:C.muted,fontWeight:600}}>eBay</span> : <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>}
+                                {l.cochable === false ? <span className="vrm-preparation-controle" data-lot-ebay="1" style={{fontSize:12,color:C.muted,fontWeight:600}}>eBay</span> : null}
                               </div>
                               </React.Fragment>
                             );
