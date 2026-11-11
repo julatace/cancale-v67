@@ -18667,18 +18667,18 @@ function JourneeHorsLigne({ uid, tab }) {
   // (9 nov.) Le Stock hors connexion : l'inventaire contre la dernière liste gardée.
   if (tab === 'garage') return (
     <div data-hors-ligne="stock" style={{padding:'16px 14px 40px'}}>
-      <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>Stock</h2>
-      <LigneHorsLigne>Hors connexion : l’inventaire marche avec la dernière liste.</LigneHorsLigne>
+      <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{tr('nav.garage')}</h2>
+      <LigneHorsLigne>{tr('journee.horsConnexionInventaire')}</LigneHorsLigne>
       <BlocInventaireHorsLigne uid={uid}/>
     </div>
   );
   // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
   // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
-  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? 'Colis' : 'Ma journée'}</h2>;
+  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? 'Colis' : tr('reglages.ma-journee.lib')}</h2>;
   if (!photo) return (
     <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
       {titre}
-      <LigneHorsLigne>Hors connexion — aucune copie {colis ? 'de tes colis' : 'de ta journée'} ici ; elle se fera avec du réseau.</LigneHorsLigne>
+      <LigneHorsLigne>{tr('journee.horsConnexionAucune')} {colis ? tr('journee.colis') : tr('journee.journee')} {tr('journee.iciFeraAvec')}</LigneHorsLigne>
       <BlocCodesHorsLigne/>
       {!colis ? <div style={{marginTop:12}}><BlocInventaireHorsLigne uid={uid}/></div> : null}
     </div>
@@ -18702,35 +18702,35 @@ function JourneeHorsLigne({ uid, tab }) {
   const colisDepotHL = colisDepotHorsLigne(photo);
   const etatDepotHL = (c) => { const ef = c && c.tx ? gestes.etatFait({ tx: c.tx }) : ''; return ef === 'attente' ? 'attente' : ef === 'note' ? 'fait' : ''; };
   const blocEnvoyer = (<>
-    {tete('À déposer', photo.nEnvoyer)}
-    {colisDepotHL.some((c) => c.peutFaire) ? <div className="vrm-pas-a-pas-rangee" data-depot-rangee="hors-ligne"><Bouton variante="secondaire" icone="scan" data-depot-ouvrir="hors-ligne" onClick={() => setDepotHL(true)} style={{ minHeight: 44 }}>Je dépose</Bouton></div> : null}
+    {tete(tr('journee.deposer'), photo.nEnvoyer)}
+    {colisDepotHL.some((c) => c.peutFaire) ? <div className="vrm-pas-a-pas-rangee" data-depot-rangee="hors-ligne"><Bouton variante="secondaire" icone="scan" data-depot-ouvrir="hors-ligne" onClick={() => setDepotHL(true)} style={{ minHeight: 44 }}>{tr('journee.jeDepose')}</Bouton></div> : null}
     {depotHL ? <ModeDepot horsLigne vueA={photo.at} colis={colisDepotHL} etatDe={etatDepotHL}
       onDeposer={(c) => { if (c && c.tx && !etatDepotHL(c)) gestes.faire({ tx: c.tx }, true); }} onAnnuler={(c) => { if (c && c.tx) gestes.faire({ tx: c.tx }, false); }}
       onFermer={() => setDepotHL(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
     <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
       {photo.envoyer.length === 0
-        ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à envoyer à {quand}.</div>
+        ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>{tr('journee.aucunColisEnvoyer')} {quand}.</div>
         : photo.envoyer.map((e, i) => { const ef = gestes.etatFait(e); return (
           <div key={i} data-hl-colis="" data-hl-fait={ef || undefined} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderTop:i ? `1px solid ${C.border}` : 'none',flexWrap:'wrap'}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
+              <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || tr('journee.sansTitre')}</div>
               <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
             </div>
             {e.tx && Array.isArray(e.pdf) && e.pdf.length ? (pdfs[e.tx]
-              ? <a className="vrm-b vrm-b-secondaire vrm-b-petit" data-hl-pdf={e.tx} href={pdfs[e.tx]} target="_blank" rel="noopener" download={`bordereau${e.numero ? '-N' + e.numero : ''}.pdf`} style={{flexShrink:0}}>Bordereau</a>
-              : (pdfs[e.tx] === '' ? <span data-hl-pdf-absent={e.tx} style={{fontSize:12,color:C.muted,flexShrink:0}}>Bordereau pas gardé ici</span> : null)) : null}
+              ? <a className="vrm-b vrm-b-secondaire vrm-b-petit" data-hl-pdf={e.tx} href={pdfs[e.tx]} target="_blank" rel="noopener" download={`bordereau${e.numero ? '-N' + e.numero : ''}.pdf`} style={{flexShrink:0}}>{tr('journee.bordereau')}</a>
+              : (pdfs[e.tx] === '' ? <span data-hl-pdf-absent={e.tx} style={{fontSize:12,color:C.muted,flexShrink:0}}>{tr('journee.bordereauGardeIci')}</span> : null)) : null}
             <GesteHorsLigne etat={ef} libelle="Déposé" fait="Noté déposé" peut={!!e.tx} onOui={() => gestes.faire(e, true)} onNon={() => gestes.faire(e, false)} attrs={{ 'data-hl-fait-btn': '' }}/>
-            {!e.tx ? <span data-hl-sans-geste="" style={{flexBasis:'100%',fontSize:12,color:C.muted}}>{e.plateforme === 'ebay' ? 'eBay : le dépôt se suit dans eBay, au retour du réseau.' : 'Colis gardé sans son identité : « Déposé » attend le réseau.'}</span> : null}
+            {!e.tx ? <span data-hl-sans-geste="" style={{flexBasis:'100%',fontSize:12,color:C.muted}}>{e.plateforme === 'ebay' ? tr('journee.ebayDepotSuit') : tr('journee.colisGardeSans')}</span> : null}
           </div>); })}
-      {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
+      {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>{tr('journee.texte')} {photo.nEnvoyer - photo.envoyer.length} {tr('journee.autres')}</div>}
     </div>
     <RefusHorsLigne/>
   </>);
   const ligneRet = (r, i, extra = {}) => <LigneRetraitHorsLigne key={i} r={r} i={i} quand={quand} maintenant={maintenant} gestes={gestes} onEnGrand={setEnGrand} {...extra}/>;
   const blocAVerifier = (photo.nAVerifier || 0) > 0 ? (<>
-    {tete('À vérifier', photo.nAVerifier)}
+    {tete(tr('journee.verifier'), photo.nAVerifier)}
     <div data-hl-a-verifier={photo.nAVerifier} style={carte}>
-      <div style={{fontSize:12,color:C.muted,padding:'8px 0 4px',lineHeight:1.45}}>Sans doute {photo.nAVerifier > 1 ? 'repartis' : 'reparti'} chez le vendeur — pas comptés dans « à retirer ».{photo.aVerifier.length ? ` ${photo.aVerifier.length > 1 ? 'Ceux-ci ont' : 'Celui-ci a'} encore un code ou un QR : il est peut-être encore au relais.` : ''}</div>
+      <div style={{fontSize:12,color:C.muted,padding:'8px 0 4px',lineHeight:1.45}}>{tr('journee.sansDoute')} {photo.nAVerifier > 1 ? 'repartis' : 'reparti'} {tr('journee.chezVendeurComptes')}{photo.aVerifier.length ? tr('journee.ceuxCiOnt', { n: String(photo.aVerifier.length) }) : ''}</div>
       {photo.aVerifier.map((r, i) => ligneRet(r, i + 1, { verifier: true }))}
     </div>
   </>) : null;
@@ -18743,24 +18743,24 @@ function JourneeHorsLigne({ uid, tab }) {
       <div data-hors-ligne="colis" style={{padding:'16px 14px 40px'}}>
         {titre}
         <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
-        {tete('À retirer', photo.nRetirer)}
-        {photo.retirer.length ? <div className="vrm-pas-a-pas-rangee" data-relais-rangee="hors-ligne"><Bouton variante="secondaire" icone="qr" data-relais-ouvrir="photo" onClick={() => setRelaisHL(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
-        {relaisHL ? <ModeRelais Photo={PhotoVinted} horsLigne vueA={photo.at} colis={photo.retirer.map((r, i) => ({ cle: 'hl:' + (r.id || r.cle || r.tx || i), ident: r.id || '', titre: r.titre || (r.transporteur ? `Colis ${r.transporteur}` : 'Colis'), lieu: r.lieu || '', code: r.code || '',
+        {tete(tr('journee.retirer'), photo.nRetirer)}
+        {photo.retirer.length ? <div className="vrm-pas-a-pas-rangee" data-relais-rangee="hors-ligne"><Bouton variante="secondaire" icone="qr" data-relais-ouvrir="photo" onClick={() => setRelaisHL(true)} style={{ minHeight: 44 }}>{tr('journee.modeRelais')}</Bouton></div> : null}
+        {relaisHL ? <ModeRelais Photo={PhotoVinted} horsLigne vueA={photo.at} colis={photo.retirer.map((r, i) => ({ cle: 'hl:' + (r.id || r.cle || r.tx || i), ident: r.id || '', titre: r.titre || (r.transporteur ? tr('journee.colis2', { transporteur: String(r.transporteur) }) : 'Colis'), lieu: r.lieu || '', code: r.code || '',
             desaccord: r.desaccord || null, suivi: r.suivi || '', qr: /^data:image\//i.test(String(r.qr || '')) ? r.qr : '', sansQrHorsLigne: !!r.qr && !/^data:image\//i.test(String(r.qr || '')) }))}
           note={`Aucun colis à retirer à ${quand}.`} onFermer={() => setRelaisHL(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
         <div data-hl-retirer={photo.nRetirer}>
           {points.length === 0
-            ? <div style={{...carte,fontSize:13,color:C.muted,padding:'12px 14px'}}>Aucun colis à retirer à {quand}.</div>
+            ? <div style={{...carte,fontSize:13,color:C.muted,padding:'12px 14px'}}>{tr('journee.aucunColisRetirer')} {quand}.</div>
             : points.map((p, k) => (
               <div key={p.cle} data-hl-point={p.lieu || p.nom} style={carte}>
                 <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0 4px'}}>
                   <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="pin" size={15}/></span>
                   <span style={{fontSize:14,fontWeight:700,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</span>
-                  <span style={{marginLeft:'auto',fontSize:12,color:C.muted,flexShrink:0}}>{p.colis.length} colis</span>
+                  <span style={{marginLeft:'auto',fontSize:12,color:C.muted,flexShrink:0}}>{p.colis.length} {tr('journee.colis3')}</span>
                 </div>
                 {p.colis.map((r, i) => ligneRet(r, i + 1, { sansLieu: !!p.lieu }))}
               </div>))}
-          {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'0 2px 12px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
+          {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'0 2px 12px'}}>{tr('journee.texte')} {photo.nRetirer - photo.retirer.length} {tr('journee.autres')}</div>}
         </div>
         {blocAVerifier}
         {blocEnvoyer}
@@ -18774,9 +18774,9 @@ function JourneeHorsLigne({ uid, tab }) {
       <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
       {soir && soir.n > 0 && (
         <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-verif={soir.aVerifier} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,marginBottom:4}}>La liste du soir</div>
+          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,marginBottom:4}}>{tr('journee.listeSoir')}</div>
           <div style={{fontSize:15,color:C.text,lineHeight:1.45}}>
-            Demain : <b>{soir.n} colis</b> à poster{soir.enRetard || soir.aVerifier || soir.demain ? ' — ' : ''}
+            {tr('journee.demain')} <b>{soir.n} {tr('journee.colis3')}</b> {tr('journee.poster')}{soir.enRetard || soir.aVerifier || soir.demain ? ' — ' : ''}
             {[soir.enRetard ? `${soir.enRetard} déjà en retard` : '', soir.aVerifier ? `${soir.aVerifier} à vérifier sur Vinted (date estimée passée)` : '',
               soir.demain ? `${soir.demain} avec la date limite demain` : ''].filter(Boolean).join(', ')}.
           </div>
@@ -18784,20 +18784,20 @@ function JourneeHorsLigne({ uid, tab }) {
       )}
       {photo.nePasPoster > 0 && (
         <div data-hl-ne-pas-poster={photo.nePasPoster} style={{...carte,padding:'12px 14px',borderColor:`${C.warn}88`}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.text}}>Ne poste pas {photo.nePasPoster > 1 ? `ces ${photo.nePasPoster} colis eBay` : 'ce colis eBay'}</div>
-          <div style={{fontSize:13,color:C.muted,marginTop:2}}>L'acheteur a demandé l'annulation (à trancher dans eBay quand le réseau revient).</div>
+          <div style={{fontSize:15,fontWeight:700,color:C.text}}>{tr('journee.poste')} {photo.nePasPoster > 1 ? tr('journee.cesColisEbay', { nePasPoster: String(photo.nePasPoster) }) : tr('journee.colisEbay')}</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:2}}>{tr('journee.acheteurDemandeAnnulation')}</div>
         </div>
       )}
       {blocEnvoyer}
-      {tete('À retirer', photo.nRetirer)}
+      {tete(tr('journee.retirer'), photo.nRetirer)}
       {/* (revue du 23 oct.) Les mêmes colis que la tuile « À retirer » en ligne ;
           la date limite LUE (et elle seule) est dite. Les colis « à vérifier »
           ont leur bloc, en dessous, avec leur raison. */}
       <div data-hl-retirer={photo.nRetirer} style={carte}>
         {photo.retirer.length === 0
-          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à retirer à {quand}.</div>
+          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>{tr('journee.aucunColisRetirer')} {quand}.</div>
           : photo.retirer.map((r, i) => ligneRet(r, i))}
-        {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
+        {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>{tr('journee.texte')} {photo.nRetirer - photo.retirer.length} {tr('journee.autres')}</div>}
       </div>
       {blocAVerifier}
       <BlocInventaireHorsLigne uid={uid}/>
@@ -28156,7 +28156,7 @@ function JournalSemaineCarte({ liveStats }) {
         <div className="vrm-js-cases">
           {cases.map((c) => (
             <div key={c.cle} className="vrm-js-case" data-journal-case={c.cle} data-valeur={c.x.valeur == null ? '' : c.t === 'eur' ? String(Math.round(c.x.valeur * 100)) : String(c.x.valeur)} data-partiel={c.x.partiel ? '1' : undefined}
-              title={c.x.partiel && c.x.manque && c.x.manque.length ? `au moins — sans ${c.x.manque.join(', ')}` : c.x.valeur == null ? `${c.l} : pas su — ${sous(c)}` : undefined}>
+              title={c.x.partiel && c.x.manque && c.x.manque.length ? tr('journee.moinsSans', { x: String(c.x.manque.join(', ')) }) : c.x.valeur == null ? tr('journee.su', { l: String(c.l), sous: String(sous(c)) }) : undefined}>
               <span className="vrm-js-l">{c.l}</span>
               <b className={'vrm-js-v' + (c.x.valeur == null ? ' is-vide' : '')}>{corps(c)}</b>
               {sous(c) ? <small className="vrm-js-sous" data-carte-raison={c.x.valeur == null ? '' : undefined}>{sous(c)}</small> : null}
@@ -28251,7 +28251,7 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
   return (
     <div className="vrm-jv2-argent" data-jv2-argent="" data-jv2-periode={semaine ? 'semaine' : jSel.iso} data-jv2-choix={choix == null ? 'auto' : 'main'}
       data-fu-vendu-jour={vendu && vAuj != null ? String(Math.round(vAuj * 100)) : ''}>
-      <ol className="vrm-fu-semaine vrm-jv2-frise" aria-label="Les sept derniers jours" data-fu-semaine="">
+      <ol className="vrm-fu-semaine vrm-jv2-frise" aria-label={tr('journee.septDerniersJours')} data-fu-semaine="">
         {jours.map((j) => {
           const v = vJ(j), n = j.J.ventes.valeur;
           const choisi = !semaine && j.k === sel;
@@ -28269,27 +28269,27 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
       <div className="vrm-jv2-periode" key={semaine ? 'sem' : jSel.iso} data-jv2-panneau="" {...(semaine ? { 'data-journal-semaine': S.lundi } : {})}>
         <div className="vrm-jv2-quand">
           <span className="vrm-fu-surtitre vrm-jv2-nom" data-jv2-nom="">{nom}</span>
-          <button type="button" className="vrm-jv2-sem" aria-pressed={semaine} data-jv2-semaine={S.lundi} onClick={() => setChoix(semaine ? null : 'sem')}>{semaine ? 'Revenir aux jours' : S.titre}</button>
+          <button type="button" className="vrm-jv2-sem" aria-pressed={semaine} data-jv2-semaine={S.lundi} onClick={() => setChoix(semaine ? null : 'sem')}>{semaine ? tr('journee.revenirJours') : S.titre}</button>
           {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine en cours). */}
-          {onSemaine ? <button type="button" className="vrm-jv2-sem vrm-jv2-ma-semaine" data-ouvre-ma-semaine="" onClick={onSemaine}>Ma semaine <span aria-hidden="true">›</span></button> : null}
+          {onSemaine ? <button type="button" className="vrm-jv2-sem vrm-jv2-ma-semaine" data-ouvre-ma-semaine="" onClick={onSemaine}>{tr('ecran.semaine')} <span aria-hidden="true">›</span></button> : null}
         </div>
         <div className="vrm-jv2-corps">
           <div className="vrm-jv2-chiffre">
             {vSel == null
               ? <div className="vrm-fu-grand vrm-jv2-grand is-vide" data-jv2-vendu="">—</div>
               : vSel === 0
-                ? <div className="vrm-jv2-grand is-zero" data-jv2-vendu="0">Rien vendu</div>
-                : <div className="vrm-fu-grand vrm-jv2-grand" data-jv2-vendu={String(Math.round(vSel * 100))} data-partiel={J.vendu.partiel ? '1' : undefined}>{J.vendu.partiel ? <span className="vrm-fu-borne">au moins </span> : null}{montant(vSel)}</div>}
+                ? <div className="vrm-jv2-grand is-zero" data-jv2-vendu="0">{tr('journee.rienVendu')}</div>
+                : <div className="vrm-fu-grand vrm-jv2-grand" data-jv2-vendu={String(Math.round(vSel * 100))} data-partiel={J.vendu.partiel ? '1' : undefined}>{J.vendu.partiel ? <span className="vrm-fu-borne">{tr('journee.moins')} </span> : null}{montant(vSel)}</div>}
             <p className="vrm-jv2-faits">
               <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined}>{faitVentes}</span>
               {' '}
-              <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} title={verse.partiel && verse.manque && verse.manque.length ? `au moins — sans ${verse.manque.join(', ')}` : 'L’argent versé par tes sites ce jour-là (la date du versement)'}>{faitVerse}</span>
+              <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} title={verse.partiel && verse.manque && verse.manque.length ? tr('journee.moinsSans', { x: String(verse.manque.join(', ')) }) : tr('journee.argentVerseSites')}>{faitVerse}</span>
               {' '}
-              <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? `au moins — sans ${J.colis.manque.join(', ')}` : 'Les colis que tu as notés « Colis fait » ce jour-là'}>{faitColis}</span>
+              <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? tr('journee.moinsSans', { x: String(J.colis.manque.join(', ')) }) : tr('journee.colisAsNotes')}>{faitColis}</span>
             </p>
           </div>
           {photos.length && Photo
-            ? <button type="button" className="vrm-jv2-pile-bouton" data-jv2-pile={String(nPile)} data-sans-visionneuse="" aria-label={`Voir les ventes (${faitVentes})`} title="Voir dans Ventes" onClick={() => onVentes && onVentes()}>
+            ? <button type="button" className="vrm-jv2-pile-bouton" data-jv2-pile={String(nPile)} data-sans-visionneuse="" aria-label={tr('journee.voirVentes', { faitVentes: String(faitVentes) })} title={tr('journee.voirDansVentes')} onClick={() => onVentes && onVentes()}>
                 <PileVignettes className="vrm-jv2-pile" srcs={photos} n={nPile} Photo={Photo} mortes={mortes} onMorte={onMorte}/>
               </button>
             : null}
@@ -28301,11 +28301,11 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
 
 // ⟦→ ecrans/Stats.jsx #18⟧
 function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
- return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
-  <div className="vrm-day-head"><h3>Analyses des ventes</h3><Bouton variante="discret" onClick={()=>onNav?.('dashboard')}>Statistiques ›</Bouton></div>
+ return <section className="vrm-day-performance vrm-day-card" aria-label={tr('journee.performanceVentes')} style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
+  <div className="vrm-day-head"><h3>{tr('journee.analysesVentes')}</h3><Bouton variante="discret" onClick={()=>onNav?.('dashboard')}>{tr('journee.statistiques')}</Bouton></div>
   <RepartitionsVentes panelOff={panelOff} apercu/>
-  <div className="vrm-performance-chiffres"><div><span>Ventes ce mois</span><b>{partiel?'—':moisN}</b></div><div><span>Prix de vente moyen</span><b>{!partiel&&moisN?fmt(moisEur/moisN):'—'}</b></div></div>
-  {partiel&&<p style={{fontSize:11,color:C.muted}}>Lecture partielle : les indicateurs attendent les ventes manquantes.</p>}
+  <div className="vrm-performance-chiffres"><div><span>{tr('journee.ventesMois')}</span><b>{partiel?'—':moisN}</b></div><div><span>{tr('journee.prixVenteMoyen')}</span><b>{!partiel&&moisN?fmt(moisEur/moisN):'—'}</b></div></div>
+  {partiel&&<p style={{fontSize:11,color:C.muted}}>{tr('journee.lecturePartielleIndicateurs')}</p>}
  </section>;
 }
 function RepartitionsVentes({ panelOff, apercu = false }) {
@@ -28611,8 +28611,8 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   const avecNet = CB.valeur != null;
   const valeur = CB.valeur;
   let sous = null;
-  if (!B) sous = etat === 'encours' ? 'je le lis…' : <button type="button" className="vrm-jc-geste-neutre" onClick={() => { if (onNav) onNav('cat_ventes'); }}>se calcule dans l'écran Ventes ›</button>;
-  else if (B.nCout < B.n) sous = <>{B.nCout} sur {B.n} · <button type="button" className="vrm-jc-geste" data-journee-benef-porte="" onClick={versSaisiePrix}>{sansAchat} prix d'achat ›</button></>;
+  if (!B) sous = etat === 'encours' ? 'je le lis…' : <button type="button" className="vrm-jc-geste-neutre" onClick={() => { if (onNav) onNav('cat_ventes'); }}>{tr('journee.calculeDansEcran')}</button>;
+  else if (B.nCout < B.n) sous = <>{B.nCout} {tr('journee.texte2')} {B.n} · <button type="button" className="vrm-jc-geste" data-journee-benef-porte="" onClick={versSaisiePrix}>{sansAchat} {tr('journee.prixAchat')}</button></>;
   else if (!avecNet && B.raison === 'frais') sous = 'frais eBay inconnus';
   else if (!avecNet && B.raison === 'cotisations') sous = 'CA déclaré en attente';
   else if (!avecNet && B.raison === 'rien') sous = 'aucune vente ce mois-ci';
@@ -28645,7 +28645,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
           widgets ; on le remet par « + Ajouter » (feuille des widgets). */}
       {edition && (
         <div style={{ marginTop: 8 }}>
-          <Bouton variante="secondaire" className="vrm-b-petit" data-journee-benef-masquer="" onClick={() => poser(false)}>Masquer le bénéfice</Bouton>
+          <Bouton variante="secondaire" className="vrm-b-petit" data-journee-benef-masquer="" onClick={() => poser(false)}>{tr('journee.masquerBenefice')}</Bouton>
         </div>
       )}
     </>
@@ -28656,7 +28656,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
     <button type="button" className="vrm-fu-case is-jour" data-fu-case="benefice" data-journee-benef-detail="" title={titre} {...attrs} onClick={allerCompta}>
       {/* (3 nov.) La règle de main (src/beneficeNoms.js) : « Bénéfice » = la notion de Compta,
           « — » quand elle dit « pas su » (jamais un brut partiel, jamais « ≥ »). */}
-      <span>{NOM_BENEFICE} du mois</span>
+      <span>{NOM_BENEFICE} {tr('journee.mois')}</span>
       <b className={valeur == null ? 'is-vide' : undefined} style={{ '--nc': valeur == null ? 1 : Math.round(valeur).toLocaleString('fr-FR').length + 2 }} data-journee-benef-ligne="net">{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
     </button>
   );
@@ -29172,8 +29172,8 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
     <>
       {edition && (
         <div className="vrm-w-outils" data-widgets-outils="" data-noswipe="1" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: C.shadow || 'none' }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.muted, lineHeight: 1.35 }}>Glisse pour déplacer · − pour retirer</span>
-          <Bouton variante="secondaire" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ flexShrink: 0 }}>+ Ajouter</Bouton>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.muted, lineHeight: 1.35 }}>{tr('journee.glisseDeplacerRetirer')}</span>
+          <Bouton variante="secondaire" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ flexShrink: 0 }}>{tr('journee.ajouter')}</Bouton>
           <Bouton variante="primaire" data-widgets-ok="" onClick={() => { finirTire(false); setEdition(false); }} style={{ flexShrink: 0 }}>OK</Bouton>
         </div>
       )}
@@ -29196,17 +29196,17 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
                   {corps || (
                     <div className="vrm-day-card vrm-w-vide" style={{ border: `1px dashed ${C.border}`, background: C.card, color: C.muted }}>
                       <span style={{ fontWeight: 600, color: C.text }}>{d.nom}</span>
-                      <span style={{ fontSize: 12 }}>Rien à montrer pour l'instant</span>
+                      <span style={{ fontSize: 12 }}>{tr('journee.rienMontrerInstant')}</span>
                     </div>
                   )}
                 </div>
                 {edition && !d.fixe && (
-                  <button type="button" className="vrm-w-retirer" data-widget-retirer={w.id} aria-label={`Retirer ${d.nom}`} onClick={() => retirer(w.id)}>
+                  <button type="button" className="vrm-w-retirer" data-widget-retirer={w.id} aria-label={tr('journee.retirer2', { nom: String(d.nom) })} onClick={() => retirer(w.id)}>
                     <span aria-hidden="true" style={{ background: C.text, color: C.bg }}>−</span>
                   </button>
                 )}
                 {edition && d.tailles.length > 1 && (
-                  <button type="button" className="vrm-w-taille" data-widget-taille-btn={w.id} aria-label={`Largeur de ${d.nom} : ${NOM_TAILLE[w.t]} — changer`} onClick={() => changerTaille(w.id)}
+                  <button type="button" className="vrm-w-taille" data-widget-taille-btn={w.id} aria-label={tr('journee.largeurChanger', { nom: String(d.nom), x: String(NOM_TAILLE[w.t]) })} onClick={() => changerTaille(w.id)}
                     style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>{NOM_TAILLE[w.t]}</button>
                 )}
               </div>
@@ -29220,7 +29220,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
           l'iPhone. Un seul des deux se voit à une largeur donnée. */}
       {!edition && peutModifier && (
         <div className="vrm-w-modifier-bas">
-          <Bouton variante="discret" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label="Modifier les widgets de Ma journée" onClick={() => setEdition(true)}>Modifier l'écran</Bouton>
+          <Bouton variante="discret" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label={tr('journee.modifierWidgetsMa')} onClick={() => setEdition(true)}>{tr('journee.modifierEcran')}</Bouton>
         </div>
       )}
       {ajout && (
@@ -41807,7 +41807,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // icône, nombre, deux mots — et plus quatre cartes de texte. La liste en
         // dessous ne garde que les vraies alertes (double vente, colis cochés
         // non partis, litige, emails mis de côté).
-        const tuiles = { envoyer: { n: 0, sub: 'Aucun colis à envoyer' }, retirer: { n: 0, sub: 'Aucun colis à retirer' }, messages: null, prix: null };
+        const tuiles = { envoyer: { n: 0, sub: tr('journee.aucunColisEnvoyer2') }, retirer: { n: 0, sub: tr('journee.aucunColisRetirer2') }, messages: null, prix: null };
         // ⚠️ LA PREMIÈRE CHOSE QU'IL VOIT DOIT DIRE CE QU'IL PEUT FAIRE TOUT
         // DE SUITE. Mesuré le 7 septembre : 15 colis à expédier, dont **10 dont
         // le bordereau est déjà en base** — et la carte disait seulement
@@ -41839,11 +41839,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (1er nov.) LE MODE EMBALLAGE, d'ici : il s'ouvre sur Colis, sur les
           // colis de la colonne « Prêts à imprimer », dans son ordre.
           if (pretsImpr > 0) jobs.push({ id:'emballer', n:pretsImpr, icon:'box', color:C.text,
-            title:'Emballer les colis prêts', sub:`${combien} — un par un : le N°, la photo, où est la paire`,
+            title:tr('journee.emballerColisPrets'), sub:tr('journee.photoPaire', { combien: String(combien) }),
             action:'Emballer', tab:'cat_bord', prio:1, avant:()=>{ DEMANDE_EMBALLAGE.at = Date.now(); } });
           // (1er nov., « très répétitif ») Le même geste porté par la case « À envoyer »
           // quand elle se voit : la ligne d'« À faire » n'est alors plus redite (§7).
-          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: `${combien} — un par un : le N°, la photo, où est la paire` };
+          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: tr('journee.photoPaire', { combien: String(combien) }) };
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
         // même règle que Colis (`colisEb`, §11). L'étiquette se prend dans eBay
@@ -41855,7 +41855,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ? { ...tuiles.envoyer, n: toShip.length + nE, sub: `${tuiles.envoyer.sub} · ${dit}`, alerte: tuiles.envoyer.alerte || lateE > 0, ebay: nE }
             : { n: nE, sub: dit, alerte: lateE > 0, ebay: nE };
         } else if (colisEb === null) {
-          tuiles.envoyer = { ...tuiles.envoyer, ebay: null, sub: `${tuiles.envoyer.n ? tuiles.envoyer.sub + ' · ' : ''}ventes eBay pas lues` };
+          tuiles.envoyer = { ...tuiles.envoyer, ebay: null, sub: tr('journee.ventesEbayLues', { x: String(tuiles.envoyer.n ? tuiles.envoyer.sub + ' · ' : '') }) };
         } else if (colisEb) tuiles.envoyer = { ...tuiles.envoyer, ebay: 0 };
         // (1er nov., audit A4) LES COLIS LEBONCOIN ET VESTIAIRE À POSTER comptent
         // aussi — la règle de Colis (`colisAutres`), le nombre de la cloche et du
@@ -41877,7 +41877,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb = colisEb.nePasPoster.length;
           jobs.push({ id:'ebay-ne-pas-poster', n:nb, icon:'alert', color:C.warn, urgent:true,
             title:`Ne poste pas ${nb>1?`ces ${nb} colis eBay`:'ce colis eBay'}`,
-            sub:`Annulation demandée — réponds dans eBay → À traiter`,
+            sub:tr('journee.annulationDemandeeReponds'),
             tab:'cat_bord', prio:0.1 });
         }
         // ── (22 oct.) L'HEURE LIMITE DU COLIS LE PLUS PRESSÉ, SUR SA LIGNE ──
@@ -41922,7 +41922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb=cochesNonPartis.length, pl=nb>1?'s':'';
           const limite=cochesNonPartis.some(x=>x.limiteDepassee);
           jobs.push({id:'poste-sans-depart',n:nb,icon:'truck',color:C.warn,urgent:limite,  // ambre : le rouge est pour deux paires sous un N° (§7)
-            title:`Vérifier ${nb} colis coché${pl} « posté »`,
+            title:tr('journee.verifierColisCoche', { nb: String(nb), pl: String(pl) }),
             sub:`${nb>1?'Vinted ne les a pas vus':"Vinted ne l'a pas vu"} partir${limite?', date limite passée':''} — vérifie le dépôt`,
             tab:'cat_bord',prio:limite?0.2:1.5,
             photos:cochesNonPartis.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
@@ -41935,7 +41935,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(conflitsNum.length){
           const nb=conflitsNum.length;
           jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.doublon,urgent:true,
-            title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
+            title:tr('journee.numerosPortesDeux', { n: String(nb) }),
             sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige avant d'expédier`,
             tab:'cat_bord',prio:0.05});
         }
@@ -41985,7 +41985,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    (le bordereau de retour se fait sur CELUI-LÀ).
         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
-            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,photos:ar.map(o=>orderPhoto(o)),title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
+            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,photos:ar.map(o=>orderPhoto(o)),title:tr('journee.renvoyerArticlesLitige', { n: String(ar.length) }),
               sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'achats',prio:0.8}); } }
         // (3 nov.) LITIGES, RETOURS, RÉCLAMATIONS EN COURS (src/litiges.js) : une carte
         // par IDENTITÉ (transaction, conversation, retour eBay), la date limite seulement
@@ -42013,11 +42013,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const proche = prem.limiteMs!=null && prem.limiteMs-Date.now() < 24*3600000;
           jobs.push({id:'a-confirmer',n:nb,icon:'check',color:C.warn,urgent:proche,  // ambre : le rouge est pour deux paires sous un N° (§7)
            
-            title:`${nb} ${motAConfirmer(l)} à confirmer avant le ${texteLimite(prem)}`,
+            title:tr('journee.confirmerAvant', { nb: String(nb), motAConfirmer: String(motAConfirmer(l)), texteLimite: String(texteLimite(prem)) }),
             sub:`Sur Vinted : « Tout est OK » dans la conversation${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
             tab:'retraits',prio:proche?0.15:0.7});
         }
-        tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
+        tuiles.messages = { n: unread, sub: unread ? tr('journee.conversationsNonLues', { n: String(unread) }) : tr('journee.aucunMessageRecent') };
         // (21 octobre) LES MESSAGES eBAY SANS RÉPONSE, à côté de ceux de Vinted —
         // de TOUS ses comptes eBay actifs (le résumé rangé par la route, aucun
         // appel à eBay ici). Pas su ⇒ jamais « 0 » : la case le dit, et une ligne
@@ -42032,11 +42032,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const seul = avecMsg.length === 1 ? avecMsg[0].ref : null;
             jobs.push({ id:'messages-ebay', n:nE, icon:'chat', color:C.text,
               title:`${ebayMsg.auMoins ? 'Au moins ' : ''}${nE} message${nE>1?'s':''} eBay sans réponse`,
-              sub: ebayMsg.plusieurs && avecMsg.length ? `${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay` : 'Réponds dans eBay → Messages',
+              sub: ebayMsg.plusieurs && avecMsg.length ? `${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay` : tr('journee.repondsDansEbay'),
               tab:'ebay_messages', avant:()=>{ DEMANDE_EBAY_MSG.compte = seul; DEMANDE_EBAY_MSG.at = Date.now(); }, prio:2 });
           }
         } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
-          tuiles.messages = { ...tuiles.messages, ebay: null, sub: `${tuiles.messages.sub} · messages eBay pas lus` };
+          tuiles.messages = { ...tuiles.messages, ebay: null, sub: tr('journee.messagesEbayLus', { sub: String(tuiles.messages.sub) }) };
         }
         // (27 oct., 5.240) VESTIAIRE : ventes à envoyer, messages non lus — la
         //    règle de Colis (`colisVestiaire`, §11). Jamais rien sur « pas su ».
@@ -42045,13 +42045,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const n = vc.aEnvoyer.length, j = vc.aEnvoyer.map((v) => joursAvantVc(v.limite)).filter((x) => x != null);
             const presse = j.length && Math.min(...j) <= 1;
             jobs.push({ id: 'vestiaire-envoyer', n, icon: 'box', color: presse ? C.warn : C.text, urgent: !!presse, photos: vc.aEnvoyer.map((v) => v && v.photo),
-              title: `${n} vente${n > 1 ? 's' : ''} Vestiaire à envoyer`,
-              sub: presse ? (Math.min(...j) < 0 ? 'Date limite passée — bordereau sur Vestiaire' : 'À envoyer d’ici demain — bordereau sur Vestiaire') : 'Le bordereau se prend sur Vestiaire',
+              title: tr('journee.ventesVestiaireEnvoyer', { n: String(n) }),
+              sub: presse ? (Math.min(...j) < 0 ? tr('journee.dateLimitePassee') : tr('journee.envoyerIciDemain')) : tr('journee.bordereauPrendVestiaire'),
               tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
           }
           if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
-            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'plat_vestiaire', prio: 2.1 }); }
-        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
+            title: tr('journee.messagesVestiaireNon', { n: String(vc.messages) }), sub: tr('journee.repondsVestiaire'), tab: 'plat_vestiaire', prio: 2.1 }); }
+        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? tr('journee.pairesVuesMais') : tr('journee.aucunePaireBaisser') };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
         //    ligne tant qu'il y en a, avec le geste : déclarer ses adresses.
@@ -42097,14 +42097,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const lateV = jobs.some(j => j.id === 'colis-limite') ? 0 : late;
           const nl = lateV + lateE;
           if (nl > 0) jobs.push({ id:'colis-en-retard', n:nl, icon:'truck', color:C.warn, urgent:true,
-            title: lateV ? `${nl} colis en retard` : `${nl} colis eBay en retard`,
+            title: lateV ? tr('journee.colisRetard', { nl: String(nl) }) : tr('journee.colisEbayRetard', { nl: String(nl) }),
             sub:`Date limite passée${lateV && lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
             tab:'cat_bord', prio:0.15 });
         }
         if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.urgents && tracking !== null) {
           const hd = pickupUnion.urgents, lx = pickupUnion.lieux || [];
           jobs.push({ id:'retrait-dernier-jour', n:hd, icon:'box', color:C.warn, urgent:true,
-            title:`${hd} colis à retirer aujourd'hui ou demain`,
+            title:tr('journee.colisRetirerAujourd', { hd: String(hd) }),
             sub:`Dernier délai, sinon il repart — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
             tab:'retraits', prio:0.15 });
         }
@@ -42148,7 +42148,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const raisonsSansN = [nD ? pl(nD, 'délai dépassé', 'délais dépassés') : '', nT ? pl(nT, 'incident', 'incidents') : '', nc ? `pas encore ${pl(nc, 'relié', 'reliés')}` : ''].filter(Boolean).join(' · ');
           jobs.push({ id: nv ? 'retrait-a-verifier' : 'retrait-en-verification', n: nv || nc, nRelier: nc, icon:'box', color: nv ? C.warn : C.muted, detailSansN: raisonsSansN,
             photos: [...av.map(x => x && x.o ? orderPhoto(x.o) : null), ...(pickupUnion.aConfirmer || []).map(o => orderPhoto(o))],
-            title: `${nv + nc} colis à vérifier`, court: 'Colis à vérifier', detail: raisons, plein: long,
+            title: tr('journee.colisVerifier', { x: String(nv + nc) }), court: tr('journee.colisVerifier2'), detail: raisons, plein: long,
             tab:'retraits', prio:0.6 });
         }
         // (1er nov., « très répétitif ») LE MÊME NOMBRE UNE FOIS (§7). Quand la case
@@ -42176,7 +42176,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (src/cycleArticle.js), avec ses trois réponses. Rien sur « pas su ».
         if (cycle && Array.isArray(cycle.cartes)) for (const c of cycle.cartes) {
           if (cycleRepondus[c.id]) continue;
-          jobs.push({ id: 'supprime-vinted', cycle: c, icon: 'tag', color: C.text, court: `N°${c.numero} supprimé de Vinted`, detail: enArticles(String(c.title || '').slice(0, 80)), title: `N°${c.numero} supprimé de Vinted`, sub: c.title, photos: c.photo ? [c.photo] : null, prio: 0.8 });
+          jobs.push({ id: 'supprime-vinted', cycle: c, icon: 'tag', color: C.text, court: tr('journee.supprimeVinted', { numero: String(c.numero) }), detail: enArticles(String(c.title || '').slice(0, 80)), title: tr('journee.supprimeVinted', { numero: String(c.numero) }), sub: c.title, photos: c.photo ? [c.photo] : null, prio: 0.8 });
         }
         // (6 nov., vague 2 · point 1) Les ventes annulées AVANT l'envoi (paire chez lui), dites
         // UNE fois : « Voir » ouvre Ventes · Vinted sur « Annulées », où chaque vente porte son
@@ -42190,7 +42190,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // VRM sans prix d'achat (même liste : en ligne, numérotée, ni prix ni achat) : une seule
         // carte, qui le dit ; la file porte « Saisie en série » (la porte du chiffre faux, §5).
         { const nR = fileAchat ? aRelierJournee(fileAchat) : 0;
-          if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: `${nR} annonce${nR > 1 ? 's' : ''} numérotée${nR > 1 ? 's' : ''} sans prix d’achat`, detail: 'Saisis le prix ou relie l’achat (une suggestion par annonce, ou la saisie en série)', title: `${nR} annonce${nR > 1 ? 's' : ''} numérotée${nR > 1 ? 's' : ''} sans prix d’achat`, tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
+          if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: tr('journee.annoncesNumeroteesSans', { n: String(nR) }), detail: tr('journee.saisisPrixRelie'), title: tr('journee.annoncesNumeroteesSans', { n: String(nR) }), tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
         // (9 nov., « vendre plus » — retenu le 11 oct. : « plan des paires qui dorment ») Les
         // articles EN LIGNE depuis au moins le seuil choisi dans Annonces (30/60/90 j), comptés
         // par la règle du stock qui dort (`stockQuiDort`, la base de la grille). Seulement
@@ -42200,19 +42200,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const cD = datesOkJ ? cartePairesQuiDorment(stockDort, seuilDort) : null;
           if (cD) { const mA = motsArticle(vendActuel()); const nom = cD.n > 1 ? mA.noms : mA.nom;
             const court = `${cD.partiel ? 'Au moins ' : ''}${cD.n} ${nom} en ligne depuis ${cD.seuil}\u00a0j ou plus`;
-            jobs.push({ id: 'paires-dorment', n: cD.n, icon: 'sleep', color: C.text, court, detail: 'Republier, préparer ailleurs ou changer le prix toi-même : tu choisis, rien ne part seul', title: court, tab: 'cat_annonces', prio: 3.6, avant: () => demanderVue('dorment') }); } }
+            jobs.push({ id: 'paires-dorment', n: cD.n, icon: 'sleep', color: C.text, court, detail: tr('journee.republierPreparerAilleurs'), title: court, tab: 'cat_annonces', prio: 3.6, avant: () => demanderVue('dorment') }); } }
         // (6 nov.) UN INVENTAIRE DU STOCK EN COURS (src/inventaire.js, sa ligne
         // `vrm_inventaire`) : « Reprendre » ouvre le Stock sur l'inventaire. Neutre :
         // rien ne presse, c'est lui qui l'a commencé.
         if (inventaireJournee) {
           const nI = inventaireJournee.n;
-          jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: 'Inventaire en cours', detail: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, title: 'Inventaire en cours', sub: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
+          jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: tr('journee.inventaireCours'), detail: tr('journee.vusReprendsT', { n: String(nI) }), title: tr('journee.inventaireCours'), sub: tr('journee.vusReprendsT', { n: String(nI) }), tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
         }
         // (11 nov.) « CLÔTURER L'ANNÉE » : en décembre et janvier, UNE fois (src/clotureAnnee.js) —
         // « Voir » ouvre Argent → Déclarer sur la liste, et note l'année vue (SON clic). Neutre.
         { const cj = carteJourneeCloture({ maintenant: Date.now(), cloture: load(CLE_CLOTURE, {}), vue: load(CLE_CLOTURE_VUE, {}), regime: isCloudReady() ? regimeFiscal() : undefined });
           if (cj) { const court = `Clôturer ${cj.annee}`;
-            jobs.push({ id: 'cloture-annee', icon: 'doc', color: C.text, court, detail: 'Une liste guidée : ventes à dater, inventaire, chiffre d’affaires, URSSAF, impôts, export', title: court, tab: 'argent_declarer', prio: 3.4, action: 'Voir',
+            jobs.push({ id: 'cloture-annee', icon: 'doc', color: C.text, court, detail: tr('journee.listeGuideeVentes'), title: court, tab: 'argent_declarer', prio: 3.4, action: 'Voir',
               avant: () => { DEMANDE_CLOTURE.at = Date.now(); const v = load(CLE_CLOTURE_VUE, {}); save(CLE_CLOTURE_VUE, { ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}), [String(cj.annee)]: Date.now() }); } }); } }
         // (10 nov., lot N) L'ATELIER (Organisation) : des paires qui attendent > 7 j à une étape — ambre.
         if (atelierJournee) jobs.push({ id: 'atelier-attente', n: atelierJournee.n, icon: 'box', color: C.warn, court: atelierJournee.court, detail: atelierJournee.detail || null, title: atelierJournee.court, tab: 'organisation', prio: 2.45 });
@@ -42373,7 +42373,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .concat(((colisEb && colisEb.aPoster) || []).map(x => ({ cle: 'e:' + x.compte + ':' + x.orderId, num: x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '', titre: x.titre || '', transporteur: '', jours: Number.isFinite(x.jours) ? x.jours : null, site: 'ebay' })))
               // (1er nov., audit A4) Leboncoin et Vestiaire : les colis de la case « À envoyer ».
               .concat((colisAutres.leboncoin || []).map(x => ({ cle: 'l:' + x.txId, num: '', titre: x.titre || '', transporteur: '', jours: null, site: 'leboncoin' })))
-              .concat((colisAutres.vestiaire || []).map(x => ({ cle: 'vc:' + x.id, num: x.num || '', titre: 'Vente Vestiaire', transporteur: x.transporteur || '', jours: Number.isFinite(x.jours) ? x.jours : null, site: 'vestiaire' })))
+              .concat((colisAutres.vestiaire || []).map(x => ({ cle: 'vc:' + x.id, num: x.num || '', titre: tr('journee.venteVestiaire'), transporteur: x.transporteur || '', jours: Number.isFinite(x.jours) ? x.jours : null, site: 'vestiaire' })))
               .sort((a, b) => (a.jours == null ? 9999 : a.jours) - (b.jours == null ? 9999 : b.jours));
             const colRet = colonnesColis(cartesColis(), 'toutes').colonnes.find(c => c.cle === 'retirer');
             const pointsVinted = ((dropOffs && dropOffs.carriers) || []).flatMap(c => c.points || []);
@@ -42523,15 +42523,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
               {corpsTache(j, x)}
             </button>
-            <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" title="Supprimer de Leboncoin" aria-label="Supprimer de Leboncoin" data-lbc-supprimer-journee={j.lbcSuppr.map((r) => r.id).join(' ')} disabled={!!lbcSupprEnVol} onClick={() => supprimerLbcJournee(j.lbcSuppr)}>
-              {lbcSupprEnVol ? '…' : 'Supprimer'}
+            <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" title={tr('journee.supprimerLeboncoin')} aria-label={tr('journee.supprimerLeboncoin')} data-lbc-supprimer-journee={j.lbcSuppr.map((r) => r.id).join(' ')} disabled={!!lbcSupprEnVol} onClick={() => supprimerLbcJournee(j.lbcSuppr)}>
+              {lbcSupprEnVol ? '…' : tr('journee.supprimer')}
             </Bouton>
           </div>
         ); };
         // (3 nov.) Une carte de litige : la carte ouvre la vente (ou l'achat) par sa
         // transaction ; la pilule ouvre le site (son clic, jamais une action de VRM).
         const tacheLitige = (j, i) => { const l = j.litige; const x = decouper(j); const plein = [x.court, x.detail, x.plein].filter(Boolean).join('\n');
-          const mot = { probleme: 'Répondre', annulation: 'Trancher', retour: l.sens === 'achat' ? 'Renvoyer' : 'Suivre', suspendue: 'Voir' }[l.genre] || 'Voir';
+          const mot = { probleme: tr('journee.repondre'), annulation: tr('journee.trancher'), retour: l.sens === 'achat' ? 'Renvoyer' : 'Suivre', suspendue: 'Voir' }[l.genre] || 'Voir';
           return (
           <div className={'vrm-day-task is-groupe' + (j.urgent ? ' is-urgent' : '')} key={'litige' + l.cle + i} role="group" data-job="litige" data-litige={l.cle} data-litige-genre={l.genre} data-litige-sens={l.sens}
             data-litige-limite={l.limite || ''} data-litige-num={l.num || ''} data-litige-source={l.source} title={plein}>
@@ -42551,7 +42551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {(() => { const lib = j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'; return (
             <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" title={lib} aria-label={lib} data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}>
               {/* (3 nov., critique #11) Le même gabarit que les autres lignes : « Noter » en pilule à droite ; la phrase entière en infobulle. */}
-              Noter
+              {tr('journee.noter')}
             </Bouton>); })()}
           </div>
         ); };
@@ -42572,9 +42572,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (x.pasSu || !x.t) return null;
           if (x.id === 'envoyer' && x.t.presses && !x.t.presses.urgent) {
             const p = x.t.presses;
-            return p.nAuj > 0 ? { texte: `dont ${p.nAuj} aujourd'hui`, ambre: true, cle: 'presses' } : { texte: `dont ${p.n} demain`, ambre: false, cle: 'presses' };
+            return p.nAuj > 0 ? { texte: tr('journee.dontAujourdHui', { nAuj: String(p.nAuj) }), ambre: true, cle: 'presses' } : { texte: tr('journee.dontDemain', { x: String(p.n) }), ambre: false, cle: 'presses' };
           }
-          if (x.id === 'retirer' && x.t.aVerifier > 0) return { texte: `+ ${x.t.aVerifier} à vérifier`, ambre: true, cle: 'a-verifier' };
+          if (x.id === 'retirer' && x.t.aVerifier > 0) return { texte: tr('journee.verifier2', { aVerifier: String(x.t.aVerifier) }), ambre: true, cle: 'a-verifier' };
           return null;
         };
         const titreCase = (x) => x.pasSu ? (x.titrePasSu || 'Pas encore lu') : [x.t && x.t.sub, x.t && x.t.presses && !x.t.presses.urgent ? x.t.presses.phrase : ''].filter(Boolean).join(' · ');
@@ -42584,7 +42584,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <Bouton variante="secondaire" icone="box" className="vrm-b-petit vrm-day-case-geste" data-job="emballer" data-n={e.n} title={e.phrase}
               onClick={()=>{ DEMANDE_EMBALLAGE.at = Date.now(); if (onNav) onNav('cat_bord'); }}>
-              {/* (6 nov., audit des chiffres) `e.n` = « à imprimer » : le nombre n'est pas redit ici */}Emballer
+              {/* (6 nov., audit des chiffres) `e.n` = « à imprimer » : le nombre n'est pas redit ici */}{tr('journee.emballer')}
             </Bouton>
           );
         };
@@ -42620,7 +42620,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ) : null;
         W.afaire = (!loading && jobsAFaire.length>0) ? (
           <div>
-            <div className="vrm-label vrm-day-section vrm-w-etiquette" style={{color:C.muted}}>À faire</div>
+            <div className="vrm-label vrm-day-section vrm-w-etiquette" style={{color:C.muted}}>{tr('journee.faire')}</div>
             {listeTaches(jobsAFaire, {})}
           </div>
         ) : null;
@@ -42638,8 +42638,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         W.vendu = vuHero ? (
           <div className="vrm-day-money vrm-day-card vrm-jc" style={{border:`1px solid ${C.border}`,background:C.card}}>
             <div className="vrm-day-head">
-              <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {libMois}</span>
-              <Bouton variante="discret" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')}>Mes ventes ›</Bouton>
+              <span className="vrm-day-k" style={{color:C.muted}}>{tr('journee.vendu')} {libMois}</span>
+              <Bouton variante="discret" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')}>{tr('journee.mesVentes')}</Bouton>
             </div>
             {/* (16 oct.) « Rien lu » ne vaut pas « 0 € » (§5) : si AUCUN compte
                 n'a pu être lu, le chiffre est « — » ; si une partie seulement,
@@ -42647,32 +42647,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {(() => { const actifs = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length; const toutKO = actifs>0 && nomsVentesKO.length>=actifs && moisN===0; const partiel = !toutKO && (nomsVentesKO.length>0 || !!phraseNcMois); return (<>
             <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} data-vendu-non-comptees={ncMois.length || undefined} className="vrm-day-hero-n vrm-jc-hero" title={partiel ? [nomsVentesKO.length ? `Sans ${nomsVentesKO.join(', ')} (ventes pas lues)` : '', phraseNcMois ? `Pas dans ce montant : ${phraseNcMois}` : ''].filter(Boolean).join('. ') : undefined}>{toutKO ? <span className="vrm-jc-montant vrm-jc-vide">—</span> : <CountUpEuro value={moisEur} petitEuro/>}</div>
             {toutKO
-              ? <div data-vendu-manque="" className="vrm-jc-sous">Tes ventes n'ont pas pu être lues — ce n'est pas zéro.</div>
-              : <div className="vrm-jc-sous">{partiel ? 'au moins · ' : ''}{moisN} vente{moisN>1?'s':''}{jourN>0 && <> · <span data-vendu-jour={Math.round(jourEur*100)}>{jourN} aujourd'hui</span></>}{ncMois.length ? <> · <span data-vendu-manque-phrase="" title={phraseNcMois}>{ncMois.length} non comptée{ncMois.length>1?'s':''}</span></> : null}</div>}
+              ? <div data-vendu-manque="" className="vrm-jc-sous">{tr('journee.ventesOntPu')}</div>
+              : <div className="vrm-jc-sous">{partiel ? tr('journee.moins2') : ''}{moisN} {tr('journee.vente')}{moisN>1?'s':''}{jourN>0 && <> · <span data-vendu-jour={Math.round(jourEur*100)}>{jourN} {tr('commun.aujourdhui')}</span></>}{ncMois.length ? <> · <span data-vendu-manque-phrase="" title={phraseNcMois}>{ncMois.length} {tr('journee.nonComptee')}{ncMois.length>1?'s':''}</span></> : null}</div>}
             </>); })()}
             {/* (2 nov., Fusion) Le bénéfice est dans la tête sombre : plus redit ici (§7). */}
             <div className="vrm-jc-rangee">
               <div className="vrm-jc-cell" data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} data-recu-non-comptees={recuNonComptees.length || undefined}
                 title={`Reçu en ${libMois} : tes ventes versées ce mois (date du versement).${recuSans ? ` Sans ${nomsVentesKO.join(', ')} (ventes pas lues).` : ''}${adTous > 0 ? ` ${adTous} vente${adTous>1?'s':''} finalisée${adTous>1?'s':''} sans date de versement : dans aucun mois pour l'instant.` : ''}${phraseNcRecu ? ` Comptées nulle part : ${phraseNcRecu}.` : ''}${aDaterTitre}`}>
-                <div className="vrm-jc-l">Reçu en {libMois}</div>
+                <div className="vrm-jc-l">{tr('journee.recu')} {libMois}</div>
                 {/* (2 nov.) « Au moins 0 € » ne se dit jamais (§5) : un minimum nul
                     s'écrit « — », et la ligne dessous dit ce qui manque. */}
                 <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={auMoinsRecu && !(recuMois > 0) ? null : recuMois}/>}</div>
-                {declarables === null ? <div className="vrm-jc-sous">pas lu</div>
+                {declarables === null ? <div className="vrm-jc-sous">{tr('journee.lu')}</div>
                   : auMoinsRecu ? <div className="vrm-jc-sous" data-recu-adater={adTous > 0 ? adTous : undefined} data-a-dater={adVinted > 0 ? adVinted : undefined}>{[recuMois > 0 ? 'au moins' : '', adTous > 0 ? `${adTous} à dater` : '', recuNonComptees.length ? `${recuNonComptees.length} non comptée${recuNonComptees.length>1?'s':''}` : '', nomsVentesKO.length && !(recuMois > 0) && !adTous && !recuNonComptees.length ? 'pas lu' : ''].filter(Boolean).join(' · ')}</div> : null}
               </div>
               {cotisMois != null && (
                 <div className="vrm-jc-cell" data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''}
                   title={`Cotisations URSSAF à mettre de côté, sur le CA déclaré de ${libMois} — ${load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'}.`}>
-                  <div className="vrm-jc-l">À mettre de côté</div>
+                  <div className="vrm-jc-l">{tr('journee.mettreCote')}</div>
                   <div className="vrm-jc-v"><Montant v={cotisAuMoins && !(cotisMois > 0) ? null : cotisMois} prefixe="≈ "/></div>
-                  <div className="vrm-jc-sous">{cotisAuMoins && cotisMois > 0 ? 'au moins · ' : ''}URSSAF</div>
+                  <div className="vrm-jc-sous">{cotisAuMoins && cotisMois > 0 ? tr('journee.moins2') : ''}URSSAF</div>
                 </div>
               )}
               <div className="vrm-jc-cell" data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} data-ca-non-comptees={recuNonComptees.length || undefined} title={`Chiffre d'affaires ${anIci} : tes ventes versées cette année, toutes plateformes (le CA déclaré).${phraseNcRecu ? ` Au moins : pas dans ce chiffre — ${phraseNcRecu}.` : ''}`}>
                 <div className="vrm-jc-l">CA {anIci}</div>
                 <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={((adTous - adSurAn.length) > 0 || phraseNcRecu) && !(caAnnee > 0) ? null : caAnnee}/>}</div>
-                {((adTous - adSurAn.length) > 0 || phraseNcRecu) && <div className="vrm-jc-sous" data-ca-adater={(adTous - adSurAn.length) || undefined}>{caAnnee > 0 ? 'au moins' : (adTous - adSurAn.length) > 0 ? `${adTous - adSurAn.length} à dater` : 'non comptées'}</div>}
+                {((adTous - adSurAn.length) > 0 || phraseNcRecu) && <div className="vrm-jc-sous" data-ca-adater={(adTous - adSurAn.length) || undefined}>{caAnnee > 0 ? tr('journee.moins') : (adTous - adSurAn.length) > 0 ? tr('journee.dater', { x: String(adTous - adSurAn.length) }) : tr('journee.nonComptees')}</div>}
               </div>
             </div>
           </div>
@@ -42687,8 +42687,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const actifsS = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length;
           if (actifsS>0 && nomsVentesKO.length>=actifsS) return (
             <div data-carte-jours="" data-semaine-pas-lue="" className="vrm-day-week vrm-day-card vrm-jc vrm-jc-semaine" style={{border:`1px solid ${C.border}`,background:C.card}}>
-              <div className="vrm-day-head"><span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span></div>
-              <div className="vrm-jc-sous">Tes ventes n'ont pas pu être lues — ce n'est pas zéro.</div>
+              <div className="vrm-day-head"><span className="vrm-day-k" style={{color:C.muted}}>{tr('journee.semaine')}</span></div>
+              <div className="vrm-jc-sous">{tr('journee.ventesOntPu')}</div>
             </div>);
           const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
           // Le même nombre ne s'écrit pas deux fois (§7) : si toute la vente du
@@ -42697,8 +42697,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
           <div data-carte-jours="" data-total-semaine={Math.round(totSem*100)} className="vrm-day-week vrm-day-card vrm-jc vrm-jc-semaine" style={{border:`1px solid ${C.border}`,background:C.card}}>
             <div className="vrm-day-head">
-              <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
-              {!redit && <span className="vrm-jc-total" data-semaine-partiel={nomsVentesKO.length?'1':undefined} title={`Vendu cette semaine (date de la vente)${nomsVentesKO.length?` — sans ${nomsVentesKO.join(', ')} (ventes pas lues)`:''}`}>{nomsVentesKO.length ? <span style={{fontSize:'0.7em',color:C.muted}}>au moins </span> : null}<Montant v={totSem}/></span>}
+              <span className="vrm-day-k" style={{color:C.muted}}>{tr('journee.semaine')}</span>
+              {!redit && <span className="vrm-jc-total" data-semaine-partiel={nomsVentesKO.length?'1':undefined} title={`Vendu cette semaine (date de la vente)${nomsVentesKO.length?` — sans ${nomsVentesKO.join(', ')} (ventes pas lues)`:''}`}>{nomsVentesKO.length ? <span style={{fontSize:'0.7em',color:C.muted}}>{tr('journee.moins')} </span> : null}<Montant v={totSem}/></span>}
             </div>
             <BarresSemaine jours={semaine}/>
           </div>
@@ -42725,19 +42725,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sites = A && Array.isArray(A.lignes) ? [...new Set(A.lignes.map(l=>l.plateforme))] : [];
           return (
           <div data-argent-attente={K.venir.valeur == null ? '' : Math.round(K.venir.valeur*100)} data-argent-virer={K.virer.valeur == null ? '' : Math.round(K.virer.valeur*100)} data-a-venir-partiel={K.venir.partiel?'1':undefined} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:deux?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}
-            title={K.venir.partiel ? `Au moins — sans ${K.venir.manque.join(', ')}` : undefined}>
+            title={K.venir.partiel ? tr('journee.moinsSans2', { x: String(K.venir.manque.join(', ')) }) : undefined}>
             {K.montrerVenir && (
             <div style={{minWidth:0}} data-argent-moitie="venir">
-              <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>À venir</div>
-              <div className="vrm-display vrm-day-wallet-n" style={{color:K.venir.valeur == null ? C.muted : C.text}}>{K.venir.valeur == null ? PAS_SU.vide : <>{K.venir.partiel?<span className="vrm-fu-borne">au moins </span>:null}<Montant v={K.venir.valeur}/></>}</div>
+              <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>{tr('journee.venir')}</div>
+              <div className="vrm-display vrm-day-wallet-n" style={{color:K.venir.valeur == null ? C.muted : C.text}}>{K.venir.valeur == null ? PAS_SU.vide : <>{K.venir.partiel?<span className="vrm-fu-borne">{tr('journee.moins')} </span>:null}<Montant v={K.venir.valeur}/></>}</div>
               <div className="vrm-day-note" style={{color:C.muted}} data-carte-raison={K.venir.valeur == null ? '' : undefined}>{K.venir.valeur == null ? K.venir.raison : `${aVenirJ.n} vente${aVenirJ.n>1?'s':''}${sites.length>1?` · ${sites.length} sites`:sites.length===1&&sites[0]!=='Vinted'?` · ${sites[0]}`:''}`}</div>
             </div>
             )}
             {K.montrerVirer && (
               <div style={{minWidth:0,...(deux?{borderLeft:`1px solid ${C.border}`,paddingLeft:16}:{})}} data-argent-moitie="virer">
-                <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
+                <div className="vrm-day-k" style={{color:C.muted}}>{tr('journee.virer')}</div>
                 <div className="vrm-display vrm-day-wallet-n" style={{color:K.virer.valeur == null ? C.muted : C.text}}>{K.virer.valeur == null ? PAS_SU.vide : <Montant v={K.virer.valeur} dec={2}/>}</div>
-                <div className="vrm-day-note" style={{color:C.muted}} data-carte-raison={K.virer.valeur == null ? '' : undefined}>{K.virer.valeur == null ? K.virer.raison : <>{escrowJ.accounts>1?`${escrowJ.accounts} porte-monnaie`:'porte-monnaie Vinted'}{escrowJ.plusVieuxJours>7?` · lu il y a ${escrowJ.plusVieuxJours} j`:''}</>}</div>
+                <div className="vrm-day-note" style={{color:C.muted}} data-carte-raison={K.virer.valeur == null ? '' : undefined}>{K.virer.valeur == null ? K.virer.raison : <>{escrowJ.accounts>1?tr('journee.porteMonnaie', { accounts: String(escrowJ.accounts) }):tr('journee.porteMonnaieVinted')}{escrowJ.plusVieuxJours>7?tr('journee.lu2', { plusVieuxJours: String(escrowJ.plusVieuxJours) }):''}</>}</div>
               </div>
             )}
           </div>
@@ -42746,8 +42746,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         W.recentes = (!loading && dernieresVentes.length>0) ? (
             <div className="vrm-day-recent">
               <div className="vrm-w-etiquette" style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
-                <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
-                <Bouton variante="discret" onClick={()=>onNav&&onNav('cat_ventes')}>Tout voir ›</Bouton>
+                <div className="vrm-label" style={{color:C.muted,flex:1}}>{tr('journee.dernieresVentes')}</div>
+                <Bouton variante="discret" onClick={()=>onNav&&onNav('cat_ventes')}>{tr('journee.toutVoir')}</Bouton>
               </div>
               <div className="vrm-carrousel">
                 {dernieresVentes.map((o,i)=>{
@@ -42787,18 +42787,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         W.stock = (!premierJour && !baseKO) ? (()=>{
           const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
           const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
-          return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
-            <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
-            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>paire{stock?.total===1?'':'s'} en ligne</span></div>
+          return <section className="vrm-day-stock vrm-day-card" aria-label={tr('journee.apercuStockVinted')} style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
+            <div className="vrm-day-head"><h3>{tr('journee.stockActuel')} <span>Vinted</span></h3><Icon name="box" size={18}/></div>
+            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>{tr('journee.paire')}{stock?.total===1?'':'s'} {tr('journee.ligne')}</span></div>
             {stock ? <>
-              <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
-              <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
+              <div className="vrm-day-stock-meter" role="img" aria-label={tr('journee.annoncesAvecPrix', { renseignes: String(stock.renseignes), total: String(stock.total) })}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
+              <div className="vrm-day-stock-prices"><span>{tr('journee.coutAchatRenseigne')}</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
               {/* (1er nov., « très répétitif ») Le total est écrit juste au-dessus : la
                   couverture ne le redit pas (« 0 sur 6 · 6 à compléter » disait 6 deux fois). */}
-              <p data-stock-renseignes={stock.renseignes}>{stock.renseignes === 0 ? 'Aucune' : stock.manquants === 0 ? 'Toutes' : stock.renseignes} avec un prix d’achat{stock.manquants>0 ? <> · <Bouton variante="discret" data-stock-completer="" onClick={()=>{ DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{stock.renseignes === 0 ? 'Compléter' : `${stock.manquants} à compléter`} ›</Bouton></> : null}</p>
-            </> : <p>{listings.error?'Annonces pas lues pour l’instant.':'Lecture des annonces…'}</p>}
-            {stock && listings.incomplet && <p role="status">Lecture partielle : des comptes n’ont pas pu être lus.</p>}
-            <div className="vrm-day-stock-links vrm-b-rangee"><Bouton variante="secondaire" icone="tag" className="vrm-b-petit" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</Bouton><Bouton variante="secondaire" icone="box" className="vrm-b-petit" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</Bouton></div>
+              <p data-stock-renseignes={stock.renseignes}>{stock.renseignes === 0 ? tr('journee.aucune') : stock.manquants === 0 ? tr('journee.toutes') : stock.renseignes} {tr('journee.avecPrixAchat')}{stock.manquants>0 ? <> · <Bouton variante="discret" data-stock-completer="" onClick={()=>{ DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{stock.renseignes === 0 ? tr('journee.completer') : tr('journee.completer2', { manquants: String(stock.manquants) })} ›</Bouton></> : null}</p>
+            </> : <p>{listings.error?tr('journee.annoncesLuesInstant'):tr('journee.lectureAnnonces')}</p>}
+            {stock && listings.incomplet && <p role="status">{tr('journee.lecturePartielleComptes')}</p>}
+            <div className="vrm-day-stock-links vrm-b-rangee"><Bouton variante="secondaire" icone="tag" className="vrm-b-petit" onClick={()=>onNav&&onNav('cat_annonces')}>{tr('journee.voirAnnonces')}</Bouton><Bouton variante="secondaire" icone="box" className="vrm-b-petit" onClick={()=>onNav&&onNav('garage')}>{tr('journee.ouvrirStock')}</Bouton></div>
           </section>;
         })() : null;
         // Les widgets AJOUTABLES (absents de la disposition d'origine) : ils
@@ -42810,7 +42810,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         W.performance = (!baseKO && !premierJour && !loading && sales.items) ? <PerformanceJournee panelOff={panelOff} onNav={onNav} moisN={moisN} moisEur={moisEur} partiel={nomsVentesKO.length>0}/> : null;
         W.jours14 = vuHero ? (
           <div data-widget-14j="" className="vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-            <div className="vrm-day-head"><span className="vrm-day-k" style={{color:C.muted}}>14 derniers jours</span></div>
+            <div className="vrm-day-head"><span className="vrm-day-k" style={{color:C.muted}}>{tr('journee.14DerniersJours')}</span></div>
             <BarresVenduRecu jours={jours14}/>
           </div>
         ) : null;
@@ -42836,12 +42836,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const e0 = (x) => <Montant v={x}/>;
           const pct = (v) => <span className="vrm-jc-montant">{v > 0 ? '+' : ''}{v}<span className="vrm-jc-eur">{'\u202f'}%</span></span>;
           const cases = [
-            { id: 'jour', l: "Aujourd'hui", n: eJ == null ? '—' : pct(eJ), sous: R.moyenne ? <>contre {e0(R.moyenne.eur)}/j</> : 'pas de moyenne', titre: R.moyenne ? `Vendu aujourd'hui contre ${fmt(R.moyenne.eur)}/j en moyenne${R.moyenne.depuisPremiere ? ` (${R.moyenne.jours} j)` : ' (28 j)'}` : 'pas encore de moyenne', v: eJ },
-            { id: 'semaine', l: '7 derniers jours', n: e7 == null ? '—' : pct(e7), sous: <>contre {e0(R.j7av.eur)}</>, titre: `${fmt(R.j7.eur)} vendus ces 7 jours, contre ${fmt(R.j7av.eur)} les 7 d'avant`, v: e7 },
-            { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j +`, n: dort ? String(dort.n) : '—', sous: dort ? <>{e0(dort.valeur)} affichés</> : (listingDatesLu === null || listings.error ? 'pas lu' : datesOk && stockDort ? 'aucune date' : 'je lis…'), titre: dort ? `${dort.n} annonce${dort.n > 1 ? 's' : ''} en ligne depuis ${SLEEP_DAYS} jours et plus, ${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues} sur ${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? 'dates de mise en ligne pas lues' : datesOk && stockDort ? 'aucune date de mise en ligne connue' : 'je lis tes annonces…'), v: dort ? dort.n : null },
+            { id: 'jour', l: "Aujourd'hui", n: eJ == null ? '—' : pct(eJ), sous: R.moyenne ? <>{tr('journee.contre')} {e0(R.moyenne.eur)}/j</> : 'pas de moyenne', titre: R.moyenne ? `Vendu aujourd'hui contre ${fmt(R.moyenne.eur)}/j en moyenne${R.moyenne.depuisPremiere ? ` (${R.moyenne.jours} j)` : ' (28 j)'}` : tr('journee.encoreMoyenne'), v: eJ },
+            { id: 'semaine', l: '7 derniers jours', n: e7 == null ? '—' : pct(e7), sous: <>{tr('journee.contre')} {e0(R.j7av.eur)}</>, titre: tr('journee.vendusCes7', { fmt: String(fmt(R.j7.eur)), fmt2: String(fmt(R.j7av.eur)) }), v: e7 },
+            { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j +`, n: dort ? String(dort.n) : '—', sous: dort ? <>{e0(dort.valeur)} {tr('journee.affiches')}</> : (listingDatesLu === null || listings.error ? 'pas lu' : datesOk && stockDort ? 'aucune date' : 'je lis…'), titre: dort ? `${dort.n} annonce${dort.n > 1 ? 's' : ''} en ligne depuis ${SLEEP_DAYS} jours et plus, ${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues} sur ${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? tr('journee.datesMiseLigne') : datesOk && stockDort ? tr('journee.aucuneDateMise') : tr('journee.jeLisAnnonces')), v: dort ? dort.n : null },
             avecAttente
-              ? { id: 'panier', l: 'Panier moyen 30 j', n: R.panier30.moyen == null ? '—' : <Montant v={R.panier30.moyen}/>, sous: null, titre: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''} en 30 jours` : 'aucune vente en 30 jours', v: R.panier30.moyen }
-              : { id: 'attente', l: 'À venir', n: loading || valAttente == null ? '—' : <Montant v={valAttente}/>, sous: aVenirJ.partiel ? 'au moins' : null, titre: aVenirJ.partiel ? `au moins — sans ${aVenirJ.manque.join(', ')}` : `${aVenirJ.n} vente${aVenirJ.n > 1 ? 's' : ''} pas encore versée${aVenirJ.n > 1 ? 's' : ''}`, v: valAttente },
+              ? { id: 'panier', l: 'Panier moyen 30 j', n: R.panier30.moyen == null ? '—' : <Montant v={R.panier30.moyen}/>, sous: null, titre: R.panier30.n ? tr('journee.ventes30Jours', { n: String(R.panier30.n) }) : tr('journee.aucuneVente30'), v: R.panier30.moyen }
+              : { id: 'attente', l: 'À venir', n: loading || valAttente == null ? '—' : <Montant v={valAttente}/>, sous: aVenirJ.partiel ? 'au moins' : null, titre: aVenirJ.partiel ? tr('journee.moinsSans', { x: String(aVenirJ.manque.join(', ')) }) : tr('journee.ventesEncoreVersees', { n: String(aVenirJ.n) }), v: valAttente },
           // (1er nov.) Une tendance SANS BASE (« — aucune date », « pas de moyenne »)
           // n'est pas un chiffre : elle ne prend pas une case. Statistiques la dit,
           // avec sa raison (rythme, stock qui dort) — la carte y mène.
@@ -42850,8 +42850,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div className="vrm-day-card vrm-day-tendances vrm-jc" data-widget-tendances="" style={{border:`1px solid ${C.border}`,background:C.card}}>
               <div className="vrm-day-head">
-                <span className="vrm-day-k" style={{color:C.muted}}>Tendances</span>
-                <Bouton variante="discret" className="vrm-day-lien" data-tendances-stats="" href="?tab=dashboard" onClick={(ev)=>{ ev.preventDefault(); if (onNav) onNav('dashboard'); }}>Statistiques ›</Bouton>
+                <span className="vrm-day-k" style={{color:C.muted}}>{tr('journee.tendances')}</span>
+                <Bouton variante="discret" className="vrm-day-lien" data-tendances-stats="" href="?tab=dashboard" onClick={(ev)=>{ ev.preventDefault(); if (onNav) onNav('dashboard'); }}>{tr('journee.statistiques')}</Bouton>
               </div>
               <div className={`vrm-jc-rangee${cases.length > 3 ? ' vrm-jc-4' : ''} vrm-jc-tendances`} data-tendances-n={cases.length} style={{ '--n': cases.length }}>
                 {cases.map((c) => (
@@ -42972,7 +42972,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     onClick={() => { noterRelierVus(comptesARelierJour.map((c) => c.uid)); relierBoiteDe(comptesARelierJour[0].uid); }}>
                     <PileVignettes srcs={[]} n={comptesARelierJour.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="mail" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{court}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="a-relier">{detail}</span></span>
-                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Relier</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{tr('journee.relier')}</span></span>
                   </button>
                 );
               };
@@ -43005,7 +43005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <PileVignettes srcs={lignesA.map((a) => a.photo)} n={carteAilleurs.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="sync" size={20}/>}/>
                         <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titreR}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="vendus-ailleurs">{detailR}</span></span>
                       </button>
-                      <Bouton variante="danger" className="vrm-b-petit vrm-ra-bouton" data-retirer-ailleurs="" occupe={retraitAilleursEnVol} onClick={retirerDesAutresSites}>Retirer des autres sites</Bouton>
+                      <Bouton variante="danger" className="vrm-b-petit vrm-ra-bouton" data-retirer-ailleurs="" occupe={retraitAilleursEnVol} onClick={retirerDesAutresSites}>{tr('journee.retirerAutresSites')}</Bouton>
                     </div>
                   );
                 }
@@ -43035,13 +43035,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const carteTrancher = (j) => {
                 const plein = `${j.court}${j.detail ? '\n' + j.detail : ''}`;
                 return (
-                  <div key="a-trancher" className="vrm-at-journee" data-at-journee={trancherOuvert ? 'ouvert' : 'ferme'} role="group" aria-label="À trancher">
+                  <div key="a-trancher" className="vrm-at-journee" data-at-journee={trancherOuvert ? 'ouvert' : 'ferme'} role="group" aria-label={tr('nav.trancher')}>
                     <div className="vrm-day-task-list vrm-accueil-jour">
                     <button type="button" className="vrm-day-task vrm-fu-tache" data-job="a-trancher" data-n={String(j.n)} aria-expanded={trancherOuvert ? 'true' : 'false'}
                       title={plein} aria-label={plein.replace(/\n/g, ' — ')} onClick={() => setTrancherOuvert((o) => !o)}>
                       <PileVignettes srcs={j.photos || []} n={j.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="help" size={20}/>}/>
                       <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{j.court}</span>{j.detail ? <span className="vrm-day-task-note">{j.detail}</span> : null}</span>
-                      <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{trancherOuvert ? 'Fermer' : 'Trancher'}</span></span>
+                      <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{trancherOuvert ? tr('commun.fermer') : tr('journee.trancher')}</span></span>
                     </button>
                     </div>
                     {trancherOuvert && aTrancher ? <div className="vrm-at-journee-corps" data-at-journee-corps=""><ATrancher etat={aTrancher} onAller={onAllerTrancher} onTrancher={onTrancherAT} Photo={PhotoVinted} vend={PROFIL_VENDEUR.vend || vendActuel()} resume={false}/></div> : null}
@@ -43057,7 +43057,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div key="cycles" className="vrm-day-task is-groupe vrm-cycle-groupe" role="group" aria-label={titre} data-job="supprime-vinted" data-cycle-groupe={String(total)} data-n={String(total)}>
                     <div className="vrm-cycle-groupe-tete">
                       <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note">{note}</span></span>
-                      {n > 1 ? <Bouton variante="secondaire" className="vrm-b-petit vrm-cycle-tous" data-cycle-tous={CHOIX_CYCLE.CHEZ_MOI} disabled={!!cycleEnVol} onClick={() => repondreCycleTous(cs)}>Tous chez moi</Bouton> : null}
+                      {n > 1 ? <Bouton variante="secondaire" className="vrm-b-petit vrm-cycle-tous" data-cycle-tous={CHOIX_CYCLE.CHEZ_MOI} disabled={!!cycleEnVol} onClick={() => repondreCycleTous(cs)}>{tr('journee.tousChezMoi')}</Bouton> : null}
                     </div>
                     <ul className="vrm-cycle-rangees">
                       {cs.map((c) => (
@@ -43065,9 +43065,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span className="vrm-cycle-photo" aria-hidden="true">{c.photo && !imgMortes.has(c.photo) ? <PhotoVinted src={c.photo} alt="" loading="lazy" decoding="async" onError={() => noterImgMorte(c.photo)}/> : <Icon name="tag" size={18}/>}</span>
                           <span className="vrm-cycle-txt"><Numero n={c.numero} taille="petit"/><span className="vrm-cycle-titre" title={String(c.title || '')}>{enArticles(String(c.title || '').slice(0, 120)) || 'Article'}</span></span>
                           <label className="vrm-cycle-menu">
-                            <span className="vrm-sr">{`Que devient le N°${c.numero} ?`}</span>
+                            <span className="vrm-sr">{tr('journee.devient', { numero: String(c.numero) })}</span>
                             <select value="" data-cycle-select={c.id} disabled={!!cycleEnVol} onChange={(e) => { const v = e.target.value; if (v) repondreCycle(c, v); }}>
-                              <option value="" disabled>Choisir</option>
+                              <option value="" disabled>{tr('journee.choisir')}</option>
                               {ORDRE_CHOIX_CYCLE.map((ch) => <option key={ch} value={ch} data-cycle-choix={ch}>{LIBELLE_CHOIX[ch]}</option>)}
                             </select>
                             <Icon name="chevron" size={14}/>
@@ -43087,7 +43087,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
                     title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
                     <PileVignettes srcs={photosCase[x.id]} n={x.t.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={icCase[x.id] || x.ic} size={20}/>}/>
-                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{forceJ ? <span className="vrm-jp-urgent">Affichée car urgent</span> : null}{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note" data-journee-a-imprimer={nPretsJournee} data-exact={tuiles.envoyer.emballer.exact ? '1' : '0'}>{tuiles.envoyer.emballer.exact ? '' : 'au moins '}{nPretsJournee} à imprimer</span> : null}</span>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{forceJ ? <span className="vrm-jp-urgent">{tr('journee.afficheeCarUrgent')}</span> : null}{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note" data-journee-a-imprimer={nPretsJournee} data-exact={tuiles.envoyer.emballer.exact ? '1' : '0'}>{tuiles.envoyer.emballer.exact ? '' : tr('journee.moins3')}{nPretsJournee} {tr('journee.imprimer')}</span> : null}</span>
                     <span className={'vrm-day-task-action' + (x.id === 'envoyer' && nPretsJournee > 0 ? ' is-principal' : '')} data-fu-principal={x.id === 'envoyer' && nPretsJournee > 0 ? '' : undefined}><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || VERBES.voir}</span></span>
                   </button>
                 );
@@ -43100,8 +43100,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
               // Et jamais « Rien à faire… : pas lu » pendant qu'elles se lisent.
               if (!alertesLues) return { prochain: placeProchain, section: (
-                <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-afaire-attente="">
-                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2></div>
+                <section className="vrm-fu-afaire" aria-label={tr('journee.faire')} aria-busy="true" data-afaire-attente="">
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">{tr('journee.faire')}</h2></div>
                   <SqLignes n={3} montant={false}/>
                 </section>
               ) };
@@ -43116,14 +43116,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {cacheesHorsCases.length ? <div hidden data-jp-cachees="">{cacheesHorsCases.map((id) => <span key={id} data-jp-cachee={id} data-n={String(nParCarteAF[id])}/>)}</div> : null}
               </>);
               if (nGestes === 0 && nCacheesAF > 0) return { prochain: null, section: (
-                <section className="vrm-fu-afaire" aria-label="À faire" data-jp-rien-affiche={nCacheesAF}>
-                  <p className="vrm-fu-vide" data-tout-a-jour="">Rien à faire dans tes cartes affichées · {nCacheesAF} geste{nCacheesAF > 1 ? 's' : ''} dans les cartes cachées</p>
+                <section className="vrm-fu-afaire" aria-label={tr('journee.faire')} data-jp-rien-affiche={nCacheesAF}>
+                  <p className="vrm-fu-vide" data-tout-a-jour="">{tr('journee.rienFaireDans')} {nCacheesAF} {tr('journee.geste')}{nCacheesAF > 1 ? 's' : ''} {tr('journee.dansCartesCachees')}</p>
                   {compteursCaches}
                 </section>
               ) };
               if (nGestes === 0) return { prochain: null, section: pasLus.length
-                ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
-                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96} vend={vendActuel()}/><p>Rien à faire</p></div> };
+                ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>{tr('journee.rienFaireDans2')} {pasLus.join(', ').toLowerCase()} {tr('journee.lu3')}</p>
+                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96} vend={vendActuel()}/><p>{tr('journee.rienFaire')}</p></div> };
               // (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE sort de la liste : elle se pose EN TÊTE,
               // dans la carte sombre, avant l'argent (Julien : l'ordre = ce qu'il faut faire maintenant, puis
               // l'argent, puis le reste). L'ordre de toujours (le plus pressé d'abord) la désigne ; les
@@ -43159,20 +43159,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const resteAF = listeAF.filter((x) => x !== premierAF);
               const alertesReste = resteAF.filter((x) => x.alerte), autresReste = resteAF.filter((x) => !x.alerte);
               return { prochain: prochainAF, section: (
-                <section className="vrm-fu-afaire" aria-label="À faire">
+                <section className="vrm-fu-afaire" aria-label={tr('journee.faire')}>
                   {/* (11 nov., lot DJ4) « À trancher » en tête de la liste, ouvert en place. */}
                   {/* (11 nov., lot journee-perso) Carte FIXE (toujours en tête, ouverte en place) : il peut la cacher. */}
                   {jobTrancher && visJ('trancher').montree ? carteTrancher(jobTrancher) : null}
                   {/* (9 nov., Ma journée v2) « Ensuite » : le reste, après la prochaine chose (posée en tête).
                       Le nombre de gestes compte TOUT (la prochaine comprise) : le même compte qu'avant. */}
-                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">{resteAF.length ? 'Ensuite' : 'À faire'}</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">{resteAF.length ? tr('journee.ensuite') : tr('journee.faire')}</h2><span data-fu-gestes={nGestes}>{nGestes} {tr('journee.geste')}{nGestes > 1 ? 's' : ''}</span></div>
                   {resteAF.length ? (
                   <div className="vrm-day-task-list vrm-accueil-jour" data-barre-jour="" data-accueil-n={nGestes}>
                     {alertesReste.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesReste.map((x) => x.el)}</div> : null}
                     {autresReste.map((x) => x.el)}
-                  </div>) : <p className="vrm-fu-vide vrm-jv2-rien-dautre" data-accueil-n={nGestes}>Rien d’autre pour l’instant.</p>}
+                  </div>) : <p className="vrm-fu-vide vrm-jv2-rien-dautre" data-accueil-n={nGestes}>{tr('journee.rienAutreInstant')}</p>}
                   {feuilleAilleurs ? (
-                    <SheetShell titre="Vendus ailleurs" sousTitre={carteAilleurs && carteAilleurs.n ? `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} à retirer` : undefined} onClose={() => setFeuilleAilleurs(false)} maxWidth={560} data-feuille-ailleurs="">
+                    <SheetShell titre={tr('journee.vendusAilleurs')} sousTitre={carteAilleurs && carteAilleurs.n ? tr('journee.annoncesRetirer', { n: String(carteAilleurs.n) }) : undefined} onClose={() => setFeuilleAilleurs(false)} maxWidth={560} data-feuille-ailleurs="">
                       <div className="vrm-bilan-sync vrm-va-feuille">
                         {blocRetirerAilleurs(true)}
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
@@ -43180,7 +43180,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </SheetShell>
                   ) : null}
                   {feuilleDeux && deuxFois.length ? (
-                    <SheetShell titre="En ligne deux fois" sousTitre="Sur Vinted" onClose={() => setFeuilleDeux(false)} maxWidth={560} data-feuille-deux-fois="">
+                    <SheetShell titre={tr('journee.ligneDeuxFois')} sousTitre={tr('journee.vinted')} onClose={() => setFeuilleDeux(false)} maxWidth={560} data-feuille-deux-fois="">
                       <EnLigneDeuxFoisDetail groupes={deuxFois} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted}/>
                     </SheetShell>
                   ) : null}
@@ -43191,7 +43191,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })();
         return (
           <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee">
-            <ScreenHead icon="soleilLevant" title="Ma journée"/>
+            <ScreenHead icon="soleilLevant" title={tr('reglages.ma-journee.lib')}/>
 
             {/* (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee,
                 « sans textes explicatifs ») LA TÊTE SOMBRE, bord à bord : le bonjour, le
@@ -43202,9 +43202,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const actifsT = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length;
               // (9 nov.) « vendu aujourd'hui » pas lu : la frise le dit elle-même (`data-fu-vendu-jour` vide, « — »).
               return (
-              <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
+              <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
                 <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
-                <h1 className="vrm-fu-titre-tete">Ma journée</h1>
+                <h1 className="vrm-fu-titre-tete">{tr('reglages.ma-journee.lib')}</h1>
                 {/* (11 nov., lot journee-perso) La tête suit SON ordre et SES choix (« Modifier ma journée ») ;
                     une carte cachée qui publie un chiffre (frise, chiffres du mois) reste rendue dans un bloc caché :
                     ses `data-*` et ses publications ne changent pas. Sans réglage : l'ordre d'avant. */}
@@ -43293,7 +43293,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 l'app le matin, lit ça, et ne poste pas ses colis.
                 « Rien à faire » ne se dit QUE si on a pu regarder. */}
             {!loading && jobs.length===0 && (baseKO
-              ? <LignePanne>Données pas lues pour l’instant.</LignePanne>
+              ? <LignePanne>{tr('journee.donneesLuesInstant')}</LignePanne>
               /* ⚠️⚠️ LA FÊTE SUR UNE BOUTIQUE QUI N'EXISTE PAS ENCORE. Mesuré au
                  rendu le 16 septembre, sur une installation neuve : « 🎉 Tout
                  est à jour ! Rien à expédier, rien à retirer » — à quelqu'un
@@ -43325,12 +43325,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (11 nov., lot journee-perso) « Modifier ma journée » : en bas, toujours (aussi dans Paramètres → Affichage). */}
             {!baseKO && !premierJour ? (() => { const nc = nCartesCachees(persoJ, PROFIL_VENDEUR.mode); return (
               <div className="vrm-jp-bas" data-jp-bas="">
-                <Bouton variante="secondaire" icone="pencil" data-jp-modifier="" onClick={() => setFeuillePerso(true)}>Modifier ma journée</Bouton>
-                {nc ? <span className="vrm-jp-bas-note" data-jp-n-cachees={nc}>{nc} carte{nc > 1 ? 's' : ''} cachée{nc > 1 ? 's' : ''}</span> : null}
+                <Bouton variante="secondaire" icone="pencil" data-jp-modifier="" onClick={() => setFeuillePerso(true)}>{tr('journee.modifierMaJournee')}</Bouton>
+                {nc ? <span className="vrm-jp-bas-note" data-jp-n-cachees={nc}>{nc} {tr('journee.carte')}{nc > 1 ? 's' : ''} {tr('journee.cachee')}{nc > 1 ? 's' : ''}</span> : null}
               </div>
             ); })() : null}
             {feuillePerso ? (
-              <SheetShell titre="Modifier ma journée" sousTitre="Montre, cache et range tes cartes" onClose={() => setFeuillePerso(false)} maxWidth={560} data-feuille-journee-perso="">
+              <SheetShell titre={tr('journee.modifierMaJournee')} sousTitre={tr('journee.montreCacheRange')} onClose={() => setFeuillePerso(false)} maxWidth={560} data-feuille-journee-perso="">
                 <JourneePersoSetting/>
               </SheetShell>
             ) : null}
