@@ -41769,9 +41769,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div key="a-trancher" className="vrm-at-journee" data-at-journee={trancherOuvert ? 'ouvert' : 'ferme'} role="group" aria-label="À trancher">
                     <div className="vrm-day-task-list vrm-accueil-jour">
                     <button type="button" className="vrm-day-task vrm-fu-tache" data-job="a-trancher" data-n={String(j.n)} aria-expanded={trancherOuvert ? 'true' : 'false'}
-                      title={plein} aria-label={plein.replace(/\n/g, ' — ')} onClick={() => setTrancherOuvert((o) => !o)}>
+                      title={plein} data-plein={plein.replace(/\n/g, ' — ')} onClick={() => setTrancherOuvert((o) => !o)}>
+                      {/* (11 nov., lot accessibilité) Comme les autres cartes : le texte entier est lu, puis
+                          « Trancher »/« Fermer » (un aria-label sans le mot affiché, WCAG 2.5.3). */}
                       <PileVignettes srcs={j.photos || []} n={j.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="help" size={20}/>}/>
-                      <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{j.court}</span>{j.detail ? <span className="vrm-day-task-note">{j.detail}</span> : null}</span>
+                      <span className="vrm-sr-seul">{plein.replace(/\n/g, ' — ')} — </span>
+                      <span className="vrm-day-task-textes" aria-hidden="true"><span className="vrm-day-task-title">{j.court}</span>{j.detail ? <span className="vrm-day-task-note">{j.detail}</span> : null}</span>
                       <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{trancherOuvert ? 'Fermer' : 'Trancher'}</span></span>
                     </button>
                     </div>
