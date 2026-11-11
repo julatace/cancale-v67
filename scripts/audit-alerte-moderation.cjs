@@ -89,6 +89,11 @@ async function regle(R) {
   const g = R.fusionnerModeration([], [rs], { at: t0 });
   const g2 = R.fusionnerModeration(g.liste, [R.evenementCompteModeration('restreint', t0 + H, {})], { at: t0 + H });
   dit(g.ajoutes.length === 1 && g2.ajoutes.length === 0 && g.liste[0].r === 'listing_restricted', 'R10 « limité » : raison gardée, pas deux fois en 24 h');
+  const g3 = R.fusionnerModeration(g.liste, [R.evenementCompteModeration('restreint', t0 + 25 * H, {})], { at: t0 + 25 * H, maintenant: t0 + 25 * H });
+  dit(g3.ajoutes.length === 1, 'R10c une nouvelle limite le lendemain ⇒ nouvelle alerte (la première est passée)');
+  const court = R.fusionnerModeration([], [R.evenementCompteModeration('restreint', t0, { jusqua: t0 + H })], { at: t0 });
+  const court2 = R.fusionnerModeration(court.liste, [R.evenementCompteModeration('restreint', t0 + 2 * H, {})], { at: t0 + 2 * H });
+  dit(court2.ajoutes.length === 0, 'R10d frein court passé, nouvelle limite 2 h après ⇒ pas deux alertes en 24 h');
   const b = R.fusionnerModeration([], [R.evenementCompteModeration('banni', t0)], { at: t0 });
   const b2 = R.fusionnerModeration(b.liste, [], { compte: 'actif', at: t1 });
   dit(b.ajoutes.length === 1 && b2.liste[0].f === t1, 'R10b « fermé » puis profil actif ⇒ fermée');
@@ -324,10 +329,10 @@ const MUTATIONS = [
   ['réservée comptée disparue', "(A[id] === 'o' || A[id] === 'h') && !Object", "(A[id] === 'o' || A[id] === 'h' || A[id] === 'r') && !Object"],
   ['vendue comptée', "return /sold/i.test(String(it.item_closing_action || '')) ? 's' : 'c';", "return 'o';"],
   ['tout vide alerté', "if (disparues.length >= 3 && !restants.length) { disparues = []; raisons.push('tout-disparu'); }", ''],
-  ['deux fois', "if (l.some((e) => meme(e) && !e.f)) continue;", ''],
+  ['deux fois', "if (l.some((e) => meme(e) && ouvert(e))) continue;", ''],
   ['restreint 24 h', "if (n.s === 'restreint' && l.some((e) => meme(e) && Math.abs(n.t - e.t) < MODERATION_RESTREINT_MS)) continue;", ''],
   ['revenue pas fermée', "if (e.s === 'masquee' && st && st !== 'h') { e.f = fin; change = true; }", ''],
-  ['première lecture alerte', "return rien('premiere-lecture');", "avant = { at: 0, etats: {} };"],
+  ['première lecture alerte', "return rien('premiere-lecture');", "avant = { at: 0, etats: Object.fromEntries(Object.keys(apres.etats).map((k) => [k, 'o'])) };"],
   ['vu ignoré', "&& !(v[e.cle] != null)", ''],
   ['vente prouvée ignorée', "&& !(e.s === 'disparue' && vendues && vendues.has && vendues.has(e.a))", ''],
   ['notifié ignoré', "&& n[e.cle] == null", ''],
@@ -347,6 +352,24 @@ async function prouver() {
     const rouge = ko > 0; ko = k0;
     console.log((rouge ? '  ✅ ' : '  ❌ ') + `mutation « ${nom} » ⇒ ${rouge ? 'rouge' : 'RESTE VERTE'}`);
     if (rouge) vertes++; else ko++;
+  }
+  // Les garde-fous du FOND (le vrai background.js muté)
+  const bg = fs.readFileSync(BG, 'utf8');
+  const MUT_BG = [
+    ['lecture partielle comparée', "if (capturePrevue && ecritRow !== false && type === 'listings') { try { await guetterDressing(", "if (ecritRow !== false && type === 'listings') { try { await guetterDressing("],
+    ['point de départ avancé sur lecture ratée', "if (rg === null) return null;            // pas rangé : le point de départ n'avance pas\n        ouvertsApres = rg.ouverts;", "ouvertsApres = rg ? rg.ouverts : [];"],
+    ['restreint sans alerte', "if (restreint) { try { await noterCompteModeration(", "if (false) { try { await noterCompteModeration("],
+    ['banni sans frein', "if (sorte === 'banni') await poserFreinCompte(u);", ""],
+  ];
+  for (const [nom, a, b] of MUT_BG) {
+    if (!bg.includes(a)) { console.log('  ❌ mutation introuvable : ' + nom); ko++; continue; }
+    const f = path.join(tmp, `bg-${Math.random().toString(36).slice(2)}.js`);
+    fs.writeFileSync(f, bg.replace(a, b));
+    const k0 = ko; ko = 0;
+    await extension(f).catch(() => { ko++; });
+    const rouge = ko > 0; ko = k0;
+    console.log((rouge ? '  ✅ ' : '  ❌ ') + `mutation du fond « ${nom} » ⇒ ${rouge ? 'rouge' : 'RESTE VERTE'}`);
+    if (!rouge) ko++;
   }
   // Le background.js d'origin/main
   const ancien = path.join(tmp, 'background-main.js');

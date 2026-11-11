@@ -5269,8 +5269,11 @@ function fusionnerModeration(liste, nouveaux, { etats = null, compte = null, at 
     const n = nettoyerModeration(x);
     if (!n || n.f) continue;
     const meme = (e) => e.s === n.s && (n.a ? e.a === n.a : !e.a);
+    // Un « limité » n'est ouvert que jusqu'à sa fin (`j`, sinon 24 h) : une nouvelle
+    // limite des semaines plus tard est un nouvel événement.
+    const ouvert = (e) => !e.f && !(e.s === 'restreint' && Number(e.j || (e.t + MODERATION_RESTREINT_MS)) <= n.t);
     if (l.some((e) => e.k === n.k)) continue;
-    if (l.some((e) => meme(e) && !e.f)) continue;                                    // déjà ouvert
+    if (l.some((e) => meme(e) && ouvert(e))) continue;                               // déjà ouvert
     if (n.s === 'restreint' && l.some((e) => meme(e) && Math.abs(n.t - e.t) < MODERATION_RESTREINT_MS)) continue;
     l.push(n); ajoutes.push(n); change = true;
   }
