@@ -54,17 +54,14 @@ function fichiers(dossier, ext = /\.(jsx?|mjs)$/) {
 function extraire(src, nom) {
   const m = new RegExp(`^(?:export )?(?:async )?function ${nom}\\(|^(?:export )?const ${nom}\\s*=\\s*`, 'm').exec(src);
   if (!m) return null;
-  let i = m.index, prof = 0, vu = false;
-  const ouvre = '({[', ferme = ')}]';
-  let dans = null;
-  for (let k = i; k < src.length; k++) {
-    const c = src[k];
-    if (dans) { if (c === '\\') { k++; continue; } if (c === dans) dans = null; continue; }
-    if (c === "'" || c === '"' || c === '`') { dans = c; continue; }
-    if (ouvre.includes(c)) { prof++; vu = true; }
-    else if (ferme.includes(c)) { prof--; if (vu && prof === 0 && /^function/.test(m[0].replace(/^export /, '').replace(/^async /, ''))) return src.slice(i, k + 1).replace(/^export /, ''); }
-    else if (c === ';' && prof === 0 && vu) return src.slice(i, k + 1).replace(/^export /, '');
-    else if (c === '\n' && prof === 0 && vu && !/^function/.test(m[0])) return src.slice(i, k).replace(/^export /, '');
+  // Comptage des parenthèses (la méthode des audits de la compta) : fin d'une fonction à
+  // l'accolade qui ferme son corps, fin d'un `const` au « ; » de premier niveau.
+  const estFn = /function/.test(m[0]); let prof = 0, vuCorps = false;
+  for (let i = m.index; i < src.length; i++) {
+    const c = src[i];
+    if (c === '(' || c === '[' || c === '{') { prof++; if (c === '{') vuCorps = true; }
+    else if (c === ')' || c === ']' || c === '}') { prof--; if (estFn && vuCorps && prof === 0 && c === '}') return src.slice(m.index, i + 1).replace(/^export /, ''); }
+    else if (!estFn && c === ';' && prof === 0) return src.slice(m.index, i + 1).replace(/^export /, '');
   }
   return null;
 }

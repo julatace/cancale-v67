@@ -44,6 +44,8 @@ import '../stats-categories.css';
 import { resumePeriode, margeConnue, meilleuresVentes, ageDuStock, venduEtRecu, MIN_DONNEES, recordsDe, colonneCompte } from '../statsPlus.js';   // (11 nov., lot stats-plus)
 import '../stats-plus.css';
 import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categoriesLecture.js';   // (11 nov., lot rapport-mois) lectures partagées
+import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
+import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
 
 // ⟦← App.jsx #6⟧
 // « Annonces en ligne » : UNE règle d'écriture pour chaque écran qui la montre
@@ -116,7 +118,10 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
   const n=mois.length;
   if(!n)return null;
   const H=compact?124:Math.max(hauteur,196), left=18,right=18,top=14,bottom=28;
-  const vals=mois.map(m=>Math.max(0,Number(valeur(m))||0));
+  // (11 nov., famille « pas su ≠ 0 ») un mois au chiffre pas su : aucune barre, « — » (jamais 0 €).
+  const brut=mois.map(m=>valeurSue(valeur(m)));
+  const vals=brut.map(v=>v==null?0:Math.max(0,v));
+  const ecrire=i=>brut[i]==null?'—':format(vals[i]);
   const max=Math.max(1,...vals),base=H-bottom;
   const col=(W-left-right)/n;
   const X=i=>left+(i+.5)*col;
@@ -131,11 +136,11 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
   const choisir=(m,i)=>{setLecture(cleDe(m));if(onChoisir)onChoisir(i===externe?null:cleDe(m));};
   return <div ref={ref} className="vrm-chart-months" style={{width:'100%',minWidth:0}}>
     <svg {...{[attr]:''}} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group"
-      aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${format(vals[i])}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
+      aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${ecrire(i)}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
       <defs><linearGradient id={`area${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent} stopOpacity=".20"/><stop offset="1" stopColor={C.accent} stopOpacity=".01"/></linearGradient><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
       {[0,.5,1].map(f=><line key={f} x1={left} x2={W-right} y1={Y(max*f)} y2={Y(max*f)} stroke={C.border} strokeWidth="1" strokeDasharray={f?'3 5':undefined}/>)}
       {presentation==='ligne'&&<g aria-hidden="true" pointerEvents="none"><path d={`M ${X(0)} ${base} L ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')} L ${X(n-1)} ${base} Z`} fill={`url(#area${uid})`}/><path d={`M ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')}`} fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/></g>}
-      {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${format(vals[i])}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
+      {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${ecrire(i)}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={brut[i]==null?'':Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
         <title>{label}</title>
         {actif&&presentation!=='ligne'&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
         <rect x={X(i)-col/2} y="0" width={col} height={H} fill="transparent"/>
@@ -143,8 +148,8 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
         {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
       </g>;})}
     </svg>
-    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{format(vals[lu])}</strong></div>}
-    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{format(vals[lu-1])}</strong></div>}
+    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{ecrire(lu)}</strong></div>}
+    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{ecrire(lu-1)}</strong></div>}
   </div>;
 }
 // ⟦← App.jsx #11⟧
@@ -162,8 +167,9 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
     const db=(type==='encaisse'?b.receiveDate:b.saleDate)||'';
     return db.localeCompare(da);
   });
-  const totalCA=ventes.reduce((s,v)=>s+(+v.sellPrice||0),0);
-  const totalProfit=ventes.reduce((s,v)=>s+((+v.sellPrice||0)-(+v.buyPrice||0)),0);
+  // (11 nov., famille « pas su ≠ 0 ») un achat inconnu ne vaut pas 0 € : bénéfice des ventes au coût connu, « sur N ».
+  const tot=totauxVentesManuelles(ventes);
+  const totalCA=tot.ca, totalProfit=tot.benefice;
   return (
     <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
@@ -172,13 +178,13 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
       </div>
       <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12}}>
         <span style={{color:C.text}}>CA : <b>{fmt(totalCA)}</b></span>
-        <span style={{color:C.accentTexte}}>Bénéfice : <b>{fmt(totalProfit)}</b></span>
+        <span style={{color:C.accentTexte}} data-benefice-mois={totalProfit==null?'':Math.round(totalProfit*100)}>Bénéfice : <b>{totalProfit==null?'—':fmt(totalProfit)}</b>{totalProfit!=null&&tot.nConnus<tot.n?` sur ${tot.nConnus} vente${tot.nConnus>1?'s':''} sur ${tot.n}`:''}</span>
       </div>
       <div style={{maxHeight:260,overflowY:'auto'}}>
         {ventes.map((v,i)=>{
           const nom=catName[v.productId]||(v.productId?('Paire '+v.productId):'—');
           const dateAff=(type==='encaisse'?v.receiveDate:v.saleDate)||'';
-          const benef=(+v.sellPrice||0)-(+v.buyPrice||0);
+          const benef=beneficeVenteManuelle(v);
           return (
             <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
               <div style={{flex:1,minWidth:0}}>
@@ -186,8 +192,8 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
                 <div style={{color:C.muted,fontSize:11}}>{dateAff}{v.productId?` · n°${v.productId}`:''}</div>
               </div>
               <div style={{textAlign:'right',marginLeft:10}}>
-                <div style={{color:C.text,fontWeight:500}}>{fmt(+v.sellPrice||0)}</div>
-                <div style={{color:benef>=0?C.accent:C.warn,fontSize:11}}>{benef>=0?'+':''}{fmt(benef)}</div>
+                <div style={{color:C.text,fontWeight:500}}>{fmt(valeurSue(v.sellPrice))}</div>
+                <div style={{color:C.muted,fontSize:11}}>{benef==null?'—':`${benef>=0?'+':''}${fmt(benef)}`}</div>
               </div>
             </div>
           );

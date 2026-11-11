@@ -71,6 +71,7 @@ import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov.,
 import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'année »
 import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
+import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -1120,7 +1121,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',color:C.accentTexte,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
+                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(valeurSue(inv.sellPrice))}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label="Imprimer la facture" title="Imprimer la facture"><Icon name="printer" size={15}/></Btn>

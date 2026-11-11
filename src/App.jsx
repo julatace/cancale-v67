@@ -667,6 +667,7 @@ ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
 import { jourParis } from "./dateParis.js";   // (11 nov.) jour/mois métier à l'heure de Paris
+import { sommeConnue, texteSomme, medianeSue } from "./sommeConnue.js";   // (11 nov.) « pas su » ≠ 0
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -8043,6 +8044,8 @@ const montantCommande = (o) => {
 const montantCommandeLu = (o) => {
   const p = o && o.price;
   if (p == null) return null;
+  // (11 nov., famille « pas su ≠ 0 ») une commande dans une autre devise n'est pas sue EN EUROS : écartée, jamais convertie.
+  if (typeof p === 'object' && p.currency_code && String(p.currency_code).toUpperCase() !== 'EUR') return null;
   const v = (typeof p === 'object') ? (p.amount ?? p.value) : p;
   if (v == null || String(v).trim() === '') return null;
   const n = Number(String(v).replace(',', '.'));
@@ -21855,13 +21858,15 @@ function LigneAchatLbc({ o, floute = false }) {
       {qrUrl && <button className="vrm-icon-control vrm-buy-quick" type="button" data-lbc-achat-qr="" onClick={() => setQr(v => !v)} title="QR du colis" aria-label="QR du colis" aria-expanded={qr} style={{ color: C.warn }}><Icon name="key" size={16} /></button>}
     </>} />;
 }
+const prixLbcSu = (o) => (o && o.price != null && o.price !== '' && Number.isFinite(Number(o.price)) ? Number(o.price) / 100 : null);
 function lbcArgent(lbcVentes) {
   const ventes = (lbcVentes && lbcVentes.ventes) || [];
   const actives = ventes.filter(o => !lbcAnnulee(o));
   const finals = actives.filter(lbcFinalisee);
   const enCours = actives.filter(o => !lbcFinalisee(o));
-  const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
-  return { n: ventes.length, actives: actives.length, recu: somme(finals), nRecu: finals.length, attente: somme(enCours), nAttente: enCours.length };
+  // (11 nov., famille « pas su ≠ 0 ») un prix absent n'est pas 0 € : sommé à part (src/sommeConnue.js), « au moins ».
+  const recuS = sommeConnue(finals, prixLbcSu), attenteS = sommeConnue(enCours, prixLbcSu);
+  return { n: ventes.length, actives: actives.length, recu: recuS.total, recuS, nRecu: finals.length, attente: attenteS.total, attenteS, nAttente: enCours.length };
 }
 // Résumé COMPACT d'une plateforme, toujours visible en haut de son onglet —
 // la même forme que `VintedResume` (Julien : « eBay et Leboncoin comme Vinted :
@@ -21963,8 +21968,8 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const recus = actives.filter(lbcFinalisee);
   const enRoute = actives.filter(o => !lbcFinalisee(o));
   const annules = achats.filter(lbcAnnulee);
-  const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
-  const fmt2 = (n) => n.toFixed(2).replace('.', ',') + '\u00a0€';
+  const somme = (arr) => sommeConnue(arr, prixLbcSu);   // (11 nov.) prix inconnu ≠ 0 € : « au moins », ou « — »
+  const fmt2 = (r) => texteSomme(r, (n) => n.toFixed(2).replace('.', ',') + '\u00a0€');
   // (28 oct.) Le plus récent d'abord, comme les achats Vinted ; une date
   // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
   // (9 nov., soir, lot AJ) La règle unique (src/ordreRecent.js) : date d'achat lue, tous comptes mélangés.
@@ -37487,7 +37492,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // 51 de juin. Choisir « juin » affichait donc 41 € au lieu de ~1 500 €,
     // sans un mot. Un total qui se présente comme complet alors qu'il exclut
     // des lignes est exactement ce qu'on s'interdit (§ « Argent en attente »).
-    let masqNb = 0, masqEur = 0;
+    let masqNb = 0, masqEur = 0, prixPasLuCa = 0;
     for (const o of (sales.items || [])) {
       if (!isHidden(o)) continue;
       if (classifyOrderStatus(o.status) === 'cancelled') continue;
@@ -37502,6 +37507,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // validé / bordereau) → argent qui arrive dans le porte-monnaie.
       if (stt === 'pending') { enAttente += sellAmt; nbAttente += 1; }
       if (stt !== 'completed') continue;
+      if (montantCommandeLu(o) == null) prixPasLuCa += 1;   // (11 nov., famille « pas su ≠ 0 ») compté, jamais 0 € muet
       const sell = sellAmt;
       const e = entreeVenteLot(o, effEntry(o));   // (11 nov.) un lot : le prix d'achat du LOT
       const fee = chargesVente(e);
@@ -37518,9 +37524,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const R = resumeBenefice(acc);
     const ca = RV.ca, frais = RV.frais, nb = RV.n;
     benefBrut = R.brut; benefConnu = R.net;
-    return { ca, cout: R.cout, frais, benef: R.net, benefBrut, benefConnu, nb, nbCout: R.nCout, bN: R.n, sansCout: R.n-R.nCout, fraisInconnus: R.fraisInconnus, couverture: couvertureBenefice(R), autresKO, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
+    const comptesKOCa = (Array.isArray(sales.failedUids) ? sales.failedUids : []).filter(u => !acctOff(u)).length;
+    return { ca, caPartiel: prixPasLuCa > 0 || comptesKOCa > 0, prixPasLuCa, comptesKOCa, cout: R.cout, frais, benef: R.net, benefBrut, benefConnu, nb, nbCout: R.nCout, bN: R.n, sansCout: R.n-R.nCout, fraisInconnus: R.fraisInconnus, couverture: couvertureBenefice(R), autresKO, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice, lotsTx, lotLiens]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice, lotsTx, lotLiens]);
 
   // ── LE BÉNÉFICE, PUBLIÉ JOUR PAR JOUR (19 oct.) — l'écran Ventes est son
   // PROPRIÉTAIRE (§11) : Comptabilité somme ces jours, elle ne relit aucun prix
@@ -39405,14 +39412,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Les MÊMES ventes que le registre (`ventesComptees` : comptes lus cette
     // fois, et couvrant les comptes d'aujourd'hui) — les deux totaux sont écrits
     // côte à côte, ils ne parlent pas de deux listes différentes (§11).
-    const ids = []; let ca = 0;
+    const ids = []; const lues = [];
     for (const o of (ventesComptees || [])) {
       if (!o || venteOffOf(o) || !venteFinalisee(o)) continue;
       if (ymOf(o.date) !== reportMonth) continue;
       const tx = o.transaction_id != null ? o.transaction_id : o.id; if (tx == null) continue;
-      ids.push('vinted:' + tx); ca += montantCommande(o);
+      ids.push('vinted:' + tx); lues.push(o);
     }
-    return { ids, ca: Math.round(ca * 100) / 100 };
+    // (11 nov., famille « pas su ≠ 0 ») un prix illisible n'est pas 0 € : compté à part, le montant devient « au moins ».
+    const S = sommeConnue(lues, montantCommandeLu);
+    return { ids, ca: S.total == null ? 0 : S.total, manque: S.manque };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moisAncienneRegle, ventesComptees, reportMonth, hiddenAccts, panelAcctOff]);
   const declarerMois = (regle, montantTxt, payeTxt) => {
@@ -43898,7 +43907,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0&&totals.benefConnu!=null?String(Math.round(totals.benefConnu*100)/100):''}
             data-ventes-benef-couverture={totals.couverture} data-ventes-benef-autres={totals.autresKO?'passu':'lu'}
             style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
-            <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            <StatBox compact label="CA finalisé" value={`${totals.caPartiel?'au moins ':''}${fmtE0(totals.ca)}`} sub={`${totals.nb} vente${totals.nb>1?'s':''} Vinted${totals.prixPasLuCa?` · ${totals.prixPasLuCa} au prix pas lu`:''}${totals.comptesKOCa?` · ${totals.comptesKOCa} compte${totals.comptesKOCa>1?'s':''} pas relu${totals.comptesKOCa>1?'s':''}`:''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
@@ -44199,11 +44208,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const duMois = { from: m0, to: new Date() };
           const annule = achatAnnule;   // (3 nov.) la règle de « Dépensé », partagée avec le registre des achats (src/registres.js)
           const mois = lu ? buysBase.filter((o) => !annule(o) && dansPeriode(o, duMois)) : [];
-          const depense = lu ? mois.reduce((a, o) => a + montantCommande(o), 0) : null;
+          // (11 nov., famille « pas su ≠ 0 ») prix illisible ou compte pas relu : « au moins », la couverture dite.
+          const depS = lu ? sommeConnue(mois, montantCommandeLu) : null;
+          const comptesKO = lu ? (Array.isArray(buys.failedUids) ? buys.failedUids : []).map(String).filter((u) => !acctOff(u)).length : 0;
+          const depense = depS ? depS.total : null;
+          const depPartiel = !!(depS && (depS.partiel || comptesKO > 0));
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
           return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
             locaux={{
-              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
               enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
               recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, ...enLecture, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
@@ -44373,26 +44386,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sombre (espace Vinted), qui dit déjà Dépensé, En route, À retirer, Arrivés. */}
         {!dansPlateforme && buysBase.length>0 && aFilter!=='attente' && (()=>{
           const dans = buysBase.filter(o=>matchOrd(o));
-          const M = (o)=>montantCommande(o);
+          const M = (o)=>montantCommandeLu(o);
           const annule = achatAnnule;
           const enRoute = (o)=>!annule(o) && phaseReception(o)==='route';
-          const somme = (l)=>l.reduce((a,o)=>a+M(o),0);
+          const somme = (l)=>sommeConnue(l, M);   // (11 nov.) prix illisible ≠ 0 € (src/sommeConnue.js)
           const vrais = dans.filter(o=>!annule(o));
           const ann = dans.filter(annule);
           const rte = dans.filter(enRoute);
           const tauxAnn = dans.length ? Math.round(100*ann.length/dans.length) : 0;
-          const prix = vrais.map(M).filter(v=>v>0).sort((a,b)=>a-b);
-          const med = prix.length ? prix[Math.floor(prix.length/2)] : 0;
+          const med = medianeSue(vrais.filter((o) => M(o) > 0), M);   // « — » sans prix lu ; vraie médiane (paire : moyenne des deux)
           return (
             // (16 oct.) Une seule surface, quatre cellules — plus quatre cartes de
             // même poids. La couleur ne reste que sur le taux d'annulation quand
             // il est anormal (≥ 20 %) : c'est le seul chiffre à rattraper (§7).
             <div className="vrm-achats-kpis" style={{background:C.card,border:`1px solid ${C.border}`}}>
               {[
-                ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} article${vrais.length>1?'s':''}`, null],
+                ['Dépensé', texteSomme(somme(vrais), fmtE0), `${vrais.length} article${vrais.length>1?'s':''}`, null],
                 ['Prix médian', fmtE0(med), 'par article', null],
-                ['En route', fmtE0(somme(rte)), `${rte.length} article${rte.length>1?'s':''}`, null],
-                ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn}\u00a0%`, tauxAnn>=20?C.warn:null],
+                ['En route', texteSomme(somme(rte), fmtE0), `${rte.length} article${rte.length>1?'s':''}`, null],
+                ['Annulés', texteSomme(somme(ann), fmtE0), `${ann.length} sur ${dans.length} · ${tauxAnn}\u00a0%`, tauxAnn>=20?C.warn:null],
               ].map(([k,v,sub,col])=>(
                 <div key={k} className="vrm-achats-kpi" style={{borderColor:C.border}}>
                   <div className="vrm-achats-kpi-k" style={{color:C.muted}}>{k}</div>
@@ -49387,7 +49399,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {moisAncienneRegle && ancienneRegle ? (
                           <div style={{display:'flex',flexDirection:'column',gap:4}}>
                             {[['versement', `À la date de versement (règle actuelle) — ${fmtE(report.ca)}, ${report.nb} vente${report.nb>1?'s':''}`],
-                              ['vente', `À la date de vente (règle d'avant le 3 octobre) — ${fmtE(ancienneRegle.ca)}, ${ancienneRegle.ids.length} vente${ancienneRegle.ids.length>1?'s':''} Vinted`]].map(([k, t]) => (
+                              ['vente', `À la date de vente (règle d'avant le 3 octobre) — ${ancienneRegle.manque ? 'au moins ' : ''}${fmtE(ancienneRegle.ca)}, ${ancienneRegle.ids.length} vente${ancienneRegle.ids.length>1?'s':''} Vinted${ancienneRegle.manque ? ` (${ancienneRegle.manque} au prix pas lu)` : ''}`]].map(([k, t]) => (
                               <label key={k} style={{display:'flex',gap:8,alignItems:'flex-start',cursor:'pointer'}}>
                                 <input type="radio" name="decl-regle" checked={declForm.regle===k} onChange={()=>setDeclForm(f=>({...f, regle:k}))} style={{marginTop:3}}/>
                                 <span>{t}</span>
@@ -56317,7 +56329,7 @@ function AppCoeur() {
             // (5 nov., chantier G) Ni sur Messages (« CA finalisé — » au-dessus des conversations).
             if (sec === 'ventes' || sec === 'achats' || sec === 'messages') return null;
             return (
-            <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
+            <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives && ar.recu != null ? texteSomme(ar.recuS, e2) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives && ar.attente != null ? texteSomme(ar.attenteS, e2) : null, true]]}/>
           ); })()}
           {sec==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
           {sec==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
@@ -56325,9 +56337,9 @@ function AppCoeur() {
               // Jamais lu (aucune visite de « Mes transactions ») : « — », pas 0.
               const v = (n) => (vide && !lu) ? null : n;
               return <KpiVentes plateforme="leboncoin" tuiles={[
-                { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
+                { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : texteSomme(ar.attenteS, fmt) },
                 { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
-                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
+                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : texteSomme(ar.recuS, fmt), brut: (vide && !lu) ? null : ar.recu },
               ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}

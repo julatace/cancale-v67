@@ -27,6 +27,7 @@
 import { mentionFacture, cleFactureLigne } from './factureAchat.js';
 import { PERIODE_OK, libellePeriode, moisDePeriode, jourFr, eurosTexte } from './registres.js';
 import { moisParis, moisRecents } from './dateParis.js';
+import { valeurSue } from './sommeConnue.js';
 
 export { libellePeriode };
 export const TYPES_PERIODE = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
@@ -82,8 +83,9 @@ export function donneesExportComptable({ periode, recettes = null, achats = null
   const lu = ligne && Array.isArray(ligne.mois);
   const caParMois = lu ? bornes.yms.filter((ym) => ym <= ymNow).map((ym) => {
     const m = ligne.mois.find((x) => x && x.ym === ym);
-    const ca = m ? Number(m.ca) || 0 : 0;
-    return { ym, mois: libellePeriode(ym), n: m ? Number(m.n != null ? m.n : m.count) || 0 : 0, ca, urssaf: micro && typeof aPayer === 'function' ? aPayer(ca, taux) : null, declare: !!(m && m.declare) };
+    // (11 nov., famille « pas su ≠ 0 ») un mois PUBLIÉ au CA illisible s'écrit « — », jamais 0,00 €.
+    const ca = m ? valeurSue(m.ca) : 0;
+    return { ym, mois: libellePeriode(ym), n: m ? Number(m.n != null ? m.n : m.count) || 0 : 0, ca, urssaf: ca != null && micro && typeof aPayer === 'function' ? aPayer(ca, taux) : null, declare: !!(m && m.declare) };
   }) : null;
   const tot = lu && typeof montantPeriode === 'function' ? montantPeriode(bornes, ligne, taux) : { ca: null, apayer: null, partiel: false };
   const caDeclare = tot && tot.ca != null ? tot.ca : null;
