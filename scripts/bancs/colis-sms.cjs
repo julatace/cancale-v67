@@ -125,7 +125,10 @@ const ouvrir = async (b, vp, sombre, tab, init = {}) => {
           const pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null');
           const lignes = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')];
           return {
-            pub, onglet: (document.querySelector('[data-colis-onglet-choix="retirer"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'),
+            // (11 nov., intégration colis) Plus d'onglet « À retirer » : le nombre est porté par l'entrée « Achats » de la navigation
+            // (la même publication `vrm_colis_retirer`) et par la liste elle-même (`data-cc-n`).
+            pub, onglet: (document.querySelector('[data-badge-nav="achats"]') || { getAttribute: () => null }).getAttribute('data-badge-n'),
+            colonne: (document.querySelector('[data-cc-colonne="retirer"]') || { getAttribute: () => null }).getAttribute('data-cc-n'),
             points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point:not(.vrm-rpf-verifier)')].map((p) => ({ nom: ((p.querySelector('.vrm-rpf-nom') || {}).textContent || '').trim(), n: p.querySelectorAll('[data-cc-carte]').length })),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).map((l) => ({ id: l.getAttribute('data-cc-carte'), code: !!l.querySelector('[data-rp-code]') })),
             verif: (() => { const d = document.querySelector('.vrm-rpf-verifier'); return d ? d.getAttribute('data-retirer-a-verifier') : null; })(),
@@ -134,7 +137,7 @@ const ouvrir = async (b, vp, sombre, tab, init = {}) => {
           };
         });
         dit(m.pub && m.pub.total === 2, 'vrm_colis_retirer = 2 (les deux casiers annoncés par SMS)', JSON.stringify(m.pub && { total: m.pub.total }));
-        dit(m.onglet === '2', '« À retirer · 2 »', m.onglet);
+        dit(m.onglet === '2' && m.colonne === '2', '« Achats · 2 » (navigation) = la liste « À retirer » (2)', `${m.onglet}/${m.colonne}`);
         const noms = m.points.map((p) => p.nom).sort();
         dit(noms.length === 2 && noms[0] === 'Casier 24/7 Intermarché' && noms[1] === 'Casier 24/7 Super U' && m.points.every((p) => p.n === 1), 'deux casiers différents ⇒ deux cartes, nommées « Casier 24/7 … »', JSON.stringify(m.points));
         dit(m.comptes.length === 2 && m.comptes.every((c) => c.code), 'chaque colis SMS montre son code', JSON.stringify(m.comptes));

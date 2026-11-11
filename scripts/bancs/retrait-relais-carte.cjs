@@ -121,7 +121,8 @@ async function main() {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
         // (2 nov., colis clair) Le lien ouvre Colis sur « À retirer » : la liste par point
         // porte les codes (une fois) ; les outils dessous ne redessinent ni carte ni colis.
-        await pg.locator('[data-colis-onglet="retirer"]').first().waitFor({ timeout: 20000 });
+        // (11 nov., intégration colis) `?tab=cat_achats` ouvre Achats, section « À retirer » en tête (lot DJ3).
+        await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 20000 });
         await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 25000 }).catch(() => {});
         await pg.waitForTimeout(1200);
         const r = await pg.evaluate(() => { const d = document.querySelector('[data-colis-retraits="outils"]');

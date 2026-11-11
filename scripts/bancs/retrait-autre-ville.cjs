@@ -192,7 +192,8 @@ async function main() {
         dit(!!rennes && /^(casier247)?halles\|35000$/.test(rennes.cle) && /Rue de Paris/.test(rennes.adr), `${T} une rue sans numéro, avec son code postal, reste l'adresse du point`, JSON.stringify(rennes));
         const pv = pt(/^pointpresse\|56000$/), pb = pt(/^pointpresse\|29200$/);
         dit(!!pv && !!pb && pv.codes.join() === '666666' && pb.codes.join() === '777777', `${T} deux relais du même nom dans deux villes : deux points, chacun SON colis`, JSON.stringify([pv, pb]));
-        const bazar = pt(/^bazardesamis/);
+        // (11 nov., intégration colis — retraits fiables) Un point lu au NOM seul n'est jamais fondu avec un autre : sa clé est `seul:…`.
+        const bazar = pt(/^(seul:)?bazardesamis/);
         dit(!!bazar && bazar.codes.join() === '444444' && (tel || bazar.pc === 'adresse'), `${T} le point non géocodable reste listé${tel ? '' : ' (pas sur la carte : adresse)'}`, JSON.stringify(bazar));
         const inc = r.pts.find((p) => p.cle === '__inconnu');
         dit(!!inc && inc.codes.join() === '888888', `${T} le colis sans lieu est sous « Point pas encore connu »`, JSON.stringify(inc));

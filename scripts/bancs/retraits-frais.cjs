@@ -168,11 +168,12 @@ const lireEcran = (pg) => pg.evaluate(() => {
   for (const d of document.querySelectorAll('details[data-rp-section], details[data-retraits-sortis]')) d.open = true;
   const pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null');
   const lignes = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].map((l) => ({ cle: l.getAttribute('data-cc-carte'), section: (l.closest('[data-rp-section]') || { getAttribute: () => '' }).getAttribute('data-rp-section'), hors: l.hasAttribute('data-hors-compte') }));
-  const onglet = document.querySelector('[data-colis-onglet-choix="retirer"]');
+  // (11 nov., intégration colis) Plus d'onglet « À retirer » : le nombre est l'entrée « Achats » de la navigation (même publication).
+  const onglet = document.querySelector('[data-badge-nav="achats"]');
   const col = document.querySelector('.vrm-rpf');
   const voile = document.querySelector('.maplibregl-cooperative-gesture-screen');
   return { pub, lignes,
-    ongletN: onglet ? onglet.getAttribute('data-colis-onglet-n') : null,
+    ongletN: onglet ? onglet.getAttribute('data-badge-n') : null,
     ongletTexte: onglet ? onglet.textContent.trim() : '',
     comptes: col ? col.getAttribute('data-retirer-comptes') : null,
     surCarte: col ? col.getAttribute('data-retirer-sur-carte') : null,
@@ -212,7 +213,7 @@ const lireEcran = (pg) => pg.evaluate(() => {
         const J = (o) => JSON.stringify(o);
         // F1
         // P2 : le Chronopost ET la seconde moitié Vinted (un témoin = un carton : plus de témoin libre ⇒ un autre colis).
-        dit(m.ongletN === '2' && m.pub && m.pub.total === 2 && m.comptes === '2', 'F1 onglet « À retirer » = 2 = vrm_colis_retirer (Ma journée, cloche, widget) = la colonne', J({ onglet: m.ongletN, pub: m.pub && m.pub.total, colonne: m.comptes }));
+        dit(m.ongletN === '2' && m.pub && m.pub.total === 2 && m.comptes === '2', 'F1 « Achats · 2 » (navigation) = vrm_colis_retirer (Ma journée, cloche, widget) = la colonne', J({ onglet: m.ongletN, pub: m.pub && m.pub.total, colonne: m.comptes }));
         const d2 = m.lignes.filter((l) => /conv-d2/.test(l.cle));
         dit(d2.length === 1 && !d2[0].hors && d2[0].section !== 'double', 'F1 la seconde moitié de P2 (aucun témoin libre) est À RETIRER, comptée — jamais « peut-être »', J(d2));
         // F2
