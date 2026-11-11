@@ -142,6 +142,10 @@ async function contexte(b, vp, sombre, etat) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   return { ctx, pg, errs };
 }
+// (11 nov., rouges A) « Une nouvelle ouverture de l'app » : depuis le 9 nov. (vitesse), le cache
+// d'écran est écrit QUAND LA PAGE EST QUITTÉE (`pagehide`) — l'effacer avant `goto` ne suffit plus,
+// la page qui part le réécrit. On l'efface aussi après elle (écouteur posé après celui de l'app).
+const nouvelleOuverture = (pg) => pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); window.addEventListener('pagehide', () => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} }); } catch (_) {} });
 const clic = async (pg, sel) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); await l.click({ timeout: 4000 }).catch(async () => { await pg.$eval(sel, (x) => x.click()); }); };
 const fermerFeuille = async (pg, dans) => { const x = pg.locator(`${dans} button[aria-label="Fermer"]`).first(); if (await x.count()) await x.click(); else await pg.keyboard.press('Escape'); await pg.waitForTimeout(250); };
 const vueSelection = async (pg) => {
@@ -193,9 +197,13 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           // (6 nov., vague 2) « Prix mini… » n'agit au nom d'aucun compte (une écriture dans ses fiches) :
           //  il reste possible ; tout ce qui agit au nom d'un compte reste grisé.
           // (6 nov.) « à la main » non plus (rien ne part d'ici ; une paire à la fois, chacune dit son compte).
-          const parCompte = mix.filter(([k]) => k !== 'mini' && k !== 'main');
+          // (11 nov., rouges A) « Baisser le prix… » (lot C, 10 nov.) est `parPaire` comme « à la main » :
+          //  comptes mélangés permis, chaque annonce d'un autre compte que l'onglet ne part JAMAIS
+          //  (scripts/audit-annonces-actions.cjs B23–B26 le juge). Les QUATRE tuiles au nom d'un compte restent grisées ici.
+          const parCompte = mix.filter(([k]) => k !== 'mini' && k !== 'main' && k !== 'baisser');
           dit(parCompte.length === 4 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
           dit(mix.some(([k, ok]) => k === 'mini' && ok === 'oui'), `A ${T} « Prix mini… » reste possible sur deux comptes (rien ne part chez Vinted)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
+          dit(mix.some(([k, ok]) => k === 'baisser' && ok === 'oui'), `A ${T} « Baisser le prix… » ouvre sa feuille sur deux comptes (une annonce à la fois, autre compte que l’onglet jamais envoyé)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
           dit(mix.some(([k, ok]) => k === 'main' && ok === 'oui'), `A ${T} « à la main » reste possible sur deux comptes (une paire à la fois, chacune avec son compte)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
           // (6 nov., finitions) La phrase de tête dit JUSTE : ce qui se lance au nom d'un compte, et « Prix mini » possible.
           dit(/Republier, modifier, brouillon, mise en ligne : un compte à la fois/.test(teteMix) && /Prix mini[^.]*: possible/.test(teteMix) && /à la main[^.]*: possible/.test(teteMix) && !/une action se lance sur un seul compte/.test(teteMix), `A ${T} deux comptes : la tête dit « … : un compte à la fois · Prix mini, Republier à la main : possible »`, teteMix);
@@ -269,7 +277,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           // L'ancienne n'est plus en ligne ⇒ le N° passe sur la nouvelle.
           etat.sans9102 = true;
           // Une nouvelle ouverture de l'app (le cache d'écran de 5 min ne sert pas la lecture d'avant).
-          await pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} });
+          await nouvelleOuverture(pg);
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
           await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
           await vueSelection(pg);
@@ -293,7 +301,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           dit(await pg.locator('[data-main-lie="9121"]').count() > 0, `K ${T} masquée : SON clic relie 9121 (confirmée)`);
           // La sauvegarde de l'appareil part après un court délai (`save`) : on l'attend avant de recharger.
           for (let i = 0; i < 40; i++) { if (await pg.evaluate(() => /"9110":\{[^}]*"nouvelId":"9121"/.test(localStorage.getItem('vrm_repub_main') || ''))) break; await pg.waitForTimeout(250); }
-          await pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} });
+          await nouvelleOuverture(pg);
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
           await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
           await vueSelection(pg);
@@ -304,7 +312,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           dit(n45.length === 1 && n45[0] === '9110', `K ${T} la masquée 9110 encore là ⇒ le N°45 reste à elle seule (jamais deux paires sous un N°)`, n45.join(','));
           await pg.screenshot({ path: nomF('masquee') });
           etat.sans9110 = true;
-          await pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} });
+          await nouvelleOuverture(pg);
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
           await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
           await vueSelection(pg);
