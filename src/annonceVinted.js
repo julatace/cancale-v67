@@ -80,6 +80,7 @@ export function etatFicheVinted(fiche, items) {
   const f = fiche || {};
   const d = f.vinted && f.vinted.draftId ? String(f.vinted.draftId) : '';
   if (!d) return 'a-creer';
+  if (f.vinted.publieAt) return 'en-ligne';   // SA mise en ligne depuis VRM, acceptée par Vinted
   const it = (Array.isArray(items) ? items : []).find((x) => String(x && x.id) === String(d));
   return it && !it.is_draft ? 'en-ligne' : 'brouillon';
 }
