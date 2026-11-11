@@ -18,7 +18,11 @@
 //      bloquer tous les gestes ;
 //   G. `storeHarvest` jette ce qui arrive si le compte a changé avant l'écriture ;
 //   H. aucun clic synthétique (`.click()`) dans l'extension (§3) ;
-//   I. la page ne lance plus aucune moisson hors de la file.
+//   I. la page ne lance plus aucune moisson hors de la file ;
+//   J. hautes suivantes : `garde` refuse un compte illisible (gestes auto),
+//      les lectures `exec` de l'app passent par le budget 20/h, une réponse à un
+//      acheteur / le profil ne sont rangés qu'en FORME, la fenêtre ne recharge
+//      plus l'extension sur un worker seulement lent.
 //  Usage : node scripts/audit-robustesse-extension.cjs [--ext dossier] [--app App.jsx] [--prouve]
 //  `--ext` : un autre dossier d'extension (la preuve sur origin/main, §6.1) ;
 //  `--prouve` : chaque mutation (règle réaffaiblie) doit rendre un rouge.
@@ -240,6 +244,41 @@ async function auditer(S) {
     await attendre(250);
     dit(appels.length === 0, 'I1 la page ne lance AUCUNE requête Vinted d’elle-même (la lecture passe par la file du fond)', `${appels.length} : ${appels.slice(0, 4).join(' · ')}`);
   });
+  // ── J : les autres « haute » ──
+  await essaie('J', async () => {
+    const item = 444, tx = 9001, oid = 7001;
+    const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: 45 }),
+      main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: { num: '7', min: '40' } }, vinted_offre_refus_msg: '',
+        vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 } } };
+    const f = fond({ lignes, connecte: null, vinted: () => ({ status: 200, body: {} }) });
+    f.ctx.activeUidForDomain = async () => UID;
+    await f.ctx.autoAccepterOffres(UID);
+    const pv = f.store.vrmOffresPrevues || {}; for (const k in pv) if (pv[k]) pv[k].at = Date.now() - 1000;
+    if (!Object.keys(pv).length) f.store.vrmOffresPrevues = { [oid]: { at: Date.now() - 1000, uid: UID, quoi: 'accept' } };
+    await f.ctx.autoAccepterOffres(UID);
+    const gr = await f.ctx.garde(UID, { domain: 'www.vinted.fr' });
+    dit(accepts(f) === 0 && gr && gr.ok === false, 'J1 compte connecté illisible : `garde` refuse, aucun geste AUTOMATIQUE (« pas su » ne vaut pas « oui »)', JSON.stringify({ n: accepts(f), gr }));
+    const g = fond({ vinted: () => ({ status: 200, body: { conversation: { id: 1, messages: [] } } }) });
+    for (let i = 0; i < 26; i++) await g.envoyer({ from: 'vmr-bridge', action: 'exec', uid: UID, method: 'GET', endpoint: '/api/v2/conversations/' + (100 + i) }, { origin: 'https://vrm.center', url: 'https://vrm.center/' });
+    dit(g.j.vinted.length > 0 && g.j.vinted.length <= 20, 'J2 26 lectures de fil demandées par l’app : au plus 20 partent (budget de lecture 20/h)', `${g.j.vinted.length} lecture(s)`);
+    const h = fond();
+    await h.ctx.storeWriteReq('www.vinted.fr', 'POST', '/api/v2/conversations/5/replies', JSON.stringify({ reply: { body: 'Bonjour Camille, mon 06 00 00 00 00' } }), null, 7);
+    await h.ctx.storeWriteReq('www.vinted.fr', 'PUT', '/api/v2/users/111', JSON.stringify({ user: { real_name: 'Camille Inventée', birthday: '1990-01-01' } }), null, 7);
+    const brut = JSON.stringify(h.lignes);
+    dit(!/Camille|06 00|1990/.test(brut) && /reply\.body:string/.test(brut), 'J3 une réponse à un acheteur et le profil : seule la FORME est rangée (jamais le texte, le nom, la naissance)', brut.slice(0, 300));
+    const pop = lire(S.popup);
+    const m = /async function reparerSiPerime\(\) \{[\s\S]*?\n\}/.exec(pop);
+    if (!m) dit(false, 'J4 reparerSiPerime existe');
+    else {
+      let recharge = 0; const store = {};
+      const c = { setTimeout: (fn) => setTimeout(fn, 1), clearTimeout, Date, Number, String,
+        chrome: { runtime: { getManifest: () => ({ version: '5.356.0' }), lastError: null, sendMessage() { /* worker lent : aucune réponse */ }, reload() { recharge++; } },
+          storage: { local: { get: async (k) => ({ [k]: store[k] }), set: async (o) => Object.assign(store, o) } } } };
+      vm.runInNewContext('const REPARATION_STORE = "vrmReparation";\n' + m[0] + '\nthis.r = reparerSiPerime;', c);
+      const r = await c.r();
+      dit(recharge === 0, 'J4 la fenêtre ne recharge plus l’extension quand le service worker est seulement LENT (republication pas coupée)', JSON.stringify({ r, recharge }));
+    }
+  });
   return out;
 }
 
@@ -258,11 +297,15 @@ const MUTATIONS = {
   sans_delai: { f: 'bg', m: (s) => s.replace("headers: {apikey:SUPABASE_KEY,Authorization:`Bearer ${session.access_token}`}, signal: signalDelai(SB_DELAI_LECTURE_MS) });", "headers: {apikey:SUPABASE_KEY,Authorization:`Bearer ${session.access_token}`} });"), attendu: 'F1' },
   ecriture_sans_delai: { f: 'bg', m: (s) => s.replace("      signal: signalDelai(SB_DELAI_ECRITURE_MS),\n", ''), attendu: 'F2' },
   compte_lu_au_debut: { f: 'bg', m: (s) => s.replace("{ const encore = await activeAccountId(domain); if (!encore || String(encore) !== String(uid)) { noterDiag('moisson_compte_change'); return; } }", ''), attendu: 'G1' },
+  garde_credule: { f: 'bg', m: (s) => s.replace(`  if (!actif) return { ok: false, code: 'vinted-absent', error: "aucun compte Vinted lisible dans ce Chrome — VRM n'agit pas tout seul sans savoir quel compte est connecté" };\n`, ''), attendu: 'J1' },
+  lecture_hors_budget: { f: 'bg', m: (s) => s.replace("    const gl = await gardeLecture(msg.uid, acc, 'clic');\n    if (gl) return gl;\n", ''), attendu: 'J2' },
+  reponse_rangee: { f: 'bg', m: (s) => s.replace('|\\/replies\\b|phone|verification|\\/users\\/\\d+\\/?$/i;', '/i;'), attendu: 'J3' },
+  rechargement_aveugle: { f: 'popup', m: (s) => s.replace("  if (typeof code !== 'string' || !/^\\d+\\.\\d+\\.\\d+$/.test(code)) return 'pas-su';\n", ''), attendu: 'J4' },
   clic_remis: { f: 'bg', m: (s) => s.replace("if(activer&&!ouverte){b.scrollIntoView({block:'center'});", "if(activer&&!ouverte){b.click();b.scrollIntoView({block:'center'});"), attendu: 'H1' },
 };
 
 function sources(dossier) {
-  return { bg: path.join(dossier, 'background.js'), inject: path.join(dossier, 'inject.js'), content: path.join(dossier, 'content.js'), app: APP };
+  return { bg: path.join(dossier, 'background.js'), inject: path.join(dossier, 'inject.js'), content: path.join(dossier, 'content.js'), popup: path.join(dossier, 'popup.js'), app: APP };
 }
 function afficher(res) {
   let ko = 0;

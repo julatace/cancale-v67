@@ -68,6 +68,12 @@ async function reparerSiPerime() {
     } catch (_) { clearTimeout(t); res(null); }
   });
   if (code === manif) return 'a-jour';
+  // ⚠️ 5.356 (revue de robustesse, haute 19) : un service worker LENT (réveil,
+  //    en pleine republication : coffre → suppression → brouillon) ne répondait
+  //    pas en 6 s ⇒ `undefined` ≠ manifeste ⇒ rechargement : l'opération était
+  //    coupée au milieu. On ne recharge plus que sur une version REÇUE et
+  //    différente — sans réponse, rien (« pas su » ne vaut pas « périmé »).
+  if (typeof code !== 'string' || !/^\d+\.\d+\.\d+$/.test(code)) return 'pas-su';
   let deja = null;
   try { deja = (await chrome.storage.local.get(REPARATION_STORE))[REPARATION_STORE] || null; } catch (_) { return 'stockage'; }
   if (deja && deja.cle === manif && Date.now() - Number(deja.at || 0) < 24 * 3600e3) return 'deja';

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.344.0';
+const CODE_VERSION = '5.356.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4357,7 +4357,11 @@ async function storeSeenUrls(domain, paths, reponses, conversation) {
 //    ces requêtes ne sert à reproduire une action de vente. On garde leur
 //    CHEMIN et leur méthode (diagnostic), jamais leur contenu. Et une requête
 //    vers un autre site (publicité, mesure d'audience) n'est pas rangée du tout.
-const WREQ_SENSIBLE = /bank_account|credit_card|payments|payment|payout|user_2fa|save_email|email_change|personal_data|purchases\/|checkout|identity|password|dsa\/|help_center|complaint|refund|user_addresses/i;
+// ⚠️ 5.356 (revue de robustesse, haute 17) : aussi le TEXTE envoyé à un acheteur
+//    (`…/replies`), le profil (`PUT /users/{id}` : nom réel, naissance), le
+//    téléphone et les vérifications — leur contenu n'est jamais rangé, seule la
+//    FORME (noms de clés et types) l'est (`formeCorps`).
+const WREQ_SENSIBLE = /bank_account|credit_card|payments|payment|payout|user_2fa|save_email|email_change|personal_data|purchases\/|checkout|identity|password|dsa\/|help_center|complaint|refund|user_addresses|\/replies\b|phone|verification|\/users\/\d+\/?$/i;
 // (17 oct.) LA FORME D'UNE DEMANDE DE RETRAIT D'ARGENT. Julien veut « un endroit
 // où on peut retirer l'argent du porte-monnaie ». Sa page a déjà appelé
 // `POST /api/v2/users/{id}/payouts`, mais VRM n'en connaît que le chemin : son
@@ -4419,7 +4423,7 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabI
       }
     }
   }
-  const forme = WREQ_FORME.test(path) ? formeCorps(body) : null;   // AVANT de retirer le contenu
+  const forme = (WREQ_FORME.test(path) || WREQ_SENSIBLE.test(path)) ? formeCorps(body) : null;   // AVANT de retirer le contenu
   if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
   // (ex: /api/v2/items/123 et /api/v2/items/456 -> meme cle).
@@ -13469,6 +13473,13 @@ async function executerPourApp(msg, sender) {
   if (!acc) return { ok: false, error: 'compte introuvable' };
   const stop = await gardeStricte(msg.uid, acc, { lecture: !!permis.lecture });
   if (stop) return stop;
+  // ⚠️ 5.356 (revue de robustesse, haute 15) : une LECTURE demandée par l'app
+  //    (GET d'une conversation) passe par le budget de lecture (20/h, classe
+  //    « clic » : son geste, sans réserve) — avant, ni plafond ni budget.
+  if (methode === 'GET' && !permis.favorisOuvrir && !permis.favorisListe && !permis.favori) {
+    const gl = await gardeLecture(msg.uid, acc, 'clic');
+    if (gl) return gl;
+  }
   // ⚠️ 19 oct. : la file peut attendre (une autre requête Vinted en vol) — le
   //   compte du cookie est REVÉRIFIÉ à son tour, juste avant de partir. Basculé
   //   entre-temps sur un autre compte ⇒ rien ne part (rouge sur l'avant).
@@ -14873,6 +14884,10 @@ async function garde(uid, acc) {
   const pause = await pauseVinted();
   if (pause) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(pause) };
   const actif = await compteConnecte(acc && acc.domain);
+  // ⚠️ 5.356 (revue de robustesse, haute 16) : `garde` ne sert qu'aux gestes
+  //    AUTOMATIQUES — un compte connecté INCONNU (cookie illisible) n'est plus
+  //    « oui » : rien ne part (« pas su » ne vaut pas « oui », §5).
+  if (!actif) return { ok: false, code: 'vinted-absent', error: "aucun compte Vinted lisible dans ce Chrome — VRM n'agit pas tout seul sans savoir quel compte est connecté" };
   if (actif && String(actif) !== String(uid)) {
     return { ok: false, code: 'autre-compte',
              error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted avant d'agir (sinon Vinted voit deux comptes depuis la même session)" };
