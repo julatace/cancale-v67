@@ -59,6 +59,7 @@ import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.
 // ⟦→ ecrans/Reglages.jsx #2⟧
 // (6 nov., vitesse 2) FavorisVinted : chargé à la demande (voir `aLaDemande`).
 import PiloteFavorisAuto from './PiloteFavorisAuto.jsx';
+import { suivi as suiviTravail } from './suiviTravail.js';   // (11 nov., lot suivi-travail) un travail long suivi (Republier, publier ailleurs, baisse, vacances)
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 // ⟦→ ecrans/Leboncoin.jsx #1⟧
 import './bilanSynchronisation.css'; // (8 nov.) style de ./AnnoncesLeboncoin.jsx, gardé à sa place (son écran est chargé à la demande)
@@ -269,6 +270,17 @@ const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 // (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
 const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
 const JaugeActions = aLaDemande(() => import('./JaugeActions.jsx'));
+// (11 nov., lot suivi-travail) La feuille « VRM travaille » (src/composants/SuiviTravail.jsx) : chargée
+// seulement quand un travail existe (en cours, ou laissé par un rechargement). La règle reste ici (petite).
+const SuiviTravailHoteParesseux = aLaDemande(() => import('./composants/SuiviTravail.jsx'), true);
+function SuiviTravailCoque() {
+  const s = React.useSyncExternalStore(suiviTravail.abonner, suiviTravail.lire, suiviTravail.lire);
+  // Au montage (session ouverte) : un travail laissé par un rechargement revient « interrompu »,
+  // l'annonce en cours dite par l'extension si elle le sait (ses `cmds`), jamais devinée.
+  React.useEffect(() => { suiviTravail.relire(__vmrJobs); }, []);
+  if (!s) return null;
+  return <SuiviTravailHoteParesseux lireJobs={() => __vmrJobs} abonnerExt={onVmrExt}/>;
+}
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
@@ -23388,24 +23400,17 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
       catch (_) { return { accepte: false, code: 'charge', raison: 'l’écran eBay n’a pas pu se charger — réessaie' }; }
     },
   };
-  // Le lancement : le plan, le suivi commun s'il est là (VRM figé, détail, barre —
-  // src/publierPartoutSuivi.js), puis l'envoi l'un après l'autre. « Reprendre » après
-  // une pause relance ce qui n'est pas parti (rien deux fois : seulement « pas envoyé »).
+  // Le lancement : le plan, le suivi commun (VRM figé, détail, barre — SuiviTravail, via
+  // src/publierPartoutSuivi.js), puis l'envoi l'un après l'autre. « Mettre en pause » attend
+  // ENTRE deux envois (`continuer()`), « Reprendre » repart d'où il en était.
   const lancer = async ({ coches, surEtat, surTotal }) => {
-    const planTout = planPartout(lignes || [], coches);
-    const courir = async (plan) => {
-      if (typeof surTotal === 'function') surTotal(plan.length);
-      const sv = suiviPourPartout(await chargerSuivi(), plan, { uid: String(vendActuel() || ''), surGeste: (g) => {
-        if (g !== 'reprendre') return;
-        const reste = plan.filter((e) => res[e.cle] && res[e.cle].etat === 'pas-envoye');
-        if (reste.length) courir(reste);
-      } });
-      const res = await executerPartout({ plan, envoyer, attendre: (j) => attendreFinJob(j),
-        surEtat: (cle, e) => { surEtat(cle, e); if (sv) sv.surEtat(cle, e); }, doitSArreter: sv ? sv.doitSArreter : undefined });
-      if (sv) sv.terminer();
-      return res;
-    };
-    return courir(planTout);
+    const plan = planPartout(lignes || [], coches);
+    if (typeof surTotal === 'function') surTotal(plan.length);
+    const sv = suiviPourPartout(await chargerSuivi(), plan, { uid: String(vendActuel() || '') });
+    const res = await executerPartout({ plan, envoyer, attendre: (j) => attendreFinJob(j),
+      surEtat: (cle, e) => { surEtat(cle, e); if (sv) sv.surEtat(cle, e); }, doitSArreter: sv ? sv.doitSArreter : undefined });
+    if (sv) sv.terminer();
+    return res;
   };
   return <PublierPartout lignes={lignes} lecture={lecture} reglage={reglage} params={params} etatsLbc={LBC_ETATS} saisies={saisies} vus={vus}
     exclues={choisies === undefined ? 0 : voulus.length - choisies.length}
@@ -41843,10 +41848,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!ok) return;
     const owner = AUTH.user?.id || '';
     setRetraitAilleursEnVol(true);
+    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : une ligne par site à retirer (jamais un pseudo).
+    const sitesAuto = plan.articles.flatMap((a) => a.sites.filter((x) => x.voie === 'auto').map((x) => ({ id: x.cle, num: a.numero || '', titre: x.plateforme === 'lbc' || /leboncoin/i.test(String(x.plateforme)) ? 'Leboncoin' : /ebay/i.test(String(x.plateforme)) ? 'eBay' : String(x.plateforme || '') })));
+    const suiviR = suiviTravail.demarrer({ sorte: 'retirer-ailleurs', titre: 'Retirer des autres sites', etapes: [['envoi', 'Demande de retrait au site'], ['accepte', 'Retrait accepté par le site']], articles: sitesAuto });
+    const suivre = (f) => async (site, art) => {
+      if (suiviR && !(await suiviR.continuer())) return { statut: 'arrete', texte: 'pas tenté — arrêté' };
+      if (suiviR) suiviR.etape(site.cle, 'envoi');
+      const r = await f(site, art);
+      if (suiviR) {
+        if (r.statut === 'retire') suiviR.etape(site.cle, 'accepte');
+        suiviR.fin(site.cle, r.statut === 'retire' ? { etat: 'ok' } : r.statut === 'incertain' ? { etat: 'main', raison: r.texte, geste: 'Regarde l’annonce sur le site avant de recommencer' } : r.statut === 'arrete' ? { etat: 'saute', raison: r.texte } : { etat: 'refus', raison: r.texte });
+      }
+      return r;
+    };
     try {
       const res = await executerRetraits(plan, {
-        lbc: async (site) => { let rep = null; try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(site.id), confirme: true }, 70000); } catch (_) { rep = null; } return issueLbc(rep); },
-        ebay: async (site) => {
+        lbc: suivre(async (site) => { let rep = null; try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(site.id), confirme: true }, 70000); } catch (_) { rep = null; } return issueLbc(rep); }),
+        ebay: suivre(async (site) => {
           // Le retrait automatique (allumé chez lui) a peut-être déjà pris cette annonce : on ne la double pas.
           if (__retraitEbayAutoTentes.has(String(site.id))) return { statut: 'incertain', texte: 'le retrait automatique d’eBay s’en occupe déjà — regarde sur eBay' };
           let code = 0, j = null;
@@ -41855,8 +41873,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             code = r && Number.isFinite(r.status) ? r.status : 0; j = await r.json().catch(() => null);
           } catch (_) { code = 0; j = null; }
           return issueEbay(code, j);
-        },
-      }, () => (AUTH.user?.id || '') === owner);
+        }),
+      }, () => (AUTH.user?.id || '') === owner && !(suiviR && suiviR.etat() && suiviR.etat().demande === 'arret'));
+      // Les sites pas tentés (la précédente du même site n'est pas passée) : dits dans la feuille aussi.
+      if (suiviR) { for (const [cle, r] of Object.entries(res)) if (r.statut === 'arrete' && r.texte !== 'pas tenté — arrêté') suiviR.fin(cle, { etat: 'saute', raison: r.texte }); suiviR.terminer(''); }
       setRetraitsAilleurs({ plan, res });
       if (only === 'journee') setFeuilleAilleurs(true);   // le résultat par site se lit dans la feuille
       const nOk = Object.values(res).filter((r) => r.statut === 'retire').length, nKo = Object.values(res).length - nOk;
@@ -56948,6 +56968,8 @@ function AppCoeur() {
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}
       <ConfirmHost/>
+      {/* (11 nov., lot suivi-travail) VRM figé pendant un travail long : détail, barre, pause / arrêt. */}
+      <SuiviTravailCoque/>
       {/* (2 nov.) Le mode automatique des favoris : VRM ouvert dans un onglet suffit. */}
       <PiloteFavorisAutoConnecte comptes={vintedAccounts.map(a=>String(a.vinted_user_id))}/>
       {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe

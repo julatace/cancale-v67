@@ -10,7 +10,7 @@
 //   a-finir    ⇒ fin « main » (à finir sur le site : jamais « fait »)
 //   refuse     ⇒ fin « refus » + sa raison
 //   pas-envoye ⇒ fin « saute » + sa raison
-// « Pause » / « Arrêter » du suivi : lus ENTRE deux envois (`doitSArreter`).
+// « Pause » / « Arrêter » du suivi : lus ENTRE deux envois (`continuer()` : la pause attend Reprendre).
 // Module PUR : `suivi` est passé en argument (null ⇒ aucun suivi, la feuille
 // garde son propre état par case) ; scripts/audit-publier-partout.cjs l'exécute.
 import { NOM_PARTOUT } from './publierPartout.js';
@@ -39,7 +39,11 @@ export function suiviPourPartout(suivi, plan, { titre = 'Publier partout', uid =
   return {
     pilote: p,
     surEtat,
-    doitSArreter: () => { try { return !!p.doitSArreter(); } catch (_) { return true; } },
+    // ENTRE deux envois : `continuer()` du suivi (sur « pause », attend Reprendre / Arrêter) ;
+    // un suivi d'avant sans `continuer` : `doitSArreter()`.
+    doitSArreter: async () => {
+      try { if (typeof p.continuer === 'function') return !(await p.continuer()); return !!p.doitSArreter(); } catch (_) { return true; }
+    },
     terminer: (raison) => { try { p.terminer(raison || ''); } catch (_) {} },
   };
 }

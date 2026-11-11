@@ -396,8 +396,9 @@ export function planPartout(lignes, coches) {
 // Un refus qui dit « plafond », « pause », 429 ou « en cours » ARRÊTE ce site
 // pour le reste de la série (jamais insister) ; les autres sites continuent.
 const ARRET_SITE = /^(plafond|quota|pause|limite|429|403|frein|en-cours|compte|onglet|delai)$/;
-// doitSArreter() : lu ENTRE deux envois (jamais au milieu d'un dépôt) — « Pause » /
-//   « Arrêter » du suivi (SuiviTravail) : ce qui reste n'est PAS envoyé, et le dit.
+// doitSArreter() : lu ENTRE deux envois (jamais au milieu d'un dépôt), peut être une
+//   promesse (« Mettre en pause » du suivi SuiviTravail attend Reprendre / Arrêter) ;
+//   vrai ⇒ ce qui reste n'est PAS envoyé, et le dit.
 // Vestiaire avec des champs « à finir sur le site » (`e.finir`) : le dépôt s'ouvre
 //   sans publier tout seul ⇒ « à finir sur Vestiaire : … » tout de suite, et ce site
 //   s'arrête (un seul dépôt en attente : le suivant écraserait celui-ci).
@@ -407,7 +408,7 @@ export async function executerPartout({ plan, envoyer = {}, attendre, surEtat, d
   let stop = '';
   const dire = (cle, e) => { res[cle] = e; if (typeof surEtat === 'function') { try { surEtat(cle, e); } catch (_) {} } };
   for (const e of arr(plan)) {
-    if (!stop && typeof doitSArreter === 'function') { let v = false; try { v = !!doitSArreter(); } catch (_) { v = true; } if (v) stop = 'pas envoyé : arrêté par toi'; }
+    if (!stop && typeof doitSArreter === 'function') { let v = false; try { v = !!(await doitSArreter()); } catch (_) { v = true; } if (v) stop = 'pas envoyé : arrêté par toi'; }
     if (stop) { if (e && e.cle) dire(e.cle, { etat: 'pas-envoye', raison: stop }); continue; }
     if (!e || !e.num || !e.apercu || !e.apercu.ref) { if (e && e.cle) dire(e.cle, { etat: 'pas-envoye', raison: 'pas de N° : aucune identité, rien ne part' }); continue; }
     if (arrete[e.site]) { dire(e.cle, { etat: 'pas-envoye', raison: arrete[e.site] }); continue; }
