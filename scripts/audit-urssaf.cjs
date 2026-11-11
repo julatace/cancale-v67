@@ -523,7 +523,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   // Constat 3 — on ne note pas une déclaration sur une lecture incomplète.
   essaie('la lecture complète', () => {
     const L = c.lectureIncomplete;
-    const base = { registre: {}, ventes: [], ventesErreur: false, comptesEchec: [], versements: {}, lbc: true, ebay: [] };
+    const base = { registre: {}, ventes: [], ventesErreur: false, comptesEchec: [], versements: {}, lbc: true, ebay: [], vestiaire: [] };
     L(base) === null
       ? ok('tout est lu ⇒ rien ne bloque (l\'autre sens : le geste reste possible)')
       : nok('tout est lu ⇒ rien ne bloque', JSON.stringify(L(base)));
@@ -536,6 +536,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       ['Leboncoin illisible', { lbc: null }, 'rates'],
       ['eBay illisible', { ebay: null }, 'rates'],
       ['registre pas encore chargé', { registre: null }, 'enCours'],
+      // (11 nov., revue robustesse) Vestiaire raté ⇒ « pas su », jamais une liste vide.
+      ['Vestiaire illisible', { vestiaire: null }, 'rates'],
+      ['Vestiaire en cours', { vestiaire: undefined }, 'enCours'],
     ];
     const rates = cas.filter(([, d, ou]) => { const r = L({ ...base, ...d }); return !(r && r[ou] && r[ou].length); }).map(([n]) => n);
     rates.length === 0
@@ -547,6 +550,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   iGarde > 0 && iEcrit > iGarde && /if \(manque\b[^\n]*return; \}/.test(geste)
     ? ok('le GESTE refuse lui-même avant d\'écrire (pas seulement le bouton) : une lecture peut tomber formulaire ouvert')
     : nok('declarerMois refuse une lecture incomplète avant d\'écrire', 'garde absente ou après l\'écriture');
+  /lectureIncomplete\(\{[^}]*vestiaire:\s*ventesVc\b/.test(geste)
+    ? ok('le geste passe la lecture Vestiaire telle quelle (null = pas su, jamais [])')
+    : nok('le geste passe la lecture Vestiaire à la garde', 'vestiaire absent de lectureIncomplete dans declarerMois');
   /data-decl-ouvrir disabled=\{!!report\.incomplet\}/.test(SRC)
     ? ok('le bouton « J\'ai déclaré ce mois » est grisé par la même règle')
     : nok('le bouton est grisé par la même règle');
