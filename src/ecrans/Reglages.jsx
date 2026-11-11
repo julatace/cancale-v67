@@ -1933,7 +1933,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       // (11 nov.) Revenir en arrière : des points posés tout seuls (avant une action en série, un
       // import, chaque jour) ou une sauvegarde complète ⇒ aperçu précis ⇒ choisir quoi ⇒ confirmer (src/restauration.js).
-      { id:'revenir', type:'panneau', nu:true, ic:'restore', lib:'Revenir en arrière', desc:'Après une fausse manip : voir ce qui changera, choisir quoi remettre.', data:{ 'data-reglage-revenir':'' }, el:<RevenirEnArriere/> },
+      { id:'revenir', type:'panneau', nu:true, ic:'undo', lib:'Revenir en arrière', desc:'Après une fausse manip : voir ce qui changera, choisir quoi remettre.', data:{ 'data-reglage-revenir':'' }, el:<RevenirEnArriere/> },
       // (10 nov., lot Y) Ce qu'il a supprimé DANS VRM, restaurable 30 jours (src/corbeille.js).
       { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:'Corbeille', desc:'Ce que tu as supprimé, à restaurer pendant 30 jours.', val:String(lireListeCorbeille().length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', desc:'Remettre VRM tel qu’il était dans une sauvegarde.', onClick:onImport },

@@ -4235,7 +4235,7 @@ function RevenirEnArriere() {
             <Segmente label="Valeurs plus récentes" value={conflits || ''} onChange={setConflits} options={[{ v: 'garder', l: 'Les garder', data: { 'data-retour-conflits-choix': 'garder' } }, { v: 'remettre', l: 'Revenir quand même', data: { 'data-retour-conflits-choix': 'remettre' } }]}/>
           </div>)}
         <div className="vrm-retour-actions">
-          <Bouton variante="primaire" icone="restore" data-retour-confirmer="" occupe={etat === 'envoi'} disabled={!ms || !ms.length} onClick={confirmer}>Revenir à ce moment</Bouton>
+          <Bouton variante="primaire" icone="undo" data-retour-confirmer="" occupe={etat === 'envoi'} disabled={!ms || !ms.length} onClick={confirmer}>Revenir à ce moment</Bouton>
           <Bouton variante="discret" onClick={fermer}>Retour</Bouton>
         </div>
         {!ms && nConflits > 0 && <p className="vrm-retour-tete" data-retour-attend="">Réponds d’abord pour les valeurs plus récentes.</p>}
@@ -14484,6 +14484,8 @@ const ICON_PATHS = {
   shop:   <><path d="M3.5 8h17l-1 11.3a2 2 0 0 1-2 1.8H6.5a2 2 0 0 1-2-1.8L3.5 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></>,
   save:   <><path d="M12 3v11m0 0 4-4m-4 4-4-4"/><path d="M4.5 15v3a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-3"/></>,
   restore:<><path d="M12 21a9 9 0 1 0-9-9"/><path d="M3 4v5h5"/></>,
+  // (11 nov.) « Revenir en arrière » (src/restauration.js) : une flèche qui revient.
+  undo:<><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></>,
   box:    <><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16V8Z"/><path d="M3.5 8 12 12.5 20.5 8M12 12.5V20.5"/></>,
   image:  <><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></>,
   moon:   <><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></>,

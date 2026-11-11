@@ -152,6 +152,8 @@ async function main() {
         await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
         await pg.locator('[data-reglage-revenir]').first().waitFor({ timeout: 15000 });
         await pg.waitForTimeout(1200);   // le nuage lu (les points ne se posent pas avant)
+        await pg.locator('[data-reglage-revenir]').first().scrollIntoViewIfNeeded().catch(() => {});
+        await capture(pg, `retour-reglages-${vp.width}`);
         await tap(pg, '[data-reglage-revenir]');
         await pg.locator('[data-retour-liste]').first().waitFor({ timeout: 8000 });
       };
