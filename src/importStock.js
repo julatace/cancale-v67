@@ -34,9 +34,11 @@
 // Module PUR : exécuté par scripts/audit-import-autre-outil.cjs.
 // ═══════════════════════════════════════════════════════════════════════════
 import { dateDuFichier, prixDuFichier, LIGNES_MAX } from './importAchats.js';
-import { refAchat } from './achatsDoubles.js';
 
 export { LIGNES_MAX };
+// La référence d'une vente comparée : majuscules, lettres et chiffres seulement, 3 au moins
+// (« LBC-77 » = « lbc 77 »). Jamais un titre, un prix ou une date.
+export const refVente = (v) => { const s = String(v == null ? '' : v).toUpperCase().normalize('NFKD').replace(/[^0-9A-Z]/g, ''); return s.length >= 3 && s.length <= 40 ? s : ''; };
 export const SOURCE_IMPORT = 'importe';
 export const CLE_STOCK_IMPORTE = 'vrm_stock_importe';
 export const CLE_VENTES_IMPORTEES = 'vrm_ventes_importees';
@@ -54,16 +56,16 @@ export const champsDe = (mode) => (mode === 'ventes' ? CHAMPS_VENTES : CHAMPS_ST
 
 // ── Les colonnes ──────────────────────────────────────────────────────────────
 const net = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/°|º|#/g, ' n ').replace(/[^a-z0-9]+/g, ' ').trim();
+  .replace(/[°º]/g, '').replace(/#/g, ' n ').replace(/[^a-z0-9]+/g, ' ').trim();
 // L'ORDRE COMPTE : le premier motif qui dit le nom gagne.
 const NUMERO = /^(n|no|nr|num|numero|number|n vrm|numero vrm|n rangement|numero de rangement|n de rangement|n carton|carton|n etiquette|numero d etiquette|etiquette|tag|sku|n sku|item number|stock number|n stock|n article|numero article)$/;
 const MOTS = {
   stock: [
     ['numero', NUMERO],
     ['prix', /^(prix d achat|prix achat|prix paye|cout|cout d achat|cout achat|achat|achete|paye|purchase price|buy price|cost|cost price|unit cost|prix de revient)$/],
-    ['prix', /\b(prix d achat|cout|purchase|cost)\b/],
     ['date', /^(date|date d achat|date achat|achete le|date de l achat|date d entree|entree|date d ajout|ajoute le|purchase date|bought|bought on|date added|added)$/],
     ['date', /\bdate\b/],
+    ['prix', /\b(prix d achat|cout|purchase|cost)\b/],
     ['emplacement', /^(emplacement|rangement|place|localisation|location|lieu|etagere|bac|rayon|zone|bin|shelf|box|boite|stockage|ou)$/],
     ['emplacement', /\b(emplacement|localisation|etagere|location|shelf)\b/],
     ['notes', /^(notes?|remarques?|commentaires?|comments?|observations?|infos?|details?|memo)$/],
@@ -134,7 +136,7 @@ export const eurDe = (p) => { const s = String(p == null ? '' : p).trim(); if (!
 //                numeroPris(n°) ⇒ '' (libre) ou la raison (« déjà dans VRM ») ;
 //                archive : la lettre de l'archive ('' sans archive).
 // opts (ventes) : refsLues : Set des identités lues (`idLu`) ;
-//                 refsImportees : Set des `refAchat` déjà importées ;
+//                 refsImportees : Set des `refVente` déjà importées ;
 //                 avecSansRef : il a coché « importer aussi celles sans n° ».
 // Chaque ligne : { n, etat: 'ok'|'conflit'|'double'|'averifier'|'ecartee', raison, notes:[], rec }.
 export function creerApercu(mode, { rows, colonnes, numeroDe = null, numeroPris = null, archive = '', refsLues = null, refsImportees = null, avecSansRef = false } = {}) {
@@ -183,7 +185,7 @@ export function creerApercu(mode, { rows, colonnes, numeroDe = null, numeroPris 
     const site = texte(val(r, 'plateforme'), 30);
     const plateforme = plateformeDe(site);
     const refBrute = texte(val(r, 'ref'), 40);
-    const ref = refAchat(refBrute);
+    const ref = refVente(refBrute);
     const apercu = titre || refBrute || '';
     if (!titre && !refBrute && (p.ok && !p.prix)) return { ...L, etat: 'ecartee', raison: 'Ligne vide', apercu };
     if (!date) return { ...L, etat: 'ecartee', raison: 'Date de vente illisible', apercu };

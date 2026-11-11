@@ -532,7 +532,7 @@ import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichi
 import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJournee } from "./operations/atelier.js";
 // ⟦→ ecrans/Compta.jsx #8⟧
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
-import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport } from "./importStock.js";
+import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, refVente } from "./importStock.js";
 import { ImportStockReglage } from "./composants/ImportStock.jsx";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
@@ -583,7 +583,7 @@ import {ChoixReponses,ResumeOffre} from "./ActionsClaires.jsx";
 import {LignePlancher} from "./LignePlancher.jsx";
 import { CLE_NOTES_PAIRES, NOTE_MAX, noteDe, opsNote, notesPropres, numerosAmbigus } from './notePaire.js';
 import { NotePaireVue } from './NotePaire.jsx';
-import { CLE_HORS_MASQUES, achatsEnDouble, opsGarder, horsVisibles, refAchat as refAchatImport } from './achatsDoubles.js';
+import { CLE_HORS_MASQUES, achatsEnDouble, opsGarder, horsVisibles } from './achatsDoubles.js';
 import { AchatsEnDouble } from './AchatsEnDouble.jsx';
 import {DejaEnStock} from "./DejaEnStock.jsx";
 import {ReventeModele} from "./ReventeModele.jsx";
@@ -4040,7 +4040,7 @@ const outilsImport = {
   contexte: async (mode) => {
     if (mode === 'ventes') {
       if (!isCloudReady()) return null;
-      const refsImportees = new Set(lireVentesImportees().filter((x) => x && x.ref).map((x) => (x.plateforme || '') + '|' + refAchatImport(x.ref)));
+      const refsImportees = new Set(lireVentesImportees().filter((x) => x && x.ref).map((x) => (x.plateforme || '') + '|' + refVente(x.ref)));
       return { refsLues: ventesLuesImport(), refsImportees };
     }
     const pris = await numerosServisImport();
