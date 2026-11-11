@@ -171,7 +171,7 @@ async function sw(ctx, id, ms = 20000) {
 }
 const dansSW = async (ctx, id, fn, a) => { const s = await sw(ctx, id, 8000); if (!s) return { erreur: 'pas de service worker' }; return s.evaluate(fn, a).catch((e) => ({ erreur: String(e.message || e).slice(0, 200) })); };
 const attendreQue = async (fn, ms, pas = 300) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const v = await fn().catch(() => null); if (v) return v; await attendre(pas); } return null; };
-const capture = async (pg, nom) => { if (!CAPT || !pg) return; fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, nom + '.png') }).catch(() => {}); };
+const capture = async (pg, nom) => { if (process.env.BANC_DEBUG && pg && pg.__enCours) { console.log('     EN COURS', nom, [...pg.__enCours.values()].map((u) => u.slice(0, 140))); console.log('     TEXTE', nom, (await pg.evaluate(() => document.visibilityState + ' focus=' + document.hasFocus() + ' ' + document.body.innerText).catch(() => '')).replace(/\s+/g, ' ').slice(0, 1500)); } if (!CAPT || !pg) return; fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, nom + '.png') }).catch(() => {}); };
 
 // La session de l'app (comme `session.cjs`) : posée une fois, base cloisonnée.
 async function poserSessionApp(ctx, s) {
@@ -188,6 +188,7 @@ async function poserSessionApp(ctx, s) {
 
 // Annonces → À relancer → Qui dorment (comme baisse-prix.cjs).
 async function ouvrirQuiDorment(pg) {
+  await pg.bringToFront();
   await pg.goto('https://vrm.center/?tab=vinted_annonces', { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('[data-vue-relancer]', { timeout: 40000 }).catch(() => {});
   await pg.locator('[data-vue-relancer]').first().click().catch(() => {});
@@ -242,7 +243,7 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
   try {
     const ctx = await lancer(path.join(TMP, 'profil'), EXT); ctxs.push(ctx);
     const erreursApp = [];
-    ctx.on('page', (p) => p.on('pageerror', (e) => { if (/vrm\.center/.test(p.url())) erreursApp.push(String(e.message).slice(0, 160)); }));
+    ctx.on('page', (p) => { p.on('pageerror', (e) => { if (/vrm\.center/.test(p.url())) erreursApp.push(String(e.message).slice(0, 160)); }); if (process.env.BANC_DEBUG) { const enCours = new Map(); p.on('request', (r) => enCours.set(r, r.url())); p.on('requestfinished', (r) => enCours.delete(r)); p.on('requestfailed', (r) => { console.log('     ÉCHEC', r.url().slice(0, 160), r.failure() && r.failure().errorText); enCours.delete(r); }); p.__enCours = enCours; } if (process.env.BANC_DEBUG) p.on('console', (m) => { if (/vrm\.center/.test(p.url()) && m.type() !== 'debug') console.log('     app>', m.type(), m.text().slice(0, 200)); }); });
     const sApp = M.ouvrir(M.USERS.get(U.email));
     await poserSessionApp(ctx, { access_token: sApp.access_token, refresh_token: sApp.refresh_token, expires_at: Date.now() + 3600e3, user: sApp.user });
     const w = await sw(ctx, ID);
@@ -275,8 +276,8 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
     const vt = await ctx.newPage();
     if (veut(2) || veut(3) || veut(4) || veut(5)) {
       console.log('\n── 2. visite du dressing ⇒ Annonces');
-      await vt.goto('https://www.vinted.fr/banc/connexion?uid=111');
-      await vt.goto('https://www.vinted.fr/member/111-vendeur_a');
+      await vt.bringToFront(); await vt.goto('https://www.vinted.fr/banc/connexion?uid=111');
+      await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/111-vendeur_a');
       const lignes = await attendreQue(async () => { const l = M.ligne('harvest_111_listings'); const v = M.ligne('harvest_111_orders_sold'); const a = M.lignes('vinted_accounts').find((x) => String(x.vinted_user_id) === '111'); return l && v && a ? { l, v, a } : null; }, 45000, 500);
       dit(!!lignes, '2 : la visite range le dressing, les ventes et le compte (lignes écrites par l’extension)', JSON.stringify(M.lignes().map((r) => r.id)));
       const items = lignes ? (lignes.l.data.payload.items || []).map((x) => String(x.id)).sort() : [];
@@ -284,7 +285,7 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
       dit(!!lignes && lignes.l.owner === U.id && lignes.a.owner === U.id, '2 : rangé sous CE vendeur VRM (owner du jeton de l’extension)');
       // Il regarde le dressing d'un autre membre : la page charge SES annonces.
       const n0 = vinted().length;
-      await vt.goto('https://www.vinted.fr/member/222-autre_b');
+      await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/222-autre_b');
       await attendreQue(async () => vinted((e) => e.p === '/api/v2/wardrobe/222/items').length > 0, 15000);
       await attendre(4000);
       const l2 = M.ligne('harvest_111_listings');
@@ -293,7 +294,7 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
       void n0;
       // L'app : Annonces.
       const pg = vrm || await ctx.newPage();
-      await pg.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
+      await pg.bringToFront(); await pg.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
       const cartes = await attendreQue(async () => { const c = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce]')].map((x) => x.getAttribute('data-carte-annonce'))); return c.length ? c : null; }, 40000, 500) || [];
       await capture(pg, '2-annonces');
       dit(cartes.includes('91010001') && cartes.includes('91010002'), '2 : ses annonces sont visibles dans Annonces', JSON.stringify(cartes));
@@ -301,7 +302,7 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
 
       // ══ 3. LA VENTE ════════════════════════════════════════════════════════
       console.log('\n── 3. une vente ⇒ Ventes');
-      await pg.goto('https://vrm.center/?tab=cat_ventes', { waitUntil: 'domcontentloaded' });
+      await pg.bringToFront(); await pg.goto('https://vrm.center/?tab=cat_ventes', { waitUntil: 'domcontentloaded' });
       const ventes = await attendreQue(async () => { const v = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sale-row[data-tx]')].map((x) => ({ tx: x.getAttribute('data-tx'), compte: (x.querySelector('[data-vente-compte]') || x).getAttribute('data-vente-compte') || '', texte: x.innerText.slice(0, 120) }))); return v.length ? v : null; }, 40000, 500) || [];
       await capture(pg, '3-ventes');
       const v1 = ventes.find((v) => v.tx === '7001001');
@@ -316,7 +317,7 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
       console.log('\n── 4. « Baisser le prix » depuis l’app ⇒ l’extension, au nom du compte de l’onglet');
       // Il a modifié une fois l'annonce sur vinted.fr (enregistrée sans rien
       // changer) : la page envoie SA fiche, l'extension apprend le format.
-      await vt.goto('https://www.vinted.fr/items/91010001-annonce/edit');
+      await vt.bringToFront(); await vt.goto('https://www.vinted.fr/items/91010001-annonce/edit');
       await vt.evaluate(async () => {
         const corps = JSON.stringify({ item: { id: 91010001, title: 'Nike Cortez blanche', description: 'Très bon état', price: { amount: '60.0', currency_code: 'EUR' }, catalog_id: 1234, assigned_photos: [{ id: 910100010, orientation: 0 }] } });
         await fetch('/api/v2/item_upload/items/91010001', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: corps });
@@ -325,7 +326,7 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
       dit(!!appris, '4 : son propre enregistrement sur vinted.fr apprend le format de l’annonce (vrm_vinted_modele)');
       const coffre = M.ligne('coffre_111_91010001');
       dit(!!coffre, '4 : l’annonce est sauvegardée dans le coffre (filet avant tout geste)');
-      await vt.goto('https://www.vinted.fr/member/111-vendeur_a');      // l'onglet reste sur vinted.fr
+      await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/111-vendeur_a');      // l'onglet reste sur vinted.fr
       await attendre(1500);
       const d0 = vinted().length;
       const r = await baisserDepuisApp(pg, 91010001);
@@ -376,8 +377,8 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
     // ══ 5. UN AUTRE COMPTE DANS L'ONGLET ═════════════════════════════════════
     if (veut(5)) {
       console.log('\n── 5. il bascule l’onglet sur autre_b ⇒ rien n’est fait pour vendeur_a');
-      await vt.goto('https://www.vinted.fr/banc/connexion?uid=222');
-      await vt.goto('https://www.vinted.fr/member/222-autre_b');
+      await vt.bringToFront(); await vt.goto('https://www.vinted.fr/banc/connexion?uid=222');
+      await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/222-autre_b');
       const actif = await attendreQue(async () => { const r = await dansSW(ctx, ID, async () => compteConnecte('www.vinted.fr')); return r === '222' ? r : null; }, 15000);
       dit(actif === '222', '5 : l’extension voit autre_b dans l’onglet');
       // La vente d'autre_b, lue à la visite, est rangée sous autre_b.
@@ -419,8 +420,8 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
       const co = w6 ? await w6.evaluate(async (a) => { const r = await authLogin(a.e, a.p); return r && r.ok; }, { e: U.email, p: U.mdp }).catch(() => false) : false;
       dit(co === true, '6 : l’extension 5.335 est installée et connectée à ce compte VRM');
       const v6 = await ctx6.newPage();
-      await v6.goto('https://www.vinted.fr/banc/connexion?uid=111');
-      await v6.goto('https://www.vinted.fr/member/111-vendeur_a');
+      await v6.bringToFront(); await v6.goto('https://www.vinted.fr/banc/connexion?uid=111');
+      await v6.bringToFront(); await v6.goto('https://www.vinted.fr/member/111-vendeur_a');
       await attendre(3000);
       const p6 = await ctx6.newPage();
       const etat = await (async () => { await p6.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' }); return attendreQue(() => p6.evaluate(() => new Promise((ok) => { const reqId = 'v' + Math.random(); const h = (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'etat:result' && d.reqId === reqId) { window.removeEventListener('message', h); ok(d.resp); } }; window.addEventListener('message', h); window.postMessage({ __vmr: 'etat', reqId }, '*'); setTimeout(() => ok(null), 4000); })), 20000); })();
@@ -440,6 +441,9 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
   } catch (e) {
     dit(false, 'le banc a tourné jusqu’au bout', String(e && e.stack || e).slice(0, 300));
   } finally {
+    if (process.env.BANC_DUMP) fs.writeFileSync(process.env.BANC_DUMP, JSON.stringify(M.st.tables));
+    if (process.env.BANC_JOURNAL) for (const a of M.st.api) console.log(`     API ${a.m} ${a.p}${a.q} ${a.src}`);
+    if (process.env.BANC_JOURNAL) for (const j of journal) if (j.src === 'app') console.log(`     ${j.m} ${j.t} ${j.q || j.ids || ''} → ${j.n}`);
     for (const c of ctxs) await c.close().catch(() => {});
     await M.fermer();
     try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (_) {}

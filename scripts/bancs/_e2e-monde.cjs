@@ -118,6 +118,13 @@ function monde({ tls, port, dist, comptes, journal }) {
       if (!u) return rep(res, 200, []);
       // `meta->>k` (colonne calculée par la base, migration 004) : relu dans `data`, même règle que le SQL.
       const r = servir(miens(), metaVersData(url.toString()), req.headers);
+      // `select=*` : TOUTE la ligne (le mini PostgREST ne rend que les colonnes d'app_data).
+      const sel = q.get('select');
+      if (!sel || sel === '*') {
+        const l = miens(); const ref = l.map((x, i) => Object.assign({ __ref: i }, x));
+        const u2 = new URL(metaVersData(url.toString())); u2.searchParams.set('select', '__ref');
+        r.body = servir(ref, u2.toString(), req.headers).body.map((x) => Object.assign({}, l[x.__ref]));
+      }
       noter({ k: 'rest', src, m, t, q: url.search.slice(0, 160), n: r.body.length });
       return rep(res, 200, r.body, { 'content-range': r.range });
     }
@@ -131,7 +138,9 @@ function monde({ tls, port, dist, comptes, journal }) {
         if (!r0 || r0[conflit] == null) continue;
         const i = rows.findIndex((x) => String(x[conflit]) === String(r0[conflit]));
         if (i >= 0 && rows[i].owner !== u.sub) return rep(res, 403, { code: '42501', message: 'row-level security' });
-        const ligne = Object.assign({}, i >= 0 ? rows[i] : {}, r0, { owner: u.sub, updated_at: new Date().toISOString() });
+        // Les défauts de la vraie table (`id` par séquence pour vinted_accounts, schema-exemple.sql).
+        const defauts = i < 0 && t === 'vinted_accounts' ? { id: ++st.n, login: null } : {};
+        const ligne = Object.assign(defauts, i >= 0 ? rows[i] : {}, r0, { owner: u.sub, updated_at: new Date().toISOString() });
         if (i >= 0) rows[i] = ligne; else rows.push(ligne);
         st.ecritures.push({ t, id: String(r0[conflit]), src, at: Date.now() });
       }
@@ -157,6 +166,8 @@ function monde({ tls, port, dist, comptes, journal }) {
       if (req.method === 'OPTIONS') return rep(res, 204, '');
       if (p === '/api/sante') return rep(res, 200, { ok: true });
       const u = qui(req);
+      if (p === '/api/compte' && url.searchParams.get('mode') === 'equipe') return rep(res, 200, { ok: false, erreur: 'non-installe' });
+      if (p === '/api/compte' && url.searchParams.get('mode') === 'abonnement') return rep(res, 200, { ok: true, proprietaire: true, acces: true, statut: 'active', configure: true });
       if (p === '/api/compte' && url.searchParams.get('mode') === 'session-extension') {
         // Le serveur fabrique une session À PART pour le même compte (lien magique
         // échangé côté serveur en production) : une famille de jetons à elle.
@@ -240,7 +251,7 @@ function monde({ tls, port, dist, comptes, journal }) {
         if (host === 'www.vinted.fr') return vinted(req, res, url, corps);
         if (host === 'images1.vinted.net') { res.writeHead(200, { 'content-type': 'image/svg+xml', 'access-control-allow-origin': '*' }); return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="#ccc"/></svg>'); }
         return rep(res, 404, '');
-      } catch (e2) { try { rep(res, 500, { e: String(e2) }); } catch (_) {} }
+      } catch (e2) { noter({ k: 'rest', src: quiParle(req), m: req.method, t: 'ERREUR ' + String(e2 && e2.message).slice(0, 120), q: url.search.slice(0, 200), n: 500 }); try { rep(res, 500, { e: String(e2) }); } catch (_) {} }
     });
   });
   return {
