@@ -356,7 +356,7 @@ async function extension() {
       }
       return fetchFond(url, o);
     };
-    f.ctx.authToken = async () => ({ access_token: 'session' }); f.ctx.notifierApp = async () => {};
+    f.ctx.authToken = async () => ({ access_token: 'session', user_id: 'owner-banc' }); f.ctx.notifierApp = async () => {};
     let r = {}; try { r = await f.ctx.executerMessageFavori('111', { vinted_user_id: '111', domain: 'www.vinted.fr', access_token: 'j' }, { jeton: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }); } catch (e) { r = { erreur: String(e.message) }; }
     return { r, ecritures: f.j.vinted.filter((v) => v.methode === 'POST').map((v) => v.chemin) };
   };

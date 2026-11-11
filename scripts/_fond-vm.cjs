@@ -77,6 +77,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
+  // (5.366) « N'agir que si tu es là » : par défaut, le banc est quelqu'un qui vient d'utiliser
+  // l'onglet (un audit qui juge la présence pose lui-même `vrmSecu`).
+  if (store.vrmSecu === undefined) { const t = Date.now(); store.vrmSecu = { presence: { vinted: t, vestiaire: t, leboncoin: t } }; }
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
   const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [],

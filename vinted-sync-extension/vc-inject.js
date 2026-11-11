@@ -1121,8 +1121,11 @@
   // (5.366) Un CONTRÔLE ANTI-ROBOT de Vestiaire (DataDome, captcha) se reconnaît à ses
   // en-têtes ou au début du texte : seul le OUI/NON sort (et le Retry-After), jamais le texte.
   const defiDe = (res, txt) => {
-    try { if (res && res.headers && (res.headers.get('x-datadome') || res.headers.get('x-dd-b') || /challenge/i.test(String(res.headers.get('cf-mitigated') || '')))) return true; } catch (_) {}
-    return Number(res && res.status) >= 400 && /captcha-delivery\.com|geo\.captcha|\bdatadome\b|\bcaptcha\b|cf-chl|challenge-platform|hcaptcha|recaptcha|turnstile|just a moment/i.test(String(txt || '').slice(0, 6000));
+    const st = Number(res && res.status) || 0;
+    // `x-datadome: protected` accompagne aussi les réponses normales : seulement sur un refus (≥ 400).
+    try { if (res && res.headers && st >= 400 && (/protected|blocked/i.test(String(res.headers.get('x-datadome') || '')) || /^\d+$/.test(String(res.headers.get('x-dd-b') || '').trim()))) return true; } catch (_) {}
+    try { if (res && res.headers && /^challenge$/i.test(String(res.headers.get('cf-mitigated') || '').trim())) return true; } catch (_) {}
+    return st >= 400 && /captcha-delivery\.com|geo\.captcha|\bdatadome\b|\bcaptcha\b|cf-chl|challenge-platform|hcaptcha|recaptcha|turnstile|just a moment/i.test(String(txt || '').slice(0, 6000));
   };
   const raDe = (res) => { try { const v = res && res.headers && res.headers.get('retry-after'); return v ? String(v).slice(0, 40) : ''; } catch (_) { return ''; } };
   // ── 5.319 (4 nov., Julien : « voir les offres reçues sur Vestiaire et y répondre

@@ -13220,7 +13220,10 @@ function secuDefi(rep) {
   const r = rep && typeof rep === 'object' ? rep : {};
   const st = Number(r.status) || 0;
   const e = r.entetes && typeof r.entetes === 'object' ? r.entetes : {};
-  if (e['x-datadome'] || e['x-dd-b'] || /challenge/i.test(String(e['cf-mitigated'] || ''))) return 'robot';
+  // ⚠️ `x-datadome: protected` accompagne AUSSI les réponses normales d'un site protégé :
+  //    l'en-tête ne vaut « contrôle » que sur un REFUS (≥ 400) ; `cf-mitigated: challenge` est un défi.
+  if (st >= 400 && (/protected|blocked/i.test(String(e['x-datadome'] || '')) || /^\d+$/.test(String(e['x-dd-b'] || '').trim()))) return 'robot';
+  if (/challenge/i.test(String(e['cf-mitigated'] || ''))) return 'robot';
   const html = /text\/html/i.test(String(e['content-type'] || ''));
   if (st < 400 && !html && !r.defi) return '';
   let txt = String(r.texte || '').slice(0, 6000);
@@ -13481,7 +13484,11 @@ function secuEntetes(res) {
 async function secuGeste(pf, compte, sorte, mode, opts = {}) {
   const cle = secuCle(pf, compte);
   if (!cle) return null;                       // compte illisible : les gardes d'avant décident (elles refusent)
+  // L'heure de la décision : jamais AVANT la fin d'une attente déjà faite (un minuteur
+  // réveillé un peu tôt ne doit pas refaire attendre le même geste).
+  let horloge = Date.now();
   for (let tour = 0; tour < 3; tour++) {
+    horloge = Math.max(horloge, Date.now());
     const s = await secuLire();
     if (s === null) return mode === 'clic' ? null : { ok: false, code: 'stockage', secu: 'stockage', error: RAISON_STOCKAGE };
     let lu = null;
@@ -13494,7 +13501,7 @@ async function secuGeste(pf, compte, sorte, mode, opts = {}) {
     const arret = secuArretEffectif([...(Array.isArray(tout.evts) ? tout.evts : []), ...((lu && lu.autres) || []), ...(Array.isArray(s.evts) ? s.evts : [])]).arrete;
     const c = (s.comptes && s.comptes[cle]) || {};
     const profil = SECU_COMPTES.includes(mode) && reg.rodage ? await secuProfil(pf, compte) : null;
-    const d = secuDecision({ reg, etat: c, sorte, mode, maintenant: Date.now(), compte: String(compte), gestes: c.gestes, presenceAt: (s.presence || {})[pf], profil, arret });
+    const d = secuDecision({ reg, etat: c, sorte, mode, maintenant: horloge, compte: String(compte), gestes: c.gestes, presenceAt: (s.presence || {})[pf], profil, arret });
     if (!d.ok) {
       await secuDireRefus(cle, pf, d);
       await secuPublier(false);
@@ -13504,6 +13511,7 @@ async function secuGeste(pf, compte, sorte, mode, opts = {}) {
       if (opts.sansAttendre) { const dd = { code: 'espace', jusqua: Date.now() + d.attendreMs }; return { ok: false, code: 'secu-espace', secu: 'espace', jusqua: dd.jusqua, error: secuTexte(SECU_REFUS, 'espace', secuMots(pf, dd)) }; }
       try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['secu:' + mode, d.attendreMs]); } catch (_) {}
       await new Promise((ok) => setTimeout(ok, d.attendreMs));
+      horloge += d.attendreMs;
       continue;                                // relu après l'attente (« Tout arrêter » a pu tomber entre-temps)
     }
     // La place est prise : notée AVANT le geste (comme le plafond horaire), jamais après.

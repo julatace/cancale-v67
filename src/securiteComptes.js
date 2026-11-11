@@ -188,7 +188,10 @@ function secuDefi(rep) {
   const r = rep && typeof rep === 'object' ? rep : {};
   const st = Number(r.status) || 0;
   const e = r.entetes && typeof r.entetes === 'object' ? r.entetes : {};
-  if (e['x-datadome'] || e['x-dd-b'] || /challenge/i.test(String(e['cf-mitigated'] || ''))) return 'robot';
+  // ⚠️ `x-datadome: protected` accompagne AUSSI les réponses normales d'un site protégé :
+  //    l'en-tête ne vaut « contrôle » que sur un REFUS (≥ 400) ; `cf-mitigated: challenge` est un défi.
+  if (st >= 400 && (/protected|blocked/i.test(String(e['x-datadome'] || '')) || /^\d+$/.test(String(e['x-dd-b'] || '').trim()))) return 'robot';
+  if (/challenge/i.test(String(e['cf-mitigated'] || ''))) return 'robot';
   const html = /text\/html/i.test(String(e['content-type'] || ''));
   if (st < 400 && !html && !r.defi) return '';
   let txt = String(r.texte || '').slice(0, 6000);

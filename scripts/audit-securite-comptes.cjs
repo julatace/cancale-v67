@@ -46,7 +46,7 @@ const MUTATIONS = {
   rafale: ['src/securiteComptes.js', 'if (reste > 0) {', 'if (false) {'],
   rond: ['src/securiteComptes.js', 'if (reste < 1500 || reste > 58500) v += 2300 + r() * 4100;', ''],
   decalage: ['src/securiteComptes.js', 'if (!v) return 0;', 'return 0;'],
-  defi: ['src/securiteComptes.js', "if (e['x-datadome'] || e['x-dd-b'] || /challenge/i.test(String(e['cf-mitigated'] || ''))) return 'robot';", ''],
+  defi: ['src/securiteComptes.js', "if (st >= 400 && (/protected|blocked/i.test(String(e['x-datadome'] || ''))", "if ((/protected|blocked/i.test(String(e['x-datadome'] || ''))"],
   retry: ['vinted-sync-extension/background.js', 'const minutes = Math.max(PAUSE_PALIERS_MIN[niveau - 1], Math.ceil((Number(retryMs) || 0) / 60000));', 'const minutes = PAUSE_PALIERS_MIN[niveau - 1];'],
   moteur: ['vinted-sync-extension/background.js', "if (await secuGeste('vinted', uid, 'offre', 'auto')) break;", ''],
   observer: ['vinted-sync-extension/background.js', "        c.robot = { depuis: t };", ''],
@@ -155,7 +155,8 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   // Retry-After et détection.
   dit(S.secuRetryAfterMs('120', 0) === 120000 && S.secuRetryAfterMs('n’importe quoi', 0) === 0 && S.secuRetryAfterMs('999999', 0) === 24 * 3600000, 'R21 Retry-After lu en secondes (ou date), borné à 24 h');
   dit(S.secuDefi({ status: 403, json: { url: 'https://geo.captcha-delivery.com/captcha/?initialCid=x' } }) === 'robot'
-    && S.secuDefi({ status: 200, entetes: { 'x-datadome': 'protected' } }) === 'robot'
+    && S.secuDefi({ status: 403, entetes: { 'x-datadome': 'protected' } }) === 'robot'
+    && S.secuDefi({ status: 200, entetes: { 'x-datadome': 'protected', 'content-type': 'application/json' }, json: { ok: 1 } }) === ''
     && S.secuDefi({ status: 403, json: { message: 'Ton compte est restreint pour activité automatisée' } }) === 'restreint'
     && S.secuDefi({ status: 200, json: { item: { description: 'pas de captcha ici' } } }) === ''
     && S.secuDefi({ status: 429, json: {} }) === '', 'R22 contrôle anti-robot reconnu (DataDome, captcha), restriction reconnue, une annonce qui dit « captcha » ne l’est pas');
