@@ -62,6 +62,8 @@ export const DESSINS_TRANSPORTEURS = Object.freeze({
   relaiscolis: { fond: '#E2001A', svg: `<text x="16" y="14.6" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.8" letter-spacing="-0.3" textLength="22" lengthAdjust="spacingAndGlyphs">Relais</text><text x="16" y="24.4" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.8" letter-spacing="-0.3" textLength="20" lengthAdjust="spacingAndGlyphs">Colis</text>` },
   shop2shop: { fond: '#00A0DF', svg: `<text x="16" y="14.4" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.6" letter-spacing="-0.3" textLength="21" lengthAdjust="spacingAndGlyphs">Shop2</text><text x="16" y="24.2" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.6" letter-spacing="-0.3" textLength="18" lengthAdjust="spacingAndGlyphs">Shop</text>` },
   gls: { fond: '#061AB1', svg: `<text x="16" y="20.4" text-anchor="middle" fill="#FFD100" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="900" font-size="12.5" letter-spacing="-0.4" textLength="22" lengthAdjust="spacingAndGlyphs">GLS</text>` },
+  // (11 nov., lot DJ3) La Poste (lettre suivie) : l'oiseau-enveloppe stylisé, bleu sur jaune, et le mot.
+  laposte: { fond: '#FFCD00', svg: `<path d="M7 13.2 16 8l9 5.2-9 3.6Z" fill="#003DA5"/><path d="M16 16.8 25 13.2 21.6 18.6 16 20.4Z" fill="#003DA5" opacity=".75"/><text x="16" y="27.2" text-anchor="middle" fill="#003DA5" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="7.4" letter-spacing="-0.2" textLength="22" lengthAdjust="spacingAndGlyphs">La Poste</text>` },
   colisprive: { fond: '#EE7203', svg: `<text x="16" y="14.6" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.8" letter-spacing="-0.3" textLength="20" lengthAdjust="spacingAndGlyphs">Colis</text><text x="16" y="24.4" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.8" letter-spacing="-0.3" textLength="20" lengthAdjust="spacingAndGlyphs">Privé</text>` },
 });
 
@@ -81,6 +83,7 @@ export const TRANSPORTEURS = Object.freeze({
   gls:          { nom: 'GLS',           logos: [], marque: { fond: '#061AB1', encre: '#FFD100', sigle: 'GLS' } },
   colisprive:   { nom: 'Colis Privé',   logos: [], marque: { fond: '#EE7203', encre: '#FFFFFF', sigle: 'CP' } },
   shop2shop:    { nom: 'Shop2Shop',     logos: [], marque: { fond: '#00A0DF', encre: '#FFFFFF', sigle: 'S2' } },
+  laposte:      { nom: 'La Poste',      logos: [], marque: { fond: '#FFCD00', encre: '#003DA5', sigle: 'LP' } },
   inpost:       { nom: 'InPost',        logos: [], marque: { fond: '#FFCD00', encre: '#1D1D1B', sigle: 'IP' } },
   dhl:          { nom: 'DHL',           logos: [], marque: { fond: '#FFCC00', encre: '#D40511', sigle: 'DHL' } },
   fedex:        { nom: 'FedEx',         logos: [], marque: { fond: '#4D148C', encre: '#FFFFFF', sigle: 'FX' } },
@@ -94,14 +97,17 @@ const sansAccents = (s) => String(s == null ? '' : s).normalize('NFD').replace(/
 export function cleTransporteur(raw) {
   const s = sansAccents(raw).replace(/[_\-.]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s) return null;
-  if (/mondial/.test(s)) return 'mondialrelay';
+  // ⚠️ (11 nov., lot DJ3 — Julien : « tu mets InPost mais InPost appartient à Mondial Relay ») En France,
+  // « InPost » sur un bordereau ou un e-mail Vinted est le réseau Mondial Relay (« Mondial Relay by InPost »,
+  // mesuré sur ses e-mails ; 19 étiquettes de sa base ne nomment qu'« InPost » et portent le logo Mondial
+  // Relay). Le logo montré est celui du bordereau : Mondial Relay. Une clé `inpost` rangée avant est relue ici.
+  if (/mondial|inpost/.test(s)) return 'mondialrelay';
   if (/shop ?2 ?shop/.test(s)) return 'shop2shop';
   if (/chrono|pickup/.test(s)) return 'chronopost';
   if (/relais ?colis/.test(s)) return 'relaiscolis';
   if (/colis ?prive/.test(s)) return 'colisprive';
   if (/coliss|la ?poste|laposte/.test(s)) return 'colissimo';
   if (/vinted/.test(s)) return 'vinted';
-  if (/inpost/.test(s)) return 'inpost';
   if (/\bdpd\b/.test(s)) return 'dpd';
   if (/\bups\b/.test(s)) return 'ups';
   if (/\bgls\b/.test(s)) return 'gls';

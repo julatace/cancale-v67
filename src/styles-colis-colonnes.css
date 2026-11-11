@@ -291,3 +291,11 @@ html body .vrm-rpf-ligne .vrm-rpf-desaccord { display: flex; flex-direction: col
 html body .vrm-rpf-ligne .vrm-rpf-desaccord-t { font-weight: 600; }
 html body .vrm-rpf-ligne .vrm-rpf-desaccord-v b { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 html body .vrm-rpf-ligne .vrm-rpf-code-origine { margin: 4px 0; font-size: 12px; color: var(--p-gris, #86868b); }
+
+/* ── (11 nov., lot DJ3) LES COLIS EN SECTION de Ventes (« À expédier ») et d'Achats (« À retirer ») ──
+   L'intertitre et la barre (Scanner · Tout imprimer · …) sur UNE ligne ; la ligne de résumé, discrète.
+   Les règles de l'écran Colis (styles-premium.css) s'appliquent aussi à `.vrm-colis-section`. */
+.vrm-colis-section-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-width: 0; margin: 14px 0 10px; }
+.vrm-colis-section-titre { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink, #1D1D1F); }
+.vrm-colis-section-tete .vrm-colis-barre { margin-left: auto; }
+.vrm-colis-resume { margin: 0 2px 10px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }

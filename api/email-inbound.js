@@ -1720,7 +1720,8 @@ export function detecterTransporteur(mail) {
     : /relais\s*colis|relaiscolis/.test(carrierSrc) ? 'relaiscolis'
     : /colissimo|\bla\s*poste\b|laposte/.test(carrierSrc) ? 'colissimo'
     : /shop\s*2\s*shop|shop2shop/.test(carrierSrc) ? 'shop2shop'
-    : /inpost/.test(carrierSrc) ? 'inpost'
+    // (11 nov., lot DJ3) « InPost » = le réseau Mondial Relay en France (« Mondial Relay by InPost »).
+    : /inpost/.test(carrierSrc) ? 'mondialrelay'
     : /\bups\b/.test(carrierSrc) ? 'ups'
     : /\bdpd\b/.test(carrierSrc) ? 'dpd'
     : /\bgls\b/.test(carrierSrc) ? 'gls'

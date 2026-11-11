@@ -6436,14 +6436,15 @@ const methodeDuPoint = (colis) => {
 };
 const carrierKey = (raw) => {
   const s = String(raw || '').toLowerCase();
-  if (/mondial/.test(s)) return 'mondialrelay';
+  // (11 nov., lot DJ3 — Julien : « tu mets InPost mais InPost appartient à Mondial Relay ») « InPost » = le réseau
+  // Mondial Relay en France : le logo du bordereau (src/transporteursVisuels.js, `cleTransporteur`).
+  if (/mondial|inpost/.test(s)) return 'mondialrelay';
   if (/chrono/.test(s)) return 'chronopost';
   if (/\bups\b/.test(s)) return 'ups';
   if (/vinted/.test(s)) return 'vinted';
   if (/relais\s*colis|relaiscolis/.test(s)) return 'relaiscolis';
   if (/coliss|la\s*poste|laposte/.test(s)) return 'colissimo';
   if (/shop\s*2\s*shop|shop2shop/.test(s)) return 'shop2shop';
-  if (/inpost/.test(s)) return 'inpost';
   if (/\bdpd\b/.test(s)) return 'dpd';
   if (/\bgls\b/.test(s)) return 'gls';
   if (/\bdhl\b/.test(s)) return 'dhl';
@@ -15989,10 +15990,9 @@ function BottomBar({tab,setTab,sites,badges}) {
     window.addEventListener('resize',poser);
     return ()=>{ window.removeEventListener('resize',poser); try{ ro&&ro.disconnect(); }catch(_){} };
   },[]);
-  // Un nombre ne s'écrit qu'une fois sur l'écran (§7) : Ventes et Colis portent
-  // la MÊME notion (les colis à poster, `vrm_colis_aposter`). Dans la barre, il
-  // reste sur Colis, là où on les poste ; la colonne de l'ordinateur ne change pas.
-  const badgesBarre=badges?{...badges,ventes:undefined}:badges;
+  // (11 nov., lot DJ3) Colis n'est plus dans la barre : le nombre de colis à poster
+  // (`vrm_colis_aposter`) est porté par Ventes, là où on les poste désormais.
+  const badgesBarre=badges;
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
