@@ -22,7 +22,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {appelerEbay} from './ebayRequetes.js';
 import Pourquoi from './composants/PourquoiReplie.jsx';
-import {veillesDuFil,MAX_VEILLES_ACTIVES} from './operations/metier.js';
+import {veillesDuFil,MAX_VEILLES_ACTIVES,criteresDeVeille} from './operations/metier.js';
 
 export const RELIRE_MS = 15 * 60 * 1000;
 // Le jour de Paris (le plafond du serveur repart à minuit, heure de Paris).
@@ -82,10 +82,8 @@ export function raisonEchec(res) {
 // charger cet écran) ; ré-exporté ici, ses lecteurs ne changent pas.
 import { repereAdmis } from './repereEbay.js';
 export { repereAdmis };
-export const criteresDeVeille = (v) => ({
-  mots: v.mots, exclus: v.exclus || '', pointure: v.pointure || '', minimum: v.minimum ?? null, maximum: v.maximum ?? null,
-  etat: v.etatArticle || 'tous', pays: v.pays || 'tous', categorie: v.categorie || '', achatImmediat: v.achatImmediat !== false, livraisonFR: v.livraisonFR !== false,
-});
+// (11 nov.) La forme vit dans metier.js : le serveur des alertes la lit aussi (§11).
+export { criteresDeVeille };
 
 // « Nouveau » depuis la dernière visite : une annonce absente de ce qui était
 // connu AVANT cette visite. Première lecture d'une recherche ⇒ rien n'est

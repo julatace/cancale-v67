@@ -167,9 +167,15 @@ export function compterAppel(d, jour, plafond = PLAFOND_VRM_JOUR, source = 'main
   const meme = !!(d && d.jour === jour);
   const n = meme && Number.isSafeInteger(d.n) && d.n >= 0 ? d.n : 0;
   const fil = meme && Number.isSafeInteger(d.fil) && d.fil >= 0 ? d.fil : 0;
+  // (11 nov., lot alertes-ebay) Les ALERTES (le serveur relit ses recherches, sans
+  // l'app ouverte) comptent dans la MÊME part automatique que le fil : fil +
+  // alertes ≤ 150, les 50 restantes ne servent toujours qu'à « Chercher ».
+  const alerte = meme && Number.isSafeInteger(d.alerte) && d.alerte >= 0 ? d.alerte : 0;
   if (n >= plafond) return undefined;
-  if (source === 'fil' && fil >= PLAFOND_FIL_JOUR) return null;
-  return { jour, n: n + 1, fil: fil + (source === 'fil' ? 1 : 0), plafond };
+  if ((source === 'fil' || source === 'alerte') && fil + alerte >= PLAFOND_FIL_JOUR) return null;
+  const suite = { jour, n: n + 1, fil: fil + (source === 'fil' ? 1 : 0), plafond };
+  if (alerte || source === 'alerte') suite.alerte = alerte + (source === 'alerte' ? 1 : 0);
+  return suite;
 }
 
 // Le restant RÉEL du plafond d'eBay pour l'application, quand eBay le dit
@@ -189,6 +195,14 @@ export function lireQuotaReponse(j) {
     }
   }
   return null;
+}
+
+// L'appel à Browse, le même pour « Chercher », le fil et les alertes du serveur
+// (api/_lib/ebay-alertes.js) : marché EBAY_FR, jeton d'APPLICATION.
+export async function requeteBrowse({ origine, c, jeton, fetcher }) {
+  const r = await fetcher(urlRecherche(origine, c), { headers: { Authorization: `Bearer ${jeton}`, Accept: 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_FR', 'X-EBAY-C-ENDUSERCTX': 'contextualLocation=country=FR' } });
+  const txt = await r.text();
+  return { r, txt };
 }
 
 export function creerRechercheEbay({ jetonApplication, oublierJetonApplication = () => {}, modifierDonnee, origine = 'https://api.ebay.com', fetcher = (...a) => globalThis.fetch(...a), maintenant = () => Date.now() }) {
@@ -229,8 +243,7 @@ export function creerRechercheEbay({ jetonApplication, oublierJetonApplication =
     const c = cr.c;
     let r, txt = '';
     try {
-      r = await fetcher(urlRecherche(origine, c), { headers: { Authorization: `Bearer ${jeton}`, Accept: 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_FR', 'X-EBAY-C-ENDUSERCTX': 'contextualLocation=country=FR' } });
-      txt = await r.text();
+      ({ r, txt } = await requeteBrowse({ origine, c, jeton, fetcher }));
     } catch (_) {
       return { status: 502, body: { ok: false, reason: 'ebay', appels, error: 'Je n’ai pas pu chercher sur eBay (pas de réponse) — ce n’est pas « aucun résultat ». Réessaie dans un moment.' } };
     }
