@@ -413,7 +413,7 @@ const MUTATIONS = [
   ['orion', 'une page déjà là ne compte pas', "vierge=!document.querySelector('script');", "vierge=true;", 'O4b'],
   ['bg', 'un réveil sans sansRejet', "if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());", "if (a.name === 'vrm-photos') tickPhotos();", 'P1'],
   ['bg', 'plus de filet unhandledrejection', "    self.addEventListener('unhandledrejection', (e) => {", "    (() => {})('unhandledrejection', (e) => {", 'P2'],
-  ['bg', 'alarme figée à sa période', "if (!a || (voulue != null && Number(a.periodInMinutes) !== Number(voulue)))", 'if (!a)', 'L1'],
+  ['bg', 'alarme figée à sa période', "if (!a || (voulue != null && a.periodInMinutes != null && Number(a.periodInMinutes) !== Number(voulue)))", 'if (!a)', 'L1'],
   ['content', 'minuterie de cookies nue', "      minuterieVivante(() => { if (document.visibilityState !== 'hidden') envoyerCookies(); }, 10000);", "      setInterval(() => { if (document.visibilityState !== 'hidden') envoyerCookies(); }, 10000);", 'M1'],
   ['bg', 'vrmActions des autres comptes gardés', "await chrome.storage.local.set({ [cle]: bornerRegistre(cur, 3600000, 200) });\n    if (!/^vc:/.test(String(uid))) await publierActions(uid, list);", "await chrome.storage.local.set({ [cle]: cur });\n    if (!/^vc:/.test(String(uid))) await publierActions(uid, list);", 'S1'],
   ['bg', 'vrmRefus sans borne', 'await chrome.storage.local.set({ vrmRefus: bornerRegistre(cur, 30 * 864e5, 100) });', 'await chrome.storage.local.set({ vrmRefus: cur });', 'S2'],

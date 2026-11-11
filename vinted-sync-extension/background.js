@@ -9325,7 +9325,7 @@ function alarmeSiAbsente(nom, opts) {
     chrome.alarms.get(nom, (a) => {
       void (chrome.runtime && chrome.runtime.lastError);
       const voulue = opts && opts.periodInMinutes;
-      if (!a || (voulue != null && Number(a.periodInMinutes) !== Number(voulue))) { try { chrome.alarms.create(nom, opts); } catch (_) {} }
+      if (!a || (voulue != null && a.periodInMinutes != null && Number(a.periodInMinutes) !== Number(voulue))) { try { chrome.alarms.create(nom, opts); } catch (_) {} }
     });
   } catch (_) { try { chrome.alarms.create(nom, opts); } catch (_) {} }
 }
@@ -15624,13 +15624,13 @@ async function photoBytes(url) {
     // 5.361 (revue, 100) : la taille annoncée AVANT de télécharger, et une image seulement.
     const annonce = Number(res.headers.get('content-length'));
     if (isFinite(annonce) && annonce > 12000000) return { ok: false, error: 'image trop lourde' };
-    if (!typeImage(res.headers.get('content-type') || 'image/jpeg')) return { ok: false, error: 'pas une image' };
+    const mime = String(res.headers.get('content-type') || 'image/jpeg').split(';')[0].trim().toLowerCase();
+    if (!/^image\/(jpeg|jpg|png|webp|gif|avif|heic)$/.test(mime)) return { ok: false, error: 'pas une image' };
     const buf = await res.arrayBuffer();
     if (!buf.byteLength || buf.byteLength > 12000000) return { ok: false, error: 'image trop lourde' };
     const bytes = new Uint8Array(buf);
     let bin = '';
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    const mime = typeImage(res.headers.get('content-type') || 'image/jpeg');
     return { ok: true, dataUrl: `data:${mime};base64,${btoa(bin)}` };
   } catch (e) { return { ok: false, error: String(e).slice(0, 60), statut: 0 }; }  // 0 = réseau (passager)
 }
@@ -21506,13 +21506,13 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
 //    plafond de taille (tout en mémoire du worker) ; et la liste blanche du pont
 //    (`[\w.-]*vinted\.net`) laissait passer `https://evilvinted.net/`.
 //    Désormais : https seulement, hôte EXACTEMENT un CDN des sites (sous-domaine
-//    de vinted.net, leboncoin.fr ou vestiairecollective.com — jamais un nom qui
+//    de vinted.net (ou d'un site Vinted), leboncoin.fr ou vestiairecollective.com — jamais un nom qui
 //    finit pareil), sans identifiant dans l'adresse ; 15 photos au plus (la
 //    limite Leboncoin), 12 Mo chacune (lu dans `content-length` AVANT de
 //    télécharger, puis revérifié), 60 Mo pour toute la série ; une réponse qui
 //    n'est pas une image est refusée.
 const PHOTOS_MAX = 15, PHOTO_MAX_OCTETS = 12000000, PHOTOS_MAX_OCTETS = 60000000;
-const HOTES_PHOTOS = /^(?:[a-z0-9-]+\.)*(?:vinted\.net|leboncoin\.fr|vestiairecollective\.com)$/i;
+const HOTES_PHOTOS = /^(?:[a-z0-9-]+\.)*(?:vinted\.(?:net|fr|com|it|de)|leboncoin\.fr|vestiairecollective\.com)$/i;
 function urlPhotoPermise(u, hotes) {
   try {
     const x = new URL(String(u || ''));

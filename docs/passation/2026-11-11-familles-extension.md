@@ -68,9 +68,17 @@ stricte ⇒ canal douteux).
 
 ## Vérifié
 
-`audit-familles-extension` (ci-dessus) ; les audits qui lisent l'extension (voir la fin de ce
-récit) ; `tests/orion-injection`, `orion-paquet`, `orion-pont-canal`, `favoris-chrome-csp` ;
-`regles-achat-extension` ; `npm run build`. `scripts/_fond-vm.cjs` : option `vraisComptes` (garde
+`audit-familles-extension` (ci-dessus) ; les 143 audits qui lisent l'extension, joués ici ET sur la
+branche de départ : aucun nouveau rouge (rouges des deux côtés, hors de ce lot :
+`controle-prod-quotidien`, `exec`, `extension-5186`, `lbc-plus-vue-pause`). Remis à la règle :
+`audit-extension-navigateurs` (le relais imité répond avec l'onglet visé, comme content.js),
+`tests/orion-injection` (capteur en ligne : aucune balise `src` chargée ; CSP stricte ⇒ canal
+douteux). Trouvés par eux et corrigés : `photoBytes` autonome (le pont l'extrait seule), l'affiche
+générique de Vinted (`*.vinted.com`) reste lisible pour le détourage, une alarme sans période
+connue n'est pas recréée. Verts aussi : `orion-paquet`, `orion-pont-canal`, `favoris-chrome-csp`,
+`orion-auth-autonome` (`orion-connexion` : plus de 3 min, non conclu), `coherence`, `variables`,
+`tdz`, `identite`, `icones`, `extension-zip`, `regles-achat-extension`, `robustesse-extension`,
+`vinted-forme` ; `npm run build`. `scripts/_fond-vm.cjs` : option `vraisComptes` (garde
 le vrai `getStoredAccounts`) et `self.addEventListener` noté dans `j.globales`.
 
 ## Ce qui reste de la revue

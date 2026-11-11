@@ -232,7 +232,8 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
       f.ctx.location = new URL('https://www.vinted.fr/');
       const r = await f.ctx.fetch(m.p, { credentials: 'include', headers: m.h || {} });
       let json = null; try { json = await r.json(); } catch (_) {}
-      return { id: m.id, status: r.status, ok: r.ok, json, origine: 'https://www.vinted.fr' };
+      // 5.361 : la boîte aux lettres est ADRESSÉE — content.js répond avec SON onglet (celui visé).
+      return { id: m.id, tab: m.tab, status: r.status, ok: r.ok, json, origine: 'https://www.vinted.fr' };
     };
     if (voie === 'message') {
       f.ctx.chrome.tabs.sendMessage = (id, m, cb) => { if (m && m.vrm === 'fetchPage') { repondre(m).then((o) => cb && cb(o)); return; } if (typeof cb === 'function') cb(); };
