@@ -82,6 +82,7 @@ const UA_PC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.3
 const CONFIGS = [
   { id: 'ipad10-portrait', w: 820, h: 1180, tablette: 'etroite', tourne: 'ipad10-paysage' },
   { id: 'ipad10-paysage', w: 1180, h: 820, tablette: 'large' },
+  { id: 'tactile-768', w: 768, h: 1024, tablette: 'etroite' },
   { id: 'mini-portrait', w: 744, h: 1133, tablette: 'etroite', tourne: 'mini-paysage' },
   { id: 'mini-paysage', w: 1133, h: 744, tablette: 'large' },
   { id: 'pro-portrait', w: 1024, h: 1366, tablette: 'large' },
@@ -181,7 +182,7 @@ const aller = async (pg, t) => {
       const nom = `${cf.id} ${t}`;
       dit(!r.mort, `${nom} : l'écran s'affiche`);
       dit(r.docSw <= r.vw + 1 && r.mainSw <= r.mainCw + 1 && r.mainDroite <= r.vw + 1, `${nom} : aucun débordement horizontal`, `page ${r.docSw}/${r.vw}, main ${r.mainSw}/${r.mainCw}, bord droit de main ${r.mainDroite}`);
-      if (!cf.telephone) dit(!r.chevauche, `${nom} : recherche, filtres de site et île ne se chevauchent pas`, r.chevauche);
+      if (cf.tablette) dit(!r.chevauche, `${nom} : recherche, filtres de site et île ne se chevauchent pas`, r.chevauche);
       if (cf.tablette) {
         dit(r.coarse, `${nom} : le banc sert bien un pointeur au doigt`);
         dit(r.sidebar && !r.tabbar, `${nom} : coque tablette (rail à gauche, pas de barre du bas)`, `rail ${r.sidebar} · barre du bas ${r.tabbar}`);
