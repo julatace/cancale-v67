@@ -42,6 +42,7 @@ const MUTATIONS = [
   ['M6 N° rendu même porté ailleurs', "if (autres.length || ailleurs.has(c) || rendus.has(c)) {", "if (false) {"],
   ['M7 conflits écrits sans réponse', "if (nConflits && conflits !== 'garder' && conflits !== 'remettre') return null;", ""],
   ['M8 point du jour sur un « pas su »', "if (!Array.isArray(rows)) return false;\n  const j = jourParis(maintenant);", "if (!Array.isArray(rows)) return true;\n  const j = jourParis(maintenant);"],
+  ['M10 une fiche nommée par son ANCIEN N°', "const lib = estObjet(cur[id]) && cur[id].numero != null && String(cur[id].numero).trim() ? nom(id, cur[id]) :", "const lib = true ? nom(id, { ...(P[id] || {}), ...(cur[id] || {}), numero: (cur[id] || {}).numero || (P[id] || {}).numero }) :"],
   ['M9 emplacement hors des 24', "for (let s = 0; s < MAX_POINTS; s++) if (!vivants.has(s)) {", "for (let s = 0; s < MAX_POINTS + 50; s++) if (!vivants.has(s) && s >= vivants.size) {"],
 ];
 if (process.argv.includes('--prouve')) {
@@ -115,6 +116,11 @@ if (process.argv.includes('--prouve')) {
     dit(t === '12 prix d’achat remis · 3 notes · 0 numéro', 'B2 le résumé dit « 12 prix d’achat remis · 3 notes · 0 numéro »', t);
     const l1 = ap.lignes.find((l) => l.cat === 'prix' && l.id === 'it1');
     dit(l1 && l1.morceaux.length === 2 && l1.morceaux.some((m) => m.k === 'vinted_buyprice_by_num'), 'B3 le miroir par N° suit sa fiche : UNE ligne par paire', l1 && J(l1.morceaux.map((m) => m.k)));
+    {
+      const pt = C(base); delete pt.vinted_annonce_numeros.it5.numero; pt.vinted_annonce_numeros.it5.buyPrice = 99; pt.vinted_annonce_numeros.it31 = { numero: '5', title: 'Autre' };
+      const a5 = M.apercu({ point, actuel: magasin(pt).lire, cleNum }).lignes.find((l) => l.cat === 'prix' && l.id === 'it5');
+      dit(a5 && !/N°5/.test(a5.libelle) && /it5/.test(a5.libelle), '§5 une fiche qui a perdu son N° (porté maintenant par une autre) n’est JAMAIS nommée par l’ancien N°', a5 && a5.libelle);
+    }
     dit(ap.lignes.filter((l) => l.cat === 'prix').every((l) => /^it\d+$/.test(l.id)), 'B4 chaque ligne nomme sa paire par son IDENTITÉ (id d’annonce), jamais par son titre');
     const rien = M.apercu({ point, actuel: magasin(base).lire, cleNum });
     dit(rien.ok && rien.lignes.length === 0, 'B5 rien n’a changé ⇒ aperçu vide');

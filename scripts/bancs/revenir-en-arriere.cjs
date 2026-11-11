@@ -178,6 +178,9 @@ async function main() {
         dit((await hauteur(pg, '[data-retour-confirmer]')) >= 44 && (await hauteur(pg, '[data-retour-choix="prix"]')) > 0, `${T} cibles ≥ 44 px`);
         dit((await deborde(pg)) <= 1, `${T} aperçu : aucun débordement horizontal`);
         await capture(pg, `retour-apercu-${vp.width}`);
+        dit((await pg.locator('[data-retour-conflit-ligne="it20"]').count()) === 1 && /45\s*€\s*→\s*—/.test(await pg.locator('[data-retour-conflit-ligne="it20"]').first().innerText()), `${T} 2. la valeur plus récente est MONTRÉE (N°20 : 45 € → —) dans la question`);
+        await pg.locator('[data-retour-question]').first().scrollIntoViewIfNeeded();
+        await capture(pg, `retour-apercu-bas-${vp.width}`);
         const nAvant = ecrits.length;
         await tap(pg, '[data-retour-conflits-choix="garder"]');
         dit(!(await pg.locator('[data-retour-confirmer]').first().isDisabled()), `${T} 3. « Les garder » ouvre la confirmation`);

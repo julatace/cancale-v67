@@ -4108,7 +4108,7 @@ const valeurAffichee = (cat, v) => {
 };
 const RAISONS_LIGNE = {
   'ajoute-depuis': 'ajouté depuis ce moment', 'retouche': 'retouché après un point plus récent', 'retire-depuis': 'retiré depuis',
-  'attribue-depuis': 'N° attribué depuis : il reste', 'change-depuis': 'N° changé depuis : le N° actuel reste', 'numero-pris': 'N° porté par une autre paire : pas rendu',
+  'attribue-depuis': 'attribué depuis, il reste', 'change-depuis': 'changé depuis, le N° actuel reste', 'numero-pris': 'porté par une autre paire, pas rendu',
   'fiche-absente': 'la fiche n’existe plus (voir la Corbeille)', 'pose-depuis': 'posé depuis : il reste', 'trop-gros': 'trop gros pour un point : il reste',
   'numero-garde': 'seul le N° diffère : il reste', 'rendu': 'N° rendu (porté par aucune autre)',
 };
@@ -4165,7 +4165,7 @@ function RevenirEnArriere() {
     setEtat('envoi');
     const r = await restaurerMorceaux(ms, ouvert.source);
     setEtat('');
-    setFait({ ...r, resume: resumeTxt });
+    setFait({ ...r, resume: resumeTxt, gardes: nConflits && conflits === 'garder' ? nConflits : 0 });
     if (r.ok !== false) relire();
   };
   const annuler = async (p) => {
@@ -4185,6 +4185,7 @@ function RevenirEnArriere() {
         <div className="vrm-retour" data-retour-fait={fait.ok === false ? 'echec' : fait.ok === true ? 'ok' : 'garde'} data-retour-ignores={fait.ignores || 0}>
           <p className="vrm-retour-titre">{fait.ok === false ? 'Rien n’a changé' : 'Retour en arrière fait'}</p>
           {fait.ok !== false && <p className="vrm-retour-resume" data-retour-resume="">{fait.resume}</p>}
+          {fait.ok !== false && fait.gardes > 0 && <p className="vrm-retour-tete" data-retour-gardes={fait.gardes}>{fait.gardes} valeur{fait.gardes > 1 ? 's' : ''} plus récente{fait.gardes > 1 ? 's' : ''} gardée{fait.gardes > 1 ? 's' : ''}, comme tu l’as choisi.</p>}
           <p className="vrm-retour-tete">{issueTexte(fait)}{fait.ignores ? ` ${fait.ignores} valeur${fait.ignores > 1 ? 's' : ''} changée${fait.ignores > 1 ? 's' : ''} entre-temps : gardée${fait.ignores > 1 ? 's' : ''}.` : ''}</p>
           <div className="vrm-retour-actions">
             {fait.ok !== false && pFait && <Bouton variante="secondaire" icone="restore" data-retour-annuler-fait="" disabled={etat === 'envoi'} onClick={() => annuler(pFait)}>Annuler la restauration</Bouton>}
@@ -4213,9 +4214,9 @@ function RevenirEnArriere() {
                   {voir.map((l, i) => (
                     <li key={l.cat + l.id + i} className={`vrm-retour-ligne is-${l.etat}`} data-retour-ligne={l.etat} data-retour-id={l.id}>
                       <span className="vrm-retour-lib">{l.libelle}</span>
-                      <span className="vrm-retour-val">{l.etat === 'garde' || l.etat === 'refus' ? (RAISONS_LIGNE[l.raison] || '') : <>{valeurAffichee(l.cat, l.maintenant)} → {valeurAffichee(l.cat, l.avant)}{l.raison && RAISONS_LIGNE[l.raison] && l.etat === 'conflit' ? <small> · {RAISONS_LIGNE[l.raison]}</small> : null}</>}</span>
+                      <span className="vrm-retour-val">{l.etat === 'garde' || l.etat === 'refus' ? `${l.cat === 'numeros' ? `N°${l.maintenant != null ? l.maintenant : l.avant} : ` : ''}${RAISONS_LIGNE[l.raison] || ''}` : <>{valeurAffichee(l.cat, l.maintenant)} → {valeurAffichee(l.cat, l.avant)}{l.raison && RAISONS_LIGNE[l.raison] && l.etat === 'conflit' ? <small> · {RAISONS_LIGNE[l.raison]}</small> : null}</>}</span>
                     </li>))}
-                  {L.length > voir.length && <li className="vrm-retour-plus"><button type="button" className="vrm-lien-action" onClick={() => setDeplie((d) => ({ ...d, [cat.id]: true }))}>Voir les {L.length - voir.length} autres</button></li>}
+                  {L.length > voir.length && <li className="vrm-retour-plus"><Bouton variante="discret" taille="petit" data-retour-plus={cat.id} onClick={() => setDeplie((d) => ({ ...d, [cat.id]: true }))}>Voir les {L.length - voir.length} autres</Bouton></li>}
                 </ul>}
               </li>);
           })}
@@ -4223,6 +4224,14 @@ function RevenirEnArriere() {
         {nConflits > 0 && (
           <div className="vrm-retour-conflits" data-retour-question="">
             <p><b>{nConflits} valeur{nConflits > 1 ? 's' : ''} plus récente{nConflits > 1 ? 's' : ''} que ce moment</b> (ajoutée{nConflits > 1 ? 's' : ''} depuis, ou retouchée{nConflits > 1 ? 's' : ''} après un point plus récent). Revenir en arrière les effacerait : que faire ?</p>
+            <ul className="vrm-retour-lignes is-conflits">
+              {lignesChoisies.filter((l) => l.etat === 'conflit').slice(0, deplie._conflits ? 500 : 6).map((l, i) => (
+                <li key={'c' + l.cat + l.id + i} className="vrm-retour-ligne is-conflit" data-retour-conflit-ligne={l.id}>
+                  <span className="vrm-retour-lib">{l.libelle}</span>
+                  <span className="vrm-retour-val">{valeurAffichee(l.cat, l.maintenant)} → {valeurAffichee(l.cat, l.avant)}</span>
+                </li>))}
+              {nConflits > 6 && !deplie._conflits && <li className="vrm-retour-plus"><Bouton variante="discret" taille="petit" onClick={() => setDeplie((d) => ({ ...d, _conflits: true }))}>Voir les {nConflits - 6} autres</Bouton></li>}
+            </ul>
             <Segmente label="Valeurs plus récentes" value={conflits || ''} onChange={setConflits} options={[{ v: 'garder', l: 'Les garder', data: { 'data-retour-conflits-choix': 'garder' } }, { v: 'remettre', l: 'Revenir quand même', data: { 'data-retour-conflits-choix': 'remettre' } }]}/>
           </div>)}
         <div className="vrm-retour-actions">

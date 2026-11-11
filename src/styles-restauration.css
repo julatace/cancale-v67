@@ -24,3 +24,5 @@
 .vrm-retour-conflits p { margin: 0; font-size: 13.5px; color: var(--w-encre, #1D1D1F); }
 .vrm-retour-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-retour-actions .vrm-b { min-height: 44px; }
+.vrm-retour-plus { margin-top: 4px; }
+.vrm-retour-lignes.is-conflits { margin: 0; }

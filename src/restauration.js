@@ -197,7 +197,10 @@ export function apercu({ point, actuel, plusRecent = null, cleNum = (x) => Strin
     for (const id of new Set([...Object.keys(P), ...Object.keys(cur)])) {
       const pv = prendre(P[id], champs), cv = prendre(cur[id], champs);
       if (egal(pv, cv)) continue;
-      const lib = nom(id, cur[id] || P[id]);
+      // Le nom : le N° d'AUJOURD'HUI seulement (§5 : l'ancien N° d'une fiche qui l'a perdu peut
+      // être porté maintenant par une autre paire — il désignerait le mauvais carton) ; sinon le
+      // titre et l'identité de l'annonce.
+      const lib = estObjet(cur[id]) && cur[id].numero != null && String(cur[id].numero).trim() ? nom(id, cur[id]) : `${estObjet(cur[id]) && (cur[id].title || cur[id].titre) ? String(cur[id].title || cur[id].titre).slice(0, 40) + ' · ' : ''}${k === CLE_VENTES ? 'vente' : 'annonce'} ${id}`;
       if (!estObjet(cur[id])) { lignes.push({ cat, etat: 'refus', id, libelle: lib, maintenant: null, avant: pv, raison: 'fiche-absente', morceaux: [] }); continue; }
       const m = { k, type: 'champs', id, avant: brut(cur[id], champs), apres: pv };
       const lv = Lr ? prendre(Lr[id], champs) : undefined;
@@ -307,6 +310,9 @@ export function apercu({ point, actuel, plusRecent = null, cleNum = (x) => Strin
   for (const [id, f] of Object.entries(fiches)) if (estObjet(f) && f.numero != null && String(f.numero).trim()) porter(f.numero, 'f:' + id);
   for (const [id, f] of Object.entries(ventes)) if (estObjet(f) && f.numero != null && String(f.numero).trim()) porter(f.numero, 'v:' + id);
   const rendus = new Set();
+  // Sur une ligne de N°, le nom ne porte pas de N° (c'est la valeur) : le titre et l'IDENTITÉ
+  // de l'annonce — 50 paires au même titre restent 50 lignes distinctes.
+  const nomSansNum = (pre) => (id, f) => `${f && (f.title || f.titre) ? String(f.title || f.titre).slice(0, 40) + ' · ' : ''}${pre === 'v:' ? 'vente' : 'annonce'} ${id}`;
   const parNumero = (k, snapKey, cur, pre, nom) => {
     const P = point[snapKey] || {};
     for (const id of new Set([...Object.keys(P), ...Object.keys(cur)])) {
@@ -318,21 +324,21 @@ export function apercu({ point, actuel, plusRecent = null, cleNum = (x) => Strin
         lignes.push({ cat: 'numeros', etat: 'garde', id, libelle: nom(id, cur[id]), maintenant: cn, avant: pn, raison: pn == null ? 'attribue-depuis' : 'change-depuis', morceaux: [] });
         continue;
       }
-      if (!estObjet(cur[id])) { lignes.push({ cat: 'numeros', etat: 'refus', id, libelle: `N°${pn}`, maintenant: null, avant: pn, raison: 'fiche-absente', morceaux: [] }); continue; }
+      if (!estObjet(cur[id])) { lignes.push({ cat: 'numeros', etat: 'refus', id, libelle: nom(id, P[id]), maintenant: null, avant: pn, raison: 'fiche-absente', morceaux: [] }); continue; }
       const c = cleNum(pn);
       const autres = (portes.get(c) || []).filter((q) => q !== pre + id);
       if (autres.length || ailleurs.has(c) || rendus.has(c)) {
-        lignes.push({ cat: 'numeros', etat: 'refus', id, libelle: nom(id, { numero: pn }), maintenant: null, avant: pn, raison: 'numero-pris', morceaux: [] });
+        lignes.push({ cat: 'numeros', etat: 'refus', id, libelle: nom(id, cur[id]), maintenant: null, avant: pn, raison: 'numero-pris', morceaux: [] });
         continue;
       }
       rendus.add(c);
       const ms = [{ k, type: 'champs', id, avant: brut(cur[id], ['numero']), apres: { numero: copie(pn) }, sansRetour: true }];
       if (!dansPool.has(c)) { ms.push({ k: CLE_POOL, type: 'element', id: copie(pn), apres: copie(pn), sansRetour: true }); dansPool.add(c); }
-      lignes.push({ cat: 'numeros', etat: 'remis', id, libelle: nom(id, { numero: pn }), maintenant: null, avant: pn, raison: 'rendu', morceaux: ms });
+      lignes.push({ cat: 'numeros', etat: 'remis', id, libelle: nom(id, cur[id]), maintenant: null, avant: pn, raison: 'rendu', morceaux: ms });
     }
   };
-  parNumero(CLE_FICHES, 'fiches', fiches, 'f:', nomFiche);
-  parNumero(CLE_VENTES, 'ventes', ventes, 'v:', nomVente);
+  parNumero(CLE_FICHES, 'fiches', fiches, 'f:', nomSansNum('f:'));
+  parNumero(CLE_VENTES, 'ventes', ventes, 'v:', nomSansNum('v:'));
 
   const parCat = {};
   for (const c of CATEGORIES) parCat[c.id] = { remis: 0, conflit: 0, garde: 0, refus: 0 };
