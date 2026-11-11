@@ -23,7 +23,7 @@ export const voixDisponible = () => typeof window !== 'undefined' && typeof (win
 export const VOIX = { refus: false };
 
 export const PHRASES_VOIX = {
-  refus: 'Micro refusé par le navigateur : autorise le micro pour ce site (le cadenas à gauche de l’adresse), puis recharge la page. En attendant, tape ta recherche.',
+  refus: 'Micro refusé par le navigateur : autorise-le pour ce site (cadenas à gauche de l’adresse) puis recharge, ou tape ta recherche.',
   'aucun-son': 'Je n’ai rien entendu. Touche le micro et parle tout de suite.',
   reseau: 'La reconnaissance de ton navigateur ne répond pas. Tape ta recherche.',
   materiel: 'Aucun micro trouvé sur cet appareil. Tape ta recherche.',

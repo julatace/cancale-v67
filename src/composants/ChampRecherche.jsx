@@ -77,7 +77,7 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
         </button>
       ) : null}
       {phrase ? <span className="vrm-champ-recherche-voix" data-voix-erreur={phrase} role="status"
-        style={{position:'absolute',left:0,right:0,top:'calc(100% + 4px)',zIndex:5,fontSize:12,lineHeight:1.4,padding:'6px 10px',borderRadius:10,background:'var(--vrm-surface, #fff)',color:'var(--vrm-ink, #1D1D1F)',border:'1px solid var(--vrm-line, rgba(0,0,0,.1))',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}
+        style={{position:'absolute',left:0,top:'calc(100% + 4px)',width:'max(100%, 260px)',maxWidth:'calc(100vw - 32px)',boxSizing:'border-box',zIndex:5,fontSize:12,lineHeight:1.4,padding:'6px 10px',borderRadius:10,background:'var(--vrm-surface, #fff)',color:'var(--vrm-ink, #1D1D1F)',border:'1px solid var(--vrm-line, rgba(0,0,0,.1))',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}
         onClick={()=>effacerErreurVoix(canal)}>{PHRASES_VOIX[phrase] || PHRASES_VOIX.autre}</span> : null}
     </div>
   );
