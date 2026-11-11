@@ -59,6 +59,12 @@ rien changé. Fonctions `api/` : aucune ajoutée (12/12). Pas de PR (la session 
   CE navigateur) avec la trace « 1 point masqué · Afficher », jamais un point au colis du dernier jour ; ordre
   « Récents » (défaut, sa décision du 9 nov.) ou « Date limite ».
 
+- `src/sourcesRetrait.js` : `verifiePar` — la ligne dit QUI a vérifié en dernier : « vérifié par Chronopost à
+  14:05 », « par e-mail à 09:12 », « par Vinted » ; la marque déjà dite n'est pas répétée. Exigence « même sans
+  extension » : rien ici ne dépend de l'extension (e-mails, lectures serveur `transp_*`, achats relus) ; la
+  lecture serveur de Mondial Relay (Cloudflare) relève du lot `suivi-commandes` (rien poussé à reprendre au
+  moment de ce récit : sa branche ne porte que nos commits).
+
 ## 3. Le colis fantôme (« allé au relais pour un colis parti depuis une semaine »)
 
 Cause probable, lue dans le code : rien ne disait qu'un colis n'avait été REVU par aucune source. Un colis d'un
@@ -81,7 +87,7 @@ Les fins prouvées (retiré, reparti, commande finie) sortaient déjà le colis 
 
 ## 5. Cas testés (liste exhaustive)
 
-`scripts/audit-retraits-fiables.cjs` (93 verts ; arbre d'avant : 32 rouges ; `--prouve` 13/13 mutations) :
+`scripts/audit-retraits-fiables.cjs` (95 verts ; arbre d'avant `claude/colis-a-leur-place` : 34 rouges ; `--prouve` 14/14 mutations) :
 - A, vraie route, un e-mail inventé par cas ⇒ une ligne, son code, son point : Mondial Relay comptoir (Lille,
   lignes vides) · Mondial Relay casier « LOCKER 24/7 SUPER U » (Brest, rue sans numéro) · « changé de plan »
   avec code (Marseille, en route) · InPost Locker (Strasbourg) · Relais Colis « Relais : … » (Ajaccio) ·
@@ -100,17 +106,17 @@ Les fins prouvées (retiré, reparti, commande finie) sortaient déjà le colis 
   choisi · `lieuGenerique` serveur.
 - D : code du changement · code d'un autre e-mail du même n° · aucun ⇒ « code pas encore reçu », jamais celui
   d'un autre n°.
-- E : > 48 h ⇒ « pas confirmé » ; < 48 h non ; aucune date ⇒ rien.
+- E : > 48 h ⇒ « pas confirmé » ; < 48 h non ; aucune date ⇒ rien ; « vérifié par Chronopost à 14:05 » (lecture transporteur la plus récente), « vérifié par e-mail à 09:12 » (seul l'e-mail).
 - F : ligne rangée sur une suggestion ⇒ relue au vrai point ; point juste ⇒ inchangé.
 - H : transporteur plus récent à une autre adresse ⇒ « déplacé » ; plus ancien ⇒ désaccord dit ; date inconnue
   ⇒ rien choisi.
 - G : branchements (aucune complétion par nom, « à vérifier » sans n°, code visible, masqués avec trace, ambre,
   « Adresse pas lue », alerte avec code et ancien point).
 
-Banc `scripts/bancs/retraits-fiables.cjs` (vraie app, 390 tactile sombre + 1512 clair) : **20 verts** — F1
+Banc `scripts/bancs/retraits-fiables.cjs` (vraie app, 390 tactile sombre + 1512 clair) : **22 verts** — F1
 deux Super U de Lille = deux cartes, Marseille/Ajaccio/Saint-Denis à leur point ; F2 casiers au nom seul seuls,
 « Adresse pas lue » ; F3 code lisible ; F4 alerte avec code (autre e-mail du même n°) et ancien point ; F5
-« pas confirmé depuis le 8 nov. » ; F6 masquer/afficher ; débordement ; erreurs. Captures regardées (390
+« pas confirmé depuis le 8 nov. » ; F6 masquer/afficher ; F7 « vérifié par e-mail … » ; débordement ; erreurs. Captures regardées (390
 sombre, 1512 clair, alerte).
 
 Cas déjà couverts par les audits existants, relancés verts : deux codes en désaccord, code « sûr » à deux voix,
@@ -128,7 +134,7 @@ contredit (`codes-retrait`, `retraits-irreprochables`, `retrait-fiable`, `retrai
   plus « le seul point de ce nom » ; « Super U » sans adresse = point à part) ; `audit-villes-colis` H2 (aucune
   complétion par le registre).
 - Bancs : `retraits-fiables` 20/0, `colis-retirer-propre` 129/0, `retraits-irreprochables` 26/0 ;
-  `achats-retraits` 68/16 — **les 16 mêmes rouges sur la tête de `claude/colis-a-leur-place`** (le lien
+  `retraits-irreprochables` (deux attendus portés : « vérifié par Mondial Relay à 09:40 », marque transporteur non redite) ; `achats-retraits` 68/16 — **les 16 mêmes rouges sur la tête de `claude/colis-a-leur-place`** (le lien
   « → Colis » et la carte sombre retirés par DJ3, « Peut-être en double · 9 », « à vérifier 0/3 ») : hors lot.
 
 ## 7. Ce qui reste / tranché

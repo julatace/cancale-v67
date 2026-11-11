@@ -160,6 +160,7 @@ const lire = (pg) => pg.evaluate(() => {
         dit(c9 && c9.code === '510009' && c9.de === 'autre-email' && /TABAC ANCIEN EXEMPLE/.test(c9.ancien), 'F4 « Point relais changé » : le code du colis (autre e-mail du même n°) et l’ancien point', J(al));
         const vieux = L('6A41100000801');
         dit(vieux && vieux.pasConfirme && /pas confirmé depuis le 8 nov/.test(vieux.verifie) && a && !a.pasConfirme, 'F5 vu il y a 4 jours, rien depuis ⇒ « pas confirmé depuis le 8 nov. » (ambre) ; un colis vu hier ne l’est pas', J([vieux, a && a.verifie]));
+        dit(a && /^vérifié par e-mail/.test(a.verifie), 'F7 la ligne dit QUI a vérifié en dernier (« vérifié par e-mail … »)', a && a.verifie);
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1, 'rien ne déborde', `${deb}px`);
         if (SHOTS) {

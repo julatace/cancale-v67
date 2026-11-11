@@ -309,3 +309,5 @@ html body .vrm-rpf-ligne .vrm-rpf-verifie.is-ambre { color: var(--vrm-warn, #B25
 html body .vrm-rpf-tete .vrm-rpf-masquer { font: inherit; padding: 12px 2px; margin: -12px 0; background: none; border: 0; color: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 html body .vrm-rpf .vrm-rpf-ordre { margin: 4px 0 8px; }
 html body .vrm-rpf .vrm-rpf-masques { display: block; min-height: 44px; margin: 6px 0; font-size: 13px; background: none; border: 0; color: var(--p-gris, #86868b); cursor: pointer; text-align: left; }
+/* (11 nov., retraits fiables) « vérifié par Chronopost à 14:05 » passe à la ligne au téléphone (jamais rogné). */
+html body .vrm-rpf-ligne .vrm-rpf-verifie { white-space: normal !important; }

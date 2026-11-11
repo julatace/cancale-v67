@@ -170,8 +170,8 @@ const lire = (pg) => pg.evaluate(() => {
         dit(m.ongletN === '5' && m.pub && m.pub.total === 5, 'les cinq colis sont À RETIRER (liste = publication)', J({ onglet: m.ongletN, pub: m.pub && m.pub.total }));
         const r1 = L('87660001');
         dit(!!r1 && r1.code === '700001' && r1.sur, 'R1 e-mail + conversation de SA commande au même code ⇒ « sûr »', J(r1 && { code: r1.code, sur: r1.sur }));
-        dit(!!r1 && r1.sources === 'vinted,email,message,transporteur' && r1.marques.join('·') === 'Vinted·e-mail·message·transporteur', 'R1 les marques : Vinted · e-mail · message · transporteur', r1 && r1.sources);
-        dit(!!r1 && Number(r1.verifie) === Date.parse('2026-11-12T08:40:00.000Z') && /^vérifié à 09:40$/.test(r1.verifieTexte), 'R1 « vérifié à 09:40 » (la lecture chez le transporteur, la plus récente)', r1 && `${r1.verifie} · ${r1.verifieTexte}`);
+        dit(!!r1 && r1.sources === 'vinted,email,message,transporteur' && r1.marques.join('·') === 'Vinted·e-mail·message', 'R1 les marques : Vinted · e-mail · message (11 nov. : « transporteur » est dit par « vérifié par Mondial Relay », pas deux fois)', r1 && r1.sources);
+        dit(!!r1 && Number(r1.verifie) === Date.parse('2026-11-12T08:40:00.000Z') && /^vérifié par Mondial Relay à 09:40$/.test(r1.verifieTexte), 'R1 « vérifié par Mondial Relay à 09:40 » (la lecture chez le transporteur, la plus récente ; 11 nov. : la source est dite)', r1 && `${r1.verifie} · ${r1.verifieTexte}`);
         const r2 = L('1790000000000062');
         dit(!!r2 && !r2.code && r2.bouton2 && /email:B12345/.test(r2.desaccord) && /message:C99999/.test(r2.desaccord), 'R2 e-mail B12345 et conversation C99999 ⇒ « 2 codes » ambre, AUCUN code choisi', J(r2 && { code: r2.code, d: r2.desaccord }));
         const r3 = L('87660003');

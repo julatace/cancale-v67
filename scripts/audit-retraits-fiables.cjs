@@ -36,6 +36,7 @@ const MUTATIONS = {
   'jamais-ancien': ['src/sourcesRetrait.js', 'maintenant - ms > CONFIRMATION_MAX_MS', 'false'],
   'relecture-suggestion': ['src/lieuxRetrait.js', "return { ...t, lieu: l, lieuLuDansTexte: true, lieuSuggestionEcarte", "return t; ({ ...t, lieu: l, lieuLuDansTexte: true, lieuSuggestionEcarte"],
   'deplace-ignore': ['src/relaisColis.js', "  const plusRecent = tr.etat === 'disponible'", "  const plusRecent = false && tr.etat === 'disponible'"],
+  'verifie-sans-qui': ['src/sourcesRetrait.js', "  if (par && parQui(par)) return", "  if (false) return"],
   'registre-revient': ['src/App.jsx', '    const completer = (lu) => lu;', '    const completer = (lu) => completerParPointConnu(lu, new Map());'],
 };
 if (process.argv.includes('--prouve')) {
@@ -178,6 +179,10 @@ const ATTENDU = {"MR suggestions sous un en-tête, vrai point sous un autre": ["
     const S = await importer('src/sourcesRetrait.js');
     const now = Date.parse('2026-11-11T12:00:00.000Z');
     dit(S.verifieAncien(now - 49 * 3600e3, now) && !S.verifieAncien(now - 47 * 3600e3, now) && !S.verifieAncien(null, now), '> 48 h ⇒ « pas confirmé » ; < 48 h ⇒ vérifié ; aucune date ⇒ rien (pas su)');
+    const sc = S.sourcesDuColis({ t: { suivi: '41000060', carrier: 'chronopost', receivedAt: '2026-11-11T09:12:00.000Z' }, tr: { carrier: 'chronopost', lu: '2026-11-11T13:05:00.000Z', etat: 'disponible' } });
+    dit(sc.verifiePar === 'chronopost' && S.texteVerifie(sc.verifieMs, now, sc.verifiePar) === 'vérifié par Chronopost à 14:05', 'la dernière vérification dit QUI : « vérifié par Chronopost à 14:05 »', J(sc));
+    const se = S.sourcesDuColis({ t: { suivi: '41000061', carrier: 'mondialrelay', receivedAt: '2026-11-11T08:12:00.000Z' } });
+    dit(se.verifiePar === 'email' && S.texteVerifie(se.verifieMs, now, se.verifiePar) === 'vérifié par e-mail à 09:12', '« vérifié par e-mail à 09:12 » quand seul l’e-mail l’a vu', J(se));
     dit(/^pas confirmé depuis le \d+ nov\.$/.test(S.texteNonConfirme(Date.parse('2026-11-08T12:00:00.000Z'))), '« pas confirmé depuis le 8 nov. »', S.texteNonConfirme(Date.parse('2026-11-08T12:00:00.000Z')));
   });
 

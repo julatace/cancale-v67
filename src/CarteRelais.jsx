@@ -391,8 +391,11 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // la ligne le dit en ambre et le détail montre les deux valeurs avec leur source (src/sourcesRetrait.js).
   const desaccord = Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1 ? x.codesDesaccord : null;
   const aCode = !!(x.code || x.qr || x.code2 || desaccord);
+  // (11 nov.) La source qui a vérifié en dernier est dite dans « vérifié par … » : pas deux fois.
+  const parSource = x.verifiePar ? (['email', 'sms', 'vinted', 'message'].includes(x.verifiePar) ? x.verifiePar : 'transporteur') : '';
   const marques = Array.isArray(x.sources) ? x.sources : [];
-  const verifie = texteVerifie(x.verifieMs);
+  const marquesVues = marques.filter((m) => !(parSource && m === parSource && !texteVerifie(x.verifieMs, Date.now(), x.verifiePar).startsWith('pas')));
+  const verifie = texteVerifie(x.verifieMs, Date.now(), x.verifiePar);
   const ancien = !x.horsCompte && verifieAncien(x.verifieMs);
   const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
@@ -421,7 +424,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
             {!aCode && !x.horsCompte ? <span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span> : null}
           </span> : (!aCode && !x.horsCompte ? <span className="vrm-rpf-puces"><span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span></span> : null)}
           {/* D'où vient ce que la ligne dit, en petit : les sources qui ont vu CE colis et l'heure de la dernière vérification. */}
-          {marques.length || verifie ? <span className="vrm-rpf-sources" data-rp-sources-ligne="">{marques.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="" data-rp-pas-confirme={ancien ? '1' : undefined}>{ancien ? texteNonConfirme(x.verifieMs) : verifie}</span> : null}</span> : null}
+          {marquesVues.length || verifie ? <span className="vrm-rpf-sources" data-rp-sources-ligne="">{marquesVues.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="" data-rp-pas-confirme={ancien ? '1' : undefined}>{ancien ? texteNonConfirme(x.verifieMs) : verifie}</span> : null}</span> : null}
         </span>
         <span className="vrm-rpf-chevron" aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span>
         </button>
