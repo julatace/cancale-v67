@@ -1921,54 +1921,39 @@ function majTampon(fn) {
 async function viderTampon(buf) {
   const aDesN = Object.keys(buf.n || {}).length, aDesR = Object.keys(buf.rates || {}).length;
   if (!aDesN && !aDesR) return;
-  const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
-  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
-  //    reste. On n'écrit pas.
-  //    (et le tampon local n'est PAS vidé : les compteurs repartiront au prochain tour.)
-  if (rows === null) return;
-  const tout = (rows[0] && rows[0].data) || {};
-  const n = { ...(tout.n || {}) };
-  for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
-  // ⚠️ ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
-  // `rates` — les échantillons de réponses ratées. Et comme les compteurs
-  // partent à chaque capture (des centaines de fois par jour) alors qu'un
-  // échantillon n'est posé que sur un échec, la preuve était détruite dans la
-  // minute (constaté le 24 août).
-  // ⚠️⚠️ LA VERSION QUI A VRAIMENT TOURNÉ — ET C'EST UNE MESURE, PAS UNE DÉDUCTION.
-  // Le dossier le répète : « ne pas redéduire une version d'un compteur à zéro ».
-  // Trois sessions de suite ont pourtant dû la DEVINER (« aucun `retrait_*` donc
-  // antérieure à 5.45 »), et une de ces déductions était fausse. Le pont
-  // (`bridge.js`) l'annonce, mais uniquement quand l'app est ouverte dans LE
-  // Chrome où l'extension est installée : depuis son iPhone, ou depuis une
-  // session comme celle-ci, personne ne peut la lire.
-  // ⚠️ C'EST UN DIAGNOSTIC, PAS UNE CAPACITÉ. Cette version est celle de
-  // l'extension qui a capté EN DERNIER, quelque part — jamais celle du
-  // navigateur qui lit l'app. `extSait()` continue donc de n'écouter QUE le
-  // pont : décider ce qu'on promet sur cette valeur-ci serait promettre à un
-  // iPhone ce qu'un Chrome sait faire, c'est-à-dire le défaut le plus coûteux
-  // du projet. `audit-coherence.cjs` l'interdit.
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE : rien n'est écrit (et le tampon local n'est
+  //    PAS vidé : les compteurs repartiront au prochain tour).
+  // ⚠️ 5.362 (revue, moyenne 71) : comparer-et-échanger sur `data.rev`
+  //    (`modifierLigneCas`) — deux Chrome additionnaient chacun leurs compteurs à
+  //    la MÊME lecture, et le second effaçait ceux du premier.
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
-  // ⚠️ 5.165 : la version ÉCRITE DANS LE CODE, à côté de celle du manifeste.
-  //    Mesuré le 9 octobre : des sessions qui écrivaient `ver = 5.164.0`
-  //    envoyaient des requêtes que seul un `background.js` d'avant la 5.134
-  //    sait former. Copie partielle (manifeste neuf, code ancien) ou deux
-  //    extensions sous la même session ? On n'a pas pu trancher. Les deux
-  //    nombres côte à côte le diront la prochaine fois (`audit-extension-zip`
-  //    exige qu'ils soient égaux dans le zip livré).
-  const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
-    ...tout, n, rates: { ...(tout.rates || {}), ...(buf.rates || {}) }, majAt: new Date().toISOString(),
-    ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION,
-  } }], 'id');
-  // ⚠️ LE TITRE DE CETTE FONCTION LE DISAIT, LE CODE NE LE FAISAIT PAS : le
-  //    tampon était vidé même quand l'écriture avait échoué — les compteurs d'un
-  //    tour partaient avec elle. On ne vide que ce qui est arrivé en base.
-  if (okDiag === false) return;
+  const okDiag = await modifierLigneCas('panel_diag_capture', (d) => {
+    const tout = Object.assign({}, d || {}); delete tout.rev;
+    const n = { ...(tout.n || {}) };
+    for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
+    // 5.362 (moyenne 49) : les anciens échantillons perdent leur `tete` (un morceau du corps).
+    const rates = {};
+    for (const [k, v] of Object.entries(Object.assign({}, tout.rates || {}, buf.rates || {}))) { if (v && typeof v === 'object') { const c = Object.assign({}, v); delete c.tete; rates[k] = c; } }
+    return { ...tout, n, rates, majAt: new Date().toISOString(),
+      ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION };
+  });
+  if (okDiag !== true) return;
   buf.n = {}; buf.rates = {};
   try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
 }
 
 // Un exemplaire par type, écrasé à chaque fois (pas d'accumulation).
+function formeEchantillon(body) {
+  const t = String(body == null ? '' : body).trim();
+  if (!t) return 'vide';
+  if (/^</.test(t)) return 'html';
+  try {
+    const j = JSON.parse(t);
+    if (Array.isArray(j)) return 'liste';
+    if (j && typeof j === 'object') return 'objet:' + Object.keys(j).slice(0, 12).map((k) => String(k).replace(/[^A-Za-z0-9_]/g, '').slice(0, 30)).join(',');
+    return typeof j;
+  } catch (_) { return 'illisible'; }
+}
 async function echantillonRate(type, id, body) {
   const t = String(type || 'inconnu');
   return majTampon((buf) => {
@@ -1976,7 +1961,10 @@ async function echantillonRate(type, id, body) {
       id: String(id == null ? '' : id).slice(0, 40),
       taille: body == null ? null : String(body).length,
       type: typeof body,
-      tete: String(body == null ? '' : body).slice(0, 160),
+      // ⚠️ 5.362 (revue, moyenne 49) : plus AUCUN morceau du corps (les 160 premiers
+      //    caractères pouvaient porter le texte d'un message, une adresse). La FORME
+      //    seulement : JSON ou non, et les noms de clés du premier niveau.
+      forme: formeEchantillon(body),
       at: new Date().toISOString(),
     };
   });
@@ -4452,16 +4440,15 @@ async function noterStatutsOffres(parsed) {
       vus[String(e.status)] = String(e.status_title || '').trim() || '(sans libellé)';
     }
     if (!Object.keys(vus).length) return;
-    const rows = await sbGet('app_data?id=eq.panel_offer_statuts&select=data');
-      // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
-    //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
-    //    reste. On n'écrit pas.
-    if (rows === null) return;
-    const cur = (rows[0] && rows[0].data) || {};
-    const next = { ...(cur.statuts || {}), ...vus };
-    // Rien de nouveau → on n'écrit pas (inutile de repousser la même ligne).
-    if (JSON.stringify(next) === JSON.stringify(cur.statuts || {})) return;
-    await supabaseUpsert('app_data', [{ id: 'panel_offer_statuts', data: { statuts: next, majAt: new Date().toISOString() } }], 'id');
+    // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE (rien écrit) ; 5.362 (revue, moyenne 71) :
+    //    comparer-et-échanger sur `data.rev` (deux Chrome ne s'écrasent plus).
+    await modifierLigneCas('panel_offer_statuts', (d) => {
+      const cur = d || {};
+      const next = { ...(cur.statuts || {}), ...vus };
+      // Rien de nouveau → on n'écrit pas (inutile de repousser la même ligne).
+      if (JSON.stringify(next) === JSON.stringify(cur.statuts || {})) return undefined;
+      return { statuts: next, majAt: new Date().toISOString() };
+    });
   } catch (_) { /* purement diagnostique : ne doit jamais gêner la capture */ }
 }
 
@@ -4563,18 +4550,19 @@ async function storeSeenUrls(domain, paths, reponses, conversation) {
   //    pro bloqué), écraser était fatal.
   // ⚠️ Et « rien lu » ne vaut pas « rien » : lecture ratée ⇒ on n'écrit pas,
   //    sinon on efface ce qu'on avait (la leçon des lire-fusionner-réécrire).
-  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_seen_urls&select=data`);
-  if (rows === null) return;
-  const cur = (rows[0] && rows[0].data) || {};
-  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin
-  // (`fusionnerSeen` : les plus RÉCENTS gardés, les clés normalisées).
-  const f = fusionnerSeen(cur, paths, reponses, conversation);
-  const data = Object.assign({ uid }, f, { capturedAt: new Date().toISOString(), ver: EXT_VERSION });
-  // Rien de neuf → on ne repousse pas la même ligne.
-  if (JSON.stringify(f.paths) === JSON.stringify(cur.paths || [])
-      && JSON.stringify(f.reponses) === JSON.stringify(cur.reponses || {})
-      && JSON.stringify(f.conversation || null) === JSON.stringify(cur.conversation || null)) return;
-  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_seen_urls`, data }], 'id');
+  // ⚠️ 5.362 (revue, moyenne 71) : comparer-et-échanger sur `data.rev` — deux
+  //    Chrome du même compte s'écrasaient la ligne (lire-fusionner-réécrire).
+  await modifierLigneCas(`harvest_${uid}_seen_urls`, (d) => {
+    const cur = d || {};
+    // Bornes par construction : un diagnostic ne doit jamais grossir sans fin
+    // (`fusionnerSeen` : les plus RÉCENTS gardés, les clés normalisées).
+    const f = fusionnerSeen(cur, paths, reponses, conversation);
+    // Rien de neuf → on ne repousse pas la même ligne.
+    if (JSON.stringify(f.paths) === JSON.stringify(cur.paths || [])
+        && JSON.stringify(f.reponses) === JSON.stringify(cur.reponses || {})
+        && JSON.stringify(f.conversation || null) === JSON.stringify(cur.conversation || null)) return undefined;
+    return Object.assign({ uid }, f, { capturedAt: new Date().toISOString(), ver: EXT_VERSION });
+  });
 }
 
 // Range une requete d'ECRITURE observee (baisser prix, message...) dans une
@@ -4632,6 +4620,9 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabI
   const scope=await authToken();if(!scope?.user_id)return;
   const uid = await activeAccountId(domain);
   if (!uid) return;
+  // ⚠️ 5.362 (revue, moyenne 47) : même garde que `storeHarvest` — un compte
+  //    supprimé / « ignoré » (ou pas su) ne voit plus ses requêtes d'écriture rangées.
+  if ((await compteNonCapte(uid)) !== false) { noterDiag('ecriture_compte_non_capte'); return; }
   let path = url;
   let hote = '';
   try { const U = new URL(url, `https://${domain}`); path = U.pathname; hote = U.hostname; } catch (_) {}
@@ -6064,9 +6055,31 @@ function commandeMaigre(o) {
   return out;
 }
 
+// ⚠️ 5.362 (revue, moyenne 48) — LE PROFIL EST RANGÉ MAIGRE. `users/current` porte
+//    le nom réel, le téléphone, la date de naissance, l'adresse, les soldes… et il
+//    était rangé BRUT. Seul ce que VRM lit est gardé (liste blanche, champ par champ) :
+//    l'identité (id, login), la photo, les avis, l'état (banni, vacances), le type de
+//    compte (pro ou non — sans les données de la société), et l'e-mail (l'app en
+//    pré-remplit l'adresse de réception du compte).
+const PROFIL_CHAMPS = ['id', 'login', 'email', 'feedback_reputation', 'feedback_count', 'positive_feedback_count', 'neutral_feedback_count', 'negative_feedback_count', 'is_on_holiday', 'is_account_banned', 'account_status', 'business', 'business_account_id'];
+function profilMaigre(p) {
+  if (!p || typeof p !== 'object' || !p.user || typeof p.user !== 'object') return p;
+  const u = p.user, o = {};
+  for (const k of PROFIL_CHAMPS) if (u[k] !== undefined && (u[k] === null || typeof u[k] !== 'object')) o[k] = u[k];
+  if (u.business_account && typeof u.business_account === 'object') o.business_account = { id: u.business_account.id != null && typeof u.business_account.id !== 'object' ? u.business_account.id : null };
+  else if (u.business_account === null) o.business_account = null;
+  if (u.photo && typeof u.photo === 'object') {
+    const ph = {};
+    for (const k of ['url', 'full_size_url']) if (typeof u.photo[k] === 'string') ph[k] = u.photo[k].slice(0, 500);
+    if (Array.isArray(u.photo.thumbnails)) ph.thumbnails = u.photo.thumbnails.slice(0, 8).filter((t) => t && typeof t.url === 'string').map((t) => ({ type: typeof t.type === 'string' ? t.type.slice(0, 40) : '', url: t.url.slice(0, 500) }));
+    o.photo = ph;
+  }
+  return { user: o };
+}
 function alleger(type, payload) {
   try {
     if (!payload || typeof payload !== 'object') return payload;
+    if (type === 'profile') return profilMaigre(payload);
     if (type === 'listings' && Array.isArray(payload.items)) {
       return { code: payload.code, pagination: payload.pagination, items: payload.items.map(articleMaigre) };
     }
@@ -8855,6 +8868,15 @@ async function fetchAllWardrobe(getter, profileId, maxPages = 10, suivi) {
 // `suivi` (facultatif) reçoit `pagesLues` : 0 = Vinted n'a RIEN rendu (lecture
 // ratée), ce qu'une liste vide ne dit pas — un compte sans vente rend aussi `[]`.
 // Il vit à côté du résultat, jamais dedans : le résultat part tel quel en base.
+// 5.362 (revue, moyenne 46) : la dernière page des commandes. Vinted dit `total_pages`
+// ⇒ lui seul fait foi ; sinon une page vide, ou plus courte que `parPage`.
+function dernierePageCommandes(json, page, parPage) {
+  const lot = json && Array.isArray(json.my_orders) ? json.my_orders : [];
+  if (!lot.length) return true;
+  const tp = Number(json && json.pagination && json.pagination.total_pages);
+  if (Number.isFinite(tp) && tp > 0) return page >= tp;
+  return lot.length < parPage;
+}
 async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
   let all = []; let pagination = null;
   if (suivi) suivi.pagesLues = 0;
@@ -8864,7 +8886,10 @@ async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
     if (suivi) suivi.pagesLues++;
     all = all.concat(r.json.my_orders);
     pagination = r.json.pagination || pagination;
-    if (r.json.my_orders.length < 40) break; // derniere page atteinte
+    // ⚠️ 5.362 (revue, moyenne 46) : la DERNIÈRE page est celle que Vinted annonce
+    //    (`total_pages`) ; la longueur du lot ne sert que s'il ne le dit pas (Vinted
+    //    peut plafonner `per_page` plus bas : 1re page seule, sans le dire).
+    if (dernierePageCommandes(r.json, page, 40)) break;
     await wait(1200); // pause entre pages (discret)
   }
   return { my_orders: all, pagination };
@@ -8954,7 +8979,7 @@ async function fetchAllOrdersCookie(domain, type, maxPages = 8) {
     if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) break;
     all = all.concat(r.json.my_orders);
     pagination = r.json.pagination || pagination;
-    if (r.json.my_orders.length < 40) break;
+    if (dernierePageCommandes(r.json, page, 40)) break;   // 5.362 (moyenne 46)
     await wait(1200);
   }
   return { my_orders: all, pagination };
@@ -9038,8 +9063,10 @@ async function pageActiveFetch() {
             const lot = r && Array.isArray(r.my_orders) ? r.my_orders : null;
             if (!lot) break;
             if (!out) out = r; else out.my_orders = out.my_orders.concat(lot);
-            const tp = r.pagination && r.pagination.total_pages;
-            if (!lot.length || (tp && pg >= tp) || lot.length < 100) break;
+            // 5.362 (revue, moyenne 46) : `total_pages` d'abord (règle recopiée de
+            // `dernierePageCommandes` : cette fonction tourne DANS la page).
+            const tp = Number(r.pagination && r.pagination.total_pages);
+            if (!lot.length || (Number.isFinite(tp) && tp > 0 ? pg >= tp : lot.length < 100)) break;
             await new Promise(res => setTimeout(res, 700));
           }
           return out;
@@ -10808,19 +10835,28 @@ try {
 // y a … »), dans une seule ligne app_data `vinted_listing_dates` = { id: ts }.
 // C'est la SEULE source de l'ancienneté réelle : Vinted ne la renvoie pas dans
 // les données du dressing. Elle se remplit au fil de ta navigation.
+// ⚠️ 5.362 (revue, moyenne 50) : COMPARER-ET-ÉCHANGER sur `data.rev`
+//    (`modifierLigneCas`) — deux Chrome qui lisaient la même ligne se perdaient
+//    mutuellement leurs dates — et la ligne est BORNÉE (`LISTING_DATES_MAX`, les
+//    plus récemment lues gardées) : elle grossissait sans fin.
+const LISTING_DATES_MAX = 3000;
 async function saveListingDate(id, ts, text) {
-  const rows = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
-  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
-  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
-  //    reste. On n'écrit pas.
-  if (rows === null) return;
-  const cur = (rows[0] && rows[0].data) || {};
   const key = String(id);
-  // On ne réécrit pas une date déjà connue (la 1re lecture est la plus proche
-  // de la vérité ; « il y a 3 mois » lu plus tard donnerait la même chose).
-  if (cur[key] && cur[key].ts) return;
-  cur[key] = { ts: Number(ts), text: String(text || '').slice(0, 60), readAt: new Date().toISOString() };
-  await supabaseUpsert('app_data', [{ id: 'vinted_listing_dates', data: cur }], 'id');
+  if (!/^\d{1,20}$/.test(key) || !Number.isFinite(Number(ts))) return;
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE : `modifierLigneCas` n'écrit rien sur une lecture ratée.
+  await modifierLigneCas('vinted_listing_dates', (d) => {
+    const cur = Object.assign({}, d || {}); delete cur.rev;
+    // On ne réécrit pas une date déjà connue (la 1re lecture est la plus proche
+    // de la vérité ; « il y a 3 mois » lu plus tard donnerait la même chose).
+    if (cur[key] && cur[key].ts) return undefined;
+    cur[key] = { ts: Number(ts), text: String(text || '').slice(0, 60), readAt: new Date().toISOString() };
+    const ids = Object.keys(cur).filter((k) => cur[k] && typeof cur[k] === 'object');
+    if (ids.length > LISTING_DATES_MAX) {
+      ids.sort((a, b) => String(cur[b].readAt || '').localeCompare(String(cur[a].readAt || '')));
+      for (const k of ids.slice(LISTING_DATES_MAX)) delete cur[k];
+    }
+    return cur;
+  });
 }
 
 // Mémorise la DESCRIPTION et les PHOTOS lues sur la page de l'annonce, dans
