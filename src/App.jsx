@@ -622,6 +622,8 @@ import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from ".
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
 import "./styles-corbeille.css";
+import { PREFIXE_POINT, slotDe, idPoint, instantane as instantaneRestauration, instantaneValide, lirePoints, choisirEmplacement, lignePoint, pointInutile, pointDuJourManque, pointSuivant, apercu as apercuRestauration, texteResume, morceauxChoisis, morceauxAnnulation, ecrireRestauration, instantaneFichier, CATEGORIES as CATEGORIES_RESTAURATION, REGLAGES as REGLAGES_RESTAURABLES, RAISONS as RAISONS_POINT, MAX_POINTS as MAX_POINTS_RESTAURATION } from "./restauration.js";   // (11 nov.) Revenir en arrière
+import "./styles-restauration.css";
 // (9 nov., lot B) « Annuler » au lieu des confirmations réversibles + ⌘K qui agit (src/annulerCommandes.js).
 import { champsAvant, actionsPour, destinationAction, DEMANDE_COMMANDE } from "./annulerCommandes.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
@@ -4128,6 +4130,292 @@ function CorbeilleSetting() {
     </div>);
 }
 export { gesteCorbeille, restaurerCorbeille, CorbeilleSetting, lireListeCorbeille };
+
+// ── (11 nov.) REVENIR EN ARRIÈRE (src/restauration.js, docs/passation/2026-11-11-restauration.md) ──
+// Des POINTS de restauration posés tout seuls (avant une action en série, avant un import,
+// une fois par jour) dans SES lignes `restore_{0..23}` (jamais `main`) ; la liste se lit par
+// `meta` (scalaires) ; un point entier n'est lu qu'à son ouverture. Restaurer = des morceaux
+// CONDITIONNELS écrits par l'écrivain de la corbeille (comparer-et-échanger de `cloudPush`),
+// après avoir posé un point qui porte leur inverse (« Annuler la restauration »).
+// Les N° ne reculent jamais : seulement rendus à une fiche qui n'en porte plus (src/restauration.js).
+const lireCleRestauration = (k) => {
+  let t; try { t = localStorage.getItem(k); } catch (_) { return undefined; }
+  if (t == null) return null;
+  try { return JSON.parse(t); } catch (_) { return REGLAGES_RESTAURABLES[k] ? null : undefined; }   // un réglage en texte brut n'est pas repris
+};
+const filtreProprio = () => (CLOISONNE && AUTH.user ? `&owner=eq.${encodeURIComponent(AUTH.user.id)}` : '');
+// La liste brute (id + meta) — `null` = pas su (rien ne se décide dessus).
+const listerPointsServeur = async () => {
+  if (!AUTH.user?.id) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=id,meta&id=like.${PREFIXE_POINT}*${filtreProprio()}&order=id`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j.filter((x) => x && slotDe(x.id) != null) : null;
+  } catch (_) { return null; }
+};
+// UN point entier (sa ligne) — `null` = pas su.
+const lirePointServeur = async (slot) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=data&id=eq.${idPoint(slot)}${filtreProprio()}`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const d = Array.isArray(j) && j.length === 1 ? j[0].data : null;
+    return d && typeof d === 'object' && instantaneValide(d.snap) ? d : null;
+  } catch (_) { return null; }
+};
+// Écrire une ligne de point : POST si l'emplacement n'a jamais servi, sinon PATCH gardé par `data.rev`.
+// 'ok' · 'conflit' (un autre appareil a écrit : on relit) · 'ko'.
+const ecrirePointServeur = async (id, data, { existe, rev }) => {
+  try {
+    if (!existe) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([withOwner({ id, data })]) });
+      return r.ok ? 'ok' : r.status === 409 ? 'conflit' : 'ko';
+    }
+    const garde = rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev}`;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${filtreProprio()}&${garde}&select=id`, { method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data, updated_at: new Date().toISOString() }) });
+    if (!r.ok) return 'ko';
+    const j = await r.json().catch(() => null);
+    return Array.isArray(j) && j.length === 1 ? 'ok' : Array.isArray(j) && j.length === 0 ? 'conflit' : 'ko';
+  } catch (_) { return 'ko'; }
+};
+const _pointsAbonnes = new Set();
+const emettrePoints = () => { [..._pointsAbonnes].forEach((f) => { try { f(); } catch (_) {} }); };
+let _pointEnVol = Promise.resolve();
+// Pose un point. L'instantané est pris TOUT DE SUITE (synchrone) : c'est l'état d'AVANT le
+// geste qui suit l'appel, même si l'envoi part ensuite. Rien sans le nuage lu (l'appareil
+// pourrait porter une copie vide ou périmée, §4.1). Rend { ok, slot?, inutile?, raison? }.
+const poserPoint = (raison, libelle = '', { annulation = null, force = false } = {}) => {
+  if (!isCloudReady() || !AUTH.user?.id) return Promise.resolve({ ok: false, raison: 'nuage' });
+  const snap = instantaneRestauration(lireCleRestauration);
+  if (!snap) return Promise.resolve({ ok: false, raison: 'lecture' });
+  const maintenant = Date.now();
+  const p = _pointEnVol.then(async () => {
+    for (let essai = 0; essai < 3; essai++) {
+      const rows = await listerPointsServeur();
+      if (!rows) return { ok: false, raison: 'base' };
+      if (!annulation && !force && pointInutile(lirePoints(rows, maintenant), snap)) return { ok: true, inutile: true };
+      const e = choisirEmplacement(rows, maintenant);
+      const d = lignePoint({ snap, raison, libelle, maintenant, annulation, rev: e.rev });
+      if (!d) return { ok: false, raison: 'trop-gros' };
+      const w = await ecrirePointServeur(idPoint(e.slot), d, e);
+      if (w === 'ok') { emettrePoints(); return { ok: true, slot: e.slot, at: d.at }; }
+      if (w !== 'conflit') return { ok: false, raison: 'base' };
+    }
+    return { ok: false, raison: 'base' };
+  });
+  _pointEnVol = p.catch(() => {});
+  return p;
+};
+// Avant une action en série ou un import : le point part, l'action n'attend pas (l'instantané
+// est déjà pris) ; s'il n'a pas pu être posé, c'est dit une fois.
+const pointAvant = (raison, libelle) => {
+  poserPoint(raison, libelle).then((r) => { if (!r.ok && r.raison !== 'nuage') toast('Point de restauration pas posé (la base n’a pas répondu) : « Revenir en arrière » ne pourra pas défaire ce geste.'); }).catch(() => {});
+};
+// Le point du jour : décidé sur la liste du SERVEUR (jamais sur un drapeau de l'appareil).
+onCloudReady(() => { setTimeout(async () => { try { const rows = await listerPointsServeur(); if (pointDuJourManque(rows)) await poserPoint('jour', ''); } catch (_) {} }, 30000); });
+// Les N° portés hors des fiches et des ventes : un N° rendu ne doit être porté par AUCUNE autre paire.
+const numerosPortesAilleurs = () => {
+  const out = [];
+  try { for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) out.push(n); } catch (_) {}
+  try { for (const x of Object.values(load('vrm_vc_numeros', {}) || {})) { const n = x && typeof x === 'object' ? x.numero : x; if (n) out.push(n); } } catch (_) {}
+  return out;
+};
+// Restaurer : poser d'abord le point qui porte l'inverse (sans lui, rien ne s'écrit : on ne
+// pourrait pas annuler), puis les morceaux conditionnels.
+const restaurerMorceaux = async (ms, source) => {
+  if (!ms || !ms.length) return { ok: true, ecrit: false, ignores: 0 };
+  const pt = await poserPoint('restauration', source, { annulation: morceauxAnnulation(ms), force: true });
+  if (!pt.ok) return { ok: false, raison: 'point', detail: pt.raison };
+  const r = await ecrireRestauration({ morceaux: ms, lire: lireCleRestauration, ecrire: ecrireCleCorbeille, combiner: combinerIssues });
+  return { ...r, slot: pt.slot };
+};
+// Annuler une restauration : son point porte l'inverse ; un point est posé avant ; un N° rendu reste.
+const annulerRestauration = async (p) => {
+  const d = await lirePointServeur(p.slot);
+  if (!d || !Array.isArray(d.annulation) || !d.annulation.length) return { ok: false, raison: 'base' };
+  if (d.annulee) return { ok: true, ecrit: false, ignores: 0, deja: true };
+  const pt = await poserPoint('annulation', p.libelle || '', { force: true });
+  if (!pt.ok) return { ok: false, raison: 'point', detail: pt.raison };
+  const r = await ecrireRestauration({ morceaux: d.annulation, lire: lireCleRestauration, ecrire: ecrireCleCorbeille, combiner: combinerIssues });
+  if (r.ok !== false) {
+    const nd = { ...d, rev: (Number.isSafeInteger(d.rev) ? d.rev : 0) + 1, annulee: new Date().toISOString(), annulable: false };
+    await ecrirePointServeur(idPoint(p.slot), nd, { existe: true, rev: Number.isSafeInteger(d.rev) ? d.rev : null });
+    emettrePoints();
+  }
+  return r;
+};
+const dateHeurePoint = (iso) => { try { return new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
+const euroPoint = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? `${n.toLocaleString('fr-FR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })} €` : String(v); };
+// Ce qu'une ligne d'aperçu montre (maintenant → au moment choisi).
+const valeurAffichee = (cat, v) => {
+  if (v === null || v === undefined || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length)) return '—';
+  if (cat === 'prix') return typeof v === 'object' ? (v.buyPrice != null ? euroPoint(v.buyPrice) : '—') : euroPoint(v);
+  if (cat === 'liens') return v.buyFromId || v.buyFrom || v.buyGros ? 'relié' : '—';
+  if (cat === 'notes') { const t = typeof v === 'object' ? v.t : v; return t ? `« ${String(t).slice(0, 40)}${String(t).length > 40 ? '…' : ''} »` : '—'; }
+  if (cat === 'numeros') return `N°${v}`;
+  if (cat === 'depenses') return v.montant != null ? euroPoint(v.montant) : v.prix != null ? euroPoint(v.prix) : 'présente';
+  if (cat === 'reglages') return typeof v === 'boolean' ? (v ? 'oui' : 'non') : typeof v === 'string' || typeof v === 'number' ? String(v).slice(0, 30) : 'réglé';
+  return 'réglé';
+};
+const RAISONS_LIGNE = {
+  'ajoute-depuis': 'ajouté depuis ce moment', 'retouche': 'retouché après un point plus récent', 'retire-depuis': 'retiré depuis',
+  'attribue-depuis': 'attribué depuis, il reste', 'change-depuis': 'changé depuis, le N° actuel reste', 'numero-pris': 'porté par une autre paire, pas rendu',
+  'fiche-absente': 'la fiche n’existe plus (voir la Corbeille)', 'pose-depuis': 'posé depuis : il reste', 'trop-gros': 'trop gros pour un point : il reste',
+  'numero-garde': 'seul le N° diffère : il reste', 'rendu': 'N° rendu (porté par aucune autre)',
+};
+const MOTS_ECHEC = { point: 'Le point de restauration n’a pas pu être posé (la base n’a pas répondu) : rien n’a changé. Réessaie dans un instant.', lecture: 'Une donnée n’a pas pu être lue : rien n’a changé. Réessaie dans un instant.', conflits: 'Réponds d’abord pour les valeurs plus récentes.' };
+const issueTexte = (r) => (r.ok === true ? 'Enregistré.' : r.ok === null ? 'Gardé sur cet appareil : l’envoi au nuage part dès que la base répond.' : MOTS_ECHEC[r.raison] || 'La base a refusé : réessaie.');
+
+function RevenirEnArriere() {
+  const [rows, setRows] = React.useState(undefined);          // undefined en cours · null pas su · liste
+  const [ouvert, setOuvert] = React.useState(null);           // { p?, fichier?, snap, suivant, at }
+  const [ap, setAp] = React.useState(null);
+  const [choix, setChoix] = React.useState({});
+  const [conflits, setConflits] = React.useState(null);       // null = pas répondu · 'garder' · 'remettre'
+  const [etat, setEtat] = React.useState('');                 // '' · 'lecture' · 'envoi'
+  const [fait, setFait] = React.useState(null);
+  const [deplie, setDeplie] = React.useState({});
+  const relire = React.useCallback(() => { listerPointsServeur().then(setRows); }, []);
+  React.useEffect(() => { relire(); _pointsAbonnes.add(relire); const off = onCloudReady(relire); return () => { _pointsAbonnes.delete(relire); if (typeof off === 'function') off(); }; }, [relire]);
+  const points = Array.isArray(rows) ? lirePoints(rows) : [];
+  const calculer = (snap, suivant) => {
+    const a = apercuRestauration({ point: snap, actuel: lireCleRestauration, plusRecent: suivant, cleNum, numerosAilleurs: numerosPortesAilleurs() });
+    setAp(a); setConflits(null); setFait(null); setDeplie({});
+    const c = {}; if (a.ok) for (const cat of CATEGORIES_RESTAURATION) { const p = a.parCat[cat.id]; c[cat.id] = p.remis + p.conflit > 0; }
+    setChoix(c);
+  };
+  const ouvrirPoint = async (p) => {
+    setEtat('lecture'); setFait(null);
+    const suiv = pointSuivant(points, p);
+    const [d, ds] = await Promise.all([lirePointServeur(p.slot), suiv ? lirePointServeur(suiv.slot) : Promise.resolve(null)]);
+    setEtat('');
+    if (!d) { toast('Ce point n’a pas pu être lu : réessaie.'); return; }
+    setOuvert({ p, snap: d.snap, suivant: ds ? ds.snap : null, at: p.at, source: `${RAISONS_POINT[p.raison] || 'Point'} du ${dateHeurePoint(p.at)}` });
+    calculer(d.snap, ds ? ds.snap : null);
+  };
+  const ouvrirFichier = () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = async (e) => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      let data; try { data = JSON.parse(await f.text()); } catch (_) { toast('⚠ Fichier de sauvegarde illisible.'); return; }
+      const r = instantaneFichier(data, versionNumerotation());
+      if (!r.ok) { toast('⚠ Ce fichier n’est pas une « Sauvegarde complète » de VRM.'); return; }
+      setOuvert({ fichier: f.name, snap: r.snap, suivant: null, at: r.at, numerosFermes: r.numerosFermes, source: `Sauvegarde complète${r.at ? ` du ${dateHeurePoint(r.at)}` : ''}` });
+      calculer(r.snap, null);
+    };
+    inp.click();
+  };
+  const fermer = () => { setOuvert(null); setAp(null); setFait(null); };
+  const lignesChoisies = ap && ap.ok ? ap.lignes.filter((l) => choix[l.cat]) : [];
+  const nConflits = lignesChoisies.filter((l) => l.etat === 'conflit').length;
+  const ms = ap && ap.ok ? morceauxChoisis(ap, choix, nConflits ? conflits : 'garder') : null;
+  const resumeTxt = ap && ap.ok ? texteResume(ap, choix, conflits || 'garder') : '';
+  const confirmer = async () => {
+    if (!ms || !ms.length) return;
+    if (!(await askConfirm({ title: 'Revenir à ce moment ?', desc: `${resumeTxt}.${nConflits ? (conflits === 'remettre' ? ` Les ${nConflits} valeurs plus récentes sont remises aussi.` : ` Les ${nConflits} valeurs plus récentes sont gardées.`) : ''} Un point est posé avant : tu pourras annuler.`, ok: 'Revenir en arrière', cancel: 'Pas maintenant' }))) return;
+    setEtat('envoi');
+    const r = await restaurerMorceaux(ms, ouvert.source);
+    setEtat('');
+    setFait({ ...r, resume: resumeTxt, gardes: nConflits && conflits === 'garder' ? nConflits : 0 });
+    if (r.ok !== false) relire();
+  };
+  const annuler = async (p) => {
+    if (!(await askConfirm({ title: 'Annuler cette restauration ?', desc: 'Ce qu’elle a remis revient comme avant elle (sauf ce que tu as changé depuis). Un N° rendu reste : un N° ne recule jamais.', ok: 'Annuler la restauration', cancel: 'Garder' }))) return;
+    setEtat('envoi');
+    const r = await annulerRestauration(p);
+    setEtat('');
+    toast(r.ok === false ? (MOTS_ECHEC[r.raison] || 'Rien n’a changé : réessaie.') : r.deja ? 'Déjà annulée.' : `Restauration annulée.${r.ignores ? ` ${r.ignores} valeur${r.ignores > 1 ? 's' : ''} changée${r.ignores > 1 ? 's' : ''} depuis, gardée${r.ignores > 1 ? 's' : ''}.` : ''}`);
+    setFait(null); relire();
+  };
+  // ── L'aperçu d'un moment ──
+  if (ouvert && ap) {
+    if (!ap.ok) return (<div className="vrm-retour" data-retour-apercu="pas-su"><p className="vrm-retour-tete">{ap.raison === 'lecture' ? 'Tes données ne sont pas encore chargées : réessaie dans un instant.' : 'Ce point est abîmé : il ne peut pas servir.'}</p><Bouton variante="secondaire" onClick={fermer}>Retour</Bouton></div>);
+    if (fait) {
+      const pFait = fait.slot != null ? points.find((x) => x.slot === fait.slot) || { slot: fait.slot, at: new Date().toISOString(), libelle: ouvert.source, annulable: true } : null;
+      return (
+        <div className="vrm-retour" data-retour-fait={fait.ok === false ? 'echec' : fait.ok === true ? 'ok' : 'garde'} data-retour-ignores={fait.ignores || 0}>
+          <p className="vrm-retour-titre">{fait.ok === false ? 'Rien n’a changé' : 'Retour en arrière fait'}</p>
+          {fait.ok !== false && <p className="vrm-retour-resume" data-retour-resume="">{fait.resume}</p>}
+          {fait.ok !== false && fait.gardes > 0 && <p className="vrm-retour-tete" data-retour-gardes={fait.gardes}>{fait.gardes} valeur{fait.gardes > 1 ? 's' : ''} plus récente{fait.gardes > 1 ? 's' : ''} gardée{fait.gardes > 1 ? 's' : ''}, comme tu l’as choisi.</p>}
+          <p className="vrm-retour-tete">{issueTexte(fait)}{fait.ignores ? ` ${fait.ignores} valeur${fait.ignores > 1 ? 's' : ''} changée${fait.ignores > 1 ? 's' : ''} entre-temps : gardée${fait.ignores > 1 ? 's' : ''}.` : ''}</p>
+          <div className="vrm-retour-actions">
+            {fait.ok !== false && pFait && <Bouton variante="secondaire" icone="restore" data-retour-annuler-fait="" disabled={etat === 'envoi'} onClick={() => annuler(pFait)}>Annuler la restauration</Bouton>}
+            {fait.ok === false && <Bouton variante="secondaire" data-retour-reessayer="" onClick={() => setFait(null)}>Réessayer</Bouton>}
+            <Bouton variante="discret" onClick={fermer}>Terminé</Bouton>
+          </div>
+        </div>);
+    }
+    return (
+      <div className="vrm-retour" data-retour-apercu={ouvert.p ? ouvert.p.slot : 'fichier'} data-retour-conflits={nConflits}>
+        <p className="vrm-retour-titre">{ouvert.source}</p>
+        <p className="vrm-retour-tete">Ce qui changera si tu reviens à ce moment. Rien n’est écrit avant ta confirmation.</p>
+        {ouvert.numerosFermes && <p className="vrm-retour-tete" data-retour-numeros-fermes="">Ce fichier date d’avant la remise à zéro des numéros : ses N° ne sont pas repris.</p>}
+        <p className="vrm-retour-resume" data-retour-resume="">{resumeTxt || 'Rien de coché.'}</p>
+        <ul className="vrm-retour-cats">
+          {CATEGORIES_RESTAURATION.map((cat) => {
+            const p = ap.parCat[cat.id]; const L = ap.lignes.filter((l) => l.cat === cat.id);
+            const n = p.remis + p.conflit;
+            const voir = deplie[cat.id] ? L : L.slice(0, 8);
+            return (
+              <li key={cat.id} className="vrm-retour-cat" data-retour-cat={cat.id} data-retour-remis={p.remis} data-retour-conflit={p.conflit} data-retour-garde={p.garde} data-retour-refus={p.refus}>
+                <label className="vrm-retour-case">
+                  <input type="checkbox" checked={!!choix[cat.id]} disabled={!n} onChange={(e) => { const v = e.target.checked; setChoix((c) => ({ ...c, [cat.id]: v })); }} data-retour-choix={cat.id}/>
+                  <span><b>{cat.lib}</b><small>{n ? `${p.remis} à remettre${p.conflit ? ` · ${p.conflit} plus récent${p.conflit > 1 ? 's' : ''}` : ''}` : 'rien à remettre'}{p.garde ? ` · ${p.garde} gardé${p.garde > 1 ? 's' : ''}` : ''}{p.refus ? ` · ${p.refus} impossible${p.refus > 1 ? 's' : ''}` : ''}</small></span>
+                </label>
+                {L.length > 0 && <ul className="vrm-retour-lignes">
+                  {voir.map((l, i) => (
+                    <li key={l.cat + l.id + i} className={`vrm-retour-ligne is-${l.etat}`} data-retour-ligne={l.etat} data-retour-id={l.id}>
+                      <span className="vrm-retour-lib">{l.libelle}</span>
+                      <span className="vrm-retour-val">{l.etat === 'garde' || l.etat === 'refus' ? `${l.cat === 'numeros' ? `N°${l.maintenant != null ? l.maintenant : l.avant} : ` : ''}${RAISONS_LIGNE[l.raison] || ''}` : <>{valeurAffichee(l.cat, l.maintenant)} → {valeurAffichee(l.cat, l.avant)}{l.raison && RAISONS_LIGNE[l.raison] && l.etat === 'conflit' ? <small> · {RAISONS_LIGNE[l.raison]}</small> : null}</>}</span>
+                    </li>))}
+                  {L.length > voir.length && <li className="vrm-retour-plus"><Bouton variante="discret" taille="petit" data-retour-plus={cat.id} onClick={() => setDeplie((d) => ({ ...d, [cat.id]: true }))}>Voir les {L.length - voir.length} autres</Bouton></li>}
+                </ul>}
+              </li>);
+          })}
+        </ul>
+        {nConflits > 0 && (
+          <div className="vrm-retour-conflits" data-retour-question="">
+            <p><b>{nConflits} valeur{nConflits > 1 ? 's' : ''} plus récente{nConflits > 1 ? 's' : ''} que ce moment</b> (ajoutée{nConflits > 1 ? 's' : ''} depuis, ou retouchée{nConflits > 1 ? 's' : ''} après un point plus récent). Revenir en arrière les effacerait : que faire ?</p>
+            <ul className="vrm-retour-lignes is-conflits">
+              {lignesChoisies.filter((l) => l.etat === 'conflit').slice(0, deplie._conflits ? 500 : 6).map((l, i) => (
+                <li key={'c' + l.cat + l.id + i} className="vrm-retour-ligne is-conflit" data-retour-conflit-ligne={l.id}>
+                  <span className="vrm-retour-lib">{l.libelle}</span>
+                  <span className="vrm-retour-val">{valeurAffichee(l.cat, l.maintenant)} → {valeurAffichee(l.cat, l.avant)}</span>
+                </li>))}
+              {nConflits > 6 && !deplie._conflits && <li className="vrm-retour-plus"><Bouton variante="discret" taille="petit" onClick={() => setDeplie((d) => ({ ...d, _conflits: true }))}>Voir les {nConflits - 6} autres</Bouton></li>}
+            </ul>
+            <Segmente label="Valeurs plus récentes" value={conflits || ''} onChange={setConflits} options={[{ v: 'garder', l: 'Les garder', data: { 'data-retour-conflits-choix': 'garder' } }, { v: 'remettre', l: 'Revenir quand même', data: { 'data-retour-conflits-choix': 'remettre' } }]}/>
+          </div>)}
+        <div className="vrm-retour-actions">
+          <Bouton variante="primaire" icone="undo" data-retour-confirmer="" occupe={etat === 'envoi'} disabled={!ms || !ms.length} onClick={confirmer}>Revenir à ce moment</Bouton>
+          <Bouton variante="discret" onClick={fermer}>Retour</Bouton>
+        </div>
+        {!ms && nConflits > 0 && <p className="vrm-retour-tete" data-retour-attend="">Réponds d’abord pour les valeurs plus récentes.</p>}
+      </div>);
+  }
+  // ── La liste des moments ──
+  return (
+    <div className="vrm-retour" data-retour-liste={rows === undefined ? 'en-cours' : rows === null ? 'pas-su' : points.length}>
+      <p className="vrm-retour-tete">Des points posés tout seuls : avant chaque action en série, avant chaque import, et une fois par jour. Gardés 30 jours, {MAX_POINTS_RESTAURATION} au plus. Les numéros de rangement ne reculent jamais.</p>
+      {rows === null && <p className="vrm-retour-tete" data-retour-pas-su="">La liste n’a pas pu être lue (la base n’a pas répondu). <button type="button" className="vrm-lien-action" onClick={relire}>Réessayer</button></p>}
+      {rows === undefined && <p className="vrm-retour-tete">Lecture des points…</p>}
+      {Array.isArray(rows) && !points.length && <p className="vrm-retour-tete" data-retour-vide="">Aucun point pour l’instant : le premier se pose aujourd’hui.</p>}
+      {points.length > 0 && <ul className="vrm-corbeille-liste">
+        {points.map((p) => (
+          <li key={p.slot} className="vrm-corbeille-ligne" data-retour-point={p.slot} data-retour-raison={p.raison}>
+            <div className="vrm-corbeille-quoi"><b>{dateHeurePoint(p.at)}</b><small>{RAISONS_POINT[p.raison] || 'Point'}{p.libelle ? ` · ${p.libelle}` : ''}{p.annulee ? ' · annulée' : ''}</small></div>
+            {p.annulable && !p.annulee && <Bouton variante="discret" className="vrm-corbeille-restaurer" data-retour-annuler={p.slot} disabled={etat !== ''} onClick={() => annuler(p)}>Annuler la restauration</Bouton>}
+            <Bouton variante="secondaire" className="vrm-corbeille-restaurer" data-retour-voir={p.slot} disabled={etat !== ''} onClick={() => ouvrirPoint(p)}>Voir</Bouton>
+          </li>))}
+      </ul>}
+      <div className="vrm-retour-actions">
+        <Bouton variante="secondaire" icone="archive" data-retour-fichier="" onClick={ouvrirFichier}>Depuis une sauvegarde complète</Bouton>
+        <Bouton variante="discret" data-retour-poser="" disabled={etat !== ''} onClick={() => { poserPoint('main', '', { force: true }).then((r) => toast(r.ok ? 'Point posé.' : 'Pas pu poser le point : réessaie.')); }}>Poser un point maintenant</Bouton>
+      </div>
+    </div>);
+}
+export { RevenirEnArriere, pointAvant };
 
 // ── (10 nov., lot BD) LA NOTE PRIVÉE D'UNE PAIRE (src/notePaire.js, src/NotePaire.jsx) ──
 // UN état pour tous les endroits où la paire apparaît (Annonces, fiche paire, Ventes,
@@ -14422,6 +14710,8 @@ const ICON_PATHS = {
   shop:   <><path d="M3.5 8h17l-1 11.3a2 2 0 0 1-2 1.8H6.5a2 2 0 0 1-2-1.8L3.5 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></>,
   save:   <><path d="M12 3v11m0 0 4-4m-4 4-4-4"/><path d="M4.5 15v3a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-3"/></>,
   restore:<><path d="M12 21a9 9 0 1 0-9-9"/><path d="M3 4v5h5"/></>,
+  // (11 nov.) « Revenir en arrière » (src/restauration.js) : une flèche qui revient.
+  undo:<><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></>,
   box:    <><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16V8Z"/><path d="M3.5 8 12 12.5 20.5 8M12 12.5V20.5"/></>,
   image:  <><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></>,
   moon:   <><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></>,
@@ -36897,6 +37187,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     numeroDe: (v, ms) => { const k = cleNum(v); if (!k) return ''; if (archiveNumeros() && /^\d+$/.test(k) && !(ms != null && isFinite(ms))) return null; return numeroExterne(k, null, null, ms); },
     etatNumero: (k) => { const f = fichesDuNumero(k); return !f.length ? 'absent' : f.length > 1 ? 'deux' : prixAchatDe(f[0], buyByNum) != null ? 'prix' : 'libre'; },
     onImporter: ({ achats, couts }) => {
+      pointAvant('import', `Import d’un tableur (${achats.length} achat${achats.length > 1 ? 's' : ''})`);   // (11 nov.) revenir en arrière
       setOffBuys(prev => { const u = [...achats, ...prev]; save('vinted_offvinted_buys', u); return u; });
       const nums = Object.keys(couts || {});
       if (nums.length) setBuyByNum(prev => { const u = { ...prev }; for (const k of nums) { const f = fichesDuNumero(k); if (f.length !== 1 || prixAchatDe(f[0], u) != null) continue; u[String(f[0].numero).trim()] = couts[k]; } save('vinted_buyprice_by_num', u); return u; });
@@ -37617,6 +37908,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Aucune saisie automatique : c'est lui qui tape, ou qui tape sur une
   // suggestion qu'il voit (règle tenue depuis §22).
   const [fillBuyOpen, setFillBuyOpen] = useState(false);
+  // (11 nov.) Revenir en arrière : un point AVANT la saisie en série (l'état d'avant est pris à l'ouverture).
+  React.useEffect(() => { if (fillBuyOpen) pointAvant('serie', 'Saisie en série des prix d’achat'); }, [fillBuyOpen]);
   // Venu du tableau de bord : « Bénéfice net — saisis tes prix d'achat » est un
   // bouton, il amène ICI et ouvre la saisie. Le drapeau est consommé une fois.
   useEffect(() => {
@@ -38251,6 +38544,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const w = ecrituresRepartition({ achat: lot.achat, articles: lot.articles, saisies, inclus, ventilation: ventilationDeTx(lot.tx), confirme: true,
       at: new Date().toISOString(), accNom: lot.achat._acc ? accNameOf(lot.achat._acc) : '', photo: orderPhoto(lot.achat) || '' });
     if (!w) { toast("La somme ne tombe pas juste : rien n'a été enregistré"); return false; }
+    pointAvant('serie', `Répartition d’un lot (${w.ecritures.length} prix)`);   // (11 nov.) revenir en arrière
     for (const x of w.ecritures) poserPatchAchat(x.cle, x.patch);
     setRepartitionsLots((prev) => { const u = { ...prev, [lot.tx]: lot.journal ? { ...w.journal, avant: lot.journal.avant } : w.journal }; save('vrm_repartitions_lots', u); return u; });
     toast(`${w.ecritures.length} prix d'achat enregistrés`);
@@ -56100,6 +56394,8 @@ function AppCoeur() {
                 if(NUMEROS_FUSION.includes(k) && v && typeof v==='object' && !Array.isArray(v) && cur && typeof cur==='object' && !Array.isArray(cur)) return [k,{ ...v, ...cur }];
                 return [k,v];
               });
+              // (11 nov.) Revenir en arrière : un point AVANT l'import ; sans lui, rien n'est écrit.
+              { const pt=await poserPoint('import','Restauration d’une sauvegarde complète'); if(!pt.ok){ toast('⚠ Le point de restauration n’a pas pu être posé : rien n’a changé. Réessaie dans un instant.'); return; } }
               const avant=entries.map(([k])=>[k,localStorage.getItem(k)]);
               entries.forEach(([k,v])=>{ try{ localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v)); }catch(_){} });
               let enregistre=false, refus=null;
@@ -56278,6 +56574,7 @@ function AppCoeur() {
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
         onImport={(data)=>{
+          pointAvant('import','Ancien fichier de sauvegarde');   // (11 nov.) revenir en arrière
           if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
           if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);}
           if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);}
