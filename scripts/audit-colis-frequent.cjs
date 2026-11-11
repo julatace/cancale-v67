@@ -173,7 +173,7 @@ const transp = (owner, carrier, suivi, o = {}) => base.set(`${owner}|transp_${ca
     const r5 = M.regrouperArrivees([moitie(8, 0)], { commandeDe: () => null, temoins: [temoin(8, 9 * 86400000, true)], temoinActif: actif });
     dit(r5.liste.length === 1 && !r5.doutes.length && !(r5.probables || []).length, 'A4 un témoin hors des 3 jours ne touche pas la moitié (elle reste à retirer)');
     const app = sansCommentaires(fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8'));
-    dit(/regrouperArrivees\(emailList, \{[^}]*temoinActif: \(w\) => !temoinFini\(w\) \}\)/.test(app) && /noterProbable\(p\.t, p\.commande, p\.temoin\)/.test(app), 'A5 l’app branche la règle (`temoinActif`) et DIT chaque moitié finie (sortis)');
+    dit(/regrouperArrivees\(emailList, \{[^}]*temoinActif: \(w\) => !temoinFini\(w\)(, attendEncore)? \}\)/.test(app) && /noterProbable\(p\.t, p\.commande, p\.temoin\)/.test(app), 'A5 l’app branche la règle (`temoinActif`) et DIT chaque moitié finie (sortis)');
     const RC = await importer('src/relaisColis.js');
     dit(typeof RC.surLaCarte === 'function' && RC.surLaCarte({ cle: 'p', nComptes: 1 }) && !RC.surLaCarte({ cle: 'p', nComptes: 0, arrives: [{ horsCompte: true }] }) && !RC.surLaCarte({ cle: 'p', nComptes: 0, nAttendus: 3 }),
       'A5 la carte n’épingle qu’un point où un colis COMPTÉ attend (ni « à vérifier », ni « en double », ni « en route »)');
