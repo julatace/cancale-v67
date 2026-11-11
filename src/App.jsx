@@ -2774,7 +2774,7 @@ const verifierAvantPublication = async (tout, opts = {}) => {
   const lignes = sansCoupees(tout, coupees);
   if (!Array.isArray(lignes) || !lignes.length) return true;
   const n = lignes.length;
-  return (await askConfirm({ kind: 'verif', site: opts.site || '', lignes, title: opts.titre || `${n} point${n > 1 ? 's' : ''} à vérifier`, desc: lignes.map((l) => `${l.qui ? l.qui + ' · ' : ''}${l.texte} — ${l.geste}`).join('\n'), ok: opts.ok })) === true;
+  return (await askConfirm({ kind: 'verif', site: opts.site || '', lignes, titrePerso: opts.titre || '', title: opts.titre || `${n} point${n > 1 ? 's' : ''} à vérifier`, desc: lignes.map((l) => `${l.qui ? l.qui + ' · ' : ''}${l.texte} — ${l.geste}`).join('\n'), ok: opts.ok })) === true;
 };
 
 // Meme chose pour window.prompt : une saisie, dans la feuille de l'app.
@@ -3142,12 +3142,16 @@ function AskTextSheet({ q, close }) {
 // ligne par alerte, son geste, POURQUOI elle est là (`POURQUOI_ALERTE`), et
 // « Ne plus me le dire » (le code est coupé partout, synchronisé, Paramètres le
 // rallume). Une alerte coupée disparaît de la feuille ; « Publier quand même » reste.
-function ListeVerif({ lignes }) {
+function ListeVerif({ lignes, titre = '' }) {
   const [coupees, setCoupees] = React.useState(() => lireCoupees(load(CLE_VERIF_COUPEES, null)));
   const couper = (code) => { const r = couperAlerte(load(CLE_VERIF_COUPEES, null), code); save(CLE_VERIF_COUPEES, r); setCoupees(lireCoupees(r)); };
   const vues = lignes.filter((l) => !coupees.has(l.code));
   const premier = new Set();
+  // Le titre suit ce qui RESTE (une alerte coupée ne compte plus).
+  const n = vues.length;
   return (
+    <>
+    <div data-verif-titre={n} style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre || (n ? `${n} point${n > 1 ? 's' : ''} à vérifier` : 'Plus rien à vérifier')}</div>
     <div className="vrm-verif-liste" data-verif-vues={vues.length} style={{marginTop:12,display:'flex',flexDirection:'column',borderTop:`1px solid ${C.border}`}}>
       {vues.map((l, i) => {
         // « Ne plus me le dire » une fois par SORTE d'alerte (Republier : plusieurs paires).
@@ -3157,12 +3161,13 @@ function ListeVerif({ lignes }) {
             <span style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
             <span style={{fontSize:13,color:C.muted,lineHeight:1.4}}>{l.geste}</span>
             {lien && POURQUOI_ALERTE[l.code] ? <span data-verif-pourquoi={l.code} style={{fontSize:12,color:C.muted,lineHeight:1.4}}>{POURQUOI_ALERTE[l.code]}</span> : null}
-            {lien && NOMS_ALERTES[l.code] ? <button type="button" className="vrm-lien-action" data-verif-couper={l.code} onClick={() => couper(l.code)} style={{alignSelf:'flex-start',minHeight:44,padding:'0 2px',fontSize:13}}>Ne plus me le dire</button> : null}
+            {lien && NOMS_ALERTES[l.code] ? <button type="button" className="vrm-lien-action" data-verif-couper={l.code} onClick={() => couper(l.code)} style={{alignSelf:'flex-start',minHeight:44,padding:'0 2px',fontSize:13,fontWeight:600,background:'transparent',border:0,boxShadow:'none',color:C.accentTexte || C.accent,cursor:'pointer'}}>Ne plus me le dire</button> : null}
           </div>
         );
       })}
-      {!vues.length ? <p data-verif-tout-coupe="" style={{fontSize:13,color:C.muted,padding:'10px 0',margin:0}}>Plus rien à vérifier : tu peux publier.</p> : null}
+      {!vues.length ? <p data-verif-tout-coupe="" style={{fontSize:13,color:C.muted,padding:'10px 0',margin:0}}>Tu peux publier.</p> : null}
     </div>
+    </>
   );
 }
 
@@ -3178,8 +3183,7 @@ function ConfirmHost() {
   if (q.kind === 'verif') return createPortal(
     <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation">
       <div data-verif-sheet={q.site || ''} data-verif-n={(q.lignes || []).length}>
-        <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{q.title}</div>
-        <ListeVerif lignes={q.lignes || []}/>
+        <ListeVerif lignes={q.lignes || []} titre={q.titrePerso || ''}/>
         <div style={{display:'flex',gap:9,marginTop:16}}>
           <Bouton variante="discret" data-verif-publier="" onClick={() => close(true)} style={{flex:1}}>{q.ok || 'Publier quand même'}</Bouton>
           <Bouton variante="primaire" autoFocus data-verif-corriger="" onClick={() => close(false)} style={{flex:1}}>Corriger</Bouton>

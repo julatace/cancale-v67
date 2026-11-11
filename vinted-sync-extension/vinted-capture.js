@@ -230,6 +230,9 @@
     if (!resaDemandee) { resaDemandee = true; resa = await demander({ action: 'numeroPourPublier' }); }
     const b = boutonPublier();
     const deja = document.querySelector('[data-vrm-num-depot]');
+    // (11 nov., 5.353) « Je numérote moi-même » (`raison: 'ecrit'`, 5.324) : VRM ne réserve
+    // rien et n'affiche RIEN à côté du bouton — la pastille « n'a pas pu réserver » mentait.
+    if (resa && resa.raison === 'ecrit') { if (deja) deja.remove(); return; }
     if (deja && b && deja.previousElementSibling === b) return;
     if (deja) deja.remove();
     const texte = resa && resa.ok && resa.numero ? `N°${resa.numero} — écris-le sur le carton` : 'VRM n’a pas pu réserver de numéro : il sera donné dans VRM';
