@@ -73,7 +73,15 @@ const ATTENDU_BARRES = {
   '93000005': { code: 'date', txt: /^encore 4 j · estimée$/, ambre: '0', pct: pct(MS - 1 * J, finJour(4)), estimee: true },
 };
 let ko = 0, ok = 0;
-const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
+const ditBrut = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
+// (11 nov., Julien : « tu peux enlever la carte pour les points relais, ça sert à rien ») LA CARTE EST RETIRÉE.
+// Ses contrôles (épingles, cadrage, hauteur, gestes, « Agrandir ») ne s'appliquent plus : ils sont tus ici, et
+// UN contrôle les remplace dans chaque vue — « aucune carte n'est rendue » (rouge sur le code d'avant). Tout le
+// reste du banc (listes, villes, délais, comptes) est inchangé.
+const CONTROLE_CARTE = /carte (est|ne porte|se cadre|se tait)|épingle|Agrandir|hauteur raisonnable|centre de la carte|un doigt fait défiler|sur la carte|se cadre|trente : les 30 points|non géocodable/;
+let carteTus = 0;
+const dit = (c, m, d) => { if (CONTROLE_CARTE.test(String(m))) { carteTus++; return; } ditBrut(c, m, d); };
+const pasDeCarte = async (pg, nom) => { const n = await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-carte, [data-retirer-carte-etat], .maplibregl-map').length); ditBrut(n === 0, `${nom} plus de carte des points relais (décision du 11 nov.)`, String(n)); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).split('\n')[0].slice(0, 200)); } };
 
 // ── Le fond servi (style raster quadrillé, comme carte-stable.cjs) ──────────
@@ -174,6 +182,7 @@ const allerRetirer = async (pg) => {
   await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
   await pg.locator('.vrm-rpf').first().waitFor({ timeout: 15000 });
   await pg.waitForTimeout(1500);
+  await pasDeCarte(pg, 'À retirer');
 };
 // Une couleur rouge (teinte < 15° ou > 345°, saturée) : jamais sur une barre.
 const teinte = (rgb) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(rgb || ''); if (!m) return null; const [r, g, b] = [m[1], m[2], m[3]].map((x) => Number(x) / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; const s = mx === 0 ? 0 : d / mx; let h = 0; if (d) { if (mx === r) h = 60 * (((g - b) / d) % 6); else if (mx === g) h = 60 * ((b - r) / d + 2); else h = 60 * ((r - g) / d + 4); } if (h < 0) h += 360; return { h, s }; };

@@ -72,7 +72,15 @@ const S_TRENTE = S_ZERO.concat(Array.from({ length: 30 }, (_, i) => { const cp =
 let ROWS = S_TOUS;
 
 let ko = 0;
-const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+const ditBrut = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+// (11 nov., Julien : « tu peux enlever la carte pour les points relais, ça sert à rien ») LA CARTE EST RETIRÉE.
+// Ses contrôles (épingles, cadrage, hauteur, gestes, « Agrandir ») ne s'appliquent plus : ils sont tus ici, et
+// UN contrôle les remplace dans chaque vue — « aucune carte n'est rendue » (rouge sur le code d'avant). Tout le
+// reste du banc (listes, villes, délais, comptes) est inchangé.
+const CONTROLE_CARTE = /carte (est|ne porte|se cadre|se tait)|épingle|Agrandir|hauteur raisonnable|centre de la carte|un doigt fait défiler|sur la carte|se cadre|trente : les 30 points|non géocodable/;
+let carteTus = 0;
+const dit = (c, m, d) => { if (CONTROLE_CARTE.test(String(m))) { carteTus++; return; } ditBrut(c, m, d); };
+const pasDeCarte = async (pg, nom) => { const n = await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-carte, [data-retirer-carte-etat], .maplibregl-map').length); ditBrut(n === 0, `${nom} plus de carte des points relais (décision du 11 nov.)`, String(n)); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 160)); } };
 const types = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
 const srv = http.createServer((q, r) => {
@@ -150,6 +158,7 @@ async function lireColonne(pg, tel, attendreCarte) {
   await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
   await pg.locator('[data-cc-colonne="retirer"]').first().waitFor({ timeout: 25000 });
   await pg.waitForFunction(() => { let p = null; try { p = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return !!p; }, null, { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(800); await pasDeCarte(pg, 'À retirer');
   if (!tel && attendreCarte) await pg.waitForFunction((n) => document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-repere="oui"]').length >= n, attendreCarte, { timeout: attendreCarte > 10 ? 60000 : 15000 }).catch(() => {});
   await pg.waitForTimeout(1200);
   return pg.evaluate(() => {

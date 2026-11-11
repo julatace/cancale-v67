@@ -214,9 +214,12 @@ const ouvrir = async (b, vp, sombre) => {
         dit(m.deb <= 1 && !m.hors.length, 'rien ne déborde', `${m.deb}px ${m.hors.join(' | ')}`);
         if (JEU === 'base') {
           const by = (s) => m.rangs.find((r) => r.id && r.id.includes(s)) || {};
-          dit(by('9301').code && !by('9301').avenir, 'code connu ⇒ bouton « Code »', JSON.stringify(by('9301')));
+          // (11 nov., Julien : « des QR codes, des infos dans tous les sens ») Le code est ÉCRIT sur la ligne (plus de bouton « Code »).
+          const vis9301 = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte*="9301"]'); const c = l && l.querySelector('[data-rp-code-visible]'); return c ? c.getAttribute('data-rp-code-visible') : null; });
+          dit(vis9301 === '012345' && !by('9301').avenir, 'code connu ⇒ écrit sur la ligne', JSON.stringify({ vis9301, l: by('9301') }));
           dit(by('90000021').avenir && !by('90000021').code, 'code pas encore lu ⇒ puce « Code à venir »', JSON.stringify(by('90000021')));
-          dit(by('90000022').code, 'QR ⇒ bouton « Code »', JSON.stringify(by('90000022')));
+          const vis22 = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte="r:e:90000022"]'); const c = l && l.querySelector('[data-rp-code-visible]'); return c ? c.getAttribute('data-rp-code-visible') : null; });
+          dit(!!vis22, 'QR ⇒ dit sur la ligne', JSON.stringify({ vis22, l: by('90000022') }));
           const cmd = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].find((x) => /Sac seau toile/.test(x.innerText)); return l ? { avenir: !!l.querySelector('[data-rp-code-a-venir]'), code: !!l.querySelector('[data-rp-code]'), point: (l.closest('[data-relais-point]') || { getAttribute: () => '' }).getAttribute('data-relais-point') } : null; });
           dit(!!cmd && cmd.avenir && !cmd.code && /tabacduquai/i.test(cmd.point || ''), '« Ton achat t’attend » : titre de l’e-mail, « Code à venir », dans le relais lu', JSON.stringify(cmd));
           const titres = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf [data-rp-titre]')].filter((t) => t.getBoundingClientRect().height > 0).map((t) => { const cs = getComputedStyle(t); return { t: t.textContent, h: Math.round(t.getBoundingClientRect().height), coupe: t.scrollWidth > t.clientWidth + 1 || t.scrollHeight > t.clientHeight + 2 || (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap') }; }));
@@ -234,14 +237,15 @@ const ouvrir = async (b, vp, sombre) => {
           dit(pp.length === 2, 'même nom de relais dans deux villes : deux cartes', JSON.stringify(pp));
           // (3 nov., 13 h 02) Des SECTIONS, dans l'ordre : aujourd'hui · prêts · code à venir · lieu à confirmer ·
           // à vérifier · en route · argent à vérifier ; chaque colis UNE fois, dans SA section.
-          dit(m.sections.join(',') === 'aujourdhui,prets,avenir,lieu,verifier,route,argent', 'sections dans l’ordre (aujourd’hui > prêts > code à venir > lieu > à vérifier > en route > argent)', m.sections.join(','));
+          // (11 nov., Julien : « organise mieux les retraits ») « Prêts » et « Code à venir » ne font plus qu'UNE section « À retirer ».
+          dit(m.sections.join(',') === 'aujourdhui,prets,lieu,verifier,route,argent', 'sections dans l’ordre (aujourd’hui > à retirer > lieu > à vérifier > en route > argent)', m.sections.join(','));
           const sec = (s) => Object.entries(m.dansSection).filter(([, v]) => v === s).map(([k]) => k);
           dit(sec('aujourdhui').length === 1 && /90000003/.test(sec('aujourdhui')[0]), '« À retirer aujourd’hui » : le seul colis au dernier jour', sec('aujourdhui').join());
           // (5 nov., Julien : « 2 points de retrait alors que c'est le même ») UN POINT, UNE CARTE : Phone Cash
           // (code connu, QR, code pas lu) va TOUT ENTIER dans « Prêts à retirer », la ligne sans code garde sa
           // puce « Code à venir » ; « Code à venir » ne garde que les points dont AUCUN colis n'a de code.
-          dit(sec('prets').every((k) => !/cmd01|90000008/.test(k)) && sec('prets').some((k) => /9301/.test(k)) && sec('prets').some((k) => /90000022/.test(k)) && sec('prets').some((k) => /90000021/.test(k)), '« Prêts à retirer » : les points qui ont un colis avec code ou QR, tous leurs colis dedans', sec('prets').join());
-          dit(sec('avenir').some((k) => /cmd01|conv|commande/.test(k) || k === 'r:e:email_track_vinted_commande_cmd01') && sec('avenir').every((k) => !/9301|90000022|90000021/.test(k)), '« Code à venir » : les points sans aucun code', sec('avenir').join());
+          // (11 nov.) Une section « À retirer » : les colis avec code ET ceux au code à venir (dit sur leur ligne), chacun une fois.
+          dit(sec('prets').some((k) => /9301/.test(k)) && sec('prets').some((k) => /90000022/.test(k)) && sec('prets').some((k) => /90000021/.test(k)) && sec('prets').some((k) => /cmd01|conv|commande/.test(k)) && !m.sections.includes('avenir'), '« À retirer » : les colis avec code et ceux au code à venir, dans la même section', sec('prets').join(','));
           dit(!(await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-section:not(.is-repli) [data-relais-point-suite]').length)), 'chaque point UNE fois (aucune carte « suite » dans une autre section)');
           dit(sec('lieu').length === 1 && /90000008/.test(sec('lieu')[0]), '« Lieu à confirmer » : le colis sans lieu', sec('lieu').join());
           dit(m.air.every((a) => a >= 20 && a <= 40), 'de l’air entre les sections (20–40 px)', m.air.join(','));
@@ -276,12 +280,14 @@ const ouvrir = async (b, vp, sombre) => {
           const det = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte*="9301"]'); const d = l && l.querySelector('[data-rp-detail]'); return d ? { code: !!d.querySelector('[data-code-retrait="012345"], .vrm-rp-gestes'), txt: d.innerText.slice(0, 200) } : null; });
           dit(!!det && det.code, 'toucher la ligne ouvre son détail (code, gestes)', JSON.stringify(det));
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>{window.__codeCopie=t;}}}));
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-code').first().click();
+          // (11 nov.) Copier se fait sur le code du détail (« Code de retrait · Copier ») : le texte exact, zéro initial compris.
+          await pg.locator('[data-cc-carte*="9301"] [data-rp-detail] .vrm-pickup-code').first().click();
+          await pg.waitForTimeout(150);
           dit(await pg.evaluate(()=>window.__codeCopie)==='012345','Code copie le texte exact en conservant le zéro initial');
           const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang button').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
-          dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir, code et retrait restent côte à côte');
+          dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir et retrait restent côte à côte');
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('refus');}}}));
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-code').first().click();
+          await pg.locator('[data-cc-carte*="9301"] [data-rp-detail] .vrm-pickup-code').first().click();
           dit(await pg.locator('[data-cc-carte*="9301"] [data-rp-detail]').count()===1,'un presse-papiers refusé garde le détail disponible');
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-en-route-liste] [data-en-route-achat]')].some((x) => x.getBoundingClientRect().height > 0), null, { timeout: 15000 }).catch(() => {});
