@@ -230,3 +230,5 @@
 @media (prefers-reduced-motion: reduce) {
   .vrm-offres-auto-piste, .vrm-offres-auto-piste > span { transition: none !important; }
 }
+/* (11 nov., lot DJ8) Le lien vers l'écran complet des offres auto (Messages → Favoris & offres). */
+.vrm-offres-auto .vrm-offres-auto-regler { align-self: flex-start; min-height: 44px; margin: 0 0 4px 12px; text-align: left; }

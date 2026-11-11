@@ -147,9 +147,9 @@ export function historiqueNumero({ cle: cible, fiches, saleOv = null, journal = 
       if (!doublonJ) pousser({ cle: 'fiche', id: String(id), ...o, preuve: o.preuve + sur(id) });
     } else if (!dejaJournal(id)) pousser({ cle: 'fiche', quoi: 'inconnu', at: null, id: String(id), texte: `Origine non enregistrée (${QUAND_JOURNAL})`, preuve: 'fiche de l’annonce' + sur(id) });
     // Ce qui a suivi, sur la même fiche.
-    if (r && str(r.ecrit)) pousser({ cle: 'carton', quoi: 'ecrit-carton', at: isoOk(r.ecrit), id: String(id), texte: '« C’est écrit » : le nouveau N° est sur le carton', preuve: 'ton clic' + sur(id) });
+    if (r && str(r.ecrit)) pousser({ cle: 'carton', quoi: 'ecrit-carton', at: isoOk(r.ecrit), id: String(id), texte: '« C’est écrit » : le nouveau N° est écrit là où l’article est rangé', preuve: 'ton clic' + sur(id) });
     const cv = isoOk(f.cartonVerifie);
-    if (cv && cv !== isoOk(f.manuelAt) && !(r && cv === isoOk(r.ecrit))) pousser({ cle: 'carton', quoi: 'carton', at: cv, id: String(id), texte: 'Carton vérifié', preuve: 'ton clic' + sur(id) });
+    if (cv && cv !== isoOk(f.manuelAt) && !(r && cv === isoOk(r.ecrit))) pousser({ cle: 'carton', quoi: 'carton', at: cv, id: String(id), texte: 'N° vérifié là où l’article est rangé', preuve: 'ton clic' + sur(id) });
   }
 
   // c. Les fiches qui ont QUITTÉ ce N° (leur dernier changement le dit).
