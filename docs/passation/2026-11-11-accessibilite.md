@@ -64,6 +64,17 @@ icônes (`BoutonBase`), les images d'annonce (aucune violation `image-alt`).
 - `npm run build` vert ; audits `variables`, `tdz`, `coherence`, `identite`, `icones`,
   `textes-courts`, `fonctions-api`, `secrets`, `csp` verts.
 
+- **Bancs voisins** (les noms changés touchent leurs sélecteurs : `[aria-label="Plus"]` ⇒
+  `[aria-label^="Plus"]` dans 9 bancs ; `double-vente` lit `data-plein`) : `garde-ecrans`,
+  `morceau-perime`, `journee-coherence`, `clavier-voiceover`, `argent`, `achats-messages-premium`
+  **verts**. `navigation-tache` (8), `iphone-reprise` (13), `double-vente` (9), `nav-v2` (4) sont
+  **rouges à l'identique sur `origin/main`** (mêmes lignes, arbre `git archive`) : groupes du menu
+  (« Argent », Paramètres passés dans le menu du profil, lot DJ6) et croisement eBay→Leboncoin —
+  d'autres lots. Deux lignes B7 (balayage, sombre) d'`iphone-reprise` sont sorties rouges une fois
+  sur la machine chargée, vertes à la relance (instables, pas ce lot).
+- `audit-coherence` exige l'historique complet de `main` (clone superficiel ⇒ « rien n'est
+  conclu ») : `git fetch --unshallow origin main`, puis vert.
+
 ## Ce qui reste
 
 - axe ne couvre qu'une partie de WCAG (≈ 30-40 %) : l'ordre du focus « logique », la
