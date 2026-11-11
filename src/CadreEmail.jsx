@@ -17,6 +17,7 @@
 //     ouverture, jamais retenu) ; les pixels de suivi ont été retirés au serveur.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { documentCadre } from './cadreEmail.js';
+import { tr } from './i18n/index.js';
 
 export const SANDBOX_CADRE = 'allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 
@@ -61,8 +62,8 @@ export default function CadreEmail({ html, images = 0, sombreEmail = false, appS
   }, [mesurer]);
   return <div className="vrm-boite-cadre" data-cadre-email="" data-images={montrer ? 'montrees' : images > 0 ? 'bloquees' : 'aucune'}>
     {images > 0 && !montrer && <div className="vrm-boite-cadre-images" data-cadre-images-bloquees={images}>
-      <span>{images > 1 ? `${images} images bloquées` : '1 image bloquée'}</span>
-      <button type="button" className="vrm-boite-second" data-cadre-afficher-images="" onClick={() => setMontrer(true)}>Afficher les images</button>
+      <span>{images > 1 ? tr('emails.imagesBloquees', { images: String(images) }) : tr('emails.1ImageBloquee')}</span>
+      <button type="button" className="vrm-boite-second" data-cadre-afficher-images="" onClick={() => setMontrer(true)}>{tr('emails.afficherImages')}</button>
     </div>}
     <iframe ref={cadre} title={titre} className="vrm-boite-cadre-iframe" sandbox={SANDBOX_CADRE} srcDoc={doc} referrerPolicy="no-referrer"
       style={{ colorScheme: sombre ? 'light dark' : 'light' }} onLoad={mesurer}/>

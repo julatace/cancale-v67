@@ -11,7 +11,9 @@ import ecran_achats from './fr/achats.js';
 import ecran_annonces from './fr/annonces.js';
 import ecran_stock from './fr/stock.js';
 import ecran_messages from './fr/messages.js';
+import ecran_emails from './fr/emails.js';
 export default {
+  ...ecran_emails,
   ...ecran_messages,
   ...ecran_stock,
   ...ecran_annonces,
