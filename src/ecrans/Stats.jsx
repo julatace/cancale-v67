@@ -625,6 +625,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix}/>
+      {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
+          (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
+      <div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
@@ -635,7 +638,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
-      <RepliStats id="argent" titre="L’argent depuis le début" phrase="Finalisé par plateforme et par compte, mois par mois, objectif du mois, entre deux dates.">
+      <RepliStats id="argent" titre="L’argent depuis le début" phrase="Finalisé par plateforme et par compte, mois par mois, entre deux dates.">
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
@@ -681,8 +684,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         </div>
         {(CBa.raison === 'achats' || (manquePrix && stockInconnu)) && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
-      {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre. */}
-      <div className="vrm-finance-goal"><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
 
       {/* (16 oct.) Les deux volets repliés vivent dans UNE carte, l'un sous
           l'autre — ils flottaient entre deux cartes avec des marges inégales. */}

@@ -128,15 +128,15 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 }
 @media (max-width: 360px) { .vrm-fu-grand { font-size: 34px; } .vrm-fu-case { padding: 9px 9px; } .vrm-fu-case b { font-size: 17px; } }
 /* (4 nov.) L'objectif du mois : une barre fine sous les cases, rien d'autre. */
-.vrm-fu-objectif { display: flex; flex-direction: column; gap: 6px; }
+.vrm-fu-objectif { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .vrm-fu-objectif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-objectif-ligne > b { font: 600 13px/1.3 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-fu-objectif-sur { color: var(--fu-sur-sombre-2); font-weight: 500; }
-.vrm-fu-objectif-bas { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
-.vrm-fu-objectif-bas > .vrm-fu-objectif-reste { flex: 1 1 auto; min-width: 0; }
-.vrm-fu-objectif-rythme { flex: 0 0 auto; font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-fu-objectif-bas { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; min-width: 0; }
+.vrm-fu-objectif-bas > .vrm-fu-objectif-reste { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.vrm-fu-objectif-rythme { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2, rgba(255,255,255,.7)); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vrm-fu-objectif-rythme.is-avance { color: #fff; }
-.vrm-fu-objectif-bilan { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font: 500 13px/1.35 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; }
+.vrm-fu-objectif-bilan { box-sizing: border-box; max-width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font: 500 13px/1.35 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; }
 .vrm-fu-objectif-vu { all: unset; box-sizing: border-box; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,.14); color: #fff; font: 600 13px/1 var(--vrm-police); cursor: pointer; }
 .vrm-fu-objectif-vu:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-carte-objectif-prop { display: flex; align-items: center; gap: 10px; margin: 0; font: 500 13px/1.35 var(--vrm-police); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
