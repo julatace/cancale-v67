@@ -75,7 +75,7 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee' }) {
     if (/\/rest\/v1\/rpc\//.test(u)) return json(null);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json(m === 'GET' ? base.comptes : []);
     if (!/\/rest\/v1\/app_data/.test(u)) return json([]);
-    if (base.panneVentes && /orders_sold/.test(u) && /nItems/.test(u)) return json({ message: 'panne' }, 500);
+    if (base.panneVentes && /orders_(sold|\*)/.test(u) && /nItems/.test(u)) return json({ message: 'panne' }, 500);
     if (m === 'POST' || m === 'PATCH') {
       try {
         const b = JSON.parse(req.postData() || 'null');
@@ -101,17 +101,19 @@ async function capture(pg, nom, plein = false) {
   fs.mkdirSync(SHOTS, { recursive: true });
   await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: plein });
 }
+// (11 nov.) Le guide est devenu la petite carte du parcours d'arrivée (src/ParcoursArrivee.jsx) :
+// six étapes (la configuration est la 2e, elle porte la question du numéro), l'étape courante
+// ouverte, les six en repli (`data-parcours-rang`).
 const guide = (pg) => pg.evaluate(() => {
   const g = document.querySelector('[data-guide-demarrage]');
   if (!g) return null;
   const r = (s) => { const e = g.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { w: b.width, h: b.height }; };
   return { faites: g.getAttribute('data-guide-faites'), courante: g.getAttribute('data-guide-courante'),
-    etats: Object.fromEntries([...g.querySelectorAll('[data-guide-etape]')].map((e) => [e.getAttribute('data-guide-etape'), e.getAttribute('data-etat')])),
+    etats: Object.fromEntries([...g.querySelectorAll('[data-parcours-rang]')].map((e) => [e.getAttribute('data-parcours-rang'), e.getAttribute('data-etat')])),
     segments: g.querySelectorAll('.vrm-guide-barre > span').length,
-    question: !!g.querySelector('[data-guide-numerotation]'),
-    choix: [...g.querySelectorAll('[data-guide-numerotation-choix]')].map((e) => ({ cle: e.getAttribute('data-guide-numerotation-choix'), h: e.getBoundingClientRect().height })),
-    exemple: r('[data-exemple-entrer]'), verifier: r('[data-guide-verifier]'), plusTard: r('[data-guide-plus-tard]'),
-    gesteCourant: !!g.querySelector('[data-courante="1"] [data-guide-geste]'),
+    question: !!document.querySelector('[data-guide-numerotation]'),
+    exemple: r('[data-exemple-entrer]'), continuer: r('[data-parcours-continuer]'), plusTard: r('[data-guide-plus-tard]'),
+    attente: !!g.querySelector('[data-parcours-carte="etape"] [data-courante="1"]') && !g.querySelector('[data-guide-plus-tard]'),
     carteDansCarte: g.querySelectorAll('.vrm-card').length };
 });
 const verif = (pg) => pg.evaluate(() => {
@@ -129,6 +131,8 @@ const MAIN = (extra) => ({ id: 'main', owner: UID, data: { vrm_bienvenue_vue: { 
 const COMPTE = [{ id: 1, vinted_user_id: '9001', login: 'compte_banc', domain: 'www.vinted.fr', owner: UID, updated_at: iso(0), created_at: iso(3) }];
 const RECEPTION = { id: 'email_reception_00aa11bb22cc33dd', owner: UID, data: { at: iso(1), adresses: ['boite@exemple.test'] } };
 const NUMS = { 51000: { numero: '1' }, 51001: { numero: '2' } };
+const CONF = { etat: 'fait', at: iso(1), statut: null, version: 1 };
+const DRESSING = { id: 'harvest_9001_listings', owner: UID, data: { type: 'listings', uid: '9001', capturedAt: new Date(Date.now() - 3600e3).toISOString(), nItems: 0, payload: { items: [] } }, meta: { capturedAt: new Date(Date.now() - 3600e3).toISOString() } };
 const VENTES = (n) => ({ id: 'harvest_9001_orders_sold', owner: UID, data: { type: 'orders_sold', uid: '9001', capturedAt: new Date(Date.now() - 3600e3).toISOString(), nItems: n, payload: { my_orders: [] } }, meta: { capturedAt: new Date(Date.now() - 3600e3).toISOString() } });
 
 async function neuf(nav, W, theme) {
@@ -136,59 +140,55 @@ async function neuf(nav, W, theme) {
   const base = { lignes: [MAIN({})], comptes: [] };
   const o = await ouvrir(nav, { W, sombre, base });
   await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {});
-  await attendre(o.pg, async () => { const g = await guide(o.pg); return g && g.question; }, 5000);
+  await attendre(o.pg, async () => { const g = await guide(o.pg); return g && g.courante; }, 5000);
   const g = await guide(o.pg);
   dit(!!g, `${T} N1 le parcours s'affiche pour un compte neuf`);
-  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'extension', `${T} N1 1 sur 5 : le compte est fait, on continue par l'extension`, JSON.stringify(g));
-  dit(g && Object.keys(g.etats).join(',') === 'compte,extension,vinted,emails,vente' && g.segments === 5, `${T} N1 les cinq étapes, une barre en cinq segments`, JSON.stringify(g && g.etats));
-  dit(g && ['extension', 'vinted', 'emails', 'vente'].every((k) => g.etats[k] !== 'fait'), `${T} N1 rien d'autre n'est coché sans preuve`, JSON.stringify(g && g.etats));
+  dit(g && g.faites === '1' && g.etats.compte === 'fait' && g.courante === 'configuration', `${T} N1 1 sur 6 : le compte est fait, on continue par « Tu vends quoi ? »`, JSON.stringify(g));
+  dit(g && Object.keys(g.etats).join(',') === 'compte,configuration,extension,emails,vinted,premiere' && g.segments === 6, `${T} N1 les six étapes, une barre en six segments`, JSON.stringify(g && g.etats));
+  dit(g && ['configuration', 'extension', 'emails', 'vinted', 'premiere'].every((k) => g.etats[k] !== 'fait'), `${T} N1 rien d'autre n'est coché sans preuve`, JSON.stringify(g && g.etats));
   dit(g && g.exemple && (!o.tel || g.exemple.h >= 43.5), `${T} N1 « Voir VRM avec des exemples » (44 px au doigt)`, JSON.stringify(g && g.exemple));
-  dit(g && g.question && g.choix.length === 2 && g.choix.every((c) => c.h >= 44), `${T} N1 la question de la numérotation : deux choix d'au moins 44 px`, JSON.stringify(g && g.choix));
-  dit(g && g.plusTard, `${T} N1 « Plus tard » sur l'étape courante`);
+  dit(g && !g.question, `${T} N1 la question du numéro n'est plus posée dans la carte (étape « Où est ton numéro ? » de Ma configuration)`);
+  dit(g && g.plusTard && g.continuer && (!o.tel || g.continuer.h >= 43.5), `${T} N1 « Commencer » et « Plus tard » sur l'étape courante`, JSON.stringify(g));
   dit(g && g.carteDansCarte === 0, `${T} N1 une seule carte`);
   dit(!(await deborde(o.pg)), `${T} N1 rien ne déborde`);
   await capture(o.pg, `pm-${W}-${theme}-1-neuf`, true);
-  // N2
-  if (g && g.question) {
-    await o.pg.click('[data-guide-numerotation-choix="moi"]');
-    const ecrit = await attendre(o.pg, async () => { const d = ligneMain(base).vrm_numero_ecrit; return d && d.actif === true && d.choisi; });
-    const g2 = await guide(o.pg);
-    dit(ecrit && g2 && !g2.question, `${T} N2 « Je numérote moi-même » écrit vrm_numero_ecrit (allumé, choisi) et la question disparaît`, JSON.stringify(ligneMain(base).vrm_numero_ecrit));
-  }
-  // N3
-  if (await o.pg.$('[data-guide-verifier]')) {
-    await o.pg.click('[data-guide-verifier]');
-    await attendre(o.pg, async () => { const v = await verif(o.pg); return v && v.passu === '0'; }, 6000);
-    const v = await verif(o.pg);
-    dit(v && v.lignes.extension && v.lignes.extension.etat === 'action' && v.lignes.comptes && v.lignes.comptes.etat === 'action' && v.lignes.comptes.geste === 'vinted' && v.lignes.emails && v.lignes.emails.etat === 'action' && v.lignes.emails.geste === 'emails',
-      `${T} N3 « Vérifier mon installation » : extension, comptes, boîte e-mail à faire, avec leur geste`, JSON.stringify(v));
-    dit(v && v.ok === '0' && !Object.values(v.lignes).some((l) => l.etat === 'ok') && !v.lignes.relecture, `${T} N3 jamais « OK » sans lecture, pas de relecture sans compte`, JSON.stringify(v));
-    dit(v && (o.tel ? !v.lignes.extension.geste : v.lignes.extension.geste === 'installer'), `${T} N3 extension : ${o.tel ? 'sur le téléphone, aucun paquet proposé ici' : 'le geste « Installer » sur ordinateur'}`, JSON.stringify(v && v.lignes.extension));
-    await capture(o.pg, `pm-${W}-${theme}-2-verifier`, true);
-  } else dit(false, `${T} N3 « Vérifier mon installation » existe`);
-  // N4
-  if (await o.pg.$('[data-guide-plus-tard="extension"]')) {
-    await o.pg.click('[data-guide-plus-tard="extension"]');
+  // N3 — « Vérifier mon installation » vit dans Paramètres → Aide.
+  await o.pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
+  await o.pg.waitForSelector('[data-sous-ouvrir="verifier"], [data-verif-installation]', { timeout: 15000 }).catch(() => {});
+  await o.pg.evaluate(() => { const b = [...document.querySelectorAll('[data-sous-ouvrir="verifier"]')].find((x) => x.getBoundingClientRect().height > 0); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } });
+  await attendre(o.pg, async () => { const v = await verif(o.pg); return v && v.passu === '0'; }, 8000);
+  const v = await verif(o.pg);
+  dit(v && v.lignes.extension && v.lignes.extension.etat === 'action' && v.lignes.comptes && v.lignes.comptes.etat === 'action' && v.lignes.comptes.geste === 'vinted' && v.lignes.emails && v.lignes.emails.etat === 'action' && v.lignes.emails.geste === 'emails',
+    `${T} N3 « Vérifier mon installation » : extension, comptes, boîte e-mail à faire, avec leur geste`, JSON.stringify(v));
+  dit(v && v.ok === '0' && !Object.values(v.lignes).some((l) => l.etat === 'ok') && !v.lignes.relecture, `${T} N3 jamais « OK » sans lecture, pas de relecture sans compte`, JSON.stringify(v));
+  await capture(o.pg, `pm-${W}-${theme}-2-verifier`, true);
+  // N4 — « Plus tard » sur la configuration puis sur l'extension : la boîte e-mail (Vinted suit l'extension).
+  await o.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+  await o.pg.waitForSelector('[data-guide-plus-tard="configuration"]', { timeout: 15000 }).catch(() => {});
+  if (await o.pg.$('[data-guide-plus-tard="configuration"]')) {
+    await o.pg.click('[data-guide-plus-tard="configuration"]');
+    await o.pg.waitForSelector('[data-guide-plus-tard="extension"]', { timeout: 5000 }).catch(() => {});
+    await o.pg.click('[data-guide-plus-tard="extension"]').catch(() => {});
     await o.pg.waitForTimeout(400);
     const g4 = await guide(o.pg);
-    const ecrit = await attendre(o.pg, async () => { const d = ligneMain(base).vrm_parcours_plus_tard; return d && d.extension; });
+    const ecrit = await attendre(o.pg, async () => { const d = ligneMain(base).vrm_parcours_plus_tard; return d && d.extension && d.configuration; });
     dit(g4 && g4.courante === 'emails' && g4.etats.extension !== 'fait', `${T} N4 « Plus tard » : l'étape courante passe à la boîte e-mail, rien n'est coché`, JSON.stringify(g4));
     dit(ecrit, `${T} N4 « Plus tard » est enregistré (synchronisé)`, JSON.stringify(ligneMain(base)));
     await capture(o.pg, `pm-${W}-${theme}-3-plus-tard`);
-  } else dit(false, `${T} N4 « Plus tard » sur l'extension existe`);
+  } else dit(false, `${T} N4 « Plus tard » sur l'étape courante existe`);
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
 }
 
 async function miChemin(nav, W, theme) {
   const sombre = theme === 'sombre', T = `[mi-chemin ${W}px ${theme}]`;
-  const base = { lignes: [MAIN({ vinted_annonce_numeros: NUMS }), RECEPTION, VENTES(0)], comptes: COMPTE };
+  const base = { lignes: [MAIN({ vinted_annonce_numeros: NUMS, vrm_configuration: CONF }), RECEPTION, DRESSING, VENTES(0)], comptes: COMPTE };
   const o = await ouvrir(nav, { W, sombre, base });
   await o.pg.waitForSelector('[data-guide-demarrage]', { timeout: 15000 }).catch(() => {});
-  await attendre(o.pg, async () => { const g = await guide(o.pg); return g && g.courante === 'vente'; }, 6000);
+  await attendre(o.pg, async () => { const g = await guide(o.pg); return g && g.courante === 'premiere'; }, 6000);
   const g = await guide(o.pg);
-  dit(g && g.faites === '4' && g.courante === 'vente' && g.etats.vente === 'afaire', `${T} N5 4 sur 5, on attend la première vente`, JSON.stringify(g));
-  dit(g && !g.gesteCourant && !g.question && !g.exemple, `${T} N5 rien à faire (attente), pas de question de numérotation (des N° existent), plus d'exemple`, JSON.stringify(g));
+  dit(g && g.faites === '5' && g.courante === 'premiere' && g.etats.premiere === 'attente', `${T} N5 5 sur 6, on attend la première vente`, JSON.stringify(g));
+  dit(g && g.attente && !g.question && !g.exemple, `${T} N5 rien à faire (attente, pas de « Plus tard »), pas de question de numérotation, plus d'exemple`, JSON.stringify(g));
   await capture(o.pg, `pm-${W}-${theme}-4-mi-chemin`);
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
@@ -196,7 +196,7 @@ async function miChemin(nav, W, theme) {
 
 async function installe(nav, W, theme) {
   const sombre = theme === 'sombre', T = `[installé ${W}px ${theme}]`;
-  const base = { lignes: [MAIN({ vinted_annonce_numeros: NUMS }), RECEPTION, VENTES(14)], comptes: COMPTE };
+  const base = { lignes: [MAIN({ vinted_annonce_numeros: NUMS, vrm_configuration: CONF }), RECEPTION, DRESSING, VENTES(14)], comptes: COMPTE };
   const o = await ouvrir(nav, { W, sombre, base });
   await o.pg.waitForTimeout(5000);
   const g = await guide(o.pg);
@@ -217,12 +217,12 @@ async function installe(nav, W, theme) {
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
   // I2
-  const base2 = { lignes: [MAIN({ vinted_annonce_numeros: NUMS }), RECEPTION, VENTES(14)], comptes: COMPTE, panneVentes: true };
+  const base2 = { lignes: [MAIN({ vinted_annonce_numeros: NUMS, vrm_configuration: CONF }), RECEPTION, DRESSING, VENTES(14)], comptes: COMPTE, panneVentes: true };
   const o2 = await ouvrir(nav, { W, sombre, base: base2 });
   await o2.pg.waitForSelector('[data-guide-demarrage]', { timeout: 12000 }).catch(() => {});
   await o2.pg.waitForTimeout(1500);
   const g2 = await guide(o2.pg);
-  dit(g2 && g2.etats.vente === 'passu' && g2.courante === 'vente', `${T} I2 ventes illisibles : « pas pu vérifier », ni cochée ni cachée`, JSON.stringify(g2));
+  dit(g2 && g2.etats.premiere === 'passu' && g2.courante === 'premiere', `${T} I2 ventes illisibles : « pas pu vérifier », ni cochée ni cachée`, JSON.stringify(g2));
   await o2.ctx.close();
 }
 
