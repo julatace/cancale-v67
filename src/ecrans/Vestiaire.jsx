@@ -286,7 +286,7 @@ function AnnoncesVestiaire() {
     const vieille = !(age <= 24 * 3600e3);
     const sansFiche = liste.length > 0 && liste.every(({ it }) => !it.titre && !it.photo && !it.prix && !it.statut);
     const n = liste.length;
-    if (!n) corps = <div data-vc-annonces="vide" style={style}>Aucune annonce sur Vestiaire à la dernière lecture ({ageCourtVc(d.capturedAt)}). Si tu viens d'en publier une, {geste} : la liste se met à jour toute seule.</div>;
+    if (!n) corps = <div data-vc-annonces="vide" style={style}>Aucune annonce Vestiaire à la dernière lecture ({ageCourtVc(d.capturedAt)}). Tu viens d'en publier ? {geste}.</div>;
     else corps = (
       <div data-vc-annonces="lu" data-vc-annonces-n={n} data-vc-annonces-vieille={vieille ? '1' : '0'}>
         {/* (9 nov., lot AI) UNE ligne courte (« au moins 3 annonces · lu il y a 7 j · à confirmer »),
@@ -662,7 +662,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
           {v.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{v.suivi}</dd></div> : null}
           {v.etat && v.etape === 'autre' ? <div className="vrm-recap-ligne"><dt>Vestiaire écrit</dt><dd>« {v.etat} »</dd></div> : null}
         </dl>
-        {enV ? <p data-vc-vente-vinted="" className="vrm-recap-issue">Encore en ligne sur Vinted — retire-la de Vinted pour ne pas la vendre deux fois. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer">Ouvrir l'annonce ↗</a></p> : null}
+        {enV ? <p data-vc-vente-vinted="" className="vrm-recap-issue">Encore en ligne sur Vinted : retire-la, sinon double vente. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer">Ouvrir l'annonce ↗</a></p> : null}
       </section>
       <section className="vrm-recap-gestes" aria-label="Actions">
         {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
@@ -857,7 +857,7 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
       <ComposeConv valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Vestiaire" libelleEnvoyer="Envoyer sur Vestiaire"
         envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-vc-envoyer': '' }}/>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Part de l'onglet Vestiaire ouvert {NAV.dans}, à ton nom, un message à la fois.</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Part de l'onglet Vestiaire {NAV.dans}, à ton nom, un à la fois.</span>
         <a href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.muted, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 13 }}>Ouvrir sur Vestiaire ↗</a>
       </div>
     </div>
