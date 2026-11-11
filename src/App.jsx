@@ -422,7 +422,7 @@ import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
-import { lireAvecCopie, SEL_VERSION, stockageApp, effacerCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
+import { lireAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
@@ -28661,6 +28661,18 @@ const etatOrdersDuCache = (type, accounts) => {
 // libre (`requestIdleCallback`). Un effacement reste écrit tout de suite (ci-dessus).
 let _persistAcctTimer = null;
 const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+// (11 nov., états vides) RETOUR DU RÉSEAU avec des listes gardées « pas relues » (src/copieLignes.js) :
+// les caches de lecture de la session sont vidés AVANT que les écrans se remontent (cet écouteur est posé
+// au chargement du module, avant ceux des écrans) ⇒ ils relisent la base, pas la mémoire de la coupure.
+if (typeof window !== 'undefined') window.addEventListener('online', () => {
+  try {
+    if (!etatCopies()) return;
+    viderCacheLignes(); Object.keys(_acctCache).forEach((k) => delete _acctCache[k]); _persistAcctCache();
+    // Les commandes gardées ne se revalident qu'au préchargement (une fois par ouverture) : on le relance,
+    // par la MÊME règle (`lireAvecCopie`) — réussi, la mention « pas relu » part ; raté, elle reste.
+    _prechargeComptes = null; _prechargeLancePour = ''; prechargerDemarrage();
+  } catch (_) {}
+});
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
   _persistAcctTimer = { idle: false, id: setTimeout(()=>{
     try { if (typeof window.requestIdleCallback === 'function') { _persistAcctTimer = { idle: true, id: window.requestIdleCallback(_persistAcctCache, { timeout: 5000 }) }; return; } } catch(_) {}
@@ -35389,6 +35401,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
+  /* eslint-disable-next-line */ }, [curSub, cleComptes]);
+  // (11 nov., états vides) RETOUR DU RÉSEAU : des listes gardées sur l'appareil n'ont pas pu être relues
+  // (« Vu à hh:mm · pas relu », src/copieLignes.js) ⇒ l'écran ouvert les relit tout de suite, comme au retour
+  // sur l'app (même chemin, sans requête Vinted). Rien à relire ⇒ rien ne part. La règle de la copie ne change pas.
+  useEffect(() => {
+    const auRetour = () => {
+      if (cache() || !accounts.length || !etatCopies()) return;
+      viderCacheLignes();
+      if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
+      if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
+      if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
+      if (curSub === 'messages' || curSub === 'journee') loadConvs();
+    };
+    window.addEventListener('online', auRetour);
+    return () => window.removeEventListener('online', auRetour);
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── LES VENTES ARRIVENT TOUTES SEULES (2 octobre) ─────────────────────────
   // « Ça doit être presque instantanément mis à jour dès que je fais une
