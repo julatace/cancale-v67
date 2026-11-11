@@ -254,6 +254,8 @@ export async function notifierSuiviVinted(tx, uid) {
   if (r && r.coupe) return { status: 200, envoye: false, raison: r.coupe === 'preference' ? 'preference' : 'abonnement' };
   // « Envoyée » seulement si un appareil l'a reçue (clé du serveur absente,
   // appareils illisibles ou aucun appareil : on le dit, sans mentir).
+  // (11 nov.) Gardée pour le résumé groupé, ou déjà dite aujourd'hui : pas un échec.
+  if (r && (r.attente || r.doublon)) return { status: 200, envoye: false, raison: r.attente ? 'dans-le-resume' : 'deja-dite' };
   if (!r || !(Number(r.sent) > 0)) return { status: 200, envoye: false, raison: r && r.erreur ? 'envoi-impossible' : 'aucun-appareil' };
   return { status: 200, envoye: true };
 }
