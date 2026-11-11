@@ -12,7 +12,7 @@ import { prendreDemandeAchat, EVT_ACHAT_LIEN } from '../raccourcisSiri.js';
 import { ReventeModele } from '../ReventeModele.jsx';
 import { ImportAchatsFeuille } from '../composants/ImportAchats.jsx';
 import { prendrePhotoPartagee } from '../partagePhoto.js';
-import { Bouton, C, FermeAuRetour, SheetShell, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
+import { exemplesActuels, Bouton, C, FermeAuRetour, SheetShell, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
 
 // ⟦← App.jsx #1⟧
@@ -437,7 +437,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
             {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>Importer un tableur</Bouton> : null}
           </div>
-          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
+          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder={exemplesActuels().achat} enterKeyHint="next" autoComplete="off" style={inp} />)}
           {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
           {/* (10 nov., lot AV) Ce que tu as revendu ce modèle : le passé, jamais un conseil (src/reventeModele.js). */}
           {titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}

@@ -3504,7 +3504,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       <div data-numero-ecrit-exemple="" style={{marginTop:12,padding:'12px 14px',borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,fontSize:13,color:C.text,lineHeight:1.55}}>
         <div style={{fontWeight:700}}>Termine ta description par :</div>
         <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:15,marginTop:6}}>N° 123</div>
-        <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #123 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être la pointure. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
+        <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #123 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être une taille. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
       </div>
       <div data-numero-essai={lectureEssai ? lectureEssai.etat : 'vide'} style={{marginTop:12}}>
         <label htmlFor="vrm-numero-essai" style={{display:'block',fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Essaie : colle une description</label>

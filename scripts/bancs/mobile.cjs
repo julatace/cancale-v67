@@ -114,7 +114,7 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
     check(await p.evaluate(()=>document.querySelector('.vrm-mobile-nav').getBoundingClientRect().bottom<=844.5),largeur+' grand affichage: navigation toujours dans l’écran');
     await p.getByRole('button',{name:'Normal',exact:true}).tap();
     await p.evaluate(()=>localStorage.setItem('vrm_zoom','0.65'));
-    await p.getByRole('button',{name:'Rechercher une paire'}).tap();const recherche=p.getByPlaceholder(/N°|numéro|titre|marque/i).first();
+    await p.getByRole('button',{name:/^Rechercher (une paire|un article)$/}).tap();const recherche=p.getByPlaceholder(/N°|numéro|titre|marque/i).first();
     await recherche.fill('New Balance');check(!(await p.locator('.vrm-mobile-nav').isVisible()),largeur+' clavier: navigation masquée');
     await p.keyboard.press('Escape');await p.evaluate(()=>document.activeElement.blur());
     await p.waitForTimeout(120);

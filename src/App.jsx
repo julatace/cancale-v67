@@ -39005,7 +39005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const f = x.x.itemId ? numD[x.x.itemId] : null; const num = (f && f.numero != null) ? String(f.numero).trim() : '';
         const titre = x.x.titre || o.title || '(sans titre)';
         L.push({ cle: 'lbc:' + x.x.txId, site: 'leboncoin', num, etatNum: etatN(num), titre, compte: 'Leboncoin', transporteur: nomTr(x), trCle: (x.tr && x.tr.cle) || '', limite: '', limiteAmbre: false,
-          photo: sure ? (photoArticle(o) || null) : null, paire: sure ? 'sure' : 'a-verifier', raisonPaire: sure ? '' : 'Cette vente Leboncoin n’a pas encore été relue : VRM ne montre pas de photo devinée. Vérifie la paire sur le carton.',
+          photo: sure ? (photoArticle(o) || null) : null, paire: sure ? 'sure' : 'a-verifier', raisonPaire: sure ? '' : `Cette vente Leboncoin n’a pas encore été relue : VRM ne montre pas de photo devinée. Vérifie ${motsArticle(vendActuel()).le} là où ${motsArticle(vendActuel()).elle} est rangé${motsArticle(vendActuel()).e}.`,
           pdf: false, sansBordereau: o.label && o.label.voucherUrl ? 'Le bordereau Leboncoin s’imprime, tamponné, depuis l’écran Colis Leboncoin.' : 'Bordereau à générer sur Leboncoin.',
           suivi: '', peutFaire: true, geste: { site: 'leboncoin', cle: 'lbc:' + x.x.txId, txId: x.x.txId, num, titre } });
         continue;

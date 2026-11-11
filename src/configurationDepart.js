@@ -96,9 +96,9 @@ export const CHOIX_OU = OU_NUMERO.map((v) => ({ v, titre: NOM_OU[v], sous: SOUS_
 // quel (aucune carte cochée, rien réécrit tant qu'il ne touche pas une carte).
 export const CHOIX_AFFICHAGE = [
   { v: 'simple', titre: 'Simple', pourQui: 'Je débute, je vends peu', apercu: 4, puces: [
-    { ic: 'menu', t: 'Menu court : Stock et Republier attendent que tu t’en serves' },
+    { ic: 'menu', t: 'Menu court : sans Stock ni Republier au début' },
     { ic: 'plateformes', t: 'Seules tes plateformes reliées' },
-    { ic: 'journee', t: 'Ma journée sans le conseil « Prix à baisser »' },
+    { ic: 'journee', t: 'Ma journée sans le conseil «\u00a0Prix à baisser\u00a0»' },
   ] },
   { v: 'complet', titre: 'Complet', pourQui: 'Je vends beaucoup, plusieurs comptes', apercu: 8, puces: [
     { ic: 'menu', t: 'Tous les écrans dans le menu' },

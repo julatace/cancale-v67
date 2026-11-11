@@ -25,7 +25,9 @@
 'use strict';
 const path = require('path'), http = require('http'), fs = require('fs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs'));
+const { fabriquer } = require(path.join(__dirname, '_base-volume.cjs'));
+const { servir } = require('./_minipgrest.cjs');
+const { metaVersData } = require('./_meta.cjs');
 const DIST = process.env.BANC_DIST || process.argv[2] || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 10231;
 const SHOTS = process.env.SHOTS || '';
@@ -63,12 +65,13 @@ function baseLunettes({ vend = { choix: 'autre', categories: ['lunettes'], at: '
   }
   b.rows = b.rows.filter((r) => !/^email_track_/.test(r.id) && r.id !== 'email_journal');
   const m = b.main[0].data;
+  m.vrm_bienvenue_vue = { at: '2026-11-01T10:00:00.000Z' }; m.vrm_visite_vue = { at: '2026-11-01T10:00:00.000Z' };
   if (vend) m.vrm_je_vends = vend;
   if (!neuve) {
     m.vrm_configuration = { etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 };
     m.vrm_plateformes_affichees = { sites: ['vinted'], at: '2026-11-01T10:00:00.000Z' };
   } else {
-    b.rows = []; b.accounts = []; b.main[0].data = {};
+    b.rows = []; b.accounts = []; b.main[0].data = { vrm_bienvenue_vue: { at: '2026-11-01T10:00:00.000Z' }, vrm_visite_vue: { at: '2026-11-01T10:00:00.000Z' } };
   }
   return b;
 }
@@ -83,6 +86,8 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee', proprio = false }
   await pg.addInitScript(([s, sombre]) => {
     try {
       if (!sessionStorage.getItem('banc_init')) {
+        // La porte des bancs marque « Tu vends quoi ? » vue : ce banc la juge.
+        localStorage.removeItem('vrm_je_vends'); localStorage.setItem('vrm_banc_vends', '1');
         localStorage.setItem('vrm_session', JSON.stringify(s));
         localStorage.setItem('vrm_local_owner', s.user.id);
         localStorage.setItem('vinted_dark', sombre ? 'true' : 'false');
@@ -99,6 +104,7 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee', proprio = false }
     const u = decodeURIComponent(req.url());
     if (/\/rest\/v1\/rpc\//.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
     if (m === 'POST' || m === 'PATCH') {
+      if (process.env.BANC_DEBUG) console.log('ECRIT', m, u.slice(0, 160), String(req.postData() || '').slice(0, 300));
       try {
         const b = JSON.parse(req.postData() || 'null');
         const rows = Array.isArray(b) ? b : b && b.id ? [b] : [];
@@ -113,9 +119,11 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee', proprio = false }
       return route.fulfill({ status: m === 'POST' ? 201 : 200, contentType: 'application/json', body: m === 'PATCH' ? '[{"id":"main"}]' : '[]' });
     }
     if (m === 'DELETE') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-    const h = await req.allHeaders();
-    const rep = repondre(req.url(), h.range, base);
-    return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body: JSON.stringify(rep.body) });
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(base.accounts.map((a) => ({ ...a, owner: UID }))) });
+    if (!/\/rest\/v1\/app_data/.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    const lignes = [...base.main, ...base.rows].map((l) => ({ owner: UID, updated_at: new Date().toISOString(), ...l }));
+    const r = servir(lignes, decodeURIComponent(metaVersData(req.url())), req.headers());
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': r.range || '0-0/0' }, body: JSON.stringify(r.body) });
   });
   await pg.route('**/api/**', (r) => {
     const u = r.request().url();
@@ -233,14 +241,15 @@ async function scenario(nav, nom, W, theme) {
     // La note d'un article : un exemple de lunettes (jamais « semelle »).
     await o.pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
     await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
-    const bouton = await attendre(o.pg, async () => !!(await o.pg.$('[data-note-ajouter], [data-note-paire-ajout], [aria-label^="Ajouter une note"]')), 8000);
+    const bouton = await attendre(o.pg, async () => !!(await o.pg.$('[data-note-paire="ajout"]')), 8000);
     if (bouton) {
-      await o.pg.click('[data-note-ajouter], [data-note-paire-ajout], [aria-label^="Ajouter une note"]');
-      const ph = await attendre(o.pg, async () => !!(await o.pg.$('[data-asktext="note-paire"] input, [data-asktext="note-paire"] textarea, .vrm-asktext input, .vrm-asktext textarea')), 4000)
-        ? await o.pg.$eval('[data-asktext="note-paire"] input, [data-asktext="note-paire"] textarea, .vrm-asktext input, .vrm-asktext textarea', (i) => i.getAttribute('placeholder') || '') : null;
+      await o.pg.evaluate(() => document.querySelector('[data-note-paire="ajout"]').click());
+      const vu = await attendre(o.pg, async () => !!(await o.pg.$('[data-ask-champ="note-paire"]')), 5000);
+      const ph = vu ? await o.pg.$eval('[data-ask-champ="note-paire"]', (i) => i.getAttribute('placeholder') || '') : null;
       const tout = await releveTexte(o.pg);
-      dit(ph != null && /verre|monture|étui|rayure/i.test(ph) && !MOTS_CHAUSSURE.test(phrasesAvec(tout, MOTS_CHAUSSURE).join(' ')), `${T} la note d’un article propose un exemple de lunettes`, `${ph} | ${phrasesAvec(tout, MOTS_CHAUSSURE).join(' ¦ ')}`);
+      dit(ph != null && /verre|monture|étui|rayure/i.test(ph) && !phrasesAvec(tout, MOTS_CHAUSSURE).length, `${T} la note d’un article propose un exemple de lunettes`, `${ph} | ${phrasesAvec(tout, MOTS_CHAUSSURE).join(' ¦ ')}`);
       await capture(o.pg, `${pref}-note`);
+      await o.pg.keyboard.press('Escape').catch(() => {});
     } else dit(false, `${T} le bouton « note » d’un article est trouvé`);
     dit(!(await deborde(o.pg)), `${T} rien ne déborde`);
     dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' | '));

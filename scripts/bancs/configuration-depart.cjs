@@ -156,7 +156,7 @@ async function neuf(nav, W, theme) {
   dit(e.centre, `${T} le titre est au milieu`);
   dit(e.segments === 7 && e.n === '1' && e.sur === '7', `${T} barre de progression (7 étapes sans statut), 1 sur 7`, JSON.stringify(e));
   dit(!e.retourVisible, `${T} pas de « Retour » à la 1re étape`);
-  dit(e.cartes.length === 18 && e.cartes.every((c) => c.h >= 44 && !c.coche), `${T} des tuiles à toucher (≥ 44 px, 18 propositions depuis le 9 nov. soir), rien de coché d'avance`, JSON.stringify(e.cartes));
+  dit(e.cartes.length === 19 && e.cartes.every((c) => c.h >= 44 && !c.coche), `${T} des tuiles à toucher (≥ 44 px, 19 propositions : Lunettes depuis le 11 nov.), rien de coché d'avance`, JSON.stringify(e.cartes));
   dit(/Passer/.test(e.suivant), `${T} sans réponse, le bouton dit « Passer cette étape »`, e.suivant);
   await capture(o.pg, `cfg-${W}-${theme}-1-vends`);
   await choisir(o.pg, 'vends:autre');

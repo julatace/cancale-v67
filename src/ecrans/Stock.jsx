@@ -14,7 +14,7 @@ import { LIGNE_INVENTAIRE } from '../inventaire.js';
 import { ValeurStockCarte, useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF) la valeur du stock, publiée par Annonces
 import { EmballagesCarte } from '../EmballagesCarte.jsx';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
-import { useMotsArticle, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -178,6 +178,7 @@ const depuisQuand = (ms) => { if (!Number.isFinite(ms)) return 'jamais lu'; cons
 
 function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
   const motsStock = useMotsArticle();   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
+  const exemplesStock = useExemplesVendeur();   // (11 nov., lot DJ2) le nom d’emballage proposé
   const [meubles, setMeubles] = React.useState(() => { const m = load('vrm_meubles', []); return Array.isArray(m) ? m : []; });
   const [slots, setSlots] = React.useState(() => { const s = load('vrm_slots', {}); return s && typeof s === 'object' ? s : {}; });
   const [pairsLost, setPairsLost] = useStateCle('vinted_pairs_lost', () => load('vinted_pairs_lost', {}));
@@ -980,7 +981,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {blocResume}
     <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock} mots={motsStock}/>
     {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
-    <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
+    <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
       lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
     <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>Inventaire de fin d’année</span><span aria-hidden="true">›</span></button>
     {annuel ? <InventaireAnnuel owner={AUTH.user?.id || ''} cle={cleNum} Feuille={SheetShell} lire={lireLigneInventaire} onFermer={() => setAnnuel(false)} onSaisirPrix={saisirPrixStock}
