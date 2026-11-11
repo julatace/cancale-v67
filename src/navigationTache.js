@@ -39,7 +39,10 @@ export const TACHES_SITE = {
   // (10 nov., lot AB) Messages a « Tous » : un seul fil par acheteur et par paire,
   // toutes plateformes (src/filUnique.js). Le défaut reste Vinted (`defaut`) : les
   // liens d'hier (`?tab=messages`, notifications, Favoris & offres) n'en changent pas.
-  messages: { toutes: true, defaut: 'vinted' },
+  // (11 nov., décision C9 — Julien : « tranche ») « Tous » par défaut, et SON dernier choix
+  // retenu (`choixSeul` : seul son toucher sur la rangée l'écrit, jamais un lien ni le défaut).
+  // Les liens qui visent une conversation Vinted portent `site=vinted` (notifications, cat_msg).
+  messages: { toutes: true, defaut: 'toutes', choixSeul: true },
   achats: { toutes: false },
 };
 export const estTacheSite = (tab) => Object.prototype.hasOwnProperty.call(TACHES_SITE, tab);
@@ -121,19 +124,24 @@ export function redirigerOnglet(id, sub, deplaces) {
 // choisi). Lu et écrit sous try/catch : navigation privée, stockage bloqué ⇒
 // le défaut, rien ne casse.
 const CLE_FILTRES = 'vrm_filtre_site';
+// (11 nov., C9) Un écran `choixSeul` lit SA clé `tab:choix` (écrite par son toucher seul) : la
+// valeur d'avant (posée à chaque visite, « vinted » chez tous) n'est plus lue.
+const cleFiltre = (tab) => (TACHES_SITE[tab] && TACHES_SITE[tab].choixSeul ? tab + ':choix' : tab);
 export function filtreRetenu(tab) {
   try {
     const m = JSON.parse(localStorage.getItem(CLE_FILTRES) || '{}') || {};
-    const v = m[tab];
+    const v = m[cleFiltre(tab)];
     return typeof v === 'string' ? siteDeTache(tab, v) : null;
   } catch (_) { return null; }
 }
-export function retenirFiltre(tab, site) {
+export function retenirFiltre(tab, site, choix = false) {
   if (!estTacheSite(tab)) return;
+  if (TACHES_SITE[tab].choixSeul && !choix) return;
   try {
     const m = JSON.parse(localStorage.getItem(CLE_FILTRES) || '{}') || {};
-    if (m[tab] === site) return;
-    m[tab] = site;
+    const k = cleFiltre(tab);
+    if (m[k] === site) return;
+    m[k] = site;
     localStorage.setItem(CLE_FILTRES, JSON.stringify(m));
   } catch (_) {}
 }

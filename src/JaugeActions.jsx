@@ -84,7 +84,7 @@ export function JaugesComptes({ uids = [], nomCompte = () => null }) {
           </div>
         );
       })}
-      <p className="vrm-jauges-pied">50 actions par heure et par compte. VRM s’arrête à 45 : les 5 dernières restent à tes clics.</p>
+      <p className="vrm-jauges-pied">50 actions/heure par compte. VRM s’arrête à 45 : 5 restent à tes clics.</p>
     </div>
   );
 }

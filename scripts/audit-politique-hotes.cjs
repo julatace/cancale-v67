@@ -101,6 +101,8 @@ const COUPLES = {
   'src/modeVacances.js|www.leboncoin.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|www.ebay.fr': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
   'src/modeVacances.js|fr.vestiairecollective.com': ['lien', LIEN + ' — mode vacances « À faire sur le site ↗ »'],
+  'src/ecrans/Compta.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted ↗ » : ventes pas encore datées (relecture du détail)'],
+  'src/ecrans/Compta.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire ↗ » : ventes pas encore datées'],
   'src/relaisChange.js|maps.apple.com': ['lien', LIEN + ' — « Itinéraire » vers le nouveau point relais (adresse lue dans l’e-mail)'],
   'src/relaisChange.js|www.google.com': ['lien', LIEN + ' — « Itinéraire » (Google Maps) vers le nouveau point relais'],
   'src/App.jsx|vercel.com': ['lien', LIEN],

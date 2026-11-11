@@ -1,51 +1,112 @@
-/* ── La recherche d'entreprise (9 nov., soir) : Ma facture et Ma configuration ──
-   Les jetons de l'écran qui l'accueille (configuration : --cfg-* ; app : --vrm-*),
-   avec repli. Neutre ; l'accent seulement sur « C'est bon ». */
+/* ── La recherche d'entreprise (9 nov. ; refaite le 11 nov., lot DJ1) ──────────────
+   Ma facture et Ma configuration. Les jetons de l'écran qui l'accueille (configuration :
+   --cfg-* ; widgets DA6 : --w-* ; app : --vrm-*), avec repli. Neutre ; l'accent seulement
+   sur le geste principal (« Rechercher », « Oui, c'est moi », « C'est bon »). */
 .vrm-ent {
-  --ent-carte: var(--cfg-carte, var(--d-carte, var(--vrm-surface, #fff)));
+  --ent-carte: var(--cfg-carte, var(--w-carte, var(--d-carte, var(--vrm-surface, #fff))));
   --ent-fond: var(--cfg-fond, var(--d-fond, var(--vrm-bg, #F5F5F7)));
-  --ent-encre: var(--cfg-encre, var(--d-encre, var(--vrm-ink, #1D1D1F)));
-  --ent-gris: var(--cfg-gris, var(--d-gris, var(--vrm-muted, #6E6E73)));
-  --ent-filet: var(--cfg-filet, var(--d-filet, var(--vrm-line, rgba(60,60,67,.18))));
-  --ent-accent: var(--cfg-accent, var(--d-accent, var(--vrm-accent, #0071E3)));
+  --ent-encre: var(--cfg-encre, var(--w-encre, var(--d-encre, var(--vrm-ink, #1D1D1F))));
+  --ent-gris: var(--cfg-gris, var(--w-gris, var(--d-gris, var(--vrm-muted, #6E6E73))));
+  --ent-filet: var(--cfg-filet, var(--w-filet, var(--d-filet, var(--vrm-line, rgba(60,60,67,.18)))));
+  --ent-accent: var(--cfg-accent, var(--w-accent, var(--d-accent, var(--vrm-accent, #0071E3))));
+  --ent-remplir: var(--cfg-remplir, var(--w-remplir, var(--d-remplir, rgba(118,118,128,.12))));
+  --ent-ambre: var(--d-warn, var(--vrm-warn, #B25000));
   box-sizing: border-box; min-width: 0; color: var(--ent-encre);
-  border-radius: 14px; background: var(--ent-carte); box-shadow: inset 0 0 0 1px var(--ent-filet);
-  padding: 12px 14px; font-size: 15px; line-height: 1.4; text-align: left;
+  border-radius: 18px; background: var(--ent-carte); box-shadow: inset 0 0 0 .5px var(--ent-filet), var(--w-ombre, 0 1px 2px rgba(0,0,0,.04));
+  padding: 16px; font-size: 15px; line-height: 1.4; text-align: left; margin: 4px 0 6px;
+  animation: vrmEntApparait .28s cubic-bezier(.2,.8,.2,1) both;
 }
-.vrm-ent-cherche { display: flex; align-items: center; gap: 12px; min-height: 44px; }
-.vrm-ent-cherche-t { display: grid; gap: 2px; min-width: 0; }
-.vrm-ent-cherche-t b { font-weight: 600; }
-.vrm-ent-cherche-t small, .vrm-ent-tete small { font-size: 13px; color: var(--ent-gris); overflow-wrap: anywhere; }
-.vrm-ent-pulse { display: inline-flex; gap: 4px; flex-shrink: 0; }
-.vrm-ent-pulse i { width: 7px; height: 7px; border-radius: 50%; background: var(--ent-gris); opacity: .3; animation: vrmEntPulse 1s ease-in-out infinite; }
-.vrm-ent-pulse i:nth-child(2) { animation-delay: .15s; }
-.vrm-ent-pulse i:nth-child(3) { animation-delay: .3s; }
-@keyframes vrmEntPulse { 0%, 100% { opacity: .25; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .vrm-ent-pulse i { animation: none; opacity: .6; } }
+@keyframes vrmEntApparait { from { opacity: 0; transform: translateY(4px) scale(.995); } to { opacity: 1; transform: none; } }
 
-.vrm-ent-rien p { margin: 0; font-size: 14px; color: var(--ent-gris); }
-.vrm-ent-rien .vrm-ent-b { margin-top: 10px; }
-.vrm-ent-refus { margin: 6px 0 0; font-size: 13px; line-height: 1.4; color: var(--d-warn, var(--vrm-warn, #B25000)); }
-
-.vrm-ent-trouve { display: grid; gap: 10px; }
 .vrm-ent-tete { display: grid; gap: 2px; }
-.vrm-ent-tete b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
-.vrm-ent-lignes { display: grid; }
-.vrm-ent-ligne { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px 0; border-top: .5px solid var(--ent-filet); }
-@media (min-width: 560px) { .vrm-ent-ligne { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } }
-.vrm-ent-ligne-t { display: grid; gap: 1px; min-width: 0; }
-.vrm-ent-ligne-t small { font-size: 12px; color: var(--ent-gris); }
-.vrm-ent-ligne-t b { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
-.vrm-ent-ecart { font-size: 13px; color: var(--d-warn, var(--vrm-warn, #B25000)); overflow-wrap: anywhere; }
+.vrm-ent-tete b { font-size: 17px; font-weight: 600; letter-spacing: -.015em; }
+.vrm-ent-tete small { font-size: 13px; color: var(--ent-gris); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Prêt : le numéro est valide, un geste lance la recherche. */
+.vrm-ent-pret { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 14px; }
+.vrm-ent-pret-t { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.vrm-ent-pret-t b { font-size: 15px; font-weight: 600; }
+.vrm-ent-pret-t small { font-size: 13px; color: var(--ent-gris); }
+
+/* La recherche : une barre qui avance (8 s au plus) et des lignes-squelette qui se remplissent. */
+.vrm-ent-cherche { display: grid; gap: 12px; }
+.vrm-ent-barre { height: 3px; border-radius: 3px; background: var(--ent-remplir); overflow: hidden; }
+.vrm-ent-barre i { display: block; height: 100%; width: 100%; border-radius: inherit; background: var(--ent-accent); transform-origin: left; transform: scaleX(.04);
+  animation: vrmEntBarre var(--ent-duree, 8000ms) cubic-bezier(.15,.7,.3,1) forwards; }
+@keyframes vrmEntBarre { to { transform: scaleX(1); } }
+.vrm-ent-squelette { display: grid; }
+.vrm-ent-sq-ligne { display: grid; grid-template-columns: 116px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 36px; border-top: .5px solid var(--ent-filet); }
+.vrm-ent-sq-ligne small { font-size: 13px; color: var(--ent-gris); }
+.vrm-ent-sq-barre { position: relative; display: block; height: 12px; border-radius: 6px; background: var(--ent-remplir); overflow: hidden; width: 0;
+  animation: vrmEntRemplit .6s cubic-bezier(.2,.8,.2,1) forwards; animation-delay: calc(var(--i, 0) * 220ms); }
+.vrm-ent-sq-barre::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); transform: translateX(-100%); animation: vrmEntReflet 1.3s ease-in-out infinite; animation-delay: calc(var(--i, 0) * 220ms + .6s); }
+@keyframes vrmEntRemplit { to { width: var(--l, 60%); } }
+@keyframes vrmEntReflet { to { transform: translateX(100%); } }
+:root[data-theme="dark"] .vrm-ent-sq-barre::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent); }
+
+/* Rien trouvé / registre muet / trop long. */
+.vrm-ent-rien { display: grid; gap: 10px; }
+.vrm-ent-rien p { margin: 0; font-size: 15px; color: var(--ent-encre); }
+.vrm-ent-rien .vrm-ent-b { justify-self: start; }
+.vrm-ent-refus { margin: 6px 0 0; font-size: 13px; line-height: 1.4; color: var(--ent-ambre); }
+
+/* « C'est bien toi ? » */
+.vrm-ent-trouve { display: grid; gap: 12px; }
+.vrm-ent-fiche { margin: 0; display: grid; }
+.vrm-ent-ligne { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 10px 0; border-top: .5px solid var(--ent-filet);
+  animation: vrmEntApparait .3s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@media (min-width: 560px) { .vrm-ent-ligne { grid-template-columns: 132px minmax(0, 1fr); gap: 12px; align-items: baseline; } }
+.vrm-ent-ligne dt { font-size: 13px; color: var(--ent-gris); }
+.vrm-ent-ligne dd { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.vrm-ent-ligne dd > b { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; letter-spacing: -.01em; }
+.vrm-ent-ligne[data-ent-cas="info"] dd > b { font-weight: 500; }
+.vrm-ent-trou { display: inline-block; min-width: 3.5em; padding: 0 6px; border-radius: 6px; background: var(--ent-remplir); color: var(--ent-gris); font-weight: 500; font-size: 14px; }
+.vrm-ent-aide { font-size: 13px; color: var(--ent-gris); }
+.vrm-ent-ecart { display: grid; gap: 6px; font-size: 13px; color: var(--ent-ambre); overflow-wrap: anywhere; }
+.vrm-ent-choix { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border-radius: 10px; background: var(--ent-remplir); justify-self: start; }
+.vrm-ent-choix button { appearance: none; border: 0; min-height: 44px; padding: 0 14px; border-radius: 8px; background: transparent; color: var(--ent-encre); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.vrm-ent-choix button[aria-checked="true"] { background: var(--ent-carte); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+.vrm-ent-ville { display: grid; gap: 4px; }
+.vrm-ent-ville span { font-size: 13px; color: var(--ent-gris); }
+.vrm-ent-ville input { box-sizing: border-box; min-height: 44px; width: 100%; max-width: 280px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--ent-remplir); color: var(--ent-encre); font: inherit; font-size: 16px; }
+.vrm-ent-ville input:focus-visible { outline: 2px solid var(--ent-accent); outline-offset: 1px; }
+.vrm-ent-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ent-gris); }
+
 .vrm-ent-gestes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-@media (min-width: 560px) { .vrm-ent-gestes { display: flex; } }
 .vrm-ent-b {
-  appearance: none; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 0; cursor: pointer;
+  appearance: none; box-sizing: border-box; min-height: 44px; padding: 0 16px; border-radius: 12px; border: 0; cursor: pointer;
   font: inherit; font-size: 15px; font-weight: 600; white-space: nowrap;
-  background: var(--cfg-remplir, var(--d-remplir, rgba(118,118,128,.12))); color: var(--ent-encre);
+  background: var(--ent-remplir); color: var(--ent-encre);
 }
 .vrm-ent-b.is-ok { background: var(--ent-accent); color: #fff; }
+.vrm-ent-b:disabled { opacity: .55; cursor: default; }
 .vrm-ent-b:focus-visible { outline: 2px solid var(--ent-accent); outline-offset: 2px; }
-.vrm-ent-tout { width: 100%; }
-.vrm-ent-erreur { margin: 0; font-size: 13px; color: var(--d-warn, var(--vrm-warn, #B25000)); }
-.vrm-ent-notes { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; line-height: 1.45; color: var(--ent-gris); }
+.vrm-ent-b-petit { min-height: 44px; padding: 0 12px; font-size: 14px; }
+.vrm-ent-erreur { margin: 0; font-size: 13px; color: var(--ent-ambre); }
+
+/* Après : une ligne, une coche. */
+.vrm-ent-fait { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.vrm-ent-fait > span:not(.vrm-ent-coche) { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.vrm-ent-fait b { font-size: 15px; font-weight: 600; }
+.vrm-ent-fait small { font-size: 13px; color: var(--ent-gris); }
+.vrm-ent-coche { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ent-accent); color: #fff; font-size: 15px; font-weight: 700;
+  animation: vrmEntCoche .35s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes vrmEntCoche { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Le statut choisi ⇒ ses mentions. */
+.vrm-ent-mentions { list-style: none; margin: 0; padding: 0; display: grid; }
+.vrm-ent-mentions li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 44px; border-top: .5px solid var(--ent-filet);
+  animation: vrmEntApparait .3s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.vrm-ent-puce { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--ent-ambre); }
+.vrm-ent-puce.is-ok { box-shadow: none; background: var(--ent-remplir); color: var(--ent-encre); }
+.vrm-ent-mention-t { font-size: 15px; overflow-wrap: anywhere; }
+.vrm-ent-propose { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: var(--ent-remplir); font-size: 14px; }
+.vrm-ent-propose .vrm-ent-b { justify-self: start; background: var(--ent-carte); }
+.vrm-ent-forme .vrm-ent-final { grid-template-columns: minmax(0, 1fr); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-ent, .vrm-ent-ligne, .vrm-ent-mentions li, .vrm-ent-coche { animation: none; }
+  .vrm-ent-barre i { animation: none; transform: scaleX(.5); }
+  .vrm-ent-sq-barre { animation: none; width: var(--l, 60%); }
+  .vrm-ent-sq-barre::after { animation: none; display: none; }
+}

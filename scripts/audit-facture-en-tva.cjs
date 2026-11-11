@@ -87,8 +87,8 @@ async function textePdf(octets) {
 
   // L'e-mail
   const m = regle.emailFacture(CFG, en, { via: 'vrm' });
-  dit(/^Facture \/ Invoice FA-2026-0007/.test(m.sujet) && /Please find attached invoice FA-2026-0007/.test(m.texte) && /Vous trouverez ci-joint la facture FA-2026-0007/.test(m.texte) && /on behalf of Boutique Banc EI/.test(m.texte),
-    'F14 l’e-mail : objet bilingue, message par défaut anglais puis français, pied traduit', m.sujet);
+  dit(/^Facture \/ Invoice FA-2026-0007/.test(m.sujet) && /Please find attached invoice FA-2026-0007/.test(m.texte) && /Vous trouverez ci-joint la facture FA-2026-0007/.test(m.texte) && !/on behalf of|pour le compte de/.test(m.texte + m.html),
+    'F14 l’e-mail : objet bilingue, message par défaut anglais puis français, aucun pied VRM (11 nov.)', m.sujet);
   const mPerso = regle.emailFacture({ ...CFG, message: 'Ciao {acheteur}, grazie !' }, en, { via: 'boite' });
   dit(mPerso.texte === 'Ciao Giulia Banco, grazie !', 'F15 un message écrit par le vendeur reste le sien (jamais traduit)', mPerso.texte);
   const mFr = regle.emailFacture(CFG, fr, { via: 'vrm' });

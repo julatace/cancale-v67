@@ -23,6 +23,13 @@ def elargir_oauth(f):
     for c in m['content_scripts']:
         if 'oauth-retour.js' in c['js']:c['matches']=['https://*/*']
     f['manifest.json']=json.dumps(m).encode()
+def ajouter_hote(f):
+    m=json.loads(f['manifest.json']);m['permissions'].append('https://exemple.invalid/*');f['manifest.json']=json.dumps(m).encode()
+def elargir_infos(f):
+    m=json.loads(f['manifest.json'])
+    for c in m['content_scripts']:
+        if 'vinted-infos.js' in c['js']:c['matches']=['https://*/*']
+    f['manifest.json']=json.dumps(m).encode()
 assert essai().returncode==0,'La livraison actuelle doit être reconnue'
 cas={
  'fichier inattendu':lambda f:f.update({'inattendu.js':b'inattendu'}),
@@ -33,7 +40,9 @@ cas={
  'adaptateur modifié':lambda f:f.update({'compat-orion.js':b'alteration'}),
  'version périmée':lambda f:manifeste(f,'version','0.0.1'),
  'base commune modifiée':lambda f:f.update({'background.js':b'alteration'}),
+ 'hôte ajouté':ajouter_hote,
+ 'infos Vinted élargies à tous les sites':elargir_infos,
 }
 for nom,modifier in cas.items():
     r=essai(modifier);assert r.returncode!=0,nom+' accepté à tort';print('REFUS confirmé : '+nom)
-print('9 contrôles du garde Orion réussis, archives de production intactes.')
+print(f'{len(cas)+1} contrôles du garde Orion réussis, archives de production intactes.')

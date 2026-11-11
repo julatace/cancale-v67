@@ -2,7 +2,8 @@
 //  LA FACTURE PRO — LEBONCOIN, EBAY, VESTIAIRE (10 nov., lot S)
 // ════════════════════════════════════════════════════════════════════════════
 // Dans le détail d'une vente Leboncoin, eBay ou Vestiaire d'un vendeur PRO (sa
-// fiche « Ma facture » porte un SIRET valide) :
+// fiche « Ma facture » porte un SIRET valide) ET d'un compte qu'il a dit
+// professionnel (11 nov., src/facturePro/comptes.js ; jamais répondu ⇒ on demande) :
 //   · facture déjà émise ⇒ « Facture FA-… » (PDF, partager) ;
 //   · la vente ne peut pas être facturée ⇒ la raison, en mots (src/facturePro/sources.js) ;
 //   · sinon « Faire la facture » : l'acheteur (que la plateforme ne donne pas) se
@@ -12,7 +13,8 @@
 // Le serveur (api/_lib/facture-autres.js) relit la vente lui-même et refait la règle.
 import React from 'react';
 import { SheetShell } from './composants/SheetShell.jsx';
-import { ApercuFacture, useFicheFacturation, FicheFacturation, relireFactures } from './FacturePro.jsx';
+import { ApercuFacture, useFicheFacturation, FicheFacturation, relireFactures, ecrireChampsFiche } from './FacturePro.jsx';
+import { compteFacturable, avecCompte, compteDeVente } from './facturePro/comptes.js';
 import { verifierSiret, manquantsVendeur, manquantsVente, contenuFacture, euros, jourParis, nomFichier } from './facturePro/regle.js';
 import { PLATEFORMES, venteAutre, idFactureAutre, manquantsAcheteurSaisi, venteFacture, ID_FACTURE_AUTRE_RE } from './facturePro/sources.js';
 
@@ -86,11 +88,36 @@ export function FactureAutreVente({ plateforme, vente, deps }) {
     </div>;
   }
   if (estPro(cfg) !== true || f === undefined) return null;
+  // (11 nov., lot DJ1) Seulement un compte PROFESSIONNEL : jamais répondu ⇒ on DEMANDE ; « non » ⇒ rien.
+  const compte = compteDeVente(plateforme, vente);
+  const cf = compteFacturable(cfg, plateforme, compte);
+  if (cf === 'demander') return <QuestionCompte plateforme={plateforme} compte={compte} nom={plateforme === 'ebay' ? String(vente._pseudo || compte) : compte} deps={deps}/>;
+  if (cf !== true) return null;
   if (f === null) return <p className="vrm-fp-muet" data-fa-etat="pas-su">Facture : tes factures n'ont pas pu être lues — réessaie dans un instant.</p>;
   if (!v.ok) return <p className="vrm-fp-muet vrm-fp-raison" data-fa-plateforme={plateforme} data-fa-ref={ref} data-fa-etat="refus" data-fa-code={v.code}>Facture : {v.raison}.</p>;
   return <div className="vrm-fp-vente vrm-fa" data-fa-plateforme={plateforme} data-fa-ref={ref} data-fa-etat="a-faire">
     <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-fa-faire="" onClick={() => setOuverte(true)}>Faire la facture</button>
     {ouverte ? <FeuilleFactureAutre v={v} cfg={cfg} deps={deps} fermer={() => setOuverte(false)}/> : null}
+  </div>;
+}
+
+// « Ce compte est-il professionnel ? » — sur la vente, une fois par compte. SON clic écrit
+// `comptesFacture` dans sa fiche (relue juste avant ; lecture ratée ⇒ rien écrit).
+function QuestionCompte({ plateforme, compte, nom, deps }) {
+  const [occupe, setOccupe] = React.useState(false);
+  const L = PLATEFORMES[plateforme].l;
+  const repondre = async (oui) => {
+    setOccupe(true);
+    const ok = await ecrireChampsFiche(deps, (frais) => ({ comptesFacture: avecCompte(frais, plateforme, compte, oui) }));
+    setOccupe(false);
+    if (!ok) deps.toast("Pas enregistré : la base n'a pas répondu. Réessaie.");
+  };
+  return <div className="vrm-fp-vente vrm-fa vrm-fa-question" data-fa-plateforme={plateforme} data-fa-etat="demander" data-fa-compte={compte}>
+    <p className="vrm-fp-muet" style={{ margin: 0 }}>Facture Pro : <span className="vrm-sensible" data-stream-type="compte">{nom || compte}</span> est-il ton compte {L} professionnel ?</p>
+    <div className="vrm-fp-gestes">
+      <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} data-fa-compte-oui="" onClick={() => repondre(true)}>Oui, facturer</button>
+      <button type="button" className="vrm-b vrm-b-discret" disabled={occupe} data-fa-compte-non="" onClick={() => repondre(false)}>Non</button>
+    </div>
   </div>;
 }
 
@@ -160,12 +187,13 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer, deja = null }) {
 // (La liste des factures émises est le registre d'Argent → Factures, src/FacturePro.jsx :
 // il lit toutes les pièces `facture_pro`, Leboncoin et eBay comprises — pas de seconde liste.)
 
-// Vestiaire : la même raison pour CHAQUE vente (le prix payé par l'acheteur n'est
-// jamais relevé) ⇒ dite UNE fois, sous la liste (§7), au vendeur Pro seulement.
-// `ventes` : les ventes Vestiaire affichées (brutes, avec `id`).
+// Vestiaire : la même raison pour CHAQUE vente dont le prix de vente n'est pas lu
+// ⇒ dite UNE fois, sous la liste (§7), au vendeur Pro seulement. (11 nov., 5.340)
+// Une vente dont l'extension a lu le prix (`prixVente`) a sa facture dans son détail :
+// elle n'est pas comptée ici. `ventes` : les ventes Vestiaire affichées (brutes, avec `id`).
 export function FactureVcTete({ ventes, deps }) {
   const cfg = useFicheFacturation(deps);
-  const liste = Array.isArray(ventes) ? ventes.filter(Boolean) : [];
+  const liste = (Array.isArray(ventes) ? ventes.filter(Boolean) : []).filter((x) => !x.prixVente);
   if (estPro(cfg) !== true || !liste.length) return null;
   const v = venteAutre('vestiaire', liste[0]);
   if (v.ok) return null;
