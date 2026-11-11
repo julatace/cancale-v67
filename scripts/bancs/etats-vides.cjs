@@ -152,6 +152,8 @@ const sonde = (pg) => pg.evaluate(() => {
     copie: [...document.querySelectorAll('[data-copie-pas-relu]')].filter(vis).map((e) => e.textContent.trim()),
     horsLigne: [...document.querySelectorAll('[data-hors-ligne-ligne]')].filter(vis).length,
     deborde: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    // L'écran de démarrage (index.html) posé PAR-DESSUS : ce qu'il cache, personne ne le lit.
+    demarrage: (() => { const d = document.getElementById('vrm-demarrage'); return !!(d && !d.hasAttribute('data-sortie') && getComputedStyle(d).opacity !== '0'); })(),
   };
 });
 const ZERO_EUROS = /(^|[^\d,])0,00\s?€/;
@@ -191,6 +193,10 @@ async function etatP(nav, W, theme, [tab, nom]) {
   dit(!ZERO_EUROS.test(s.texte), `${T} pas su ≠ « 0,00 € »`, (s.texte.match(/.{0,60}0,00\s?€.{0,30}/) || [''])[0]);
   dit(!RIEN_FAUX.test(s.texte), `${T} pas su ≠ « Aucune … »`, (s.texte.match(/.{0,60}(Aucune vente|Aucun achat|Aucune annonce|Aucun message|Aucun e-mail|Aucun colis).{0,40}/) || [''])[0]);
   dit(!A_JOUR.test(s.texte), `${T} jamais « Tout est à jour » quand une lecture a raté`);
+  // Une lecture RATÉE n'est plus « en cours » : « pas lu », jamais « lecture… » (relu après 8 s).
+  await o.pg.waitForTimeout(5500);
+  const s2 = await sonde(o.pg);
+  dit(!/[Ll]ecture…|Lecture\.\.\./.test(s2.texte), `${T} lecture ratée ⇒ pas « lecture… » à l'infini`, (s2.texte.match(/.{0,50}[Ll]ecture(…|\.\.\.).{0,20}/) || [''])[0]);
   dit(!s.deborde, `${T} rien ne déborde`);
   dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await capture(o.pg, `ev-P-${tab}-${W}-${theme}`);
@@ -200,9 +206,14 @@ async function etatB(nav, W, theme, [tab, nom]) {
   const T = `[B base injoignable ${nom} ${W}px ${theme}]`;
   const base = BASES.B();
   const o = await ouvrir(nav, { W, sombre: theme === 'sombre', base, tab });
+  let navs = 0; o.pg.on('framenavigated', (f) => { if (f === o.pg.mainFrame()) navs++; });
   await attendre(o.pg, async () => (await sonde(o.pg)).blocsPanne >= 1, 15000);
-  await o.pg.waitForTimeout(2000);
+  // Le bloc doit RESTER : une page qui se recharge seule en boucle le montre une seconde puis repart sur
+  // l'écran de démarrage (vu à la capture de Ma journée). On le relit après 8 s.
+  await o.pg.waitForTimeout(8000);
   const s = await sonde(o.pg);
+  dit(navs === 0, `${T} la page ne se recharge pas toute seule`, `navigations=${navs}`);
+  dit(!s.demarrage, `${T} l'écran de démarrage est parti (le bloc se voit)`);
   dit(s.blocsPanne === 1, `${T} la coque dit la panne UNE fois`, `blocs=${s.blocsPanne} · ${s.texte.slice(0, 160)}`);
   dit(!A_JOUR.test(s.texte), `${T} aucun « Tout est à jour »`);
   dit(!ZERO_EUROS.test(s.texte), `${T} aucun « 0,00 € »`, (s.texte.match(/.{0,60}0,00\s?€.{0,30}/) || [''])[0]);

@@ -53791,7 +53791,9 @@ function AppCoeur() {
   const [versementsCoque, setVersementsCoque] = useState(undefined);
   useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersementsCoque(m); }).catch(() => { if (!mort) setVersementsCoque(null); }); return () => { mort = true; }; }, [ventesCoque]);
   const liveStatsVus = useMemo(() => {
-    if (!liveStats) return liveStats;
+    // (11 nov., états vides) Les ventes n'ont PAS PU être lues (`null`) et rien d'autre n'a posé `liveStats`
+    // (annonces illisibles aussi) : « pas lu », pas « lecture… » à l'infini — pas su ≠ en cours (§5).
+    if (!liveStats) return ventesCoque === null ? { ...VENDU_PAS_SU } : liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
     if (!Array.isArray(ventesCoque)) return liveStats;
     try {
