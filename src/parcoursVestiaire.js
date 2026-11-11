@@ -15,11 +15,14 @@
 //  · « Colis fait » posé par LUI (`vrm_vc_colis_done`) ;
 //  · la date de versement LUE (`verseLe`) et le paiement ESTIMÉ par Vestiaire
 //    (`paiementEstime`, son texte tel quel).
-// ⚠️ Les e-mails Vestiaire d'après la vente (expédition, réception, contrôle,
-//    paiement) n'ont JAMAIS été reçus (0 e-mail Vestiaire en base le 11 nov. ;
-//    seul l'e-mail de VENTE est reconnu, par son sujet, et range la vente dans
-//    `vc_ventes`). Leur sujet n'est pas inventé ici : ils restent gardés entiers
-//    (« forme pas encore apprise ») jusqu'à ce qu'un vrai soit lu.
+// ⚠️ Les e-mails Vestiaire reconnus par leur SUJET (api/_lib/vestiaire-email.js,
+//    vestiaire-email-autres.js : la vente, « Il vous reste N jours pour expédier »,
+//    l'annonce en attente / en ligne, les offres — formes relevées le 9 nov.) ne
+//    disent AUCUNE étape d'après l'envoi (réception, contrôle, paiement) : aucun
+//    e-mail de ce genre n'a été vu (0 ligne `email_*` Vestiaire dans la base lue le
+//    11 nov.). Leur sujet n'est pas inventé ici : ils restent gardés entiers (« forme
+//    pas encore apprise ») jusqu'à ce qu'un vrai soit lu ; la vente née d'un e-mail
+//    entre dans `vc_ventes` et suit ce parcours.
 //
 // Les règles :
 //  · « done » seul prouve une étape ; « pending » dit l'étape EN COURS chez

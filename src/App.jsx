@@ -42041,6 +42041,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
           tuiles.messages = { ...tuiles.messages, ebay: null, sub: `${tuiles.messages.sub} · messages eBay pas lus` };
         }
+        // (11 nov., lot vestiaire-plus) Messages et offres Vestiaire ⇒ Messages FILTRÉ sur Vestiaire. Avant,
+        //    `plat_vestiaire` menait à la section par défaut de Vestiaire (Annonces) : la ligne
+        //    « N messages Vestiaire non lus » ouvrait les annonces.
+        const allerMessagesVc = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=messages&site=vestiaire' })); } catch (_) {} };
         // (27 oct., 5.240) VESTIAIRE : ventes à envoyer, messages non lus — la
         //    règle de Colis (`colisVestiaire`, §11). Jamais rien sur « pas su ».
         { const vc = colisVestiaire(vcEtat);
@@ -42053,7 +42057,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
           }
           if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
-            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'plat_vestiaire', prio: 2.1 });
+            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'messages', avant: allerMessagesVc, prio: 2.1 });
           // (11 nov., lot vestiaire-plus) LES OFFRES VESTIAIRE REÇUES, encore à toi : une ligne par
           //    offre, celle qui expire le plus tôt d'abord (échéance LUE ; ambre sous 6 h), avec le
           //    geste « Répondre » (Messages → Vestiaire : Accepter · Refuser · Contre-offre si appris,
@@ -42070,10 +42074,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 court: tr('journee.vcOffre.court', { prix: eurosOffre(o.offre) }),
                 detail: o.expire == null ? tr('journee.vcOffre.sansEcheance', { article }) : o.bientot ? tr('journee.vcOffre.expire', { article, reste }) : tr('journee.vcOffre.reste', { article, reste }),
                 action: tr('journee.vcOffre.repondre'), attrs: { 'data-vc-offre-journee': o.id, 'data-vc-offre-expire': o.expire == null ? '' : String(o.expire), 'data-vc-offre-bientot': o.bientot ? '1' : undefined },
-                tab: 'plat_vestiaire', prio: (o.bientot ? 0.25 : 1.25) + i / 1000 });
+                tab: 'messages', avant: allerMessagesVc, prio: (o.bientot ? 0.25 : 1.25) + i / 1000 });
             });
             if (oj.reste > 0) jobs.push({ id: 'vestiaire-offres-reste', n: oj.reste, icon: 'tag', color: C.text, court: tr('journee.vcOffres.autres', { n: oj.reste }), detail: tr('journee.vcOffres.autresDetail'),
-              action: tr('journee.vcOffre.voir'), tab: 'plat_vestiaire', prio: 1.26 + oj.lignes.length / 1000 });
+              action: tr('journee.vcOffre.voir'), tab: 'messages', avant: allerMessagesVc, prio: 1.26 + oj.lignes.length / 1000 });
           } }
         tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
@@ -56013,7 +56017,7 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
-      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${vcARetirer} paire${vcARetirer>1?'s':''} vendue${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
+      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${vcARetirer} article${vcARetirer>1?'s':''} vendu${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
       if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
       if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, photos:lbcRemovePhotos, lbcSuppr:(lbcARetirer||[]).filter(r=>r&&r.lbcId).map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vinted' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
