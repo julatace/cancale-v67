@@ -252,21 +252,22 @@ async function auditer(S) {
     dit(r3 && (r3.canal === undefined || r3.canal === 'sur') && h.j.diags.includes('suppression_vue'), 'O3 Chrome (capteur du manifeste, monde MAIN) : canal sûr, rien ne change', JSON.stringify({ canal: r3 && r3.canal }));
     // orion-main.js : le capteur en ligne, constaté.
     const om = lire(path.join(S.orion, 'orion-main.js'));
-    const jouer = (inlineOk) => {
+    const jouer = (inlineOk, scriptsDeLaPage = 0) => {
       const attrs = {}, poses = [];
       const docEl = { setAttribute: (k, v) => { attrs[k] = String(v); }, getAttribute: (k) => (k in attrs ? attrs[k] : null), removeAttribute: (k) => { delete attrs[k]; } };
       const g2 = { location: { hostname: 'www.vinted.fr' }, console: { warn() {} }, MutationObserver: class { observe() {} disconnect() {} } };
       g2.document = { documentElement: docEl, head: { appendChild(s) { poses.push(s); if (s.textContent && inlineOk) { const m = /setAttribute\(("[^"]+"),"1"\)/.exec(s.textContent); if (m) attrs[JSON.parse(m[1])] = '1'; } } },
-        createElement: () => ({ remove() {} }) };
+        createElement: () => ({ remove() {} }), querySelector: (q) => (q === 'script' && scriptsDeLaPage ? {} : null) };
       g2.chrome = { runtime: { getURL: (p) => 'chrome-extension://x/' + p } };
       g2.globalThis = g2; vm.createContext(g2);
       const src = om.replace('null;/*__VRM_SOURCES_PAGE__*/', () => JSON.stringify({ 'inject.js': '/* capteur */' }) + ';');
       vm.runInContext(src, g2);
       return { inline: g2.__vrmCanalInline, srcPose: poses.some((s) => s.src), poses: poses.length };
     };
-    const a = jouer(true), b = jouer(false);
+    const a = jouer(true), b = jouer(false), c = jouer(true, 1);
     dit(a.inline === true && !a.srcPose && b.inline === false && b.srcPose,
       'O4 orion-main.js : capteur EN LIGNE exécuté ⇒ canal sûr, aucune balise `src` ; refusé par la page ⇒ balise `src` et canal « douteux »', JSON.stringify({ a, b }));
+    dit(c.inline === false, 'O4b un script de la page est DÉJÀ dans le document (il a pu tourner) : même posé en ligne, le canal reste « douteux »', JSON.stringify(c));
     const zip = require('./zip-extension.cjs');
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-orion-src-'));
     try {
@@ -408,7 +409,8 @@ const MUTATIONS = [
   ['content', 'Orion : canal toujours « sûr »', "return !globalThis.__vrmOrionCompat || globalThis.__vrmCanalInline === true;", 'return true;', 'O1'],
   ['bg', 'le fond croit un canal douteux', "if (PAGE_SORTES_PREUVE.has(String(msg.kind || '')) && canalPageDouteux(msg))", 'if (false)', 'O1'],
   ['content', 'le canal n’est plus posé par content.js', "      m.canal = canalSur() ? 'sur' : 'douteux';\n", '', 'O1'],
-  ['orion', 'orion-main ne constate rien', "if(enLigne(racine)){globalThis.__vrmCanalInline=immediat===true;return true;}", 'if(false){}', 'O4'],
+  ['orion', 'orion-main ne constate rien', "if(enLigne(racine)){globalThis.__vrmCanalInline=vierge;return true;}", 'if(false){}', 'O4'],
+  ['orion', 'une page déjà là ne compte pas', "vierge=!document.querySelector('script');", "vierge=true;", 'O4b'],
   ['bg', 'un réveil sans sansRejet', "if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());", "if (a.name === 'vrm-photos') tickPhotos();", 'P1'],
   ['bg', 'plus de filet unhandledrejection', "    self.addEventListener('unhandledrejection', (e) => {", "    (() => {})('unhandledrejection', (e) => {", 'P2'],
   ['bg', 'alarme figée à sa période', "if (!a || (voulue != null && Number(a.periodInMinutes) !== Number(voulue)))", 'if (!a)', 'L1'],

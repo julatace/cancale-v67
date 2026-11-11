@@ -19,13 +19,15 @@ const os=require('node:os');
  if(!bloque){
   await p.waitForFunction(()=>window.captures.some(x=>x.kind==='injectReady'),null,{timeout:8000}).catch(e=>{throw Error(e.message+' '+JSON.stringify({messages,assets}));});
   await p.evaluate(()=>fetch('/api/v2/inbox').then(r=>r.json()));await p.waitForFunction(()=>window.captures.some(x=>x.kind==='harvest'&&x.type==='inbox'));
-  assert.equal(api,1);n++;assert.equal(assets,1);n++;
-  await p.evaluate(boot);assert.equal(assets,1);n++;
+  // 5.361 : le capteur est posé EN LIGNE (canal privé sûr) — aucune balise `src` chargée.
+  assert.equal(api,1);n++;assert.equal(assets,0);n++;assert.equal(typeof await p.evaluate(()=>window.__vrmCanalInline),"boolean");n++;
+  await p.evaluate(boot);assert.equal(assets,0);n++;
  }else{
   await p.waitForFunction(()=>!document.querySelector('script[src*="vrm-fixture.invalid"]'));
   assert.ok(messages.some(m=>m.includes('capteur de page n’a pas pu être chargé')));n++;
   assert.equal(await p.evaluate(()=>window.captures.some(x=>x.kind==='injectReady')),false);n++;
   assert.equal(api,0);n++;
+  assert.equal(await p.evaluate(()=>window.__vrmCanalInline),false);n++;
  }
  await c.close();
  }

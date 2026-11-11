@@ -12,7 +12,10 @@
 //       fichier à la fabrication du paquet) : il s'exécute à l'instant même, à
 //       document_start, avant toute page — son canal est sûr. On le CONSTATE (une
 //       marque tirée au hasard, posée par le capteur, relue aussitôt) ;
-//    2. refusé (règle de sécurité de la page) ou pas posé tout de suite ⇒ la
+//       Sûr seulement si AUCUNE balise `<script>` de la page n'existe encore à cet
+//       instant (aucun script de la page n'a donc pu tourner) — à document_start,
+//       ou au premier signe du document si la racine n'existait pas encore ;
+//    2. refusé (règle de sécurité de la page) ou une page déjà là ⇒ la
 //       balise `<script src>` comme avant, et `__vrmCanalInline = false` :
 //       content.js marque alors chaque message « douteux » et le fond refuse
 //       tout ce qui écrirait une preuve ou un état (bordereau, suppression,
@@ -41,14 +44,15 @@
   }catch(_){ok=false;}
   return ok;
  };
- const poser=(immediat)=>{
+ const poser=()=>{
   const racine=document.head||document.documentElement;if(!racine)return false;
   observateur?.disconnect();
-  if(enLigne(racine)){globalThis.__vrmCanalInline=immediat===true;return true;}
+  let vierge=false;try{vierge=!document.querySelector('script');}catch(_){vierge=false;}
+  if(enLigne(racine)){globalThis.__vrmCanalInline=vierge;return true;}
   const s=document.createElement('script');
   s.src=chrome.runtime.getURL(fichier);s.onload=()=>s.remove();
   s.onerror=()=>{s.remove();console.warn('VRM : le capteur de page n’a pas pu être chargé dans ce navigateur.');};
   racine.appendChild(s);return true;
  };
- if(!poser(true)){observateur=new MutationObserver(()=>poser(false));observateur.observe(document,{childList:true,subtree:true});}
+ if(!poser()){observateur=new MutationObserver(()=>poser());observateur.observe(document,{childList:true,subtree:true});}
 })();
