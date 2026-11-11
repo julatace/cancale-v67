@@ -63,7 +63,7 @@ import RepartitionAnneau from './RepartitionAnneau.jsx';
 // ⟦→ ecrans/Leboncoin.jsx #1⟧
 import './bilanSynchronisation.css'; // (8 nov.) style de ./AnnoncesLeboncoin.jsx, gardé à sa place (son écran est chargé à la demande)
 import './annonces-leboncoin.css'; // (8 nov.) style de ./AnnoncesLeboncoin.jsx, gardé à sa place (son écran est chargé à la demande)
-import { bilanEnLigneLbc, etatEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from './enLigneLbc.js';
+import { bilanEnLigneLbc, etatEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC, lectureCompleteLbc, idCompteLbcPur } from './enLigneLbc.js';
 import './ebay-annonces.css';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
@@ -573,6 +573,8 @@ import { etatArticle } from "./etatArticle.js";
 import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
+import { PasEnLigneDetail, texteCartePasEnLigne } from "./PasEnLigne.jsx";   // (11 nov., lot pas-en-ligne)
+import { DEMANDE_OUVRIR_ACHAT, candidatsPasEnLigne, jugerPasEnLigne, presentsDe as presentsPasEnLigne, seuilValide as seuilValidePasEnLigne, SEUIL_DEFAUT as SEUIL_PAS_EN_LIGNE_DEFAUT, CLE_SEUIL_PAS_EN_LIGNE } from "./pasEnLigne.js";   // (11 nov., lot pas-en-ligne)
 // ⟦→ ecrans/Stock.jsx #2⟧
 import './styles-inventaire.css'; // (8 nov.) style de ./InventaireStock.jsx, gardé à sa place (son écran est chargé à la demande)
 import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, fusionnerInventaire, normaliserInventaire, saisiesVivantes as inventaireSaisies } from "./inventaire.js";
@@ -2721,7 +2723,7 @@ const SYNC_KEYS = [
   // (11 nov.) Paramètres → Importer (src/importStock.js) : le stock et les ventes passées
   // importés d'un autre outil, et le journal des imports (« Annuler » retire ce qu'un import a créé).
   'vrm_stock_importe','vrm_ventes_importees','vrm_imports',
-  'vrm_stock_sortis','vrm_stock_garder','vrm_stock_garde_hors_ligne','vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
+  'vrm_stock_sortis','vrm_stock_garder','vrm_stock_garde_hors_ligne','vrm_pas_en_ligne_seuil','vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
   'vrm_lbc_liens',
@@ -29739,6 +29741,89 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
+// ── (11 nov., lot pas-en-ligne) « ACHETÉS MAIS PAS ENCORE EN LIGNE » ────────────────
+// La règle : src/pasEnLigne.js (identité par N° ou par achat relié ; « pas en ligne » prouvé
+// par des lectures complètes de moins de 24 h de TOUS ses comptes et sites). Ici seulement les
+// LECTURES : les articles à juger viennent de l'appareil (achats hors plateforme, stock importé,
+// achats Vinted déjà lus par l'écran) ; les annonces actuelles par la lecture du Stock
+// (`lireAnnoncesStock`, la même que l'écran Stock — §11), lancée SEULEMENT s'il y a un article
+// à juger. Trois états : `undefined` en cours · `null` pas su · le jugement.
+// Les photos des achats hors plateforme LISTÉS seulement (projetées, jamais `select=data`) ; `null` = pas su.
+const lirePhotosHorsPasEnLigne = async (ids) => {
+  try {
+    const cles = (ids || []).map((id) => 'achat_hors_photo_' + String(id).replace(/[^\w-]/g, '')).slice(0, 40);
+    if (!cles.length) return {};
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${cles.map(encodeURIComponent).join(',')})&select=id,b:data->>b64`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json(); if (!Array.isArray(rows)) return null;
+    const m = {};
+    for (const x of rows) if (x && typeof x.b === 'string' && x.b.startsWith('data:image/')) m[String(x.id).replace(/^achat_hors_photo_/, '')] = x.b;
+    return m;
+  } catch (_) { return null; }
+};
+function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [], horsMasques = [] } = {}) {
+  const [seuil, setSeuilEtat] = useStateCle(CLE_SEUIL_PAS_EN_LIGNE, () => seuilValidePasEnLigne(load(CLE_SEUIL_PAS_EN_LIGNE, SEUIL_PAS_EN_LIGNE_DEFAUT)));
+  const setSeuil = (v) => { const x = seuilValidePasEnLigne(v); setSeuilEtat(x); save(CLE_SEUIL_PAS_EN_LIGNE, x); };
+  const [lecture, setLecture] = useState(undefined);
+  const [tic, setTic] = useState(0);
+  const cand = useMemo(() => {
+    const numeros = load('vinted_annonce_numeros', {}) || {};
+    const connus = new Set(Object.values(numeros).map((f) => (f && f.numero != null ? cleNum(f.numero) : '')).filter(Boolean));
+    const venduSig = load('vrm_stock_vendus', null);
+    const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
+    const A = Array.isArray(achats) ? achats.map((o) => ({ transaction_id: o && o.transaction_id, title: o && o.title, date: o && o.date, status: o && o.status, photo: orderPhoto(o) || null, prix: montantCommande(o) })) : null;
+    return candidatsPasEnLigne({ hors, masquesHors: new Set((horsMasques || []).map(String)), importes: lireStockImporte(), achats: A,
+      liens: liensParAchat(numeros, load('vinted_sale_overrides', {}) || {}), connus, vendus, prixParNum: load('vinted_buyprice_by_num', {}) || {}, cle: cleNum });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [achats, hors, horsMasques, tic]);
+  const besoin = !!actif && cand.candidats.length > 0;
+  const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
+  useEffect(() => {
+    if (!besoin) return undefined;
+    let vivant = true;
+    (async () => {
+      let lu = null, lbc = null;
+      try { const m = await import('./ecrans/Stock.jsx'); [lu, lbc] = await Promise.all([m.lireAnnoncesStock(accounts || []), lireLbcPreuve()]); } catch (_) { lu = null; }
+      if (vivant) setLecture(lu ? { ...lu, lbcPreuve: lbc } : null);
+    })();
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [besoin, cleComptes, tic]);
+  const r = useMemo(() => {
+    if (!besoin) return { su: true, seuil, liste: [], aConfirmer: [], recents: 0, sansDate: 0, enLigne: 0, manques: { sources: [], sansNumero: 0, pasRelies: 0 }, vide: true };
+    if (lecture === undefined) return undefined;
+    if (lecture === null) return null;
+    const numeros = load('vinted_annonce_numeros', {}) || {};
+    const pairsLost = load('vinted_pairs_lost', {}) || {};
+    const venduSig = load('vrm_stock_vendus', null);
+    const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
+    const vc = lecture.vc ? annoncesVcStock({ lst: lecture.vc.lst, ventes: lecture.vc.ventes, auto: numerosVcEffectifs() }) : null;
+    const aa = annoncesActuelles({
+      vinted: lecture.vinted.map((c) => (c.ok ? { ...c, masquees: masqueesPresentes(c.masquees, numeros, pairsLost) } : c)),
+      numeros, ebay: lecture.ebay, lbc: lecture.lbc, vestiaire: vc, vendus, cle: cleNum, clePhoto: photoKey,
+    });
+    const hA = aa.su ? (aa.sansNumero.ebay + aa.sansNumero.leboncoin + aa.sansNumero.vestiaire + (aa.vcNonJugees || []).length + ((lecture.lbcPreuve && lecture.lbcPreuve.sansIdentite) || 0)) : 0;
+    const presents = aa.su ? presentsPasEnLigne({ articles: aa.articles, fiches: numeros, horsArticles: hA, cle: cleNum }) : null;
+    const sources = [];
+    for (const c of lecture.vinted) sources.push({ plateforme: 'vinted', nom: c.nom, ok: !!c.ok, lu: c.ok ? c.lu : null, complet: true });
+    if (!lecture.ebay) sources.push({ plateforme: 'ebay', nom: 'eBay', ok: false });
+    else {
+      for (const n of lecture.ebay.illisibles || []) sources.push({ plateforme: 'ebay', nom: n, ok: false });
+      for (const c of lecture.ebay.comptes || []) sources.push({ plateforme: 'ebay', nom: c.nom, ok: true, lu: Number.isFinite(c.lu) ? c.lu : null, complet: true });
+    }
+    if (!lecture.lbcPreuve) sources.push({ plateforme: 'leboncoin', nom: 'Leboncoin', ok: false });
+    else { const L = lecture.lbcPreuve.comptes; for (const c of L) sources.push({ plateforme: 'leboncoin', nom: L.length > 1 ? `Leboncoin ·${String(c.compte).slice(-4)}` : 'Leboncoin', ok: true, lu: c.lu, complet: true }); }
+    if (lecture.vc === null) sources.push({ plateforme: 'vestiaire', nom: 'Vestiaire', ok: false });
+    else if (lecture.vc && lecture.vc.lst && lecture.vc.lst.items) { const t = Date.parse(lecture.vc.lst.capturedAt || ''); sources.push({ plateforme: 'vestiaire', nom: 'Vestiaire', ok: true, lu: Number.isFinite(t) ? t : null, complet: lecture.vc.lst.complet === true }); }
+    const j = jugerPasEnLigne({ candidats: cand.candidats, presents, sources, seuilJours: seuil, maintenant: Date.now(), cle: cleNum });
+    // L'emplacement : sa case dans « Mes meubles » (par N°), sinon celui écrit dans le fichier importé.
+    const ou = (c) => { if (!c.cle) return c.ou || ''; const o = ouDansMeubles(c.cle); return o ? `${o.meuble.name || 'Meuble'} · ${o.libelle}` : (c.ou || ''); };
+    return { ...j, liste: j.liste.map((c) => ({ ...c, ou: ou(c) })), aConfirmer: j.aConfirmer.map((c) => ({ ...c, ou: ou(c) })), achatsSu: cand.achatsSu };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [besoin, lecture, seuil, cand]);
+  return { r, seuil, setSeuil, relire: () => { setLecture(undefined); setTic((x) => x + 1); } };
+}
+
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false }) {
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
@@ -37629,6 +37714,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted, n° de commande ou de facture tapé sur l'achat), jamais par titre, prix ou date
   // (src/achatsDoubles.js). Les achats Vinted masqués ne sont déjà plus dans `buysBase`.
   const achatsDoubles = useMemo(() => achatsEnDouble({ vinted: buysBase, hors: offBuysTous, masquesHors: new Set(horsMasques) }), [buysBase, offBuysTous, horsMasques]);
+  // (11 nov., lot pas-en-ligne) « Achetés mais pas encore en ligne » : jugé pour Ma journée et Achats
+  // (src/pasEnLigne.js). Les achats Vinted ne sont jugés que LUS (pas su ⇒ aucun).
+  const pasEnLigne = usePasEnLigne({ actif: curSub === 'journee' || curSub === 'achats', accounts, achats: Array.isArray(buys.items) && !buys.error ? buysBase : null, hors: offBuysTous, horsMasques });
+  const pasEnLigneJ = pasEnLigne.r && pasEnLigne.r.su ? pasEnLigne.r : null;
+  const [feuillePasEnLigne, setFeuillePasEnLigne] = useState(false);
+  const ouvrirPasEnLigne = (c) => {
+    setFeuillePasEnLigne(false);
+    if (c.source === 'import') { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} return; }
+    DEMANDE_OUVRIR_ACHAT.id = c.source === 'hors' ? c.achatId : null; DEMANDE_OUVRIR_ACHAT.at = Date.now();
+    if (c.source === 'hors') setOffSecOpen(true);
+    if (onNav) onNav('cat_achats');
+  };
+  const detailPasEnLigne = <PasEnLigneDetail r={pasEnLigne.r} seuil={pasEnLigne.seuil} onSeuil={pasEnLigne.setSeuil} onOuvrir={ouvrirPasEnLigne} onRelire={pasEnLigne.relire}
+    onAnnonces={() => { setFeuillePasEnLigne(false); if (onNav) onNav('vinted_annonces'); }} Bouton={Bouton} Segmente={Segmente} Pourquoi={Pourquoi} Photo={PhotoVinted} lirePhotos={lirePhotosHorsPasEnLigne}/>;
   const achatsLusEnEntier = Array.isArray(buys.items) && !buys.error && !(Array.isArray(buys.failed) && buys.failed.length);
   // Le nombre pour « À trancher », publié par CET écran (pas su ⇒ rien publié, jamais 0).
   useEffect(() => { if (curSub === 'achats' && achatsLusEnEntier) publierATrancher('achats-doubles', achatsDoubles.length); }, [curSub, achatsLusEnEntier, achatsDoubles]);
@@ -42955,10 +43054,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
@@ -43028,6 +43127,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     onClick={() => { noterSortiesVues(sortiesStock.map((x) => x.cle)); if (un && onLocate) onLocate(un.num); else if (onNav) onNav('garage'); }}>
                     <PileVignettes srcs={sortiesStock.map((x) => x.photo)} n={sortiesStock.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="home" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{court}</span><span className="vrm-day-task-note">{detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
+                  </button>
+                );
+              };
+              // (11 nov., lot pas-en-ligne) « N articles achetés pas en ligne » : la liste s'ouvre en feuille.
+              const cartePasEnLigne = () => {
+                const t = texteCartePasEnLigne(pasEnLigneJ);
+                return (
+                  <button key="pas-en-ligne" type="button" className="vrm-day-task vrm-fu-tache" data-pas-en-ligne={pasEnLigneJ.liste.map((c) => c.numero || c.tx || c.id).join(' ')} data-n={String(pasEnLigneJ.liste.length)}
+                    title={`${t.titre}\n${t.detail}`} aria-label={`${t.titre} — ${t.detail}`} onClick={() => setFeuillePasEnLigne(true)}>
+                    <PileVignettes srcs={pasEnLigneJ.liste.map((c) => (c.source === 'vinted' ? c.photo : null)).filter(Boolean)} n={pasEnLigneJ.liste.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="box" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note">{t.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
                   </button>
                 );
@@ -43138,6 +43249,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, cases.filter((x) => x.id === id).map((x) => carteCase(x))])),
                 'a-relier': comptesARelierJour.length ? [carteARelier()] : [],
                 'stock-sortie': sortiesStock.length ? [carteSortieStock()] : [],
+                // (11 nov., lot pas-en-ligne) seulement s'il y en a (PROUVÉS : « à confirmer » ne compte pas).
+                'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? [cartePasEnLigne()] : [],
                 // (11 nov.) Plus de carte « Supprimés de Vinted » : ces articles vivent dans « À trancher » (lot DJ4,
                 // `cyclesJ` est vide) ; « À trancher » est une carte FIXE, rendue en tête de la section.
                 autres: autres.map((j, i) => tache(j, i)),
@@ -43177,6 +43290,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {blocRetirerAilleurs(true)}
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
+                    </SheetShell>
+                  ) : null}
+                  {feuillePasEnLigne ? (
+                    <SheetShell titre={tr('pasEnLigne.titre')} sousTitre={tr('pasEnLigne.sousTitre')} onClose={() => setFeuillePasEnLigne(false)} maxWidth={620} data-feuille-pas-en-ligne="">
+                      {detailPasEnLigne}
                     </SheetShell>
                   ) : null}
                   {feuilleDeux && deuxFois.length ? (
@@ -45403,6 +45521,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsEnDouble groupes={achatsDoubles} masques={(offBuysTous || []).filter((b) => b && horsMasques.includes(String(b.id)))}
           onGarder={garderAchatDouble} onReafficher={reafficherHorsDouble} Photo={PhotoVinted} Icon={Icon} photo={(a) => (a.source === 'vinted' ? orderPhoto(a.achat) || '' : '')} prixAchat={(a) => (a.source === 'vinted' ? (a.achat && a.achat.price && a.achat.price.amount != null ? Number(a.achat.price.amount) : null) : prixAchatHorsNombre(a.achat))}
           compte={(a) => (a.source === 'vinted' && a.achat && a.achat._acc ? accNameOf(a.achat._acc) : '')} quand={(a) => (a.source === 'vinted' ? quandCommandeVinted(a.achat) : (a.achat && a.achat.date ? Date.parse(String(a.achat.date).length === 10 ? a.achat.date + 'T12:00:00' : a.achat.date) : null))}/>}
+        {/* (11 nov., lot pas-en-ligne) « Achetés, pas en ligne » : l'entrée de la liste sur l'écran Achats,
+            seulement quand il y a quelque chose (prouvé ou à confirmer). Le nombre écrit est le PROUVÉ. */}
+        {!modeRetraits && pasEnLigneJ && (pasEnLigneJ.liste.length || pasEnLigneJ.aConfirmer.length) ? (
+          <button type="button" className="vrm-pel-entree" data-pel-entree={String(pasEnLigneJ.liste.length)} onClick={() => setFeuillePasEnLigne(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 52, padding: '8px 14px', marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+            <Icon name="box" size={18} style={{ color: C.muted, flexShrink: 0 }}/>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>{tr('pasEnLigne.titre')}</span>
+            <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{[pasEnLigneJ.liste.length ? String(pasEnLigneJ.liste.length) : null, pasEnLigneJ.aConfirmer.length ? tr('pasEnLigne.aConfirmer', { n: pasEnLigneJ.aConfirmer.length }) : null].filter(Boolean).join(' · ')} ›</span>
+          </button>
+        ) : null}
+        {curSub === 'achats' && feuillePasEnLigne ? (
+          <SheetShell titre={tr('pasEnLigne.titre')} sousTitre={tr('pasEnLigne.sousTitre')} onClose={() => setFeuillePasEnLigne(false)} maxWidth={620} data-feuille-pas-en-ligne="">
+            {detailPasEnLigne}
+          </SheetShell>
+        ) : null}
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
@@ -51044,7 +51177,34 @@ async function lireEbayEnLigne() {
     if (!lu) return null;
     const nums = new Set(); const liste = [];
     for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) nums.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
-    return { liste, nums, illisibles: (lu.illisibles || []).map((c) => nomCompteEbay(c)) };
+    // (11 nov., lot pas-en-ligne) La date de lecture de CHAQUE compte (`capturedAt` de sa ligne ;
+    // ligne absente ⇒ jamais lu) : « pas en ligne » ne se prouve qu'avec des lectures fraîches.
+    const comptes = (lu.lignes || []).filter((x) => x && x.ligne !== undefined).map(({ compte, ligne }) => ({ nom: nomCompteEbay(compte), lu: ligne && ligne.capturedAt ? Date.parse(ligne.capturedAt) : null }));
+    return { liste, nums, illisibles: (lu.illisibles || []).map((c) => nomCompteEbay(c)), comptes };
+  } catch (_) { return null; }
+}
+// (11 nov., lot pas-en-ligne) Leboncoin, pour PROUVER « pas en ligne » : la lecture complète la
+// plus récente de CHAQUE compte connu (`lbc_listings.lectures`, la règle `lectureCompleteLbc`) et
+// le nombre d'annonces en vente qui ne portent AUCUNE identité VRM (ni référence, ni lien posé à
+// la main) — chacune pourrait être n'importe quel article. Les ventes ne sont pas relues ici : une
+// annonce vendue encore comptée en vente ne fait que retenir la preuve (le côté sûr).
+// Rend `{ comptes: [{ compte, lu }], sansIdentite }`, ou `null` = pas su.
+async function lireLbcPreuve() {
+  try {
+    const ls = await lbcListingsSession();
+    if (!ls || !ls.items) return null;
+    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const comptes = new Set();
+    let sansIdentite = 0;
+    for (const ad of Object.values(ls.items || {})) {
+      if (!ad || ad.id == null) continue;
+      const c = idCompteLbcPur(ad.account || ad.lbcUser); if (c) comptes.add(c);
+      if (!annonceLbcEnVente(ad, new Set())) continue;
+      if (etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, new Set()), lectures: ls.lectures || {}, maintenant: Date.now() }).etat === 'sortie') continue;
+      if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) sansIdentite++;
+    }
+    for (const k of Object.keys(ls.lectures || {})) { const c = idCompteLbcPur(k); if (c) comptes.add(c); }
+    return { comptes: [...comptes].map((c) => { const L = lectureCompleteLbc(ls.lectures || {}, c); return { compte: c, lu: L ? L.at : null }; }), sansIdentite };
   } catch (_) { return null; }
 }
 

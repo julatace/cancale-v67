@@ -1,0 +1,34 @@
+/* « ACHETÉS, PAS EN LIGNE » (11 nov., lot pas-en-ligne) — src/PasEnLigne.jsx
+   Une liste neutre (encre, gris) ; ambre seulement pour un manque à rattraper,
+   rouge seulement pour deux achats sous un même N° (§7). */
+:root {
+  --pel-encre: var(--w-encre, #1D1D1F);
+  --pel-gris: var(--w-gris, #6E6E73);
+  --pel-tuile: var(--w-remplir, rgba(118,118,128,.12));
+  --pel-trait: rgba(60,60,67,.14);
+  --pel-ambre: #A35200;
+}
+:root[data-theme="dark"] { --pel-encre: #F5F5F7; --pel-gris: #A1A1A6; --pel-trait: rgba(235,235,245,.16); --pel-ambre: #FFB340; }
+
+@layer vrm-premium {
+.vrm-pel { display: flex; flex-direction: column; gap: 14px; color: var(--pel-encre); min-width: 0; }
+.vrm-pel-note { margin: 0; font-size: 14px; line-height: 1.45; color: var(--pel-gris); }
+.vrm-pel-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vrm-pel-ligne { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--pel-trait); min-width: 0; min-height: 64px; }
+.vrm-pel-ligne:last-child { border-bottom: none; }
+.vrm-pel-photo { position: relative; flex-shrink: 0; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: var(--pel-tuile); }
+.vrm-pel-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-pel-num { position: absolute; left: 4px; bottom: 4px; font-size: 10px; font-weight: 700; color: #fff; background: rgba(0,0,0,.62); border-radius: 8px; padding: 1px 5px; font-variant-numeric: tabular-nums; }
+.vrm-pel-textes { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-pel-titre { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-pel-sous { font-size: 13px; color: var(--pel-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-pel-sous.is-rouge { color: var(--vrm-doublon, #D70015); font-weight: 600; }
+.vrm-pel-ligne > .vrm-b { flex-shrink: 0; min-height: 44px; }
+.vrm-pel-confirmer { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--pel-trait); padding-top: 12px; }
+.vrm-pel-repli { display: flex; justify-content: space-between; align-items: center; min-height: 44px; border: none; background: transparent; padding: 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--pel-encre); cursor: pointer; text-align: left; }
+.vrm-pel-manques { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-pel-manques li { font-size: 13px; line-height: 1.4; }
+.vrm-pel-manques li.is-ambre { color: var(--pel-ambre); }
+.vrm-pel-liste.is-doute { opacity: .78; }
+.vrm-pel-confirmer > .vrm-b { align-self: flex-start; }
+}

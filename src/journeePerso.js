@@ -46,6 +46,8 @@ export const CARTES_JOURNEE = [
   { id: 'prix', zone: 'afaire', nom: 'Prix à baisser', desc: 'Un conseil, rien ne part seul.' },
   { id: 'a-relier', zone: 'afaire', nom: 'E-mails à relier', desc: 'Les comptes dont rien n’arrive.' },
   { id: 'stock-sortie', zone: 'afaire', nom: 'Vendus encore rangés', desc: 'À sortir de tes meubles.' },
+  // (11 nov., lot pas-en-ligne) seulement s'il y en a (prouvés, src/pasEnLigne.js).
+  { id: 'pas-en-ligne', zone: 'afaire', nom: 'Achetés, pas en ligne', desc: 'Sur aucun site depuis plus de X jours.' },
   // (11 nov.) « Supprimés de Vinted » n'est plus une carte : ces articles vivent dans « À trancher » (lot DJ4).
   { id: 'autres', zone: 'afaire', nom: 'Les autres rappels', desc: 'Litiges, achats à relier, inventaire…' },
   { id: 'urssaf', zone: 'afaire', nom: 'Déclaration URSSAF', desc: 'L’échéance qui approche.' },
