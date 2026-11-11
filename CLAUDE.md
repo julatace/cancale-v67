@@ -528,10 +528,12 @@ sans la fonction.
 | `jauge` | `publierJaugeVisite` | **5.337.0** (10 nov.) | « 12/50 cette heure · repart à … » : la ligne `actions_compte_{uid}_{nav}` publiée aussi à la visite (0 compris), somme de tous les Chrome ; pas de ligne ⇒ « — » |
 | `journal` | `noterJournal` | **5.337.0** (10 nov.) | gestes ACCEPTÉS par Vinted notés dans `journal_vrm_{uid}_{nav}` (sorte, heure, n°, prix ; jamais texte ni pseudo), lus par « Ce que VRM a fait » |
 | `importdepart` | `importerHistorique` | **5.344.0** (11 nov.) | « Ton historique Vinted · 400 sur 1 250 » : tout l'historique (ventes, achats) du compte de l'onglet, 20 lectures/h, reprise ; `import_vinted_{uid}` |
+| `verifdepot` | `alertesDepotVinted` | **5.353.0** (11 nov.) | sur le formulaire de dépôt vinted.fr : encart discret « N° absent / déjà en ligne / prix sous l'achat », base VRM seulement, jamais une garde |
 
 ---
 
 ## 9. État actuel et décisions récentes
+- **11 nov. · Prévenir avant de publier (lot verif-publication, ext. 5.353)** : la vérification d'avant publication (Leboncoin, eBay, Vestiaire, Republier, brouillons) dit en plus « N° absent de la fin de la description » (seulement s'il numérote lui-même : réglage ou habitude PROUVÉE 4/5 sur 5 lues) et « déjà en ligne » (même N°, lecture < 24 h ; pas su ⇒ rien) ; chaque alerte a son pourquoi et « Ne plus me le dire » (`vrm_verif_coupees`, rallumée dans Paramètres) ; encart sur vinted.fr/items/new (sans requête Vinted, photos non jugées) ; banc `verif-publication` réparé. `docs/passation/2026-11-11-verif-publication.md`. Geste : installer 5.353.0.
 - **11 nov. · Audits rouges remis au vert** : ~35 audits rouges sur `main` ; vrais défauts corrigés (pilotage paginé sans ordre, « Chrome » en dur dans Mode vacances, icônes de Réglages en double, conseil « compte sans e-mail » sans cible, captures sans garde-fou, écrans refusés par « Signaler », `<img>` brutes) ; audits périmés remis à la même règle ; clone superficiel ⇒ versions publiées « pas su ». Restent : zone Colis, logos. `docs/passation/2026-11-11-audits-rouges.md`. Geste : aucun.
 - **11 nov. · Import de départ (ext. 5.344)** : l'extension relit TOUT l'historique Vinted (ventes puis achats) d'un compte, 4 pages de 100 par passage onglet vinted.fr ouvert, dans les 20 lectures/h, 12 pages/h au plus, jamais la place de l'argent et des colis, reprise là où elle s'est arrêtée, fusion par n° ; base déjà complète ⇒ aucune lecture ; progression dans `import_vinted_{uid}` (carte du logo, Ma journée, Paramètres → Mon historique Vinted, « Tout récupérer ») ; état simple pour l'accompagnement : `etatSimpleImport` (`src/importDepart.js`). `docs/passation/2026-11-11-import-depart.md`. Geste : installer 5.344.0, laisser vinted.fr ouvert jusqu'à « Tout est récupéré ✓ ».
 - **11 nov. · VRM installable (lot app-installable)** : 2e ouverture instantanée (coquille servie du cache, relue derrière ; seules `/` et `/index.html`, une page statique ne remplace plus l'app) ; nouvelle version ⇒ « Mettre à jour » discret une fois (jamais de rechargement pendant une saisie, `src/miseAJour.js`) ; aide d'installation une fois (iPhone 2 gestes, Android « Installer », `src/aideInstallation.js`) ; écrans de démarrage iPhone clair/sombre, icônes toutes tailles, raccourcis, plus de rechargement au tirer ; clic de notification vers la fenêtre de l'app. `docs/passation/2026-11-11-app-installable.md`. Geste : aucun (reposer l'icône pour le nouvel écran de démarrage).
@@ -540,7 +542,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.344.0** (11 nov.). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.353.0** (11 nov.). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
