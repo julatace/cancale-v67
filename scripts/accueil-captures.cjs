@@ -39,6 +39,12 @@ const ECRANS = [
   { nom: 'messages', tab: 'messages', w: 390, h: 844 },
   { nom: 'bureau', tab: 'journee', w: 1440, h: 900 },
 ];
+const CATALOGUE_VARIE = [
+  ['Veste en jean bleue', "Levi's", 'M'], ['Air Max 90 blanche', 'Nike', '42'], ['Sac cabas en cuir camel', 'Sézane', ''],
+  ['Pull en laine écru', 'Maje', 'S'], ['Robe longue fleurie', 'Sandro', '38'], ['Manteau en laine gris', 'COS', 'L'],
+  ['Samba OG noire', 'Adidas', '39'], ['Jean droit brut', 'A.P.C.', 'W32'], ['Doudoune sans manches noire', 'Uniqlo', 'M'],
+  ['Lunettes de soleil écaille', 'Persol', ''], ['Chemise en lin blanche', 'Arket', 'L'], ['Bottines en cuir marron', 'Clarks', '40'],
+];
 const SEUL = liste('SEUL', ECRANS.map((e) => e.nom).join(','));
 
 const srv = http.createServer((q, r) => {
@@ -58,11 +64,12 @@ async function capturer(nav, e, theme) {
   const ctx = await nav.newContext({ viewport: { width: e.w, height: e.h }, isMobile: tel, hasTouch: tel, deviceScaleFactor: 2, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', reducedMotion: 'reduce', serviceWorkers: 'block' });
   const sorties = [];
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => { sorties.push(r.request().url().slice(0, 80)); return r.abort(); });
-  // (11 nov.) Le catalogue MÉLANGÉ (src/exempleDonnees.js `varie`) : la page parle
-  // à tout revendeur. CATALOGUE=baskets rend le jeu d'avant (pour comparer).
-  await ctx.addInitScript(({ sombre, varie }) => {
-    try { sessionStorage.setItem('vrm_mode_exemple', '1'); if (varie) sessionStorage.setItem('vrm_exemple_catalogue', 'varie'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
-  }, { sombre, varie: process.env.CATALOGUE !== 'baskets' });
+  // (11 nov.) Le catalogue MÉLANGÉ (src/exempleDonnees.js `catalogue`) : la page
+  // parle à tout revendeur. Il vit ICI, pas dans l'app livrée (budget du fichier
+  // d'entrée). CATALOGUE=baskets rend le jeu d'avant (pour comparer). Tout est inventé.
+  await ctx.addInitScript(({ sombre, catalogue }) => {
+    try { sessionStorage.setItem('vrm_mode_exemple', '1'); if (catalogue) window.__vrmExempleCatalogue = catalogue; localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
+  }, { sombre, catalogue: process.env.CATALOGUE === 'baskets' ? null : CATALOGUE_VARIE });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (x) => erreurs.push(String(x.message || x).slice(0, 200)));

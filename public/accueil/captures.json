@@ -36,13 +36,13 @@
   "modeExemple": true
  },
  "messages-clair.webp": {
-  "sha256": "5112b3959bebbe0ac5d05fb45020097c249334db72a50cf2bec11a0326ec05ee",
+  "sha256": "d7445e8e466634ab3a56e6c3ce74d79310461a0339a4df9894ceb83f99da8068",
   "ecran": "messages",
   "largeur": 390,
   "modeExemple": true
  },
  "messages-sombre.webp": {
-  "sha256": "31d92f57301f783ecb42de3be3bd3aae72e0f13af1e9b2ab2b95f581e9f31b1d",
+  "sha256": "ffe6f1f6ba8514982ecb69b384dc123cec5fcb1351127a7c2a70589040bf610d",
   "ecran": "messages",
   "largeur": 390,
   "modeExemple": true
@@ -60,13 +60,13 @@
   "modeExemple": true
  },
  "retirer-clair.webp": {
-  "sha256": "b372a82ede5eba2028044bc98ca97f24e0088751cab46543ec76d075b2fd2cbf",
+  "sha256": "38618ee3dcee46dac44a3c9d7d760cfc7e02d50eee6f1a75bd1ba097db27a945",
   "ecran": "cat_bord",
   "largeur": 390,
   "modeExemple": true
  },
  "retirer-sombre.webp": {
-  "sha256": "dfe73c3a47c28a2222002cd31c5d0cf5076471b0002d029d4df378bde3b496b0",
+  "sha256": "20c2a153b562a52a68dff9133a73eb3f61bcb7cb8b9746a38a95c9826d736fd1",
   "ecran": "cat_bord",
   "largeur": 390,
   "modeExemple": true

@@ -17,21 +17,15 @@ export const EMAIL_EXEMPLE = 'exemple@vrm.invalid';
 // ne doivent JAMAIS apparaître dans la vraie base ni dans le stockage réel.
 export const TRACES_EXEMPLE = ['vendeuse_a', 'vendeuse_b', 'acheteuse_lyon', EMAIL_EXEMPLE];
 
-// (11 nov., page d'accueil publique) `varie` : un catalogue MÉLANGÉ (vêtements,
-// sacs, chaussures, accessoires) pour les captures de vrm.center, qui parlent à
-// tout revendeur, pas seulement à celui de baskets. Demandé par
-// scripts/accueil-captures.cjs (`vrm_exemple_catalogue` = 'varie' dans la
-// session de la page) ; sans lui, le jeu est EXACTEMENT celui d'avant (les
-// bancs qui s'appuient dessus ne voient rien changer). Tout reste inventé.
-const CATALOGUE_VARIE = [
-  ['Veste en jean bleue', "Levi's", 'M'], ['Air Max 90 blanche', 'Nike', '42'], ['Sac cabas en cuir camel', 'Sézane', ''],
-  ['Pull en laine écru', 'Maje', 'S'], ['Robe longue fleurie', 'Sandro', '38'], ['Manteau en laine gris', 'COS', 'L'],
-  ['Samba OG noire', 'Adidas', '39'], ['Jean droit brut', 'A.P.C.', 'W32'], ['Doudoune sans manches noire', 'Uniqlo', 'M'],
-  ['Lunettes de soleil écaille', 'Persol', ''], ['Chemise en lin blanche', 'Arket', 'L'], ['Bottines en cuir marron', 'Clarks', '40'],
-];
-const article = (i) => { const [m, b, t] = CATALOGUE_VARIE[i % CATALOGUE_VARIE.length]; return { titre: `${m}${t ? ` taille ${t}` : ''}`, marque: b, taille: t || 'Taille unique' }; };
-
-export function jeuExemple(now = Date.now(), { varie = false } = {}) {
+// (11 nov., page d'accueil publique) `catalogue` : une liste [titre, marque,
+// taille] MÉLANGÉE (vêtements, sacs, chaussures…) que scripts/accueil-captures.cjs
+// pose dans la page (`window.__vrmExempleCatalogue`, jamais dans l'app livrée :
+// le fichier d'entrée a un budget) pour des captures qui parlent à tout
+// revendeur. Sans elle, le jeu est EXACTEMENT celui d'avant (les bancs qui s'y
+// appuient ne voient rien changer). Tout reste inventé.
+export function jeuExemple(now = Date.now(), { catalogue = null } = {}) {
+  const varie = Array.isArray(catalogue) && catalogue.length > 0 && catalogue.every((x) => Array.isArray(x) && x.every((v) => typeof v === 'string'));
+  const article = (i) => { const [m, b, t] = catalogue[i % catalogue.length]; return { titre: `${m}${t ? ` taille ${t}` : ''}`, marque: b, taille: t || 'Taille unique' }; };
   const iso = (j) => new Date(now - j * 86400000).toISOString();
   const ts = (j) => Math.floor((now - j * 86400000) / 1000);
   const MARQUES = ['Nike', 'Adidas', 'New Balance', 'Asics', 'Salomon'];
@@ -61,7 +55,7 @@ export function jeuExemple(now = Date.now(), { varie = false } = {}) {
     { id: 'email_track_mondialrelay_40817263', data: { carrier: 'mondialrelay', status: 'disponible', suivi: '40817263', code: '582913', lieu: 'Le Fournil\n8 Rue de la Paix\n35000 Rennes', subject: 'Votre colis est disponible', receivedAt: iso(1), arriveLe: iso(1), dateLimite: new Date(now + 5 * 86400000).toISOString() } },
     { id: 'harvest_111_billing', data: { capturedAt: iso(0.01), payload: { user_balance: { available_amount: { amount: '64.0' }, escrow_amount: { amount: '120.0' } } } } },
     { id: 'lbc_accounts', data: { accounts: { lbcA: { id: 'lbcA', name: 'Ma boutique', sessionAt: iso(1) } } } },
-    { id: 'lbc_listings', data: { items: { 3100000001: { id: '3100000001', ref: '2', customRef: 'VRM-2', subject: varie ? 'Sac cabas en cuir camel' : 'Adidas Samba OG noire T39', status: 'active', account: 'lbcA', seenAt: iso(0.5), price: 55 } } } },
+    { id: 'lbc_listings', data: { items: { 3100000001: { id: '3100000001', ref: '2', customRef: 'VRM-2', subject: varie ? article(2).titre : 'Adidas Samba OG noire T39', status: 'active', account: 'lbcA', seenAt: iso(0.5), price: 55 } } } },
     { id: 'lbc_ventes', data: { ventes: {} } },
   ].map((l) => ({ ...l, owner: UID_EXEMPLE, updated_at: iso(0), created_at: iso(30) }));
   const comptes = [
