@@ -258,6 +258,9 @@ const FactureVenteLigne = (props) => <Suspense fallback={null}><FactureVenteLign
 // (10 nov., lot S) La facture Pro d'une vente Leboncoin / eBay / Vestiaire, dans le détail de la vente.
 const FactureAutreParesseuse = lazy(() => import('./FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureAutreVente = (props) => <Suspense fallback={null}><FactureAutreParesseuse {...props}/></Suspense>;
+// (11 nov., lot lbc-plus) La remise en main propre organisée d'une vente Leboncoin (date, heure, lieu, « Remis »).
+const RemiseMainPropreParesseuse = lazy(() => import('./RemiseMainPropre.jsx'));
+const RemiseMainPropre = (props) => <Suspense fallback={null}><RemiseMainPropreParesseuse {...props}/></Suspense>;
 // (8 nov.) Le refus de facture commun à plusieurs lignes, dit une fois en tête de la liste (§7).
 const FactureRaisonsTeteParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureRaisonsTete })));
 const FactureRaisonsTete = (props) => <Suspense fallback={null}><FactureRaisonsTeteParesseuse {...props}/></Suspense>;
@@ -2687,6 +2690,11 @@ const SYNC_KEYS = [
   // (11 nov.) Les RAPPELS qu'il a posés (« Me le rappeler », api/_lib/rappels-perso.js) :
   // { [id]: { sorte, num|item|tx, jour, note, etat… } } — lus PROJETÉS par le cron (9 h) et l'agenda.
   'vrm_rappels',
+  // (11 nov., lot lbc-plus) Les REMISES EN MAIN PROPRE qu'il a organisées (api/_lib/remises-main-propre.js :
+  // { [id]: { tx, num, jour, heure, lieu, etat… } }) et l'heure du dernier rendez-vous prévu (lue PROJETÉE et
+  // FILTRÉE par le passage de 15 min) ; le registre des republications Leboncoin (src/lbcPlus.js :
+  // { [cléN°]: ISO }, la limite d'une fois par N jours) et son réglage (7 · 14 · 30 · 60).
+  'vrm_remises', 'vrm_remise_fin', 'vrm_lbc_repub_journal', 'vrm_lbc_repub_jours',
   // (10 nov., lot Y) La CORBEILLE 30 jours ({ [id]: entrée }, src/corbeille.js) : ce qu'il a supprimé DANS VRM.
   'vrm_corbeille',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
@@ -11655,7 +11663,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_rappels', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_cloture_annee', 'vrm_cloture_vue', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_rappels', 'vrm_remises', 'vrm_lbc_repub_journal', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_cloture_annee', 'vrm_cloture_vue', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -21803,7 +21811,7 @@ function CarteLbc({ o, num = '', benef = null, floute = false, compte = undefine
   // « Postée » = expédiée, « Livrée » et « Payée » = finalisée (Leboncoin verse à la finalisation).
   const friseLbc = lbcAnnulee(o) ? null : <Frise etapes={friseVenteLue({ vendue: true, postee: lbcExpediee(o) || lbcFinalisee(o), livree: lbcFinalisee(o), payee: lbcFinalisee(o) }, { geste: ton === 'action' })} cle={'lbc' + o.txId} className="vrm-fu-ligne-frise" label="Où en est la vente"/>;
   return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} compte={compte} ton={ton} montant={montant(o.price != null && String(o.price).trim() !== '' ? Number(o.price) / 100 : null)} etat={motEtatVente(etatCourt)}
-    suite={o.isSeller === true ? <FactureAutreVente plateforme="leboncoin" vente={o} deps={DEPS_FACTURE}/> : null}
+    suite={o.isSeller === true ? <><RemiseMainPropre o={o} num={num} eligible={!lbcAnnulee(o) && !lbcExpediee(o) && !lbcFinalisee(o)}/><FactureAutreVente plateforme="leboncoin" vente={o} deps={DEPS_FACTURE}/></> : null}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
