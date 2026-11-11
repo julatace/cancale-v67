@@ -21,7 +21,8 @@ import { notesParCompte } from '../notesRecues.js';
 import { useValeurStock } from '../CascadeVente.jsx';   // (10 nov., lot BF)
 import { texteValeurStock } from '../coutVente.js';
 // ⟦← App.jsx #2⟧
-import {comparerDeuxMois,ymEnFace} from '../comparerMois.js';
+import {comparerDeuxMois,ymEnFace,bornesMois} from '../comparerMois.js';
+import { estLot as estLotAchat, nombreLot } from '../achatsSourcing.js';   // (11 nov., C5) la règle des lots de l'écran Achats
 import '../styles-mois-boucle.css';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 // ⟦← App.jsx #3⟧
@@ -1597,7 +1598,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
-      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix}/>
+      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
       <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
@@ -1700,6 +1701,10 @@ const raisonComparer = (x) => {
 // grise, jamais rouge ni vert), et aucune flèche quand un côté est « au moins » ou « — ».
 // Aucun chiffre neuf : `comparerDeuxMois` (src/comparerMois.js) avec les règles de toujours —
 // achats = le registre des achats du mois (`registreAchatsDe`, la carte « Registres »).
+// (11 nov., décision C11) Les annonces et ventes rangées par l'extension pour Leboncoin, eBay et
+// Vestiaire : l'identifiant et le PREMIER élément seulement (jamais `select=data`, §4.4). Une
+// lecture ratée ⇒ null (tous les sites montrés).
+const lireLignesSitesMarge = () => lireTout('or=(id.eq.lbc_listings,id.eq.lbc_ventes,id.like.ebay_orders*,id.like.ebay_listings*,id.eq.vc_listings,id.eq.vc_ventes)&select=id,a:data->items->0,v:data->ventes->0,o:data->orders->0').catch(() => null);
 const MOIS_CHOIX = 25;   // le mois en cours et les 24 d'avant (le même mois l'an dernier y est)
 const ymListeComparer = (maintenant) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < MOIS_CHOIX; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
 const libelleMoisCourt = (ym, maintenant) => { const [y, m] = String(ym).split('-').map(Number); return `${MOIS_COURTS[m - 1]}${y !== new Date(maintenant).getFullYear() ? ` ${y}` : ''}`; };
@@ -1735,13 +1740,46 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
       .catch(() => { if (!mort) setAchatsLus(null); });
     return () => { mort = true; };
   }, []);
+  // (11 nov., décision C5) Les PAIRES : le nombre d'articles d'un achat Vinted en lot, lu sur SA
+  // transaction (`items_count`, côté acheteur, la projection de l'écran Achats) — seulement les
+  // achats des deux mois choisis. Pas lu ⇒ la règle des lots sans lui (titre « Lot 3 », lot déclaré).
+  const txDesMois = React.useMemo(() => {
+    if (!achatsLus || !Array.isArray(achatsLus.achats)) return '';
+    const bs = [bornesMois(choix.a), bornesMois(choix.b)];
+    const ids = new Set();
+    for (const o of achatsLus.achats) {
+      const t = Date.parse((o && o.date) || ''); if (!Number.isFinite(t) || !bs.some((b) => t >= b.de && t < b.a)) continue;
+      if (o._uid && /^\d+$/.test(String(o.transaction_id || ''))) ids.add(`harvest_${o._uid}_txn_${o.transaction_id}`);
+    }
+    return [...ids].sort().join(',');
+  }, [achatsLus, choix.a, choix.b]);
+  const [nArticlesTx, setNArticlesTx] = React.useState({});
+  React.useEffect(() => {
+    if (!txDesMois) return undefined;
+    let mort = false;
+    (async () => {
+      const ids = txDesMois.split(','), m = {};
+      for (let i = 0; i < ids.length; i += 100) {
+        const rows = await lireTout(`id=in.(${ids.slice(i, i + 100).join(',')})&select=id,side:data->payload->transaction->>user_side,nb:data->payload->transaction->>items_count`).catch(() => null);
+        if (!Array.isArray(rows)) continue;
+        for (const r of rows) { const tx = String((r && r.id) || '').split('_txn_')[1]; if (tx && r.side === 'buyer' && r.nb != null && Number.isInteger(Number(r.nb))) m[tx] = Number(r.nb); }
+      }
+      if (!mort) setNArticlesTx(m);
+    })();
+    return () => { mort = true; };
+  }, [txDesMois]);
+  const nombreDe = (l) => {
+    const declares = load('vrm_lots_declares', {}) || {};
+    const a = { title: l.titre, transaction_id: l.reference };
+    return estLotAchat(a, { nArticlesTx, declares }) ? nombreLot(a, { nArticlesTx, declares }) : 1;
+  };
   const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
     ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
   const K = comparerDeuxMois({ ymA: choix.a, ymB: choix.b, maintenant, vendu,
     recuDe: (b) => recuAvecADater(recuPublieEntre(ligneUrssaf, b, maintenant), ligneUrssaf),
     beneficeDe: ({ ym, jusqua }) => { const B = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, jusqua); return B ? chiffreBenefice(B, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' }; },
     achatsDe: ({ ym }) => (achatsLus === undefined ? undefined : achatsLus === null ? null : achatsLus.registre({ achats: achatsLus.achats, recus: [], periode: ym, panelOff })),
-    R: { bilanLignes } });
+    nombreDe, R: { bilanLignes } });
   const colA = K ? nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant) : '', colB = K ? nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant) : '';
   const val = (x, type) => x.valeur == null ? '—' : type === 'eur' ? fmt(x.valeur) : String(x.valeur);
   const cents = (x, type) => x == null ? '' : type === 'eur' ? String(Math.round(x * 100)) : String(x);
@@ -1749,6 +1787,8 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
   // Sous un chiffre : « au moins », la couverture du bénéfice (« 3/4 prix »), ou rien.
   const sous = (x, Lg) => {
     if (Lg.cle === 'benefice' && x.n > 0 && x.nCout < x.n) return `${x.nCout}/${x.n} prix`;
+    // (11 nov., C5) Sous les paires : le nombre d'ACHATS, en petit.
+    if (Lg.cle === 'paires' && x.achats != null) return `${x.partiel ? 'au moins · ' : ''}${x.achats} achat${x.achats > 1 ? 's' : ''}`;
     if (x.partiel) return 'au moins';
     return '';
   };
@@ -1779,7 +1819,8 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
         {K.lignes.map((Lg) => (
           <div key={Lg.cle} className="vrm-cm-grille vrm-cm-ligne" data-comparer-ligne={Lg.cle} data-a={cents(Lg.a.valeur, Lg.type)} data-b={cents(Lg.b.valeur, Lg.type)} data-ecart={cents(Lg.ecart, Lg.type)} data-pct={Lg.pct == null ? '' : String(Lg.pct)} data-sens={Lg.sens || ''}
             data-a-partiel={Lg.a.partiel ? '1' : undefined} data-b-partiel={Lg.b.partiel ? '1' : undefined}
-            data-a-raison={Lg.a.valeur == null ? (Lg.a.raison || 'pasSu') : undefined} data-b-raison={Lg.b.valeur == null ? (Lg.b.raison || 'pasSu') : undefined}>
+            data-a-raison={Lg.a.valeur == null ? (Lg.a.raison || 'pasSu') : undefined} data-b-raison={Lg.b.valeur == null ? (Lg.b.raison || 'pasSu') : undefined}
+            data-a-achats={Lg.cle === 'paires' && Lg.a.achats != null ? String(Lg.a.achats) : undefined} data-b-achats={Lg.cle === 'paires' && Lg.b.achats != null ? String(Lg.b.achats) : undefined}>
             <span className="vrm-cm-nom">{nomLigne(Lg)}</span>
             {[Lg.a, Lg.b].map((x, i) => (
               <span key={i} className={'vrm-cm-v' + (i === 0 ? ' is-a' : '') + (x.valeur == null ? ' is-vide' : '')} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? raisonComparer(x) : undefined}>

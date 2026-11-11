@@ -1,4 +1,4 @@
-import { centimes, beneficePaire } from "./beneficePaire.js";
+import { beneficePaire } from "./beneficePaire.js";
 export const identifiantVinted = (v) =>
   /^\d{1,20}$/.test(String(v || "")) ? String(v) : null;
 // Only explicit native recreation edges establish identity. Numbers and titles never do.
@@ -51,35 +51,7 @@ export function chaineArticle(id, archives = [], numeros = {}) {
   if (ns.size > 1) conflit = true;
   return { ids: conflit ? [depart] : [...ids], conflit };
 }
-export function bilanAnnonce(it, draft) {
-  const d = String(draft?.id) === String(it.id) ? draft : null;
-  const manque = [],
-    inconnu = [];
-  const titre = d?.title ?? it.title;
-  if (!String(titre || "").trim()) manque.push("Titre");
-  const prix =
-    d && Object.prototype.hasOwnProperty.call(d, "price")
-      ? d.price
-      : typeof it.price === "object"
-        ? it.price?.amount
-        : it.price;
-  if (centimes(prix) == null || centimes(prix) <= 0) manque.push("Prix");
-  const photos =
-    d?.photos?.length ??
-    it.photoCount ??
-    (it.photos?.length || it.photosDetail?.length || (it.photo ? 1 : null));
-  if (photos === 0) manque.push("Photos");
-  else if (photos == null) inconnu.push("Photos");
-  const desc = d?.desc ?? it.desc ?? it.description;
-  if (typeof desc === "string") {
-    if (!desc.trim()) manque.push("Description");
-  } else if (it.descLen === 0) manque.push("Description");
-  else if (it.descLen == null) inconnu.push("Description");
-  // Applicability of dimensions/brand/size depends on category: never require them globally.
-  if (!d?.caracteristiques && !it.brand && !it.size)
-    inconnu.push("Caractéristiques");
-  return { manque, inconnu, prepare: !!d };
-}
+// (11 nov., C10) `bilanAnnonce` (l'ancien bloc « Annonces à compléter ») : fondu dans src/annoncesACompleter.js.
 export function comparerComptes({
   comptes,
   ventes,
