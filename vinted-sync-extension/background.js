@@ -860,7 +860,8 @@ function messageErreurOAuth(e, fournisseur, contexte) {
   if (a('identity_already_exists') || /identity is already linked/i.test(desc)) {
     // « Identity is already linked » (à CE compte) ≠ « … to another user » (un autre compte VRM).
     if (/already linked\s*\.?$/i.test(desc.trim()) && !/another/i.test(desc)) return `${nomConnu || 'Ce compte'} est déjà relié à ton compte VRM. Rien à faire.`;
-    return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
+    // Le chemin en 3 gestes, le MÊME que l'écran de suppression (lot suppression-oauth).
+    return `Ce ${nom} a déjà son propre compte VRM. 1. Déconnecte-toi, puis « Continuer avec ${nom} ». 2. Paramètres → Supprimer mon compte : tape SUPPRIMER. 3. Reconnecte-toi ici, puis relie ${nom}.`;
   }
   if (a('manual_linking_disabled') || /manual.?linking/i.test(desc)) return 'La liaison n’est pas encore activée sur VRM. Ton compte reste inchangé.';
   if (a('email_exists') || /already been registered/i.test(desc)) return `Cette adresse a déjà un compte VRM. Connecte-toi avec elle, puis relie ${nom} dans ton profil.`;

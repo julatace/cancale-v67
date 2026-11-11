@@ -137,6 +137,9 @@ const oauthDelier = async (provider, id) => {
  if(!(await askConfirm({title:`Délier ${nom} ?`,desc:plan.avertissement,ok:'Délier',cancel:'Annuler'})))return{ok:false};
  try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(plan.id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});
   if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:refusDelier(r.status,j,provider)};}
+  // Supabase a pu remplacer l'e-mail du compte : la session affichée le suit (relu, jamais deviné).
+  try{const f=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});const u=f.ok?await f.json():null;
+   if(u&&u.id===AUTH.user?.id&&typeof u.email==='string'&&u.email&&u.email!==AUTH.user?.email&&AUTH.session)writeSession({...AUTH.session,user:{...AUTH.session.user,email:u.email}});}catch(_){}
   try{relireFiche(AUTH.user?.id);}catch(_){}return{ok:true};
  }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
 };

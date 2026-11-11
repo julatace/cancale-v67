@@ -239,7 +239,7 @@ async function parcours(b, largeur) {
     await toucher(o.pg, o.pg.locator('[data-connexion-relier="discord"]'), mobile);
     await o.pg.waitForTimeout(6000);
     const t = await texte(o.pg), s = await sessionDe(o.pg);
-    dit(/Ce Discord a déjà son propre compte VRM\. Connecte-toi avec Discord, puis supprime cet autre compte/.test(t) && !ANGLAIS.test(t), `${tag} · P11 Discord pris par un autre compte VRM : le chemin clair`, t.slice(0, 300));
+    dit(/Ce Discord a déjà son propre compte VRM\. 1\. Déconnecte-toi, puis « Continuer avec Discord »\. 2\. Paramètres → Supprimer mon compte : tape SUPPRIMER\. 3\. Reconnecte-toi ici, puis relie Discord\./.test(t) && !ANGLAIS.test(t), `${tag} · P11 Discord pris par un autre compte VRM : le chemin clair`, t.slice(0, 300));
     dit(s && s.user && s.user.id === UID && o.j.tokens.length === 0 && adressePropre(o.pg.url()), `${tag} · P11 il reste connecté à SON compte, rien échangé, adresse propre`, o.pg.url());
     await capture(o.pg, `${tag}-p11-discord-deja-pris`); await o.ctx.close();
   });
@@ -271,6 +271,8 @@ async function parcours(b, largeur) {
     dit(o.j.supprimes.length === 1 && o.j.supprimes[0] === 'google-1' && /Google n’est plus relié à ton compte VRM/.test(t2), `${tag} · P13 délié sur SON clic, une requête, c’est dit`, JSON.stringify(o.j.supprimes));
     dit(await o.pg.locator('[data-connexion-compte="google"][data-connexion-etat="aucun"]').count() >= 1, `${tag} · P13 la ligne Google repasse « Relier »`);
     dit(sourceAvant === 'google' && sourceApres === 'discord', `${tag} · P13 la photo suit : Google avant, Discord après`, `${sourceAvant} → ${sourceApres}`);
+    const s13 = await sessionDe(o.pg);
+    dit(s13 && s13.user && s13.user.email === 'pseudo@discord.test' && /pseudo@discord\.test/.test(t2), `${tag} · P13 l’e-mail affiché suit celui que Supabase a posé`, JSON.stringify(s13 && s13.user));
     dit(!o.j.errs.length, `${tag} · P13 aucune erreur d’app`, o.j.errs.join('|'));
     await capture(o.pg, `${tag}-p13-delie`); await o.ctx.close();
   });

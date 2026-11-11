@@ -70,7 +70,7 @@ function chargerRegle(texte) {
       ['M1 liaison : adresse déjà prise', { error: 'invalid_request', code: 'email_exists', description: 'A user with this email address has already been registered' }, 'discord', 'liaison', /déjà un compte VRM.*relie Discord/],
       ['M1 liaison : manual linking éteint', { code: 'manual_linking_disabled', description: 'Manual linking is disabled' }, 'discord', 'liaison', /pas encore activée/],
       ['M1 inconnu (500)', { error: 'server_error', description: 'Multiple accounts with the same email address in the same linking domain detected: default' }, 'google', 'connexion', /La connexion avec Google n’a pas pu aboutir/],
-      ['M2 identité déjà reliée à un AUTRE compte', { error: 'server_error', code: 'identity_already_exists', description: 'Identity is already linked to another user' }, 'discord', 'liaison', /Ce Discord a déjà son propre compte VRM/],
+      ['M2 identité déjà reliée à un AUTRE compte', { error: 'server_error', code: 'identity_already_exists', description: 'Identity is already linked to another user' }, 'discord', 'liaison', /Ce Discord a déjà son propre compte VRM\. 1\. Déconnecte-toi, puis « Continuer avec Discord »\. 2\. Paramètres → Supprimer mon compte/],
       ['M2 identité déjà reliée à CE compte', { error: 'server_error', code: 'identity_already_exists', description: 'Identity is already linked' }, 'google', 'liaison', /^Google est déjà relié à ton compte VRM\. Rien à faire\.$/],
     ];
     for (const [nom, e, f, c, attendu] of CAS) {
