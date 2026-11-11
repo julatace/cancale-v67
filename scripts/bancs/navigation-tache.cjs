@@ -229,7 +229,9 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           // (5 nov.) « E-mails » rejoint « Gérer » (demande du 5 nov., `docs/passation/2026-11-05-onglet-emails.md`).
           dit(exp.join('|') === 'garage|emails|compta', 'J. « Gérer » : Stock, E-mails, Argent (À trancher est une carte de Ma journée, lot DJ4 ; Achats est dans la barre, lot DJ3), aucune entrée « Colis à retirer »', exp.join('|'));
           const libArgent = await pg.evaluate(() => { const e = document.querySelector('.vrm-sheet [data-nav-entree="compta"]'); return e ? e.innerText.trim() : ''; });
-          dit(libArgent === 'Argent', 'J. l’entrée `compta` s’appelle « Argent »', libArgent);
+          // (11 nov.) Le libellé passe par tr() : « Argent » en français, la clé `nav.compta` dans la langue ACTIVE.
+          { const lg = await pg.evaluate(() => (document.documentElement.getAttribute('lang') || 'fr').slice(0, 2)); const dc = await dicoLangue(lg);
+            dit(libArgent === dc['nav.compta'] && (await dicoLangue('fr'))['nav.compta'] === 'Argent', 'J. l’entrée `compta` s’appelle « Argent » (nav.compta, langue ' + lg + ')', libArgent); }
           dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
           dit(!!f && !['journee', 'annonces', 'ventes', 'achats', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
