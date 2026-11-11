@@ -73,7 +73,14 @@ function selects(ligne, texte) {
     let v = m[1];
     let inconnue = null;
     v = v.replace(/\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g, (x, nom) => {
-      const d = new RegExp('(?:const|let|var)\\s+' + nom.replace(/\$/g, '\\$') + "\\s*=\\s*(['\"`])([^'\"`]*)\\1").exec(texte);
+      const re = new RegExp('(?:const|let|var)\\s+' + nom.replace(/\$/g, '\\$') + "\\s*=\\s*(['\"`])([^'\"`]*)\\1");
+      let d = re.exec(texte);
+      // (10 nov., lot K) Une constante IMPORTÉE d'un module de src/ (`SEL_VERSION`,
+      // src/copieLignes.js) est résolue dans ce module — jamais devinée.
+      if (!d) {
+        const im = new RegExp('import\\s*\\{[^}]*\\b' + nom.replace(/\$/g, '\\$') + '\\b[^}]*\\}\\s*from\\s*["\'](\\./[^"\']+)["\']').exec(texte);
+        if (im) { try { d = re.exec(fs.readFileSync(path.join(RACINE, 'src', im[1]), 'utf8')); } catch (_) { d = null; } }
+      }
       if (!d) { inconnue = nom; return ''; }
       return d[2];
     });
