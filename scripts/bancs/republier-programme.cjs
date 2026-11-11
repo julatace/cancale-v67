@@ -129,10 +129,14 @@ const attendre = async (f, ms = 15000) => { const t = Date.now(); while (Date.no
 async function moteur(pg) {
   await pg.locator('[data-actions-ouvrir]').first().click();
   await pg.waitForSelector('[data-selection-vue]', { timeout: 8000 });
-  await pg.locator('[data-selection-annonce="9104"] input').check();
-  await pg.locator('[data-selection-annonce="9102"] input').check();
-  await pg.locator('[data-actions-possibles]').click();
-  await pg.locator('[data-action-sel="recreer"]').click();
+  await pg.evaluate(() => { for (const c of document.querySelectorAll('[data-selection-annonce] input:checked')) c.click(); });
+  await pg.locator('[data-selection-compte="111"] [data-selection-annonce="9104"] input').first().check();
+  await pg.locator('[data-selection-compte="111"] [data-selection-annonce="9102"] input').first().check();
+  if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `rp-selection-${pg.viewportSize().width}.png`) });
+  // (vue « Republier » d'Annonces) « Par VRM · N » ouvre l'atelier ; sinon « Actions » → Republier.
+  const parVrm = pg.locator('.vrm-sel-barre [data-republier-lancer]');
+  if (await parVrm.count()) await parVrm.first().click();
+  else { await pg.locator('[data-actions-possibles]').click({ timeout: 8000 }); await pg.locator('[data-action-sel="recreer"]').click(); }
   await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 6000 });
 }
 
@@ -161,6 +165,7 @@ async function moteur(pg) {
         await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {});
         dit(await pg.locator('[data-rp-ouvrir]').count() === 0, 'A0 « Programmer… » n’est proposé qu’après « Je confirme » (comme Lancer)');
         await pg.locator('[data-republier-confirme]').check();
+        const ordreVu = await pg.$$eval('[data-republier-ligne]', (els) => els.map((e) => e.getAttribute('data-republier-ligne')));
         await pg.locator('[data-rp-ouvrir]').click();
         const cond = await pg.locator('[data-rp-conditions] li').count();
         dit(cond === 5, 'A1 les conditions du départ sont dites À L’AVANCE (VRM ouvert, onglet sur le compte, extension, plafond, pause)', String(cond));
@@ -175,13 +180,13 @@ async function moteur(pg) {
         await attendre(async () => !!ligneProg(rows), 8000);
         const p = ligneProg(rows);
         dit(p && p.etat === 'attente' && p.at === new Date(val).getTime(), 'A3 la programmation est écrite à SON heure exacte, en attente', p ? `${p.etat} ${new Date(p.at).toISOString()}` : 'rien');
-        dit(p && p.ids.join(',') === '9104,9102' && p.reglages && p.reglages.esp && p.reglages.esp.mode === 'fixe', 'A4 SES paires dans SON ordre, et SES réglages figés (espacement fixe)', p ? p.ids.join(',') : '');
+        dit(p && ordreVu.length === 2 && p.ids.join(',') === ordreVu.join(',') && p.reglages && p.reglages.esp && p.reglages.esp.mode === 'fixe', 'A4 SES paires dans l’ordre de l’atelier, et SES réglages figés (espacement fixe)', p ? `${p.ids.join(',')} (écran ${ordreVu.join(',')})` : '');
         dit((await pg.evaluate(() => window.__repub.length)) === 0, 'A5 RIEN n’est envoyé à Vinted en programmant');
         await pg.locator('[data-rp-carte][data-rp-etat="attente"]').waitFor({ timeout: 6000 }).catch(() => {});
         dit(await pg.locator('[data-rp-carte][data-rp-etat="attente"] [data-rp-modifier]').count() === 1 && await pg.locator('[data-rp-carte][data-rp-etat="attente"] [data-rp-annuler]').count() === 1, 'A6 Annonces : la carte « Republication programmée » avec Modifier et Annuler');
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `rp-carte-${tag}.png`) });
         await pg.locator('[data-rp-annuler]').click();
-        await pg.locator('[role="dialog"] button', { hasText: /^Annuler$/ }).last().click().catch(() => {});
+        await pg.locator('.vrm-confirmation button').last().click().catch(() => {});
         await attendre(async () => (ligneProg(rows) || {}).etat === 'annulee', 6000);
         dit((ligneProg(rows) || {}).etat === 'annulee', 'A7 « Annuler » (confirmé) : rien ne partira', (ligneProg(rows) || {}).etat);
         dit(!errs.length, 'A8 aucune erreur de page', errs.slice(0, 2).join(' | '));

@@ -1376,7 +1376,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const setPCommun = (v) => poserR((c) => ({ prix: { ...c.prix, commun: v } }));
   const setPArr = (v) => poserR((c) => ({ prix: { ...c.prix, arrondi: v } }));
   const setPFin = (v) => poserR((c) => ({ prix: { ...c.prix, fin: v } }));
-  const [esp, setEsp] = useState(() => (PR && PR.esp && Number(PR.esp.fixe) > 0 ? Number(PR.esp.fixe) : REPUB_ESP_DEFAUT));
+  const [esp, setEsp] = useState(() => (PR && PR.esp && PR.esp.fixe !== '' && PR.esp.fixe != null && Number.isFinite(Number(PR.esp.fixe)) && Number(PR.esp.fixe) >= 0 ? Number(PR.esp.fixe) : REPUB_ESP_DEFAUT));
   // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
   // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
   const espMem = (() => { const v = load('vrm_republier_esp', null); return v && typeof v === 'object' ? v : {}; })();
