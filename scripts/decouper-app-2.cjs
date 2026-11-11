@@ -103,6 +103,12 @@ function sansEffet(n) {
       // envelopper un composant : React.memo / forwardRef / lazy / aLaDemande (rien ne s'exécute avant le rendu)
       const nomC = c.type === 'Identifier' ? c.name : (c.type === 'MemberExpression' && !c.computed && c.object.type === 'Identifier' && c.object.name === 'React' ? c.property.name : '');
       if (['memo', 'forwardRef', 'lazy', 'aLaDemande'].includes(nomC) && n.arguments.length && n.arguments.every((a) => a.type !== 'SpreadElement' && sansEffet(a))) return true;
+      // (11 nov., reprise) une méthode de tableau qui ne modifie rien (map, filter, join…) sur une valeur
+      // sans effet, dont le rappel est une flèche à EXPRESSION elle-même sans effet : elle tourne au
+      // chargement, mais ne fait que calculer (ex. Object.fromEntries(PLATEFORMES.map((p) => [p.id, p.nom]))).
+      if (c.type === 'MemberExpression' && !c.computed && /^(map|filter|join|concat|slice|flat|flatMap|includes|indexOf|some|every|find|findIndex|keys|values|entries)$/.test(c.property.name) && sansEffet(c.object)
+        && n.arguments.every((a) => a.type !== 'SpreadElement' && (a.type === 'ArrowFunctionExpression' ? !a.async && a.body.type !== 'BlockStatement' && sansEffet(a.body) : a.type !== 'FunctionExpression' && sansEffet(a)))) return true;
+      if (c.type === 'Identifier' && /^(String|Number|Boolean)$/.test(c.name) && n.arguments.every((a) => a.type !== 'SpreadElement' && sansEffet(a))) return true;
       const nom = c.type === 'MemberExpression' && c.object.type === 'Identifier' && !c.computed ? c.object.name + '.' + c.property.name : '';
       return ['Object.freeze', 'Object.keys', 'Object.entries', 'Object.fromEntries', 'Object.assign'].includes(nom) && n.arguments.every((a) => a.type !== 'SpreadElement' && sansEffet(a)) && (nom !== 'Object.assign' || (n.arguments[0] && n.arguments[0].type === 'ObjectExpression'));
     }

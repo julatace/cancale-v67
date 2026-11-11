@@ -42,5 +42,33 @@ doitRefuser('la branche appelle une fonction qui écrit le composant', `const [t
   return (<div>{tab==='t' && (<b>{lire()}</b>)}{compte}</div>);`, /qui écrit le composant/);
 doitRefuser('lit this', `const [tab] = useState('t');
   return (<div>{tab==='t' && (<b>{this}</b>)}</div>);`, /this/);
+// ── imports différés (sur des fichiers de synthèse dans un dossier temporaire)
+{
+  const fs = require('fs'), os = require('os');
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-differe-'));
+  const ecr = (f, t) => fs.writeFileSync(path.join(d, f), t);
+  ecr('Pur.jsx', "import './pur.css';\nconst NOMS = Object.fromEntries([['a', 1]].map((x) => [x[0], x[1]]));\nexport default function Pur() { return <i>{NOMS.a}</i>; }\n");
+  ecr('pur.css', 'i{}');
+  ecr('Effet.jsx', "const T = localStorage.getItem('x');\nexport default function Effet() { return <i>{T}</i>; }\n");
+  ecr('Paquet.jsx', "import confetti from 'confettis';\nexport default function Paquet() { return <i/>; }\n");
+  ecr('Deux.jsx', "export function A() { return <i/>; }\nexport function B() { return <b/>; }\n");
+  const appSrc = (lignes, rendu) => `import React, { lazy, Suspense } from 'react';\n${lignes}\nfunction aLaDemande(c){return c;}\n// ⟦démarrage léger⟧ racines paresseuses\nexport default function App() { return (<div>${rendu}</div>); }\n`;
+  const app = path.join(d, 'App.jsx');
+  const un = (lignes, rendu, liste) => T.differer(appSrc(lignes, rendu), liste, app);
+  const S = require('./_source-app.cjs');
+  let r = un("import Pur from './Pur.jsx';   // commentaire", '<Pur/>', [{ nom: 'Pur' }]);
+  const recolle = r.src.replace(/^[^\n]*\/\/ ⟦découpe 2⟧[^\n]*\n/gm, '').replace(/^\/\/ ⟦différé⟧ /gm, '').split('\n').filter((l) => !/gardé à sa place/.test(l)).join('\n');
+  if (!r.R.differes.length || !/const Pur = aLaDemandeSansAttente\(\(\) => import\('\.\/Pur\.jsx'\)\)/.test(r.src) || !/import '\.\/pur\.css'; \/\/ \(8 nov\.\) style/.test(r.src) || recolle !== appSrc("import Pur from './Pur.jsx';   // commentaire", '<Pur/>')) { ko++; console.log('❌ différé pur : devait partir, style gardé, texte recollé identique — ' + r.R.refus.join(' ; ')); } else console.log('✅ différé pur : part, son style reste importé à sa place, le texte recollé est identique');
+  void S;
+  r = un("import Effet from './Effet.jsx';", '<Effet/>', [{ nom: 'Effet' }]);
+  if (r.R.differes.length || !/autre chose que déclarer/.test(r.R.refus.join(' '))) { ko++; console.log('❌ différé à effet : devait être refusé'); } else console.log('✅ différé dont le module agit au chargement : refusé');
+  r = un("import Paquet from './Paquet.jsx';", '<Paquet/>', [{ nom: 'Paquet' }]);
+  if (r.R.differes.length || !/paquet confettis/.test(r.R.refus.join(' '))) { ko++; console.log('❌ différé à paquet : devait être refusé'); } else console.log('✅ différé qui amène un paquet inconnu d’App.jsx : refusé');
+  r = un("import Pur from './Pur.jsx';", '{String(Pur)}', [{ nom: 'Pur' }]);
+  if (r.R.differes.length || !/hors JSX/.test(r.R.refus.join(' '))) { ko++; console.log('❌ différé utilisé hors JSX : devait être refusé'); } else console.log('✅ différé utilisé hors JSX : refusé');
+  r = un("import { A, B } from './Deux.jsx';", '<A/><B/>', [{ nom: 'A' }]);
+  if (r.R.differes.length || !/reste importé/.test(r.R.refus.join(' '))) { ko++; console.log('❌ différé dont le module reste importé : devait être refusé'); } else console.log('✅ différé dont le module reste importé par ses autres noms : refusé (rien de gagné)');
+  fs.rmSync(d, { recursive: true, force: true });
+}
 if (ko) { console.log(`\n❌ ${ko} garde-fou(x) de l'outil de découpe en défaut`); process.exit(1); }
 console.log('\n✅ chaque garde-fou de l’outil de découpe refuse son cas, le cas sûr part');

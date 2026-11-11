@@ -286,6 +286,10 @@
     },
     {
       "nom": "ChoixEmballageColis"
+    },
+    {
+      "nom": "ConfigurationDepart",
+      "attente": "feuille"
     }
   ]
 }
