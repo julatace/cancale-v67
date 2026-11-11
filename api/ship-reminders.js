@@ -92,6 +92,7 @@ import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
 import { passageSondes } from './_lib/statut-sondes.js';
+import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie, purgerErreursAnciennes } from './_lib/alertes-production.js';
 import { pushConfigure } from './_lib/push.js';
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
@@ -1320,7 +1321,31 @@ async function sondesStatut(maintenant = Date.now()) {
     maintenant, proprietaire, pushPret: pushConfigure(), configSmtp: cfg,
     smtp: () => envoyerSmtp({ seulementConnexion: true, hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE, de: process.env.RELANCES_EXPEDITEUR, a: process.env.RELANCES_EXPEDITEUR }),
     envoyer: (notif) => (_bancSondes.envoyer ? _bancSondes.envoyer(notif, proprietaire) : contexteVendeur.run({ owner: proprietaire }, () => sendPushToAll({ ...notif, cat: 'signalement' }))),
+    // (11 nov.) Les incidents et les sondes muettes passent par le journal des alertes
+    // de production ; à chaque passage, ce qui attendait la fin de l'heure part aussi.
+    alerter: (signaux) => alerterProduction(proprietaire, { signaux }),
   });
+}
+// (11 nov.) Le journal des alertes de production (api/_lib/alertes-production.js),
+// au PROPRIÉTAIRE seul. `_bancSondes.envoyer` : le banc compte sans service de push.
+function alerterProduction(proprietaire, groupe) {
+  if (!proprietaire) return Promise.resolve({ fait: false, raison: 'VRM_OWNER_UID absent : personne à prévenir' });
+  return groupeProduction({ proprio: proprietaire, groupe,
+    pousser: (notif) => (_bancSondes.envoyer ? _bancSondes.envoyer(notif, proprietaire) : contexteVendeur.run({ owner: proprietaire }, () => sendPushToAll(notif))) });
+}
+// Un passage `?moment=colis` : en panne (pas fait, ou un vendeur qui plante) ·
+// transporteur refusé en série. 2 passages de suite ⇒ une alerte. Le journal ne
+// gagne une écriture que si une série bouge.
+async function alerterColis(r) {
+  try {
+    const proprietaire = (await proprietaireInstallation()) || '';
+    const panne = !(r && r.fait) || Number(r.echecs) > 0;
+    const refus = r && r.fait ? refusEnSerie(r.bilans) : null;
+    return await alerterProduction(proprietaire, { vidange: false, suites: [
+      { cle: 'colis:passage', echec: panne, seuil: ECHECS_COLIS, signal: SIGNAUX_PROD.colisPassage },
+      { cle: 'colis:transporteur', echec: refus, seuil: ECHECS_COLIS, signal: SIGNAUX_PROD.colisTransporteur },
+    ] });
+  } catch (e) { return { fait: false, erreur: String((e && e.message) || e).slice(0, 120) }; }
 }
 
 // ── LES LIGNES DU PROPRIÉTAIRE NEUTRE (le curseur du cron) ─────────────────
@@ -1387,7 +1412,7 @@ export default async function handler(req, res) {
     let clOk = false;
     try {
       const cl = await cloisonnee();
-      if (!cl) { res.status(503).json({ ok: false, moment: 'colis', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      if (!cl) { const alerte = await alerterColis(null); res.status(503).json({ ok: false, moment: 'colis', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis', alerte: alerte && { fait: !!alerte.fait, notifiees: alerte.notifiees || 0 } }); return; }
       clOk = true;
       r = await passageColisFrequent({
         lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(),
@@ -1408,7 +1433,8 @@ export default async function handler(req, res) {
     } catch (e) { et = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     // Le bilan ne porte que des NOMBRES (aucun vendeur nommé, aucun n° de suivi) : il part dans le journal GitHub.
     const bilans = (r && r.bilans) || [];
-    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'colis', dus: r && r.dus, traites: r && r.traites, restants: r && r.restants, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint,
+    const alerte = await alerterColis(r);
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'colis', alerte: alerte && { fait: !!alerte.fait, notifiees: alerte.notifiees || 0 }, dus: r && r.dus, traites: r && r.traites, restants: r && r.restants, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint,
       lus: bilans.reduce((t, b) => t + (Number(b.lus) || 0), 0), changes: bilans.reduce((t, b) => t + (Number(b.changes) || 0), 0), ...(r && !r.fait ? { raison: r.raison || r.erreur || 'pas-su' } : {}),
       etiquettes: et && { fait: !!et.fait, dus: et.dus, traites: et.traites, lus: et.lus, ranges: et.ranges, vus: et.vus, restants: et.restants, echecs: et.echecs, budgetAtteint: et.budgetAtteint, ...(et.fait ? {} : { raison: et.raison || et.erreur || 'pas-su' }) } });
     return;
@@ -1487,6 +1513,9 @@ export default async function handler(req, res) {
       const proprio = String(process.env.VRM_OWNER_UID).trim().toLowerCase();
       try { alertesPlantages = await vidangerAlertesPlantages({ proprio, maintenant: debutCron, pousser: (n) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(n)) }); } catch (e) { alertesPlantages = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     }
+    // (11 nov.) Les erreurs (plantages) gardées 30 jours au plus.
+    let purgeErreurs = null;
+    if (!soir && !reveil) { try { purgeErreurs = await purgerErreursAnciennes({ url: SUPABASE_URL, headers: HEADERS, proprio: await proprietaireInstallation(), maintenant: debutCron }); } catch (e) { purgeErreurs = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (9 nov.) Un point par jour pour les courbes du tableau du propriétaire (api/_lib/pilotage.js).
     let pilotage = null;
     if (!soir && !reveil) { try { pilotage = await noterPilotageDuJour({ maintenant: debutCron }); } catch (e) { pilotage = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
@@ -1529,7 +1558,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
