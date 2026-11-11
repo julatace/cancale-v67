@@ -76,20 +76,26 @@ nom de compte, prix d'achat, note. Montré seulement si l'écran va s'ouvrir sur
 ## 6. Preuves
 **Mesure** (`_mesure-demarrage.cjs`, `REPRISE=2`, octets lus) :
 
-| | avant (`origin/main`) | après |
-|---|---|---|
-| Ma journée 1re | 2 708 Ko | 2 781 Ko (+73 : champs de version, 1re fois seulement) |
-| Ma journée 2e / 3e | **927 / 927 Ko** | **458 / 458 Ko** (−51 %) |
-| Annonces 1re | 2 889 Ko | 2 961 Ko |
-| Annonces 2e / 3e | **1 108 / 1 108 Ko** | **638 / 638 Ko** (−42 %) |
-| les deux familles, 2e | ~490 Ko (7 lectures) | **21 Ko** (2 nombres + 2 « depuis ») |
+| | avant (`origin/main`) | après (1er passage) | après (2e passage, version finale) |
+|---|---|---|---|
+| Ma journée 1re | 2 708 Ko | 2 781 Ko | 2 453 Ko |
+| Ma journée 2e / 3e | **927 / 927 Ko** | **458 / 458 Ko** | 766 / **456 Ko** |
+| Annonces 1re | 2 889 Ko | 2 961 Ko | 2 961 Ko |
+| Annonces 2e / 3e | **1 108 / 1 108 Ko** | **638 / 638 Ko** | **636 / 636 Ko** |
+| les deux familles, 2e | ~490 Ko (7 lectures) | **21 Ko** (2 nombres + 2 « depuis ») | |
+
+(Ma journée 2e à 766 Ko au 2e passage : la fraîcheur des comptes est lue tard, la page du banc s'est
+fermée avant que sa copie soit rangée — rangée sans faire attendre l'écran ; la 3e ouverture la sert.
+Gain à la 2e/3e ouverture : −51 % Ma journée, −42 % Annonces.)
 
 **Banc `scripts/bancs/ouverture-legere-2.cjs`** (390 tactile clair, 1512 sombre) : 1 · A (aucune
 relecture entière, versions seules, 563 → 21 Ko ; instantané montré, inerte, sans photo ni lien,
 puis remplacé) · R (transaction réécrite reçue seule, copie fraîche à 520) · D (ligne partie ⇒
 relue entière) · K (panne ⇒ « Vu à hh:mm · pas relu », copie gardée, lecture d'avant tentée, aucune
 écriture) · C (autre compte : tout relu, copies à lui, instantané de l'autre jamais montré).
-**46 verts, 0 rouge.** — résultats sur `origin/main` et mutations : §6 bis.
+**46 verts, 0 rouge.** Sur `origin/main` (banc copié dans l'arbre `git archive`) : **34 rouges**.
+Mutation au navigateur (copie servie quand le nombre est illisible) : K rouge (2 rouges).
+Banc du lot K (`ouverture-legere.cjs`) : 32 verts, 0 rouge.
 
 `scripts/tests/copie-familles.test.mjs` 9/9 ; mutations (chacune rouge) : copie servie sur nombre
 illisible · nombre ignoré · lignes écrites ignorées (3) · date future qui repousse la borne · pas de
@@ -109,6 +115,12 @@ d'`api/_lib/pilotage.js`).
 Ma journée 1512 : texte identique ; 390 : seule la bande d'état du haut diffère (« Vérification de
 tes données… » / « Extension jamais vue » : l'instant de la capture), tout le reste identique.
 Autres écarts : heures « vérifié à 12:03 / 12:12 » (l'horloge du passage) et bandeaux du haut.
+
+**`chargement.cjs`** (même banc, deux builds) : `origin/main` 14 rouges, après **13** (mêmes familles :
+« pas su » transitoires sur les cartes et CLS de Messages/Stock, préexistants ; un a basculé dans chaque
+sens d'un passage à l'autre). Un 1er passage avait 3 rouges de plus (« Qui dorment : lecture… » à
+1512 px) : la 1re ouverture attendait IndexedDB puis le rangement — corrigé (marque
+`vrm_copies_familles` lue sans attendre, rangement sans faire attendre l'écran), revérifié vert.
 
 Captures regardées (390 / 1512) : instantané d'Annonces aligné sur l'écran vrai (tête, puces, carte,
 place des vignettes), libellés de la carte sans chiffre dupliqué.
