@@ -28,6 +28,7 @@ import { texteBilan } from './bilan-semaine.js';
 import { notificationDoubleVente } from './double-vente.js';
 import { texteComptesARelire } from './comptes-a-relire.js';
 import { texteCompteRelie } from '../../src/compteRelie.js';
+import { texteAvisBas } from '../../src/avisNegatif.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -184,6 +185,13 @@ export const APERCUS_NOTIF = {
     quoi: 'Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois.',
     exemples: [
       { ...texteCompteRelie([{ plateforme: 'vinted', id: '123', nom: EX.compte }]), mene: 'Paramètres · Comptes liés' },
+    ],
+  },
+  // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) : le vrai texte (src/avisNegatif.js).
+  avis: {
+    quoi: 'Un avis Vinted de 3★ ou moins (seuil réglable) vient d’arriver : une fois par avis.',
+    exemples: [
+      { ...texteAvisBas({ nom: EX.compte, avis: [{ note: 2 }] }), mene: 'Vinted · tes avis (pour répondre)' },
     ],
   },
 };

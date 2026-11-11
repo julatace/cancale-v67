@@ -64,6 +64,7 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR} from '../../api/_lib/notif-textes.js';
+import {reglageSeuilAvis,SEUILS_AVIS,SEUIL_AVIS_DEFAUT} from '../avisNegatif.js';   // (11 nov.) le seuil « avis négatif » (push_prefs.avisSeuil)
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
 // ⟦← App.jsx #5⟧
@@ -1473,6 +1474,15 @@ function PushPrefsSetting({ comptes, onMuets }) {
         </select>
       </div>
       {soirCalme ? <div className="vrm-np-relance" data-np-soir-calme="">Pendant tes heures calmes : il ne sonnera pas.</div> : null}
+      {/* (11 nov., lot avis-negatif) Le seuil d'un « avis négatif » : 1★ à 4★, défaut 3★ (src/avisNegatif.js).
+          Rangé dans `push_prefs.avisSeuil` ; le serveur le lit avant de décider (api/_lib/avis-negatif.js). */}
+      <div className="vrm-np-ligne" data-np-avis-seuil={String(reglageSeuilAvis(prefs || {}))}>
+        <span className="vrm-np-lib">Avis négatif<small>Prévenu quand un avis Vinted arrive à ce nombre d’étoiles ou moins.</small></span>
+        <select className="vrm-np-soir" aria-label="Seuil d’un avis négatif" data-np-avis-choix="" value={String(reglageSeuilAvis(prefs || {}))} disabled={!prefs||busy}
+          onChange={(e)=>{ const v = Number(e.target.value); const suite = { ...(prefs || {}) }; if (v === SEUIL_AVIS_DEFAUT) delete suite.avisSeuil; else suite.avisSeuil = v; ecrirePrefs(suite, 'Le seuil des avis'); }}>
+          {SEUILS_AVIS.map((n)=><option key={n} value={String(n)}>{n}★ ou moins</option>)}
+        </select>
+      </div>
       <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
         <span className="vrm-np-lib">Regrouper<small>« 3 bordereaux prêts à imprimer » au lieu de trois notifications.</small></span>
         <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper : ${regroupe?'activé':'désactivé'}`}/>
@@ -1495,7 +1505,7 @@ const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
   { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
-  { id: 'comptes', titre: 'Comptes', ids: ['comptes'] },
+  { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
 ];
 function groupesFamillesNotif(familles) {
   const vus = new Set();
