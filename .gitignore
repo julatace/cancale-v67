@@ -15,6 +15,8 @@ dist/
 # les vraies adresses — et ce dépôt est PUBLIC. Elles ne montent jamais.
 scripts/bancs/fx
 scripts/bancs/*.json
+# (11 nov.) les budgets de vitesse sont une donnée du dépôt (inventée, aucune donnée réelle)
+!scripts/bancs/budget-vitesse.json
 scripts/bancs/*.png
 scripts/bancs/*.pdf
 undefined/

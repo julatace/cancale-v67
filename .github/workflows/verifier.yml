@@ -96,8 +96,10 @@ jobs:
           # nouveau-vendeur seul : le plus long (chaque écran, 2 largeurs, 2 thèmes).
           - part: 1
             lot: nouveau-vendeur garde-ecrans
+          # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
+          # écran principal, contre scripts/bancs/budget-vitesse.json (~5 min).
           - part: 2
-            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis
+            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis budget-vitesse
           - part: 3
             lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois chiffres-coherents retraits-suivi
     steps:
