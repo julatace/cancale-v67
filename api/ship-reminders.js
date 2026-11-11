@@ -321,7 +321,7 @@ function txsAExpedier(d) {
   // l'extension. Une preuve illisible (`null`) manque, rien d'autre : le colis reste compté.
   const pr = d.preuves || {};
   const partisVinted = ventesPartiesParPreuve({ bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone, bordsShipped,
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
   const pasPartie = (t) => !masquees.has(t) && !partisVinted.has(String(t));
   const resume = new Set(); let resumeTrouve = false;
   const parTx = {};
@@ -360,7 +360,7 @@ function ventesEmailColis(d) {
   const pr = d.preuves || {};
   return colisVentesEmailServeur({ mails: d.mailsVentes, comptes: [...vivants], masques: d.main.vinted_accounts_hidden, panneau: d.panneau, connues, lectures,
     bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone: objet(d.main.vinted_ship_done), bordsShipped: objet(d.main.vinted_bords_shipped),
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
 }
 
 // `soir` : le bilan du DIMANCHE SOIR (26 oct.). Il porte la semaine EN COURS

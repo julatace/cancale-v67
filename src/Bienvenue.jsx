@@ -124,7 +124,7 @@ export default function Bienvenue({ prenom = '', dark = false, onTheme, onTermin
           <div className="vrm-bienvenue-corps" key="univers">
             <p className="vrm-bienvenue-sur">Bienvenue{prenom ? `, ${prenom}` : ''}</p>
             <h2 id="vrm-bienvenue-titre">Choisis ton univers</h2>
-            <p className="vrm-bienvenue-texte">Un clic, et VRM prend ses couleurs. Tu pourras changer quand tu veux dans Paramètres → Affichage.</p>
+            <p className="vrm-bienvenue-texte">Un clic, et VRM prend ses couleurs. À changer dans Paramètres → Affichage.</p>
             <div className="vrm-bienvenue-univers" role="radiogroup" aria-label="Univers">
               {[['clair', 'Clair', 'Lumineux, pour la journée', false], ['nuit', 'Nuit', 'Sombre, reposant le soir', true]].map(([k, t, s, d]) => (
                 <button key={k} type="button" role="radio" aria-checked={dark === d} data-univers={k} data-choisi={dark === d ? '1' : '0'} onClick={() => onTheme && onTheme(d)}>
@@ -166,7 +166,7 @@ export default function Bienvenue({ prenom = '', dark = false, onTheme, onTermin
           <div className="vrm-bienvenue-corps" key="fin">
             <p className="vrm-bienvenue-sur">Prêt</p>
             <h2 id="vrm-bienvenue-titre">Une seule chose à faire</h2>
-            <p className="vrm-bienvenue-texte">Installer l'extension {ouInstaller} et ouvrir Vinted une fois. Ma journée te montre chaque geste, et avance toute seule quand c'est fait.</p>
+            <p className="vrm-bienvenue-texte">Installer l'extension {ouInstaller} et ouvrir Vinted une fois. Ma journée te guide.</p>
             <div className="vrm-bienvenue-gestes">
               <button type="button" className="vrm-bienvenue-second" onClick={precedent}>Retour</button>
               <button type="button" className="vrm-bienvenue-principal" data-bienvenue-commencer onClick={fermer}>Commencer</button>

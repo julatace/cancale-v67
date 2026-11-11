@@ -36,6 +36,7 @@ import PastilleTransporteur, { BadgeTransporteur } from './PastilleTransporteur.
 import { cleStatTransporteur, cleTransporteur, svgMarque } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
 import { NOMS_SOURCES, texteVerifie, verifieAncien, texteNonConfirme } from './sourcesRetrait.js';
+import Pourquoi from './composants/PourquoiReplie.jsx';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -798,19 +799,19 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
       {aVerifier.length > 0 && (
         <section className="vrm-rp-point vrm-rp-verifier" data-retirer-a-verifier={aVerifier.length}>
           <header className="vrm-rp-tete">
-            <span className="vrm-rp-ident">
+            <div className="vrm-rp-ident">
               <b className="vrm-rp-nom">À vérifier · {aVerifier.length}</b>
-              {(() => { const n = aVerifier.filter((c) => c.trInconnu).length; return n ? <span className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</span> : null; })()}
-              {(() => { const n = aVerifier.filter((c) => String(c.cle || '').startsWith('r:c:')).length; return n ? <span className="vrm-rp-resume" data-en-verification={n}>{n > 1 ? `${n} achats en cours de vérification` : '1 achat en cours de vérification'} : Vinted {n > 1 ? 'les dit' : 'le dit'} au point relais, mais rien ne {n > 1 ? 'les' : 'le'} relie encore à un colis ci-dessus — peut-être le même. Hors du compte.</span> : null; })()}
-              <span className="vrm-rp-resume">{raisonCommune ? `${raisonCommune[0].toUpperCase()}${raisonCommune.slice(1)}. ` : ''}Hors du compte « à retirer » : regarde le suivi, et touche « J’ai retiré » si tu l’as eu.{(() => { const n = aVerifier.filter((c) => c.encoreCode || c.code || c.qr).length; return n ? ` ${n > 1 ? `${n} ont encore leur code ou leur QR` : '1 a encore son code ou son QR'} : peut-être encore au relais.` : ''; })()}</span>
-            </span>
+              {(() => { const n = aVerifier.filter((c) => c.trInconnu).length; return n ? <div className="vrm-rp-adresse" data-transp="transporteur-inconnu" data-transp-n={n}>Transporteur pas encore connu{n > 1 ? ` pour ${n} colis` : ''} : le suivi Vinted ne le nomme pas</div> : null; })()}
+              {(() => { const n = aVerifier.filter((c) => String(c.cle || '').startsWith('r:c:')).length; return n ? <div className="vrm-rp-resume" data-en-verification={n}>{n > 1 ? `${n} achats en cours de vérification` : '1 achat en cours de vérification'} : au relais selon Vinted, peut-être un colis ci-dessus. Hors du compte.</div> : null; })()}
+              <div className="vrm-rp-resume">{raisonCommune ? `${raisonCommune[0].toUpperCase()}${raisonCommune.slice(1)}. ` : ''}Hors du compte « à retirer » : regarde le suivi. Retiré ? Touche « J’ai retiré ».{(() => { const n = aVerifier.filter((c) => c.encoreCode || c.code || c.qr).length; return n ? ` ${n > 1 ? `${n} ont encore leur code ou leur QR` : '1 a encore son code ou son QR'} : peut-être encore au relais.` : ''; })()}</div>
+            </div>
           </header>
           <div className="vrm-rp-liste">
             {aVerifier.map((x, i) => <CarteColisRetirer key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} avecLieu raison={raisonCommune ? '' : raisons[i]} C={C} avecTransporteur={!x.trInconnu}/>)}
           </div>
         </section>
       )}
-      {carteVisible && <p className="vrm-rp-note vrm-rp-attrib" data-relais-note="">Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : Vinted, adresse.data.gouv.fr.</p>}
+      {carteVisible && <div className="vrm-rp-note vrm-rp-attrib" data-relais-note=""><div>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap</div><div>Adresses : Vinted, adresse.data.gouv.fr</div></div>}
     </div>
   );
 }
@@ -877,9 +878,9 @@ export default function CarteRelaisColis({ donnees, C, compacte = false, sansLis
             );
           })}
           <div data-relais-note="" style={{ ...muted, fontSize: 11.5 }}>
-            Un colis n'est rangé sous un point que par ce qui le désigne lui (l'e-mail du transporteur, la conversation, ou le suivi Vinted de CET achat) — jamais deviné.
-            {sansRelais > 0 ? ` ${sansRelais} achat${sansRelais > 1 ? 's' : ''} en route sans destination connue : elle ne vient que du suivi Vinted de l'achat, quand il la donne (l'extension le relit en passant).` : ''}
-            {' '}Les arrivées sont celles que Vinted estime, pas une promesse. Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : adresse.data.gouv.fr.
+            Arrivées estimées par Vinted, pas une promesse.{sansRelais > 0 ? ` ${sansRelais} achat${sansRelais > 1 ? 's' : ''} en route sans destination connue.` : ''}
+            <div>Fond : OpenFreeMap · © OpenMapTiles · © OpenStreetMap ; adresses : adresse.data.gouv.fr</div>
+            <Pourquoi>Un colis n'est rangé sous un point que par ce qui le désigne lui (l'e-mail du transporteur, la conversation, ou le suivi Vinted de CET achat) — jamais deviné.{sansRelais > 0 ? ' La destination d’un achat ne vient que de son suivi Vinted, quand il la donne (l’extension le relit en passant).' : ''}</Pourquoi>
           </div>
         </div>
       )}

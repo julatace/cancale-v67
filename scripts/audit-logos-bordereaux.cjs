@@ -26,7 +26,14 @@ const imp = (rel) => import('file://' + path.join(R, rel));
     dit(V.cleTransporteur('Mondial Relay by InPost') === 'mondialrelay', 'A « Mondial Relay by InPost » ⇒ Mondial Relay', V.cleTransporteur('Mondial Relay by InPost'));
     for (const [txt, k] of [['Chronopost', 'chronopost'], ['Colissimo', 'colissimo'], ['Vinted Go', 'vinted'], ['Relais Colis', 'relaiscolis'], ['DPD', 'dpd'], ['UPS', 'ups'], ['GLS', 'gls'], ['Shop2Shop', 'shop2shop'], ['Colis Privé', 'colisprive']]) dit(V.cleTransporteur(txt) === k, `A « ${txt} » reste ${k}`, V.cleTransporteur(txt));
     const m = V.marqueDuTransporteur(V.cleTransporteur('InPost'));
-    dit(!!(m && /<path/.test(m.svg || '') && m.fond === '#C90547'), 'A le dessin montré pour « InPost » est le tracé Mondial Relay (framboise)', m && m.fond);
+    dit(!!(m && /<path/.test(m.svg || '') && m.svg === V.DESSINS_TRANSPORTEURS.mondialrelay.svg && m.fond === V.DESSINS_TRANSPORTEURS.mondialrelay.fond), 'A le dessin montré pour « InPost » est le tracé Mondial Relay (framboise)', m && m.fond);
+    // (11 nov., photos de VRAIS bordereaux) Mondial Relay : framboise (teinte 320–345°), point + « r » blancs, petit carré rose ;
+    // Chronopost ET Shop2Shop : le cube (un hexagone encre, aucun mot-symbole écrit) ; « InPost » s'appelle Mondial Relay.
+    const teinte = (h) => { const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return -1; let t = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; t *= 60; return t < 0 ? t + 360 : t; };
+    const dmr = V.DESSINS_TRANSPORTEURS.mondialrelay;
+    dit(teinte(dmr.fond) >= 320 && teinte(dmr.fond) <= 345 && (dmr.svg.match(/<circle/g) || []).length === 1 && /<rect/.test(dmr.svg) && !/<text/.test(dmr.svg), 'A Mondial Relay = le logo du bordereau (framboise, point, « r », carré)', dmr.fond);
+    for (const k of ['chronopost', 'shop2shop']) { const d = V.DESSINS_TRANSPORTEURS[k]; dit(!!d && !/<text/.test(d.svg) && /M16 4\.2 26\.6 10\.3V22\.5L16 28\.6 5\.4 22\.5V10\.3Z/.test(d.svg), `A ${k} = le cube Chronopost du bordereau (aucun mot-symbole)`, d && d.svg.slice(0, 60)); }
+    dit(V.TRANSPORTEURS.inpost.nom === 'Mondial Relay' && V.TRANSPORTEURS.shop2shop.nom === 'Chronopost Shop2Shop', 'A les noms : « InPost » ⇒ Mondial Relay, « Shop2Shop » ⇒ Chronopost Shop2Shop', V.TRANSPORTEURS.inpost.nom + ' / ' + V.TRANSPORTEURS.shop2shop.nom);
     for (const k of ['mondialrelay', 'chronopost', 'colissimo', 'relaiscolis', 'ups', 'dpd', 'gls', 'colisprive', 'inpost', 'vinted', 'shop2shop', 'laposte']) dit(!!(V.DESSINS_TRANSPORTEURS[k] && V.DESSINS_TRANSPORTEURS[k].svg), `A un dessin SVG pour ${k} (planche)`);
     dit(!/https?:\/\//.test(JSON.stringify(V.DESSINS_TRANSPORTEURS).replace(/http:\/\/www\.w3\.org\/2000\/svg/g, '')), 'A aucun dessin ne charge quoi que ce soit (aucune adresse)');
   });

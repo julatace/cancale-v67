@@ -320,6 +320,27 @@ function base() {
     dit(APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u)).length === 2, 'T8 passage suivant : aucun PDF relu (idempotent)');
   });
 
+  // (11 nov., lot DJ3 — « InPost appartient à Mondial Relay ») T9 — une étiquette rangée « inpost » (sans n° : la
+  // règle d'avant ne lisait pas son n° Mondial Relay) ou « plusieurs » (Mondial Relay + InPost) est relue UNE fois.
+  await essaie('T9', async () => {
+    if (!mod) throw new Error('route absente');
+    const { PDFDocument, StandardFonts } = require(path.join(R, 'node_modules', 'pdf-lib'));
+    const fab = async (lignes) => { const d = await PDFDocument.create(); const f = await d.embedFont(StandardFonts.Helvetica); const p = d.addPage([283, 425]); lignes.forEach((l, i) => p.drawText(l, { x: 10, y: 400 - 16 * i, font: f, size: 10 })); return Buffer.from(await d.save()).toString('base64'); };
+    const mr = await fab(['Mondial Relay by InPost', 'InPost', 'N° de suivi : 87696698']);
+    LIGNES = [{ owner: OWNER, id: 'main', data: {} },
+      { owner: OWNER, id: 'vrm_bord_transporteurs', data: { v: 1, pdf: { '34000000011': { t: 'inpost' } }, pdfVus: { '34000000012': { r: 'plusieurs', at: '2026-11-01T00:00:00Z' } } } },
+      { owner: OWNER, id: 'harvest_77_label_34000000011', data: { uid: '77', tx: '34000000011', capturedAt: '2026-11-05T10:00:00Z', pdfB64: mr } },
+      { owner: OWNER, id: 'harvest_77_label_34000000012', data: { uid: '77', tx: '34000000012', capturedAt: '2026-11-05T11:00:00Z', pdfB64: mr } }];
+    APPELS = []; ECRITS = []; PANNE = () => false;
+    await lancer();
+    const r = rangement();
+    dit(r && r.pdf && r.pdf['34000000011'] && r.pdf['34000000011'].t === 'mondialrelay' && r.pdf['34000000011'].s === '87696698', 'T9 « inpost » rangé avant le 11 nov. ⇒ relu : Mondial Relay + son n°', JSON.stringify(r && r.pdf));
+    dit(r && r.pdf && r.pdf['34000000012'] && r.pdf['34000000012'].s === '87696698' && !(r.pdfVus && r.pdfVus['34000000012']), 'T9 « plusieurs » (Mondial Relay + InPost) ⇒ relu : un seul transporteur', JSON.stringify(r && r.pdfVus));
+    const n1 = APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u)).length;
+    await lancer();
+    dit(n1 === 2 && APPELS.filter((a) => a.meth === 'GET' && /pdfB64/.test(a.u)).length === 2, 'T9 relu une seule fois (idempotent)', n1);
+  });
+
   console.log(`\n${ko ? '❌' : '✅'} transporteur des anciens bordereaux : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.log('❌ audit planté : ' + ((e && e.stack) || e)); process.exit(1); });

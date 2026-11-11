@@ -35,10 +35,16 @@ const MUTATIONS = {
   'etiquette-acceptee': ['api/_lib/depart-vente.js', "  if (SUJET_ETIQUETTE.test(sujet) && !SUJET_DEPOT.test(sujet) && status === 'transit') return null;\n", ''],
   'info-acceptee': ['api/_lib/depart-vente.js', "const ETATS_PARTI = new Set(['transit', 'available', 'delivered', 'retour']);", "const ETATS_PARTI = new Set(['transit', 'available', 'delivered', 'retour', 'info']);"],
   'avant-vente-accepte': ['api/_lib/depart-vente.js', "  if (pe && !(v != null && pe.at != null && pe.at < v - TOLERANCE_AVANT_VENTE_MS)) {", '  if (pe) {'],
-  'widget-sans-email': ['api/widget.js', 'lignesEmail: preuves.lignesEmail, departs,', 'lignesEmail: null, departs,'],
-  'widget-sans-panneau': ['api/widget.js', 'panelBordsDone: preuves.panelBordsDone || {},', 'panelBordsDone: {},'],
-  'cron-sans-email': ['api/ship-reminders.js', 'lignesEmail: pr.lignesEmail || null,', 'lignesEmail: null,'],
+  // (11 nov.) Ancres rendues uniques (deux appels de la règle par fichier : elles ne s'appliquaient plus).
+  'widget-sans-email': ['api/widget.js', 'bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail,', 'bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: null,'],
+  'widget-sans-panneau': ['api/widget.js', 'bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {},', 'bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: {},'],
+  'cron-sans-email': ['api/ship-reminders.js', "bordsDuVendeur(d) : {}, shipDone, bordsShipped,\n    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null,", "bordsDuVendeur(d) : {}, shipDone, bordsShipped,\n    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: null,"],
+  'widget-sans-etiquettes': ['api/widget.js', 'departs, entrants: preuves.entrants, etiquettes: preuves.etiquettes || null });', 'departs, entrants: preuves.entrants });'],
   'bilan-sans-bordereaux': ['api/ship-reminders.js', '    departs, bords: bordsB, preuves,', '    departs, preuves,'],
+  'etiquette-ignoree': ['api/_lib/depart-vente.js', "  const bp = bordsAvecEtiquettes(bordsParTx, etiquettes);", '  const bp = objet(bordsParTx);'],
+  'suivi-pdf-ignore': ['api/_lib/depart-vente.js', "export const suiviDuBord = (b) => (b ? (String(b.suivi || '').trim() || String(b.suiviPdf || '').trim()) : '');", "export const suiviDuBord = (b) => (b ? String(b.suivi || '').trim() : '');"],
+  'app-sans-etiquettes': ['src/App.jsx', 'etiquettes: pdfEtiquettesParTx(), shipDone,', 'shipDone,'],
+  'app-email-dabord': ['src/App.jsx', "      .filter(e => !partiParPreuve(partisVinted.get(e.txn)));", '      ;'],
   'app-sans-email': ['src/App.jsx', "lignesEmail: Array.isArray(tracking) ? tracking : null, departs: vcLoc0.departs,", 'lignesEmail: null, departs: vcLoc0.departs,'],
 };
 const ARG_PROUVE = process.argv.find((x) => x.startsWith('--prouve'));
@@ -146,14 +152,15 @@ const n = (i) => `XW${String(500000000 + i).padStart(9, '0')}TS`;
 const T = {
   depot: '9001', partage1: '9002', partage2: '9003', achat: '9004', entrant: '9005', fait: '9006', panneau: '9007',
   etiquette: '9008', ancien: '9009', expedie: '9010', info: '9011', annulee: '9012',
+  pdf: '9013',   // (11 nov., lot DJ3) étiquette captée SANS e-mail de bordereau ; son n° est lu sur l'étiquette (PDF)
 };
-const S = { depot: n(1), partage: n(2), achat: n(4), entrant: n(5), etiquette: n(8), ancien: n(9), info: n(11), annulee: n(12), fait: n(6), panneau: n(7), expedie: n(10) };
+const S = { pdf: n(13), depot: n(1), partage: n(2), achat: n(4), entrant: n(5), etiquette: n(8), ancien: n(9), info: n(11), annulee: n(12), fait: n(6), panneau: n(7), expedie: n(10) };
 const JUMELLES = Array.from({ length: 50 }, (_, i) => String(9100 + i));   // 50 ventes au MÊME titre
 const SEULE = '9123';
 const vente = (tx, o = {}) => ({ transaction_id: Number(tx), title: 'Nike Dunk Low Panda 42', status: FIGE, transaction_user_status: 'needs_action', date: iso(NOW - 50 * H), price: { amount: '60.0', currency_code: 'EUR' }, ...o });
 const bord = (tx, suivi) => ({ type: 'bordereau', transaction: tx, suivi, numero: '', modele: 'Nike Dunk Low Panda 42', receivedAt: iso(NOW - 48 * H), filename: `b-${tx}.pdf`, dateLimite: '' });
 const email = (suivi, o = {}) => ({ type: 'suivi', carrier: 'mondialrelay', suivi, status: 'transit', statusLabel: 'En transit', subject: 'Votre colis est entre de bonnes mains', receivedAt: iso(NOW - 20 * H), emailAt: iso(NOW - 20 * H), sens: 'sortant', ...o });
-const AEXP = [T.depot, T.partage1, T.partage2, T.achat, T.entrant, T.fait, T.panneau, T.etiquette, T.ancien, T.expedie, T.info, ...JUMELLES];
+const AEXP = [T.pdf, T.depot, T.partage1, T.partage2, T.achat, T.entrant, T.fait, T.panneau, T.etiquette, T.ancien, T.expedie, T.info, ...JUMELLES];
 const RESTENT = [T.partage1, T.partage2, T.achat, T.entrant, T.etiquette, T.ancien, T.info, ...JUMELLES.filter((t) => t !== SEULE)];
 function poser({ sansEmails = false } = {}) {
   base.clear(); pannes = new Set();
@@ -163,6 +170,8 @@ function poser({ sansEmails = false } = {}) {
   base.set(`${A}|harvest_U1_orders_purchased`, { capturedAt: iso(NOW - 40 * H), resume: { at: iso(NOW - 40 * H), txns: [] }, payload: { my_orders: [] } });
   for (const [tx, s] of [[T.depot, S.depot], [T.partage1, S.partage], [T.partage2, S.partage], [T.achat, S.achat], [T.entrant, S.entrant], [T.fait, S.fait], [T.panneau, S.panneau], [T.etiquette, S.etiquette], [T.ancien, S.ancien], [T.expedie, S.expedie], [T.info, S.info], [T.annulee, S.annulee]]) base.set(`${A}|email_bord_${tx}`, bord(tx, s));
   JUMELLES.forEach((t, i) => base.set(`${A}|email_bord_${t}`, bord(t, n(100 + i))));
+  // (11 nov.) T.pdf : étiquette captée par l'extension, AUCUN e-mail de bordereau (mesuré : 24057428717) — son n° n'existe que là.
+  base.set(`${A}|vrm_bord_transporteurs`, { v: 1, pdf: { [T.pdf]: { t: 'chronopost', s: S.pdf } } });
   base.set(`${A}|panel_bords_done`, { [T.panneau]: NOW - 3 * H });
   // Le n° d'un ACHAT (ligne `transp_`, lue chez le transporteur pour un achat) : le même n° qu'une vente ⇒ ambigu.
   base.set(`${A}|transp_chronopost_${S.achat}`, { suivi: S.achat, carrier: 'chronopost', etat: 'en_route' });
@@ -175,6 +184,8 @@ function poser({ sansEmails = false } = {}) {
   base.set(`${A}|email_track_mondialrelay_${S.ancien}`, email(S.ancien, { receivedAt: iso(NOW - 20 * 24 * H), emailAt: iso(NOW - 20 * 24 * H) }));
   base.set(`${A}|email_track_mondialrelay_${S.info}`, email(S.info, { status: 'info', subject: 'Ton compte évolue', sens: undefined }));
   base.set(`${A}|email_track_mondialrelay_${S.annulee}`, email(S.annulee));
+  // (11 nov., lot DJ3) Le n° lu sur l'étiquette de T.pdf (ligne légère du cron) et l'e-mail de dépôt de CE n°.
+  base.set(`${A}|email_track_chronopost_${S.pdf}`, email(S.pdf, { carrier: 'chronopost', subject: 'Preuve de dépôt de votre colis', sens: 'sortant' }));
   base.set(`${A}|email_track_mondialrelay_${n(123)}`, email(n(123), { subject: 'Confirmation du dépôt de votre colis' }));
 }
 
@@ -186,6 +197,9 @@ function poser({ sansEmails = false } = {}) {
     dit(typeof D.ventesPartiesParPreuve === 'function' && typeof D.raisonDepartVente === 'function', 'api/_lib/depart-vente.js existe (la règle unique)');
     const bp = {}, lignes = [];
     for (const [tx, s] of [['1', 'XW500000001TS'], ['2', 'XW500000002TS'], ['3', 'XW500000002TS'], ['4', 'XW500000004TS'], ['5', 'XW500000005TS']]) bp[tx] = { transaction: tx, suivi: s, receivedAt: iso(NOW - 48 * H) };
+    // (11 nov.) Le bordereau du dépôt « du 7 nov. » est reçu AVANT cet e-mail (date fixe : la règle « e-mail plus
+    // vieux que la vente ⇒ rien » jugeait l'horloge du jour, le contrôle rougissait seul après le 9 nov.).
+    bp['1'].receivedAt = iso(Date.UTC(2026, 10, 6, 9));
     // Forme de l'APP (les lignes `tracking` relues) : status, suivi, subject, sens, emailAt.
     lignes.push({ suivi: 'XW500000001TS', status: 'transit', subject: 'Votre colis est entre de bonnes mains', carrier: 'mondialrelay', emailAt: Date.UTC(2026, 10, 7, 9) });
     lignes.push({ suivi: 'XW500000002TS', status: 'transit', subject: 'Votre colis est entre de bonnes mains', carrier: 'mondialrelay', emailAt: iso(NOW - 10 * H) });
@@ -198,6 +212,23 @@ function poser({ sansEmails = false } = {}) {
     dit(!m.has('4'), 'n° aussi porté par un ACHAT ⇒ ambigu, reste');
     dit(!m.has('5'), 'un e-mail ENTRANT (« disponible », sens entrant) ne fait jamais partir une vente');
     dit(D.ventesPartiesParPreuve({ txs: ['1'], bordsParTx: bp, lignesEmail: null }).size === 0, 'e-mails illisibles (null) ⇒ rien de prouvé (pas su ≠ parti)');
+    // (11 nov., lot DJ3 — Julien : « Tout imprimer » proposait une paire DÉJÀ DÉPOSÉE) L'e-mail du bordereau ne porte
+    // aucun n° (134 sur 237, mesuré) ; le n° est sur SON étiquette (même transaction) : l'e-mail de dépôt de ce n° prouve.
+    {
+      const bpE = { 61: { transaction: '61', receivedAt: iso(NOW - 48 * H) }, 62: { transaction: '62', receivedAt: iso(NOW - 48 * H) } };
+      const lE = [{ suivi: '87696698', status: 'transit', subject: 'Votre colis est entre de bonnes mains', carrier: 'mondialrelay', sens: 'sortant', emailAt: iso(NOW - 10 * H) },
+        { suivi: 'XW652257595TS', status: 'transit', subject: 'Preuve de dépôt de votre colis', carrier: 'chronopost', sens: 'sortant', emailAt: iso(NOW - 10 * H) }];
+      const etiq = { 61: { t: 'mondialrelay', s: '87696698' }, 63: { t: 'chronopost', s: 'XW652257595TS' }, 64: { t: 'chronopost' } };
+      const mE = D.ventesPartiesParPreuve({ txs: ['61', '62', '63', '64'], bordsParTx: bpE, lignesEmail: lE, etiquettes: etiq });
+      dit(mE.has('61') && mE.get('61').type === 'email' && mE.get('61').depot, 'bordereau sans n° dans l’e-mail + n° lu sur SON étiquette + e-mail de dépôt de ce n° ⇒ parti', JSON.stringify(mE.get('61')));
+      dit(mE.has('63') && mE.get('63').type === 'email', 'étiquette captée sans e-mail de bordereau + e-mail de dépôt de son n° ⇒ parti', JSON.stringify(mE.get('63')));
+      dit(!mE.has('62') && !mE.has('64'), 'aucun n° connu (ni e-mail, ni étiquette) ⇒ rien déduit, reste à envoyer', [...mE.keys()].join(','));
+      const etiqPart = { 61: { t: 'mondialrelay', s: '87696698' }, 62: { t: 'mondialrelay', s: '87696698' } };
+      const mP = D.ventesPartiesParPreuve({ txs: ['61', '62'], bordsParTx: bpE, lignesEmail: lE, etiquettes: etiqPart });
+      dit(mP.size === 0, 'le même n° d’étiquette sur deux ventes ⇒ ambigu, rien déduit', [...mP.keys()].join(','));
+      const mS = D.ventesPartiesParPreuve({ txs: ['61'], bordsParTx: { 61: { transaction: '61', suivi: 'XW500000009TS', receivedAt: iso(NOW - 48 * H) } }, lignesEmail: lE, etiquettes: etiq });
+      dit(!mS.has('61'), 'l’e-mail porte SON n° : le n° de l’étiquette ne le remplace pas', [...mS.keys()].join(','));
+    }
     const r6 = D.raisonDepartVente('6', null, { shipDone: { 6: Date.UTC(2026, 10, 7, 15) } });
     dit(r6 && r6.type === 'colis-fait' && r6.phrase === 'Colis fait le 7 nov.', '« Colis fait » ⇒ parti, « Colis fait le 7 nov. »', r6 && r6.phrase);
     dit(D.raisonDepartVente('7', { transaction: '7' }, { panelBordsDone: { 7: 1 } }).type === 'panneau', 'traité depuis le panneau de l’extension ⇒ parti');
@@ -222,10 +253,10 @@ function poser({ sansEmails = false } = {}) {
     dit(v === RESTENT.length, `widget : ${RESTENT.length} colis Vinted à envoyer — le déposé (e-mail), le « Colis fait », le panneau, l’expédié à la main et la jumelle prouvée sortent ; n° partagé, achat, entrant, étiquette, e-mail ancien, « info » restent`, `vinted=${v} (attendu ${RESTENT.length})`);
     poser({ sansEmails: true });
     const r2 = await widget();
-    dit(r2.corps && r2.corps.ship && r2.corps.ship.vinted === RESTENT.length + 2, 'sans aucun e-mail : le déposé et la jumelle restent « à envoyer » (rien deviné)', `vinted=${r2.corps && r2.corps.ship && r2.corps.ship.vinted}`);
+    dit(r2.corps && r2.corps.ship && r2.corps.ship.vinted === RESTENT.length + 3, 'sans aucun e-mail : le déposé, celui de l’étiquette et la jumelle restent « à envoyer » (rien deviné)', `vinted=${r2.corps && r2.corps.ship && r2.corps.ship.vinted}`);
     poser(); pannes.add('id=like.email_track_*&meta->>status=in.(transit');
     const r3 = await widget();
-    dit(r3.corps && r3.corps.ship && r3.corps.ship.vinted === RESTENT.length + 2, 'e-mails illisibles ⇒ les colis restent comptés (pas su ≠ parti), le widget répond quand même', `vinted=${r3.corps && r3.corps.ship && r3.corps.ship.vinted}`);
+    dit(r3.corps && r3.corps.ship && r3.corps.ship.vinted === RESTENT.length + 3, 'e-mails illisibles ⇒ les colis restent comptés (pas su ≠ parti), le widget répond quand même', `vinted=${r3.corps && r3.corps.ship && r3.corps.ship.vinted}`);
   });
 
   // ══ §3 LE CRON : MATIN, SOIR (`lireDonneesColis`) ET BILAN (`lireDonneesBilan`) ══
@@ -250,6 +281,8 @@ function poser({ sansEmails = false } = {}) {
     dit(/ventesPartiesParPreuve\(\{[\s\S]{0,300}shipDone, bordsShipped, panelBordsDone,[\s\S]{0,200}lignesEmail: Array\.isArray\(tracking\)/.test(app), 'app : `partisVinted` = la règle, avec Colis fait, expédié, panneau, e-mails et départs');
     dit(/const rv = partisVinted\.get\(String\(b\.transaction\)\); if \(rv && rv\.type !== 'colis-fait'\) return true;/.test(app), 'app : `bordShipped` (Colis, Ma journée, la cloche, `toShip`) sort la vente prouvée');
     dit(!/shippedSuivis\.has\(String\(b\.suivi\)\.toUpperCase\(\)\)\) return true; \/\/ colis déjà/.test(app), 'app : plus aucune sortie par le n° SANS la règle (n° partagé, achat) pour une vente reliée');
+    dit(/ventesPartiesParPreuve\(\{[\s\S]{0,200}etiquettes: pdfEtiquettesParTx\(\)/.test(app), 'app : `partisVinted` lit aussi le n° de SON étiquette (bordereau sans n°)');
+    dit(/\.filter\(e => !partiParPreuve\(partisVinted\.get\(e\.txn\)\)\)/.test(app) && /if \(partiParPreuve\(partisVinted\.get\(String\(o\.transaction_id\)\)\)\) continue;/.test(app), 'app : « Tout imprimer » et le compteur sortent la vente prouvée même sans bordereau e-mail');
     dit(/raisonDepartPubliee\(o\.transaction_id\)/.test(app) && /aPoster: \(o\) => aExpedier\(o\) && !shipDone\[String\(o\.transaction_id\)\] && !raisonDepartPubliee/.test(app), 'app : Ventes et la loupe disent « Envoyée » (registre publié par Colis)');
   });
 
