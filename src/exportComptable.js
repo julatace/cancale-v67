@@ -24,7 +24,7 @@
 // « Pas su » s'écrit « — » (jamais 0) ; un total incomplet dit « au moins » et
 // nomme ce qui manque ; jamais « encaissé » (§5).
 // ─────────────────────────────────────────────────────────────────────────────
-import { mentionFacture } from './factureAchat.js';
+import { mentionFacture, cleFactureLigne } from './factureAchat.js';
 import { PERIODE_OK, libellePeriode, moisDePeriode, jourFr, eurosTexte } from './registres.js';
 
 export { libellePeriode };
@@ -94,6 +94,8 @@ export function donneesExportComptable({ periode, recettes = null, achats = null
   const ventes = recettes ? recettes.lignes.map((l) => ({
     id: l.id, dateVente: l.tsVente != null ? jourFr(l.tsVente) : '', dateVersement: l.tsVersement != null ? jourFr(l.tsVersement) : (DATE_PAS_LUE[l.plateforme] || ''),
     plateforme: l.plateforme, compte: l.compte, num: l.num, reference: l.reference, titre: l.titre, montant: l.montant, note: l.raison || '',
+    // (11 nov.) Les frais LUS de la plateforme (eBay) ; null = pas su (jamais 0).
+    frais: Number.isFinite(l.frais) ? l.frais : null,
   })) : null;
   const aDater = recettes ? recettes.horsPeriode.map((l) => ({
     id: l.id, dateVente: l.tsVente != null ? jourFr(l.tsVente) : '', plateforme: l.plateforme, compte: l.compte, num: l.num, reference: l.reference, titre: l.titre, montant: l.montant, note: l.raison || 'à dater',
@@ -102,6 +104,8 @@ export function donneesExportComptable({ periode, recettes = null, achats = null
     id: l.id, date: l.date, plateforme: l.plateforme, fournisseur: l.compte || l.fournisseur || '', reference: l.reference, num: l.num, titre: l.titre,
     saisi: l.saisi == null ? null : l.saisi, lu: l.source === 'saisi' ? null : l.montant, sourceLue: l.source === 'recu' ? 'reçu Vinted' : l.source === 'article' ? 'article seul (sans port ni frais)' : '', note: l.raison || '',
     facture: mentionFacture(l, factures),
+    // (11 nov.) La clé de SA facture jointe (le zip la range) ; '' = aucune.
+    factureCle: factures && cleFactureLigne(l) && factures[cleFactureLigne(l)] ? cleFactureLigne(l) : '',
   })) : null;
   const sansCout = achatsL ? achatsL.filter((l) => l.saisi == null).length : null;
   // Aucun coût saisi sur des achats de la période : « pas su » (« — »), jamais « au moins 0,00 € » (§5).
@@ -130,7 +134,8 @@ export function resumeExport(d) {
   if (d.regime === 'micro') L.push([`URSSAF à payer (${String(d.taux).replace('.', ',')} %)`, d.urssaf == null ? '—' : `${d.partielCa ? 'au moins ' : ''}${eurosTexte(d.urssaf)}`, 'urssaf']);
   else L.push(['URSSAF', 'non calculée', 'urssaf']);
   L.push(['Achats de la période', d.nAchats == null ? '—' : String(d.nAchats), 'n-achats']);
-  L.push(['Coût d’achat saisi', d.coutSaisi == null ? '—' : `${d.sansCout ? 'au moins ' : ''}${eurosTexte(d.coutSaisi)}`, 'cout']);
+  // (11 nov.) La couverture À CÔTÉ du chiffre : « au moins 42,00 € · 1 sur 50 ».
+  L.push(['Coût d’achat saisi', d.coutSaisi == null ? '—' : `${d.sansCout ? 'au moins ' : ''}${eurosTexte(d.coutSaisi)}${d.sansCout ? ` · ${d.nAchats - d.sansCout} sur ${d.nAchats}` : ''}`, 'cout']);
   return L;
 }
 // La couverture : ce qui manque, nommé (jamais tu).
@@ -167,8 +172,8 @@ export function csvExportComptable(d) {
   L.push(['Total', '', nbT(d.caDeclare), d.regime === 'micro' ? nbT(d.urssaf) : '', '']);
   L.push([]);
   L.push(['VENTES VERSÉES SUR LA PÉRIODE']);
-  L.push(['Date de vente', 'Date de versement', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Montant reçu (€)', 'Note']);
-  if (d.ventes) { for (const v of d.ventes) L.push([v.dateVente, v.dateVersement, v.plateforme, v.compte, v.num, v.reference, v.titre, nbT(v.montant), v.note]); L.push(['', '', '', '', '', '', 'Total', nbT(d.totalVentes), d.ventesCompletes ? '' : 'au moins']); }
+  L.push(['Date de vente', 'Date de versement', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Montant reçu (€)', 'Frais lus (€)', 'Note']);
+  if (d.ventes) { for (const v of d.ventes) L.push([v.dateVente, v.dateVersement, v.plateforme, v.compte, v.num, v.reference, v.titre, nbT(v.montant), nbT(v.frais), v.note]); L.push(['', '', '', '', '', '', 'Total', nbT(d.totalVentes), '', d.ventesCompletes ? '' : 'au moins']); }
   else L.push(['—', 'ventes pas lues']);
   L.push([]);
   L.push(['VENTES À DATER (sans date de versement : dans aucun mois)']);
@@ -183,8 +188,10 @@ export function csvExportComptable(d) {
   return '﻿' + L.map((r) => r.map(cel).join(';')).join('\r\n') + '\r\n';
 }
 
-// Le PDF : UNE page A4 — en-tête, résumé, CA par mois, ce qui manque.
-// Le détail ligne par ligne est dans le tableur (le PDF le dit).
+// Le PDF : la 1re page A4 — en-tête, résumé, CA par mois, ce qui manque, les
+// justificatifs du zip. (11 nov.) Puis, s'il y en a, les manques NOMMÉS ligne par
+// ligne : les ventes à dater (dans aucun mois) et les achats sans coût saisi.
+// Le reste du détail est dans le tableur (le PDF le dit).
 export async function pdfExportComptable(d, { PDFLib = null } = {}) {
   const PL = PDFLib || await import('pdf-lib');
   const { PDFDocument, StandardFonts, rgb } = PL;
@@ -194,7 +201,7 @@ export async function pdfExportComptable(d, { PDFLib = null } = {}) {
   const f = await doc.embedFont(StandardFonts.Helvetica), fb = await doc.embedFont(StandardFonts.HelveticaBold);
   const ENCRE = rgb(0.11, 0.11, 0.12), GRIS = rgb(0.42, 0.42, 0.45), FILET = rgb(0.86, 0.86, 0.88);
   const W = 595.28, H = 841.89, M = 44;
-  const page = doc.addPage([W, H]);
+  let page = doc.addPage([W, H]);
   const dessinable = (ch) => { try { f.encodeText(ch); return true; } catch (_) { return false; } };
   const propre = (s) => { let o = ''; for (const ch of String(s == null ? '' : s).replace(/[‘’]/g, "'").replace(/[   ]/g, ' ').replace(/−/g, '-').replace(/—/g, '-').replace(/[\r\n\t]+/g, ' ')) o += dessinable(ch) ? ch : (dessinable(ch.normalize('NFD')[0]) ? ch.normalize('NFD')[0] : ''); return o; };
   const borne = (s, font, t, max) => { let x = propre(s); if (font.widthOfTextAtSize(x, t) <= max) return x; while (x.length > 1 && font.widthOfTextAtSize(x + '...', t) > max) x = x.slice(0, -1); return x + '...'; };
@@ -229,5 +236,29 @@ export async function pdfExportComptable(d, { PDFLib = null } = {}) {
   txt('Ventes datées au jour où la plateforme a versé l’argent (Vinted, Vestiaire), de la vente (Leboncoin), de la commande payée (eBay).', M, y, { t: 7.5, c: GRIS }); y -= 10;
   txt('Comptes écartés par le vendeur : hors de tous les totaux.', M, y, { t: 7.5, c: GRIS }); y -= 10;
   txt('Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — VRM ne remplace pas un comptable.', M, y, { t: 7.5, c: GRIS });
+  // (11 nov.) Les pièces rangées dans le zip, et celles qui n'ont pas pu l'être (nommées).
+  const J = d.justificatifs;
+  if (J) {
+    y -= 22; txt('Justificatifs dans le zip', M, y, { font: fb, t: 11 }); y -= 15;
+    txt(`· ${J.ventes} facture${J.ventes > 1 ? 's' : ''} de vente émise${J.ventes > 1 ? 's' : ''} par VRM`, M, y, { t: 9 }); y -= 13;
+    txt(`· ${J.achats} facture${J.achats > 1 ? 's' : ''} d’achat jointe${J.achats > 1 ? 's' : ''}`, M, y, { t: 9 }); y -= 13;
+    for (const m of (J.manque || []).slice(0, 4)) { if (y < M + 10) break; txt(`· pas dans le zip : ${m}`, M, y, { t: 9 }); y -= 13; }
+  }
+  // Les manques nommés, une ligne chacun (pages suivantes).
+  const listes = [
+    ['Ventes à dater — dans aucun mois', 'Sans date de versement : à dater avant de les déclarer.', (d.aDater || []).map((v) => [v.dateVente || '—', v.plateforme, [v.num ? `N°${v.num}` : '', v.reference, v.titre].filter(Boolean).join(' · '), v.montant == null ? '—' : eurosTexte(v.montant)])],
+    ['Achats sans coût saisi', 'Saisis leur prix dans VRM (Achats), ou joins la facture.', (d.achats || []).filter((a) => a.saisi == null).map((a) => [a.date || '—', a.plateforme, [a.num ? `N°${a.num}` : '', a.reference, a.titre].filter(Boolean).join(' · '), a.lu == null ? '—' : `lu : ${eurosTexte(a.lu)}`])],
+  ];
+  for (const [titre, sous, lignes] of listes) {
+    if (!lignes.length) continue;
+    page = doc.addPage([W, H]); y = H - M;
+    txt(`${titre} (${lignes.length})`, M, y - 6, { font: fb, t: 14 }); y -= 22;
+    txt(`${d.libelle} · ${sous}`, M, y, { t: 8.5, c: GRIS }); y -= 20;
+    for (const [dt, pf, qui, mt] of lignes) {
+      if (y < M + 14) { page = doc.addPage([W, H]); y = H - M; txt(`${titre} (suite)`, M, y - 6, { font: fb, t: 12 }); y -= 24; }
+      txt(dt, M, y, { t: 8.5, max: 64 }); txt(pf, M + 68, y, { t: 8.5, max: 62, c: GRIS }); txt(qui, M + 134, y, { t: 8.5, max: W - 2 * M - 134 - 90 }); txt(mt, W - M, y, { t: 8.5, droite: true, max: 86 });
+      y -= 5; filet(y); y -= 9;
+    }
+  }
   return doc.save();
 }

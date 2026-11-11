@@ -64,6 +64,10 @@ function versionsPubliees({ racine } = {}) {
   const depots = [process.env.VRM_GIT, racine].filter(Boolean);
   const refs = process.env.VRM_REF_PUBLIEE ? [process.env.VRM_REF_PUBLIEE] : ['origin/main', 'main'];
   for (const depot of depots) {
+    // (11 nov.) Un clone SUPERFICIEL (`--depth`) coupe l'historique : la 5.170.0 de production
+    // « manquait » sans que rien ne le dise. Coupé ⇒ ce dépôt n'est pas lu (`null` = pas su ;
+    // `git fetch --unshallow origin main`, ou VRM_GIT=<un dépôt complet>).
+    if (String(git(depot, ['rev-parse', '--is-shallow-repository']) || '').trim() === 'true') continue;
     for (const ref of refs) {
       const log = git(depot, ['log', '--first-parent', '--format=%H', ref, '--', ...CHEMINS]);
       if (log == null) continue;
