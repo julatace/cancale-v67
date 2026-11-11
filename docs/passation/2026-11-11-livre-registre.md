@@ -66,9 +66,7 @@ Le mot « conforme » n'est jamais écrit (audit M8).
 - « Particulier » quand l'acheteur n'est pas connu (sa demande). Pseudo plutôt que nom.
 - La référence de transaction de la plateforme vaut référence de pièce (c'est le justificatif
   que la plateforme tient) ; une facture ou un reçu la remplace quand il existe.
-- Le mode de paiement d'un achat hors plateforme n'a pas de champ dans VRM : pas ajouté (hors
-  périmètre) ; nommé « à écrire sur le fichier exporté ». À décider : un champ « payé en espèces /
-  carte / virement » sur l'achat hors plateforme.
+- (Remplacé par « Payé en », voir la suite ci-dessous.)
 - Les anciennes `csvRegistre` / `pdfRegistre` restent (audit-registres, zip comptable) ; la carte
   ne les appelle plus.
 
@@ -97,6 +95,24 @@ Le mot « conforme » n'est jamais écrit (audit M8).
 - Audits communs : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api,
   secrets, quoi-de-neuf, traduction, registres : verts.
 
+## Suite (même jour, validé par Julien) : « Payé en »
+- `src/modePaiement.js` (pur) : Espèces · Carte · Virement · Chèque · Autre ; un mode inconnu
+  n'est jamais pris ; vide = « — » et le manque nommé.
+- `src/composants/ChoixPaiement.jsx` : cinq choix de 44 px, facultatif (rien par défaut, second
+  toucher = enlevé), dans « Nouvel achat » / « Modifier l'achat » hors plateforme
+  (`src/ecrans/Achats.jsx`, champ `paiement` de `vinted_offvinted_buys`, synchronisé) et le
+  formulaire d'achat en gros (`src/AchatsOutils.jsx`, `vrm_fournisseurs.achats[id].paiement`,
+  gardé par `lireRegistre` / `champsAchatGros`). Aucune migration.
+- Registre des achats : colonne Règlement = le mode choisi, Espèces = Oui / Non ; le manque
+  « sans mode de paiement » n'est plus compté quand il est rempli (geste : Ouvrir Achats). Le
+  livre de police en profite (même ligne).
+- Preuves : `audit-livre-registre` 42 verts, `--prouve` 17/17 (+ mode deviné, mode ignoré hors
+  plateforme, mode ignoré en gros, espèces mal dites) ; audits qui copient `registres.js` /
+  `fournisseurs.js` mis à jour (registres 64, livre-police 34, achats-export 58,
+  achats-sourcing 32, fournisseurs 52, export-zip 31, mois-boucle 53) ; banc `livre-registre`
+  étendu (fiche de l'achat : mode relu, changé, rangé ; capture `paye-en-*`).
+- Le choix « Ouvrir le mode de paiement manquant » d'un achat Vinted ne se pose pas : le
+  paiement passe par Vinted (« Paiement via Vinted »).
+
 ## Geste de Julien
-Relire les sources (F36018, D. 123-205-1, art. 50-0 du CGI) ; dire si un champ « mode de
-paiement » doit être ajouté aux achats hors plateforme.
+Relire les sources (F36018, D. 123-205-1, art. 50-0 du CGI) .

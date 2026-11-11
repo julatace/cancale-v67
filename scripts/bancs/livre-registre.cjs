@@ -97,7 +97,7 @@ const FICHES_GROS={
   f20:{ numero:'20', title:'Paire en gros inventée', buyGros:{ id:'g1', at:'1', part:3250 }, buyPrice:'32,50' },
   f21:{ numero:'21', title:'Paire en gros inventée bis', buyGros:{ id:'g1', at:'2', part:3250 }, buyPrice:'32,50', buyFromId:'71002' },
 };
-const HORS=[{ id:'hb1', title:'Paire rattachée inventée', price:'120', date:`${GROS_DATE.getFullYear()}-${String(GROS_DATE.getMonth()+1).padStart(2,'0')}-${String(GROS_DATE.getDate()).padStart(2,'0')}`, source:'Fournisseur', numero:'30' }];
+const HORS=[{ id:'hb1', title:'Paire rattachée inventée', price:'120', date:`${GROS_DATE.getFullYear()}-${String(GROS_DATE.getMonth()+1).padStart(2,'0')}-${String(GROS_DATE.getDate()).padStart(2,'0')}`, source:'Fournisseur', numero:'30', paiement:'especes' }];
 // [montant, date] des lignes en gros et hors plateforme attendues.
 const AUTRES_ACHATS=[[325,GROS_DATE,'gros'],[50,GROS0_DATE,'gros'],[120,GROS_DATE,'hors']];
 const COMPTA={ depenses:[{ id:'d1', date:jourIso(ceMois(1)), libelle:'Cartons inventés', cat:'Emballage', montant:12.5 }], packs:[], abonnements:[], fixes:[{ id:'f1', label:'Local inventé', montant:20 }] };
@@ -267,7 +267,8 @@ const CAP=process.env.BANC_CAPTURE||'';
         console.log('   achats',JSON.stringify({...A,texte:undefined}));
         const a1=await ligneTxt(pg,'vinted:71001'), hb=await ligneTxt(pg,'hors:hb1'), g1=await ligneTxt(pg,'gros:g1');
         dit(a1&&/vendeuse_71001/.test(a1)&&/Paiement via Vinted/.test(a1)&&/Transaction Vinted 71001/.test(a1),'achat Vinted : pseudo du vendeur (côté acheteur), règlement, référence',a1);
-        dit(hb&&/Grossiste inventé/.test(hb)&&/Photo du ticket \(ticket-invente\.jpg\)/.test(hb)&&/mode de règlement/.test(hb),'achat hors plateforme : fournisseur, la photo du ticket jointe PAR SON IDENTITÉ, mode de paiement à compléter',hb);
+        dit(hb&&/Grossiste inventé/.test(hb)&&/Photo du ticket \(ticket-invente\.jpg\)/.test(hb)&&/Espèces/.test(hb)&&!/mode de règlement/.test(hb),'achat hors plateforme : fournisseur, la photo du ticket jointe PAR SON IDENTITÉ, « Payé en Espèces » (plus de manque)',hb);
+        dit(g1&&/mode de règlement/.test(g1),'achat en gros sans « Payé en » : le mode de règlement est nommé à compléter (jamais deviné)',g1);
         dit(g1&&/À compléter/.test(g1)&&/pièce justificative/.test(g1),'achat en gros sans pièce : « à compléter » nommé sur sa ligne',g1);
         dit(A&&A.manques.some(m=>/^reglement:[1-9]/.test(m))&&A.manques.some(m=>/^piece:[1-9]/.test(m)),'manques nommés et comptés',A&&A.manques.join(' '));
         const nA=Number(A.n);
@@ -279,6 +280,23 @@ const CAP=process.env.BANC_CAPTURE||'';
         if(CAP) fs.writeFileSync(path.join(CAP,`registre-achats-${nomT}.pdf`),pdfA.octets);
         const LA=(await lirePdf(pdfA.octets)).map(l=>l.join(' ')).join('\n').replace(/[  ]/g,' ');
         dit(/Registre des achats/.test(LA)&&/vendeuse_71001/.test(LA)&&/Photo du ticket/.test(LA)&&/À compléter/.test(LA),'PDF des achats : pseudo, ticket, à compléter');
+        // (11 nov.) « Payé en » dans la fiche de l'achat hors plateforme : lu, changé par SON toucher, rangé avec l'achat.
+        await pg.keyboard.press('Escape').catch(()=>{}); await pg.waitForTimeout(400);
+        await aller(pg,'achats','[data-achats-hors]',1500);
+        if(!(await pg.locator('[data-achat-hors-id="hb1"]').count())) await pg.click('[data-achats-hors-entete]').catch(()=>{});
+        await pg.click('[data-achat-hors-id="hb1"]',{timeout:15000}).catch(()=>{});
+        await pg.waitForSelector('[data-achat-paiement]',{timeout:10000}).catch(()=>{});
+        const p0=await pg.getAttribute('[data-achat-paiement]','data-achat-paiement').catch(()=>null);
+        dit(p0==='especes','« Payé en » relu sur la fiche de l’achat (Espèces)',p0);
+        await pg.click('[data-achat-paiement-choix="carte"]').catch(()=>{});
+        const p1=await pg.getAttribute('[data-achat-paiement]','data-achat-paiement').catch(()=>null);
+        const hP=await pg.evaluate(()=>[...document.querySelectorAll('[data-achat-paiement-choix]')].map(e=>Math.round(e.getBoundingClientRect().height)));
+        dit(p1==='carte'&&hP.length===5&&hP.every(h=>h>=44),'cinq choix de 44 px, « Carte » choisi',`${p1} · ${hP.join(',')}`);
+        if(CAP){ await pg.locator('[data-achat-hors-form]').scrollIntoViewIfNeeded().catch(()=>{}); await pg.locator('[data-achat-paiement]').scrollIntoViewIfNeeded().catch(()=>{}); await pg.locator('[data-achat-hors-form]').screenshot({path:path.join(CAP,`paye-en-${nomT}.png`)}).catch(()=>{}); }
+        await pg.click('[data-achat-hors-enregistrer]').catch(()=>{});
+        await pg.waitForFunction(()=>{ try{ const l=JSON.parse(localStorage.getItem('vinted_offvinted_buys')||'[]'); const b=l.find(x=>x&&x.id==='hb1'); return b&&b.paiement==='carte'; }catch(_){ return false; } },null,{timeout:10000}).catch(()=>{});
+        const rangé=await pg.evaluate(()=>{ try{ const l=JSON.parse(localStorage.getItem('vinted_offvinted_buys')||'[]'); const b=l.find(x=>x&&x.id==='hb1'); return b?b.paiement:null; }catch(_){ return null; } });
+        dit(rangé==='carte','« Carte » rangé avec l’achat (vinted_offvinted_buys, synchronisé)',rangé);
         const cibles=await pg.evaluate(()=>[...document.querySelectorAll('[data-registres-vue] button, [data-registres-vue] select, [data-registres-vue] input')].filter(e=>e.offsetParent&&!e.classList.contains('vrm-seg-btn')).map(e=>Math.round(e.getBoundingClientRect().height)));
         dit(cibles.length&&cibles.every(h=>h>=44),'cibles au doigt ≥ 44 px',cibles.join(','));
         const deb=await pg.evaluate(()=>{ const s=document.querySelector('[data-registres-vue]'); return s?s.scrollWidth-s.clientWidth:0; });
