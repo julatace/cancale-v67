@@ -26,6 +26,12 @@ require('./_porte-banc.cjs');
 //     « Créer mon compte » / « Se connecter » ouvrent le BON formulaire
 //     (`?inscription` / `?connexion`) ; personne d'autre ne voit la page ;
 //   • le poids de ce qui se charge avant l'app ; le film (`?film`) inchangé.
+//  (11 nov., lot accueil-public) + « pour qui » dans le premier écran ; deux
+//  cartes d'offre dont le NOM et la PHRASE sont ceux d'OFFRES
+//  (api/_lib/plan-regle.js) et le MONTANT celui des CGV ; le SEO (titre,
+//  description, Open Graph avec une image 1200 × 630 faite d'une capture en
+//  mode exemple, données structurées SANS avis ni note, prix = réglages) ; la
+//  FAQ en questions (h3) / réponses ; le chargement mesuré sur une 4G lente.
 //  ⚠️ AUCUNE FIXTURE : une page publique ne lit aucune donnée.
 //  PORT=… pour lancer à côté d'un autre banc (défaut 4523). SEUL=rendu,captures…
 //  CAPTURES=dossier : une capture par taille et par thème (à REGARDER, §6.2).
@@ -152,12 +158,14 @@ async function controlesRendu(nav, nom, opt, S) {
     }, S.prixCgv || '?');
     dit(!!prix && prix.bottom <= H, `${nom} : le prix des CGV (${S.prixCgv} € par mois) est dans le premier écran`, prix ? `bas à ${Math.round(prix.bottom)} px` : 'absent du haut de page');
     dit(!!prix && new RegExp(`${S.essaiCgv}\\s*jours d.essai gratuit`).test(prix.texte), `${nom} : l'essai (${S.essaiCgv} jours, celui des CGV) est dit à côté du prix`, prix && prix.texte);
+    const pour = await visibleDansEcran(pg, '[data-pour-qui]');
+    dit(pour && pour.bottom <= H && pour.op > 0.5 && /Vinted/.test(pour.texte) && /revendeur/i.test(pour.texte), `${nom} : « pour qui » (les revendeurs Vinted…) est dans le premier écran`, pour ? `${pour.texte} · bas à ${Math.round(pour.bottom)} px` : 'absent');
     const pre = await visibleDansEcran(pg, '[data-prerequis]');
     dit(pre && pre.bottom <= H && /ordinateur/i.test(pre.texte), `${nom} : le prérequis (un ordinateur) est dans le premier écran`, pre ? `bas à ${Math.round(pre.bottom)} px` : 'absent');
     const variante = await pg.evaluate(() => { const e = document.querySelector('[data-prerequis]'); return e && e.getAttribute('data-variante'); });
     dit(variante === (opt.mobile ? 'tactile' : 'souris'), `${nom} : le prérequis parle à ${opt.mobile ? 'un téléphone' : 'un ordinateur'}`, `variante ${variante}`);
     const cta = await visibleDansEcran(pg, '[data-section="hero"] [data-cta="inscription"]');
-    dit(cta && cta.bottom <= H && cta.top >= 0, `${nom} : « Créer mon compte » est dans le premier écran`, cta ? `${Math.round(cta.top)}–${Math.round(cta.bottom)}` : 'absent');
+    dit(cta && cta.bottom <= H && cta.top >= 0, `${nom} : « Essayer gratuitement » (data-cta=inscription) est dans le premier écran`, cta ? `${Math.round(cta.top)}–${Math.round(cta.bottom)}` : 'absent');
     const offert = S.reglages.ACCES_OFFERT;
     const off = await pg.evaluate(() => ({ a: document.querySelectorAll('[data-acces-offert]').length, carte: document.querySelectorAll('[data-sans-carte]').length }));
     if (offert === 'true') dit(off.a > 0 && off.carte > 0, `${nom} : ACCES_OFFERT = true → « Gratuit pour l'instant » et « Aucune carte bancaire »`, JSON.stringify(off));
@@ -252,7 +260,7 @@ async function controlesRendu(nav, nom, opt, S) {
     await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(400);
     const navCta = () => pg.evaluate(() => { const b = document.querySelector('.av-nav [data-cta-nav="inscription"]'); return b ? { op: Number(getComputedStyle(b).opacity), tab: b.tabIndex, d: getComputedStyle(b).display } : null; });
     const haut = await navCta();
-    dit(haut && (haut.op === 0 || haut.d === 'none') && haut.tab === -1, `${nom} : en haut de page, « Créer mon compte » n'est PAS doublé dans la barre`, JSON.stringify(haut));
+    dit(haut && (haut.op === 0 || haut.d === 'none') && haut.tab === -1, `${nom} : en haut de page, le bouton d'inscription n'est PAS doublé dans la barre`, JSON.stringify(haut));
     if (!opt.mobile) {
       await pg.evaluate(() => window.scrollTo(0, 1600));
       await pg.waitForFunction(() => { const b = document.querySelector('.av-nav [data-cta-nav="inscription"]'); return b && getComputedStyle(b).opacity === '1'; }, null, { timeout: 2000 }).catch(() => {});
@@ -278,14 +286,16 @@ async function controlesRendu(nav, nom, opt, S) {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ dist/ absent — lance npm run build'); process.exit(1); }
   // Les sources de vérité : les réglages, les CGV, le serveur, le registre des captures.
   const srcReglages = lire('src/accueil-reglages.js') || '';
-  const reglages = { ACCES_OFFERT: constante(srcReglages, 'ACCES_OFFERT'), DETOURAGE_POUR_TOUS: constante(srcReglages, 'DETOURAGE_POUR_TOUS'), PRIX_MOIS: (constante(srcReglages, 'PRIX_MOIS') || '').replace(/['"]/g, ''), ESSAI_JOURS: (constante(srcReglages, 'ESSAI_JOURS') || '').replace(/['"]/g, '') };
+  const reglages = { ACCES_OFFERT: constante(srcReglages, 'ACCES_OFFERT'), DETOURAGE_POUR_TOUS: constante(srcReglages, 'DETOURAGE_POUR_TOUS'), PRIX_MOIS: (constante(srcReglages, 'PRIX_MOIS') || '').replace(/['"]/g, ''), PRIX_PRO_MOIS: (constante(srcReglages, 'PRIX_PRO_MOIS') || '').replace(/['"]/g, ''), ESSAI_JOURS: (constante(srcReglages, 'ESSAI_JOURS') || '').replace(/['"]/g, '') };
   const cgv = lire('public/legal/cgv.html') || '';
   const prixCgv = (/abonnement à (\d+,\d{2})\s€ par mois/i.exec(cgv) || [])[1] || null;
+  const prixProCgv = (/Offre Pro : (\d+,\d{2}) € par mois/.exec(cgv) || [])[1] || null;
+  let OFFRES = null; try { OFFRES = (await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'))).OFFRES; } catch (_) { OFFRES = null; }
   const essaiCgv = (/essai gratuit de (\d+) jours/i.exec(cgv) || [])[1] || null;
   const essaiStripe = (/trial_period_days:\s*(\d+)/.exec(lire('api/compte.js') || '') || [])[1] || null;
   const essaiRelances = (/DUREE_ESSAI_JOURS\s*=\s*(\d+)/.exec(lire('api/_lib/relances-essai.js') || '') || [])[1] || null;
   let registre = {}; try { registre = JSON.parse(lire('public/accueil/captures.json')); } catch (_) { registre = {}; }
-  const S = { reglages, prixCgv, essaiCgv, registre };
+  const S = { reglages, prixCgv, prixProCgv, essaiCgv, registre };
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-gpu-compositing'] });
   try {
     if (veut('rendu')) {
@@ -300,7 +310,7 @@ async function controlesRendu(nav, nom, opt, S) {
       await essaie('captures', async () => {
         const src = sansCommentaires(lire('src/Accueil.jsx'));
         const noms = [...new Set([...src.matchAll(/(?:nom|capture):\s*'([a-z]+)'|nom="([a-z]+)"/g)].map((m) => m[1] || m[2]))];
-        dit(noms.length >= 5, `la page montre ${noms.length} écrans de l'app (${noms.join(', ')})`);
+        dit(noms.length >= 6, `la page montre ${noms.length} écrans de l'app (${noms.join(', ')})`);
         const fichiers = noms.flatMap((n) => ['clair', 'sombre'].map((t) => `${n}-${t}.webp`));
         const absents = fichiers.filter((f) => !fs.existsSync(path.join(RACINE, 'public', 'accueil', f)));
         dit(absents.length === 0, 'chaque écran existe en clair ET en sombre (public/accueil/)', absents.join(', '));
@@ -327,7 +337,13 @@ async function controlesRendu(nav, nom, opt, S) {
         const t = await pg.evaluate(() => document.querySelector('[data-accueil]').innerText);
         const montants = [...t.matchAll(/(\d+,\d{2})\s*€\s*(?:\/\s*mois|par mois)/gi)].map((m) => m[1]);
         const montantsCarte = await pg.evaluate(() => [...document.querySelectorAll('[data-prix]')].map((e) => e.innerText.replace(/\s+/g, ' ')));
-        dit(!!prixCgv && montants.length > 0 && montants.every((m) => m === prixCgv) && montantsCarte.length === 1 && montantsCarte[0].includes(prixCgv), `le prix affiché est celui des CGV (${prixCgv} € par mois), aucun autre`, `CGV ${prixCgv} · page ${montants.join(', ')} · carte ${montantsCarte.join(' | ')}`);
+        dit(!!prixCgv && !!prixProCgv && montants.length >= 2 && montants.every((m) => m === prixCgv || m === prixProCgv), `chaque prix affiché est un prix des CGV (Solo ${prixCgv} €, Pro ${prixProCgv} €), aucun autre`, `CGV ${prixCgv}/${prixProCgv} · page ${montants.join(', ')}`);
+        // Les cartes d'offre : le nom et la phrase d'OFFRES, le montant des CGV.
+        const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-offre]')].map((c) => ({ cle: c.getAttribute('data-offre'), nom: (c.querySelector('h3') || {}).innerText || '', montant: ((c.querySelector('.av-montant b') || {}).innerText || '').replace(/\s+/g, ' '), phrase: (c.querySelector('[data-offre-phrase]') || {}).innerText || '' })));
+        const attendu = { solo: prixCgv, pro: prixProCgv };
+        const fautes = !OFFRES ? ['OFFRES illisible'] : cartes.filter((c) => !OFFRES[c.cle] || c.nom.trim() !== OFFRES[c.cle].nom || !c.phrase.startsWith(OFFRES[c.cle].phrase) || !c.montant.startsWith(attendu[c.cle] || '?')).map((c) => JSON.stringify(c));
+        dit(cartes.length === 2 && cartes.map((c) => c.cle).join() === 'solo,pro' && fautes.length === 0, 'deux cartes, Solo puis Pro : nom et phrase = OFFRES (source unique), montant = CGV', fautes.join(' · ') || cartes.map((c) => `${c.nom} ${c.montant}`).join(' | '));
+        dit(reglages.PRIX_PRO_MOIS === prixProCgv, 'PRIX_PRO_MOIS (src/accueil-reglages.js) = CGV (offre Pro)', `${reglages.PRIX_PRO_MOIS} / ${prixProCgv}`);
         dit(reglages.PRIX_MOIS === prixCgv, 'PRIX_MOIS (src/accueil-reglages.js) = CGV', `${reglages.PRIX_MOIS} / ${prixCgv}`);
         dit(!!essaiCgv && reglages.ESSAI_JOURS === essaiCgv && essaiStripe === essaiCgv && essaiRelances === essaiCgv, `l'essai : ESSAI_JOURS = CGV = Stripe (trial_period_days) = relances (DUREE_ESSAI_JOURS)`, `page ${reglages.ESSAI_JOURS} · CGV ${essaiCgv} · Stripe ${essaiStripe} · relances ${essaiRelances}`);
         const essais = [...t.matchAll(/(\d+)\s*jours d.essai/g)].map((m) => m[1]);
@@ -342,8 +358,11 @@ async function controlesRendu(nav, nom, opt, S) {
         dit(!/ne vend (rien|aucune donnée)/i.test(t) || /ne vend aucune donnée/i.test(conf), '« ne vend rien » s’appuie sur la politique publiée');
         const auto = await pg.evaluate(() => { const c = document.querySelector('[data-confiance]'); return c ? c.querySelectorAll('[data-automatisme]').length : -1; });
         dit(auto === 2 && /favori/i.test(t) && /republi/i.test(t), 'la confiance nomme les automatismes éteints, et dit que favoris et republication ne partent que lancés', `${auto} automatisme(s)`);
-        const v = await pg.evaluate(() => { const tout = (document.body.innerText.match(/Vestiaire/g) || []).length; const faq = ((document.querySelector('[data-faq]') || {}).innerText || '').match(/Vestiaire/g) || []; return { tout, faq: faq.length }; });
-        dit(v.tout === v.faq, '« Vestiaire » n’apparaît que dans les questions (pas encore branché)', JSON.stringify(v));
+        // (11 nov.) La phrase de l'offre Solo (OFFRES, la même que les CGV et les
+        // Paramètres) nomme « un Vestiaire » parmi les comptes : c'est le périmètre
+        // de l'abonnement, pas une promesse de totaux. Ailleurs, rien.
+        const v = await pg.evaluate(() => { const n = (t) => ((t || '').match(/Vestiaire/g) || []).length; const tout = n(document.body.innerText); const faq = n((document.querySelector('[data-faq]') || {}).innerText); const offres = [...document.querySelectorAll('[data-offre-phrase]')].reduce((a, e) => a + n(e.innerText), 0); return { tout, faq, offres }; });
+        dit(v.tout === v.faq + v.offres, '« Vestiaire » n’apparaît que dans les questions et la phrase d’offre (OFFRES), pas comme fonction branchée', JSON.stringify(v));
         if (reglages.DETOURAGE_POUR_TOUS === 'false') dit(!/Photoroom|détour/i.test(t), 'DETOURAGE_POUR_TOUS = false → ni « Photoroom » ni « détourage »');
         const faux = [];
         if (/rien n['’]est envoyé à ta place|(deux|2) minutes|tout automatique/i.test(t)) faux.push('promesse fausse');
@@ -353,6 +372,80 @@ async function controlesRendu(nav, nom, opt, S) {
         const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/;
         const avecEmail = ['src/Accueil.jsx', 'src/accueil-reglages.js'].filter((f) => EMAIL.test(sansCommentaires(lire(f))));
         dit(avecEmail.length === 0, 'aucune adresse e-mail écrite dans les fichiers de la page', avecEmail.join(', '));
+        await ctx.close();
+      });
+    }
+
+    if (veut('faq')) {
+      console.log('\n── LES QUESTIONS : UNE QUESTION, SA RÉPONSE');
+      await essaie('faq', async () => {
+        const { ctx, pg } = await page(nav, TEL);
+        const q = await pg.evaluate(() => [...document.querySelectorAll('[data-faq] [data-question]')].map((d) => ({ h3: d.querySelectorAll('h3').length, q: ((d.querySelector('h3') || {}).innerText || '').trim(), r: [...d.querySelectorAll('p')].filter((p) => p.innerText.trim()).length })));
+        dit(q.length >= 6 && q.every((x) => x.h3 === 1 && /\?$|\.$/.test(x.q) && x.r >= 1), `${q.length} questions : chacune un titre (h3) et au moins une réponse`, q.filter((x) => !(x.h3 === 1 && x.r >= 1)).map((x) => x.q).join(' · '));
+        const h = await pg.evaluate(() => [...document.querySelectorAll('[data-accueil] h1, [data-accueil] h2, [data-accueil] h3')].map((e) => Number(e.tagName[1])));
+        const saut = h.findIndex((n, i) => i > 0 && n > h[i - 1] + 1);
+        dit(h[0] === 1 && saut === -1, 'les titres se suivent sans sauter de niveau (h1 → h2 → h3)', h.join(''));
+        await ctx.close();
+      });
+    }
+
+    if (veut('seo')) {
+      console.log('\n── SEO : TITRE, DESCRIPTION, IMAGE DE PARTAGE, DONNÉES STRUCTURÉES SANS AVIS');
+      await essaie('seo', async () => {
+        const html = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
+        const meta = (re) => ((re.exec(html) || [])[1] || '').trim();
+        const titre = meta(/<title>([^<]*)<\/title>/), desc = meta(/<meta name="description" content="([^"]*)"/);
+        dit(titre.length >= 20 && titre.length <= 70 && /VRM/.test(titre) && !/sneaker/i.test(titre), 'un titre de 20 à 70 signes, qui nomme VRM, pas « sneakers » seulement', `${titre.length} · ${titre}`);
+        dit(desc.length >= 80 && desc.length <= 170 && /Vinted/.test(desc) && !/sneaker/i.test(desc), 'une description de 80 à 170 signes, pour tout revendeur', `${desc.length} · ${desc}`);
+        dit(/<link rel="canonical" href="https:\/\/vrm\.center\/"/.test(html), 'canonical : https://vrm.center/');
+        const og = {}; for (const m of html.matchAll(/<meta property="og:([a-z:_]+)" content="([^"]*)"/g)) og[m[1]] = m[2];
+        dit(['title', 'description', 'url', 'image', 'type'].every((k) => og[k]) && /summary_large_image/.test(html), 'Open Graph complet (titre, description, url, image, type) et carte large', JSON.stringify(Object.keys(og)));
+        const fichier = (og.image || '').replace('https://vrm.center', '');
+        const img = fs.existsSync(path.join(DIST, fichier)) ? fs.readFileSync(path.join(DIST, fichier)) : null;
+        // Dimensions d'un JPEG : le premier marqueur SOFn.
+        const dims = (() => { if (!img || img[0] !== 0xFF || img[1] !== 0xD8) return null; let i = 2; while (i < img.length) { if (img[i] !== 0xFF) return null; const m = img[i + 1], l = img.readUInt16BE(i + 2); if (m >= 0xC0 && m <= 0xC3) return { h: img.readUInt16BE(i + 5), w: img.readUInt16BE(i + 7) }; i += 2 + l; } return null; })();
+        dit(!!dims && dims.w === 1200 && dims.h === 630 && og['image:width'] === '1200' && og['image:height'] === '630', 'l’image de partage existe : un JPEG 1200 × 630, dimensions déclarées', dims ? `${dims.w}×${dims.h}` : `absente (${fichier})`);
+        dit(!!img && img.length <= 150 * 1024, 'l’image de partage pèse ≤ 150 Ko', img ? `${Math.round(img.length / 1024)} Ko` : '');
+        let reg = null; try { reg = JSON.parse(lire('public/og-vrm.json')); } catch (_) { reg = null; }
+        const src = reg && reg.source && fs.existsSync(path.join(RACINE, 'public', reg.source)) ? crypto.createHash('sha256').update(fs.readFileSync(path.join(RACINE, 'public', reg.source))).digest('hex') : null;
+        const regCap = reg && S.registre[(reg.source || '').replace(/^accueil\//, '')];
+        dit(!!img && !!reg && reg.sha256 === crypto.createHash('sha256').update(img).digest('hex') && !!regCap && regCap.modeExemple === true && regCap.sha256 === reg.sourceSha256 && src === reg.sourceSha256, 'elle est celle de scripts/accueil-og.cjs, faite d’une capture au registre du mode exemple (empreintes)', reg ? `${reg.source}` : 'public/og-vrm.json absent');
+        const blocs = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+        let ld = null; try { ld = JSON.parse(blocs[0]); } catch (_) { ld = null; }
+        dit(blocs.length === 1 && !!ld && ld['@type'] === 'SoftwareApplication' && ld.name === 'VRM', 'des données structurées : un SoftwareApplication « VRM », JSON valide');
+        dit(!/aggregateRating|"review"|ratingValue|reviewCount/i.test(blocs.join('')), 'aucun avis ni note dans les données structurées (il n’y en a pas)');
+        const offresLd = (ld && ld.offers) || [];
+        const enPoint = (p) => String(p || '').replace(',', '.');
+        const okLd = OFFRES && offresLd.length === 2 && offresLd[0].name === OFFRES.solo.nom && offresLd[1].name === OFFRES.pro.nom && offresLd[0].price === enPoint(reglages.PRIX_MOIS) && offresLd[1].price === enPoint(reglages.PRIX_PRO_MOIS) && offresLd.every((o) => o.priceCurrency === 'EUR');
+        dit(!!okLd, 'les offres des données structurées = OFFRES (noms) et réglages/CGV (prix, en euros)', JSON.stringify(offresLd.map((o) => [o.name, o.price, o.priceCurrency])));
+        const { ctx, pg } = await page(nav, TEL);
+        const t = await pg.evaluate(() => document.title);
+        dit(t === titre.replace(/&amp;/g, '&'), 'la page affichée garde le même titre que index.html', t);
+        await ctx.close();
+      });
+    }
+
+    if (veut('lent')) {
+      console.log('\n── LE CHARGEMENT SUR UNE 4G LENTE (390 px, mesuré)');
+      await essaie('4G lente', async () => {
+        const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, serviceWorkers: 'block' });
+        await ctx.route(/supabase\.co|\/api\//, (rt) => rt.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+        await ctx.route(/^https?:\/\/(?!localhost)/, (rt) => rt.abort());
+        await ctx.addInitScript(() => { window.__lcp = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lcp = e.startTime; }).observe({ type: 'largest-contentful-paint', buffered: true }); } catch (_) {} });
+        const pg = await ctx.newPage();
+        const cdp = await ctx.newCDPSession(pg);
+        // « 4G lente » : 150 ms de latence, 1,6 Mbit/s descendant, 750 kbit/s montant.
+        await cdp.send('Network.enable');
+        await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8, uploadThroughput: 750e3 / 8 });
+        let octets = 0; cdp.on('Network.loadingFinished', (e) => { octets += e.encodedDataLength || 0; });
+        const t0 = Date.now();
+        await pg.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
+        const charge = Date.now() - t0;
+        await pg.waitForTimeout(800);
+        const lcp = await pg.evaluate(() => window.__lcp);
+        console.log(`     chargement complet ${charge} ms · LCP ${Math.round(lcp)} ms · ${Math.round(octets / 1024)} Ko transférés avant tout défilement`);
+        dit(lcp > 0 && lcp < 4000, 'sur 4G lente, le plus grand élément s’affiche en moins de 4 s', `${Math.round(lcp)} ms`);
+        dit(octets > 0 && octets < 400 * 1024, 'avant tout défilement, moins de 400 Ko transférés (compression du serveur de banc : aucune ; Vercel compresse)', `${Math.round(octets / 1024)} Ko`);
         await ctx.close();
       });
     }
