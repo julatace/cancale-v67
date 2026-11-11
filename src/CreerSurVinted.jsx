@@ -104,7 +104,8 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
     const file = pretes.map((l) => l.f);
     const pause = entreMs != null ? entreMs : 8000 + Math.floor(Math.random() * 12000);
     await lancerTravail({
-      titre: tr('creerVinted.titre'), sorte: 'creer-vinted', uid: compte.uid, entreMs: file.length > 1 ? pause : 0,
+      titre: tr('creerVinted.titre'), sorte: 'creer-vinted', uid: compte.uid, seuilMs: 0,   // des photos à envoyer : toujours long, VRM figé tout de suite
+      entreMs: file.length > 1 ? pause : 0,
       etapes: [['envoi', tr('creerVinted.etape.envoi')], ['brouillon', tr('creerVinted.etape.brouillon')]],
       articles: file.map((f) => ({ id: f.id, num: f.numero, titre: f.titre })),
       executer: async (a, o) => {
