@@ -131,7 +131,14 @@ async function ouvrirAnnonces(pg) {
   if (!(await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller)).catch(() => false))) await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
 }
 async function ouvrirSaisie(pg) {
-  await attendre(async () => (await pg.getByRole('button', { name: /Outils/ }).count()) > 0, 15000);
+  if ((await pg.locator('[data-fillbuy]').count()) > 0) return true;
+  // Le chemin d'aujourd'hui : le prochain geste d'Annonces (« prix ») ouvre la saisie en série.
+  const geste = pg.locator('[data-ann-prochain-geste="prix"] [data-ann-prochain-geste-bouton]');
+  if (await attendre(async () => (await geste.count()) > 0, 15000)) {
+    await geste.first().click().catch(() => {});
+    if (await attendre(async () => (await pg.locator('[data-fillbuy]').count()) > 0, 8000)) return true;
+  }
+  await attendre(async () => (await pg.getByRole('button', { name: /Outils/ }).count()) > 0, 5000);
   await pg.getByRole('button', { name: /Outils/ }).first().click().catch(() => {});
   await attendre(async () => (await pg.getByText(/Compl[ée]ter les prix d'achat/).count()) > 0, 5000);
   await pg.getByText(/Compl[ée]ter les prix d'achat/).first().click().catch(() => {});
@@ -180,6 +187,7 @@ async function main() {
       const rang = async () => pg.evaluate(async () => { try { const c = await caches.open('vrm-shell-v6'); const r = await c.match('/hors-ligne-assets.json'); if (!r) return { n: 0, sur: -1 }; const l = (await r.json()).fichiers || []; let n = 0; for (const f of l) if (await c.match(f)) n++; return { n, sur: l.length }; } catch (e) { return { n: 0, sur: -1 }; } }).catch(() => ({ n: 0, sur: -1 }));
       await attendre(async () => { const r = await rang(); return r.sur > 0 && r.n === r.sur; }, 30000, 500);
       const rr = await rang();
+      if (!(rr.sur > 0)) console.log('    (service worker :', JSON.stringify(await pg.evaluate(async () => ({ ctrl: !!(navigator.serviceWorker && navigator.serviceWorker.controller), caches: await caches.keys(), n: (await (await caches.open('vrm-shell-v6')).keys()).map((r) => new URL(r.url).pathname).slice(0, 8) })).catch((e) => String(e))), ')');
       dit(rr.sur > 10 && rr.n === rr.sur, `${T} : en ligne, les morceaux de l'app sont rangés pour le hors ligne`, `${rr.n}/${rr.sur}`);
       const saisieOk = await ouvrirSaisie(pg);
       await pg.screenshot({ path: path.join(CAPT, `en-ligne-${T}.png`) });
