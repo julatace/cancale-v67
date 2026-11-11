@@ -585,7 +585,8 @@
     const lbcVisible = !!lbcLignes;
     // Le détail s'OUVRE tout seul dès qu'il y a un geste à faire (ou rien de sûr).
     // (Un compte ignoré garde « Capter ce compte » sous les yeux : le moyen de revenir.)
-    const ouvert = resume.etat === 'geste' || ignore || detailOuvert;
+    // (« Connecté à VRM : x — C’est fait » se lit sans rien ouvrir, une fois.)
+    const ouvert = resume.etat === 'geste' || ignore || justeConnecte || detailOuvert;
     const outils = [
       v && v.connecte && !changerCompte ? '<button class="lien" data-changer-vrm>Changer de compte VRM</button>' : '',
       `<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`,
