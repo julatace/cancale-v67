@@ -615,8 +615,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
           </span>
           <span className="vrm-rpf-meta">
             {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
-            {!p.inconnu && !pressant(p) ? <button type="button" className="vrm-lien-action vrm-rpf-masquer" data-relais-masquer={p.cle} aria-label={`Masquer ${p.nom || 'ce point'}`} onClick={() => { const m = new Set(masques); m.add(p.cle); setMasques(m); }}>Masquer</button> : null}
-            <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n && n < rows.length ? <span data-relais-sans-code={n}> · {n} code à venir</span> : null; })()}</span>
+            <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n && n < rows.length ? <span data-relais-sans-code={n}> · {n} code à venir</span> : null; })()}
+              {!p.inconnu && !pressant(p) ? <> · <button type="button" className="vrm-rpf-masquer" data-relais-masquer={p.cle} aria-label={`Masquer ${p.nom || 'ce point'}`} onClick={() => { const m = new Set(masques); m.add(p.cle); setMasques(m); }}>Masquer</button></> : null}</span>
           </span>
         </header>
         {dTete ? <div className="vrm-rpf-tete-delai"><BarreDelai d={dTete} enTete/></div> : null}
@@ -678,7 +678,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
           <summary className="vrm-rpf-section-titre is-repli"><span>Comptés avec un autre colis<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
           <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
         </details>) : null}
-      {masquesIci.length ? <button type="button" className="vrm-lien-action vrm-rpf-masques" data-relais-masques={masquesIci.length} data-relais-masques-colis={masquesIci.reduce((t, p) => t + p.nComptes, 0)}
+      {masquesIci.length ? <button type="button" className="vrm-rpf-masques" data-relais-masques={masquesIci.length} data-relais-masques-colis={masquesIci.reduce((t, p) => t + p.nComptes, 0)}
         onClick={() => { const m = new Set(masques); for (const p of masquesIci) m.delete(p.cle); setMasques(m); }}>
         {masquesIci.length === 1 ? '1 point masqué' : `${masquesIci.length} points masqués`} · Afficher</button> : null}
       {nRoute ? (
