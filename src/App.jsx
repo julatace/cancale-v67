@@ -604,6 +604,7 @@ import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGarde
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
+import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -3090,6 +3091,7 @@ function AskTextSheet({ q, close }) {
           <Bouton variante="secondaire" icone="link" data-ask-relier="" onClick={() => { oublier(); close({ relier: true }); }} style={{flexShrink:0}}>{q.suggestion.bouton}</Bouton>
         </div>
       ) : null}
+      {q.suggestion && q.suggestion.autre ? <Bouton variante="discret" icone="search" data-ask-autre="" onClick={() => { oublier(); close({ autre: true }); }} style={{marginTop:4}}>Choisir un autre achat</Bouton> : null}
       <form onSubmit={(e) => { e.preventDefault(); oublier(); close(v); }}>
         <input ref={ref} value={v} onChange={e => setV(e.target.value)}
           aria-label={titre}
@@ -12159,8 +12161,13 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
+  const nomPdf = `recu-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
+  // (11 nov., lot DJ5 — Julien : « quand on appuie sur Reçu ça ne télécharge pas le reçu mais que ça
+  // l'ouvre ») `ouvrir` : le PDF s'affiche DANS VRM (la visionneuse PDF, « Télécharger » y reste un
+  // geste second) — aucun téléchargement. Téléphone compris : la visionneuse garde « Ouvrir dans un onglet ».
+  if (opts.ouvrir) { _poserVisionneuse({ url, nom: nomPdf, titre: NOM_RECU_ACHAT, at: Date.now() }); return; }
   const a = document.createElement('a');
-  a.href = url; a.download = `recu-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
+  a.href = url; a.download = nomPdf;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 };
@@ -12679,7 +12686,7 @@ function CoutAchatVente({ onSaisir, onRelier, surLigne = false, recap = false, p
           <>
             {propose && onUtiliser ? <Bouton variante="primaire" data-prix-propose={propose.centimes} data-prix-propose-par={propose.par} onClick={onUtiliser}>Utiliser {propose.texte}</Bouton> : null}
             <Bouton variante="secondaire" icone="pencil" className={recap ? 'vrm-geste-ambre' : undefined} data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat">{recap ? 'Saisir le prix d’achat' : 'Prix d’achat'}</Bouton>
-            {onRelier && <Bouton variante={recap ? 'discret' : 'secondaire'} icone="link" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">{recap ? 'ou relier un achat' : 'Relier un achat'}</Bouton>}
+            {onRelier && <Bouton variante={recap ? 'discret' : 'secondaire'} icone="link" data-cout-vente-relier data-cout-vente-autre={propose && onUtiliser ? '1' : undefined} onClick={() => onRelier(!!(propose && onUtiliser))} title="Choisir l'achat Vinted correspondant : son prix remplit le coût">{propose && onUtiliser ? 'Choisir un autre achat' : recap ? 'ou relier un achat' : 'Relier un achat'}</Bouton>}
           </>
         )}
       </div>
@@ -13974,6 +13981,8 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
               <div className="vrm-ar-gestes">
                 {l.sugg ? <Bouton variante="secondaire" icone="link" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}>{relierTxt}</Bouton>
                   : <Bouton variante="secondaire" icone="link" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}>Choisir un achat</Bouton>}
+                {/* (11 nov., lot DJ5) La suggestion n'est qu'une proposition : un AUTRE achat se choisit ici. */}
+                {l.sugg ? <Bouton variante="discret" icone="search" data-ar-autre={String(l.sugg.achat.transaction_id)} onClick={() => onChoisir(it, l.sugg.achat)}>Autre achat</Bouton> : null}
                 <Bouton variante="discret" icone="pencil" data-ar-saisir="" onClick={() => onSaisir(it)}>Saisir</Bouton>
                 {!l.plusTard ? <Bouton variante="discret" data-ar-plus-tard-geste="" onClick={() => onPlusTard(l.id)}>Plus tard</Bouton> : null}
               </div>
@@ -14069,6 +14078,11 @@ const ICON_PATHS = {
   wallet:  <><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h11a2 2 0 0 1 2 2v1"/><rect x="3.5" y="7.5" width="17" height="11" rx="2"/><circle cx="16.6" cy="13" r="1.1"/></>,
   info:    <><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2"/><path d="M12 7.9h.01"/></>,
   more:  <><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></>,
+  // (11 nov., lot DJ5 — Julien : « change le logo des Annonces et de Ma journée ») Deux dessins
+  // parlants, même grille 24 et même trait : la VITRINE (store, auvent festonné, porte) pour
+  // Annonces, le SOLEIL LEVANT (demi-soleil sur l'horizon, rayons) pour Ma journée.
+  vitrine: <><path d="M4.6 4h14.8l1.8 5.2"/><path d="M4.6 4 2.8 9.2a2.3 2.3 0 0 0 4.6 0 2.3 2.3 0 0 0 4.6 0 2.3 2.3 0 0 0 4.6 0 2.3 2.3 0 0 0 4.6 0"/><path d="M4.6 12.4v7.1a1 1 0 0 0 1 1h12.8a1 1 0 0 0 1-1v-7.1"/><path d="M10 20.5v-4.3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4.3"/></>,
+  soleilLevant: <><path d="M2.5 17.5h19"/><path d="M7 17.5a5 5 0 0 1 10 0"/><path d="M12 6.5v3M5.2 10.2l1.8 1.8M18.8 10.2 17 12M2.8 14.5h1.6M19.6 14.5h1.6"/><path d="M8 21h8"/></>,
   sun:   <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   chart: <><path d="M5 20V10M12 20V4M19 20v-6"/></>,
   grid:  <><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 9.7h17M3.5 15.3h17M9.7 3.5v17M15.3 3.5v17"/></>,
@@ -14456,8 +14470,8 @@ function EbayMessagesVolets({ compte, comptesEbay, ...p }) {
 // de groupe « Autres outils » ni « Dans Vinted » (17 oct.), Organisation hors du
 // menu (29 oct.), pas de saisie « N° + Entrée » (29 oct.).
 const BOTTOM_TABS=[
-  {id:'journee',  icon:'sun',  label:'Ma journée', court:'Journée'},
-  {id:'annonces', icon:'grid', label:'Annonces'},
+  {id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Journée'},
+  {id:'annonces', icon:'vitrine', label:'Annonces'},
   {id:'ventes',   icon:'bag',  label:'Ventes'},
   {id:'cat_bord', icon:'box',  label:'Colis'},
 ];
@@ -29381,6 +29395,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // email reçu deux fois) ne sont plus « on ne tranche pas » : c'est le même
   // achat, l'identité tient — l'index garde le meilleur des deux.
   const receiptFor = (o) => recuDeLAchat(o, indexRecusAchat);
+  // (11 nov., lot DJ5 — Julien : « quand on a relié une annonce à un achat, je veux que quand on appuie
+  // sur Reçu ça ne télécharge pas le reçu mais que ça l'ouvre comme dans l'onglet Achats ») LE REÇU D'UN
+  // ACHAT RELIÉ S'OUVRE, il ne se télécharge plus : le reçu reçu par e-mail (par SON n° de transaction,
+  // la règle de l'onglet Achats) ⇒ la même feuille (`FeuilleRecuAchat`) ; sinon l'attestation de VRM
+  // s'affiche dans la visionneuse PDF (« Télécharger » y reste, en geste second). Les reçus pas encore
+  // lus (Annonces n'en lit pas) le sont au toucher ; une lecture ratée ⇒ l'attestation, jamais rien.
+  const [recuOuverture, setRecuOuverture] = useState('');
+  const ouvrirRecuRelie = async (a, numero) => {
+    if (!a) return;
+    const tx = String(a.transaction_id || '');
+    let rc = null;
+    if (achEmails !== undefined) rc = receiptFor(a);
+    else {
+      setRecuOuverture(tx);
+      const em = await fetchEmailAchats();
+      setAchEmails(em);
+      const recus = recusAchatDe(em);
+      rc = Array.isArray(recus) ? recuDeLAchat(a, indexRecusParTransaction(recus.filter((r) => !(r && r.id && recusDelies[r.id])), (r) => ventilationRecuAchat(r && r.texte).trouve)) : null;
+      setRecuOuverture('');
+    }
+    if (rc) { setReceiptView(rc); return; }
+    generateAchatJustificatif(a, { account: a._accName || accNameOf(a._acc), regime: load('vinted_regime', 'micro'), numero: numero || '', ouvrir: true });
+  };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
   const [geo, setGeo] = useState(() => load('vrm_geo_cache_v2', {}));
@@ -29939,8 +29976,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')}\u00a0${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
           </div>
         </div>
-        <button type="button" onClick={()=>generateAchatJustificatif(a,{ account:a._accName||accNameOf(a._acc), regime:load('vinted_regime','micro'), numero:numero||'' })}
-          title="Reçu d'achat PDF (avec le N° de l'article)" aria-label="Reçu d'achat"
+        <button type="button" data-recu-relie={String(a.transaction_id||'')} disabled={recuOuverture===String(a.transaction_id||'')} onClick={()=>ouvrirRecuRelie(a, numero)}
+          title="Ouvrir le reçu d'achat" aria-label="Reçu d'achat"
           style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:12,background:C.bg,color:C.text,cursor:'pointer',fontSize:11,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}><Icon name="doc" size={14}/> Reçu</button>
       </div>
     );
@@ -32286,7 +32323,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const achats = await Promise.race([chargerAchats(), new Promise((r) => setTimeout(() => r(null), 1500))]);
       const s = Array.isArray(achats) && achats.length ? meilleureSuggestion({ item, achats, liens: liensParAchat(numeros, saleOv), marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : null;
       const aff = s ? suggestionNumerotage(texteSuggestion(s, propositionSuggestion(s.achat)), montant) : null;
-      if (aff) sugg = { achat: s.achat, aff: { ...aff, photo: orderPhoto(s.achat) || '' } };
+      if (aff) sugg = { achat: s.achat, aff: { ...aff, photo: orderPhoto(s.achat) || '', autre: true } };
     } catch (_) { sugg = null; }
     const rep = await askText({
       title: `Prix d'achat de la N°${numeroPose} ?`,
@@ -32295,7 +32332,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       suggestion: sugg ? sugg.aff : null,
     });
     if (rep == null) return;                               // « Plus tard » / fermé : rien d'écrit
-    if (typeof rep === 'object') { if (rep.relier && sugg) await relierAchatAnnonce(item, sugg.achat); return; }
+    if (typeof rep === 'object') { if (rep.relier && sugg) await relierAchatAnnonce(item, sugg.achat); else if (rep.autre && sugg) openPicker({ ...item, _autre: String(sugg.achat.transaction_id) }); return; }
     const w = ecrirePrixTape(item, rep, numeroPose);
     if (w.etat === 'ok') toast(`Prix d'achat enregistré : ${w.patch.buyPrice}\u00a0€`);
   };
@@ -33144,6 +33181,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span aria-hidden="true">€</span>
               </label>
               {sgAff ? <Bouton variante="discret" taille="petit" icone="link" data-num-neuf-relier={String(sg.achat.transaction_id)} title={sgAff.detail} onClick={() => relierAchatAnnonce(it, sg.achat)}>{sgAff.bouton}</Bouton> : null}
+              {sgAff ? <Bouton variante="discret" taille="petit" icone="search" data-num-neuf-autre={String(sg.achat.transaction_id)} onClick={() => openPicker({ ...it, _autre: String(sg.achat.transaction_id) })}>Autre achat</Bouton> : null}
             </>}
           </div>
         </div>); })}
@@ -37217,11 +37255,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { buyPrice: price!=null?String(price):'', buyFromId: a.transaction_id?String(a.transaction_id):null,
       buyFrom: { title: a.title||'', date: a.date||'', photo: orderPhoto(a)||'', price, devise: a.price?.currency_code||'EUR', seller: a.seller||a.user_login||'', status: a.status||'', account: accNom } };
   };
-  const relierAchat = async (a) => {
+  // (11 nov., lot DJ5) « Déplacer ici » : un achat déjà relié ailleurs est DÉLIÉ de ses autres
+  // détenteurs (src/relierAutreAchat.js) après SA confirmation, puis relié ici — un achat simple ne
+  // compte qu'une fois dans les coûts. Un LOT pas complet n'est jamais « pris ».
+  const iciPicker = (cible) => (cible ? (cible._saleTx ? { ou: 'vente', cle: String(cible._saleTx) } : { ou: 'fiche', cle: String(cible.id) }) : null);
+  const relierAchat = async (a, opts = {}) => {
     const cible = pickerFor; if (!cible || !a) return;
+    const autres = ecrituresDeplacer(a, { numeros, saleOv, ici: iciPicker(cible) });
+    if (opts.deplacer || autres.length) {
+      if (autres.length) {
+        const ok = await askConfirm({ title: texteDejaRelie(autres), desc: 'Il sera délié de là-bas et relié ici.', ok: 'Déplacer ici', cancel: 'Annuler' });
+        if (!ok) return;
+      }
+    }
     const w = await ecritureRelierAchat(a); if (!w) return;
+    for (const x of autres) { if (x.ou === 'vente') setSaleOverride(x.cle, x.patch); else setNumeros((prev) => { const u = { ...prev, [x.cle]: { ...(prev[x.cle] || {}), ...x.patch } }; save('vinted_annonce_numeros', u); return u; }); }
     if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w);
     setPickerFor(null);
+    toast(`Achat relié${w.buyPrice ? ` · ${String(w.buyPrice).replace('.', ',')}\u00a0€` : ''}`);
+  };
+  // « Délier » (la feuille, quand CET article a déjà son achat) : le lien part, le prix posé par lui aussi.
+  const entreePicker = (cible) => (cible ? (cible._saleTx ? saleOv[String(cible._saleTx)] : numeros[cible.id]) : null);
+  const delierAchatPicker = () => {
+    const cible = pickerFor; const patch = patchDelier(entreePicker(cible)); if (!cible || !patch) return;
+    if (cible._saleTx) setSaleOverride(cible._saleTx, patch); else updatePair(cible, patch);
+    setPickerFor(null);
+    toast('Achat délié');
   };
   // (6 nov., vague 2 · point 4) « Relier » depuis la file « Sans achat relié » : SON tap, sur CETTE annonce.
   const relierAchatAnnonce = async (it, a) => {
@@ -41406,7 +41465,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })();
         return (
           <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee">
-            <ScreenHead icon="sun" title="Ma journée"/>
+            <ScreenHead icon="soleilLevant" title="Ma journée"/>
 
             {/* (2 nov., 22 h, Julien : « recopie à l'identique » la maquette FusionJournee,
                 « sans textes explicatifs ») LA TÊTE SOMBRE, bord à bord : le bonjour, le
@@ -41829,7 +41888,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const emailEnTete = !!(o._venteEmail && o._acc && ventesEmailTete.has(String(o._acc.vinted_user_id || '')));
             const libDepose = num ? `N°${num}` : (o.title || '');
             const gesteCout = coutManque ? <CoutAchatVente surLigne propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
-                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date }); }}/> : null;
+                  onRelier={(autre)=>{ const idf = identiteAnnonce(o); const _autre = autre ? '1' : undefined; openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre }); }}/> : null;
             // (6 nov., vague 2 · point 1) Vente annulée AVANT l'envoi, paire chez lui : « Remettre en
             // vente » (SON clic → « Republier à la main » depuis le coffre, src/annuleesChezToi.js).
             const annChez = annulChezParTx.get(txL) || null;
@@ -41922,7 +41981,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {st !== 'cancelled' ? <BarreCoutVente c={cv}/> : null}
                   <dl>
                     <div className="vrm-recap-ligne"><dt>Prix de vente</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt><PointCout cle="achat"/>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker({ ...saleItem, _dateRef: o.date })}/> : '—'}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt><PointCout cle="achat"/>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={(autre)=>openPicker({ ...saleItem, _dateRef: o.date, _autre: autre ? '1' : undefined })}/> : '—'}</dd></div> : null}
                     {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt><PointCout cle="frais"/>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
                     {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/>Emballage</dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt><PointCout cle="benefice"/>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
@@ -41978,7 +42037,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     )}
                     {aRelie ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                      <Bouton variante="secondaire" icone="doc" onClick={()=>generateAchatJustificatif(aRelie,{ account:aRelie._accName||accNameOf(aRelie._acc), regime:load('vinted_regime','micro'), numero:num||'' })} title="Reçu d'achat PDF (avec le N° de l'article)" aria-label="Reçu d'achat">Reçu d’achat</Bouton>
+                      <Bouton variante="secondaire" icone="doc" data-recu-relie={String(aRelie.transaction_id||'')} disabled={recuOuverture===String(aRelie.transaction_id||'')} onClick={()=>ouvrirRecuRelie(aRelie, num)} title="Ouvrir le reçu d'achat" aria-label="Reçu d'achat">Reçu d’achat</Bouton>
                       <Bouton variante="discret" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente">Changer l’achat relié</Bouton>
                     </div> : null}
                   </details>
@@ -43720,7 +43779,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         {/* (26 oct., « trop brouillon ») Dans l'espace Vinted, l'onglet « Annonces »
             dit déjà où l'on est : pas de second titre. */}
-        {!dansPlateforme && <ScreenHead icon="tag" title="Annonces en ligne" />}
+        {!dansPlateforme && <ScreenHead icon="vitrine" title="Annonces en ligne" />}
         <NoAcc/>
         {/* (2 nov.) Sans compte Vinted, rien à compléter : « 0 à relire sur Vinted » n'était qu'un zéro de plus. */}
         {/* (3 nov., critique #7) « Annonces à compléter » et « Offres automatiques » vivent dans « Outils » (…). */}
@@ -44145,7 +44204,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
-            onChoisir={(it)=>openPicker({ ...it, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
+            onChoisir={(it, propose)=>openPicker({ ...it, _autre: propose ? String(propose.transaction_id || '1') : undefined, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='acompleter' ? (
           <VueACompleter Photo={PhotoVinted} res={annACompleter} onPrixAchat={(id)=>{ const it=(listings.items||[]).find(x=>x&&String(x.id)===String(id)); if (it) saisirPrixAnnonce(it); }}/>
         ) : annSort==='masquees' ? (
@@ -46660,7 +46719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
-        <div data-relier-feuille onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
@@ -46687,7 +46746,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
               <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
-                curTx={numeros[pickerFor.id]?.buyFromId || ''} compteDe={(a)=>accNameOf(a._acc)||''} prixDe={prixPayeAchat} onRelier={relierAchat}
+                curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>accNameOf(a._acc)||''} prixDe={prixPayeAchat} onRelier={relierAchat}
+                autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
+                dejaRelie={(a)=>texteDejaRelie(detenteursAchat(a && a.transaction_id, { numeros, saleOv }))}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}/>
             </div>
           </div>
@@ -47258,6 +47319,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>
                        <Bouton variante="primaire" data-prix-propose={pp.centimes} data-prix-propose-par={pp.par} data-prix-garder="" onClick={()=>appliquerProposition('f:'+r.key, pp)}>{tp.garder}</Bouton>
                        <Bouton variante="secondaire" data-prix-corriger="" onClick={()=>{ const n=document.querySelector(`[data-fillbuy="${i}"]`); if(n) n.focus(); }}>{tp.corriger}</Bouton>
+                       {/* (11 nov., lot DJ5) La proposition n'est pas une obligation : un AUTRE achat se choisit (SON clic). */}
+                       {numeros[r.key] ? <Bouton variante="discret" icone="search" data-prix-autre-achat={r.key} onClick={()=>{ const f=numeros[r.key]||{}; openPicker({ id:r.key, title:f.title||r.titre||'', photo:f.photo||null, price:f.price??null, size:f.size??null, _acc: f.accountId ? { vinted_user_id: f.accountId } : undefined, _autre: pp.achat ? String(pp.achat.transaction_id||'1') : '1' }); }}>Choisir un autre achat</Bouton> : null}
                      </div>
                      {/* (9 nov., lot F) Au moment de confirmer CET achat : les AUTRES paires du même modèle
                          déjà sur l'étagère — une information par ressemblance, rien n'est relié ni écrit. */}

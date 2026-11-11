@@ -552,8 +552,14 @@ const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#00
 // « Voir tous les achats » : ceux pas encore reliés (un LOT reste jusqu'à son
 // nombre d'articles), recherche par mot, filtres compte et mois. Rien n'est
 // relié sans SON tap (`onRelier`). Aucun texte explicatif.
-function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C }) {
-  const [tous, setTous] = useState(false);
+// (11 nov., lot DJ5 — Julien : « quand l'app me fait une proposition pour relier un achat, je ne peux
+// pas en sélectionner un autre ») `autre` : ouverte depuis « Choisir un autre achat », la feuille part
+// directement sur la recherche (aucune suggestion). `pris` : les achats déjà reliés ailleurs passent les
+// mêmes filtres et viennent APRÈS les libres, « Déjà relié à N°… » (`dejaRelie`), « Déplacer ici » ; `actuel`
+// + `onDelier` : l'achat relié à CET article, « Délier ». Toujours SON clic, sur UNE ligne (son n°).
+function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C, autre = false, actuel = null, onDelier = null, dejaRelie = null }) {
+  const [tous, setTous] = useState(!!autre);
+  const [voirPris, setVoirPris] = useState(false);
   const [q, setQ] = useState('');
   const [compte, setCompte] = useState('');
   const [mois, setMois] = useState('');
@@ -567,7 +573,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   const [marque, setMarque] = useState('');
   const [taille, setTaille] = useState('');
   const sugg = useMemo(() => (Array.isArray(achats) ? suggestionsAchat({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : []), [cible, achats, liens]);
-  const voirTous = tous || (Array.isArray(achats) && !sugg.length);
+  const voirTous = tous || !!autre || (Array.isArray(achats) && !sugg.length);
   // (relecture du 5 nov.) Les dates de réception se lisent à la demande (son tap sur
   // « Filtres ») : tant qu'elles arrivent, le filtre de date attend — il n'écarte rien
   // sur une lecture pas faite (« pas su » ≠ « pas reçu »).
@@ -578,7 +584,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   const filtres = useMemo(() => (voirTous && Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe, extractBrand) : { mois: [], comptes: [], marques: [], tailles: [] }), [voirTous, achats, liens, curTx]);
   const nFiltres = [prixMin, prixMax, recuDu, recuAu, marque, taille].filter((x) => String(x || '').trim()).length;
   if (!Array.isArray(achats)) return <div data-relier-chargement style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>…</div>;
-  const ligne = (a, attrs) => {
+  const ligne = (a, attrs, pris = '') => {
     const ph = orderPhoto(a), lot = etiquetteLot(a, liens), px = prixDe(a);
     const d = a.date ? new Date(a.date) : null;
     return (
@@ -586,21 +592,33 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
         <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || '—'}</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[lot, d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '', compteDe(a)].filter(Boolean).join(' · ')}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[lot, d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '', compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted', a.seller || a.user_login ? `de ${a.seller || a.user_login}` : ''].filter(Boolean).join(' · ')}</div>
+          {pris ? <div data-relier-deja={pris} style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pris}</div> : null}
         </div>
         <div data-relier-prix style={{ fontSize: 15, fontWeight: 700, color: C.text, flexShrink: 0 }}>{px != null ? prixCourt(px) : '—'}</div>
-        <Bouton variante="secondaire" data-relier-achat={String(a.transaction_id)} onClick={() => onRelier(a)} style={{ flexShrink: 0, minHeight: 44 }}>Relier</Bouton>
+        {pris ? <Bouton variante="discret" data-relier-deplacer={String(a.transaction_id)} onClick={() => onRelier(a, { deplacer: true })} style={{ flexShrink: 0, minHeight: 44 }}>Déplacer ici</Bouton>
+          : <Bouton variante="secondaire" data-relier-achat={String(a.transaction_id)} onClick={() => onRelier(a)} style={{ flexShrink: 0, minHeight: 44 }}>Relier</Bouton>}
       </div>
     );
   };
   const sel = { minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 13, fontFamily: 'inherit', padding: '0 8px', flex: '1 1 0', minWidth: 0 };
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang }))}</div>}
-      {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>Voir tous les achats</Bouton>}
+      {actuel ? (
+        <div data-relier-actuel={String(actuel.transaction_id || '')} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{orderPhoto(actuel) ? <PhotoVinted src={orderPhoto(actuel)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="link" size={18} style={{ color: C.muted }}/>}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: C.muted }}>Relié à</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actuel.title || '—'}</div>
+          </div>
+          {onDelier ? <Bouton variante="discret" data-relier-delier={String(actuel.transaction_id || '')} onClick={onDelier} style={{ flexShrink: 0, minHeight: 44 }}>Délier</Bouton> : null}
+        </div>
+      ) : null}
+      {!autre && sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang }))}</div>}
+      {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>Choisir un autre achat</Bouton>}
       {voirTous && (
         <div data-tous-achats={liste.length} style={{ marginTop: sugg.length ? 10 : 0 }}>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Titre, marque, n° de transaction" data-tous-achats-recherche
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Titre, marque, n° de transaction" data-tous-achats-recherche autoFocus={!!autre} type="search" enterKeyHint="search" aria-label="Chercher dans mes achats"
             style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit' }}/>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             {filtres.comptes.length > 1 && <select aria-label="Compte" data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">Tous les comptes</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
@@ -627,6 +645,18 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
           {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? 'Je lis les dates de réception de tes achats…' : 'Dates de réception pas lues : seules « Je l’ai retiré » comptent.'}</div> : null}
           {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{detail.sansReception} achat{detail.sansReception > 1 ? 's' : ''} sans date de réception lue, pas dans cette liste.</div>}
           {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
+          {(() => {
+            const pris = detail.pris || [];
+            if (!pris.length) return null;
+            const cherche = !!(q.trim() || nFiltres || compte || mois);
+            if (!cherche && !voirPris) return <Bouton variante="discret" data-relier-voir-pris={pris.length} onClick={() => setVoirPris(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>{`Déjà reliés (${pris.length})`}</Bouton>;
+            return (
+              <div data-relier-pris={pris.length} style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.muted }}>Déjà reliés</div>
+                {pris.slice(0, 100).map((a) => ligne(a, { 'data-achat-pris': String(a.transaction_id) }, (dejaRelie && dejaRelie(a)) || 'Déjà relié'))}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
