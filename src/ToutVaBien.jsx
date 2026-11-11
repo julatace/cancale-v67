@@ -22,7 +22,8 @@ import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { nomPlateforme } from './plateformes.js';
 import { ageLecture } from './comptesLies.js';
 import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
-import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS } from './App.jsx';
+import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS, useEstProprietaire, enTeteSession } from './App.jsx';
+import { AlertesProduction } from './composants/AlertesProduction.jsx';
 import './styles-tout-va-bien.css';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
@@ -154,6 +155,8 @@ function LigneAppareil({ a, maintenant, ouvert, onOuvrir }) {
 export function ToutVaBien({ onComptes }) {
   const { etat, relire } = useEtatCapture({ complet: true });
   const [ouvert, setOuvert] = React.useState(null);
+  // (11 nov.) Les alertes de production : au propriétaire seul (la route le revérifie).
+  const proprio = useEstProprietaire();
   if (etat === undefined || !etat.comptesPrets) return <div className="vrm-tvb" data-tout-va-bien="lecture"><div className="vrm-tvb-tete"><Pastille ton="passu"/><div><b className="vrm-tvb-resume">Je vérifie…</b></div></div></div>;
   const { appareils, pannes, lignes, passu, ancien, maintenant } = etat;
   const panneDe = new Map(pannes.map((p) => [`${p.plateforme}:${p.id}`, p]));
@@ -208,6 +211,7 @@ export function ToutVaBien({ onComptes }) {
           </div>
         ) : null}
       </GroupeIos>
+      {proprio ? <AlertesProduction entetes={enTeteSession}/> : null}
       {onComptes ? <div className="vrm-tvb-pied"><button type="button" className="vrm-lien-action" onClick={onComptes}>Gérer mes comptes liés</button></div> : null}
     </div>
   );

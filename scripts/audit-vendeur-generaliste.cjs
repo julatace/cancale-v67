@@ -42,6 +42,8 @@ const PERMIS = [
   ['src/profilVendeur.js', /./, 'la tuile « Sneakers » et la règle du mot'],
   ['src/ecrans/Reglages.jsx', /^'Sneakers'$/, 'Je vends : « Sneakers » est un des choix proposés'],
   ['src/ecrans/Ebay.jsx', /^'baskets mode'$/, 'clé de rapprochement des types d’article eBay (jamais affichée)'],
+  ['src/statsCategories.js', /^'Chaussures'$/, 'nom d’une famille de catégories Vinted (Statistiques par catégorie), affichée seulement si le vendeur a des chaussures'],
+  ['src/aideFiches.js', /^'(la mauvaise chaussure)'$/, 'côté Sneakers de la table de mots (remplacé par « le mauvais article » hors Sneakers)'],
 ];
 const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/i;
 // Les exemples de baskets (S3) et les fichiers qui ne contiennent que des LISTES de lecture
