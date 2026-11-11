@@ -90,34 +90,35 @@ file d'envoi faisait gagner l'appareil, sans un mot).
 - La file d'envoi d'avant reste pour tout ce qui n'est pas un geste (réglages, chiffres
   publiés par les écrans) : elle repart après le rejeu.
 
-## 5. ÉTAT À LA REPRISE (11 nov., soir)
+## 5. ÉTAT À LA REPRISE (11 nov., nuit) — TOUT VERT
 
-Tête poussée : voir `git log -1 origin/claude/hors-ligne`. Build vert (avec la liste des morceaux).
+Bancs repassés sur le build de la tête (réseau vraiment coupé) :
+- **`gestes-hors-ligne.cjs` : 113 OK, 0 KO** (390 et 1512 ; A réouverture hors ligne + écrans
+  jamais ouverts, B deux appareils / à trancher, C file pleine + geste pendant le rejeu,
+  D 429 puis 503, E coupure pendant un geste, F numéros intacts). Captures regardées
+  (`A-attente`, `B-trancher` 390/1512, `A-compta-hors-ligne`, `A-hors-ligne-1512`).
+- **Rouge sur l'avant** : le même banc sur le build de `main` (`/home/user/wt/main-ref/dist`) :
+  15 OK, 31 KO (pas de pastille, Annonces illisible hors ligne, aucun geste noté ni rejoué).
+- `hors-reseau.cjs` : 66 OK, 0 KO · `file-envoi.cjs` : 30 OK, 0 KO.
+- `audit-gestes-hors-ligne --prouve` : 17/17 mutations vues (la mutation « 429 ⇒ sauté » visait
+  la photo, pas l'écriture de `main` : corrigée, et la photo d'achat au rejeu est testée).
 
-**Fait et vérifié** : registre des gestes + rejeu (audit 16/16 mutations), intégration App.jsx,
-audits verts (variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
-quoi-de-neuf, traduction, gestes-hors-ligne §1–15, file-envoi, et ceux qui lisent `sw.js` :
-app-installable, csp, journee-hors-ligne, inventaire-hors-ligne, notifs-belles, signalement,
-vapid, verifier-production, diagnostic, aide-signalement, import-partage-aide).
+Corrigé pendant ces passages (apporté ou révélé par ce lot) :
+1. Écrans jamais ouverts hors ligne ⇒ liste des morceaux du build (écrite APRÈS Vite : un
+   morceau vide retiré faisait un 404 qui arrêtait tout), rangée par le service worker,
+   gardée par la purge.
+2. Comptes Vinted illisibles hors ligne (« Je n'ai pas pu lire tes comptes ») ⇒ dernière
+   liste lue gardée sur l'appareil SANS jeton ni cookie (`vrm_comptes_copie`), servie seulement
+   hors ligne mesuré et pour CE vendeur.
+3. Un prix = UN geste (il vit dans la fiche ET dans `vinted_buyprice_by_num`) : groupés par N°
+   dans la pastille et la feuille, un seul choix tranche les deux.
+4. Retour du réseau après une ouverture à froid : les gestes partent quand la porte se lève
+   (`suivreHorsLigne`), et le rejeu réessaie tant que la porte n'est pas revérifiée.
+5. Le bandeau froid disait « Rien n'est envoyé ni enregistré » : « Tes gestes partent au retour
+   du réseau » (tr) ; « vu à hh:mm » dit une fois (la mention de copie se tait hors ligne).
+6. Bancs voisins remis à la forme d'aujourd'hui : prix rangés « 41,00 » jugés en nombres,
+   saisie par le prochain geste d'Annonces, jeton neuf au renouvellement (comme Supabase).
 
-**Trouvé par le banc (1er passage)** et corrigé :
-1. Un écran à la demande jamais ouvert en ligne n'était PAS dans le cache du service worker :
-   hors ligne, « La page n'a pas pu se charger ». ⇒ `vite.config.js` publie
-   `/hors-ligne-assets.json` (≈ 100 morceaux, sans carte/3D/film), `public/sw.js`
-   (`rechaufferMorceaux`) les range un par un après la coquille ; la purge d'un déploiement les
-   garde (`nomsGardesHorsLigne`). Rangement à la 2e ouverture en ligne (la 1re n'est pas encore
-   servie par le service worker).
-2. La saisie en série ne s'ouvre plus par « Outils → Compléter les prix d'achat » : le banc passe
-   par le prochain geste d'Annonces (`data-ann-prochain-geste="prix"`).
-3. `hors-reseau.cjs` était rouge avant le lot (porte froide sans abonnement servi) : corrigé.
-
-**PAS ENCORE MESURÉ** : le banc `gestes-hors-ligne.cjs` n'a pas pu repasser après ces
-corrections — la file des créneaux lourds (`lourd.sh`, 40 à 50 commandes en attente) ne l'a pas
-servi en 2 h (tâche arrêtée à la limite). À faire en premier à la reprise :
-`BANC_TAILLES=390 BANC_PORT=… lourd.sh node scripts/bancs/gestes-hors-ligne.cjs`, regarder
-`en-ligne-390.png`, `A-settings-hors-ligne-390.png`, `A-attente-390.png`, `B-trancher-390.png` ;
-puis 1512 ; puis la preuve « rouge avant » : `BANC_DIST=/home/user/wt/main-ref/dist` (build de
-`main` sans le registre) doit rougir A–E ; puis `hors-reseau.cjs` et `file-envoi.cjs`
-(`NODE_OPTIONS=--require …/_porte-banc.cjs`) pour vérifier qu'ils restent verts.
-Si le banc rougit sur la pastille ou le registre, regarder d'abord la capture (porte fermée ?
-écran de secours ?) avant de toucher au code.
+Reste : rien de rouge connu dans ce lot. Le rangement des morceaux se fait à la 2e ouverture en
+ligne (la 1re n'est pas encore servie par le service worker) — ≈ 3,5 Mo une fois par
+déploiement (carte, 3D et film d'accueil exclus).
