@@ -50,6 +50,9 @@ function base(scen) {
   ];
   if (panne) rows.push({ id: 'panel_diag_capture', data: { ver: '5.322.0', verCode: '5.322.0', majAt: iso(1 * M), n: {}, rates: {} } });
   else rows.push({ id: 'panel_diag_capture', data: { ver: ATTENDUE, verCode: ATTENDUE, majAt: iso(6 * M), n: {}, rates: {} } });
+  // (11 nov., ext. 5.357) Vinted a changé la forme de sa page des ventes (prix devenu un nombre) :
+  // l'extension n'a rien rangé et l'a dit, sans aucune valeur, sur DEUX comptes ⇒ une seule ligne.
+  if (scen === 'forme') for (const u of ['111', '222']) rows.push({ id: `harvest_${u}_forme_inconnue`, data: { type: 'forme_inconnue', uid: u, at: iso(5 * M), formes: { orders_sold: { page: 'ventes', champ: 'price', attendu: 'prix', vu: 'number', forme: ['price:number', 'title:string'], vuLe: iso(5 * M), depuis: iso(2 * H), n: 3 } } } });
   return rows;
 }
 
@@ -117,6 +120,16 @@ async function scenario(b, scen, largeur, sombre) {
   } else {
     await pg.waitForTimeout(2500);
     dit(!(await alerte.count()), `${nom} : aucune ligne ambre`);
+    if (scen === 'forme') {
+      const f = pg.locator('[data-forme-vinted="journee"]');
+      await f.waitFor({ timeout: 10000 }).catch(() => {});
+      const t = (await f.count()) ? await f.innerText() : '';
+      dit((await f.locator('[data-forme-page]').count()) === 1 && /Vinted a changé sa page des ventes : VRM ne la lit plus, on corrige/.test(t), `${nom} : Ma journée dit « Vinted a changé sa page des ventes… » une fois (deux comptes)`, t);
+      await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-forme-journee-${nom}.png`) });
+      if (await f.count()) await f.locator('[data-forme-compris]').click();
+      await pg.waitForTimeout(300);
+      dit(!(await pg.locator('[data-forme-vinted="journee"]').count()), `${nom} : « Compris » la range (dite une fois)`);
+    }
     await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
   }
   // « Voir » ouvre le sous-écran lui-même ; sinon on touche la ligne de Paramètres.
@@ -144,6 +157,9 @@ async function scenario(b, scen, largeur, sombre) {
     }
   } else if (scen === 'ok') {
     dit(resume === 'Tout est à jour', `${nom} : « Tout est à jour »`, resume);
+    dit(!(await page.locator('[data-forme-vinted]').count()), `${nom} : aucune ligne « Vinted a changé »`);
+  } else if (scen === 'forme') {
+    dit(resume === 'Vinted a changé une page' && (await page.locator('[data-forme-vinted="tvb"] [data-forme-page="ventes"]').count()) === 1, `${nom} : Tout va bien ? dit « Vinted a changé une page » et la ligne des ventes`, resume);
   } else {
     dit(/pas pu tout vérifier/.test(resume) && !/Tout est à jour/.test(resume), `${nom} : pas su ⇒ jamais « Tout est à jour »`, resume);
   }
@@ -162,7 +178,7 @@ async function scenario(b, scen, largeur, sombre) {
   let b;
   try {
     b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const [scen, l, s] of [['panne', 390, false], ['panne', 1512, false], ['panne', 390, true], ['panne', 1512, true], ['ok', 390, false], ['ok', 1512, true], ['passu', 390, false]]) {
+    for (const [scen, l, s] of [['panne', 390, false], ['panne', 1512, false], ['panne', 390, true], ['panne', 1512, true], ['ok', 390, false], ['ok', 1512, true], ['passu', 390, false], ['forme', 390, false], ['forme', 1512, true]]) {
       try { await scenario(b, scen, l, s); } catch (e) { dit(false, `${scen}-${l} s’exécute`, String(e.message || e).slice(0, 200)); }
     }
   } catch (e) { dit(false, 'le banc s’exécute', String(e.message || e).slice(0, 200)); }

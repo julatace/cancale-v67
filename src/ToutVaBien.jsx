@@ -172,6 +172,7 @@ export function ToutVaBien({ onComptes }) {
   const ancienInconnu = av.ancienInconnu;
   const aFaire = (av.comptes || 0) + (av.extensions || 0);
   const sansAppareil = Array.isArray(appareils) && !appareils.length;
+  const nFormes = formes ? formes.length : 0;
   const resume = aFaire ? (aFaire === 1 ? '1 chose à voir' : `${aFaire} choses à voir`)
     : nFormes ? 'Vinted a changé une page'
     : passu.length ? 'Je n’ai pas pu tout vérifier'
@@ -181,7 +182,6 @@ export function ToutVaBien({ onComptes }) {
     : nFormes ? 'Rien à faire de ton côté : VRM corrige sa lecture.'
     : passu.length ? `Pas lu : ${passu.join(', ')}. Rien n’est affirmé pour eux.`
     : sansAppareil ? 'Aucune extension 5.327 ou plus récente n’a encore donné son appareil.' : `Vérifié ${quandRelu(maintenant)}.`;
-  const nFormes = formes ? formes.length : 0;
   const ton = aFaire || nFormes ? 'geste' : passu.length ? 'passu' : 'ok';
   const parSite = ['vinted', 'leboncoin', 'vestiaire', 'ebay'].map((p) => [p, lignes.filter((l) => l.plateforme === p)]).filter(([, l]) => l.length);
   return (

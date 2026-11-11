@@ -10,4 +10,4 @@
 }
 .vrm-forme-ligne { display: flex; align-items: flex-start; gap: 8px; margin: 0; flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
 .vrm-forme-point { flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--vrm-warn, #B25000); }
-.vrm-forme-compris { min-height: 44px; min-width: 44px; margin-left: auto; }
+.vrm-forme-compris { min-height: 44px; min-width: 44px; margin-left: auto; padding: 0 4px; border: 0; background: none; color: var(--w-accent, #0071E3); font: inherit; font-weight: 600; cursor: pointer; }

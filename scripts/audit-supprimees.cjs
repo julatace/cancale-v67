@@ -351,7 +351,7 @@ const numsDe = (r) => ((r && r.queue) || []).map((a) => String(a.numero)).sort()
     // Le dressing RELU (rangé) fait foi sur les suppressions d'avant : l'app doit
     // le savoir tout de suite, sinon elle garde la lecture d'hier et son âge.
     const f = faireFond({ src: BG_MUT, lignes: {} });
-    const r = await f.ctx.storeHarvestRow('111', 'listings', { items: [{ id: 6000000001, title: 'x', is_closed: false }], pagination: { total_entries: 1, total_pages: 1 } }, 'www.vinted.fr', { complet: true });
+    const r = await f.ctx.storeHarvestRow('111', 'listings', { items: [{ id: 6000000001, title: 'x', price: { amount: '10.0' }, is_closed: false }], pagination: { total_entries: 1, total_pages: 1 } }, 'www.vinted.fr', { complet: true });
     dit(r === 'ecrit' && f.j.evts.some((e) => e && e.type === 'maj' && e.quoi === 'annonces' && e.uid === '111'),
       'un dressing RANGÉ prévient l’app (maj · annonces) : elle relit et rajeunit « lu il y a… »', `${r} · ${JSON.stringify(f.j.evts)}`);
     const g = faireFond({ src: BG_MUT, lignes: { harvest_111_listings: { nItems: 61, capturedAt: new Date().toISOString(), payload: { items: [] } } } });

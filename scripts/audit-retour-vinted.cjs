@@ -124,7 +124,7 @@ const il = (ms) => Date.now() - ms;
   // 7. Une lecture COMPLÈTE rangée date le compte ; une partielle, non.
   {
     const f = faireFond({ src: F.src, connecte: UID, lignes: {} });
-    const items = [{ id: 1, title: 'a' }, { id: 2, title: 'b' }];
+    const items = [{ id: 1, title: 'a', price: { amount: '10.0' } }, { id: 2, title: 'b', price: { amount: '12.0' } }];   // 5.357 : la vraie forme (prix `{amount}`), sinon la porte de forme refuse
     await f.ctx.storeHarvestRow(UID, 'listings', { items: items.slice(0, 1), pagination: { total_entries: 2 } }, 'www.vinted.fr', { complet: false });
     const avant = (f.store.vrmCaptureComplete || {})[UID];
     dit(!avant, '7 · une lecture partielle du dressing ne date rien', String(avant));
