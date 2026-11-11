@@ -35,7 +35,8 @@ const ECRANS = [
   { nom: 'journee', tab: 'journee', w: 390, h: 844 },
   { nom: 'retirer', tab: 'cat_bord', w: 390, h: 844, gestes: [/^\s*À retirer/, /^\s*Code\s*$/], defile: 560 },
   { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844, defile: 620 },
-  { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/Micro-entrepreneur/, /^\s*Par mois\s*$/] },
+  { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/^\s*Ventes\s*$/, /^\s*Argent\s*$/, /^\s*Argent\s*$/, /^\s*Déclarer\s*$/, /^\s*Micro-entrepreneur/, /^\s*Par mois\s*$/] },
+  { nom: 'messages', tab: 'messages', w: 390, h: 844 },
   { nom: 'bureau', tab: 'journee', w: 1440, h: 900 },
 ];
 const SEUL = liste('SEUL', ECRANS.map((e) => e.nom).join(','));
@@ -57,9 +58,11 @@ async function capturer(nav, e, theme) {
   const ctx = await nav.newContext({ viewport: { width: e.w, height: e.h }, isMobile: tel, hasTouch: tel, deviceScaleFactor: 2, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', reducedMotion: 'reduce', serviceWorkers: 'block' });
   const sorties = [];
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => { sorties.push(r.request().url().slice(0, 80)); return r.abort(); });
-  await ctx.addInitScript((sombre) => {
-    try { sessionStorage.setItem('vrm_mode_exemple', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
-  }, sombre);
+  // (11 nov.) Le catalogue MÉLANGÉ (src/exempleDonnees.js `varie`) : la page parle
+  // à tout revendeur. CATALOGUE=baskets rend le jeu d'avant (pour comparer).
+  await ctx.addInitScript(({ sombre, varie }) => {
+    try { sessionStorage.setItem('vrm_mode_exemple', '1'); if (varie) sessionStorage.setItem('vrm_exemple_catalogue', 'varie'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
+  }, { sombre, varie: process.env.CATALOGUE !== 'baskets' });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (x) => erreurs.push(String(x.message || x).slice(0, 200)));

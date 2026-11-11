@@ -129,7 +129,9 @@ export function installerModeExemple(win = typeof window !== 'undefined' ? windo
   let ssReel = null, lsReel = null;
   try { ssReel = win.sessionStorage; lsReel = win.localStorage; } catch (_) { return false; }
   if (!demande(ssReel)) return false;
-  const jeu = jeuExemple(Date.now());
+  // (11 nov.) Les captures de la page d'accueil demandent un catalogue mélangé.
+  let varie = false; try { varie = ssReel.getItem('vrm_exemple_catalogue') === 'varie'; } catch (_) { varie = false; }
+  const jeu = jeuExemple(Date.now(), { varie });
   ETAT = { actif: true, ssReel, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes }, autres: {}, surPlace: 0, ecritures: 0, refusees: 0, coupes: 0 };
 
   // 1. LE STOCKAGE : en mémoire. La session de l'exemple n'existe que là.
