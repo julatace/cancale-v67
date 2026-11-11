@@ -35,6 +35,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  ['src/accueil/TempsGagne.jsx', ['*']],
   ['src/profil/MenuProfil.jsx', ['*']],
   ['src/composants/GardeEcran.jsx', ['*']],
   ['src/i18n/ChoixLangue.jsx', ['*']],
@@ -68,7 +69,7 @@ async function principal() {
   }
   // Les clés publiques (lues par la page d'accueil AVANT l'app) sont dans la partie publique.
   try {
-    const acc = lire('src/Accueil.jsx') + lire('src/main.jsx') + lire('src/i18n/ChoixLangue.jsx');
+    const acc = lire('src/Accueil.jsx') + lire('src/accueil/TempsGagne.jsx') + lire('src/main.jsx') + lire('src/i18n/ChoixLangue.jsx');
     const pub = (await import(pathToFileURL(path.join(R, 'src', 'i18n', 'langues', 'fr-accueil.js')).href + '?v=' + Math.random())).default;
     const hors = [...new Set([...acc.matchAll(/\btr\(\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)].map((m) => m[1]))].filter((k) => !(k in pub));
     dit(!hors.length, 'D0 chaque clé de l’accueil, du démarrage et du sélecteur est dans fr-accueil.js (sinon : la clé brute avant l’app)', hors);
