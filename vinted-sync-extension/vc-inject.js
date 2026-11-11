@@ -406,8 +406,12 @@
   // écrit en euros, au centime.
   const eurosEcrits = (t) => { const m = /^\s*(\d{1,3}(?:[\s\u00a0\u202f.]?\d{3})*|\d+)(?:,(\d{2}))?\s*€\s*$/.exec(String(t || '')); return m ? Number(m[1].replace(/[\s\u00a0\u202f.]/g, '')) + (m[2] ? Number(m[2]) / 100 : 0) : null; };
   function scalairesVente(e) {
-    const out = { etat: '', date: '', montant: null };
+    const out = { etat: '', date: '', montant: null, prixVente: null };
     if (e && typeof e.sellerEarning === 'string' && eurosEcrits(e.sellerEarning) != null) out.montant = { valeur: eurosEcrits(e.sellerEarning), devise: 'EUR', cle: 'sellerEarning' };
+    // 5.340 — LE PRIX DE VENTE de l'article (`sellerPrice`, une chaîne à côté de
+    // `sellerEarning`, mesurée dans `vc_ventes.forme` le 10 nov.) : pour la facture
+    // Pro. Lu SEULEMENT s'il est écrit en euros au centime ; sinon rien (jamais deviné).
+    if (e && typeof e.sellerPrice === 'string') { const pv = eurosEcrits(e.sellerPrice); if (pv != null && pv > 0) out.prixVente = { valeur: pv, devise: 'EUR', cle: 'sellerPrice' }; }
     const visite = (x, prof, chemin) => {
       if (!x || typeof x !== 'object' || prof > 2) return;
       for (const k of Object.keys(x).slice(0, 80)) {
@@ -531,7 +535,7 @@
         const cv = colisVente(e); const sv = suiviAchat(e);
         const fi = ficheAnnonce(e);
         const titre = [typeof e.brandName === 'string' ? e.brandName.trim() : '', fi.titre].filter(Boolean).join(' ').slice(0, 140);
-        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant, limite: cv.limite, etiquette: cv.etiquette, suivi: sv.suivi, transporteur: sv.transporteur, titre, photo: photoVc(e.imageUrl) || photoAnnonce(e) };
+        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant, ...(sc.prixVente ? { prixVente: sc.prixVente } : {}), limite: cv.limite, etiquette: cv.etiquette, suivi: sv.suivi, transporteur: sv.transporteur, titre, photo: photoVc(e.imageUrl) || photoAnnonce(e) };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];

@@ -207,7 +207,7 @@ function ConversationsLeboncoin() {
           </div>
           {/* Un compte « pas encore lu » : le geste est dit UNE fois, sous la liste
               (§7) — pas sur chaque ligne. */}
-          {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension, et son nombre de messages arrivera ici.</div> : null}
+          {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension.</div> : null}
           {/* (3 nov., 5.318) Les conversations LUES par l'extension : texte, date, « de toi ». */}
           {fils.length ? (
             <div className="vrm-msg-list" data-lbc-convs={fils.length} style={{ marginTop: 10 }}>

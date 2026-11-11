@@ -1335,7 +1335,7 @@ function MailEssaiSetting() {
   return (
     <div data-mail-essai={etat && etat !== 'envoi' ? etat.ok : etat === 'envoi' ? 'envoi' : 'pret'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
       <div className="vrm-np-ligne">
-        <span className="vrm-np-lib">Voir un e-mail de VRM<small>Un e-mail d’essai, à l’adresse de ton compte. Trois par heure au plus.</small></span>
+        <span className="vrm-np-lib">Voir un e-mail de VRM<small>Arrive sur l’adresse de ton compte (3 par heure).</small></span>
         <Bouton variante="secondaire" className="vrm-b-petit" disabled={etat === 'envoi'} onClick={envoyer}>{etat === 'envoi' ? 'Envoi…' : 'M’envoyer un e-mail d’essai'}</Bouton>
       </div>
       {etat && etat !== 'envoi' ? <div className="vrm-np-relance" role="status" style={{paddingTop:6}}>{etat.texte}</div> : null}
@@ -2369,7 +2369,7 @@ function DoubleVerification({ onEtat } = {}) {
       </>)}
       {cours && cours.etape === 'qr' && (<>
         {cours.ajout && <div data-mfa-ajout-consigne="" style={{...txt,marginBottom:6}}>Prends <b style={{color:C.text}}>l'autre appareil</b> (« {cours.nom} »), pas celui des codes actuels.</div>}
-        <div style={txt}><b style={{color:C.text}}>1.</b> Sur {cours.ajout ? 'cet appareil' : 'ton iPhone'}, ouvre l'app <b style={{color:C.text}}>Mots de passe</b> (ou Google Authenticator), touche « + » puis scanne ce code :</div>
+        <div style={txt}><b style={{color:C.text}}>1.</b> Sur {cours.ajout ? 'cet appareil' : 'ton iPhone'}, dans <b style={{color:C.text}}>Mots de passe</b> (ou Authenticator), touche « + » et scanne :</div>
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:12,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
@@ -2660,15 +2660,15 @@ function FermerCompte({ onExporter }) {
             </div>
           ) : info.proprietaire ? (
             <div data-fermer-etat="proprietaire" style={txt}>
-              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Supprimer ce compte effacerait toute la boutique : désactivé ici, exprès.
+              <b style={{ color: C.text }}>Compte propriétaire : suppression désactivée ici.</b> <Pourquoi>Tu es le propriétaire de cette installation VRM. Supprimer ce compte effacerait toute la boutique : désactivé ici, exprès.</Pourquoi>
             </div>
           ) : (
             <div data-fermer-etat="possible">
-              <span style={{ ...titreBloc, marginTop: 0 }}>1. D’abord, garde une copie</span>
+              <div style={{ ...titreBloc, marginTop: 0 }}>1. D’abord, garde une copie</div>
               <div style={txt}>Un fichier sur ton appareil : ventes, achats, stock, compta, factures.</div>
               {onExporter && <div style={{ marginTop: 8 }}><Bouton variante="secondaire" onClick={onExporter} data-supprimer-exporter="">Exporter mes données</Bouton></div>}
 
-              <span style={titreBloc}>2. Ce qui sera supprimé</span>
+              <div style={titreBloc}>2. Ce qui sera supprimé</div>
               <ul data-supprimer-liste="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
                 <li>Tes données VRM : ventes, annonces captées, numéros, compta, réglages, notifications ({nb(Math.max(0, n.donnees - n.facturesPro), 'élément', 'éléments')}).</li>
                 <li>{n.comptesVinted ? `Tes comptes Vinted liés (${n.comptesVinted}) et leurs connexions.` : 'Tes connexions aux sites de revente.'}</li>
@@ -2677,7 +2677,7 @@ function FermerCompte({ onExporter }) {
                 {info.abonnement && info.abonnement.actif && <li data-supprimer-abonnement="">Ton abonnement est résilié d’abord : aucun nouveau prélèvement.</li>}
               </ul>
 
-              <span style={titreBloc}>3. Ce qui est gardé, et pourquoi</span>
+              <div style={titreBloc}>3. Ce qui est gardé, et pourquoi</div>
               <ul data-supprimer-garde="" style={{ ...txt, margin: '4px 0 0', paddingLeft: 18 }}>
                 {n.facturesPro > 0 && <li data-supprimer-factures={n.facturesPro}>{nb(n.facturesPro, 'facture Pro émise', 'factures Pro émises')} : gardée{n.facturesPro > 1 ? 's' : ''} 10 ans (loi), sans accès. Exporte-les aussi.</li>}
                 <li>Les factures de ton abonnement VRM, chez Stripe (même obligation de 10 ans).</li>
@@ -2686,7 +2686,7 @@ function FermerCompte({ onExporter }) {
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la suppression, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
 
-              <span style={titreBloc}>4. Confirme que c’est toi</span>
+              <div style={titreBloc}>4. Confirme que c’est toi</div>
               <label style={{ display: 'block', ...txt, marginTop: 4 }}>
                 Tape <b style={{ color: C.text }}>{MOT_SUPPRIMER}</b> en majuscules
                 <input type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={tape} onChange={(e) => setTape(e.target.value)}
@@ -2867,17 +2867,20 @@ function MonAbonnement() {
       <Tete etat="Ton abonnement" titre="Compte propriétaire" phrase="Compte propriétaire de VRM : gratuit, aucun abonnement.">
         {mentionsAremplir && (
           <div data-mentions-manquantes={mentionsAremplir.length} style={note}>
-            Le paiement reste <b>fermé</b> tant que les mentions légales sont incomplètes ({mentionsAremplir.join(', ')}). Elles se remplissent dans <b>public/legal/editeur.js</b>, et l'adresse de contact aussi dans src/contact.js.
+            Paiement <b>fermé</b> : mentions légales incomplètes ({mentionsAremplir.join(', ')}). À remplir dans <b>public/legal/editeur.js</b>.{' '}
+            <Pourquoi>Le paiement reste fermé tant que les mentions légales sont incomplètes. Elles se remplissent dans public/legal/editeur.js, et l'adresse de contact aussi dans src/contact.js.</Pourquoi>
           </div>
         )}
         {e.mentionsCompletes === null && (
           <div data-mentions-manquantes="pas-su" style={{ ...note, color: C.muted }}>
-            Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : paiement fermé. Écris les textes entre guillemets droits (« "Marie d'Exemple" »).
+            Je n'ai pas pu relire <b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> (« {e.mentionsErreur.trim().slice(0, 160)} »)</> : null} : paiement fermé.{' '}
+            <Pourquoi>Les mentions légales n'ont pas pu être relues : le paiement reste fermé. Écris les textes entre guillemets droits (« "Marie d'Exemple" »).</Pourquoi>
           </div>
         )}
         {prixAcorriger && (
           <div data-prix-stripe="different" style={note}>
-            Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) ≠ CGV (<b>{PRIX_CGV_LISIBLE}</b>) : paiement <b>fermé</b>. Stripe → Produits : prix {PRIX_CGV_LISIBLE.replace(' / ', ' par ')}, clé « vrm_mensuel » (« transférer la clé »).
+            Prix Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) ≠ CGV (<b>{PRIX_CGV_LISIBLE}</b>) : paiement <b>fermé</b>. Corrige la clé « vrm_mensuel » chez Stripe.{' '}
+            <Pourquoi>Stripe → Produits : prix {PRIX_CGV_LISIBLE.replace(' / ', ' par ')}, clé « vrm_mensuel » (« transférer la clé »).</Pourquoi>
           </div>
         )}
         {e.offres && e.offres.pro && !e.offres.pro.ouvert && (
@@ -2895,7 +2898,7 @@ function MonAbonnement() {
   );
   // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
   if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/></div>;
-  const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
+  const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée. <Pourquoi label="Carte d’essai">Carte d'essai 4242 4242 4242 4242.</Pourquoi></div> : null;
   const cb = fx && fx.carte;
   const texteCarte = cb ? `${cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : 'Carte'} •••• ${cb.fin}${cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}` : (fx === undefined && e.peutGerer ? 'Je regarde…' : null);
   const listeFactures = e.peutGerer ? <FacturesAbonnement fx={fx}/> : null;
@@ -3616,12 +3619,13 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
       )}
       {mode === 'lettre' && !refusee && !enregistree && (
         <div data-numeros-lettre-a-taper style={{fontSize:12,color:C.muted,marginTop:8,lineHeight:1.5}}>
-          Tape la lettre de ta série : tant qu'aucune n'est tapée, tes prochains numéros restent en <b>chiffres</b> (1, 2, 3…).
+          Tape la lettre de ta série. Sans lettre : <b>chiffres</b> (1, 2, 3…).
         </div>
       )}
       {mode === 'lettre' && arch && refusee && (
         <div data-numeros-lettre-archive style={{fontSize:12,color:C.text,marginTop:8,lineHeight:1.5}}>
-          « {refusee} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : elle n'est pas enregistrée. Tes prochains numéros restent {enregistree ? <>en <b>{enregistree}</b> ({enregistree}1, {enregistree}2…)</> : <>en <b>chiffres</b> (1, 2, 3…)</>}. Choisis une autre lettre.
+          « {refusee} » est la lettre de tes <b>anciens</b> numéros : pas enregistrée. Choisis une autre lettre.{' '}
+          <Pourquoi>« {refusee} » est la lettre de tes anciens numéros ({arch}1, {arch}2…) : elle n'est pas enregistrée. Tes prochains numéros restent {enregistree ? <>en {enregistree} ({enregistree}1, {enregistree}2…)</> : <>en chiffres (1, 2, 3…)</>}.</Pourquoi>
         </div>
       )}
       <div style={{fontSize:12,color:C.muted,marginTop:8,lineHeight:1.5}}>
@@ -3875,7 +3879,7 @@ function ReglagesStream() {
       <h3 className="vrm-stream-h" style={{color:C.muted}}>Photos</h3>
       <div className="vrm-stream-cats">
         <div className="vrm-set-ligne" data-stream-option="photos" data-stream-cache={regles.photos ? '1' : '0'}>
-          <span className="vrm-set-lib"><b style={{color:C.text}}>Flouter aussi les photos</b><small style={{color:C.muted}}>Les photos des articles qui ont une de tes marques ou un de tes mots.</small></span>
+          <span className="vrm-set-lib"><b style={{color:C.text}}>Flouter aussi les photos</b><small style={{color:C.muted}}>Articles avec une de tes marques ou un de tes mots.</small></span>
           <Interrupteur on={!!regles.photos} label="Flouter aussi les photos" onClick={() => changer({ photos: !regles.photos })}/>
         </div>
         <div className="vrm-set-ligne" data-stream-option="photosToutes" data-stream-cache={regles.photosToutes ? '1' : '0'}>
@@ -4036,9 +4040,10 @@ function EmailStartSetting({ nu = false }) {
           cette date — il reçoit pour tous les vendeurs ; sa date de départ est la
           propriété VRM_START_DATE du script. Réservé au propriétaire (Paramètres). */}
       <div data-import-collectif="" style={{fontSize:12,color:C.muted,margin:'-6px 0 12px',lineHeight:1.45}}>
-        Avec la boîte collective, cette date ne s’applique pas : le script utilise sa propriété <code>VRM_START_DATE</code> (Apps Script → Paramètres du projet → Propriétés du script).
+        Boîte collective : cette date ne s’applique pas.{' '}
+        <Pourquoi>Avec la boîte collective, le script utilise sa propriété <code>VRM_START_DATE</code> (Apps Script → Paramètres du projet → Propriétés du script).</Pourquoi>
       </div>
-      {reprise&&<p role="status" className="vrm-settings-draft" style={{color:C.warn}}>Une modification non enregistrée a été reprise pour ce compte. La date en ligne reste {base?base.split('-').reverse().join('/'):'non définie'} tant que tu ne valides pas.</p>}
+      {reprise&&<p role="status" className="vrm-settings-draft" style={{color:C.warn}}>Une modification non enregistrée a été reprise. En ligne : {base?base.split('-').reverse().join('/'):'non définie'} tant que tu ne valides pas.</p>}
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontSize:12,fontWeight:500,color:C.text}}>À partir du</span>
         <input type="date" value={date} onChange={e=>{setDate(e.target.value);setStatus('modifie');}} disabled={status==='load'||status==='pasLu'||status==='saving'}
@@ -4784,11 +4789,12 @@ function EmailsSetting({onComptes}) {
             sur chaque ligne il ne reste que SON état et SON geste. */}
         {aConfirmer.length > 0 && (
           <div data-preuve-explication={preuves && preuves.installation ? 'installation' : 'vendeur'} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 8px'}}>
-            Chaque adresse se confirme une fois : VRM envoie un lien <b style={{color:C.text}}>à cette adresse</b>, et tu l'ouvres en étant connecté à VRM.{' '}
+            Chaque adresse se confirme une fois, par un lien reçu <b style={{color:C.text}}>dessus</b>.{' '}
             {preuves && preuves.installation
               ? "Les tiennes restent reçues en attendant ; confirme-les pour les protéger."
               : "Pas confirmée : ses e-mails sont mis de côté, rendus à la confirmation."}
             {phraseBoite ? <span data-preuve-boite={!boite.at ? 'jamais' : boiteAge > 30 * 60000 ? 'arretee' : 'active'}>{' '}{phraseBoite}</span> : null}
+            {' '}<Pourquoi>VRM envoie un lien à cette adresse, et tu l'ouvres en étant connecté à VRM.</Pourquoi>
           </div>
         )}
         {preuves === null && (

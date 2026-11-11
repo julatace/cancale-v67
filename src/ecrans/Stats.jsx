@@ -1211,16 +1211,16 @@ const lireProfilsNotes = async () => {
       // (À venir) la liste des avis, quand l'extension lira /api/v2/user_feedbacks :
       // tant que la ligne n'existe pas, la liste reste « pas encore lue ».
       // (10 nov., lot BN) la ligne est petite (20 avis sans personne, < 1 Ko) : projetée, jamais `select=data`.
-      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_feedbacks&data->>type=eq.feedbacks&select=id,avis:data->payload->user_feedbacks,pag:data->payload->pagination`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_feedbacks&data->>type=eq.feedbacks&select=id,avis:data->payload->user_feedbacks,pag:data->payload->pagination,hist:data->payload->historique`, { headers: sbAuth() }),
     ]);
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
-    const avis = {}, pags = {};
-    try { if (f.ok) { const fj = await f.json(); if (Array.isArray(fj)) for (const x of fj) { const u = ((x && x.id) || '').match(/^harvest_(\d+)_feedbacks$/); if (u && Array.isArray(x.avis)) { avis[u[1]] = x.avis; pags[u[1]] = x.pag && typeof x.pag === 'object' ? x.pag : null; } } } } catch (_) {}
+    const avis = {}, pags = {}, hists = {};
+    try { if (f.ok) { const fj = await f.json(); if (Array.isArray(fj)) for (const x of fj) { const u = ((x && x.id) || '').match(/^harvest_(\d+)_feedbacks$/); if (u && Array.isArray(x.avis)) { avis[u[1]] = x.avis; pags[u[1]] = x.pag && typeof x.pag === 'object' ? x.pag : null; hists[u[1]] = Array.isArray(x.hist) ? x.hist : null; } } } } catch (_) {}
     return j.map((x) => {
       const uid = String((x && x.uid) || ((x && x.id) || '').match(/^harvest_(\d+)_profile$/)?.[1] || '');
-      return { uid, at: x.at, login: x.login, rep: x.rep, n: x.n, pos: x.pos, neu: x.neu, neg: x.neg, avis: avis[uid], pag: pags[uid] || null };
+      return { uid, at: x.at, login: x.login, rep: x.rep, n: x.n, pos: x.pos, neu: x.neu, neg: x.neg, avis: avis[uid], pag: pags[uid] || null, hist: hists[uid] || null };
     });
   } catch (_) { return null; }
 };

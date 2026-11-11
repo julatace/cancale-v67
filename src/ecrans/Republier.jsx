@@ -509,7 +509,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, border: `1px solid ${reel ? C.warn : C.border}`, borderRadius: 12, padding: 10, background: reel ? `${C.warn}0c` : 'transparent' }}>
               <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', cursor: 'pointer' }}>
                 <input type="checkbox" data-file-reel checked={reel} onChange={ev => { setReel(ev.target.checked); if (!ev.target.checked) setReelOk(false); }} style={{ marginTop: 2, accentColor: C.warn, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: C.text }}><b>Publier pour de vrai sur Vinted</b> : baisser le prix de chaque annonce. <span style={{ color: C.muted }}>Même N°, rien supprimé ; une annonce douteuse est sautée.</span></span>
+                <span style={{ fontSize: 13, color: C.text }}><b>Pour de vrai sur Vinted</b> : baisse chaque prix. <span style={{ color: C.muted }}>Même N°, rien supprimé, douteuse sautée.</span></span>
               </label>
               {majExt && <div data-file-reel-maj style={{ fontSize: 12, color: C.warn, paddingLeft: 27 }}>Mets l'extension à jour ({EXT_ATTENDUE}), connectée au bon compte : sinon rien ne part.</div>}
               {reel && <>
