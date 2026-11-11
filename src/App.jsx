@@ -436,6 +436,7 @@ import { registrePointsConnus, completerParPointConnu, lieuLePlusComplet, memePo
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais.jsx";
 import AlerteRelaisChange from "./AlerteRelaisChange.jsx";
+import { placeDesColis, ecranDeCible } from "./colisPlace.js";
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
@@ -14459,7 +14460,10 @@ const BOTTOM_TABS=[
   {id:'journee',  icon:'sun',  label:'Ma journée', court:'Journée'},
   {id:'annonces', icon:'grid', label:'Annonces'},
   {id:'ventes',   icon:'bag',  label:'Ventes'},
-  {id:'cat_bord', icon:'box',  label:'Colis'},
+  // (11 nov., lot DJ3 — Julien : « regrouper les colis à expédier dans les ventes, les colis à retirer
+  // dans achats ») Plus d'onglet Colis : « À expédier » est en tête de Ventes, « À retirer » en tête
+  // d'Achats, qui prend sa place dans la barre (src/colisPlace.js : les anciens chemins y mènent).
+  {id:'achats',   icon:'cart', label:'Achats'},
 ];
 // Messages : dans la colonne de l'ordinateur ; sur téléphone, dans « Plus »
 // (cinq places dans la barre, la cinquième est « Plus »).
@@ -14495,7 +14499,6 @@ const GROUPES_PLUS=[
     // tout ce que VRM n'a pas pu décider, une ligne = un geste (src/aTrancher.js).
     {id:'trancher',   icon:'help', label:'À trancher'},
     {id:'garage',     icon:'home', label:'Stock'},
-    {id:'achats',     icon:'cart', label:'Achats'},
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
     {id:'emails',     icon:'mail', label:'E-mails'},
     // (10 nov., Julien : « L'onglet Compta est trop flou, tu peux peut-être le relier avec
@@ -14526,7 +14529,7 @@ const PLUS_TABS=GROUPES_PLUS.filter(g=>!g.ordi).flatMap(g=>g.items).filter((t,i,
 // Quand on est DANS un écran que la barre ne porte pas, quel onglet reste
 // allumé. Une notion, une source (§11).
 const BAR_GROUPE={
-  cat_expedition:'cat_bord',
+  cat_expedition:'ventes',
   // (29 oct., revue) Organisation s'ouvre depuis Réglages : la roue est mise en avant.
   organisation:'settings',
   // (10 nov.) Statistiques est un segment d'Argent : l'entrée « Argent » reste allumée.
@@ -14565,7 +14568,9 @@ const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
   cat_msg: ['messages', 'vinted'], leboncoin: ['annonces', 'leboncoin'], ebay_annonces: ['annonces', 'ebay'],
-  cat_achats: ['cat_bord', 'retirer'], retraits: ['cat_bord', 'retirer'], ebay_agent: ['ventes', 'ebay.agent'], vestiaire_ventes: ['ventes', 'vestiaire'],
+  // (11 nov., lot DJ3) Colis n'est plus un onglet : « À expédier » en tête de Ventes, « À retirer » en tête
+  // d'Achats. `setTab` affine avec `placeDesColis` (src/colisPlace.js : « retirer » demandé ⇒ Achats).
+  cat_achats: ['achats', null], retraits: ['achats', null], cat_bord: ['ventes', null], cat_expedition: ['ventes', null], ebay_agent: ['ventes', 'ebay.agent'], vestiaire_ventes: ['ventes', 'vestiaire'],
   vestiaire_annonces: ['annonces', 'vestiaire'],
   // (10 nov.) Argent : `?tab=argent`, `?tab=stats`, et la vue « Déclarer » (src/argent.js).
   ...CHEMINS_ARGENT,
@@ -15166,8 +15171,11 @@ function BarreHaut({ champ, poserSlot }) {
 // dans n'importe quel <a href=…>point relais</a> ») : on n'affiche que le texte, jamais une balise.
 const texteSansBalises = (t) => String(t == null ? '' : t).replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 const CIBLE_NOTIF = { c: null, tab: null, at: 0 };
+// (11 nov., lot DJ3) L'onglet de colis demandé juste avant un `setTab` (« À trancher », recherche…).
+const DEMANDE_COLIS = { o: null, at: 0 };
 const poserCible = (c, tab) => {
-  CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = tab || null; CIBLE_NOTIF.at = Date.now();
+  // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
+  CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = ecranDeCible(tab || null, c) || null; CIBLE_NOTIF.at = Date.now();
   // (6 nov., vague 3) Une case du Stock est aussi SÉLECTIONNÉE par le Stock (pas seulement éclairée).
   if (c && c.type === 'case' && c.meuble && c.i !== '' && c.i != null) { DEMANDE_STOCK_CASE.m = String(c.meuble); DEMANDE_STOCK_CASE.i = Number(c.i); DEMANDE_STOCK_CASE.at = Date.now(); try { window.dispatchEvent(new Event('vrm:stock-case')); } catch (_) {} }
   try { window.dispatchEvent(new Event('vrm:cible-notif')); } catch (_) {}
@@ -17596,7 +17604,8 @@ function useRejouerInventaire(pret) {
   }, [pret]);
 }
 // Les onglets qui montrent COLIS hors réseau (`cat_bord`, et ceux qui y mènent).
-const ONGLETS_COLIS_HL = ['cat_bord', 'retraits', 'cat_achats', 'cat_expedition'];
+// (11 nov., lot DJ3) + Ventes (« À expédier ») et Achats (« À retirer ») : les colis y vivent désormais.
+const ONGLETS_COLIS_HL = ['cat_bord', 'retraits', 'cat_achats', 'cat_expedition', 'ventes', 'achats'];
 function JourneeHorsLigne({ uid, tab }) {
   const [, tic] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { const t = setInterval(tic, 60000); return () => clearInterval(t); }, []);
@@ -17619,7 +17628,7 @@ function JourneeHorsLigne({ uid, tab }) {
   );
   // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
   // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
-  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? 'Colis' : 'Ma journée'}</h2>;
+  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? (tab === 'ventes' ? 'Ventes' : tab === 'achats' ? 'Achats' : 'Colis') : 'Ma journée'}</h2>;
   if (!photo) return (
     <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
       {titre}
@@ -28452,7 +28461,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, filTous = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, filTous = false, colisDans = null }) {
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
@@ -38647,6 +38656,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ventes Vinted, `colisEbay`, `colisVestiaire`, `pickupUnion` pour les
   // retraits, `venteStage` pour les partis. `colonnesColis` les range.
   const [siteColis, setSiteColis] = useState(() => (SITES_COLIS.includes(siteColisDemande) && siteColisDemande !== 'leboncoin') ? siteColisDemande : 'toutes');
+  // (11 nov., lot DJ3) En section de Ventes / d'Achats, le site suit le filtre de l'écran hôte (un seul filtre).
+  React.useEffect(() => { if (colisDans) setSiteColis((SITES_COLIS.includes(siteColisDemande) && siteColisDemande !== 'leboncoin') ? siteColisDemande : 'toutes'); }, [colisDans, siteColisDemande]);
   useEffect(() => { if (Array.isArray(profilPlateformes.plateformes) && siteColis !== 'toutes' && !profilPlateformes.plateformes.includes(siteColis)) setSiteColis('toutes'); }, [siteColis, profilPlateformes.plateformes?.join('|')]);
   // (2 nov., Julien : « des données Vinted dans eBay, inadmissible ») Le filtre de
   // site vaut pour TOUT Colis, pas seulement les colonnes : un bloc d'un site ne
@@ -41618,7 +41629,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {[['all','Toutes'],['transit',L.enRoute],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
             <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'background-color .15s ease, color .15s ease'}}>{label}</button>
           ))}
-          {onNav ? <button type="button" className="vrm-ventes-vers-colis" data-ventes-vers-colis="" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{L.aEnvoyer} : Colis ›</button> : null}
+          {/* (11 nov., lot DJ3) Plus de « À envoyer : Colis › » : la section « À expédier » est en tête de cet écran. */}
+          {false && onNav ? <button type="button" className="vrm-ventes-vers-colis" data-ventes-vers-colis="" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{L.aEnvoyer} : Colis ›</button> : null}
         </div>
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
@@ -42134,7 +42146,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Ce qui n'est ni un filtre, ni un chiffre, ni une vente vit ici :
             colis à expédier (il a son écran), argent en attente et son détail,
             vente repérée via bordereau, ventes par jour. */}
-        {toShip.length>0 && (()=>{
+        {/* (11 nov., lot DJ3) « N colis à expédier · le plus pressé » n'est plus redit ici : la section
+            « À expédier », en tête de Ventes, porte chaque colis, sa limite et ses gestes (une fois, §7). */}
+        {false && toShip.length>0 && (()=>{
           // (revue du 22 oct.) « en retard » : une limite LUE et dépassée ; une
           // date estimée dépassée est « à vérifier » (`retard`, le module).
           const late = toShip.filter(t=>t.retard).length;
@@ -42350,9 +42364,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé." right={<div className="vrm-achats-gestes" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}{gestesRetraitAchats}</div>}/>)}
         {/* (9 nov.) Pas dans Colis → À retirer : ce bloc y est rendu SOUS la liste (avant « Argent à vérifier ») et Colis porte
             déjà « Scanner » en tête de l'onglet (mode retrait) ; il ne reste que dans l'espace plateforme → Achats. */}
-        {dansPlateforme && !modeRetraits && !baseKO && pickupUnion.total > 0 ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}{gestesRetraitAchats}</div> : null}
-        {/* (10 nov., lot L) Dans l'espace Vinted (pas d'en-tête), la calculette garde sa place en haut. */}
-        {dansPlateforme && !modeRetraits && !(!baseKO && pickupUnion.total > 0) ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}</div> : null}
+        {/* (11 nov., lot DJ3) « Scanner » au point relais vit dans la barre de la section « À retirer », en tête
+            d'Achats (une fois) : ici, la calculette seule. */}
+        {dansPlateforme && !modeRetraits ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
@@ -42376,7 +42390,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
             compte connecté dans l'onglet) : dit ICI, sur l'écran où il le constate. Se tait si elle est à jour. */}
-        <ExtEnRetard onNav={onNav}/>
+        {/* (11 nov., lot DJ3) Une fois sur Achats : la liste le dit, pas ses outils de retrait. */}
+        {!retraitsOutils && <ExtEnRetard onNav={onNav}/>}
         {/* (5 nov., revue 2.16) Fournisseurs · Délai · Lots rangés derrière « … » : une seule carte de
             chiffres en tête, les outils à un geste (src/AchatsOutils.jsx, inchangé). */}
         {!modeRetraits && !baseKO && achatsOutilsOuverts && <div className="vrm-achats-outils" id="vrm-achats-outils" data-achats-outils="ouverts">
@@ -42433,7 +42448,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             règle (`pickupUnion.total`), seulement quand les e-mails de suivi sont lus. */}
         {/* (5 nov.) Le chemin vers Colis reste ; dans l'espace Vinted, la carte sombre dit déjà le nombre :
             le lien ne le répète pas (le même nombre une fois, §7). */}
-        {modeListeAchats && tracking!==null && pickupUnion.total>0 && (
+        {/* (11 nov., lot DJ3) Plus de lien « → Colis » : la section « À retirer » est en tête de cet écran. */}
+        {false && modeListeAchats && tracking!==null && pickupUnion.total>0 && (
           <div style={{margin:'0 0 12px'}}>
             <button type="button" className="vrm-lien-action" data-achats-vers-colis={pickupUnion.total} onClick={()=>onNav&&onNav('cat_achats')}
               style={{minHeight:44,background:'transparent',border:0,padding:0,color:C.text,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
@@ -42611,7 +42627,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* (10 nov.) « Votre colis a changé de plan » : POINT RELAIS CHANGÉ, en ambre, avec le
             nouveau point LU dans l'e-mail et son itinéraire (src/AlerteRelaisChange.jsx). */}
-        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>}
+        {/* (11 nov., lot DJ3) Sur Achats, l'alerte est rendue une fois, dans la section « À retirer » (ses outils). */}
+        {(aFilter==='attente' || (aFilter==='route' && !modeListeAchats)) && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>}
         {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
             des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
@@ -43440,6 +43457,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (db||0) - (da||0);
           });
           if (!rendus.length) return null;
+          // (11 nov., lot DJ3) Sur Achats, « Argent à vérifier » est dit une fois : sous « À retirer » (ses outils).
+          if (modeListeAchats) return null;
           const avecMontant = rendus.filter(r => r.o && montantCommande(r.o) > 0);
           const tot = avecMontant.reduce((t,r) => t + montantCommande(r.o), 0);
           const auMoins = avecMontant.length < rendus.length;
@@ -45237,7 +45256,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // restent. Un colis d'un autre site (eBay, Leboncoin, Vestiaire) ⇒ les
           // colonnes restent aussi : il y a quelque chose de LU à montrer.
           colisSansCompte = noAcc && !baseKO && vue.total === 0;
-          if (colisSansCompte) return (<>
+          if (colisSansCompte) return colisDans ? null : (<>
             <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"/>
             <div data-colis-sans-compte="">
               <EmptyState icon="link" title="Aucun compte Vinted lié"
@@ -45263,7 +45282,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const uEnv = urgenceColis();
           const urgentEnv = !!(uEnv && uEnv.total) || !!(colisEb && (colisEb.aPoster || []).some(x => x.jours != null && x.jours <= 1));
           const urgentRet = !!(pubRet && pubRet.urgents) || ((colRet && colRet.cartes) || []).some(x => x.ambre);
-          const onglet = ongletColis === 'retirer' || ongletColis === 'envoyer' || ongletColis === 'envoyes' ? ongletColis : (urgentRet && !urgentEnv ? 'retirer' : 'envoyer');
+          // (11 nov., lot DJ3 — Julien : « regrouper les colis à expédier dans les ventes, les colis à retirer
+          // dans achats ») `colisDans` : ce même écran rendu EN SECTION — « À expédier » en tête de Ventes
+          // (À envoyer · Envoyés), « À retirer » en tête d'Achats. Mêmes règles, mêmes cartes, mêmes gestes.
+          const onglet = colisDans === 'achats' ? 'retirer'
+            : colisDans === 'ventes' ? (ongletColis === 'envoyes' ? 'envoyes' : 'envoyer')
+            : ongletColis === 'retirer' || ongletColis === 'envoyer' || ongletColis === 'envoyes' ? ongletColis : (urgentRet && !urgentEnv ? 'retirer' : 'envoyer');
           ongletColisVu = onglet;
           // (3 nov.) « Envoyés · N » : le nombre de cartes de l'onglet (la même liste, `listeEnvoyes`).
           // Ventes Vinted pas encore lues ⇒ pas de nombre (jamais un 0 inventé, §5).
@@ -45432,9 +45456,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const su = t ? String(suiviDeLigne(t) || '') : ''; if (/^colis\b/i.test(String(x.titre || '')) && su) return `n°…${su.slice(-4)}`; return x.titre; };
           const retirerColis = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null; if (t) markCollected(t); else if (o) markPickupDone(o); };
           return (<>
-            <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"
-              desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
-              right={
+            {(() => { const barreColis = (
                 /* (5 nov., revue 2.21) LA BARRE DU HAUT NE SAUTE PLUS : les trois mêmes boutons, à la même
                    place, sur « À envoyer », « Envoyés » et « À retirer » (avant : « Tout imprimer » et
                    « Scanner » apparaissaient et disparaissaient d'un onglet à l'autre, « … » était un rond
@@ -45443,6 +45465,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    dit pourquoi. « … » montre les outils de Colis (Emballer, Tout générer) à leur place. */
                 <div className="vrm-colis-barre" data-colis-barre="">
                   <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label={onglet === 'retirer' ? 'Scanner un colis à retirer' : 'Scanner un bordereau'} data-scan-mode-bouton={onglet === 'retirer' ? 'retrait' : 'envoi'} title={onglet === 'retirer' ? 'Scanner le colis au point relais : VRM montre l’achat attendu' : 'Scanner le code-barres d’un bordereau : VRM montre la paire qui doit être dedans'} onClick={() => setScanOuvert(onglet === 'retirer' ? 'retrait' : 'envoi')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
+                  {colisDans === 'achats' ? null : <>
                   <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
                     title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
                     onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : 'Tout imprimer'}</Bouton>
@@ -45451,8 +45474,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                   <Bouton variante="secondaire" icone="more" data-colis-barre-btn="outils" data-colis-outils-bascule="" aria-label="Outils des colis : emballer, générer les bordereaux" aria-expanded={outilsColis ? 'true' : 'false'} title="Outils des colis : emballer, générer les bordereaux"
                     onClick={() => setOutilsColis((v) => !v)}/>
+                  </>}
                 </div>
-              }/>
+              );
+              // (11 nov., lot DJ3) En section de Ventes / d'Achats : un intertitre (le titre de l'écran est « Ventes »
+              // ou « Achats ») et la MÊME barre à sa droite ; jamais un second « Colis » en grand titre.
+              if (colisDans) return (
+                <header className="vrm-colis-section-tete" data-colis-section={colisDans} id={colisDans === 'achats' ? 'colis-a-retirer' : 'colis-a-expedier'}>
+                  <h2 className="vrm-colis-section-titre">{colisDans === 'achats' ? 'À retirer' : 'À expédier'}</h2>
+                  {barreColis}
+                </header>);
+              return <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"
+              desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
+              right={barreColis}/>; })()}
             {/* (10 nov., Julien sur captures iPhone : « Enlève imprime bordereaux … Et imprimer garde tout
                 imprimer ») LA LIGNE « PROCHAIN GESTE » N'EST PLUS RENDUE : « N bordereaux à imprimer — Imprimer »
                 redisait le bouton « Tout imprimer » du haut, « 1 à envoyer en priorité » la limite déjà écrite sur
@@ -45468,7 +45502,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (3 nov.) Sur « À retirer », la carte sombre parle des colis à retirer : le nombre de Ma journée
                 (`vrm_colis_retirer`), et trois cases des MÊMES listes (`pickupUnion`) : dernier jour (urgents),
                 avec leur code, à vérifier (hors du compte). */}
-            {!baseKO && onglet === 'retirer' ? (() => {
+            {!baseKO && !colisDans && onglet === 'retirer' ? (() => {
               // Une ville choisie : les nombres de SA sélection (les lignes de ses points, les mêmes listes) ;
               // « Toutes » : ceux de Ma journée (`vrm_colis_retirer`) et de `pickupUnion`.
               const vs = selecteurVilles(parPoint); const vc = vs.find((v) => v.cle === villeRetrait);
@@ -45486,7 +45520,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   { cle: 'code', n: pickupUnion.prets || 0, l: 'avec code', titre: 'Le code de retrait est connu', attrs: { 'data-n': String(pickupUnion.prets || 0) } },
                   { cle: 'verifier', n: (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, l: 'à vérifier', titre: 'Hors du compte « à retirer »', attrs: { 'data-n': String((pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length) } },
                 ]}/>); })() : null}
-            {!baseKO && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
+            {/* (11 nov., lot DJ3) En section : la grande carte de Colis n'est pas redite (Ventes et Achats ont
+                LEUR carte, qui porte déjà « à envoyer » / « à retirer ») ; ses autres cases restent, en une ligne
+                discrète, des MÊMES sources (`lignesLot`, `gestesDepuis`, `pickupUnion`). Zéro ⇒ rien écrit. */}
+            {!baseKO && colisDans ? (() => {
+              const m0 = new Date(); m0.setHours(0, 0, 0, 0);
+              const parts = colisDans === 'achats'
+                ? [['dernier', pickupUnion.urgents || 0, 'd’ici demain'], ['code', pickupUnion.prets || 0, 'avec code'], ['verifier', (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, 'à vérifier']]
+                : [['imprimer', nPrets, 'à imprimer'], (() => { const d = gestesDepuis(shipDone, m0.getTime()); return ['deposes', d, d > 1 ? 'déposés aujourd’hui' : 'déposé aujourd’hui']; })()];
+              const vus = parts.filter((x) => x[1] > 0);
+              if (!vus.length) return null;
+              return <p className="vrm-colis-resume" data-colis-resume={colisDans}>{vus.map((x, i) => <span key={x[0]} data-colis-resume-case={x[0]} data-n={String(x[1])}>{i ? ' · ' : ''}{x[1]} {x[2]}</span>)}</p>; })() : null}
+            {!baseKO && !colisDans && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               // (3 nov., carte réglable par page) Défaut = la carte d'avant : « à poster » (la publication
               // `vrm_colis_aposter`, pour le site choisi en tête de Colis), « à imprimer » (`lignesLot`),
               // « déposés » (`gestesDepuis(shipDone)`) et « à retirer » (`vrm_colis_retirer`, « + » quand les
@@ -45505,22 +45550,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 leur écran (bordereau, QR), ouvert par la coque (`onColisLeboncoin`). */}
             {/* (5 nov.) Le sélecteur À LOGOS, les quatre sites toujours (comme Annonces, Ventes,
                 Achats, Messages) ; un site sans compte relevé dit ce qui manque et le geste. */}
-            <DansBarreHaut>
+            {/* (11 nov., lot DJ3) En section, le filtre des sites est celui de Ventes / Achats (un seul en haut). */}
+            {colisDans ? null : <DansBarreHaut>
               <SelecteurSites id="colis" label="Filtrer les colis par site" valeur={siteColis}
                 options={optionsSelecteur({ toutes: true, site: siteColis, sites: null }).filter(o => siteMontre(o.id, { plateformes: profilPlateformes.plateformes, choisi: siteColis })).map((o) => (o.id !== 'toutes' && sitesPresents && !sitesPresents.has(o.id) && !vue.parSite[o.id] ? { ...o, sansCompte: true } : o))}
                 onChoix={(x)=>{ if (x === 'leboncoin' && onColisLeboncoin) { onColisLeboncoin(); return; } setSiteColis(x); }}/>
-            </DansBarreHaut>
-            {siteColis !== 'toutes' && sitesPresents && !sitesPresents.has(siteColis) && !vue.parSite[siteColis] ? <OngletManque site={siteColis} onglet="colis" onNav={onNav}/> : null}
+            </DansBarreHaut>}
+            {!colisDans && siteColis !== 'toutes' && sitesPresents && !sitesPresents.has(siteColis) && !vue.parSite[siteColis] ? <OngletManque site={siteColis} onglet="colis" onNav={onNav}/> : null}
             <div className="vrm-colis-onglets" data-colis-onglet={onglet} data-colis-total={vue.total}>
               {/* (3 nov., Julien : « je veux des colis ENVOYÉS, et dans un autre onglet ») Trois onglets, iOS :
                   À envoyer · Envoyés · À retirer — les nombres d'envoi et de retrait sont CEUX de Ma journée,
                   de la cloche et du widget (`vrm_colis_aposter` / `vrm_colis_retirer`). */}
-              <Segmente plein label="Colis à envoyer, envoyés ou à retirer" value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
+              {/* (11 nov., lot DJ3) Ventes : À envoyer · Envoyés ; Achats : la liste « À retirer » seule (pas d'onglet). */}
+              {colisDans === 'achats' ? null : <Segmente plein label={colisDans ? 'Colis à envoyer ou envoyés' : 'Colis à envoyer, envoyés ou à retirer'} value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
                 options={[
                   { v: 'envoyer', l: 'À envoyer', n: nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
                   { v: 'envoyes', l: 'Envoyés', n: nEnvoyes != null ? String(nEnvoyes) : null, data: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nEnvoyes != null ? String(nEnvoyes) : '' } },
                   { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
-                ]}/>
+                ].filter((o) => !colisDans || o.v !== 'retirer')}/>}
             </div>
             {/* (3 nov.) Les puces du haut : « N en route » (achats dont Vinted ne dit pas encore le point — la liste
                 au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
@@ -45615,7 +45662,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             elle ouvre les comptes). L'ancienne ligne du bas (`FraicheurDonnees`) n'est plus rendue — elle
             était cachée par fusion.css, et redisait la même chose quand la carte du haut manquait. */}
         {/* Sans compte relié, le geste est déjà dit à la place des colonnes (une fois, §7). */}
-        {!colisSansCompte && <NoAcc/>}
+        {!colisSansCompte && !colisDans && <NoAcc/>}
         {/* (2 nov.) « À envoyer » seulement : sous « À retirer », aucun colis à envoyer n'est redit. */}
         {ongletColisVu === 'envoyer' && (<>
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
@@ -51431,7 +51478,8 @@ function AppCoeur() {
   // `?tab=` reçu gagne : la reprise se tait et `goto` mène au lien. Rien de
   // lisible ⇒ Ma journée, comme avant.
   const [reprise0]=useState(()=>{ try{ return lireReprise(stockageParcours(), AUTH.user?.id||readSession()?.user?.id||'', ONGLETS_LIENS, window.location.search); }catch(_){ return null; } });
-  const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');
+  // (11 nov., lot DJ3) Une reprise sur l'ancien onglet Colis rouvre sa moitié : Ventes ou Achats.
+  const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); return pl?pl.tab:reprise0.tab; });
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -51463,6 +51511,13 @@ function AppCoeur() {
   const tabCourant=React.useRef(tab); tabCourant.current=tab;
   const setTab=React.useCallback((v)=>{
     if(typeof v==='function'){ setTabBrut(v); return; }
+    // (11 nov., lot DJ3) Les anciens chemins vers Colis : « À expédier » de Ventes ou « À retirer » d'Achats.
+    if(typeof v==='string'){ const frais=(x)=>x&&Date.now()-x.at<3000;
+      const pl=placeDesColis({ tab:v, sub:subVoulue.current, onglet:frais(DEMANDE_COLIS)?DEMANDE_COLIS.o:null, cible:frais(CIBLE_NOTIF)?CIBLE_NOTIF.c:null });
+      if(pl){ v=pl.tab; subVoulue.current=pl.sub; if(pl.tab==='ventes') setOngletColis(pl.onglet);
+        const id=pl.tab==='achats'?'colis-a-retirer':'colis-a-expedier'; const t0=Date.now();
+        const aller=()=>{ const el=document.getElementById(id); if(el&&el.getClientRects().length){ try{ el.scrollIntoView({block:'start'}); }catch(_){} return; } if(Date.now()-t0<6000) setTimeout(aller,200); };
+        if(!(frais(CIBLE_NOTIF)&&CIBLE_NOTIF.c)) setTimeout(aller,150); } }
     // (9 nov., lot AL) « Republier » / « Favoris & offres » : l'écran qui les porte, sur leur vue.
     if(typeof v==='string'&&VUES_DEPLACEES[v]){ const [o,vue]=VUES_DEPLACEES[v]; demanderVue(vue); try{ window.dispatchEvent(new CustomEvent('vrm:vue',{detail:vue})); }catch(_){} v=o; }
     const r=redirigerOnglet(v, subVoulue.current, ONGLETS_DEPLACES);
@@ -51490,17 +51545,19 @@ function AppCoeur() {
   // `ongletColisMontre` = ce que l'écran montre (pour monter les outils de retrait).
   const [ongletColis,setOngletColis]=useState(()=>(reprise0&&reprise0.colis)||null);
   const [ongletColisMontre,setOngletColisMontre]=useState(null);
-  React.useEffect(()=>{ if(tab==='cat_bord'&&platSub==='retirer') setOngletColis('retirer'); },[tab,platSub]);
+  // (11 nov., lot DJ3) Plus d'onglet `cat_bord` : « retirer » demandé mène à Achats (`setTab`, src/colisPlace.js).
   React.useEffect(()=>{
-    const f=()=>setOngletColis('retirer');
+    // (11 nov., lot DJ3) « Aller aux colis à retirer » : la section de tête d'Achats.
+    const f=()=>{ if(tabCourant.current!=='achats') setTab('achats'); };
     // Une notification qui vise un colis de Colis ouvre SON onglet (la carte n'est que là).
     const g=()=>{ const c=CIBLE_NOTIF.c; if(!c) return;
       if(c.type==='retrait'||(c.type==='colonne'&&c.colonne==='retirer')) setOngletColis('retirer');
+      else if(c.type==='colonne'&&c.colonne==='partis') setOngletColis('envoyes');
       else if(c.type==='colis'||c.type==='colonne') setOngletColis('envoyer'); };
     window.addEventListener('vrm:ancre-retraits',f); window.addEventListener('vrm:cible-notif',g);
     return ()=>{ window.removeEventListener('vrm:ancre-retraits',f); window.removeEventListener('vrm:cible-notif',g); };
   },[]);
-  const choisirOngletColis=React.useCallback((v)=>{ setOngletColis(v); if(v!=='retirer') setPlatSub(p=>p==='retirer'?null:p); },[]);
+  const choisirOngletColis=React.useCallback((v)=>{ DEMANDE_COLIS.o=v; DEMANDE_COLIS.at=Date.now(); setOngletColis(v); if(v!=='retirer') setPlatSub(p=>p==='retirer'?null:p); },[]);
   // En changeant d'onglet, la sous-navigation revient à sa section par défaut :
   // Vinted ouvre DIRECTEMENT sur les ventes (le résumé CA/argent reste en haut,
   // pas d'écran « Aperçu » à traverser — demande de Julien) ; les autres
@@ -54108,7 +54165,8 @@ function AppCoeur() {
   // redit plus (la colonne de l'ordinateur montrait « 1 » sur Ventes ET « 1 » sur
   // Colis pour le même colis).
   // (9 nov., lot AC) « À trancher » : la somme des sources SUES (src/aTrancher.js), rien à 0.
-  const badgesNav={ cat_bord: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0, trancher: badgeATrancher(aTrancherEtat) };
+  // (11 nov., lot DJ3) Le nombre à envoyer sur Ventes, le nombre à retirer sur Achats (les mêmes publications).
+  const badgesNav={ ventes: colisBadge, achats: retraitsBadge, annonces: nAnnonces, messages: msgNonLus>0, trancher: badgeATrancher(aTrancherEtat) };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
   // (9 nov., lot AC) Le geste d'une ligne d'« À trancher » : il OUVRE l'écran propriétaire
   // (la vue d'Annonces, l'onglet de Colis) et va au bloc où il tranche — il n'écrit rien.
@@ -54150,6 +54208,39 @@ function AppCoeur() {
     </section>
   );
   const TITRES_TACHE={ ventes:'Ventes', annonces:'Annonces', messages:'Messages', achats:'Achats' };
+  // ── (11 nov., lot DJ3) LES COLIS À LEUR PLACE ─────────────────────────────
+  // Julien, mot pour mot : « Je pense que tu peux regrouper les colis à expédier dans les ventes, les
+  // colis à retirer dans achats, ça évite les répétitions et les erreurs. En veillant à bien tout
+  // garder, simplement déplacer pour pas avoir 2 fois la même chose. » L'écran Colis n'est plus un
+  // onglet : « À expédier » (À envoyer · Envoyés, bordereaux, Tout imprimer, Je dépose, Préparer,
+  // Emballer, Scanner, photo du carton…) est la section de tête de Ventes ; « À retirer » (points,
+  // codes, QR, Mode relais, hors ligne, Scanner, et ses outils : à confirmer, à vérifier, e-mails,
+  // argent à vérifier…) celle d'Achats. Les MÊMES composants (`Comptabilite only="bordereaux"`,
+  // `colisDans`), aucune copie ; les anciens chemins (`cat_bord`, `retraits`…) mènent ici (`setTab`).
+  const rendreColisSection=(t,site)=>{
+    if(baseKO) return null;
+    if(t==='ventes'&&site==='leboncoin') return (
+      <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site="leboncoin" aria-label="À expédier">
+        <header className="vrm-colis-section-tete" data-colis-section="ventes" id="colis-a-expedier"><h2 className="vrm-colis-section-titre">À expédier</h2></header>
+        <div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes}/></div>
+      </section>);
+    const commun={accounts:vintedAccounts,liveStats:liveStatsVus,accountsReady:accountsLoaded,baseKO,onNav:setTab,garageGrid,onLocate:(n)=>{setGarageLocate(String(n));setTab('garage');},onStore:(n)=>{setGaragePlace(String(n));setTab('garage');},onFreeNum:freeGarageNum};
+    if(t==='ventes') return (
+      <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site={site} aria-label="À expédier">
+        <GardeEcran nom="ventes:colis"><Comptabilite key="colis_ventes" {...commun} only="bordereaux" colisDans="ventes"
+          siteColisDemande={site==='toutes'?null:site} sitesPresents={sitesPresents}
+          ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran>
+      </section>);
+    if(t==='achats') return (
+      <section className="vrm-colis-section" data-colis-hote="achats" aria-label="À retirer">
+        <GardeEcran nom="achats:colis"><Comptabilite key="colis_achats" {...commun} only="bordereaux" colisDans="achats" sitesPresents={sitesPresents}
+          ongletColis="retirer" onOngletColis={choisirOngletColis}/></GardeEcran>
+        {/* Les OUTILS de retrait (à confirmer, à vérifier, suivis, e-mails reçus, argent à vérifier), sous la liste,
+            une fois — les mêmes qu'hier sous Colis → À retirer (`retraitsOutils`). */}
+        <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran>
+      </section>);
+    return null;
+  };
   const rendreTache=(t)=>{
     const site=siteDeTache(t,platSub);
     const sec=sectionDeTache(t,platSub);
@@ -54167,6 +54258,8 @@ function AppCoeur() {
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
+        {/* (11 nov., lot DJ3) En tête : les colis à expédier (Ventes, section principale du site) ou à retirer (Achats). */}
+        {(t==='achats' || (t==='ventes' && (!sous || sec==='ventes'))) ? rendreColisSection(t,site) : null}
         {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
         {t==='ventes' && !baseKO && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
@@ -54358,7 +54451,7 @@ function AppCoeur() {
     if (d.feuille === 'prix') { setPrixNum(String(d.num)); return; }
     if (d.feuille === 'configuration') { try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} return; }
     if (d.stock) { setGarageLocate(String(d.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(d.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
-    if (d.colis) { setPlatSub(null); setOngletColis(d.colis); }
+    if (d.colis) { setPlatSub(null); choisirOngletColis(d.colis); }
     if (d.feuille === 'lot') _pendingBordPrint = true;
     if (d.feuille === 'export') { DEMANDE_COMMANDE.export = Date.now(); setPlatSub(null); }
     if (d.tab) setTab(d.tab);
@@ -54876,7 +54969,7 @@ function AppCoeur() {
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
         {tab==='journee'&&uidInstantane&&<CaptureJournee uid={uidInstantane}/>}
-        {tab==='cat_bord'&&uidInstantane&&<CaptureColis uid={uidInstantane}/>}
+        {/* (11 nov., lot DJ3) Plus d'onglet Colis : son instantané (`CaptureColis`) n'a plus d'écran à photographier. */}
         {tab==='ventes'&&uidInstantane&&<CaptureVentes uid={uidInstantane}/>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
@@ -55116,42 +55209,10 @@ function AppCoeur() {
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
         {tab==='compta'&&<GardeEcran nom="compta"><ComptaPro vue={vueCompta(platSub)} allerVue={(v)=>setTab(ONGLET_SEGMENT[v]||'argent')} argentNav={<ArgentNav seg={segmentArgent('compta',platSub)} setTab={setTab}/>} liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}
-        {/* (31 oct., soir) Colis · Leboncoin : la pastille « Leboncoin » de la rangée
-            de filtres de Colis ouvre les colis Leboncoin (bordereau, QR — l'ancien
-            « Leboncoin → Colis », `LeboncoinColis`) ; les autres pastilles
-            ramènent aux quatre colonnes, filtrées sur leur site. */}
-        {tab==='cat_bord'&&platSub==='leboncoin'&&<GardeEcran nom="cat_bord:leboncoin">
-          <DansBarreHaut>
-            <SelecteurSites id="colis" label="Filtrer les colis par site" valeur="leboncoin"
-              options={optionsSelecteur({ toutes: true, site: 'leboncoin', sites: null }).filter(o => siteMontre(o.id, { plateformes: profilNavigation.plateformes })).map((o) => (o.id !== 'toutes' && o.id !== 'leboncoin' && sitesPresents && !sitesPresents.has(o.id) ? { ...o, sansCompte: true } : o))}
-              onChoix={(x)=>{ if(x!=='leboncoin') setPlatSub('site:'+x); }}/>
-          </DansBarreHaut>
-          {baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes}/></div>}
-        </GardeEcran>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_bord:'bordereaux',cat_expedition:'bordereaux',litiges:'litiges'}; if(tab==='cat_bord'&&platSub==='leboncoin') return null; return map[tab] ? <GardeEcran nom={tab} resetKey={platSub}><Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}
-          siteColisDemande={tab==='cat_bord'&&typeof platSub==='string'&&platSub.startsWith('site:')?platSub.slice(5):null}
-          onColisLeboncoin={tab==='cat_bord'&&(!sitesPresents||sitesPresents.has('leboncoin'))?()=>setPlatSub('leboncoin'):null}
-          ongletColis={tab==='cat_bord'?ongletColis:null} onOngletColis={tab==='cat_bord'?choisirOngletColis:null} onOngletVu={tab==='cat_bord'?setOngletColisMontre:null}
-          sitesPresents={(tab==='cat_bord'||tab==='cat_expedition'||tab==='litiges')?sitesPresents:null}/></GardeEcran> : null; })()}
-        {/* (31 oct., soir) LES COLIS À RETIRER VIVENT DANS COLIS. Sous les quatre
-            colonnes, leur DÉTAIL — l'ancienne vue « À retirer » d'Achats, mêmes
-            composants et mêmes lectures (§11) : codes et QR, dates limites, points
-            relais et carte, « J'ai retiré », à confirmer (« Tout est OK »), à
-            vérifier, suivi Vinted, n° de suivi à la main, réception des e-mails.
-            Monté à la demande (une carte « À retirer », un ancien lien, une
-            notification, ou « Codes, QR et points relais ») : il relit les achats,
-            on ne paie cette lecture que quand il sert. */}
-        {/* (2 nov.) Sous « À retirer », les OUTILS de retrait seulement (colis à
-            confirmer « Tout est OK », suivi Vinted, n° de suivi à la main, réception
-            des e-mails, colis repartis) : les colis eux-mêmes et leurs codes sont dans
-            la liste par point relais, au-dessus, une fois (`retraitsOutils`). Monté
-            seulement quand « À retirer » est montré : la lecture des achats ne se
-            paie que quand elle sert. */}
-        {tab==='cat_bord'&&platSub!=='leboncoin'&&ongletColisMontre==='retirer'&&(
-          <GardeEcran nom="cat_bord:retirer"><section id="colis-a-retirer" data-colis-retraits="outils" style={{padding:'0'}}>
-            <Comptabilite key="cat_bord_retraits" accounts={vintedAccounts} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
-          </section></GardeEcran>
-        )}
+        {/* (11 nov., lot DJ3) Colis · Leboncoin (`LeboncoinColis`) vit dans Ventes · Leboncoin, section « À expédier » (`rendreColisSection`). */}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',litiges:'litiges'}; return map[tab] ? <GardeEcran nom={tab} resetKey={platSub}><Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}
+          sitesPresents={tab==='litiges'?sitesPresents:null}/></GardeEcran> : null; })()}
+        {/* (11 nov., lot DJ3) Les OUTILS de retrait (`retraitsOutils`) sont montés sous « À retirer », en tête d'Achats (`rendreColisSection`). */}
         {tab==='vintedaccounts'&&<GardeEcran nom="vintedaccounts"><VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/></GardeEcran>}
         </AttenteEcran>
         </EcransGardes>

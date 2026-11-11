@@ -24,7 +24,7 @@ export const ALLER = Object.freeze([
   { touche: 'j', tab: 'journee', nom: 'Ma journée' },
   { touche: 'a', tab: 'annonces', nom: 'Annonces' },
   { touche: 'v', tab: 'ventes', nom: 'Ventes' },
-  { touche: 'c', tab: 'cat_bord', nom: 'Colis' },
+  { touche: 'c', tab: 'cat_bord', nom: 'Colis à expédier (Ventes)' }, // (11 nov., lot DJ3) Colis vit dans Ventes ; à retirer : Achats (h)
   { touche: 'm', tab: 'messages', nom: 'Messages' },
   { touche: 'h', tab: 'achats', nom: 'Achats' },
   { touche: 's', tab: 'garage', nom: 'Stock' },
