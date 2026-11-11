@@ -123,7 +123,10 @@ async function audit(src, bavard) {
   };
   for (let i = 0; i < 50; i++) fiches['jum' + i] = { numero: String(500 + i), title: 'Nike Dunk Low noire 42', accountId: '111' };
   const ok2 = new Set(['111', '222']);
-  const via = (dite) => { const r = V.requeteDeLaVoix(dite); return r.numero ? V.ficheDeLaVoix(r.requete, fiches, cleNum, ok2) : null; };
+  const aFiche = typeof V.ficheDeLaVoix === 'function';
+  dit(aFiche, 'la règle « un N° dit ⇒ sa fiche si unique » existe (`ficheDeLaVoix`)');
+  const fdv = aFiche ? V.ficheDeLaVoix : () => undefined;
+  const via = (dite) => { const r = V.requeteDeLaVoix(dite); return r.numero ? fdv(r.requete, fiches, cleNum, ok2) : null; };
   dit(via('cent vingt-quatre') === '124', '« cent vingt-quatre » ⇒ la fiche N°124 (unique)', via('cent vingt-quatre'));
   dit(via('numéro B 125') === 'B125', '« numéro B 125 » ⇒ la fiche B125 (pas la 125)', via('numéro B 125'));
   dit(via('cent vingt-cinq') === '125', '« cent vingt-cinq » ⇒ la 125 (pas la B125)', via('cent vingt-cinq'));
@@ -131,7 +134,7 @@ async function audit(src, bavard) {
   dit(via('trois cents') === null, 'la fiche d’un compte écarté ⇒ rien ouvert', via('trois cents'));
   dit(via('neuf cent quatre-vingt-dix-neuf') === null, 'un N° qu’aucune fiche ne porte ⇒ rien ouvert');
   dit(via('Nike Dunk Low noire quarante-deux') === null && V.requeteDeLaVoix('Nike Dunk Low noire quarante-deux').requete === 'Nike Dunk Low noire 42', 'un texte (50 paires au même titre) ⇒ la recherche normale, jamais une fiche', V.requeteDeLaVoix('Nike Dunk Low noire quarante-deux').requete);
-  dit(V.ficheDeLaVoix('124', fiches, cleNum, null) === '124', 'sans liste de comptes : l’unicité seule décide');
+  dit(fdv('124', fiches, cleNum, null) === '124', 'sans liste de comptes : l’unicité seule décide');
 
   // ── 9. Branchement ─────────────────────────────────────────────────────────
   const sans = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
