@@ -107,6 +107,8 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
   await pg.addInitScript((s) => {
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
     try { localStorage.setItem('vrm_imprimante', JSON.stringify('normale')); } catch (_) {}
+    // (11 nov.) Le Chromium du banc parle anglais : depuis la traduction, l'app le suivrait. Le banc juge le français.
+    try { localStorage.setItem('vrm_langue', JSON.stringify('fr')); } catch (_) {}
   }, SESSION);
   const lectures = { liste: 0, pdf: 0 };
   let cliqueA = Infinity, pdfAvantClic = 0;
@@ -142,7 +144,7 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
   await pg.route('**://*.vinted.net/**', (r) => r.abort());
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 160)));
-  await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=settings&reglage=imprimante`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
   // Au doigt, les panneaux sont des sous-écrans : on ouvre le nôtre.
   if (!(await pg.locator('[data-imprimante-reglage]').first().isVisible().catch(() => false))) {
@@ -151,7 +153,7 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
   }
   const res = { nom, erreurs, lectures };
   res.present = await pg.locator('[data-imprimante-reglage]').first().isVisible().catch(() => false);
-  if (!res.present) { await ctx.close(); return res; }
+  if (!res.present) { if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, `absent-${nom}.png`) }).catch(() => {}); } await ctx.close(); return res; }
   // 1. le choix
   await pg.locator('[data-imprimante-choix="thermique"]').first().click({ timeout: 3000 }).catch(() => {});
   await pg.waitForTimeout(1200);   // `save()` attend 500 ms
