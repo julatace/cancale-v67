@@ -22,9 +22,10 @@
 
 import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
-import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
+import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif } from './_lib/push.js';
+import { heureSoir, HEURES_SOIR } from './_lib/notif-groupe.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
-import { reglageCalme } from './_lib/notif-textes.js';
+import { reglageCalme, minutesParis } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
@@ -1147,11 +1148,21 @@ function bordsDuVendeur(d) {
 // Le texte : `texteSoir`, fabriqué dans api/_lib/notif-apercus.js (l'aperçu de
 // Paramètres → Notifications l'appelle aussi) — réexporté ici.
 export { texteSoir };
-async function rappelDuSoir(maintenant = Date.now()) {
+// (11 nov., lot `notifs-groupees`) L'heure choisie dans Paramètres → Notifications
+// (`push_prefs.resumeSoir`, api/_lib/notif-groupe.js). Le cron habituel (18:00 UTC)
+// laisse passer un vendeur dont l'heure n'est pas encore là : le passage de
+// 15 min (`?moment=groupe`) l'envoie à son heure (`aSonHeure`). Heure passée ⇒
+// le cron l'envoie (un retard vaut mieux qu'un oubli). Un seul par soir (mémo).
+async function rappelDuSoir(maintenant = Date.now(), { aSonHeure = false } = {}) {
   const today = parisDate(0);
   const deja = await getRow('soir_reminder_dedup');
   if (deja === undefined) return { soir: 'mémo illisible — rien envoyé' };
   if (deja && deja.date === today) return { soir: 'déjà envoyé' };
+  if (!aSonHeure) {
+    const h = heureSoir(await prefsDuVendeur());
+    const m = minutesParis(maintenant);
+    if (h && m != null && m < Number(h.slice(0, 2)) * 60 + Number(h.slice(3))) return { soir: `à son heure (${h})` };
+  }
   if (!(await pushCategorieActive('soir'))) return { soir: 'désactivé par le vendeur' };
   const d = await lireDonneesColis();
   const t = txsAExpedier(d);
@@ -1216,6 +1227,43 @@ async function traiterVendeurReveil(maintenant = Date.now()) {
   if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString() }))) return { reveil: 'memo-non-ecrit' };
   const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url, tag: 'vrm-reveil' });
   return { reveil: 'envoye', n: r.n, sent: envoi && envoi.sent };
+}
+// (11 nov., lot `notifs-groupees`) LE PASSAGE DE 15 MIN. Seuls les vendeurs qui
+// ont une fenêtre échue (`push_journal.data->>attenteJusqua` ≤ maintenant, une
+// projection : aucun `select=data`), et ceux dont l'heure du soir est là. Une
+// lecture ratée ⇒ rien (503, on repassera). Un vendeur qui plante n'arrête pas
+// les autres. Budget : 240 s.
+export const FENETRE_SOIR_MIN = 45;
+async function passageGroupe(maintenant = Date.now()) {
+  const debut = Date.now();
+  const iso = new Date(maintenant).toISOString();
+  const dus = await fetchPaginated(`app_data?id=eq.push_journal&data->>attenteJusqua=lte.${encodeURIComponent(iso)}&select=owner`);
+  if (!dus) return { fait: false, raison: 'pas su' };
+  const m = minutesParis(maintenant);
+  const heures = m == null ? [] : HEURES_SOIR.filter((h) => { const d = m - (Number(h.slice(0, 2)) * 60 + Number(h.slice(3))); return d >= 0 && d < FENETRE_SOIR_MIN; });
+  const soirs = [];
+  for (const h of heures) {
+    const rows = await fetchPaginated(`app_data?id=eq.push_prefs&data->>resumeSoir=eq.${encodeURIComponent(h)}&select=owner`);
+    if (!rows) return { fait: false, raison: 'pas su (heures du soir)' };
+    soirs.push(...rows);
+  }
+  const uniq = (l) => [...new Set(l.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
+  const aVider = uniq(dus), aSoir = uniq(soirs);
+  let echecs = 0, envoyes = 0, soirsEnvoyes = 0, budgetAtteint = false;
+  const bilans = [];
+  const tache = async (o, f) => { try { return await contexteVendeur.run({ owner: o }, f); } catch (e) { echecs += 1; return { erreur: String((e && e.message) || e).slice(0, 120) }; } };
+  const files = [...aVider.map((o) => ['groupe', o]), ...aSoir.map((o) => ['soir', o])];
+  for (let i = 0; i < files.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 240000) { budgetAtteint = true; break; }
+    const lot = files.slice(i, i + VENDEURS_EN_PARALLELE);
+    const out = await Promise.all(lot.map(([q, o]) => (q === 'groupe' ? tache(o, () => vidangerResume()) : tache(o, () => rappelDuSoir(maintenant, { aSonHeure: true })))));
+    out.forEach((r, k) => {
+      if (lot[k][0] === 'groupe' && r && r.vidange === 'envoye') envoyes += 1;
+      if (lot[k][0] === 'soir' && r && r.soir === 'envoyé') soirsEnvoyes += 1;
+      bilans.push({ q: lot[k][0], ...(r && typeof r === 'object' ? r : {}) });
+    });
+  }
+  return { fait: true, fenetres: aVider.length, resumes: envoyes, soirs: aSoir.length, soirsEnvoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
 }
 async function traiterVendeurSoir() {
   // Le soir : lire et notifier les changements, puis le rappel du soir.
@@ -1384,6 +1432,19 @@ export default async function handler(req, res) {
       r = await passageFacturesAuto({ lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000 });
     } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
     res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'factures', vendeurs: r && r.vendeurs, traites: r && r.traites, envoyees: r && r.envoyees, refusees: r && r.refusees, pauses: r && r.pauses, echecs: r && r.echecs, budgetAtteint: r && r.budgetAtteint, ...(r && !r.fait ? { raison: r.raison || 'pas-su' } : {}) });
+    return;
+  }
+  // (11 nov., lot `notifs-groupees`) `?moment=groupe` : toutes les 15 min
+  // (.github/workflows/notifs-groupees.yml). Le résumé des fenêtres échues, et
+  // le résumé du soir de ceux qui ont choisi leur heure. RIEN d'autre.
+  if (moment === 'groupe') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'groupe', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageGroupe(instantNotif());
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r });
     return;
   }
   const soir = moment === 'soir';
