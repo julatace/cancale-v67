@@ -192,7 +192,8 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       await pg.waitForSelector(FAV.length ? '[data-fc-etape="qui"] [data-fc-annonce]' : '[data-fc-vide]', { timeout: 15000 }).catch(() => {});
       await pg.waitForTimeout(800);
       dit(!errs.length, `${T} la page se monte sans erreur`, errs.join(' | '));
-      await pg.screenshot({ path: path.join(SHOTS, `fc-${F}.png`), fullPage: true });
+      await pg.screenshot({ path: path.join(SHOTS, `fc-${F}.png`) });
+      for (const e of ['qui', 'quoi', 'quand', 'historique']) await pg.locator(`[data-fc-etape="${e}"]`).screenshot({ path: path.join(SHOTS, `fc-${F}-${e}.png`) }).catch(() => {});
       const commun = await pg.evaluate(() => {
         const sec = document.querySelector('[data-fc-page]');
         const vis = (e) => { const r = e.getBoundingClientRect(); const st = getComputedStyle(e); return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none'; };
@@ -218,13 +219,20 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       const pseudosVus = PSEUDOS.filter((p) => commun.texte.includes(p));
       dit(!pseudosVus.length, `${T} aucun pseudo à l’écran (le nombre, jamais qui)`, pseudosVus.join(','));
       dit(!/\{username\}|\{Bonjour\|Salut\}/.test(await pg.evaluate(() => document.querySelector('[data-fc-bulle]')?.innerText || '')) && await pg.locator('[data-fc-bulle] [data-fc-jeton]').count() === 1, `${T} QUOI : l’aperçu porte la pastille « son pseudo », jamais la variable brute`);
+      await pg.click('[data-fc-anciens-bascule]');
+      await pg.waitForTimeout(200);
+      const tous = await pg.evaluate(() => [...document.querySelectorAll('[data-fc-etape="qui"] [data-fc-liste] [data-fc-annonce]')].map((e) => [e.getAttribute('data-fc-annonce'), Number(e.getAttribute('data-fc-aecrire'))]));
+      const attendus = [...new Set(FAV.map((f) => f[2]))].filter((it) => aEcrire(it, true) > 0);
+      dit(tous.length === attendus.length && tous.every(([it, n]) => n === aEcrire(Number(it), true)), `${T} « Inclure les anciens » : ${attendus.length} annonces, les anciens favoris ajoutés`, JSON.stringify(tous));
+      await pg.click('[data-fc-anciens-bascule]');
+      await pg.waitForTimeout(200);
       // 2. tout choisir ⇒ le compte ; aperçu de l'offre
       await pg.click('[data-fc-tout]');
       await pg.waitForTimeout(200);
       const ch = await pg.evaluate(() => Number(document.querySelector('[data-fc-choisis]')?.getAttribute('data-fc-choisis')));
       dit(ch === Math.min(10, N_TOUS), `${T} « Tout choisir » : ${N_TOUS} messages`, ch);
       const offre = await pg.evaluate(() => ({ v: document.querySelector('[data-fc-apercu-offre]')?.getAttribute('data-fc-apercu-offre'), l: document.querySelector('[data-fc-offre-ligne]')?.innerText || '' }));
-      const ex = CHOISISSABLES.find((it) => PRIX[it]) || null;
+      const ex = (qui.map((x) => Number(x.item)).find((it) => PRIX[it] != null) === Number(qui[0] && qui[0].item)) ? Number(qui[0].item) : null;   // l'aperçu montre la 1re annonce choisie
       if (ex) { const apres = Math.round(PRIX[ex] * 90) / 100; dit(Number(offre.v) === apres && offre.l.includes('−10 %'), `${T} QUOI : l’offre au centime (${PRIX[ex]} € → ${apres} €, −10 %)`, JSON.stringify(offre)); }
       // 3. QUAND : comme Vintex
       await pg.click('[data-fc-rythme="vintex"]');
