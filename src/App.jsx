@@ -19916,7 +19916,8 @@ function useVueSession(nom, initial) {
     const nouveau=typeof next==='function'?next(ancien):next;
     vuesSession.set(cle,nouveau);
     if(geste) touche.current=true;
-    if(!sansEcrire&&(readSession()?.user?.id||'')===owner){
+    // Rien de changé (un écran qui repose la même valeur) : rien d'écrit, l'heure du geste reste.
+    if(!sansEcrire&&JSON.stringify(nouveau)!==JSON.stringify(ancien)&&(readSession()?.user?.id||'')===owner){
       if(synchro){ const defaut=JSON.stringify(nouveau)===JSON.stringify(initial); noterReprise({vues:{[nom]:defaut?{efface:true}:{valeur:nouveau,at:Date.now()}}}); }
       else { try{const st=stockageParcours();if(st)garderParcours(st,owner,'vue:'+nom,nouveau);}catch(_){} }
     }
@@ -19931,12 +19932,15 @@ function useVueSession(nom, initial) {
     _vuesMontees.set(cle,m); signalerVuesMontees();
     // L'autre appareil a changé ce réglage : on le prend, SEULEMENT s'il n'a pas été
     // touché ici depuis l'ouverture (on ne remplace que ce qui est resté tel quel).
-    const relu=(e)=>{ const d=e&&e.detail; if(!d||d.k!==CLE_REPRISE_ECRANS||!d.distant||touche.current) return;
+    const adopter=()=>{ if(touche.current) return;
       const v=vueReprise(carteReprise(),nom,initial);
       const cur=vuesSession.has(cle)?vuesSession.get(cle):initial;
       if(JSON.stringify(v)!==JSON.stringify(cur)) poserRef.current(v,{sansEcrire:true,geste:false}); };
+    const relu=(e)=>{ const d=e&&e.detail; if(!d||d.k!==CLE_REPRISE_ECRANS||!d.distant) return; adopter(); };
+    // Le nuage lu à l'ouverture (onCloudReady, §5) ou relu ensuite (« distant »).
+    const offNuage=onCloudReady(adopter);
     window.addEventListener('vrm:save',relu);
-    return ()=>{ window.removeEventListener('vrm:save',relu);
+    return ()=>{ window.removeEventListener('vrm:save',relu); if(typeof offNuage==='function') offNuage();
       const cur=vuesSession.has(cle)?vuesSession.get(cle):initial;
       if(estRechercheVue(nom)&&typeof cur==='string'&&cur.trim()){ _rechercheQuittee.set(cle,Date.now()); noterReprise({vues:{[nom]:{valeur:cur,at:Date.now()}}}); }
       if(_vuesMontees.get(cle)===m){ _vuesMontees.delete(cle); signalerVuesMontees(); } };
@@ -51957,10 +51961,11 @@ function AppCoeur() {
   // (5 nov.) La reprise : l'écran, sa section, l'onglet de Colis choisi à la main.
   // (11 nov.) Rangée sur l'appareil ET pour le compte (synchronisée, avec un délai) — jamais au
   // montage : l'écran de départ n'est pas un geste, il effacerait celui de l'autre appareil.
-  const repriseMontee=React.useRef(false), aNavigue=React.useRef(false);
+  const repriseMontee=React.useRef(false), aNavigue=React.useRef(false), tabDepart=React.useRef(tab);
   React.useEffect(()=>{
     if(!repriseMontee.current){ repriseMontee.current=true; return; }
-    aNavigue.current=true;
+    // Une section ajustée à l'ouverture n'est pas un geste : seul un AUTRE écran l'est.
+    if(tab!==tabDepart.current) aNavigue.current=true;
     try{ garderReprise(stockageParcours(), AUTH.user?.id||'', { tab, sub:platSub, colis:ongletColis }, ONGLETS_LIENS); }catch(_){}
     noterReprise({ ecran:{ tab, sub:platSub, colis:ongletColis, at:Date.now() } });
   },[tab,platSub,ongletColis]);
@@ -51972,7 +51977,7 @@ function AppCoeur() {
   // Jamais avec un lien reçu (search0), jamais après un geste de navigation.
   React.useEffect(()=>{
     let fait=false, adopte=false;
-    const f=(e)=>{ const d=e&&e.detail; if(fait||!d||d.k!==CLE_REPRISE_ECRANS||!d.distant) return;
+    const f=(e)=>{ const d=e&&e.detail; if(fait||(d&&(d.k!==CLE_REPRISE_ECRANS||!d.distant))||(!d&&e!=='nuage')) return;
       fait=true;
       if(aNavigue.current) return;
       let r=null; try{ const owner=AUTH.user?.id||''; const st=stockageParcours(); r=ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ r=null; }
@@ -51984,14 +51989,16 @@ function AppCoeur() {
       if(!compteTouche.current){ const c=compteReprise(carteReprise(),siteDuTab(r.tab,r.sub)); if(c!=null) setCompteSelBrut(c); }
     };
     // Sans écran plus frais : le site et le compte de l'écran ouvert, s'ils n'ont pas été touchés ici.
-    const g=(e)=>{ const d=e&&e.detail; if(!d||d.k!==CLE_REPRISE_ECRANS||!d.distant||aNavigue.current||adopte) return;
+    const g=(e)=>{ const d=e&&e.detail; if((d&&(d.k!==CLE_REPRISE_ECRANS||!d.distant))||(!d&&e!=='nuage')||aNavigue.current||adopte) return;
       const t=tabCourant.current, sub=histoRef.current.sub;
       if(estTacheSite(t)){ const sx=siteReprise(carteReprise(),t); if(sx&&sx!==siteDeTache(t,sub)) setPlatSub(sx); }
       if(!compteTouche.current){ const c=compteReprise(carteReprise(),siteDuTab(t,sub)); if(c!=null) setCompteSelBrut(c); }
     };
     window.addEventListener('vrm:save',g);
+    // Le nuage lu à l'ouverture (onCloudReady, §5) : la même décision, une fois.
+    const offNuage=onCloudReady(()=>{ f('nuage'); g('nuage'); });
     window.addEventListener('vrm:save',f);
-    return ()=>{ window.removeEventListener('vrm:save',f); window.removeEventListener('vrm:save',g); };
+    return ()=>{ window.removeEventListener('vrm:save',f); window.removeEventListener('vrm:save',g); if(typeof offNuage==='function') offNuage(); };
   },[]);
   // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
   // « Tous les comptes » par défaut. En choisir un ne montre QUE ses annonces /

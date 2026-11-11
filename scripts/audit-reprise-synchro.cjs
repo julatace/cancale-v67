@@ -36,7 +36,7 @@ const MUTATIONS = {
   'pas-synchro': ['app', '  CLE_REPRISE_ECRANS,\n', ''],
   'sans-delai': ['app', '_repriseMinuteur = setTimeout(ecrireRepriseMaintenant, DELAI_REPRISE);', 'ecrireRepriseMaintenant();'],
   'ecrit-au-montage': ['app', 'if(!repriseMontee.current){ repriseMontee.current=true; return; }', ''],
-  'adopte-touche': ['app', '||!d.distant||touche.current) return;', '||!d.distant) return;'],
+  'adopte-touche': ['app', 'const adopter=()=>{ if(touche.current) return;', 'const adopter=()=>{ if(false) return;'],
   'adopte-apres-geste': ['app', '      if(aNavigue.current) return;\n', ''],
   'bandeau-absent': ['app', '<RepriseRetenue tab={tab}', '<RepriseRetenueAilleurs tab={tab}'],
   'gardes-perimes': ['gardes', ", 'vrm_reprise_ecrans'];", '];'],
@@ -144,7 +144,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     dit(/visibilitychange[\s\S]{0,120}auRepos\(\)/.test(app), 'au passage en arrière-plan, ce qui attend part tout de suite');
     const vue = (app.match(/function useVueSession[\s\S]*?\n\}/) || [''])[0];
     dit(/vueReprise\(carteReprise\(\),nom,initial\)/.test(vue) && /noterReprise\(\{vues:/.test(vue), 'useVueSession lit et range filtre, tri, recherche pour le compte');
-    dit(/\|\|!d\.distant\|\|touche\.current\) return;/.test(vue), 'le nuage arrivé après coup ne remplace pas un réglage touché ici');
+    dit(/const adopter=\(\)=>\{ if\(touche\.current\) return;/.test(vue) && /onCloudReady\(adopter\)/.test(vue), 'le nuage arrivé après coup ne remplace pas un réglage touché ici');
     dit(/if\(!repriseMontee\.current\)\{ repriseMontee\.current=true; return; \}/.test(app), 'l’écran de départ n’est jamais écrit au montage (il effacerait celui de l’autre appareil)');
     dit(/if\(aNavigue\.current\) return;/.test(app) && /search:search0/.test(app), 'l’écran venu du nuage ne s’impose ni après un geste, ni contre un lien reçu');
     dit(/<RepriseRetenue tab=\{tab\}/.test(app) && /retenusAffiches\(\[\.\.\._vuesMontees\.values\(\)\], tab\)/.test(app) && /data-effacer-vue=/.test(app) && /data-reinitialiser-ecran=/.test(app), 'un filtre retenu est dit à l’écran, avec « Effacer » et « Réinitialiser l’écran »');

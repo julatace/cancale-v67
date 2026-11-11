@@ -78,6 +78,7 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   dit(await attendreEcran(pA.pg, 'ventes'), 'P1 : l’ordinateur est sur Ventes', await ecran(pA.pg));
   await pA.pg.waitForTimeout(2500);
   const fin = pA.pg.locator('button[aria-pressed]', { hasText: /^Finalisées$/ }).first();
+  await capture(pA.pg, 'P1-ordinateur-ventes');
   dit((await fin.count()) > 0, 'P1 : le filtre « Finalisées » est à l’écran');
   await fin.click().catch(() => {});
   dit(await aller(pA.pg, 'annonces'), 'P1 : l’ordinateur va sur Annonces (barre)', await ecran(pA.pg));
