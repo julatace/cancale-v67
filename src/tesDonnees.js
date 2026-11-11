@@ -16,6 +16,7 @@
 //    Leboncoin, eBay et Vestiaire que tu lui demandes de remplir).
 // ════════════════════════════════════════════════════════════════════════════
 
+import { motsVendeur } from './profilVendeur.js';
 const EXT = 'vinted-sync-extension/background.js';
 
 // Le plafond d'actions de l'extension, par heure et par compte (§3, sa décision
@@ -64,12 +65,12 @@ export const GESTES = [
   { id: 'allume', titre: 'Seulement si tu l’as allumé', pied: 'Éteint au départ. Tu l’allumes et l’éteins toi-même.', lignes: [
     { id: 'offres', texte: 'Accepter une offre Vinted au-dessus du prix mini que tu as posé, refuser sous ton seuil.', preuve: [[EXT, 'm.vinted_offres_auto === true']] },
     { id: 'favoris', texte: 'Écrire aux personnes qui ont mis ton annonce en favori.', preuve: [['api/_lib/favoris-auto.js', 'Confirme l’allumage du mode automatique.']] },
-    { id: 'ebay', texte: 'Retirer d’eBay une paire vendue ailleurs (fait par le serveur VRM).', preuve: [['src/ecrans/Ebay.jsx', "load('vrm_ebay_retrait_auto', false) === true"]] },
+    { id: 'ebay', get texte() { return `Retirer d’eBay ${motsVendeur().un} vendu${motsVendeur().e} ailleurs (fait par le serveur VRM).`; }, preuve: [['src/ecrans/Ebay.jsx', "load('vrm_ebay_retrait_auto', false) === true"]] },
   ] },
   { id: 'clic', titre: 'Jamais sans ton clic', lignes: [
     { id: 'repondre', texte: 'Répondre à un acheteur, faire, accepter ou refuser une offre.', preuve: [[EXT, 'const EXEC_PERMIS = [']] },
-    { id: 'telephone', texte: 'Depuis ton téléphone, accepter une offre te demande de confirmer.', preuve: [[EXT, "'confirmation': 'ce geste vend la paire"]] },
-    { id: 'republier', texte: 'Republier une annonce Vinted : c’est toi qui choisis les paires et qui lances.', preuve: [[EXT, 'async function recreerVinted']] },
+    { id: 'telephone', texte: 'Depuis ton téléphone, accepter une offre te demande de confirmer.', preuve: [[EXT, "'confirmation': `ce geste vend ${motsExt().le}"]] },
+    { id: 'republier', get texte() { return `Republier une annonce Vinted : c’est toi qui choisis les ${motsVendeur().noms} et qui lances.`; }, preuve: [[EXT, 'async function recreerVinted']] },
     { id: 'publier', texte: 'Publier sur Leboncoin, préparer sur eBay ou Vestiaire.', preuve: [[EXT, 'async function publierVestiaire']] },
     { id: 'supprimer-lbc', texte: `Supprimer une annonce Leboncoin, après confirmation, ${PLAFOND_SUPPRESSIONS_LBC} par heure au plus.`, preuve: [[EXT, 'async function supprimeLbcDepuisApp']] },
     { id: 'repondre-autres', texte: 'Envoyer un message sur Leboncoin ou Vestiaire.', preuve: [[EXT, 'async function repondreLeboncoin'], [EXT, 'async function repondreVestiaire']] },

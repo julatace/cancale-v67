@@ -16,6 +16,7 @@ import {
 } from './inventaireAnnuel.js';
 import { normaliserInventaire, fusionnerInventaire, inventaireVide } from './inventaire.js';
 import { Numero } from './composants/Numero.jsx';
+import { motsVendeur } from './profilVendeur.js';
 import './styles-inventaire-annuel.css';
 
 const lireLocal = (owner) => { try { const v = localStorage.getItem('vrm_inventaire_local_' + (owner || 'anon')); return v ? normaliserInventaire(JSON.parse(v)) : inventaireVide(); } catch (_) { return inventaireVide(); } };
@@ -110,13 +111,13 @@ export function InventaireAnnuel({ owner = '', cle, Feuille, onFermer, onSaisirP
       {session ? <p className="vrm-ia-sous">Vérification du {jour(Number(session.finAt) || Number(session.debut) || 0)}{relu === 'ko' ? ' · cet appareil seulement' : ''}</p> : null}
       {onVerifier ? <button type="button" className="vrm-b vrm-b-secondaire vrm-ia-large" data-ia-verifier="" onClick={onVerifier}>Je vérifie mes rangements</button> : null}
       {ecarts ? (<>
-        {liste('doublons', 'Deux paires sous un même N°', ecarts.doublons.map((k) => ({ id: k, cle: k, numero: k, titre: 'Porté par deux paires', compte: '' })),
-          (l) => <li key={l.id} className="vrm-ia-l vrm-ia-double" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit" etat="doublon"/><span className="vrm-ia-l-t">Porté par deux paires</span></li>, null, 'doublon')}
+        {liste('doublons', `Deux ${motsVendeur().noms} sous un même N°`, ecarts.doublons.map((k) => ({ id: k, cle: k, numero: k, titre: `Porté par deux ${motsVendeur().noms}`, compte: '' })),
+          (l) => <li key={l.id} className="vrm-ia-l vrm-ia-double" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit" etat="doublon"/><span className="vrm-ia-l-t">Porté par deux {motsVendeur().noms}</span></li>, null, 'doublon')}
         {liste('pas-trouvees', 'Pas trouvées', ecarts.pasTrouvees, ligneEcart, 'Dans VRM, pas vues dans tes rangements.', 'geste')}
         {liste('hors-liste', 'Trouvées, pas dans la liste', ecarts.horsListe.map((k) => ({ id: k, cle: k, numero: k, titre: '', compte: '' })),
           (l) => <li key={l.id} className="vrm-ia-l" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit"/><span className="vrm-ia-l-t">Vue dans un carton</span></li>,
           inv.partiel ? 'Une lecture d’annonces manque : vérifie avant de conclure.' : 'Vues dans tes rangements, absentes de la liste.', 'geste')}
-        {ecarts.sansNumero.length ? <p className="vrm-ia-aide" data-ia-sans-numero={ecarts.sansNumero.length}>{plur(ecarts.sansNumero.length, 'paire', 'paires')} sans N° : impossible à cocher.</p> : null}
+        {ecarts.sansNumero.length ? <p className="vrm-ia-aide" data-ia-sans-numero={ecarts.sansNumero.length}>{plur(ecarts.sansNumero.length, motsVendeur().nom, motsVendeur().noms)} sans N° : impossible à cocher.</p> : null}
         <p className="vrm-ia-aide">Rien n’est changé dans VRM.</p>
       </>) : null}
     </section>);
@@ -152,8 +153,8 @@ export function InventaireAnnuel({ owner = '', cle, Feuille, onFermer, onSaisirP
           </div>) : null}
 
         {inv && inv.lignes.length ? (
-          <section className="vrm-ia-carte vrm-ia-liste" aria-label="Les paires" data-ia-lignes={inv.lignes.length}>
-            <div className="vrm-ia-tete">Les paires · {inv.lignes.length}</div>
+          <section className="vrm-ia-carte vrm-ia-liste" aria-label={`Les ${motsVendeur().noms}`} data-ia-lignes={inv.lignes.length}>
+            <div className="vrm-ia-tete">Les {motsVendeur().noms} · {inv.lignes.length}</div>
             <ul>{(tout.paires ? inv.lignes : inv.lignes.slice(0, MAX_LISTE)).map((l) => (
               <li key={l.id} className="vrm-ia-l" data-ia-ligne={l.id} data-ia-ligne-prix={l.achat == null ? 'sans' : String(l.achat)} data-ia-ligne-trouvee={ecarts ? (trouve.has(l.id) ? '1' : '0') : ''}>
                 {l.numero ? <Numero n={l.numero} taille="petit"/> : <span className="vrm-ia-sans-n">sans N°</span>}

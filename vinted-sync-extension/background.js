@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.344.0';
+const CODE_VERSION = '5.355.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -200,6 +200,8 @@ function plateformeDe(url) {
 // `lier-extension=<identifiant de CETTE extension>` — l'app, connectée, lui
 // adresse sa propre session (voir `demanderLiaison`). Plus de mot de passe VRM
 // tapé dans l'extension quand l'app peut la connecter.
+// 5.351 : les écrans que la carte du logo peut ouvrir (liste blanche, adresse de l'app).
+const ECRANS_CARTE = Object.freeze({ colis: 'tab=cat_bord', messages: 'tab=messages', offres: 'tab=messages&vue=favoris', journee: 'tab=journee' });
 function ouvrirVRMDepuis(urlActive, opts) {
   const p = plateformeDe(urlActive);
   let idExt = ''; try { idExt = String(chrome.runtime.id || ''); } catch (_) {}
@@ -207,13 +209,15 @@ function ouvrirVRMDepuis(urlActive, opts) {
   // 5.325 : « Continuer avec Google / Discord » — un nom de la liste, jamais
   // un texte reçu tel quel ; seulement avec une liaison.
   const connexion = lier && FOURNISSEURS_CONNEXION.includes(String((opts && opts.connexion) || '')) ? String(opts.connexion) : '';
-  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
+  // 5.351 : « Colis · Messages · Offres · Ma journée » depuis la carte du logo.
+  const ecran = !lier && opts && Object.prototype.hasOwnProperty.call(ECRANS_CARTE, String(opts.ecran || '')) ? ECRANS_CARTE[String(opts.ecran)] : '';
+  const cible = ecran ? APP_URL_VRM + '/?' + ecran : APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
   try {
     chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
       const t = (ouverts || [])[0];
       // Déjà sur VRM : on ne recharge pas la page (on garde l'écran où l'on est)
       // — sauf pour une liaison, que l'app lit dans l'adresse.
-      if (t && !lier && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
+      if (t && !lier && !ecran && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
       if (t) { chrome.tabs.update(t.id, { url: cible, active: true }); try { chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} }
       else chrome.tabs.create({ url: cible });
     });
@@ -830,6 +834,49 @@ function b64url(octets) {
 }
 async function noterEtatOAuth(v) { try { await chrome.storage.local.set({ [OAUTH_ETAT]: Object.assign({ at: Date.now() }, v) }); } catch (_) {} }
 const NOM_FOURN = { google: 'Google', discord: 'Discord' };
+// (5.346, lot connexions-oauth) Les refus de Supabase / Google / Discord en français :
+// MÊME règle que l'app, recopiée de src/auth/erreursOAuth.js par
+// `node scripts/audit-connexions-oauth.cjs --recopie` (ne pas modifier ici).
+// <regle-erreurs-oauth>
+const NOMS_FOURNISSEURS_OAUTH = { google: 'Google', discord: 'Discord' };
+// `e` : { error, code, description } · `fournisseur` : 'google' | 'discord' | '' (pas su) ·
+// `contexte` : 'connexion' (app) · 'liaison' (Relier, connecté) · 'extension'.
+function messageErreurOAuth(e, fournisseur, contexte) {
+  const x = e || {};
+  const code = String(x.code || '').toLowerCase().replace(/[^a-z_]/g, '');
+  const err = String(x.error || '').toLowerCase();
+  const desc = String(x.description || '');
+  const nomConnu = NOMS_FOURNISSEURS_OAUTH[fournisseur] || '';
+  const nom = nomConnu || 'ce compte';
+  const ctx = contexte === 'liaison' || contexte === 'extension' ? contexte : 'connexion';
+  const recommencer = ctx === 'liaison' ? (nomConnu ? `Reclique « Relier ${nomConnu} ».` : 'Recommence depuis Mon compte.')
+    : ctx === 'extension' ? 'Recommence depuis le logo VRM.'
+    : (nomConnu ? `Reclique « Continuer avec ${nomConnu} ».` : 'Recommence depuis la connexion.');
+  const parEmail = ctx === 'liaison' ? '' : ' Ou connecte-toi avec ton e-mail VRM.';
+  const a = (c) => code === c;
+  // Liens reçus par e-mail (confirmation, mot de passe) : aucun fournisseur en jeu.
+  if (a('otp_expired') || (!code && /email link is invalid|has expired/i.test(desc) && !nomConnu)) return 'Ce lien e-mail a expiré ou a déjà servi. Redemande un e-mail depuis la connexion.';
+  if (a('provider_email_needs_verification') || a('email_not_confirmed') || /unverified email/i.test(desc)) {
+    if (/confirmation email has been sent/i.test(desc) || a('email_not_confirmed')) return `Un e-mail de confirmation est parti vers ton adresse ${nom}. Ouvre-le, puis reviens te connecter.`;
+    return `Ton adresse e-mail ${nom} n’est pas vérifiée. Vérifie-la chez ${nom}, puis réessaie.${parEmail}`;
+  }
+  if (/error getting user email/i.test(desc)) return `${nomConnu || 'Ce compte'} n’a pas donné d’adresse e-mail. Ajoute une adresse vérifiée chez ${nom}, puis réessaie.${parEmail}`;
+  if (a('identity_already_exists') || /identity is already linked/i.test(desc)) {
+    // « Identity is already linked » (à CE compte) ≠ « … to another user » (un autre compte VRM).
+    if (/already linked\s*\.?$/i.test(desc.trim()) && !/another/i.test(desc)) return `${nomConnu || 'Ce compte'} est déjà relié à ton compte VRM. Rien à faire.`;
+    // Le chemin en 3 gestes, le MÊME que l'écran de suppression (lot suppression-oauth).
+    return `Ce ${nom} a déjà son propre compte VRM. 1. Déconnecte-toi, puis « Continuer avec ${nom} ». 2. Paramètres → Supprimer mon compte : tape SUPPRIMER. 3. Reconnecte-toi ici, puis relie ${nom}.`;
+  }
+  if (a('manual_linking_disabled') || /manual.?linking/i.test(desc)) return 'La liaison n’est pas encore activée sur VRM. Ton compte reste inchangé.';
+  if (a('email_exists') || /already been registered/i.test(desc)) return `Cette adresse a déjà un compte VRM. Connecte-toi avec elle, puis relie ${nom} dans ton profil.`;
+  if (a('signup_disabled') || /signups not allowed/i.test(desc)) return 'Les inscriptions sont fermées sur VRM pour le moment. Aucun compte n’a été créé.';
+  if (a('user_banned') || /user is banned/i.test(desc)) return 'Ce compte VRM est suspendu. Écris au support de VRM.';
+  if (['bad_oauth_state', 'bad_oauth_callback', 'flow_state_not_found', 'flow_state_expired', 'flow_state_already_used', 'bad_code_verifier'].includes(code)
+    || /flow state|oauth state|code verifier|code challenge/i.test(desc)) return `Cette connexion a expiré ou a déjà servi. ${recommencer}`;
+  if (!code && (err === 'access_denied' || /denied|cancel/i.test(desc))) return nomConnu ? `Connexion avec ${nomConnu} annulée. Rien n’a changé.` : 'Connexion annulée. Rien n’a changé.';
+  return `La connexion${nomConnu ? ' avec ' + nomConnu : ''} n’a pas pu aboutir. Réessaie dans un instant. ${recommencer}`;
+}
+// </regle-erreurs-oauth>
 // 5.329 (Julien, 8 nov. : « que ça n'ouvre AUCUN autre onglet ») : depuis la
 // carte du logo, Google / Discord ne s'ouvrent QUE dans une petite fenêtre
 // (`chrome.windows.create`, type popup) que `oauthRetour` referme. Un navigateur
@@ -906,6 +953,17 @@ async function oauthDepart(fournisseur, ongletDepart, opts) {
 }
 // Le code rendu par Supabase, remis par `oauth-retour.js`. `fixe` : la page de
 // retour de l'extension (sinon : la page d'accueil de VRM, repli de Supabase).
+// `true` seulement si vrm.center a ANNULÉ le compte (réponse `annule: true`). Tout
+// le reste (refus 409, panne, réseau) ⇒ false : on ne devine rien.
+const SANS_COMPTE_API = 'https://vrm.center/api/compte?mode=oauth-sans-compte';
+async function annulerCompteNeufOAuth(jeton) {
+  if (typeof jeton !== 'string' || !jeton) return false;
+  try {
+    const r = await fetch(SANS_COMPTE_API, { method: 'POST', headers: { Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(12000) });
+    const j = await r.json().catch(() => null);
+    return !!(r.ok && j && j.annule === true);
+  } catch (_) { return false; }
+}
 async function oauthRetour(msg, sender) {
   const src = (sender && sender.tab && sender.tab.url) || (sender && (sender.origin || sender.url)) || '';
   if (!ORIGINE_APP.test(src)) return { ok: false, code: 'origine' };
@@ -929,8 +987,9 @@ async function oauthRetour(msg, sender) {
     try { if (typeof d.tab === 'number') chrome.tabs.update(d.tab, { active: true }, () => { void chrome.runtime.lastError; }); } catch (_) {}
   };
   if (msg && msg.error) {
-    const t = String(msg.error_description || msg.error || '').slice(0, 160);
-    const message = /access_denied|denied|cancel/i.test(t) ? `Connexion avec ${nom} annulée : rien n’a changé.` : `${nom} a refusé la connexion (${t || 'sans raison'}). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    // 5.346 : le CODE de Supabase d'abord (`error_code`) — `access_denied` vaut AUSSI pour
+    // une adresse non vérifiée ou une inscription fermée : jamais « annulée » à tort.
+    const message = messageErreurOAuth({ error: String(msg.error || '').slice(0, 60), code: String(msg.error_code || '').slice(0, 60), description: String(msg.error_description || '').slice(0, 200) }, d.f, 'extension');
     await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
     return rendre({ ok: false, code: 'refus', message });
   }
@@ -942,7 +1001,7 @@ async function oauthRetour(msg, sender) {
     j = await r.json().catch(() => null);
   } catch (_) { r = null; }
   if (!r || !r.ok || !j || typeof j.access_token !== 'string' || typeof j.refresh_token !== 'string' || !j.user || typeof j.user.id !== 'string') {
-    const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : (j && (j.error_code || j.msg)) ? messageErreurOAuth({ code: String(j.error_code || ''), description: String(j.msg || j.error_description || '') }, d.f, 'extension') : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
     await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
     return rendre({ ok: false, code: 'echange', message });
   }
@@ -954,6 +1013,17 @@ async function oauthRetour(msg, sender) {
     const ids = Array.isArray(j.user.identities) ? j.user.identities : [];
     neuf = isFinite(cree) && Date.now() - cree < 10 * 60000 && !ids.some((x) => x && x.provider === 'email');
   } catch (_) { neuf = false; }
+  // 5.346 (lot connexions-oauth) : même règle que l'app (lot DJ6). Ce bouton est
+  // « Continuer avec … » — une CONNEXION. Un compte que ce clic vient de faire créer
+  // n'a été voulu par personne : le serveur l'annule (il refait toutes les preuves,
+  // `?mode=oauth-sans-compte`) et la session n'est PAS rangée. Refusé ou pas su ⇒
+  // comme avant (session rangée, « compte neuf » dit).
+  if (neuf && (await annulerCompteNeufOAuth(j.access_token)) === true) {
+    const message = `Aucun compte VRM n’est relié à ce ${nom}. Rien n’a été créé. Connecte-toi sur vrm.center avec ton e-mail. Puis relie ${nom} dans ton profil.`;
+    await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message, sansCompte: true }, enPlus));
+    // Comme tout refus : la page de retour reste ouverte et DIT la phrase (rien fermé).
+    return rendre({ ok: false, code: 'sans-compte', message });
+  }
   const email = String(j.user.email || emailDuJwt(j.access_token) || '');
   await saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((Number(j.expires_in) || 3600) * 1000), user_id: j.user.id, email, depuis: Date.now() });
   Promise.resolve().then(() => noterDiag('session_oauth_' + d.f)).catch(() => {});
@@ -3412,6 +3482,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // pour le compte du COOKIE de l'onglet qui demande (jamais un autre compte
     // nommé par le message) — c'est la règle « garde » de l'extension.
     // 5.344 : « Tout récupérer » depuis la carte du logo — le compte de l'onglet seulement.
+    // 5.354 : « Masquer / Afficher le résumé du mois » — un réglage de CE navigateur.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'resumeMasque') {
+      poserMoisMasque(msg.masque === true).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'importTout') {
       (async () => {
         let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
@@ -3442,7 +3517,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'ouvrirVRM') {
       // La carte de connexion vit dans un iframe de l'onglet : sender.tab est
       // l'onglet du site, c'est lui qui décide l'onglet de VRM.
-      ouvrirVRMDepuis((sender && sender.tab && sender.tab.url) || '');
+      // 5.351 (lot extension-visuel) : la carte ouvre VRM sur un ÉCRAN de la liste
+      // (`ECRANS_CARTE`) — un nom connu, jamais une adresse reçue telle quelle.
+      ouvrirVRMDepuis((sender && sender.tab && sender.tab.url) || '', { ecran: msg.ecran });
       sendResponse({ ok: true });
       return true;
     }
@@ -3566,6 +3643,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
+          if (msg.action === 'verifDepot') { sendResponse(await verifDepotPage(sender, msg)); return; }
           if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
           if (msg.action === 'numeros') {
             const uidOnglet = await numerosPermisDansPage(sender);
@@ -4693,13 +4771,81 @@ function numerosDuCompte(m, uid, msg) {
 // Un autre compte (le sien ou pas) ⇒ rien. Pas su ⇒ le champ manque (jamais 0).
 // Le prix d'achat part BRUT (la fiche et `vinted_buyprice_by_num` du N°) : la page
 // le lit par `prixAchatDe`, la règle de l'app recopiée (vrm-regles-achat.js).
+// ── « PAIRE » OU « ARTICLE » (11 nov., lot vocabulaire-article, 5.347.0) ─────
+// Le vocabulaire de l'app (src/profilVendeur.js) recopié TEL QUEL entre les marques
+// (`node scripts/audit-vocabulaire-article.cjs --recopie`). Ce qu'il vend : `vrm_je_vends`
+// de SA ligne main ; « automatique » ⇒ Sneakers pour le propriétaire de l'installation
+// (lu chez vrm.center, une fois par 24 h), « article » sinon — la règle `jeVendsEffectif`.
+// Rangé dans chrome.storage.local.vrm_vend_ext pour les pages (vrm-mots.js). Rien de
+// su ⇒ les textes d'avant (« paire »). Aucune écriture en base.
+const MOTS_ARTICLE = (() => {
+// <mots-article> (copie, ne pas modifier ici)
+const MOTS = {
+  sneakers: { nom: 'paire', noms: 'paires', un: 'une paire', Un: 'Une paire', le: 'la paire', Le: 'La paire', ce: 'cette paire', tes: 'tes paires', e: 'e', es: 'es', chaque: 'Chaque paire', elle: 'elle', Elle: 'Elle', une: 'une',
+    // (11 nov., lot vocabulaire-article) les formes des écrans secondaires, des notifications et de l'extension.
+    Nom: 'Paire', Noms: 'Paires', sa: 'sa paire', la: 'la', La: 'La', de: 'de la paire', a: 'à la paire', Ce: 'Cette paire', aucune: 'aucune paire', Aucune: 'Aucune paire',
+    celle: 'celle', celles: 'celles', toutes: 'toutes', Toutes: 'Toutes', laquelle: 'laquelle', autre: 'une autre paire', meme: 'la même paire', Meme: 'La même paire', lui: 'elle', eux: 'elles', deNom: 'de paire', deNoms: 'de paires', Tes: 'Tes paires', quelle: 'quelle paire', bonne: 'la bonne paire', AucuneDe: 'Aucune de ces paires', mes: 'mes paires', deMeme: 'de la même paire', quelles: 'quelles paires', ancienne: 'ANCIENNE paire', nouvelle: 'la nouvelle', ta: 'ta paire', deCe: 'de cette paire', deLa: 'de la' },
+  autre:    { nom: 'article', noms: 'articles', un: 'un article', Un: 'Un article', le: 'l’article', Le: 'L’article', ce: 'cet article', tes: 'tes articles', e: '', es: 's', chaque: 'Chaque article', elle: 'il', Elle: 'Il', une: 'un',
+    Nom: 'Article', Noms: 'Articles', sa: 'son article', la: 'le', La: 'Le', de: 'de l’article', a: 'à l’article', Ce: 'Cet article', aucune: 'aucun article', Aucune: 'Aucun article',
+    celle: 'celui', celles: 'ceux', toutes: 'tous', Toutes: 'Tous', laquelle: 'lequel', autre: 'un autre article', meme: 'le même article', Meme: 'Le même article', lui: 'lui', eux: 'eux', deNom: 'd’article', deNoms: 'd’articles', Tes: 'Tes articles', quelle: 'quel article', bonne: 'le bon article', AucuneDe: 'Aucun de ces articles', mes: 'mes articles', deMeme: 'du même article', quelles: 'quels articles', ancienne: 'ANCIEN article', nouvelle: 'le nouvel article', ta: 'ton article', deCe: 'de cet article', deLa: 'du' },
+};
+// </mots-article>
+  return MOTS;
+})();
+let _vendExt = 'sneakers';
+try { chrome.storage.local.get('vrm_vend_ext').then((o) => { const v = o && o.vrm_vend_ext; _vendExt = v && v.vend === 'autre' ? 'autre' : 'sneakers'; }).catch(() => {}); } catch (_) {}
+function motsExt() { return MOTS_ARTICLE[_vendExt === 'autre' ? 'autre' : 'sneakers']; }
+function vendDeReglage(r, proprietaire) {
+  const c = r && typeof r === 'object' ? r.choix : r;
+  if (c === 'sneakers' || c === 'autre') return c;
+  return proprietaire === true ? 'sneakers' : 'autre';
+}
+const ABONNEMENT_API = 'https://vrm.center/api/compte?mode=abonnement';
+async function proprietaireExt(owner) {
+  try {
+    const o = await chrome.storage.local.get('vrm_proprio_ext');
+    const m = o && o.vrm_proprio_ext;
+    const connu = m && m.owner === owner && typeof m.v === 'boolean';
+    if (connu && Date.now() - Number(m.at || 0) < 24 * 3600000) return m.v;
+    const s = await loadSession();
+    if (!s || !s.access_token || String(s.user_id || '') !== owner) return connu ? m.v : null;
+    const r = await fetch(ABONNEMENT_API, { headers: { Authorization: `Bearer ${s.access_token}` }, cache: 'no-store' });
+    if (!r.ok) return connu ? m.v : null;
+    const j = await r.json().catch(() => null);
+    if (!j || typeof j.proprietaire !== 'boolean') return connu ? m.v : null;
+    await chrome.storage.local.set({ vrm_proprio_ext: { owner, v: j.proprietaire, at: Date.now() } });
+    return j.proprietaire;
+  } catch (_) { return null; }
+}
+async function rafraichirVendExt(reglage, owner) {
+  if (!owner) return _vendExt;
+  const c = reglage && typeof reglage === 'object' ? reglage.choix : null;
+  const vend = vendDeReglage(reglage, (c === 'sneakers' || c === 'autre') ? null : await proprietaireExt(owner));
+  _vendExt = vend;
+  try { await chrome.storage.local.set({ vrm_vend_ext: { vend, owner, at: Date.now() } }); } catch (_) {}
+  return vend;
+}
+// Relu au plus toutes les 6 h (au démarrage, à chaque synchronisation) : UNE petite projection.
+async function vendExtAJour() {
+  try {
+    const owner = String((await loadSession())?.user_id || '');
+    if (!owner) return;
+    const o = await chrome.storage.local.get('vrm_vend_ext');
+    const v = o && o.vrm_vend_ext;
+    if (v && v.owner === owner && Date.now() - Number(v.at || 0) < 6 * 3600000) { _vendExt = v.vend === 'autre' ? 'autre' : 'sneakers'; return; }
+    const main = await lireMain(['vrm_je_vends']);
+    if (main === null) return;
+    await rafraichirVendExt(main.vrm_je_vends, owner);
+  } catch (_) {}
+}
 let _infosPage = null;
 async function donneesInfosPage(uid) {
   const owner = String((await loadSession())?.user_id || '');
   if (!owner || !uid) return null;
   if (_infosPage && _infosPage.owner === owner && _infosPage.uid === uid && Date.now() - _infosPage.at < 120000) return _infosPage;
-  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit']);
+  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit', 'vrm_je_vends']);
   if (main === null) return null;
+  await rafraichirVendExt(main.vrm_je_vends, owner);   // (5.347) « paire » / « article »
   const dates = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
   if (dates === null) return null;
   const dr = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
@@ -5149,11 +5295,270 @@ function noterEtatCompte(uid, json) {
       const ok = await supabaseUpsert('app_data', [{ id: ETAT_COMPTE_ROW, data: { comptes, majAt: new Date(maintenant).toISOString() } }], 'id');
       noterDiag(ok === false ? 'etat_compte_ecriture_ratee' : `etat_compte_${etat}`);
       if (ok !== false && (!avant || avant.etat !== etat || proChange)) { try { notifierApp({ type: 'maj', quoi: 'etatcompte', uid: k }); } catch (_) {} }
+      // 5.350 : l'alerte « Vinted a fermé le compte » (une fois par fermeture) ; rouvert ⇒ elle se ferme.
+      if (ok !== false && etat === 'banni' && !etatGarde && (!avant || avant.etat !== 'banni')) noterCompteModeration(k, 'banni', {});
+      if (ok !== false && etat === 'actif' && avant && avant.etat === 'banni') noterCompteModeration(k, 'actif', {});
       return ok !== false;
     } catch (_) { return false; }
   });
   chaineEtatCompte = fait.catch(() => false);
   return fait;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QUAND VINTED CACHE, SUPPRIME OU RESTREINT (11 nov., 5.350)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien veut être prévenu TOUT DE SUITE. Aucune requête Vinted de plus : on
+// compare ce que l'extension lit DÉJÀ —
+//   · deux lectures COMPLÈTES du dressing de SON compte (moisson active, toutes
+//     les pages : `dressingCompletFaitFoi`) — jamais une capture passive, qui
+//     peut être une page filtrée ;
+//   · son profil (`noterEtatCompte` : banni) ;
+//   · un refus « restricted / suspended » de Vinted (`poserFreinRepub`).
+// La règle (masquée, disparue, compte) est recopiée de src/moderationVinted.js
+// (`node scripts/audit-alerte-moderation.cjs --recopie`), jamais réécrite ici.
+// La dernière lecture complète de chaque compte (états seulement : o/r/h/s/c/d)
+// reste dans CE Chrome (`vrmModerationVu`) ; elle n'avance QUE si ce qu'elle a
+// trouvé est rangé (sinon la lecture suivante le retrouve). Une lecture ratée
+// de la ligne n'écrit rien (§5).
+// La notification part du serveur (`/api/push`, action `moderation`) : il relit
+// les lignes lui-même, regroupe, respecte les heures calmes et ne notifie
+// jamais deux fois le même événement (sa mémoire `vrm_moderation_notifie`).
+// Banni ou restreint ⇒ le frein de 24 h du compte (republication, baisses de
+// prix, offres automatiques — tout ce qui lit `lireFreinRepub`).
+// Exécuté par scripts/audit-alerte-moderation.cjs (le vrai fichier, dans un vm).
+// <moderation-regle>
+const MODERATION_LIGNE = 'moderation_vinted_';
+const MODERATION_MAX = 200;
+const MODERATION_JOURS = 90;
+const MODERATION_RESTREINT_MS = 24 * 3600 * 1000;
+const MODERATION_SORTES = ['masquee', 'disparue', 'banni', 'restreint'];
+const RE_ID_MODERATION = /^\d{4,15}$/;
+// L'état d'une annonce dans un dressing : o en ligne · r réservée · h masquée ·
+// s vendue · c fermée · d brouillon. `null` = pas une annonce.
+function etatArticleModeration(it) {
+  if (!it || typeof it !== 'object' || it.id == null || !RE_ID_MODERATION.test(String(it.id))) return null;
+  if (it.is_draft === true) return 'd';
+  if (it.is_closed === true) return /sold/i.test(String(it.item_closing_action || '')) ? 's' : 'c';
+  if (it.is_hidden === true) return 'h';
+  if (it.is_reserved === true) return 'r';
+  return 'o';
+}
+function etatsDressingModeration(items) {
+  const out = {};
+  for (const it of Array.isArray(items) ? items : []) {
+    const e = etatArticleModeration(it);
+    if (e) out[String(it.id)] = e;
+  }
+  return out;
+}
+// `avant` / `apres` : { at (ms), etats } — deux lectures COMPLÈTES du même compte.
+// `supprimees` : { [id]: date } de SES suppressions (`null` = pas su).
+// `vacances` : true · false · null (son profil).
+function evenementsDressingModeration({ avant, apres, supprimees, vacances } = {}) {
+  const rien = (raison) => ({ evenements: [], raison });
+  if (!apres || !apres.etats || typeof apres.etats !== 'object' || !Number.isFinite(Number(apres.at))) return rien('lecture');
+  if (!avant || !avant.etats || typeof avant.etats !== 'object' || !Number.isFinite(Number(avant.at))) return rien('premiere-lecture');
+  const at = Number(apres.at), av = Number(avant.at);
+  if (!(at > av)) return rien('ordre');
+  const A = avant.etats, B = apres.etats;
+  const ouverts = Object.keys(A).filter((id) => A[id] === 'o' || A[id] === 'r');
+  let masquees = ouverts.filter((id) => B[id] === 'h');
+  const raisons = [];
+  if (vacances === true && masquees.length) { masquees = []; raisons.push('vacances'); }
+  if (masquees.length >= 3 && masquees.length === ouverts.length) { masquees = []; raisons.push('tout-masque'); }
+  let disparues = Object.keys(A).filter((id) => (A[id] === 'o' || A[id] === 'h') && !Object.prototype.hasOwnProperty.call(B, id));
+  if (disparues.length && (supprimees === null || supprimees === undefined || typeof supprimees !== 'object')) { disparues = []; raisons.push('suppressions-pas-sues'); }
+  else disparues = disparues.filter((id) => !(supprimees[id] != null && supprimees[id] !== ''));
+  const restants = Object.keys(B).filter((id) => B[id] === 'o' || B[id] === 'h' || B[id] === 'r');
+  if (disparues.length >= 3 && !restants.length) { disparues = []; raisons.push('tout-disparu'); }
+  const evenements = [];
+  for (const id of masquees.sort()) evenements.push({ k: `masquee:${id}:${at}`, s: 'masquee', t: at, a: id, av });
+  for (const id of disparues.sort()) evenements.push({ k: `disparue:${id}:${at}`, s: 'disparue', t: at, a: id, av });
+  return { evenements, raison: raisons.join(',') };
+}
+// Un événement du COMPTE (banni, restreint) — `null` si la sorte est inconnue.
+function evenementCompteModeration(sorte, at, { raison = '', jusqua = null } = {}) {
+  const t = Number(at);
+  if ((sorte !== 'banni' && sorte !== 'restreint') || !Number.isFinite(t)) return null;
+  const e = { k: `${sorte}:${t}`, s: sorte, t };
+  const j = Number(jusqua);
+  if (jusqua != null && Number.isFinite(j) && j > t) e.j = j;
+  const r = String(raison || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  if (r) e.r = r;
+  return e;
+}
+// Rebâtit une entrée (jamais un champ inconnu) — `null` si elle ne tient pas.
+function nettoyerModeration(e) {
+  if (!e || typeof e !== 'object' || !MODERATION_SORTES.includes(e.s)) return null;
+  const t = Number(e.t);
+  if (!Number.isFinite(t) || t <= 0 || typeof e.k !== 'string' || !e.k || e.k.length > 80) return null;
+  const o = { k: e.k, s: e.s, t };
+  if (e.s === 'masquee' || e.s === 'disparue') { if (!RE_ID_MODERATION.test(String(e.a || ''))) return null; o.a = String(e.a); }
+  const av = Number(e.av); if (e.av != null && Number.isFinite(av) && av > 0 && av < t) o.av = av;
+  const j = Number(e.j); if (e.j != null && Number.isFinite(j) && j > t) o.j = j;
+  const f = Number(e.f); if (e.f != null && Number.isFinite(f) && f >= t) o.f = f;
+  const r = typeof e.r === 'string' ? e.r.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+  if (r) o.r = r;
+  return o;
+}
+// Ajoute les nouveaux événements à la liste rangée (jamais deux fois) et ferme
+// ceux que la lecture contredit. `etats` : les états de la lecture complète qui
+// vient d'arriver (ou null) ; `compte` : 'actif' quand le profil vient de le dire.
+// Rend { liste, ajoutes, change }.
+function fusionnerModeration(liste, nouveaux, { etats = null, compte = null, at = Date.now(), maintenant = Date.now() } = {}) {
+  let change = false;
+  const l = [];
+  for (const x of Array.isArray(liste) ? liste : []) { const e = nettoyerModeration(x); if (e) l.push(e); else change = true; }
+  const fin = Number(at);
+  if (etats && typeof etats === 'object') {
+    for (const e of l) {
+      if (e.f || !e.a || !(e.t < fin)) continue;
+      const st = etats[e.a];
+      if (e.s === 'masquee' && st && st !== 'h') { e.f = fin; change = true; }
+      else if (e.s === 'disparue' && st) { e.f = fin; change = true; }
+    }
+  }
+  if (compte === 'actif') for (const e of l) if (e.s === 'banni' && !e.f && e.t < fin) { e.f = fin; change = true; }
+  const ajoutes = [];
+  for (const x of Array.isArray(nouveaux) ? nouveaux : []) {
+    const n = nettoyerModeration(x);
+    if (!n || n.f) continue;
+    const meme = (e) => e.s === n.s && (n.a ? e.a === n.a : !e.a);
+    // Un « limité » n'est ouvert que jusqu'à sa fin (`j`, sinon 24 h) : une nouvelle
+    // limite des semaines plus tard est un nouvel événement.
+    const ouvert = (e) => !e.f && !(e.s === 'restreint' && Number(e.j || (e.t + MODERATION_RESTREINT_MS)) <= n.t);
+    if (l.some((e) => e.k === n.k)) continue;
+    if (l.some((e) => meme(e) && ouvert(e))) continue;                               // déjà ouvert
+    if (n.s === 'restreint' && l.some((e) => meme(e) && Math.abs(n.t - e.t) < MODERATION_RESTREINT_MS)) continue;
+    l.push(n); ajoutes.push(n); change = true;
+  }
+  const lim = Number(maintenant) - MODERATION_JOURS * 864e5;
+  const gardes = l.filter((e) => e.t > lim).sort((p, q) => p.t - q.t).slice(-MODERATION_MAX);
+  if (gardes.length !== l.length) change = true;
+  return { liste: gardes, ajoutes, change };
+}
+// </moderation-regle>
+const MODERATION_VU = 'vrmModerationVu';
+const MODERATION_A_SIGNALER = 'vrmModerationASignaler';
+const VACANCES_VUES = 'vrmVacancesVues';
+let _chaineModeration = Promise.resolve();
+function unModerationALaFois(fn) {
+  const suite = _chaineModeration.then(() => fn(), () => fn());
+  _chaineModeration = suite.then(() => {}, () => {});
+  return suite;
+}
+// Le mode vacances lu dans SON profil (aucune lecture de plus) : true · false · null.
+async function noterVacancesVues(uid, v) {
+  if (typeof v !== 'boolean' || !/^\d{1,20}$/.test(String(uid || ''))) return;
+  try { const m = (await chrome.storage.local.get(VACANCES_VUES))[VACANCES_VUES] || {}; if (!m[uid] || m[uid].v !== v) { m[uid] = { v, at: Date.now() }; await chrome.storage.local.set({ [VACANCES_VUES]: m }); } } catch (_) {}
+}
+async function vacancesVues(uid) {
+  try { const m = (await chrome.storage.local.get(VACANCES_VUES))[VACANCES_VUES] || {}; const e = m[String(uid)]; return e && typeof e.v === 'boolean' ? e.v : null; } catch (_) { return null; }
+}
+// SES suppressions (rangées + encore en file dans ce Chrome). `null` = pas su.
+async function suppressionsModeration(uid) {
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_supprimees&select=ids:data->ids`);
+  if (rows === null || !Array.isArray(rows)) return null;
+  const ids = Object.assign({}, (rows[0] && rows[0].ids && typeof rows[0].ids === 'object') ? rows[0].ids : {});
+  try {
+    const file = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || [];
+    for (const e of file) if (e && String(e.uid) === String(uid) && e.id && !ids[e.id]) ids[e.id] = e.at || true;
+  } catch (_) { return null; }
+  return ids;
+}
+// Lire-fusionner-réécrire la ligne du compte. Rend { ajoutes, ouverts } ou null (pas su / pas écrit).
+async function rangerModeration(uid, nouveaux, opts) {
+  const id = `${MODERATION_LIGNE}${uid}`;
+  const rows = await sbGet(`app_data?id=eq.${id}&select=e:data->e`);
+  if (rows === null || !Array.isArray(rows)) { noterDiag('moderation_lecture_ratee'); return null; }
+  const f = fusionnerModeration((rows[0] && rows[0].e) || [], nouveaux, { ...(opts || {}), maintenant: Date.now() });
+  if (f.change) {
+    const ok = await supabaseUpsert('app_data', [{ id, data: { uid: String(uid), v: CODE_VERSION, majAt: new Date().toISOString(), e: f.liste } }], 'id');
+    if (ok === false) { noterDiag('moderation_ecriture_ratee'); return null; }
+    noterDiag(f.ajoutes.length ? 'moderation_alerte_rangee' : 'moderation_fermee');
+    try { notifierApp({ type: 'maj', quoi: 'moderation', uid: String(uid) }); } catch (_) {}
+  }
+  if (f.ajoutes.length) await signalerModeration(true);
+  return { ajoutes: f.ajoutes, ouverts: f.liste.filter((e) => !e.f && e.a).map((e) => e.a) };
+}
+// Le frein de 24 h posé sans refus (compte fermé par Vinted) : mêmes gestes arrêtés.
+async function poserFreinCompte(uid) {
+  try {
+    const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {};
+    const f = { jusqua: Date.now() + FREIN_RESTREINT_MS, restreint: true, status: 0, at: Date.now(), banni: true };
+    const cur = m[String(uid)];
+    if (!(cur && Number(cur.jusqua) > f.jusqua)) { m[String(uid)] = f; await chrome.storage.local.set({ [FREIN_REPUB]: m }); }
+  } catch (_) {}
+}
+// Une lecture COMPLÈTE du dressing de `uid` vient d'être rangée.
+function guetterDressing(uid, items, at) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  return unModerationALaFois(async () => {
+    try {
+      const etats = etatsDressingModeration(items);
+      const memo = (await chrome.storage.local.get(MODERATION_VU))[MODERATION_VU] || {};
+      const avant = memo[u] && memo[u].etats ? memo[u] : null;
+      // Les lectures passent une à une (la chaîne) : celle-ci est APRÈS la précédente, même à la même milliseconde.
+      const t = Math.max(Number(at) || Date.now(), avant && Number.isFinite(Number(avant.at)) ? Number(avant.at) + 1 : 0);
+      const vacances = await vacancesVues(u);
+      let r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: {}, vacances });
+      // Les suppressions ne se lisent QUE s'il y a une disparue à juger (égress).
+      if (r.evenements.some((e) => e.s === 'disparue')) r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: await suppressionsModeration(u), vacances });
+      if (r.raison) noterDiag(`moderation_rien_${r.raison.split(',')[0]}`);
+      const ouverts = (avant && Array.isArray(avant.ouverts)) ? avant.ouverts : [];
+      const aFermer = ouverts.some((a) => etats[a] && etats[a] !== 'h');
+      let ouvertsApres = ouverts;
+      if (r.evenements.length || aFermer) {
+        const rg = await rangerModeration(u, r.evenements, { etats, at: t });
+        if (rg === null) return null;            // pas rangé : le point de départ n'avance pas
+        ouvertsApres = rg.ouverts;
+      }
+      const m2 = (await chrome.storage.local.get(MODERATION_VU))[MODERATION_VU] || {};
+      m2[u] = { at: t, etats, ouverts: ouvertsApres.slice(-MODERATION_MAX) };
+      await chrome.storage.local.set({ [MODERATION_VU]: m2 });
+      return r.evenements.length;
+    } catch (_) { return null; }
+  });
+}
+// Un événement du COMPTE (banni, restreint, ou le compte redevenu actif).
+function noterCompteModeration(uid, sorte, { raison = '', jusqua = null } = {}) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  return unModerationALaFois(async () => {
+    try {
+      if (sorte === 'actif') return await rangerModeration(u, [], { compte: 'actif', at: Date.now() });
+      const e = evenementCompteModeration(sorte, Date.now(), { raison, jusqua });
+      if (!e) return null;
+      if (sorte === 'banni') await poserFreinCompte(u);
+      return await rangerModeration(u, [e], { at: e.t });
+    } catch (_) { return null; }
+  });
+}
+// La notification : le serveur relit tout (le corps ne dit rien). Une marque
+// locale tient l'envoi tant qu'il n'a pas abouti (réessayé au prochain passage).
+async function signalerModeration(neuf) {
+  try {
+    if (neuf) await chrome.storage.local.set({ [MODERATION_A_SIGNALER]: Date.now() });
+    const en = Number((await chrome.storage.local.get(MODERATION_A_SIGNALER))[MODERATION_A_SIGNALER] || 0);
+    if (!en) return false;
+    if (Date.now() - en > 3 * 864e5) { await chrome.storage.local.remove(MODERATION_A_SIGNALER); return false; }   // le cron du serveur l'a fait depuis
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('moderation_push_sans_session'); return false; }
+    let status = 0;
+    try {
+      const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(COMPTE_PUSH_URL, { method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+        body: JSON.stringify({ action: 'moderation' }) });
+      clearTimeout(tm); status = r.status;
+    } catch (_) { status = 0; }
+    const fini = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 429);
+    if (fini) await chrome.storage.local.remove(MODERATION_A_SIGNALER);
+    noterDiag(status >= 200 && status < 300 ? 'moderation_push_envoye' : `moderation_push_${fini ? 'refus' : 'ko'}_${status || 'reseau'}`);
+    return fini && status < 300;
+  } catch (_) { return false; }
 }
 
 async function noterUrlLabel(url, ok) {
@@ -5605,6 +6010,82 @@ function lectureNumeroDescription(texte) {
   try { return VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(texte.slice(0, 20000), 'description')); } catch (_) { return null; }
 }
 
+// ── AVANT DE PUBLIER SUR VINTED : L'ENCART DU FORMULAIRE (11 nov., lot verif-publication, 5.353) ──
+// Sur vinted.fr/items/new, une courte liste discrète, JAMAIS une garde : rien n'est
+// cliqué, rien n'est envoyé à Vinted, aucune requête Vinted de plus (la base VRM
+// seulement, comme `donneesInfosPage`). La page envoie ce qu'elle VOIT (description,
+// prix tapés), le fond rend les alertes ; le texte n'est ni gardé ni écrit.
+//   · numero  : il numérote lui-même (réglage `vrm_numero_ecrit` allumé, ou
+//               l'habitude PROUVÉE : 5 descriptions lues, 4 sur 5 avec un N° à la
+//               fin — la règle `habitudeNumeroEcrit` de src/verifAnnonce.js) et la
+//               fin de la description n'a pas de N° (ou deux) ;
+//   · enligne : le N° écrit est celui d'une annonce EN LIGNE de CE compte (la règle
+//               `<enligne-regle>`, lecture complète < 24 h) — par identité ;
+//   · prix    : le prix tapé est sous SON prix d'achat saisi pour ce N°
+//               (`vinted_buyprice_by_num`), jamais deviné, aucun prix proposé.
+// Pas su (base muette, compte pas relu, champ introuvable) ⇒ rien. Les photos ne
+// sont pas jugées ici : le formulaire de Vinted n'a pas été mesuré (pas su ⇒ rien).
+const HABITUDE_MIN_EXT = 5;
+function habitudeNumeroEcritExt(lectures) {
+  const ls = (Array.isArray(lectures) ? lectures : []).map((l) => VRM_NUMERO_ECRIT.compacterLecture(l)).filter(Boolean);
+  if (ls.length < HABITUDE_MIN_EXT) return null;
+  const lus = ls.filter((l) => l.etat === 'lu').length;
+  return lus * 5 >= ls.length * 4 ? true : null;
+}
+const CODES_VERIF_EXT = ['numero', 'enligne', 'prix'];
+const nombreVerif = (v) => { if (v == null || v === '') return null; const n = Number(String(v).replace(/\s|€/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+const eurosVerif = (v) => (Number.isInteger(v) ? `${v} €` : `${v.toFixed(2).replace('.', ',')} €`);
+function alertesDepotVinted(page, d) {
+  const out = [];
+  if (!d || !page) return out;
+  const coupees = new Set(Array.isArray(d.coupees) ? d.coupees : []);
+  const desc = typeof page.description === 'string' ? page.description : null;
+  const ouDesc = !Array.isArray(d.ou) || d.ou.includes('description');
+  const lu = desc != null && desc.trim().length >= 5 ? VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(desc.slice(0, 20000), 'description')) : null;
+  if (d.ecrit === true && ouDesc && lu) {
+    if (lu.etat === 'rien') out.push({ code: 'numero', texte: 'Aucun N° à la fin de la description', pourquoi: `Tu numérotes toi-même : sans N°, VRM ne retrouve pas ${motsExt().le}.` });
+    else if (lu.etat === 'ambigu') out.push({ code: 'numero', texte: 'Deux N° différents dans la description', pourquoi: 'VRM ne saura pas lequel est le bon.' });
+  }
+  const cle = lu && lu.etat === 'lu' ? lu.cle : '';
+  if (cle && d.enLigne && typeof d.enLigne.has === 'function' && d.enLigne.has(cle)) out.push({ code: 'enligne', texte: `N°${cle} déjà en ligne sur ce compte`, pourquoi: `Deux annonces pour ${motsExt().un} : risque de ${motsExt().la} vendre deux fois.` });
+  const p = nombreVerif(page.prix), ac = cle && d.buyByNum ? nombreVerif(d.buyByNum[cle]) : null;
+  if (p != null && p > 0 && ac != null && ac > 0 && p < ac) out.push({ code: 'prix', texte: `Prix ${eurosVerif(p)} sous ton prix d’achat ${eurosVerif(ac)}`, pourquoi: 'Tu vendrais moins cher que ce que tu l’as payée.' });
+  return out.filter((a) => !coupees.has(a.code));
+}
+let _verifDepot = null;
+async function donneesVerifDepot(uid) {
+  const owner = String((await loadSession())?.user_id || '');
+  const u = String(uid || '');
+  if (!owner || !u) return null;
+  if (_verifDepot && _verifDepot.owner === owner && _verifDepot.uid === u && Date.now() - _verifDepot.at < 120000) return _verifDepot;
+  const main = await lireMain(['vrm_numero_ecrit', 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_verif_coupees']);
+  if (main === null) return null;
+  const rowL = await sbGet(`app_data?id=eq.harvest_${u}_listings&select=id,data`);
+  if (rowL === null) return null;
+  const rowP = await sbGet(`app_data?id=eq.harvest_${u}_enligne&select=${SELECT_ENLIGNE}`);
+  const supp = await lireSupprimeesTous();
+  const r = enLigneDesLignes(rowL, rowP === null ? null : rowP, supp, Date.now()).parCompte.get(u);
+  const fiches = main.vinted_annonce_numeros || {};
+  const cleDe = (it) => { const f = fiches[String(it && it.id)]; const n = f && f.numero != null ? cleNum(f.numero) : ''; if (n) return n; const l = it && VRM_NUMERO_ECRIT.compacterLecture(it.numEcrit); return l && l.etat === 'lu' ? l.cle : ''; };
+  // En ligne : seulement une lecture qui fait foi (`enLigne`, < 24 h) ; sinon pas su.
+  let enLigne = null;
+  if (r && Array.isArray(r.enLigne) && !(r.aConfirmer && r.aConfirmer.length) && supp !== null) { enLigne = new Set(); for (const it of r.enLigne) { const k = cleDe(it); if (k) enLigne.add(k); } }
+  const items = (rowL && rowL[0] && rowL[0].data && rowL[0].data.payload && Array.isArray(rowL[0].data.payload.items)) ? rowL[0].data.payload.items : [];
+  const reglage = main.vrm_numero_ecrit && typeof main.vrm_numero_ecrit === 'object' ? main.vrm_numero_ecrit : null;
+  const ecrit = numeroEcritAllume(main) ? true : habitudeNumeroEcritExt(items.map((it) => it && it.numEcrit).filter(Boolean));
+  const coupees = (main.vrm_verif_coupees && Array.isArray(main.vrm_verif_coupees.codes) ? main.vrm_verif_coupees.codes : []).filter((c) => CODES_VERIF_EXT.includes(c));
+  if (String((await loadSession())?.user_id || '') !== owner) return null;
+  _verifDepot = { owner, uid: u, at: Date.now(), ecrit, ou: reglage && reglage.actif === true && Array.isArray(reglage.ou) ? reglage.ou : null, enLigne, buyByNum: main.vinted_buyprice_by_num || {}, coupees };
+  return _verifDepot;
+}
+async function verifDepotPage(sender, msg) {
+  const uid = await numerosPermisDansPage(sender);
+  if (!uid) return { ok: true, alertes: [], portee: 'hors_compte' };
+  const d = await donneesVerifDepot(uid);
+  if (!d) return { ok: false };
+  return { ok: true, alertes: alertesDepotVinted({ description: msg && msg.description, prix: msg && msg.prix }, d) };
+}
+
 function articleMaigre(it) {
   const o = {};
   for (const c of CHAMPS_ARTICLE) if (it[c] !== undefined) o[c] = it[c];
@@ -5945,7 +6426,30 @@ function avisPropre(f) {
   if (typeof f.created_at === 'string' && /^\d{4}-\d{2}-\d{2}/.test(f.created_at)) o.created_at = f.created_at.slice(0, 40);
   if (Number.isFinite(Number(f.created_at_ts)) && f.created_at_ts !== null && f.created_at_ts !== '') o.created_at_ts = Number(f.created_at_ts);
   if (typeof f.feedback === 'string') o.feedback = f.feedback.slice(0, 600);
+  // 5.352 (11 nov., lot avis-negatif) — LE N° DE TRANSACTION, S'IL EST DANS LA RÉPONSE (jamais vu
+  // à ce jour) : la seule identité qui relie un avis à SA vente (§5). Chiffres seulement ; absent ⇒ rien.
+  const tx = f.transaction_id != null ? String(f.transaction_id) : '';
+  if (/^\d{1,20}$/.test(tx)) o.transaction_id = tx;
   return o;
+}
+// 5.352 (11 nov., lot avis-negatif) — APRÈS une écriture RÉUSSIE des avis : « l'extension vient de
+// lire les avis de CE compte » (`/api/push { action:'avis', uid }`). Le serveur relit la ligne au nom
+// du vendeur, compare à SA mémoire et sonne une fois par avis ≤ seuil (api/_lib/avis-negatif.js).
+// Aucune requête Vinted ; sans session, ou réseau KO, rien n'est retenté : le cron du matin et du
+// soir est le filet (la mémoire est côté serveur, rien ne se perd).
+async function signalerAvisLus(uid) {
+  try {
+    if (!/^\d{1,20}$/.test(String(uid || ''))) return false;
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('avis_signal_sans_session'); return false; }
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+      body: JSON.stringify({ action: 'avis', uid: String(uid) }) });
+    clearTimeout(t);
+    noterDiag(r.ok ? 'avis_signal_envoye' : `avis_signal_ko_${r.status}`);
+    return r.ok;
+  } catch (_) { noterDiag('avis_signal_ko_reseau'); return false; }
 }
 // 5.340 (11 nov.) — UN POINT PAR CAPTURE : { at, total (Vinted, ou null), n (avis lus),
 // c: [nombre de 1★, 2★, 3★, 4★, 5★] }. Jamais un texte, un pseudo ni un identifiant
@@ -6015,6 +6519,7 @@ async function capterAvis(uid) {
     const historique = historiqueAvis(hr && hr[0] && hr[0].h, pointAvis(maintenant, user_feedbacks, pag));
     const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_feedbacks`, data: { type: 'feedbacks', uid: String(uid), domain: acc.domain || 'www.vinted.fr', capturedAt: maintenant, nItems: user_feedbacks.length, payload: { user_feedbacks, ...(pag ? { pagination: pag } : {}), historique } } }], 'id');
     noterDiag(ok === false ? 'avis_ecriture_ratee' : 'avis_ecrits');
+    if (ok !== false) await signalerAvisLus(uid);   // 5.352 : seulement une écriture réussie
     return ok !== false;
   } catch (_) { return false; }
 }
@@ -8296,7 +8801,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
   verifFormeObjet(type, brut, '');
-  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); }   // 5.181 : actif / banni ; 5.191 : login
+  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); try { await noterVacancesVues(String(uid), vacancesDuProfil(brut)); } catch (_) {} }   // 5.181 : actif / banni ; 5.191 : login ; 5.350 : vacances (alerte modération)
   payload = alleger(type, payload);
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
@@ -8373,6 +8878,8 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // 5.294 : la date de la dernière lecture COMPLÈTE du dressing de ce compte,
   // RANGÉE (le rattrapage au retour sur Vinted la lit : `retourSurVinted`).
   if (capturePrevue && ecritRow !== false) await noterCaptureComplete(uid);
+  // 5.350 : deux lectures COMPLÈTES comparées (masquée / disparue) — aucune requête Vinted de plus.
+  if (capturePrevue && ecritRow !== false && type === 'listings') { try { await guetterDressing(uid, (brut && brut.items) || [], Date.parse(maintenant)); } catch (_) {} }
   if (fenetreCmd && ecritRow !== false) await noterFenetreRangee(`harvest_${uid}_${type}`, fenetreCmd);
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
@@ -8860,7 +9367,7 @@ function effacerReculBase() {
   }).catch(() => {});
   return _reculChaine;
 }
-function fullSync() { captureAllAccounts().then(() => runActive()); }
+function fullSync() { vendExtAJour(); captureAllAccounts().then(() => runActive()); }
 
 // ⚠️ APRÈS UNE MISE À JOUR, Chrome n'injecte PAS le nouveau bridge.js dans les
 //    onglets de l'app déjà ouverts : l'app parlerait à l'ancien (orphelin,
@@ -9979,7 +10486,7 @@ async function autoAccepterOffres(uid) {
             await chrome.storage.local.set({ vrmOffresGardeDit: dits });
             noterDiag('offre_auto_garde_' + raison);
             logActivity(raison === 'vendue-ailleurs'
-              ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : cette paire est vendue ailleurs (retire l'annonce Vinted)`
+              ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : ${motsExt().ce} est vendu${motsExt().e} ailleurs (retire l'annonce Vinted)`
               : `⏸ Offre de ${o.prix.toFixed(2)} € pas acceptée : ouvre VRM pour qu'il vérifie qu'elle n'est vendue nulle part ailleurs`);
           }
           continue;
@@ -10113,6 +10620,7 @@ async function visiteVinted() {
     await envoyerNotifsRetrait();
     // 5.331 : un « compte relié » resté en attente (réseau, session absente) repart ici.
     await envoyerComptesSignales();
+    await signalerModeration(false);   // 5.350 : une alerte de modération dont l'envoi a échoué repart
     await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -10440,18 +10948,18 @@ function tailleRefusee(rc) {
   const errs = j && Array.isArray(j.errors) ? j.errors : [];
   return errs.some((e) => e && (/^(size|size_id)\b/i.test(String(e.field || e.name || '')) || /champ taille/i.test(String(e.value || e.message || ''))));
 }
-const TEXTE_TAILLE_REFUSEE = " Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne pose une taille que si Vinted en propose une au libellé exact de ta paire.";
+const texteTailleRefusee = () => ` Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne pose une taille que si Vinted en propose une au libellé exact de ${motsExt().ta}.`;
 const TEXTE_PHOTOS_REFUSEES = " Vinted refuse les photos de ce brouillon : ouvre-le sur Vinted (Mes brouillons → Modifier), rajoute les photos, puis « Publier ». VRM ne les renvoie pas tout seul (jamais d'essais en rafale).";
 function gesteRefus(rc, corps) {
   if (!tailleRefusee(rc)) return (typeof photosRefusees === 'function' && photosRefusees(rc)) ? TEXTE_PHOTOS_REFUSEES : '';
   const pourquoi = rc && rc.tailleRaison ? ` VRM a cherché la bonne taille : ${rc.tailleRaison}.` : '';
-  if (pourquoi) return pourquoi + TEXTE_TAILLE_REFUSEE;
+  if (pourquoi) return pourquoi + texteTailleRefusee();
   try {
     const d = (corps && (corps.draft || corps.item)) || {};
     const t = (Array.isArray(d.item_attributes) ? d.item_attributes : []).filter((a) => a && a.code === 'size').map((a) => (a.ids || []).join('+')).join(',');
     echantillonRate('vinted_refus_taille', String(d.id || ''), JSON.stringify({ catalog_id: d.catalog_id || null, size: t || null }));
   } catch (_) {}
-  return TEXTE_TAILLE_REFUSEE;
+  return texteTailleRefusee();
 }
 // ── LA TAILLE RETROUVÉE (29 oct., sa décision : « VRM doit pouvoir regarder la
 // taille, garder toutes les infos de l'article ») ─────────────────────────────
@@ -10500,7 +11008,7 @@ function formeJson(j, prof = 0) {
 }
 function choisirTaille(options, libelle) {
   const cible = libelleTaille(libelle);
-  if (!cible) return { raison: "VRM ne connaît pas la taille de cette paire" };
+  if (!cible) return { raison: `VRM ne connaît pas la taille ${motsExt().deCe}` };
   const ids = [...new Set((options || []).filter((o) => libelleTaille(o.t) === cible).map((o) => o.id))];
   if (ids.length === 1) return { id: ids[0] };
   if (ids.length > 1) return { raison: `Vinted propose plusieurs tailles « ${String(libelle).slice(0, 12)} » pour cette catégorie — VRM ne choisit pas entre elles` };
@@ -10600,7 +11108,7 @@ async function champsManquantsAvant(uid, acc, it, idsPaire, opts = {}) {
       const sz = a('size'); const ids = sz ? sz.ids.map(Number) : [];
       if (!ids.length || !ids.some((x) => g.options.some((o) => o.id === x))) {
         const libelle = await libelleTaillePaire(uid, idsPaire || []);
-        const t = libelle ? choisirTaille(g.options, libelle) : { raison: "VRM ne connaît pas la taille de cette paire" };
+        const t = libelle ? choisirTaille(g.options, libelle) : { raison: `VRM ne connaît pas la taille ${motsExt().deCe}` };
         if (t.id) { it.item_attributes = [...attrs.filter((x) => x && x.code !== 'size'), { code: 'size', ids: [t.id] }]; noterDiag('avant_taille_corrigee'); }
         else { manque.push(`la taille (${t.raison})`); noter('size'); }
       }
@@ -10718,6 +11226,8 @@ async function poserFreinRepub(uid, rc) {
   const f = { jusqua: Date.now() + (restreint ? FREIN_RESTREINT_MS : FREIN_REPUB_MS), restreint, status: st, at: Date.now() };
   try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const cur = m[String(uid)]; if (!(cur && Number(cur.jusqua) > f.jusqua)) m[String(uid)] = f; await chrome.storage.local.set({ [FREIN_REPUB]: m }); } catch (_) {}
   noterDiag(restreint ? 'frein_repub_restreint' : 'frein_repub_refus');
+  // 5.350 : « Vinted limite le compte » — une alerte (pas deux dans les 24 h), la raison si Vinted la donne.
+  if (restreint) { try { await noterCompteModeration(uid, 'restreint', { raison: raisonRefusVinted(rc), jusqua: f.jusqua }); } catch (_) {} }
   return f;
 }
 function phraseFreinRepub(f) {
@@ -10884,7 +11394,7 @@ async function reglerAvant(uid, acc, it, ids, reponses, ctx = {}) {
 }
 function phraseQuestion(q, avant) {
   if (!q) return '';
-  const qui = q.num ? `de la N°${q.num}` : 'de cette paire';
+  const qui = q.num ? `${motsExt().deLa} N°${q.num}` : motsExt().deCe;
   const base = q.options ? `Il manque ${q.nom} ${qui} : choisis dans VRM, la republication reprend sur ta réponse.` : `Il manque ${q.nom} ${qui}. ${q.geste}`;
   return `${base}${q.autres && q.autres.length ? ` (Il manque aussi : ${q.autres.join(', ')}.)` : ''}${avant ? ' Rien n’a été touché.' : ''}`;
 }
@@ -11709,7 +12219,7 @@ async function gardeJourRepub(uid) {
   const l = base.length > loc.length ? base : loc;
   if (l.length < REPUB_PAR_JOUR) return null;
   const h = Math.max(1, Math.ceil((Math.min(...l) + 86400000 - Date.now()) / 3600000));
-  return { code: 'quota-jour', raison: `${REPUB_PAR_JOUR} paires republiées sur ce compte ces dernières 24 h — c'est la limite de VRM pour ne pas te faire repérer. La prochaine dans environ ${h} h. Rien n'a été touché.` };
+  return { code: 'quota-jour', raison: `${REPUB_PAR_JOUR} ${motsExt().noms} republié${motsExt().e}s sur ce compte ces dernières 24 h — c'est la limite de VRM pour ne pas te faire repérer. La prochaine dans environ ${h} h. Rien n'a été touché.` };
 }
 function idPhotoReponse(j) {
   const n = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : ((typeof v === 'string' && /^\d{1,15}$/.test(v)) ? Number(v) : null);
@@ -11933,12 +12443,12 @@ async function publierBrouillon(msg) {
   }
   { const gL = await gardeLecture(uid, acc, 'clic');
     if (!ancienneOk) {
-      if (gL) return { accepte: false, code: 'ancienne-pas-sure', raison: "VRM n'est pas sûr que l'ancienne annonce de cette paire a été supprimée, et ne peut pas la relire maintenant — réessaie dans un moment. Rien n'a été touché." };
+      if (gL) return { accepte: false, code: 'ancienne-pas-sure', raison: `VRM n'est pas sûr que l'ancienne annonce ${motsExt().deCe} a été supprimée, et ne peut pas la relire maintenant — réessaie dans un moment. Rien n'a été touché.` };
       const ra = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${b.ancienId}`, null, { timeoutMs: 30000 });
       if (ra && ra.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(ra) };
       if (!(ra && (ra.status === 404 || ra.status === 410))) {
         noterDiag('brouillon_publier_ancienne_en_ligne');
-        return { accepte: false, code: 'ancienne-en-ligne', raison: ra && ra.ok ? "l'ancienne annonce de cette paire est TOUJOURS sur Vinted : la mettre en ligne la vendrait deux fois. Supprime l'ancienne sur Vinted, puis réessaie. Rien n'a été touché." : "VRM n'a pas pu vérifier que l'ancienne annonce de cette paire a été supprimée — réessaie dans un moment. Rien n'a été touché." };
+        return { accepte: false, code: 'ancienne-en-ligne', raison: ra && ra.ok ? `l'ancienne annonce ${motsExt().deCe} est TOUJOURS sur Vinted : la mettre en ligne la vendrait deux fois. Supprime l'ancienne sur Vinted, puis réessaie. Rien n'a été touché.` : `VRM n'a pas pu vérifier que l'ancienne annonce ${motsExt().deCe} a été supprimée — réessaie dans un moment. Rien n'a été touché.` };
       }
     }
     if (!gL) {
@@ -12598,7 +13108,7 @@ async function recreerVinted(msg) {
       // nouvelle recréation de CETTE annonce (sinon un second brouillon, puis une seconde
       // suppression). « Brouillons → en ligne » reste ouvert pour le brouillon rangé.
       await poserVerrouRecreer(id);
-      return { refaire: true, accepte: true, etape: 'incertain', draftId, raison: "le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois la même paire en ligne) — regarde ton dressing ; si elle n'y est plus, « Brouillons → en ligne » met le brouillon en ligne." };
+      return { refaire: true, accepte: true, etape: 'incertain', draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois ${motsExt().meme} en ligne) — regarde ton dressing ; si elle n'y est plus, « Brouillons → en ligne » met le brouillon en ligne.` };
     }
     if (!suppIncertaine && !rdV.ok) {
       noterDiag(`versbrouillon_suppression_refusee_${rdV.status}`);
@@ -13302,7 +13812,7 @@ async function executerPourApp(msg, sender) {
   //    confirmation… et le pont le jetait : le fond ne l'exigeait que par le
   //    relais du téléphone. N'importe quel message `exec` de l'app acceptait
   //    donc une offre sans elle. Exigé ici, pour toutes les voies.
-  if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti' };
+  if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti` };
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
@@ -13826,6 +14336,121 @@ async function lbcARetirerPourCarte() {
   }
   return c && c.data ? c.data : null;
 }
+// ── LE MINI-RÉSUMÉ DU MOIS DANS LA CARTE (5.354, lot extension-resume) ───────
+// « Ce mois : 1 340 € vendus · 42 ventes · 3 à expédier », replié sous une ligne
+// discrète. L'extension ne recalcule RIEN (§5) : elle LIT ce que l'app publie déjà
+// pour le widget de l'iPhone (`widget_stats` : caMois, ventesMois,
+// caMoisNonComptees, updatedAt, et `aExpedier` recopié du badge de Colis —
+// src/resumeCarte.js). Une lecture PROJETÉE (§4.4, aucun `select=data`), au plus
+// une TENTATIVE toutes les 15 min (réussie ou non), jamais plus d'1,2 s d'attente
+// pour la carte ; aucune requête vers Vinted. « Pas su » ⇒ null (la carte dit
+// « — », jamais 0). La copie est celle d'UN compte VRM (`u`).
+// Rien n'est montré si le compte de l'ONGLET n'est pas PROUVÉ à ce compte VRM
+// (`ongletDuVendeur`) : Vinted = un compte de SA liste (`vrmLogins` de cette
+// session, jamais « ignoré ») ; Leboncoin = un compte de SON `lbc_accounts` vu sur
+// une page « moi » ; Vestiaire = un compte de SON `vc_session` ; eBay = pas su.
+// Masqué (son choix, ce navigateur : `vrmResumeMasque`) ⇒ aucune lecture du tout.
+const MOIS_CARTE_RELU_MS = 15 * 60e3;
+const MOIS_CARTE_CACHE = 'vrmResumeCarte';
+const MOIS_CARTE_MASQUE = 'vrmResumeMasque';
+const MOIS_COLIS_MAX_MS = 12 * 3600e3;   // la fraîcheur du badge de Colis (publicationColisFraiche)
+const MOIS_CARTE_REQUETE = 'app_data?id=in.(widget_stats,lbc_accounts,vc_session)&select=id,ca:data->caMois,nv:data->ventesMois,nc:data->caMoisNonComptees,ae:data->aExpedier,maj:data->>updatedAt,la:data->accounts,vcc:data->comptes';
+function moisParis(ms) {
+  try {
+    const p = {}; for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).formatToParts(new Date(ms))) p[x.type] = x.value;
+    return p.year && p.month ? `${p.year}-${p.month}` : null;
+  } catch (_) { return null; }
+}
+const nombreOuNull = (x) => (typeof x === 'number' && Number.isFinite(x) ? x : (typeof x === 'string' && x.trim() !== '' && Number.isFinite(Number(x)) ? Number(x) : null));
+// Les lignes lues ⇒ ce que la carte peut dire. Rien n'est calculé : chaque chiffre
+// est celui de l'app, ou null (pas su) — mois d'avant, champ absent, colis trop vieux.
+function resumeMoisCarte(rows, maintenant) {
+  const now = Number(maintenant) || Date.now();
+  const w = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'widget_stats') || null;
+  const lbc = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'lbc_accounts') || null;
+  const vc = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'vc_session') || null;
+  const lbcIds = [];
+  if (lbc && lbc.la && typeof lbc.la === 'object') for (const [k, a] of Object.entries(lbc.la)) {
+    if (a && typeof a === 'object' && (a.session === true || a.sessionAt || (a.source && !LBC_URL_AUTRUI.test(String(a.source))))) lbcIds.push(idCompteLbc(k));
+  }
+  const vcIds = vc && vc.vcc && typeof vc.vcc === 'object' ? Object.keys(vc.vcc).map(String).slice(0, 20) : [];
+  const majMs = w && w.maj ? Date.parse(String(w.maj)) : NaN;
+  const ceMois = Number.isFinite(majMs) && moisParis(majMs) != null && moisParis(majMs) === moisParis(now);
+  const ca = ceMois ? nombreOuNull(w.ca) : null;
+  const ventes = ceMois ? nombreOuNull(w.nv) : null;
+  const nc = ceMois ? nombreOuNull(w.nc) : null;
+  const ae = w && w.ae && typeof w.ae === 'object' ? w.ae : null;
+  const aeAt = ae ? nombreOuNull(ae.at) : null;
+  const aeFrais = aeAt != null && now - aeAt >= 0 && now - aeAt < MOIS_COLIS_MAX_MS;
+  const aExpedier = ae && aeFrais && nombreOuNull(ae.n) != null ? Math.max(0, Math.round(nombreOuNull(ae.n))) : null;
+  return {
+    ca: ca == null ? null : Math.round(ca), caAuMoins: ca != null && nc != null && nc > 0,
+    ventes: ventes == null ? null : Math.round(ventes),
+    aExpedier, aExpedierAuMoins: aExpedier != null && ae.auMoins === true,
+    maj: Number.isFinite(majMs) ? majMs : null,
+    raison: !w ? 'jamais' : !ceMois ? 'mois' : null,
+    lbcIds: [...new Set(lbcIds)].slice(0, 20), vcIds,
+  };
+}
+// Le compte de l'onglet appartient-il à CE compte VRM ? true · false · null (pas su).
+function ongletDuVendeur({ plateforme, site, logins, u, resume, vcOnglet }) {
+  if (plateforme === 'vinted') {
+    if (!site || !site.id) return null;
+    if (site.choix === 'non') return false;
+    if (!logins || logins.owner !== u || !logins.map) return null;
+    if (Object.prototype.hasOwnProperty.call(logins.map, String(site.id))) return true;
+    return Date.now() - Number(logins.at || 0) < 300000 ? false : null;
+  }
+  if (plateforme === 'leboncoin') {
+    if (!site || !site.id || !resume) return null;
+    return resume.lbcIds.includes(idCompteLbc(site.id)) ? true : null;
+  }
+  if (plateforme === 'vestiaire') {
+    if (!vcOnglet || !resume) return null;
+    return resume.vcIds.includes(String(vcOnglet)) ? true : null;
+  }
+  return null;
+}
+async function moisPourCarte(plateforme, site, tabId) {
+  let local = {};
+  try { local = await chrome.storage.local.get([MOIS_CARTE_MASQUE, MOIS_CARTE_CACHE, 'vrmLogins', VC_ONGLETS]); } catch (_) { return null; }
+  if (local[MOIS_CARTE_MASQUE] === true) return { masque: true };
+  if (plateforme !== 'vinted' && plateforme !== 'leboncoin' && plateforme !== 'vestiaire') return null;
+  let u = '';
+  try { const s = await loadSession(); u = String((s && (s.user_id || subDuJwt(s.access_token))) || ''); } catch (_) { u = ''; }
+  if (!u) return null;
+  // Vinted : la preuve se lit SANS réseau ; un compte d'un autre ne déclenche aucune lecture.
+  if (plateforme === 'vinted' && ongletDuVendeur({ plateforme, site, logins: local.vrmLogins, u }) !== true) return null;
+  let c = local[MOIS_CARTE_CACHE] || null;
+  if (c && c.u !== u) c = null;
+  if (!c || !(Date.now() - Number(c.tente || 0) < MOIS_CARTE_RELU_MS) || Date.now() < Number(c.tente || 0)) {
+    const avant = c;
+    const lire = (async () => {
+      const marque = { u, tente: Date.now(), rows: avant ? avant.rows : null, lu: avant ? avant.lu : 0 };
+      try { await chrome.storage.local.set({ [MOIS_CARTE_CACHE]: marque }); } catch (_) {}
+      const rows = await sbGet(MOIS_CARTE_REQUETE);
+      if (rows === null || !Array.isArray(rows)) return marque;        // lecture ratée : la dernière connue reste
+      const v = { u, tente: marque.tente, lu: Date.now(), rows: rows.slice(0, 3).map((r) => ({ id: r.id, ca: r.ca, nv: r.nv, nc: r.nc, ae: r.ae, maj: r.maj, la: r.la, vcc: r.vcc })) };
+      try { await chrome.storage.local.set({ [MOIS_CARTE_CACHE]: v }); } catch (_) {}
+      return v;
+    })();
+    const r = await avecDelai(lire, 1200, null).catch(() => null);
+    if (r) c = r;
+  }
+  if (!c || !c.rows) return null;
+  const resume = resumeMoisCarte(c.rows, Date.now());
+  const vcOnglet = plateforme === 'vestiaire' && tabId != null ? ((local[VC_ONGLETS] || {})[String(tabId)] || {}).compte : null;
+  if (ongletDuVendeur({ plateforme, site, logins: local.vrmLogins, u, resume, vcOnglet }) !== true) return null;
+  const { lbcIds, vcIds, ...dire } = resume;
+  return Object.assign(dire, { lu: Number(c.lu) || null });
+}
+async function poserMoisMasque(masque) {
+  try {
+    if (masque) await chrome.storage.local.set({ [MOIS_CARTE_MASQUE]: true });
+    else await chrome.storage.local.remove(MOIS_CARTE_MASQUE);
+    return { ok: true, masque: !!masque };
+  } catch (_) { return { ok: false }; }
+}
 async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
@@ -13847,6 +14472,11 @@ async function etatSite(url,tabId) {
     site = uid ? { id: String(uid), nom: (await loginDe(String(uid))) || (await loginVu(String(uid))), choix: await choixCompte(String(uid)) } : { id: null, nom: '' };
     // 5.341 : les dates de versement encore à lire sur CE compte (pas su ⇒ null).
     if (uid) site.dates = await datesPourCarte(String(uid));
+    // 5.351 : « en pause car Vinted freine » — lu dans CE Chrome (stockage local,
+    // aucune requête) : la pause 429/403 et le frein des mises en ligne du compte.
+    if (uid) { const fr = await lireFreinRepub(String(uid)).catch(() => null); site.frein = fr ? { jusqua: Number(fr.jusqua) || 0, restreint: !!fr.restreint } : null; }
+    const pz = await pauseVinted().catch(() => null);
+    site.pause = pz ? { jusqua: Number(pz.jusqua) || 0 } : null;
     // 5.344 : l'historique de départ de CE compte (pas su ⇒ null).
     if (uid) site.import = await importPourCarte(String(uid));
   } else if (plateforme === 'leboncoin') {
@@ -13877,7 +14507,9 @@ async function etatSite(url,tabId) {
   const aRetirer = aRetirerBrut ? { at: aRetirerBrut.at, liste: aRetirerProuveCarte(aRetirerBrut.liste, lectureLbc, Date.now()) } : null;
   const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now() }) : null;
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
+  // 5.354 : le mini-résumé du mois (connecté seulement ; compte de l'onglet prouvé).
+  const mois = vrm && vrm.connecte === true ? await moisPourCarte(plateforme, site, tabId).catch(() => null) : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -14519,7 +15151,7 @@ function relaisCommande(d) {
 const RAISON_REFUS_RELAIS = {
   'arguments': 'commande incomplète — rien n\'est parti',
   'non-autorise': 'action non autorisée depuis le téléphone — rien n\'est parti',
-  'confirmation': 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti',
+  'confirmation': `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti`,
   'expiree': 'commande trop ancienne (plus de 10 min) — rien n\'est parti, relance-la si tu le veux encore',
 };
 // `null` = le stockage n'a pas répondu (on ne décide rien sur « pas su »).

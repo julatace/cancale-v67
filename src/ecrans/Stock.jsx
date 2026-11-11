@@ -26,6 +26,7 @@ import { InventaireAnnuel } from "../InventaireAnnuel.jsx";   // (10 nov., lot W
 import { DEMANDE_INVENTAIRE_ANNUEL } from "../inventaireAnnuel.js";   // (11 nov.) ouverte depuis « Clôturer l'année »
 const BANDE_MAX = 60;   // la bande « À ranger » (pire cas, 11 nov.)
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
+import { motsVendeur } from '../profilVendeur.js';
 
 // ⟦← App.jsx #3⟧
 
@@ -719,7 +720,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         <div className="vrm-s2d-resume-n">
           {/* (11 nov., états vides) « au moins 0 » ne se dit jamais (§5) : rien lu et une lecture qui manque ⇒ « — ». */}
           {lecture === undefined ? '…' : (aa && aa.su && !(aa.auMoins && nAffiche === 0) ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
-          <small>{nAffiche === 1 && aa && aa.su ? 'paire en ligne' : 'paires en ligne'}{filtreActif ? ' (filtrées)' : ''}</small>
+          <small>{nAffiche === 1 && aa && aa.su ? `${motsVendeur().nom} en ligne` : `${motsVendeur().noms} en ligne`}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
         {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
         {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
@@ -734,11 +735,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           ton={nAConf > 0 || aa.manque.length > 0 || aa.vcVieille ? 'ambre' : 'neutre'}
           attrs={{ 'data-stock-resume-court': '' }}
           puces={nAffiche > 0
-            ? [{ texte: `${nRangees} rangée${nRangees > 1 ? 's' : ''}` }, { texte: `${nAffiche - nRangees - nSansNum} à ranger` },
+            ? [{ texte: `${nRangees} rangé${motsStock.e}${nRangees > 1 ? 's' : ''}` }, { texte: `${nAffiche - nRangees - nSansNum} à ranger` },
                nAConf > 0 ? { texte: `${nAConf} à confirmer`, ton: 'ambre' } : null, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null,
                nSansNum + sansNumAutres + vcSansNum.length > 0 ? { texte: `${nSansNum + sansNumAutres + vcSansNum.length} sans N°` } : null].filter(Boolean)
             : [{ texte: 'Aucune annonce lue' }, aa.manque.length > 0 ? { texte: 'Pas tout lu', ton: 'ambre' } : null].filter(Boolean)}
-          phrase={aa.manque.length > 0 ? 'Une lecture manque : ouvre ce site avec l’extension.' : nAConf > 0 ? 'À confirmer : repasse sur ce compte pour le relire.' : nAffiche - nRangees - nSansNum > 0 ? 'Range chaque paire : touche « Ranger » dans la liste.' : 'Tout ce qui est en ligne est rangé.'}>
+          phrase={aa.manque.length > 0 ? 'Une lecture manque : ouvre ce site avec l’extension.' : nAConf > 0 ? 'À confirmer : repasse sur ce compte pour le relire.' : nAffiche - nRangees - nSansNum > 0 ? `Range ${motsStock.chaque.toLowerCase()} : touche « Ranger » dans la liste.` : 'Tout ce qui est en ligne est rangé.'}>
         <div data-stock-resume-detail="">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
           {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · à part : <b>{nAConf}</b> à confirmer ({aConfTxt} — {aConfGeste})</span>}
@@ -746,7 +747,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {nMasq > 0 && <> · à part : <b>{nMasq}</b> masquée{nMasq > 1 ? 's' : ''} par Vinted (toujours chez toi)</>}
           {nSansNum > 0 && <> · <b>{nSansNum}</b> sans N° (donne-leur un N° dans Annonces pour les ranger)</>}
           {aa.manque.length > 0 && <span data-stock-manque=""> · pas lu : {manqueTxt}</span>}
-          {sansNumAutres > 0 && <> · {sansNumAutres} annonce{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? 'Leboncoin et eBay' : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} sans N° pas comptée{sansNumAutres > 1 ? 's' : ''} (rien ne dit quelle paire c'est)</>}
+          {sansNumAutres > 0 && <> · {sansNumAutres} annonce{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? 'Leboncoin et eBay' : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} sans N° pas comptée{sansNumAutres > 1 ? 's' : ''} (rien ne dit {motsStock.quelle} c'est)</>}
           {vcSansNum.length > 0 && <span data-stock-vc-sans-numero={vcSansNum.length}> · {vcSansNum.length} annonce{vcSansNum.length > 1 ? 's' : ''} Vestiaire sans N° pas comptée{vcSansNum.length > 1 ? 's' : ''} : {vcSansNum.slice(0, 4).map((x) => `« ${x.titre || 'sans titre lu'} »`).join(', ')}{vcSansNum.length > 4 ? '…' : ''} (le N° arrive quand VRM a relu tes numéros — jamais deviné par le titre)</span>}
           {vcNonDites.length > 0 && <span data-stock-vc-non-dites={vcNonDites.length}> · {vcNonDites.length} annonce{vcNonDites.length > 1 ? 's' : ''} Vestiaire à l'état non dit (ni en ligne ni partie) pas comptée{vcNonDites.length > 1 ? 's' : ''}</span>}
         </div></InfoPop>}
@@ -778,7 +779,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const { ok, pasFaits } = trierSerie(lignes(cles), (f) => (ouEst(f) || slots[cleDeFiche(f)]) ? true : 'case introuvable');
         if (!ok.length) return resumeSerie({ faits: [], pasFaits }, { un: 'enlevée', plusieurs: 'enlevées' });
         const nv = ok.filter((f) => rangeeEtat(f) === 'vendue').length;
-        if (!(await askConfirm({ title: `Enlever ${ok.length} paire${ok.length > 1 ? 's' : ''} du stock ?`, desc: `${ok.map((f) => 'N°' + f.numero).join(', ')}\n${nv ? `${nv} vendue${nv > 1 ? 's' : ''} : sortie${nv > 1 ? 's' : ''} du stock. ` : ''}${ok.length - nv ? `${ok.length - nv} plus en ligne : la case se libère. ` : ''}Les numéros restent pris, jamais redonnés.`, ok: 'Enlever', cancel: 'Annuler' }))) return { annule: true };
+        if (!(await askConfirm({ title: `Enlever ${ok.length} ${ok.length > 1 ? motsVendeur().noms : motsVendeur().nom} du stock ?`, desc: `${ok.map((f) => 'N°' + f.numero).join(', ')}\n${nv ? `${nv} vendu${motsVendeur().e}${nv > 1 ? 's' : ''} : sorti${motsVendeur().e}${nv > 1 ? 's' : ''} du stock. ` : ''}${ok.length - nv ? `${ok.length - nv} plus en ligne : la case se libère. ` : ''}Les numéros restent pris, jamais redonnés.`, ok: 'Enlever', cancel: 'Annuler' }))) return { annule: true };
         const u = { ...slots }; for (const f of ok) delete u[cleDeFiche(f)];
         const vendues = ok.filter((f) => rangeeEtat(f) === 'vendue');
         if (vendues.length) setPairsLost((prev) => { const n = { ...prev }; const at = new Date().toISOString(); for (const f of vendues) n[cleDeclarationPartie(f.numero, f.id, numeros)] = { id: String(f.id), at, title: f.title || '', from: 'stock' }; save('vinted_pairs_lost', n); return n; });
@@ -790,7 +791,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const csv = csvDe(['N°', 'Article', 'État', 'Meuble', 'Rangée', 'Colonne'], L.map((f) => { const ou = ouEst(f); return [f.numero, f.title || '', rangeeEtat(f) === 'vendue' ? 'vendue à sortir' : 'plus en ligne', ou ? ou.meuble.name : '', ou ? ou.rangee : '', ou ? ou.colonne : '']; }));
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a');
         a.href = url; a.download = `stock-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
-        return resumeSerie({ faits: L, pasFaits: [] }, { un: 'paire exportée', plusieurs: 'paires exportées' });
+        return resumeSerie({ faits: L, pasFaits: [] }, { un: `${motsVendeur().nom} exporté${motsVendeur().e}`, plusieurs: `${motsVendeur().noms} exporté${motsVendeur().es}` });
       } },
     ];
   };
@@ -830,13 +831,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     </Card>) : null;
   const blocPasSu = rangeesPasSu.length && aa ? (
     // (9 nov., lot AI) Une ligne courte (« 3 rangées pas vérifiées · N°5, N°27… ») ; la phrase entière en pop-up.
-    <InfoPop nom="stock-pas-verifiees" titre="Paires rangées pas vérifiées" ton="neutre" style={{ margin: 0 }}
+    <InfoPop nom="stock-pas-verifiees" titre={`${motsStock.Noms} rangé${motsStock.e}s pas vérifié${motsStock.e}s`} ton="neutre" style={{ margin: 0 }}
       attrs={{ 'data-stock-rangees-passu': rangeesPasSu.length }}
       puces={[{ texte: `${rangeesPasSu.length} pas vérifiée${rangeesPasSu.length > 1 ? 's' : ''}` }]}
       phrase="Une lecture manque : ni « en ligne », ni « partie » n'est dit.">
       {/* (6 nov., onglets B) La lecture qui manque est déjà NOMMÉE en tête (« pas lu : … ») : elle ne se redit
           pas ici (§7, une phrase une fois — mesuré sur sa base : « Vestiaire (jamais lu : ouvre… ») deux fois). */}
-      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. En ligne ou partie : pas su.</p>
+      <p data-stock-rangees-passu-detail="">{rangeesPasSu.length} {rangeesPasSu.length > 1 ? motsStock.noms : motsStock.nom} rangé{motsStock.e}{rangeesPasSu.length > 1 ? 's' : ''} pas vérifié{motsStock.e}{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas tout lu » en tête de Stock)' : (manqueTxt || 'la lecture de son compte manque')}. En ligne ou partie : pas su.</p>
     </InfoPop>) : null;
   // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
   const blocListe = aa && aa.su && articlesVus.length ? (
@@ -1114,7 +1115,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </div>
     )}
 
-    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
+    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
       {/* (6 nov., onglets B) CE QUE VEULENT DIRE LES CASES, en une ligne (Julien : « être accompagné ») :
           les MÊMES classes que les cases (libre, rangée, vendue = l'accent, plus en ligne = l'ambre, §7). */}

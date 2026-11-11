@@ -39,10 +39,10 @@ import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionV
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
-import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
+import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
 import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
-import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends } from './profilVendeur.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends, poserSourceVend, motsVendeur, motArticle } from './profilVendeur.js';
 import { exemplesVendeur, motTaille } from './vocabulaireVendeur.js';   // (11 nov., lot DJ2) exemples et petits mots selon ce qu'il vend
 // (9 nov.) Le bandeau discret d'un incident ouvert par les sondes de /statut.
 import { bandeauStatut, CLE_VUS as CLE_STATUT_VUS } from './statutBandeau.js';
@@ -69,7 +69,10 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
-import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';   // (11 nov., lot DJ6)
+import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth,CLE_INTENTION as CLE_INTENTION_OAUTH} from './auth/compteNeuf.js';
+import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)
+import {nouvelIdEssai,poserEssai,prendreEssais,oterEssai,candidatsVerificateur,ESSAIS_MAX} from './auth/essaisPkce.js';   // (11 nov., lot DJ6)
+import {poserReconnexion,lireReconnexion,reconnexionPermise,RETOUR_RECONNEXION,CLE_RECONNEXION} from './auth/reconnexion.js';   // (11 nov., lot suppression-oauth)
 import PorteSansCompte from './auth/PorteSansCompte.jsx';
 import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
@@ -270,6 +273,7 @@ const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 const BaissePrixSerie = aLaDemande(() => import('./BaissePrixSerie.jsx'), true);
 const JaugeActions = aLaDemande(() => import('./JaugeActions.jsx'));
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
+const AlerteModeration = lazy(() => import('./AlerteModeration.jsx'));   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // ⟦→ ecrans/Reglages.jsx #10⟧
 // (8 nov., démarrage léger) Écrans sortis d’App.jsx vers src/ecrans/ (découpe mécanique) : chargés
@@ -514,6 +518,7 @@ import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
 import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche } from "./design/carteChiffres.js";
+import { aExpedierPourCarte } from "./resumeCarte.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { useValeurStock as useValeurStockCarte } from "./CascadeVente.jsx";   // (11 nov., lot stats-plus) la case « Valeur du stock »
@@ -579,6 +584,8 @@ import { LIGNE_INVENTAIRE, enCours as inventaireEnCours, enregistrerInventaire, 
 import { lireAttendu, degelerAttendu, cleAttente as cleAttenteInventaire } from "./inventaireHorsLigne.js";
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
+import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
+import { LIGNE_AVIS_BAS, LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
@@ -607,6 +614,7 @@ import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos,
 import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
 import "./styles-journee-perso.css";   // (11 nov.) « Modifier ma journée » : l'éditeur des cartes, la ligne du bas, « Affichée car urgent »
+import "./styles-avis-bas.css";   // (11 nov., lot avis-negatif) la feuille « Avis négatif »
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
 import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
@@ -699,7 +707,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.344.0';
+const EXT_ATTENDUE = '5.355.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1126,7 +1134,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1549,7 +1557,8 @@ const authCall = async (path, body) => {
       const brut = json.error_description || json.msg || json.message || `Erreur ${res.status}`;
       // GoTrue : « captcha protection: request disallowed (…) » / code captcha_failed.
       if (/captcha/i.test(String(brut) + ' ' + String(json.error_code || json.code || ''))) return { ok: false, status: res.status, captcha: true, error: MSG_CAPTCHA_REFUS };
-      return { ok: false, status: res.status, error: brut };
+      // (11 nov., lot connexions-oauth) le code stable de GoTrue (`error_code`), pour traduire.
+      return { ok: false, status: res.status, error: brut, ...(typeof json.error_code === 'string' ? { code: json.error_code } : {}) };
     }
     return { ok: true, status: res.status, json };
   } catch (e) { return { ok: false, status: 0, error: e.name === 'AbortError' ? 'Le serveur met trop de temps à répondre. Réessaie dans un instant.' : 'La connexion au serveur a été interrompue. Réessaie.' }; }
@@ -2025,20 +2034,30 @@ const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfi
 const oauthStart = async (provider, intention) => {
   try {
     try{sessionStorage.removeItem('vrm_oauth_liaison');localStorage.removeItem('vrm_oauth_liaison');}catch(_){}
+    // (11 nov., lot suppression-oauth) « Me reconnecter avec … » (Supprimer mon compte) :
+    // une RE-AUTHENTIFICATION du compte connecté. Aucune intention (rien n'est annulé
+    // au retour) ; retour sur l'écran de suppression ; un autre compte n'entre pas.
+    const reco=intention==='reconnexion';
+    try{for(const st of [sessionStorage,localStorage]){st.removeItem(CLE_RECONNEXION);if(reco)st.removeItem(CLE_INTENTION_OAUTH);}}catch(_){}
+    if(reco&&!poserReconnexion([sessionStorage,localStorage],{owner:AUTH.user?.id,provider}))return{ok:false,error:'Reconnecte-toi à VRM, puis reviens ici.'};
     // (11 nov., lot DJ6) « connexion » ou « inscription » : au retour, un compte que
     // le bouton de CONNEXION a fait créer est annulé (src/auth/compteNeuf.js).
-    poserIntentionOAuth([sessionStorage,localStorage],intention,provider);
+    if(!reco)poserIntentionOAuth([sessionStorage,localStorage],intention,provider);
     const verifier = makeVerifier();
     sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet
     // Téléphone : l'app Discord/Google renvoie souvent le retour dans un NOUVEL
     // onglet (sessionStorage vide) — le vérificateur est aussi gardé 10 min sur
     // l'appareil. Seul, il ne sert à rien : il faut aussi le code du retour.
     try { localStorage.setItem(PKCE_KEY, JSON.stringify({ v: verifier, at: Date.now() })); } catch (_) {}
+    // (11 nov., lot connexions-oauth) SON vérificateur, sous SON identifiant, porté par
+    // l'adresse de retour (src/auth/essaisPkce.js) : le retour prend le bon, jamais un vieux.
+    const essai = nouvelIdEssai();
+    poserEssai([sessionStorage, localStorage], essai, verifier);
     const challenge = await makeChallenge(verifier);
     // Une liaison d'extension en cours survit au retour dans un NOUVEL onglet (10 min).
     try { garderLierPourRetourOAuth(); } catch (_) {}
     const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${encodeURIComponent(provider)}`
-      + `&redirect_to=${encodeURIComponent(window.location.origin + window.location.pathname)}`
+      + `&redirect_to=${encodeURIComponent(window.location.origin + (reco ? RETOUR_RECONNEXION + '&vrm_essai=' : window.location.pathname + '?vrm_essai=') + essai)}`
       + `&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256`;
     window.location.href = url;
     return { ok: true };
@@ -2055,7 +2074,7 @@ const cleanAuthUrl = () => {
   try {
     const q=new URLSearchParams(window.location.search||'');
     // URLSearchParams reconnaît aussi les noms encodés et les doublons.
-    for(const k of ['code','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
+    for(const k of ['code','vrm_essai','error','error_description','error_code','token','token_hash','access_token','refresh_token','provider_token','provider_refresh_token','expires_in','expires_at','token_type','type','state'])q.delete(k);
     const reste=q.toString();
     window.history.replaceState({},'',window.location.pathname+(reste?'?'+reste:''));
   }catch(_){}
@@ -2071,37 +2090,79 @@ const compteOAuthNeuf=(u)=>{
     return Date.now()-cree<10*60*1000?fourn:'';
   }catch(_){return'';}
 };
-// Les refus de Supabase au retour, en français, avec le geste.
-const erreurRetourOAuth=(err,provider)=>{
-  const t=String(err||'');const nom=provider==='google'?'Google':'Discord';
-  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
-  if(/manual.*link.*disabled|manual_linking/i.test(t))return `La liaison de comptes n'est pas encore activée sur le serveur de VRM. Ton compte reste inchangé.`;
-  return t;
+// Le fournisseur `f` dont l'identité vient d'être créée (< 10 min) sur un compte plus
+// vieux (> 10 min) : la liaison automatique de Supabase par adresse vérifiée. Sinon ''.
+const identiteRelieeAuto=(u,f)=>{
+  try{
+    if(f!=='google'&&f!=='discord')return'';
+    const cree=Date.parse(u?.created_at||'');if(!Number.isFinite(cree)||Date.now()-cree<10*60*1000)return'';
+    const id=(Array.isArray(u?.identities)?u.identities:[]).find(i=>i&&i.provider===f);
+    const t=Date.parse(id?.created_at||'');return Number.isFinite(t)&&Date.now()-t>=-60000&&Date.now()-t<10*60*1000?f:'';
+  }catch(_){return'';}
 };
+// Les refus de Supabase au retour, en français, avec le geste (src/auth/erreursOAuth.js :
+// le CODE d'abord, jamais le texte anglais, jamais « annulée » pour un autre refus).
+const erreurRetourOAuth=(e,provider,liaison)=>messageErreurOAuth(e,provider,liaison?'liaison':'connexion');
 const consumeAuthRedirect = async () => {
   if (!MULTI_USER) return null;
   const q = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { const li=lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: erreurRetourOAuth(err, li?.provider) }; }
+  if (err) {
+    // Le fournisseur : celui de la liaison en cours, sinon celui du bouton cliqué
+    // (avant, « Discord » par défaut même pour Google). Tout ce départ est consommé.
+    const li=lireLiaisonOAuth(sessionStorage,localStorage),it=lireIntentionOAuth([sessionStorage,localStorage]);
+    // (lot suppression-oauth) « Me reconnecter avec … » raté : rien n'a été effacé, l'écran de suppression le dit.
+    const re=lireReconnexion([sessionStorage,localStorage]);
+    try{sessionStorage.removeItem(PKCE_KEY);localStorage.removeItem(PKCE_KEY);}catch(_){}
+    // CETTE tentative est morte ; une autre en cours (autre onglet) reste (relecture du 11 nov.).
+    oterEssai([sessionStorage,localStorage],'',q.get('vrm_essai')||hash.get('vrm_essai')||'');
+    const e={error:q.get('error')||hash.get('error')||'',code:q.get('error_code')||hash.get('error_code')||'',description:q.get('error_description')||hash.get('error_description')||''};
+    cleanAuthUrl();
+    if (re) return { error: `La reconnexion avec ${re.provider==='google'?'Google':'Discord'} n’a pas abouti. Rien n’a été effacé.`, reconnexion: re.provider };
+    return { error: erreurRetourOAuth(e, li?.provider||it?.fournisseur||'', !!li), ...(li?{liaisonRatee:li.provider}:{}) };
+  }
 
   const code = q.get('code');
   if (code) {
-    const liaison=lireLiaisonOAuth(sessionStorage,localStorage);
-    let verifier = liaison?.verifier || sessionStorage.getItem(PKCE_KEY);
+    const ctxLiaison=lireLiaisonOAuth(sessionStorage,localStorage);
+    const reco=lireReconnexion([sessionStorage,localStorage]);   // (lot suppression-oauth)
+    // (11 nov., lot connexions-oauth) Le vérificateur de CETTE tentative (`vrm_essai`),
+    // puis les autres gardés — jamais un seul pris à l'aveugle (src/auth/essaisPkce.js).
+    const onglet = sessionStorage.getItem(PKCE_KEY) || '';
     sessionStorage.removeItem(PKCE_KEY);
+    let appareil = '';
     try {
       const o = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null');
       localStorage.removeItem(PKCE_KEY);
-      if (!verifier && o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) verifier = o.v;
+      if (o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) appareil = o.v;
     } catch (_) {}
+    const candidats = candidatsVerificateur({ idRetour: q.get('vrm_essai') || '', essais: prendreEssais([sessionStorage, localStorage]), liaison: ctxLiaison, onglet, appareil });
+    const verifier = candidats.length ? candidats[0].v : '';
+    // La liaison n'est en jeu que si le PREMIER vérificateur est le sien (sinon c'est une connexion).
+    let liaison = candidats.length && candidats[0].liaison ? ctxLiaison : null;
     cleanAuthUrl();
-    if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
-    const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
-    if (!r.ok) return { error: r.error };
-    if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.'};
+    // (11 nov.) Le fournisseur du bouton, lu AVANT l'échange (un refus doit le nommer).
+    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
+    const fourn=liaison?.provider||reco?.provider||intention?.fournisseur||'';
+    const enReco=reco?{reconnexion:reco.provider}:{};
+    if (!verifier) return { error: fourn ? `Cette connexion a commencé sur un autre appareil ou a expiré. ${liaison?`Reclique « Relier ${fourn==='google'?'Google':'Discord'} ».`:`Reclique « Continuer avec ${fourn==='google'?'Google':'Discord'} » ici.`}` : 'Cette connexion a commencé sur un autre appareil ou a expiré. Recommence depuis cet appareil.', ...enReco };
+    let r = null;
+    for (const c of candidats.slice(0, ESSAIS_MAX)) {
+      r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: c.v });
+      if (r.ok) { liaison = c.liaison ? ctxLiaison : null; oterEssai([sessionStorage, localStorage], c.v); break; }
+      // Seul « ce n'est pas le bon vérificateur » vaut un autre essai (Supabase garde le code).
+      if (r.code !== 'bad_code_verifier') break;
+    }
+    // CETTE tentative est consommée (réussie ou morte) ; celles d'un autre onglet restent.
+    oterEssai([sessionStorage, localStorage], '', q.get('vrm_essai') || '');
+    // Code déjà servi (double clic, retour arrière), expiré, autre appareil : la phrase, jamais l'anglais.
+    if (!r.ok) return { error: r.status === 0 ? r.error : erreurRetourOAuth({ code: r.code || '', description: r.error || '' }, fourn, !!liaison), ...(liaison?{liaisonRatee:liaison.provider}:{}), ...enReco };
+    if(typeof r.json?.access_token!=='string'||!r.json.access_token.trim()||typeof r.json?.user?.id!=='string'||!r.json.user.id.trim())return{error:'La connexion n’a pas pu être vérifiée. Recommence depuis VRM.',...enReco};
     if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
+    // (11 nov., lot suppression-oauth) Ce fournisseur ouvre un AUTRE compte : sa session reste.
+    if(!reconnexionPermise(reco,r.json))return{error:`Ce ${reco.provider==='google'?'Google':'Discord'} ouvre un autre compte VRM. Ta session est gardée. Rien n’a été effacé.`,reconnexion:reco.provider};
     const recovery=q.get('type')==='recovery';
     if(recovery)RECOVERY_PENDING=true;
     writeSession(sessionFrom(r.json));
@@ -2109,12 +2170,16 @@ const consumeAuthRedirect = async () => {
     // relié à AUCUN compte VRM : Supabase en CRÉE un, sans rien dire. On le
     // repère (créé il y a moins de 10 min, aucune identité email) pour le dire
     // AVANT d'ouvrir l'app — sinon il croit être sur sa boutique, vide.
-    const nouveauOAuth=!liaison&&!recovery?compteOAuthNeuf(r.json.user):'';
+    const nouveauOAuth=!liaison&&!reco&&!recovery?compteOAuthNeuf(r.json.user):'';
     // (11 nov., lot DJ6) Le bouton cliqué était « Continuer avec … » (connexion) :
     // ce compte neuf n'a été voulu par personne ⇒ `sansCompte` (PorteSansCompte l'annule).
-    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
     const sansCompte=nouveauOAuth&&intention?.intention==='connexion'&&intention.fournisseur===nouveauOAuth?nouveauOAuth:'';
-    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth, sansCompte };
+    // (11 nov., lot connexions-oauth) Compte ANCIEN + identité de CE fournisseur toute
+    // neuve : Supabase vient de la rattacher (même adresse e-mail vérifiée). Pas de
+    // second compte — on le DIT une fois, pour qu'il sache comment il est entré.
+    const relieAuto=!liaison&&!reco&&!recovery&&!nouveauOAuth?identiteRelieeAuto(r.json.user,fourn):'';
+    if(relieAuto)setTimeout(()=>{try{toast(`${relieAuto==='google'?'Google':'Discord'} est maintenant relié à ton compte VRM (même adresse e-mail).`,'ok');}catch(_){}},2500);
+    return { ok: true, liaison:liaison?.provider, reconnexion:reco?.provider, recovery, nouveauOAuth, sansCompte, relieAuto };
   }
 
   const at = hash.get('access_token');
@@ -2592,6 +2657,9 @@ const SYNC_KEYS = [
   // (10 nov., lot AB) Les fils de Messages qu'IL a reliés (« Oui, même fil ») ou refusés
   // (« Non ») : { liens: { [a|b]: { a, b, at } }, refus: { [a|b]: at } } — src/filUnique.js.
   'vrm_fils_relies',
+  // (11 nov., ext. 5.350) Les alertes « Vinted a agi » qu'IL a marquées « C'est vu » : { [compte|clé]: ms }
+  // (src/moderationVinted.js) — vue sur un appareil, rangée sur tous.
+  'vrm_moderation_vu',
   // (2 nov., soir) VESTIAIRE comme Vinted et Leboncoin : le N° donné à chaque
   // annonce Vestiaire qui n'en portait pas ({ [productId]: { numero, numberedAt,
   // auto } }, src/numerosVestiaire.js — fusionné comme les fiches, §5), « Colis
@@ -2632,6 +2700,9 @@ const SYNC_KEYS = [
   // (7 nov.) « Je numérote moi-même dans mes annonces » (src/numeroEcrit.js) : { actif, depuis }.
   // Allumé, VRM ne donne plus aucun N° tout seul ; il lit celui écrit dans l'annonce.
   'vrm_numero_ecrit',
+  // (11 nov.) Les alertes « vérifier avant de publier » qu'il a coupées (« Ne plus me le
+  // dire », src/verifAnnonce.js) : { codes, at } — écrit sur SON clic, rallumé dans Paramètres.
+  'vrm_verif_coupees',
   // (9 nov.) « Non, une autre paire » sur une remise en ligne (src/remiseEnLigne.js) :
   // { [id nouvelle annonce]: [ids anciennes écartées] } — plus reproposé, sur tous ses appareils.
   'vrm_remise_refus',
@@ -2863,10 +2934,14 @@ const askConfirm = (opts) => new Promise((resolve)=>{
 
 // (3 nov.) Avant une publication : rien à dire ⇒ `true` tout de suite ; sinon
 // la feuille de vérification, et SA réponse (« Publier quand même » ⇒ true).
-const verifierAvantPublication = async (lignes, opts = {}) => {
+// (11 nov.) Les alertes qu'il a coupées (« Ne plus me le dire ») ne sont plus
+// montrées : rien à dire ⇒ la publication part comme avant. Jamais une garde.
+const verifierAvantPublication = async (tout, opts = {}) => {
+  let coupees = null; try { coupees = load(CLE_VERIF_COUPEES, null); } catch (_) {}
+  const lignes = sansCoupees(tout, coupees);
   if (!Array.isArray(lignes) || !lignes.length) return true;
   const n = lignes.length;
-  return (await askConfirm({ kind: 'verif', site: opts.site || '', lignes, title: opts.titre || `${n} point${n > 1 ? 's' : ''} à vérifier`, desc: lignes.map((l) => `${l.qui ? l.qui + ' · ' : ''}${l.texte} — ${l.geste}`).join('\n'), ok: opts.ok })) === true;
+  return (await askConfirm({ kind: 'verif', site: opts.site || '', lignes, titrePerso: opts.titre || '', title: opts.titre || `${n} point${n > 1 ? 's' : ''} à vérifier`, desc: lignes.map((l) => `${l.qui ? l.qui + ' · ' : ''}${l.texte} — ${l.geste}`).join('\n'), ok: opts.ok })) === true;
 };
 
 // Meme chose pour window.prompt : une saisie, dans la feuille de l'app.
@@ -3237,6 +3312,39 @@ function AskTextSheet({ q, close }) {
   );
 }
 
+// (11 nov., lot verif-publication) La liste de « vérifier avant de publier » : une
+// ligne par alerte, son geste, POURQUOI elle est là (`POURQUOI_ALERTE`), et
+// « Ne plus me le dire » (le code est coupé partout, synchronisé, Paramètres le
+// rallume). Une alerte coupée disparaît de la feuille ; « Publier quand même » reste.
+function ListeVerif({ lignes, titre = '' }) {
+  const [coupees, setCoupees] = React.useState(() => lireCoupees(load(CLE_VERIF_COUPEES, null)));
+  const couper = (code) => { const r = couperAlerte(load(CLE_VERIF_COUPEES, null), code); save(CLE_VERIF_COUPEES, r); setCoupees(lireCoupees(r)); };
+  const vues = lignes.filter((l) => !coupees.has(l.code));
+  const premier = new Set();
+  // Le titre suit ce qui RESTE (une alerte coupée ne compte plus).
+  const n = vues.length;
+  return (
+    <>
+    <div data-verif-titre={n} style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre || (n ? `${n} point${n > 1 ? 's' : ''} à vérifier` : 'Plus rien à vérifier')}</div>
+    <div className="vrm-verif-liste" data-verif-vues={vues.length} style={{marginTop:12,display:'flex',flexDirection:'column',borderTop:`1px solid ${C.border}`}}>
+      {vues.map((l, i) => {
+        // « Ne plus me le dire » une fois par SORTE d'alerte (Republier : plusieurs paires).
+        const lien = !premier.has(l.code); premier.add(l.code);
+        return (
+          <div key={i} data-verif-probleme={l.code} data-verif-qui={l.qui || undefined} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:2}}>
+            <span style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
+            <span style={{fontSize:13,color:C.muted,lineHeight:1.4}}>{l.geste}</span>
+            {lien && POURQUOI_ALERTE[l.code] ? <span data-verif-pourquoi={l.code} style={{fontSize:12,color:C.muted,lineHeight:1.4}}>{POURQUOI_ALERTE[l.code]}</span> : null}
+            {lien && NOMS_ALERTES[l.code] ? <button type="button" className="vrm-lien-action" data-verif-couper={l.code} onClick={() => couper(l.code)} style={{alignSelf:'flex-start',minHeight:44,padding:'0 2px',fontSize:13,fontWeight:600,background:'transparent',border:0,boxShadow:'none',color:C.accentTexte || C.accent,cursor:'pointer'}}>Ne plus me le dire</button> : null}
+          </div>
+        );
+      })}
+      {!vues.length ? <p data-verif-tout-coupe="" style={{fontSize:13,color:C.muted,padding:'10px 0',margin:0}}>Tu peux publier.</p> : null}
+    </div>
+    </>
+  );
+}
+
 function ConfirmHost() {
   const [q, setQ] = React.useState(null);
   React.useEffect(() => onAsk(setQ), []);
@@ -3249,15 +3357,7 @@ function ConfirmHost() {
   if (q.kind === 'verif') return createPortal(
     <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION} className="vrm-confirmation">
       <div data-verif-sheet={q.site || ''} data-verif-n={(q.lignes || []).length}>
-        <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{q.title}</div>
-        <div className="vrm-verif-liste" style={{marginTop:12,display:'flex',flexDirection:'column',borderTop:`1px solid ${C.border}`}}>
-          {(q.lignes || []).map((l, i) => (
-            <div key={i} data-verif-probleme={l.code} data-verif-qui={l.qui || undefined} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:2}}>
-              <span style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
-              <span style={{fontSize:13,color:C.muted,lineHeight:1.4}}>{l.geste}</span>
-            </div>
-          ))}
-        </div>
+        <ListeVerif lignes={q.lignes || []} titre={q.titrePerso || ''}/>
         <div style={{display:'flex',gap:9,marginTop:16}}>
           <Bouton variante="discret" data-verif-publier="" onClick={() => close(true)} style={{flex:1}}>{q.ok || 'Publier quand même'}</Bouton>
           <Bouton variante="primaire" autoFocus data-verif-corriger="" onClick={() => close(false)} style={{flex:1}}>Corriger</Bouton>
@@ -3649,7 +3749,7 @@ const baseFusion = () => (_snapNuage && _snapNuage.existe ? _baseNuage : {});
 const conflitNumerosNuage = (motif) => {
   _pushBloque = true;
   try { console.warn('[VRM] fusion refusée (numéros) :', motif); } catch (_) {}
-  _emitSync('refus', 'un autre appareil a numéroté des paires en même temps que celui-ci — recharge la page');
+  _emitSync('refus', `un autre appareil a numéroté des ${motsVendeur().noms} en même temps que celui-ci — recharge la page`);
   signalerNumerosPerimes('vrm_fiche_perdue');
 };
 let _pushEnVol = false, _pushRelance = false;
@@ -3764,7 +3864,7 @@ const cloudPush = () => {
           // La lettre des nouveaux numéros ne peut pas être celle des anciens.
           try { localStorage.setItem('vrm_num_prefixe', JSON.stringify('')); } catch (_) {}
           try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
-          toast(`La lettre « ${archiveNumeros() || 'B'} » est celle de tes anciens numéros : tes nouvelles paires restent en chiffres.`);
+          toast(`La lettre « ${archiveNumeros() || 'B'} » est celle de tes anciens numéros : tes nouvelles ${motsVendeur().noms} restent en chiffres.`);
           _emitSync('error', 'lettre de numérotation refusée');
           // Le reste de cet envoi a été refusé avec lui : on le renvoie UNE fois,
           // sans la lettre (jamais en boucle).
@@ -4115,7 +4215,7 @@ const gesteCorbeille = (e, setters = {}, apres = null) => {
 // changé depuis est gardé ; un N° porté maintenant par une autre paire ⇒ rien (§5).
 const restaurerCorbeille = (entree) => {
   const plan = planRestauration(entree, (k) => load(k, null), cleNum);
-  if (plan.conflit) { toast(`Le N°${plan.conflit} est porté par une autre paire : rien n'est restauré.`); return false; }
+  if (plan.conflit) { toast(`Le N°${plan.conflit} est porté par ${motsVendeur().autre} : rien n'est restauré.`); return false; }
   if (!plan.ok) return false;
   gesteMorceaux(plan.gardes ? 'Restauré · ce qui a changé depuis est gardé' : `Restauré${entree.numero ? ` · N°${entree.numero}` : ''}`, morceauxRestaurer(entree));
   return true;
@@ -4310,7 +4410,7 @@ const valeurAffichee = (cat, v) => {
 };
 const RAISONS_LIGNE = {
   'ajoute-depuis': 'ajouté depuis ce moment', 'retouche': 'retouché après un point plus récent', 'retire-depuis': 'retiré depuis',
-  'attribue-depuis': 'attribué depuis, il reste', 'change-depuis': 'changé depuis, le N° actuel reste', 'numero-pris': 'porté par une autre paire, pas rendu',
+  'attribue-depuis': 'attribué depuis, il reste', 'change-depuis': 'changé depuis, le N° actuel reste', get 'numero-pris'() { return `porté par ${motsVendeur().autre}, pas rendu`; },
   'fiche-absente': 'la fiche n’existe plus (voir la Corbeille)', 'pose-depuis': 'posé depuis : il reste', 'trop-gros': 'trop gros pour un point : il reste',
   'numero-garde': 'seul le N° diffère : il reste', 'rendu': 'N° rendu (porté par aucune autre)',
 };
@@ -12899,7 +12999,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
     if (doubles.length) {
       const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'un article').join(' · ')}`).join('\n');
       const ok = await askConfirm({
-        title: doubles.length > 1 ? `${doubles.length} numéros portés par deux paires` : `Le N°${doubles[0]} est porté par deux paires`,
+        title: doubles.length > 1 ? `${doubles.length} numéros portés par deux ${motsVendeur().noms}` : `Le N°${doubles[0]} est porté par deux ${motsVendeur().noms}`,
         desc: `${liste}\n\nTamponné sur le bordereau, ce numéro peut désigner le mauvais article. Vérifie la photo et le titre avant d'imprimer.`,
         ok: 'C\'est le bon article, imprimer', cancel: 'Annuler',
       });
@@ -14666,7 +14766,7 @@ async function avecCouleurBrouillon(envoyer, titre) {
       // 5.266 : la liste des couleurs de Vinted (lue par l'extension, id et nom
       // de Vinted). Il choisit ; rien n'est deviné.
       const options = cs.sort((a, b) => Number(a[0]) - Number(b[0])).map(([i, nom]) => [i, String(nom)]);
-      id = await askChoix({ title: 'Quelle est la couleur de cette paire ?', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nChoisis-la : VRM la met et publie le brouillon tout de suite.`, options, cancel: 'Pas maintenant' });
+      id = await askChoix({ title: `Quelle est la couleur de ${motsVendeur().ce} ?`, desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nChoisis-la : VRM la met et publie le brouillon tout de suite.`, options, cancel: 'Pas maintenant' });
     }
     if (id == null) return { ...r, raison: "pas mise en ligne — choisis sa couleur sur Vinted (« Modifier »), puis publie-le. Rien n'a été touché." };
     couleurPosee = Number(id);
@@ -14691,7 +14791,7 @@ const questionRepubOk = (q) => !!(q && typeof q === 'object' && q.champ && Array
 // Une feuille : « Quelle est la catégorie de la N°12 ? » + un bouton par valeur.
 async function demanderQuestionRepub(q, titre) {
   if (!questionRepubOk(q)) return null;
-  const qui = q.num ? `la N°${q.num}` : 'cette paire';
+  const qui = q.num ? `${motsVendeur().la} N°${q.num}` : motsVendeur().ce;
   const autres = Array.isArray(q.autres) && q.autres.length ? `\nIl manque aussi : ${q.autres.join(', ')}.` : '';
   const id = await askChoix({ title: `Choisis ${q.nom || 'la valeur'} de ${qui}`, desc: `Vinted refuse l’annonce sans ${q.nom || 'ce champ'}, et VRM ne l’a pas trouvé sur l’annonce elle-même.${titre ? `\n« ${titre} »` : ''}\nChoisis : VRM le pose et reprend, une seule fois. Rien n’a été touché.${autres}`, options: q.options.map(([i, t]) => [String(i), String(t)]), cancel: 'Pas maintenant' });
   return id == null ? null : String(id);
@@ -15041,6 +15141,8 @@ const ICON_PATHS = {
   stream:  <><circle cx="12" cy="12" r="2"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8"/><path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 5.8a8.8 8.8 0 0 0 0 12.4"/><path d="M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
+  // (11 nov., lot avis-negatif) Un avis reçu : l'étoile au trait.
+  star:    <><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/></>,
   // (3 nov.) Scanner un code-barres : le viseur et ses barres.
   scan: <><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8"/><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8"/><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16"/><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 9v6"/><path d="M11 9v6"/><path d="M13.5 9v6"/><path d="M16 9v6"/></>,
   printer: <><path d="M7 9V4h10v5"/><path d="M7 17.5H5a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 5 10.5h14a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-2"/><path d="M7 14.5h10V20H7z"/></>,
@@ -18649,7 +18751,7 @@ function BlocInventaireHorsLigne({ uid, ouvrirAuto = false }) {
     <div data-hl-inventaire="liste" data-hl-inventaire-at={new Date(figee.at).toISOString()} style={{...carte,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
       <div style={{flex:1,minWidth:180}}>
         <div style={{fontSize:15,fontWeight:700,color:C.text}}>Inventaire</div>
-        <div style={{fontSize:13,color:C.muted,marginTop:2,lineHeight:1.45}}>Fais le tour de tes rangements sans réseau : {nA} paire{nA > 1 ? 's' : ''} attendue{nA > 1 ? 's' : ''} selon la liste du {quandEtat(figee.at)}.</div>
+        <div style={{fontSize:13,color:C.muted,marginTop:2,lineHeight:1.45}}>Fais le tour de tes rangements sans réseau : {motArticle(nA)} attendu{motsVendeur().e}{nA > 1 ? 's' : ''} selon la liste du {quandEtat(figee.at)}.</div>
       </div>
       <Bouton variante="secondaire" data-hl-inventaire-ouvrir="" onClick={() => setOuvert(true)} style={{minHeight:44}}>Faire l’inventaire</Bouton>
     </div>
@@ -26504,7 +26606,7 @@ function StockPhotos() {
   if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté</Card>;
   return (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} {fiches.length > 1 ? motsA.noms : motsA.nom} en stock{nVendus > 0 ? <> · <b style={{ color: C.accentTexte }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
+      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} {fiches.length > 1 ? motsA.noms : motsA.nom} en stock{nVendus > 0 ? <> · <b style={{ color: C.accentTexte }}>{nVendus} vendu{motsA.e}{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher un article" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 12, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
     </div>
     {nVendus > 0 && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Qui clignote = vendu · <b style={{ color: C.text }}>Sortie du stock</b> <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et l’article reste en stock.</Pourquoi></div>}
@@ -34538,8 +34640,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span aria-hidden="true" style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="eye" size={17}/></span>
               <span style={{flex:1,minWidth:0}}>
                 <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{masqueesBloc.presentes.length > 0
-                  ? `${masqueesBloc.presentes.length} paire${masqueesBloc.presentes.length>1?'s':''} masquée${masqueesBloc.presentes.length>1?'s':''} par Vinted, comptée${masqueesBloc.presentes.length>1?'s':''} sur ton étagère`
-                  : `${masqueesBloc.parties.length} paire${masqueesBloc.parties.length>1?'s':''} masquée${masqueesBloc.parties.length>1?'s':''} par Vinted, déclarée${masqueesBloc.parties.length>1?'s':''} partie${masqueesBloc.parties.length>1?'s':''}`}</span>
+                  ? `${motArticle(masqueesBloc.presentes.length)} masqué${motsVendeur().e}${masqueesBloc.presentes.length>1?'s':''} par Vinted, compté${motsVendeur().e}${masqueesBloc.presentes.length>1?'s':''} sur ton étagère`
+                  : `${motArticle(masqueesBloc.parties.length)} masqué${motsVendeur().e}${masqueesBloc.parties.length>1?'s':''} par Vinted, déclaré${motsVendeur().e}${masqueesBloc.parties.length>1?'s':''} partie${masqueesBloc.parties.length>1?'s':''}`}</span>
                 <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Plus en vente, mais leur numéro reste protégé. Si l'une n'est plus chez toi, dis-le.</span>
               </span>
               <span style={{color:C.muted,fontSize:17}}>{masqOpen?'▾':'▸'}</span>
@@ -34863,8 +34965,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ...(Number.isFinite(it.descLen) ? { descLen: it.descLen } : {}),
           ...(it.statusLu ? { etat: it.condition || '' } : {}),
           ...(it.couleur !== undefined ? { couleur: it.couleur } : {}),
-          ...(it.catalogId !== undefined ? { categorie: it.catalogId ? String(it.catalogId) : '' } : {}) } });
+          ...(it.catalogId !== undefined ? { categorie: it.catalogId ? String(it.catalogId) : '' } : {}),
+          // (11 nov., lot verif-publication) Le N° écrit à la fin de la description (sa
+          // lecture, jamais le texte) et « la même paire déjà en ligne sur CE compte » :
+          // une AUTRE annonce en ligne (lecture fraîche, `annBase`) du même compte portant
+          // le même N° (identité : fiche, ou N° écrit lu). Pas de N° ⇒ pas su ⇒ rien.
+          ...(it.numEcritDesc ? { numeroLu: it.numEcritDesc } : {}), ...numVerif,
+          ...(() => { const k = cleNum(e.numero || (it.numEcritDesc && it.numEcritDesc.etat === 'lu' ? it.numEcritDesc.cle : '')); const autres = k ? enLigneParNum.get(uid + ':' + k) : null; return autres && [...autres].some((x) => x !== id) ? { dejaEnLigne: true, dejaEnLigneOu: 'sur ce compte Vinted' } : {}; })() } });
     };
+    const numVerif = optsNumeroVerif();
+    const enLigneParNum = new Map();
+    for (const it of annBase) {
+      const uid = String((it._acc && it._acc.vinted_user_id) || it._uid || ''); const e = numeros[String(it.id)] || {};
+      const k = cleNum(e.numero || (it.numEcritDesc && it.numEcritDesc.etat === 'lu' ? it.numEcritDesc.cle : ''));
+      if (!uid || !k) continue;
+      const c = uid + ':' + k; if (!enLigneParNum.has(c)) enLigneParNum.set(c, new Set()); enLigneParNum.get(c).add(String(it.id));
+    }
     for (const it of annBase) ajoute(it);
     for (const it of annMasquees) ajoute(it, 'masquee');
     for (const b of (brVinted.liste || [])) ajoute(b, 'brouillon');
@@ -34878,6 +34994,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!annSelectionnables.length) return;   // rien lu (rechargement) : on ne vide rien (« rien lu » ≠ « rien »)
     if (selAnn.some((x) => !ok.has(x.uid + ':' + x.id))) setSelAnn((v) => v.filter((x) => ok.has(x.uid + ':' + x.id)));
   }, [annSelectionnables]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // (11 nov., lot verif-publication) « L'habitude d'écrire son N° » se PROUVE sur ses
+  // annonces lues (`habitudeNumeroEcrit`) : publiée pour Leboncoin, eBay, Vestiaire.
+  React.useEffect(() => { if (Array.isArray(listings.items) && !listings.error) poserLecturesEcrit(annBase.map((it) => it.numEcritDesc).filter(Boolean)); }, [annBase]);   // eslint-disable-line react-hooks/exhaustive-deps
   // Les republications à la main pas encore finies (dites au-dessus de la liste).
   const suivisMainVisibles = useMemo(() => Object.entries(repubMain || {}).map(([anc, s]) => ({ ancienId: anc, ...s, _etat: etatSuiviMain(s, { numeros, cle: cleNum }) })).filter((s) => s._etat !== 'fait'), [repubMain, numeros]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -34920,9 +35039,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // append-only) et « la vente reste dans ta compta comme perte » (aucun
       // calcul ne lit `vinted_pairs_lost` : aucune perte n'est comptée).
       `Déclarer l'article N°${n} PERDU ?\n\n` +
-      `• Il sort du stock (plus compté parmi tes paires).\n` +
+      `• Il sort du stock (plus compté parmi ${motsVendeur().tes}).\n` +
       (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
-      `• Son N°${n} reste le sien : il n'est jamais redonné à une autre paire.\n` +
+      `• Son N°${n} reste le sien : il n'est jamais redonné à ${motsVendeur().autre}.\n` +
       `• VRM ne compte aucune perte : la vente annulée n'est déjà plus dans ton chiffre d'affaires, et son prix d'achat n'entre dans aucun total.\n\n` +
       `À ne faire que si l'article ne te revient pas.`
     );
@@ -37209,13 +37328,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <span className="vrm-remise-egal" aria-hidden="true">=</span>
           {vignetteRemise(photoNouvelleRemise(r.nouvelle), '', r.titre || 'Nouvelle annonce')}
         </div>
-        <div className="vrm-remise-q"><b>Même paire{r.options.length === 1 ? ` que N°${o0.numero}` : ''} ?</b>
-          <Pourquoi label="Pourquoi ?" titre="Même paire ?">
-            {r.titre || 'Nouvelle annonce'} — {r.options.length === 1 ? <>c’est la même paire que N°{o0.numero} « {o0.titre || 'ancienne annonce'} » ?</> : 'c’est la même paire qu’une de celles-ci ?'}
+        <div className="vrm-remise-q"><b>Même {motsVendeur().nom}{r.options.length === 1 ? ` que N°${o0.numero}` : ''} ?</b>
+          <Pourquoi label="Pourquoi ?" titre={`Même ${motsVendeur().nom} ?`}>
+            {r.titre || 'Nouvelle annonce'} — {r.options.length === 1 ? <>c’est {motsVendeur().meme} que N°{o0.numero} « {o0.titre || 'ancienne annonce'} » ?</> : `c’est ${motsVendeur().meme} qu’${motsVendeur().une} de ${motsVendeur().celles}-ci ?`}
             {' '}{PHRASE_REMISE[o0.force]}
             {r.plusieurs && r.options.length > 1 ? ' Plusieurs anciennes lui ressemblent : seule l’étiquette dit laquelle.' : ''}
             {r.concurrence ? ' Une autre nouvelle annonce lui ressemble aussi.' : ''}
-            {' '}Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est la même paire, elle garde son numéro : rien à réécrire là où elle est rangée.
+            {' '}Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est {motsVendeur().meme}, {motsVendeur().elle} garde son numéro : rien à réécrire là où {motsVendeur().elle} est rangé{motsVendeur().e}.
           </Pourquoi>
         </div>
         <div className="vrm-remise-boutons">
@@ -37236,15 +37355,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return (<>
       {nSur > 0 && (
         <span className="vrm-pop-puce-hote" data-remise-resume={nSur} data-remise-bloc={tete.length ? undefined : nSur}>
-          <button type="button" className="vrm-pop-puce is-ambre" onClick={allerVignette} aria-label={`${nSur} annonce${nSur > 1 ? 's' : ''} : même paire qu’une ancienne ? Voir dans la grille`}>
+          <button type="button" className="vrm-pop-puce is-ambre" onClick={allerVignette} aria-label={`${nSur} annonce${nSur > 1 ? 's' : ''} : même ${motsVendeur().nom} qu’une ancienne ? Voir dans la grille`}>
             <span className="vrm-pop-puce-n">{nSur}</span>
-            <span className="vrm-pop-puce-txt">Même paire ?</span>
+            <span className="vrm-pop-puce-txt">Même {motsVendeur().nom} ?</span>
             <svg className="vrm-pop-puce-chev" width="7" height="12" viewBox="0 0 8 14" aria-hidden="true" focusable="false"><path d="M1.2 1.2 6.8 7l-5.6 5.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </span>
       )}
       {tete.length > 0 && (
-        <div className="vrm-remise-cartes" data-remise-bloc={tete.length} role="group" aria-label="Annonces remises en ligne : même paire ?">
+        <div className="vrm-remise-cartes" data-remise-bloc={tete.length} role="group" aria-label={`Annonces remises en ligne : même ${motsVendeur().nom} ?`}>
           {tete.slice(0, 20).map((r) => carteRemise(r, false))}
         </div>
       )}
@@ -39169,7 +39288,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     retirer: async (id) => {
       const reg = lireRegistre(registreFo); const p = reg.personnes[id]; if (!p) return false;
       const ids = Object.keys(reg.achats).filter((k) => reg.achats[k].fournisseur === id);
-      const ok = await askConfirm({ title: `Retirer ${p.nom} ?`, desc: ids.length ? `${ids.length} achat${ids.length > 1 ? 's' : ''} en gros partent avec lui et ses paires sont déliées. Un prix d’achat saisi à la main reste.` : 'Ses achats déjà saisis restent dans Achats.', ok: 'Retirer', cancel: 'Garder', danger: true });
+      const ok = await askConfirm({ title: `Retirer ${p.nom} ?`, desc: ids.length ? `${ids.length} achat${ids.length > 1 ? 's' : ''} en gros partent avec lui et ses ${motsVendeur().noms} sont délié${motsVendeur().e}s. Un prix d’achat saisi à la main reste.` : 'Ses achats déjà saisis restent dans Achats.', ok: 'Retirer', cancel: 'Garder', danger: true });
       if (!ok) return false;
       // (10 nov., lot Y) La confirmation reste (plusieurs prix d'un coup, §2.5) ; le retrait va ensuite à la
       // corbeille 30 jours : lui, ses achats en gros, ses rattachements et les liens de ses paires reviennent
@@ -39192,7 +39311,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     modifierAchat: async (aid, c) => {
       const a = achatGros(registreFo, aid); if (!a) return { erreur: 'Cet achat n’existe plus' };
       const n = reliesDuLot(numeros, aid).length;
-      if (Number(String(c.paires).trim()) < n) return { erreur: `${n} paires sont déjà reliées : délie-en d’abord` };
+      if (Number(String(c.paires).trim()) < n) return { erreur: `${n} ${motsVendeur().noms} sont déjà relié${motsVendeur().e}s : délie-en d’abord` };
       const t = avecAchatGros(registreFo, aid, { ...c, fournisseur: a.fournisseur });
       if (t.erreur) return { erreur: t.erreur };
       poserRegistreFo((p) => avecAchatGros(p, aid, { ...c, fournisseur: a.fournisseur }).registre || p);
@@ -39201,7 +39320,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     retirerAchat: async (aid) => {
       const a = achatGros(registreFo, aid); if (!a) return false;
       const n = reliesDuLot(numeros, aid).length;
-      const ok = await askConfirm({ title: 'Retirer cet achat en gros ?', desc: n ? `${n} paire${n > 1 ? 's' : ''} reliée${n > 1 ? 's' : ''} : le prix posé par cet achat part aussi. Un prix d’achat saisi à la main reste.` : '', ok: 'Retirer', cancel: 'Garder', danger: true });
+      const ok = await askConfirm({ title: 'Retirer cet achat en gros ?', desc: n ? `${motArticle(n)} relié${motsVendeur().e}${n > 1 ? 's' : ''} : le prix posé par cet achat part aussi. Un prix d’achat saisi à la main reste.` : '', ok: 'Retirer', cancel: 'Garder', danger: true });
       if (!ok) return false;
       // (10 nov., lot Y) À la corbeille 30 jours, avec les liens de ses paires (un prix retapé depuis est gardé).
       const brut = load(CLE_FOURNISSEURS, {}) || {};
@@ -39217,7 +39336,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!a || !entree) return;
       const relies = reliesDuLot(numeros, aid);
       const lien = ecritureLienGros(entree, a, { at: new Date().toISOString(), nRelies: relies.length });
-      if (!lien) { toast(relies.length >= a.paires ? 'Toutes les paires de cet achat sont reliées' : `N°${fiche.numero} est déjà relié à un achat`); return; }
+      if (!lien) { toast(relies.length >= a.paires ? `${motsVendeur().Toutes} les ${motsVendeur().noms} de cet achat sont relié${motsVendeur().e}s` : `N°${fiche.numero} est déjà relié à un achat`); return; }
       // Le prix de CETTE paire, s'il se pose sans rien remplacer (fiche sans prix) : la règle des prix, sur le lot avec elle.
       const avec = { ...numeros, [fiche.cle]: { ...entree, ...lien } };
       const w = ecrituresPrixGros({ achat: a, relies: reliesDuLot(avec, aid), prixParNum: prixParNumFo, confirme: true });
@@ -41267,7 +41386,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(openConv.loading||openConv.error) return <FicheConvVolet site="vinted" etat="attente"/>;
     const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
     const fc=ficheDeConv(pc,openConv.acc);
-    if(!fc) return <FicheConvVolet site="vinted" etat="non-reliee" raison="Vinted ne rattache aucun article à cette conversation : VRM ne devine pas la paire d’après le titre."/>;
+    if(!fc) return <FicheConvVolet site="vinted" etat="non-reliee" raison={`Vinted ne rattache aucun article à cette conversation : VRM ne devine pas ${motsVendeur().le} d’après le titre.`}/>;
     const attention=[fc.favoris!=null?`${fc.favoris} favori${fc.favoris>1?'s':''}`:null, fc.vues!=null?`${fc.vues} vue${fc.vues>1?'s':''}`:null].filter(Boolean);
     return <FicheConvVolet site="vinted" etat="reliee" fc={{ item: fc.item, num: fc.num, photo: fc.photo, titre: fc.titre, taille: fc.taille,
       sous: [fc.prix!=null?prix(fc.prix,fc.devise):null,fc.compte||null],
@@ -41696,7 +41815,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const rowsVc = resultats[3] && resultats[3].status === "fulfilled" ? resultats[3].value : null;
     if (Array.isArray(rowsVc) && rowsVc.every((r) => r.owner === owner && ["vc_listings", "vc_ventes"].includes(r.id))) {
       const lst = rowsVc.find((r) => r.id === "vc_listings") || null;
-      const rv = retraitsVestiaire({ lst: avecNumerosVc(lst), ventes: (rowsVc.find((r) => r.id === "vc_ventes") || {}).ventes || {} });
+      const rv = retraitsVestiaire({ lst: avecNumerosVc(lst), ventes: (rowsVc.find((r) => r.id === "vc_ventes") || {}).ventes || {}, mots: motsVendeur() });
       annonces.push(...rv.annonces); ventes.push(...rv.ventes); manques.push(...rv.manques);
     } else manques.push("Vestiaire non relu");
     for(const l of ea?.lignes||[])if(l.ligne?.complet===true&&Number(l.ligne.capturedAt)>0)completes.push({plateforme:'eBay',compte:String(l.compte.ref),at:Number(l.ligne.capturedAt)});
@@ -41801,6 +41920,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // et la feuille « Modifier ma journée ».
   const [persoJ] = useJourneePerso();
   const [feuillePerso, setFeuillePerso] = useState(false);
+  // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) arrivé sur un compte : une carte AMBRE
+  // dans « À faire » tant qu'il n'est pas « vu » (14 jours au plus) ; la détection est au serveur.
+  const avisBas = useAvisBas(only === 'journee' && !baseKO, { lire: lireAvisBas, ecrireVus: ecrireAvisBasVus, comptes: accounts });
+  const avisBasListe = Array.isArray(avisBas.liste) ? avisBas.liste : [];
+  const [feuilleAvis, setFeuilleAvis] = useState(false);
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
@@ -41927,11 +42051,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (1er nov.) LE MODE EMBALLAGE, d'ici : il s'ouvre sur Colis, sur les
           // colis de la colonne « Prêts à imprimer », dans son ordre.
           if (pretsImpr > 0) jobs.push({ id:'emballer', n:pretsImpr, icon:'box', color:C.text,
-            title:'Emballer les colis prêts', sub:`${combien} — un par un : le N°, la photo, où est la paire`,
+            title:'Emballer les colis prêts', sub:`${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}`,
             action:'Emballer', tab:'cat_bord', prio:1, avant:()=>{ DEMANDE_EMBALLAGE.at = Date.now(); } });
           // (1er nov., « très répétitif ») Le même geste porté par la case « À envoyer »
           // quand elle se voit : la ligne d'« À faire » n'est alors plus redite (§7).
-          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: `${combien} — un par un : le N°, la photo, où est la paire` };
+          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: `${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}` };
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
         // même règle que Colis (`colisEb`, §11). L'étiquette se prend dans eBay
@@ -42023,7 +42147,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(conflitsNum.length){
           const nb=conflitsNum.length;
           jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.doublon,urgent:true,
-            title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
+            title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux ${motsVendeur().noms}`,
             sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige avant d'expédier`,
             tab:'cat_bord',prio:0.05});
         }
@@ -42139,7 +42263,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           }
           if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
             title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'plat_vestiaire', prio: 2.1 }); }
-        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
+        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? `Des ${motsVendeur().noms} vu${motsVendeur().e}s mais qui ne partent pas` : `${motsVendeur().Aucune} à baisser` };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
         //    ligne tant qu'il y en a, avec le geste : déclarer ses adresses.
@@ -42877,7 +43001,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
           return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
             <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
-            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>paire{stock?.total===1?'':'s'} en ligne</span></div>
+            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>{stock?.total===1?motsVendeur().nom:motsVendeur().noms} en ligne</span></div>
             {stock ? <>
               <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
               <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
@@ -43043,10 +43167,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (avisBasListe.length ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
@@ -43061,6 +43185,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <PileVignettes srcs={[]} n={comptesARelierJour.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="mail" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{court}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="a-relier">{detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Relier</span></span>
+                  </button>
+                );
+              };
+              const carteAvisBas = () => {
+                const titre = titreAvisBas(avisBasListe), detail = detailAvisBas(avisBasListe);
+                return (
+                  <button key="avis-bas" type="button" className="vrm-day-task vrm-fu-tache" data-journee-avis-bas={avisBasListe.map((a) => a.cle).join(' ')} data-n={String(avisBasListe.length)}
+                    title={`${titre}\n${detail}`} aria-label={`${titre} — ${detail}`} onClick={() => setFeuilleAvis(true)}>
+                    <PileVignettes srcs={[]} n={avisBasListe.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="star" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="avis-bas">{detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Lire</span></span>
                   </button>
                 );
               };
@@ -43223,6 +43358,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const blocsAF = {
                 ailleurs: carteAilleurs ? [carteVendusAilleurs()] : [],
                 'deux-fois': deuxFois.length ? [carteDeuxFois()] : [],
+                'avis-bas': avisBasListe.length ? [carteAvisBas()] : [],
                 ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, cases.filter((x) => x.id === id).map((x) => carteCase(x))])),
                 'a-relier': comptesARelierJour.length ? [carteARelier()] : [],
                 'stock-sortie': sortiesStock.length ? [carteSortieStock()] : [],
@@ -43265,6 +43401,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {blocRetirerAilleurs(true)}
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
+                    </SheetShell>
+                  ) : null}
+                  {feuilleAvis && avisBasListe.length ? (
+                    <SheetShell titre={avisBasListe.length > 1 ? 'Avis négatifs' : 'Avis négatif'} sousTitre="Sur Vinted" onClose={() => setFeuilleAvis(false)} maxWidth={560} data-feuille-avis-bas="">
+                      <AvisBasDetail liste={avisBasListe} Bouton={Bouton} onVu={async (cles) => { const ok = await avisBas.vu(cles); if (ok && avisBasListe.length <= cles.length) setFeuilleAvis(false); return ok; }}
+                        onAller={(q) => { setFeuilleAvis(false); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?' + q.replace(/^\?/, '') })); } catch (_) {} }}/>
                     </SheetShell>
                   ) : null}
                   {feuilleDeux && deuxFois.length ? (
@@ -43764,7 +43906,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const annChez = annulChezParTx.get(txL) || null;
             const gesteRemise = annChez ? <div className="vrm-remise-ligne" data-remise-vente={txL} data-remise-etat={annChez.etat} data-remise-num={annChez.sansNum ? 'sans' : annChez.archive ? 'archive' : 'garde'}>
                 {annChez.item ? <Bouton variante="secondaire" icone="sync" data-remettre-vente={txL} onClick={()=>remettreEnVente(annChez)}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
-                {annChez.sansNum ? <span className="vrm-remise-note" data-remise-sans-num="">Paire pas reliée</span> : !annChez.item ? <span className="vrm-remise-note">Annonce pas identifiée</span> : null}
+                {annChez.sansNum ? <span className="vrm-remise-note" data-remise-sans-num="">{motsVendeur().Nom} pas relié{motsVendeur().e}</span> : !annChez.item ? <span className="vrm-remise-note">Annonce pas identifiée</span> : null}
               </div> : null;
             const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
             // ── (1er nov.) LE RÉCAPITULATIF DE LA VENTE — maquette A, « fiche en lignes nettes »
@@ -43811,13 +43953,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const issue = (() => {
                 // (6 nov., vague 2 · point 1) Annulée AVANT l'envoi (prouvé par la transaction) : la paire
                 // n'est jamais partie, elle est chez lui — le geste est « Remettre en vente ».
-                if (annChez) return { k: annChez.archive ? 'remise-archive' : 'remise', t: annChez.sansNum ? 'La paire n’est jamais partie : elle est chez toi. Paire pas reliée (cette vente n’a pas de N°).' : annChez.archive ? `La paire n’est jamais partie : elle est chez toi. Le N°${num} est un ancien numéro : remise en vente, elle en prendra un neuf.` : `La paire n’est jamais partie : elle est chez toi. Remise en vente, elle garde le N°${num}.` };
+                if (annChez) return { k: annChez.archive ? 'remise-archive' : 'remise', t: annChez.sansNum ? `${motsVendeur().Le} n’est jamais parti${motsVendeur().e} : ${motsVendeur().elle} est chez toi. ${motsVendeur().Nom} pas relié${motsVendeur().e} (cette vente n’a pas de N°).` : annChez.archive ? `${motsVendeur().Le} n’est jamais parti${motsVendeur().e} : ${motsVendeur().elle} est chez toi. Le N°${num} est un ancien numéro : remis${motsVendeur().e} en vente, ${motsVendeur().elle} en prendra un neuf.` : `${motsVendeur().Le} n’est jamais parti${motsVendeur().e} : ${motsVendeur().elle} est chez toi. Remis${motsVendeur().e} en vente, ${motsVendeur().elle} garde le N°${num}.` };
                 if (!(st === 'cancelled' && num)) return null;
                 const out = saleOutcome(o); const arch = !numeroReprenable(num);
-                if (isPairLost(num)) return { t: `N°${num} déclarée perdue : elle est sortie du stock et sa case au garage est vidée. Son numéro n'est jamais redonné à une autre paire.` };
-                if (out === 'retour') return arch ? { k: 'retour', t: `La paire te revient. Le N°${num} est un ancien numéro : elle prendra un numéro neuf à sa republication.` } : { t: `La paire te revient : elle garde le N°${num}, republie-la avec le même.` };
+                if (isPairLost(num)) return { t: `N°${num} déclaré${motsVendeur().e} perdu${motsVendeur().e} : ${motsVendeur().elle} est sorti${motsVendeur().e} du stock et sa case au garage est vidée. Son numéro n'est jamais redonné à ${motsVendeur().autre}.` };
+                if (out === 'retour') return arch ? { k: 'retour', t: `${motsVendeur().Le} te revient. Le N°${num} est un ancien numéro : ${motsVendeur().elle} prendra un numéro neuf à sa republication.` } : { t: `${motsVendeur().Le} te revient : ${motsVendeur().elle} garde le N°${num}, republie-${motsVendeur().la} avec le même.` };
                 if (out === 'suspendue') return { t: `Rien n'est tranché : le N°${num} est conservé.` };
-                return arch ? { k: 'renvoi', t: `Si la paire t'est renvoyée, elle prendra un numéro neuf (le N°${num} est un ancien numéro).` } : { t: `Si la paire t'est renvoyée, republie-la avec le N°${num}.` };
+                return arch ? { k: 'renvoi', t: `Si ${motsVendeur().le} t'est renvoyé${motsVendeur().e}, ${motsVendeur().elle} prendra un numéro neuf (le N°${num} est un ancien numéro).` } : { t: `Si ${motsVendeur().le} t'est renvoyé${motsVendeur().e}, republie-${motsVendeur().la} avec le N°${num}.` };
               })();
               const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !estParti(o) && o.transaction_id != null;
               // (2 nov.) Le transporteur LU de la vente (n° de SON bordereau) : à côté du bouton
@@ -43870,7 +44012,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
                     {/* (10 nov., lot AZ) La photo du carton fermé, rangée avec CETTE vente (son n° de transaction). */}
                     {o.transaction_id != null && st !== 'cancelled' ? <PhotoCartonVente site="vinted" tx={txL} num={num || ''}/> : null}
-                    {cell ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd><button type="button" className="vrm-lien-action" onClick={()=>{fermer();onLocate&&onLocate(num);}} title="Voir la paire au stock">{garageCellLabel(cell)}</button></dd></div>
+                    {cell ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd><button type="button" className="vrm-lien-action" onClick={()=>{fermer();onLocate&&onLocate(num);}} title={`Voir ${motsVendeur().le} au stock`}>{garageCellLabel(cell)}</button></dd></div>
                       : (num && aExpedier(o) && garageUtilise) ? <div className="vrm-recap-ligne"><dt>Rangement</dt><dd>pas au garage</dd></div> : null}
                     {aRelie ? <div className="vrm-recap-ligne" data-recap-achat-relie=""><dt>Achat relié</dt><dd><span className="vrm-recap-achat-photo">{orderPhoto(aRelie) ? <PhotoVinted src={orderPhoto(aRelie)} alt="Photo de l'achat" data-photo-achat="1" loading="lazy" decoding="async"/> : null}</span>{[aRelie.date ? new Date(aRelie.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', 'Vinted'].filter(Boolean).join(' · ')}</dd></div> : null}
                   </dl>
@@ -43880,7 +44022,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('cat_msg', null, ONGLETS_DEPLACES).tab); onNav('cat_msg'); }}>Conversation</Bouton> : null}
-                    {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche de la paire</Bouton> : null}
+                    {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche {motsVendeur().de}</Bouton> : null}
                     {/* (11 nov.) « Me le rappeler » : par le n° de transaction (§5), jamais le titre. */}
                     {o.transaction_id != null ? <BoutonRappel variante="grille" cible={{ sorte: 'vente', tx: String(o.transaction_id), num: num || '', plat: 'vinted' }} libelle={num ? `N°${num} · ${nom}` : nom}/> : null}
                     {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
@@ -43888,7 +44030,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* (11 nov., lot ventes-lot) Les articles d'un lot PROUVÉ sont dans le récapitulatif (section
                         « Lot · N articles ») ; « Voir le lot » (lecture en direct) ne reste que pour un titre
                         « Lot » dont la transaction n'est pas dans la base. */}
-                    {isLotTitle(o.title) && !(lot && lot.lu) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
+                    {isLotTitle(o.title) && !(lot && lot.lu) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title={`Voir les ${motsVendeur().noms} du lot`} aria-label={`Voir les ${motsVendeur().noms} du lot`}>Voir le lot</Bouton> : null}
                     {annChez && annChez.item ? <Bouton variante="secondaire" icone="sync" data-recap-remettre={txL} onClick={()=>{ fermer(); remettreEnVente(annChez); }}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
                     {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>poserAnnuleeReglee(txL)}>Déjà remise en vente</Bouton> : null}
                     {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
@@ -44068,7 +44210,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               une vente Leboncoin ou eBay n'a un prix d'achat que si elle est
               reliée à sa paire par IDENTITÉ (SKU, référence, lien posé). */}
           {totals.bN>0 && <div data-ventes-benef-note="" style={{fontSize:12,color:C.muted,margin:'-6px 2px 12px',lineHeight:1.45}}>
-            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : bénéfice Vinted seul' : null}{!totals.autresKO && <> <Pourquoi label="Leboncoin et eBay">Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</Pourquoi></>}
+            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : bénéfice Vinted seul' : null}{!totals.autresKO && <> <Pourquoi label="Leboncoin et eBay">Une vente Leboncoin ou eBay se relie à {motsVendeur().sa} par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</Pourquoi></>}
           </div>}
         </>)}
 
@@ -44168,7 +44310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
             {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)}\u00a0%`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
-            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
+            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/${motsVendeur().nom}`}/>}
             {/* (5 nov.) « Compte qui vend le mieux » : une seule place, Statistiques → « Quel compte vend le mieux ». */}
           </div>
         )}
@@ -45694,7 +45836,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {false && astuceNum && listings.items?.length>0 && (
           <div data-astuce-numeros style={{display:'flex',gap:8,alignItems:'center',background:'var(--vrm-b-teinte)',borderRadius:12,padding:'6px 4px 6px 12px',/* (2 nov.) au téléphone la phrase passe sur deux lignes : elle touchait le bord */margin:'0 0 12px',fontSize:13,lineHeight:1.45,color:C.muted}}>
             <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="tag" size={16}/></span>
-            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}><span data-numero-phrase="">Chaque article a un <b style={{color:C.text,fontWeight:600}}>numéro</b>, jamais redonné.</span> <Pourquoi label="À quoi il sert">Il suit l’ordre de mise en ligne : il sert à retrouver la paire sur ton étagère, sur Leboncoin et sur eBay. Il se change d’un clic sur la carte et n’est jamais donné à une autre paire.</Pourquoi></div>
+            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}><span data-numero-phrase="">Chaque article a un <b style={{color:C.text,fontWeight:600}}>numéro</b>, jamais redonné.</span> <Pourquoi label="À quoi il sert">Il suit l’ordre de mise en ligne : il sert à retrouver {motsVendeur().le} sur ton étagère, sur Leboncoin et sur eBay. Il se change d’un clic sur la carte et n’est jamais donné à {motsVendeur().autre}.</Pourquoi></div>
             <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:17,lineHeight:1,minWidth:44,minHeight:44,padding:0,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
@@ -45775,7 +45917,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
             {/* (11 nov., lot DJ8) L'écran complet : seuils par paire, aperçu, historique (Messages → Favoris & offres → Offres auto). */}
-            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>Régler par paire, voir l’historique ›</button>
+            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>Régler par {motsVendeur().nom}, voir l’historique ›</button>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
                 <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
@@ -45791,7 +45933,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {offresAuto && ext!=='ok' && (
               <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext" style={{color:C.warn}}>{ext==='absente'
                 ? "Rien ne part d'ici : ouvre VRM dans le navigateur (ordinateur) où l'extension est installée."
-                : `Mets l'extension à jour (${EXT_CAPACITES.offresgarde.replace(/\.0$/,'')}) : une plus ancienne pourrait accepter une offre sur une paire déjà vendue ailleurs.`}</div>
+                : `Mets l'extension à jour (${EXT_CAPACITES.offresgarde.replace(/\.0$/,'')}) : une plus ancienne pourrait accepter une offre sur ${motsVendeur().un} déjà vendu${motsVendeur().e} ailleurs.`}</div>
             )}
           </div>
           );
@@ -45905,7 +46047,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {numDoublons.length} numéro{numDoublons.length>1?'s':''} porté{numDoublons.length>1?'s':''} par deux annonces
             </div>
             <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
-              Même N° sur deux paires : donne un numéro NEUF à l'une des deux. <Pourquoi>Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Les numéros ne se réutilisent jamais.</Pourquoi>
+              Même N° sur deux {motsVendeur().noms} : donne un numéro NEUF à l'{motsVendeur().une} des deux. <Pourquoi>Deux {motsVendeur().noms} rangé{motsVendeur().e}s dans la même boîte : à l'expédition, tu risques d'envoyer {motsVendeur().la} mauvais{motsVendeur().e}. Les numéros ne se réutilisent jamais.</Pourquoi>
             </div>
             {numDoublons.map(g => (
               <div key={g.numero} style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
@@ -46226,7 +46368,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {urlFiche && <span className="vrm-sr">{`Ouvrir sur Vinted : ${it.title || it.brand || 'l’annonce'}. `}</span>}
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide remplir rayon={0}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
-                    {enDouble && <span className="vrm-vignette-marque is-ambre" data-vignette-en-double="" title="La même paire est en ligne deux fois sur Vinted (même photo) : retire celle en trop sur vinted.fr — l'alerte au-dessus les nomme">En double</span>}
+                    {enDouble && <span className="vrm-vignette-marque is-ambre" data-vignette-en-double="" title={`${motsVendeur().Meme} est en ligne deux fois sur Vinted (même photo) : retire celle en trop sur vinted.fr — l'alerte au-dessus les nomme`}>En double</span>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
                   </a>
                   {/* (31 oct., Vitrine) Le N° de rangement SUR la photo, en haut à
@@ -46444,7 +46586,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin`}</span> : ''}
           </div>
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-            {annStats.sansNum>0 && <span data-sans-num={annStats.sansNum} title="Le N° est la référence qui retrouve la paire sur Leboncoin : touche « + N° » sur sa fiche." style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.sansNum} sans N° — il {annStats.sansNum>1?'leur':'lui'} en faut un pour Leboncoin</span>}
+            {annStats.sansNum>0 && <span data-sans-num={annStats.sansNum} title={`Le N° est la référence qui retrouve ${motsVendeur().le} sur Leboncoin : touche « + N° » sur sa fiche.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.sansNum} sans N° — il {annStats.sansNum>1?'leur':'lui'} en faut un pour Leboncoin</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
             {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
@@ -47439,7 +47581,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    le geste principal tant qu'un bordereau est prêt ; sinon il reste à sa place, grisé, et
                    dit pourquoi. « … » montre les outils de Colis (Emballer, Tout générer) à leur place. */
                 <div className="vrm-colis-barre" data-colis-barre="">
-                  <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label={onglet === 'retirer' ? 'Scanner un colis à retirer' : 'Scanner un bordereau'} data-scan-mode-bouton={onglet === 'retirer' ? 'retrait' : 'envoi'} title={onglet === 'retirer' ? 'Scanner le colis au point relais : VRM montre l’achat attendu' : 'Scanner le code-barres d’un bordereau : VRM montre la paire qui doit être dedans'} onClick={() => setScanOuvert(onglet === 'retirer' ? 'retrait' : 'envoi')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
+                  <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label={onglet === 'retirer' ? 'Scanner un colis à retirer' : 'Scanner un bordereau'} data-scan-mode-bouton={onglet === 'retirer' ? 'retrait' : 'envoi'} title={onglet === 'retirer' ? 'Scanner le colis au point relais : VRM montre l’achat attendu' : `Scanner le code-barres d’un bordereau : VRM montre ${motsVendeur().le} qui doit être dedans`} onClick={() => setScanOuvert(onglet === 'retirer' ? 'retrait' : 'envoi')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
                   <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
                     title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
                     onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : 'Tout imprimer'}</Bouton>
@@ -49009,11 +49151,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotView && (
         <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:1300,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setLotView(null)}/>
-          <div ref={lotPanneauRef} role="dialog" aria-modal="true" aria-label="Paires du lot" tabIndex={-1} data-lot-paires=""
+          <div ref={lotPanneauRef} role="dialog" aria-modal="true" aria-label={`${motsVendeur().Noms} du lot`} tabIndex={-1} data-lot-paires=""
             onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); setLotView(null); } }}
             onClick={e=>e.stopPropagation()} style={{outline:'none',width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px calc(28px + env(safe-area-inset-bottom))'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-              <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 Paires du lot</div>
+              <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 {motsVendeur().Noms} du lot</div>
               <button className="vrm-icon-control" type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
             </div>
             <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{lotView.order?.title||''}{lotView.order?.price?.amount!=null?` · ${Number(lotView.order.price.amount).toFixed(0)}\u00a0${cur(lotView.order.price?.currency_code)}`:''}{classifyOrderStatus(lotView.order?.status)==='cancelled'?' · ❌ remboursé (hors CA)':''}</div>
@@ -49164,7 +49306,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {retoursAttendus.length>0 && (
                 <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                   <div style={{fontSize:12,color:C.danger,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⚖️ {retoursAttendus.length} litige{retoursAttendus.length>1?'s':''} en cours</div>
-                  <div className="vrm-aide" style={{fontSize:12,color:C.muted,margin:'3px 0 7px'}}>Des paires qui te reviennent (retour / remboursement / suspension) — à republier.</div>
+                  <div className="vrm-aide" style={{fontSize:12,color:C.muted,margin:'3px 0 7px'}}>Des {motsVendeur().noms} qui te reviennent (retour / remboursement / suspension) — à republier.</div>
                   <div style={{display:'flex',flexDirection:'column',gap:5}}>
                     {retoursAttendus.slice(0,6).map((r,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
@@ -50366,7 +50508,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const suivanteM = fileM && fileM.i < fileM.liste.length-1 ? (encours)=>{ const j=fileM.i+1; setRepubMainFile({ ...fileM, i:j, encours: encours||null }); setRepubMainOuvert(fileM.liste[j]); } : null;
         return <RepublierALaMain key={paire.uid+':'+paire.id} paire={paireM} rang={rangM} onSuivante={suivanteM} encours={fileM ? fileM.encours || null : null} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={fermerM} onRelire={()=>loadListings(true)}
           onDelier={()=>poserRepubMain(paire.id, { nouvelId:null, nouveauTitre:null, lieAt:null })}
-          onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
+          onLier={async (c)=>{ const ok = await askConfirm({ title:`C’est bien ${motsVendeur().meme} ?`, desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
             if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...marque, ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;
       })()}
       {kitMain && kitMain.length > 0 && (
@@ -51132,6 +51274,41 @@ async function lireLbcEnVente() {
     return liste;
   } catch (_) { return null; }
 }
+// (11 nov., lot verif-publication) « La même paire déjà en ligne ? » pour vérifier
+// avant de publier, par IDENTITÉ (le N° : SKU « VRM-{n°} » eBay, référence/lien
+// Leboncoin), jamais un titre. `true` seulement vu dans une lecture COMPLÈTE de
+// moins de 24 h ; `false` si toutes les lectures sont fraîches et aucune ne l'a ;
+// sinon `null` (pas su ⇒ aucune alerte). Lecture de la base VRM seulement.
+const FRAIS_ENLIGNE_MS = 24 * 3600 * 1000;
+async function dejaEnLigneEbay(numero) {
+  const k = cleNum(numero); if (!k) return null;
+  try {
+    const lu = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
+    if (!lu || !Array.isArray(lu.lignes)) return null;
+    let toutFrais = !lu.illisibles.length;
+    for (const { ligne } of lu.lignes) {
+      if (ligne === undefined) { toutFrais = false; continue; }
+      const t = Date.parse((ligne && ligne.capturedAt) || '');
+      const frais = Number.isFinite(t) && Date.now() - t >= 0 && Date.now() - t < FRAIS_ENLIGNE_MS;
+      if (!frais) { toutFrais = false; continue; }
+      for (const x of (ligne && Array.isArray(ligne.items) ? ligne.items : [])) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c && cleNum(c) === k) return true; }
+    }
+    return toutFrais ? false : null;
+  } catch (_) { return null; }
+}
+async function dejaEnLigneLbc(numero) {
+  const k = cleNum(numero); if (!k) return null;
+  const l = await lireLbcEnVente();
+  if (!Array.isArray(l)) return null;
+  if (l.some((x) => x && x.etat === 'enligne' && x.numero && cleNum(x.numero) === k)) return true;
+  return l.some((x) => x && x.etat !== 'enligne') ? null : false;
+}
+// Le N° qu'il écrit lui-même, pour « vérifier avant » : le réglage allumé (avec ses
+// endroits `ou`), sinon l'habitude PROUVÉE sur ses annonces Vinted lues (publiée par
+// l'écran Annonces, `poserLecturesEcrit`) ; pas su ⇒ `numeroEcrit: null` (rien jugé).
+const _lecturesEcrit = { liste: null };
+const poserLecturesEcrit = (l) => { _lecturesEcrit.liste = Array.isArray(l) ? l : null; };
+const optsNumeroVerif = () => { const actif = numeroEcritActif(); return { numeroEcrit: numeroEcritAttendu(actif, _lecturesEcrit.liste), ...(actif ? { ou: ouNumeroEcrit() } : {}) }; };
 // (5 nov.) Les annonces eBay EN LIGNE avec leur N° (SKU « VRM-{n°} », identité).
 // Rend `{ liste: [{ numero, title, photo }], nums: Set, illisibles: [nom] }`, ou
 // `null` = pas su (registre des comptes illisible).
@@ -52055,6 +52232,8 @@ function proprioTri() {
 function vendActuel() {
   return PROFIL_VENDEUR.vend || jeVendsEffectif(load(CLE_JE_VENDS, null), { proprietaire: proprioTri() }).vend;
 }
+// (11 nov., lot vocabulaire-article) La source du vocabulaire de TOUT module (`motsVendeur()`).
+poserSourceVend(() => vendActuel());
 // Les mots (« paire » / « article ») du vendeur, pour un écran qui s'abonne.
 function useMotsArticle() { const p = useProfilVendeur(); return motsArticle(p.vend || vendActuel()); }
 // (11 nov., lot DJ2) Les EXEMPLES (note, annonce, placeholders) selon ce qu'il vend
@@ -53363,6 +53542,43 @@ export function QuoiDeNeufParametres({ onNav }) {
   return <QuoiDeNeufReglage liste={q.tout} vues={q.vues} onVoir={(n) => { q.marquer([n.id]); onNav && onNav(n.tab); }}/>;
 }
 export { useQuoiDeNeuf };
+// (11 nov., lot avis-negatif) « Avis 2★ reçu sur shop_x » : les alertes du SERVEUR (`vrm_avis_bas`,
+// projection `data->alertes`), les vus de l'APP, et — seulement pour les comptes concernés — le texte
+// rangé et l'id de profil, en projection (jamais `select=data` sur une ligne de moisson). Une lecture
+// ratée de l'alerte ou des vus ⇒ `undefined` (rien montré) ; texte ou profil pas lus ⇒ « Lis l'avis
+// sur Vinted » / lien par l'identifiant du compte.
+async function lireAvisBas() {
+  // Comme les autres lectures de l'app : la base (RLS) ne rend que les lignes du vendeur de la session.
+  const get = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+  const [m, v] = await Promise.all([get(`app_data?id=eq.${LIGNE_AVIS_BAS}&select=a:data->alertes`), get(`app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`)]);
+  if (m === null || v === null) return undefined;
+  const alertes = m[0] && Array.isArray(m[0].a) ? m[0].a : [];
+  const vus = v[0] && v[0].data && typeof v[0].data === 'object' ? v[0].data : {};
+  const uids = [...new Set(alertes.map((a) => String(a && a.uid)).filter((x) => /^\d{1,20}$/.test(x)))].slice(0, 30);
+  if (!uids.length) return { memo: { alertes }, vus, textes: {}, pids: {} };
+  const [f, p] = await Promise.all([
+    get(`app_data?id=in.(${uids.map((u) => `harvest_${u}_feedbacks`).join(',')})&select=id,avis:data->payload->user_feedbacks`),
+    get(`app_data?id=in.(${uids.map((u) => `harvest_${u}_profile`).join(',')})&select=id,pid:data->payload->user->>id`),
+  ]);
+  const textes = {}, pids = {};
+  for (const r of f || []) { const u = /^harvest_(\d+)_feedbacks$/.exec(String(r && r.id || '')); if (u && Array.isArray(r.avis)) textes[u[1]] = r.avis; }
+  for (const r of p || []) { const u = /^harvest_(\d+)_profile$/.exec(String(r && r.id || '')); if (u && r.pid != null) pids[u[1]] = String(r.pid); }
+  return { memo: { alertes }, vus, textes, pids };
+}
+// « C'est vu » : lire-fusionner-réécrire SA ligne (`fn(vusLus)`) ; une lecture ratée n'écrit rien.
+async function ecrireAvisBasVus(fn) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!Array.isArray(j)) return false;
+    const data = fn(j[0] && j[0].data && typeof j[0].data === 'object' ? j[0].data : {});
+    const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify([withOwner({ id: LIGNE_AVIS_BAS_VUS, data })]) });
+    if (!w.ok) return false;
+    const o = await w.json().catch(() => null);
+    return Array.isArray(o) && o.length === 1;
+  } catch (_) { return false; }
+}
 function NoteSatisfactionJournee() {
   const uid = AUTH.user?.id || '';
   if (!uid || !CLOISONNE) return null;
@@ -53842,6 +54058,8 @@ function AppCoeur() {
       if(t==='settings'&&section==='importer'){ DEMANDE_REGLAGE_SOUS.id='importer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (11 nov., lot centre-aide) « M'y emmener » d'une fiche d'aide : le panneau de Réglages nommé (liste fermée, src/aideFiches.js).
       { const rg=p.get('reglage'); if(t==='settings'&&rg&&REGLAGES_AIDE.includes(rg)){ DEMANDE_REGLAGE_SOUS.id=rg; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } }
+      // (11 nov., lot suppression-oauth) Retour de « Me reconnecter avec … » : Supprimer mon compte.
+      if(t==='settings'&&section==='supprimer'){ DEMANDE_REGLAGE_SOUS.id='fermer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='sante'){ DEMANDE_REGLAGE_SOUS.id='sante'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
@@ -54587,8 +54805,12 @@ function AppCoeur() {
   const lireRetraitsBadge=()=>{ const pub=load('vrm_colis_retirer',null); return (pub && Number.isFinite(pub.total) && Date.now()-(Number(pub.at)||0)<12*3600000) ? pub.total : null; };
   const [colisBadge,setColisBadge]=useState(lireColisBadge);
   const [retraitsBadge,setRetraitsBadge]=useState(lireRetraitsBadge);
-  useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && (e.detail.k==='vrm_colis_aposter'||e.detail.k==='vrm_colis_retirer'))) return; setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); };
-    window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>{ setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); });
+  // (11 nov., ext. 5.354) La MÊME publication, recopiée dans `widget_stats.aExpedier` pour
+  // le mini-résumé de la carte du logo (src/resumeCarte.js) : l'extension ne recompte rien.
+  const lireColisCarte=()=>{ const a=aExpedierPourCarte(load('vrm_colis_aposter',null)); return a.n==null?'—':`${a.n}${a.auMoins?'+':''}@${a.at}`; };
+  const [colisCarte,setColisCarte]=useState(lireColisCarte);
+  useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && (e.detail.k==='vrm_colis_aposter'||e.detail.k==='vrm_colis_retirer'))) return; setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); setColisCarte(lireColisCarte()); };
+    window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>{ setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); setColisCarte(lireColisCarte()); });
     return ()=>{ window.removeEventListener('vrm:colis',f); window.removeEventListener('vrm:save',f); if(typeof stop==='function') stop(); }; },[]);
   // (9 nov., lot Z) La pastille de l'icône de VRM = le badge de Colis (src/pastilleIcone.js) ; effacée en partant.
   useEffect(()=>{ poserPastilleIcone(colisBadge); },[colisBadge]);
@@ -55598,7 +55820,7 @@ function AppCoeur() {
     // seulement complet ; sinon la valeur d'avant reste (jamais un minimum présenté complet).
     const aV = aVenirPour(liveStatsVus.aVenir);
     if (aV.valeur != null && !aV.partiel) base0.enAttente = Math.round(aV.valeur);
-    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: new Date().toISOString().slice(0, 10) }) };
+    const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: new Date().toISOString().slice(0, 10) }), aExpedier: aExpedierPourCarte(load('vrm_colis_aposter', null)) };
     const cle = JSON.stringify(data);
     if (cle === widgetEcrit.current) return;
     widgetEcrit.current = cle;
@@ -55622,7 +55844,7 @@ function AppCoeur() {
         });
       } catch (_) {}
     })();
-  }, [widgetBase, liveStatsVus]);
+  }, [widgetBase, liveStatsVus, colisCarte]);
 
   const vintedNotifChecked = React.useRef(false);
   // ⚠️⚠️ (revue du 11 octobre) UNE PREUVE RANGÉE PENDANT QUE VRM EST OUVERT.
@@ -56099,7 +56321,7 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
-      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${vcARetirer} paire${vcARetirer>1?'s':''} vendue${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
+      if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${motArticle(vcARetirer)} vendu${motsVendeur().e}${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
       if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
       if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, photos:lbcRemovePhotos, lbcSuppr:(lbcARetirer||[]).filter(r=>r&&r.lbcId).map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vinted' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
@@ -56108,10 +56330,10 @@ function AppCoeur() {
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.
-      if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirer} paire${ebayARetirer>1?'s':''} vendue${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true});
-      if(ebayARetirerAilleurs>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerAilleurs} paire${ebayARetirerAilleurs>1?'s':''} vendue${ebayARetirerAilleurs>1?'s':''} ${ebayARetirerAilleursOu}, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirerAilleurs, tab:'ebay_annonces', dv:true});
-      if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${ebayAAnnuler} paire${ebayAAnnuler>1?'s':''} vendue${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmée${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
-      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true, annonces:true});
+      if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirer)} vendu${motsVendeur().e}${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true});
+      if(ebayARetirerAilleurs>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirerAilleurs)} vendu${motsVendeur().e}${ebayARetirerAilleurs>1?'s':''} ${ebayARetirerAilleursOu}, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirerAilleurs, tab:'ebay_annonces', dv:true});
+      if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayAAnnuler)} vendu${motsVendeur().e}${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmé${motsVendeur().e}${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
+      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${motArticle(ebayARetirerVinted)} vendu${motsVendeur().e}${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true, annonces:true});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
       // lus » et « N offres reçues » ne sont pas intéressants ici — les offres
       // et les messages auront leur propre onglet (captation + envoi, comme
@@ -56121,7 +56343,7 @@ function AppCoeur() {
       // PROUVÉE) ne sont pas « deux paires » : la règle du bloc rouge (`GROUPES_DEUX_FOIS`, §11).
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1 && !GROUPES_DEUX_FOIS.some(g=>Array.isArray(g) && v.every(x=>g.some(y=>String(y)===x.id))));
       // (5 nov.) L'agent eBay est arrêté (sa décision) : plus de ligne « paires pour eBay » ici.
-      if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num', annonces:true});
+      if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — ${motsVendeur().la} mauvais${motsVendeur().e} ${motsVendeur().nom} peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num', annonces:true});
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true, annonces:true, job:'sans-numero'});
       if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF : UNE notification, le 1er de chaque mois (et les deux
@@ -56721,7 +56943,7 @@ function AppCoeur() {
         const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
         const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
         // (10 nov., lot AX) Paires · Ventes · Achats · Colis · Retraits · … (src/rechercheUnique.js).
-        const GROUPES = GROUPES_LOUPE;
+        const GROUPES = GROUPES_LOUPE.map(([t, l]) => [t, t === 'paire' ? motsVendeur().Noms : l]);
         // La TÊTE : la correspondance exacte d'identité, et PAR QUOI (« par son n° de suivi »).
         const parExacte = (l) => [...new Set(l.map(r => IDENTITES_EXACTES[r.par]).filter(Boolean))].join(', ');
         const blocExactes = exactes.length ? <div data-recherche-groupe="exacte" data-recherche-exacte="" data-recherche-n={exactes.length}>
@@ -57304,7 +57526,7 @@ function AppCoeur() {
             }
             // Ancien format (compat) : { catalog, sales, garageGrid }
             if(data && (data.catalog||data.sales||data.garageGrid)){
-              let msg='Importer cet ancien fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES, puis l\'app se rechargera.';
+              let msg='Importer cet ancien fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} ${motsVendeur().noms}\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES, puis l\'app se rechargera.';
               if(!await askConfirm(msg)) return;
               const entries=[]; if(data.catalog)entries.push(['vinted_catalog',data.catalog]); if(data.sales)entries.push(['vinted_sales',data.sales]); if(data.garageGrid)entries.push(['vinted_garage_grid',data.garageGrid]);
               await applyAndReload(entries); return;
@@ -57318,6 +57540,8 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
+        {/* (11 nov., ext. 5.350) EN TÊTE de Ma journée : ce que Vinted a masqué, fait disparaître ou limité (src/moderationVinted.js). Rien tant que rien n'est prouvé. */}
+        {tab==='journee'&&!baseKO&&<GardeEcran nom="journee:moderation"><Suspense fallback={null}><AlerteModeration comptes={vintedAccounts}/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onAllerTrancher={allerTrancher} onTrancherAT={trancherAT} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
@@ -57474,4 +57698,4 @@ export { useJourneePerso, JourneePersoSetting };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
-export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi };
+export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif };

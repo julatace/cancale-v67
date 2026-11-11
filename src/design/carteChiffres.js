@@ -29,6 +29,7 @@ import { aVenirPour } from '../argentAVenir.js';
 import { dateLocale } from '../formatsDate.js';   // (9 nov., vitesse) un format créé une fois
 
 export const CLE_CARTE_STATS = 'vrm_carte_stats';
+import { motsVendeur } from '../profilVendeur.js';
 
 export const SITES = ['toutes', 'vinted', 'vestiaire', 'leboncoin', 'ebay'];
 export const NOM_SITE = { toutes: 'Tous les sites', vinted: 'Vinted', vestiaire: 'Vestiaire', leboncoin: 'Leboncoin', ebay: 'eBay' };
@@ -98,7 +99,7 @@ export const AIDE_CHIFFRES = {
   enligne: 'Tes annonces en ligne, d’après la dernière lecture complète de ton dressing (de moins de 24 h).',
   masquees: CHIFFRES.masquees.titre,
   dorment: 'Tes annonces en ligne depuis plus de 30 jours (l’écran Annonces).',
-  stock: 'Le prix d’achat de tes paires encore chez toi, calculé par l’écran Annonces. Une paire sans prix d’achat n’y est pas : le montant est alors un minimum.',
+  get stock() { const m = motsVendeur(); return `Le prix d’achat de ${m.tes} encore chez toi, calculé par l’écran Annonces. ${m.Un} sans prix d’achat n’y est pas : le montant est alors un minimum.`; },
   objectif: 'Où tu en es de ton objectif du mois (la barre de la carte) : la part atteinte, en pourcentage.',
   urssafapayer: 'Les cotisations de ta prochaine échéance URSSAF, sur l’argent reçu (le rappel de Ma journée). Période pas finie ⇒ « au moins ».',
 };

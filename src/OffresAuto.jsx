@@ -21,6 +21,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { montant } from './format.js';
+import { motsVendeur, motArticle } from './profilVendeur.js';
 import { Numero } from './composants/Numero.jsx';
 import JaugeActions, { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, heureFr } from './jaugeActions.js';
@@ -134,7 +135,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
           <span className="vrm-oa-icone" aria-hidden="true"><Icon name="tag" size={18}/></span>
           <div className="vrm-oa-texte">
             <b>Offres automatiques</b>
-            <span data-oa-statut="">{actif ? `Allumées · ${nAvec} paire${nAvec > 1 ? 's' : ''} réglée${nAvec > 1 ? 's' : ''}` : 'Éteintes'}</span>
+            <span data-oa-statut="">{actif ? `Allumées · ${motArticle(nAvec)} réglé${motsVendeur().e}${nAvec > 1 ? 's' : ''}` : 'Éteintes'}</span>
           </div>
           <button type="button" role="switch" aria-checked={!!actif} data-offres-auto-toggle={actif ? '1' : '0'} onClick={basculer} className="vrm-offres-auto-switch" aria-label="Acceptation automatique des offres">
             <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
@@ -166,11 +167,11 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
             </div>
           ))}
         {apercu && apercu.lignes.length > 20 ? <p className="vrm-oa-vide">Et {apercu.lignes.length - 20} autres.</p> : null}
-        <div className="vrm-oa-pied" data-oa-rien-envoye="">Aperçu : rien n’est envoyé d’ici. <Pourquoi>Le moteur tourne dans l’extension, sur le compte ouvert dans l’onglet vinted.fr. Une offre au-dessus de « Accepter dès » est acceptée entre {DELAI_OFFRE_MIN} et {DELAI_OFFRE_MAX} min après qu’il l’a vue, tiré au hasard, {OFFRES_PAR_VISITE} au plus par visite, dans les 50 actions par heure. Sous « Refuser sous », elle est refusée (avec ton message s’il y en a un). Entre les deux, c’est toi qui négocies. Une paire vendue ailleurs n’est jamais acceptée.</Pourquoi></div>
+        <div className="vrm-oa-pied" data-oa-rien-envoye="">Aperçu : rien n’est envoyé d’ici. <Pourquoi>Le moteur tourne dans l’extension, sur le compte ouvert dans l’onglet vinted.fr. Une offre au-dessus de « Accepter dès » est acceptée entre {DELAI_OFFRE_MIN} et {DELAI_OFFRE_MAX} min après qu’il l’a vue, tiré au hasard, {OFFRES_PAR_VISITE} au plus par visite, dans les 50 actions par heure. Sous « Refuser sous », elle est refusée (avec ton message s’il y en a un). Entre les deux, c’est toi qui négocies. {motsVendeur().Un} vendu{motsVendeur().e} ailleurs n’est jamais accepté{motsVendeur().e}.</Pourquoi></div>
       </div>
 
       {/* ── 3. TES PAIRES : LES SEUILS ── */}
-      <h3 className="vrm-oa-titre">Tes paires</h3>
+      <h3 className="vrm-oa-titre">{motsVendeur().Tes}</h3>
       {illisibles.length ? (
         <div className="vrm-oa-illisible" data-oa-illisibles={illisibles.length} role="status">
           <span>{illisibles.length} seuil{illisibles.length > 1 ? 's' : ''} avec virgule{virguleLue === true ? ' : à écrire avec un point.' : `, ignoré${illisibles.length > 1 ? 's' : ''} par ton extension.`}</span>
@@ -178,15 +179,15 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
         </div>
       ) : null}
       <div className="vrm-oa-outils">
-        <Segmente label="Paires" value={filtre} onChange={(v) => { setFiltre(v); setMax(PAR_PAGE); }} options={[{ v: 'toutes', l: 'Toutes' }, { v: 'avec', l: 'Réglées' }, { v: 'sans', l: 'Sans seuil' }]}/>
-        <input className="vrm-oa-cherche" type="search" value={recherche} onChange={(e) => { setRecherche(e.target.value); setMax(PAR_PAGE); }} placeholder="N° ou titre" aria-label="Chercher une paire"/>
+        <Segmente label={motsVendeur().Noms} value={filtre} onChange={(v) => { setFiltre(v); setMax(PAR_PAGE); }} options={[{ v: 'toutes', l: 'Toutes' }, { v: 'avec', l: 'Réglées' }, { v: 'sans', l: 'Sans seuil' }]}/>
+        <input className="vrm-oa-cherche" type="search" value={recherche} onChange={(e) => { setRecherche(e.target.value); setMax(PAR_PAGE); }} placeholder="N° ou titre" aria-label={`Chercher ${motsVendeur().un}`}/>
       </div>
       <div className="vrm-oa-groupe" data-oa-paires={lignes.length}>
         {!Array.isArray(annonces) ? <p className="vrm-oa-vide">Annonces pas lues : « — ».</p>
-          : !lignes.length ? <p className="vrm-oa-vide">{filtre === 'avec' ? 'Aucune paire réglée.' : 'Aucune paire.'}</p>
+          : !lignes.length ? <p className="vrm-oa-vide">{filtre === 'avec' ? `${motsVendeur().Aucune} réglé${motsVendeur().e}.` : `${motsVendeur().Aucune}.`}</p>
           : lignes.slice(0, max).map((l) => (
             <div key={l.id} className="vrm-oa-paire" data-oa-paire={l.id} data-oa-min={l.min == null ? '' : String(l.min)} data-oa-refus={l.refuse == null ? '' : String(l.refuse)} data-oa-incoherent={l.incoherent ? '1' : undefined}>
-              <label className="vrm-oa-case"><input type="checkbox" checked={coches.has(l.id)} onChange={() => basculerCoche(l.id)} aria-label={`Choisir ${l.numero ? 'N°' + l.numero : l.titre || 'cette paire'}`}/></label>
+              <label className="vrm-oa-case"><input type="checkbox" checked={coches.has(l.id)} onChange={() => basculerCoche(l.id)} aria-label={`Choisir ${l.numero ? 'N°' + l.numero : l.titre || motsVendeur().ce}`}/></label>
               <span className="vrm-oa-paire-nom">
                 <span className="vrm-oa-nom">{l.numero ? <Numero n={l.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{l.titre || 'Sans titre'}</span></span>
                 <span className="vrm-oa-muet">{l.prix != null ? montant(l.prix) : '—'}{nomDe(l.uid) ? ` · ${nomDe(l.uid)}` : ''}{l.incoherent ? ' · refus au-dessus du mini' : ''}</span>

@@ -33,7 +33,7 @@ const sur = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3])
 async function charger(mut) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v3ecr-'));
   const ecrire = (f) => { let t = lire(f); if (mut && mut.fichier === f) t = mut.fn(t); const p = path.join(dir, f); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, t); return t; };
-  const theme = ecrire('src/themeMineral.js'), cible = ecrire('src/cibleNotif.js');
+  const theme = ecrire('src/themeMineral.js'), cible = ecrire('src/cibleNotif.js'); ecrire('src/profilVendeur.js');   // (lot vocabulaire-article) importé par cibleNotif
   fs.writeFileSync(path.join(dir, 'src', 'package.json'), '{"type":"module"}');
   const fusion = mut && mut.fichier === 'src/design/fusion.css' ? mut.fn(lire('src/design/fusion.css')) : lire('src/design/fusion.css');
   const app = mut && mut.fichier === 'src/App.jsx' ? mut.fn(require("./_source-app.cjs").sourceApp()) : require("./_source-app.cjs").sourceApp();

@@ -1,5 +1,6 @@
 // Montants en centimes, quantités entières, aucun appel à une plateforme.
 import {atelierDe,etapesProposees,ID_PAIRE} from './atelier.js';
+import { motsVendeur } from '../profilVendeur.js';
 export const VIDE = () => ({version:1,revision:0,missions:[],reservations:[],lots:[],consommables:[],veilles:[],receptions:[],dossiers:[],journal:[],commandes:[]});
 export class Refus extends Error { constructor(message,status=400){super(message);this.status=status;} }
 const exige=(v,m)=>{if(!v)throw new Refus(m);};
@@ -172,14 +173,14 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
  case 'atelier.etapes':{
   const a=atelierDe(d),r=etapesProposees(p.etapes,a.etapes,commande.id);exige(!r.erreur,r.erreur);
   const gardes=new Set(r.etapes.map(e=>e.id)),perdue=a.etapes.find(e=>!gardes.has(e.id)&&a.paires.some(x=>x.etape===e.id));
-  exige(!perdue,`Des paires sont encore à « ${perdue&&perdue.nom} » : avance-les d’abord.`);
+  exige(!perdue,`Des ${motsVendeur().noms} sont encore à « ${perdue&&perdue.nom} » : avance-les d’abord.`);
   d.atelier={etapes:r.etapes,paires:a.paires};break;
  }
  case 'atelier.placer':{
-  const a=atelierDe(d),id=texte(p.cible,60);exige(ID_PAIRE.test(id),'Paire non reconnue.');
+  const a=atelierDe(d),id=texte(p.cible,60);exige(ID_PAIRE.test(id),`${motsVendeur().Nom} non reconnu${motsVendeur().e}.`);
   const etape=texte(p.etape,80);exige(a.etapes.some(e=>e.id===etape),'Étape inconnue : actualise.');
   const x=a.paires.find(y=>y.id===id);
-  if(x){exige(x.etape!==etape,'Cette paire est déjà à cette étape.');(x.evenements??=[]).push({le:maintenant,auteur:acteur,de:x.etape,vers:etape});if(x.evenements.length>50)x.evenements.splice(0,x.evenements.length-50);x.etape=etape;x.depuis=maintenant;}
+  if(x){exige(x.etape!==etape,`${motsVendeur().Ce} est déjà à cette étape.`);(x.evenements??=[]).push({le:maintenant,auteur:acteur,de:x.etape,vers:etape});if(x.evenements.length>50)x.evenements.splice(0,x.evenements.length-50);x.etape=etape;x.depuis=maintenant;}
   else{const photo=texte(p.photo||'',500,true);exige(!photo||/^https:\/\//.test(photo),'Photo invalide.');ajoute(a.paires,{id,titre:texte(p.titre||'',160,true),photo,etape,depuis:maintenant,ajoute:maintenant,evenements:[{le:maintenant,auteur:acteur,de:null,vers:etape}]});}
   d.atelier={etapes:a.etapes,paires:a.paires};break;
  }

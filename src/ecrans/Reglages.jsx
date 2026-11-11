@@ -2,6 +2,7 @@ import { PlateformesSetting } from '../App.jsx';
 import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 import { RappelsSetting } from '../App.jsx';
+import { CLE_VERIF_COUPEES, lireCoupees, rallumerAlerte, NOMS_ALERTES } from '../verifAnnonce.js';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
 // (11 nov., lot journee-perso) « Ma journée » : le MÊME éditeur que « Modifier ma journée ».
@@ -17,6 +18,8 @@ import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
 import { HistoriqueModifications } from '../OutilsParcours.jsx';
 import { dateImportValide } from '../brouillonsReglages.js';
 import { preparerLiaisonOAuth } from '../auth/liaisonOAuth.js';
+import { planDelier, refusDelier } from '../auth/delierOAuth.js';
+import { nouvelIdEssai } from '../auth/essaisPkce.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ChampRecherche } from '../composants/ChampRecherche.jsx';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
@@ -28,6 +31,7 @@ import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRec
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
 import { PLATEFORMES_COMPTES, etatCompteLie, ageLecture, nomCompteLie, LIBELLE_ETAT } from '../comptesLies.js';
 import { contactEmail, CONTACT_A_VENIR } from '../contact.js';
+import { preuveSuppression, nomFournisseur } from '../../api/_lib/preuve-connexion.js';   // (11 nov., lot suppression-oauth)
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from '../../api/_lib/proprietaire-email.js';
 import { photoACacherSelon, poserReglesStream, normaliserRegles, masquerTexteStream, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM_REGLES } from '../modeStream.js';
 import { noterTicketDiscord } from '../communaute/discordAttente.js';
@@ -36,9 +40,9 @@ import { MesModeles } from '../ModelesDescription.jsx';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
 // (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
 const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
-import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
-import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur } from '../App.jsx';
+import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart } from '../App.jsx';
 
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
@@ -68,11 +72,13 @@ import { preparerApercusModes } from '../apercusBordereaux.js';
 import { actionsReglages } from '../reglagesActions.js';
 // ⟦← App.jsx #3⟧
 import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
+import { grouperAppareils, nConnexions } from '../appareilsGroupes.js';
 // ⟦← App.jsx #4⟧
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme} from '../../api/_lib/notif-textes.js';
+import {reglageSeuilAvis,SEUILS_AVIS,SEUIL_AVIS_DEFAUT} from '../avisNegatif.js';   // (11 nov.) le seuil « avis négatif » (push_prefs.avisSeuil)
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
 import {fenetreGroupe,FENETRES as FENETRES_GROUPE} from '../../api/_lib/notif-groupe.js';
@@ -105,7 +111,7 @@ import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 // ⟦← App.jsx #13⟧
 import TesDonnees from '../composants/TesDonnees.jsx';
-import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
+import { deconnecterPartout, deconnecterAutres, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
 // ⟦← App.jsx #14⟧
 import { DISCORD_ERREURS } from "../communaute/discordErreurs.js";
 // ⟦← App.jsx #15⟧
@@ -138,18 +144,25 @@ const lireConnexionsOAuth = async()=>{
  try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
 };
 // (11 nov., lot DJ6) « Délier » Google/Discord : sur son clic, confirmé ; jamais la dernière façon de se connecter.
-const oauthDelier = async (provider, id, nbIdentites) => {
+// (11 nov., lot connexions-oauth) La fiche est RELUE au clic (le compte affiché peut dater) ;
+// règle et phrases : src/auth/delierOAuth.js (refus de GoTrue traduits, e-mail qui change dit).
+const oauthDelier = async (provider, id) => {
  const nom=provider==='google'?'Google':'Discord';
- if(nbIdentites<2)return{ok:false,error:`${nom} est ta seule façon de te connecter : ajoute d’abord un mot de passe (Changer mon mot de passe).`};
- if(!id)return{ok:false,error:'Je n’ai pas pu lire cette liaison. Recharge la page.'};
- if(!(await askConfirm({title:`Délier ${nom} ?`,desc:`Tu ne pourras plus te connecter avec ${nom}. Ton compte VRM ne change pas.`,ok:'Délier',cancel:'Annuler'})))return{ok:false};
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});
-  if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:/single.identity|last.identity|at least/i.test(String(j?.msg||j?.message||j?.error_code||''))?`${nom} est ta seule façon de te connecter.`:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
+ let fiche=null;
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});if(r.ok)fiche=await r.json();}catch(_){fiche=null;}
+ const plan=planDelier(fiche,provider,id);
+ if(!plan.ok)return{ok:false,error:plan.error};
+ if(!(await askConfirm({title:`Délier ${nom} ?`,desc:plan.avertissement,ok:'Délier',cancel:'Annuler'})))return{ok:false};
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(plan.id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});
+  if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:refusDelier(r.status,j,provider)};}
+  // Supabase a pu remplacer l'e-mail du compte : la session affichée le suit (relu, jamais deviné).
+  try{const f=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:signalDelai(15000)});const u=f.ok?await f.json():null;
+   if(u&&u.id===AUTH.user?.id&&typeof u.email==='string'&&u.email&&u.email!==AUTH.user?.email&&AUTH.session)writeSession({...AUTH.session,user:{...AUTH.session.user,email:u.email}});}catch(_){}
   try{relireFiche(AUTH.user?.id);}catch(_){}return{ok:true};
  }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
 };
 const oauthRelier = async provider => {
-  try{const verifier=makeVerifier();const r=await preparerLiaisonOAuth({provider,enabled:providerEnabled(provider),token:AUTH.session?.access_token,owner:AUTH.user?.id,base:SUPABASE_URL,cle:SUPABASE_KEY,origine:window.location.origin,verifier,challenge:await makeChallenge(verifier)});if(r.ok)window.location.assign(r.url);return r;}catch(_){return{ok:false,error:'Impossible de préparer cette connexion. Réessaie.'};}
+  try{const verifier=makeVerifier();const r=await preparerLiaisonOAuth({provider,enabled:providerEnabled(provider),token:AUTH.session?.access_token,owner:AUTH.user?.id,base:SUPABASE_URL,cle:SUPABASE_KEY,origine:window.location.origin,verifier,challenge:await makeChallenge(verifier),essai:nouvelIdEssai()});if(r.ok)window.location.assign(r.url);return r;}catch(_){return{ok:false,error:'Impossible de préparer cette connexion. Réessaie.'};}
 };
 // ⟦← App.jsx #19⟧
 
@@ -1516,6 +1529,15 @@ function PushPrefsSetting({ comptes, onMuets }) {
         </select>
       </div>
       {soirCalme ? <div className="vrm-np-relance" data-np-soir-calme="">Pendant tes heures calmes : il ne sonnera pas.</div> : null}
+      {/* (11 nov., lot avis-negatif) Le seuil d'un « avis négatif » : 1★ à 4★, défaut 3★ (src/avisNegatif.js).
+          Rangé dans `push_prefs.avisSeuil` ; le serveur le lit avant de décider (api/_lib/avis-negatif.js). */}
+      <div className="vrm-np-ligne" data-np-avis-seuil={String(reglageSeuilAvis(prefs || {}))}>
+        <span className="vrm-np-lib">Avis négatif<small>Prévenu quand un avis Vinted arrive à ce nombre d’étoiles ou moins.</small></span>
+        <select className="vrm-np-soir" aria-label="Seuil d’un avis négatif" data-np-avis-choix="" value={String(reglageSeuilAvis(prefs || {}))} disabled={!prefs||busy}
+          onChange={(e)=>{ const v = Number(e.target.value); const suite = { ...(prefs || {}) }; if (v === SEUIL_AVIS_DEFAUT) delete suite.avisSeuil; else suite.avisSeuil = v; ecrirePrefs(suite, 'Le seuil des avis'); }}>
+          {SEUILS_AVIS.map((n)=><option key={n} value={String(n)}>{n}★ ou moins</option>)}
+        </select>
+      </div>
       {/* (11 nov., lot `notifs-groupees`) La fenêtre du résumé (api/_lib/notif-groupe.js) :
           la première sonne, les suivantes partent ensemble. L'urgent passe tout de suite. */}
       <div className="vrm-np-ligne vrm-np-ligne-col" data-np-regrouper={regroupe?'on':'off'} data-np-fenetre={fenetre}>
@@ -1542,7 +1564,7 @@ const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
   { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
-  { id: 'comptes', titre: 'Comptes', ids: ['comptes'] },
+  { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
 ];
 function groupesFamillesNotif(familles) {
   const vus = new Set();
@@ -1756,7 +1778,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
   React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
   // (6 nov.) Un conseil ouvre un panneau (« Voir comment ») : `DEMANDE_REGLAGE_SOUS`.
-  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; /* (11 nov., centre d'aide) l'abonnement est une vue ; appareils, double vérification, équipe vivent sous « Compte ». */ if(id==='abonnement'){ setVueBrute('abonnement'); setSous(null); return; } setVueBrute(['appareils','double','equipe'].includes(id)?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
+  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; /* (11 nov., centre d'aide) l'abonnement est une vue ; appareils, double vérification, équipe vivent sous « Compte ». */ if(id==='abonnement'){ setVueBrute('abonnement'); setSous(null); return; } setVueBrute(['appareils','double','equipe','fermer'].includes(id)?'compte':'reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
   // (6 nov.) La notification « problème signalé » ouvre la liste (propriétaire seul).
   React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setVueBrute('reglages'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
@@ -2539,49 +2561,125 @@ const seDeconnecterPartout = async () => {
   else toast('✓ VRM est fermé sur tous tes appareils.', 'ok');
   setTimeout(() => { if (AUTH.user?.id !== owner) return; try { authSignOut(); } catch (_) {} location.reload(); }, 1600);
 };
+// (11 nov., lot connexions-oauth) Regroupé par appareil + navigateur (src/appareilsGroupes.js) :
+// « Cet appareil » en tête, les autres repliés, le détail par connexion en dépliant ;
+// UN geste pour les autres (« Déconnecter les autres appareils », confirmé, scope=others) ;
+// les connexions inactives depuis plus de 30 jours comptées à part, fermées sur SON clic.
+const deconnecterLesAutres = async (relire) => {
+  const owner = AUTH.user?.id;
+  if (!owner) return;
+  const ok = await askConfirm({ title: 'Déconnecter les autres appareils ?', desc: 'VRM reste ouvert ici. Partout ailleurs, il faudra te reconnecter. L’extension VRM se reconnecte seule quand tu rouvres VRM dans son navigateur.', ok: 'Déconnecter', cancel: 'Annuler', danger: true });
+  if (!ok || AUTH.user?.id !== owner) return;
+  const r = await deconnecterAutres({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, apikey: SUPABASE_KEY, jeton: AUTH.session && AUTH.session.access_token });
+  if (AUTH.user?.id !== owner) return;
+  if (r === 'ok') toast('✓ Les autres appareils sont déconnectés.', 'ok');
+  else if (r === 'refuse') toast('Ta session ici a expiré : reconnecte-toi, puis recommence.', 'info');
+  else toast("⚠️ Le service de connexion n'a pas répondu — rien n'a été fermé. Réessaie dans un instant.", 'err');
+  relire();
+};
 function AppareilsConnectes() {
   // `undefined` en cours · `{ erreur, message }` pas su · `{ appareils }` lu.
   const [etat, setEtat] = React.useState(undefined);
   const [enVol, setEnVol] = React.useState(null);
   // (10 nov., lot H) La session qu'une alerte « Nouvel appareil » désigne (src/appareilNouveau.js).
   const [cible] = React.useState(() => { const x = DEMANDE_APPAREIL.session; DEMANDE_APPAREIL.session = null; return x; });
+  const [ouverts, setOuverts] = React.useState({});
   const lire = React.useCallback(async () => {
     const { status, j } = await appelSecurite('appareils');
     setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || "Je n'ai pas pu lire tes appareils — réessaie dans un instant." });
   }, []);
   React.useEffect(() => { lire(); }, [lire]);
+  const fermerUne = async (a) => {
+    const { status, j } = await appelSecurite('appareils', { method: 'POST', body: JSON.stringify({ session: a.id }) });
+    return status === 200 && j?.ok === true && j.ferme === a.id ? true : (j && j.message) || false;
+  };
   const fermer = async (a) => {
     const owner = AUTH.user?.id;
     if (!owner) return;
     const ok = await askConfirm({ title: `Déconnecter ${a.appareil} ?`, desc: 'VRM s’y fermera dans l’heure au plus.', ok: 'Déconnecter', cancel: 'Annuler', danger: true });
     if (!ok || AUTH.user?.id !== owner) return;
     setEnVol(a.id);
-    const { status, j } = await appelSecurite('appareils', { method: 'POST', body: JSON.stringify({ session: a.id }) });
+    const r = await fermerUne(a);
     if (AUTH.user?.id !== owner) return;
     setEnVol(null);
-    if (status === 200 && j?.ok === true && j.ferme === a.id) { toast(`✓ ${a.appareil} déconnecté.`, 'ok'); lire(); }
-    else toast('⚠️ ' + ((j && j.message) || "Je n'ai pas pu déconnecter cet appareil."), 'err');
+    if (r === true) { toast(`✓ ${a.appareil} déconnecté.`, 'ok'); lire(); }
+    else toast('⚠️ ' + (r || "Je n'ai pas pu déconnecter cet appareil."), 'err');
   };
+  const fermerAnciennes = async (liste) => {
+    const owner = AUTH.user?.id;
+    if (!owner || !liste.length) return;
+    const ok = await askConfirm({ title: `Fermer ${nConnexions(liste.length)} ancienne${liste.length > 1 ? 's' : ''} ?`, desc: 'Inactives depuis plus de 30 jours. Rien d’autre ne change.', ok: 'Fermer', cancel: 'Annuler' });
+    if (!ok || AUTH.user?.id !== owner) return;
+    setEnVol('anciennes');
+    let n = 0;
+    for (const a of liste) { if (AUTH.user?.id !== owner) return; if ((await fermerUne(a)) === true) n++; }
+    setEnVol(null);
+    toast(n === liste.length ? `✓ ${nConnexions(n)} fermée${n > 1 ? 's' : ''}.` : `⚠️ ${n} sur ${liste.length} fermée${n > 1 ? 's' : ''}. Réessaie pour les autres.`, n === liste.length ? 'ok' : 'err');
+    lire();
+  };
+  const g = etat && etat.appareils ? grouperAppareils(etat.appareils) : null;
+  // Une alerte « Nouvel appareil » désigne une connexion : son groupe s'ouvre tout seul.
+  const groupeCible = g && cible ? g.autres.find((x) => x.sessions.some((s) => s.id === cible)) : null;
+  const ouvert = (cle) => ouverts[cle] !== undefined ? ouverts[cle] : !!(groupeCible && groupeCible.appareil === cle);
+  const basculer = (cle) => setOuverts((o) => ({ ...o, [cle]: !ouvert(cle) }));
+  const resume = (grp) => `${nConnexions(grp.n)} · dernière ${quandCourt(grp.actifLe)}`;
+  const detail = (grp) => grp.sessions.map((a) => (
+    <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'} {...(cible && a.id === cible && !a.ici ? { 'data-appareil-nouveau': 'oui' } : {})} style={{ paddingLeft: 28 }}>
+      <div className="vrm-sec-corps">
+        <span className="vrm-sec-sous">{a.ici ? 'Cette connexion' : 'Connexion'} · active {quandCourt(a.actifLe)}</span>
+      </div>
+      {a.ici ? <span className="vrm-sec-etat is-ici">Ici</span>
+        : <button type="button" className="vrm-sec-bouton" data-appareil-fermer={a.id} disabled={enVol === a.id} onClick={() => fermer(a)}>{enVol === a.id ? '…' : 'Déconnecter'}</button>}
+    </div>
+  ));
+  const groupe = (grp) => (
+    <React.Fragment key={grp.appareil}>
+      <button type="button" className="vrm-sec-ligne" data-appareil-groupe={grp.appareil} data-groupe-n={grp.n} aria-expanded={ouvert(grp.appareil)} onClick={() => basculer(grp.appareil)} style={{ width: '100%', border: 0, background: 'transparent', textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
+        <div className="vrm-sec-corps">
+          <span className="vrm-sec-titre">{grp.appareil}</span>
+          <span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{grp.ici ? 'Cet appareil · ' : ''}{resume(grp)}</span>
+        </div>
+        <span aria-hidden="true" style={{ color: 'var(--fu-gris2, #6e6e73)', fontSize: 13 }}>{ouvert(grp.appareil) ? 'Masquer' : 'Détail'}</span>
+      </button>
+      {ouvert(grp.appareil) && detail(grp)}
+    </React.Fragment>
+  );
+  const nAutres = g ? g.autres.length : 0;
   return (
     <div data-appareils={etat === undefined ? 'lecture' : etat.erreur ? 'pas-su' : String(etat.appareils.length)}>
       {etat === undefined ? <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>
         : etat.erreur ? <div className="vrm-sec-liste"><div className="vrm-sec-ligne" data-appareils-erreur={etat.erreur}><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{etat.message}</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div>
         : (
-        <div className="vrm-sec-liste">
-          {etat.appareils.map((a) => (
-            <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'} {...(cible && a.id === cible && !a.ici ? { 'data-appareil-nouveau': 'oui' } : {})}>
-              <div className="vrm-sec-corps">
-                <span className="vrm-sec-titre">{a.appareil}</span>
-                <span className="vrm-sec-sous">{quandCourt(a.actifLe)}</span>
-              </div>
-              {a.ici ? <span className="vrm-sec-etat is-ici">Cet appareil</span>
-                : <button type="button" className="vrm-sec-bouton" data-appareil-fermer={a.id} disabled={enVol === a.id} onClick={() => fermer(a)}>{enVol === a.id ? '…' : 'Déconnecter'}</button>}
+        <>
+          <div className="vrm-sec-liste" data-appareils-ici="">
+            {g.ici ? groupe(g.ici) : <div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>Cet appareil n’apparaît pas dans la liste. Recharge la page.</span></div></div>}
+          </div>
+          {(nAutres > 0 || g.anciennes.length > 0) && (
+            <details className="vrm-repli" data-appareils-autres={nAutres} open={!!groupeCible || undefined} style={{ marginTop: 12 }}>
+              <summary>{nAutres > 0 ? `Voir les appareils (${nAutres})` : 'Anciennes connexions'}</summary>
+              {nAutres > 0 && <div className="vrm-sec-liste" style={{ marginTop: 8 }}>{g.autres.map(groupe)}</div>}
+              {g.anciennes.length > 0 && (
+                <div className="vrm-sec-liste" style={{ marginTop: 8 }}>
+                  <div className="vrm-sec-ligne" data-appareils-anciennes={g.anciennes.length}>
+                    <div className="vrm-sec-corps">
+                      <span className="vrm-sec-titre">{nConnexions(g.anciennes.length)} ancienne{g.anciennes.length > 1 ? 's' : ''}</span>
+                      <span className="vrm-sec-sous">Inactives depuis plus de 30 jours</span>
+                    </div>
+                    <button type="button" className="vrm-sec-bouton" data-appareils-fermer-anciennes="" disabled={enVol === 'anciennes'} onClick={() => fermerAnciennes(g.anciennes)}>{enVol === 'anciennes' ? '…' : 'Fermer'}</button>
+                  </div>
+                </div>
+              )}
+            </details>
+          )}
+          {nAutres > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <Bouton variante="secondaire" data-deconnexion-autres="" onClick={() => deconnecterLesAutres(lire)} style={{ width: '100%' }}>Déconnecter les autres appareils</Bouton>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
-      <div style={{ marginTop: 16 }}>
-        <Bouton variante="secondaire" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ width: '100%' }}>Se déconnecter partout</Bouton>
+      <div style={{ marginTop: 12, textAlign: 'center' }}>
+        <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>Se déconnecter partout</button>
       </div>
     </div>
   );
@@ -2641,7 +2739,7 @@ function JournalVrm() {
       ))}
       {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
       <div className="vrm-sec-trous" data-journal-trous="">
-        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone', extension: 'gestes de l’extension' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux', relais: 'commandes du téléphone', extension: 'gestes de l’extension', moderation: 'ce que Vinted a masqué ou limité' }[x] || x)).join(', ')}.</p> : null}
         {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
       </div>
     </div>
@@ -2674,14 +2772,17 @@ async function lireInventaireSuppression() {
   } catch (_) { return null; }
 }
 const MOT_SUPPRIMER = 'SUPPRIMER';
-// Le compte a-t-il un mot de passe ? (identités de Supabase) — `null` pas dit.
-const aMotDePasse = () => {
-  const u = AUTH.user || {};
-  const p = Array.isArray(u.identities) ? u.identities.map((i) => i && i.provider) : (u.app_metadata && Array.isArray(u.app_metadata.providers) ? u.app_metadata.providers : null);
-  return p ? p.includes('email') : null;
-};
+// (11 nov., lot suppression-oauth) La preuve que l'écran ANNONCE : le même calcul que
+// le serveur (api/_lib/preuve-connexion.js). `AUTH.user` ne porte pas les identités :
+// la fiche (`/auth/v1/user`) d'abord, sinon le jeton (`app_metadata.providers`).
+// Compte sans mot de passe ⇒ jamais de champ mot de passe.
 function FermerCompte({ onExporter }) {
-  const [ouvert, setOuvert] = React.useState(false);
+  const retourReco = AUTH_REDIRECT && AUTH_REDIRECT.reconnexion ? AUTH_REDIRECT : null;
+  const [ouvert, setOuvert] = React.useState(!!retourReco);
+  const [identites, setIdentites] = React.useState(undefined);
+  const [, setTic] = React.useState(0);
+  const [recoErreur, setRecoErreur] = React.useState(retourReco && retourReco.error ? retourReco.error : '');
+  const [recoEnCours, setRecoEnCours] = React.useState('');
   const [info, setInfo] = React.useState(undefined);
   const [tape, setTape] = React.useState('');
   const [mdp, setMdp] = React.useState('');
@@ -2695,13 +2796,27 @@ function FermerCompte({ onExporter }) {
     if (!ouvert) return;
     let mort = false; setInfo(undefined);
     lireInventaireSuppression().then((x) => { if (!mort) setInfo(x); });
+    lireConnexionsOAuth().then((x) => { if (!mort) setIdentites(x); }).catch(() => { if (!mort) setIdentites(null); });
     compterReglesEbay().then((n) => { if (!mort) setReglesEbayN(n); }).catch(() => { if (!mort) setReglesEbayN(null); });
     return () => { mort = true; };
   }, [ouvert, essai]);
   const pareil = tape.trim() === MOT_SUPPRIMER;
-  const avecMdp = aMotDePasse();
+  const preuve = preuveSuppression({ jeton: AUTH.session && AUTH.session.access_token, identites: Array.isArray(identites) ? identites : undefined });
+  const recente = preuve.recente, champMdp = !recente && (preuve.cas === 'mdp' || preuve.cas === 'pas-su');
+  // La fenêtre de 10 min se referme pendant qu'il lit : l'écran suit.
+  React.useEffect(() => {
+    if (!ouvert || !recente) return;
+    const t = setTimeout(() => setTic((x) => x + 1), Math.min(preuve.resteMs + 300, 30000));
+    return () => clearTimeout(t);
+  });
+  const reconnecter = async (p) => {
+    setRecoErreur(''); setRecoEnCours(p);
+    const r = await oauthStart(p, 'reconnexion');
+    if (!r || !r.ok) { setRecoEnCours(''); setRecoErreur((r && r.error) || 'La reconnexion n’a pas pu s’ouvrir. Réessaie.'); }
+  };
+  const peutEnvoyer = pareil && (recente || (champMdp && mdp.length > 0));
   const valider = async () => {
-    if (!pareil || occupe) return;
+    if (!peutEnvoyer || occupe) return;
     setOccupe(true);
     const r = await supprimerMonCompte({ confirmation: tape.trim(), motDePasse: mdp });
     setOccupe(false); setMdp('');
@@ -2767,24 +2882,51 @@ function FermerCompte({ onExporter }) {
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la suppression, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
 
               <div style={titreBloc}>4. Confirme que c’est toi</div>
-              <label style={{ display: 'block', ...txt, marginTop: 4 }}>
-                Tape <b style={{ color: C.text }}>{MOT_SUPPRIMER}</b> en majuscules
-                <input type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={tape} onChange={(e) => setTape(e.target.value)}
-                  data-fermer-confirmation="" aria-label={`Tape ${MOT_SUPPRIMER} pour confirmer`} style={champ}/>
-              </label>
-              <label style={{ display: 'block', ...txt, marginTop: 10 }}>
-                Ton mot de passe VRM{avecMdp === false ? ' (ton compte n’en a pas)' : ''}
-                <input type="password" autoComplete="current-password" value={mdp} onChange={(e) => setMdp(e.target.value)}
-                  data-supprimer-mdp="" style={champ}/>
-              </label>
-              <div style={{ ...txt, fontSize: 12, marginTop: 6 }}>
-                {avecMdp === false
-                  ? 'Google ou Discord : laisse vide si connecté il y a < 10 min, sinon reconnecte-toi.'
-                  : 'Google ou Discord : connexion de moins de 10 min suffit.'}
+              {recoErreur && <div role="alert" data-supprimer-reco-erreur="" style={{ ...txt, color: C.warn, marginTop: 4 }}>{recoErreur}</div>}
+              <div data-supprimer-preuve={preuve.cas}>
+                {recente && (
+                  <div data-supprimer-recent="" style={{ ...txt, color: C.text, marginTop: 4 }}>
+                    {preuve.cas === 'oauth-recent' && preuve.oauth.length === 1 ? `Tu viens de te connecter avec ${nomFournisseur(preuve.oauth[0])}.` : 'Tu viens de te connecter.'} Tape <b>{MOT_SUPPRIMER}</b> pour confirmer.
+                    <div data-supprimer-reste={Math.ceil(preuve.resteMs / 60000)} style={{ ...txt, fontSize: 12, marginTop: 2 }}>Encore {Math.max(1, Math.ceil(preuve.resteMs / 60000))} min. Ensuite, reconnecte-toi.</div>
+                  </div>
+                )}
+                {preuve.cas === 'oauth-ancien' && (
+                  <div data-supprimer-reconnexion="" style={{ ...txt, marginTop: 4 }}>
+                    Ton compte n’a pas de mot de passe. Reconnecte-toi pour confirmer que c’est toi.
+                  </div>
+                )}
+                {!recente && preuve.oauth.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    {preuve.oauth.map((p) => (
+                      <Bouton key={p} variante={preuve.cas === 'oauth-ancien' ? 'primaire' : 'secondaire'} onClick={() => reconnecter(p)} disabled={!!recoEnCours} data-supprimer-reconnecter={p}>
+                        {recoEnCours === p ? 'Ouverture…' : `Me reconnecter avec ${nomFournisseur(p)}`}
+                      </Bouton>
+                    ))}
+                  </div>
+                )}
+                {(recente || champMdp) && (
+                  <label style={{ display: 'block', ...txt, marginTop: 10 }}>
+                    Tape <b style={{ color: C.text }}>{MOT_SUPPRIMER}</b> en majuscules
+                    <input type="text" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={tape} onChange={(e) => setTape(e.target.value)}
+                      data-fermer-confirmation="" aria-label={`Tape ${MOT_SUPPRIMER} pour confirmer`} style={champ}/>
+                  </label>
+                )}
+                {champMdp && (
+                  <>
+                    <label style={{ display: 'block', ...txt, marginTop: 10 }}>
+                      Ton mot de passe VRM
+                      <input type="password" autoComplete="current-password" value={mdp} onChange={(e) => setMdp(e.target.value)}
+                        data-supprimer-mdp="" style={champ}/>
+                    </label>
+                    <div style={{ ...txt, fontSize: 12, marginTop: 6 }}>Pas de mot de passe ? Reconnecte-toi, puis reviens ici.</div>
+                  </>
+                )}
+                {(recente || champMdp) && (
+                  <Bouton variante="danger" onClick={valider} disabled={!peutEnvoyer || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
+                    {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
+                  </Bouton>
+                )}
               </div>
-              <Bouton variante="danger" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton="" style={{ marginTop: 12 }}>
-                {occupe ? 'Suppression en cours…' : 'Supprimer définitivement mon compte'}
-              </Bouton>
             </div>
           )}
         </div>
@@ -3476,6 +3618,28 @@ function JeVendsSetting() {
   );
 }
 
+// (11 nov., lot verif-publication) Les alertes « vérifier avant de publier » qu'il
+// a coupées (« Ne plus me le dire ») : chacune se rallume d'un clic. Rien de coupé ⇒
+// rien n'est montré (le réglage n'existe que s'il a servi).
+function VerifCoupeesSetting() {
+  const [brut, setBrut] = React.useState(() => load(CLE_VERIF_COUPEES, null));
+  React.useEffect(() => onCloudReady(() => setBrut(load(CLE_VERIF_COUPEES, null))), []);
+  const codes = [...lireCoupees(brut)];
+  if (!codes.length) return null;
+  const rallumer = (code) => { const r = rallumerAlerte(brut, code); save(CLE_VERIF_COUPEES, r); setBrut(r); toast(code ? 'Alerte rallumée.' : 'Toutes les alertes sont rallumées.'); };
+  return (
+    <div data-verif-coupees={codes.length} style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Alertes coupées avant de publier</div>
+      {codes.map((c) => (
+        <div key={c} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44 }}>
+          <span style={{ fontSize: 13, color: C.muted }}>{NOMS_ALERTES[c]}</span>
+          <button type="button" className="vrm-lien-action" data-verif-rallumer={c} onClick={() => rallumer(c)} style={{ minHeight: 44 }}>Rallumer</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function NumeroEcritSetting({ onAnnonces }) {
   const exemples = useExemplesVendeur();
   const lire = () => lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null));
@@ -3635,7 +3799,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       <GuideReglage titre="Numéroter dans tes annonces" etapes={[
         ['Écris le numéro là où tu ranges l’article', 'Sur le carton, l’étagère ou le bac, comme d’habitude.'],
         ['Écris-le à la fin de la description', '« N° 123 » sur la dernière ligne (ou SKU eBay, référence Leboncoin pro).'],
-        ['Ouvre tes annonces dans VRM', 'Il lit le numéro et le range avec la paire. Si un numéro ne colle pas, il te demande.'],
+        ['Ouvre tes annonces dans VRM', `Il lit le numéro et le range avec ${motsVendeur().le}. Si un numéro ne colle pas, il te demande.`],
       ]}/>
       <div data-numero-ecrit-apercu="" style={{marginTop:12}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Ce que VRM lit dans tes annonces</div>
@@ -3698,6 +3862,7 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
       <NumeroEcritSetting onAnnonces={onAnnonces}/>
+      <VerifCoupeesSetting/>
       <div style={{fontSize:13,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Le format des <b>prochains</b> numéros. Ceux déjà donnés ne changent pas.
       </div>

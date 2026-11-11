@@ -7,7 +7,7 @@
 //  D  Sans réglage : Ma journée d'avant. « Modifier ma journée » (44 px) ouvre l'éditeur ;
 //     une carte cachée quitte l'écran, son compteur reste publié (bloc caché `data-tuile`),
 //     « N gestes » ne la compte plus, la tête suit SON ordre ; aucun débordement.
-//  E  L'éditeur : 17 cartes, trois zones, cibles 44 px ; l'interrupteur ; « Revenir au
+//  E  L'éditeur : 18 cartes (avec « Avis négatif reçu », intégration extension-2), trois zones, cibles 44 px ; l'interrupteur ; « Revenir au
 //     réglage d'origine » remet tout.
 //  K  Au clavier : flèche haut, Début, Fin ; le focus reste sur la poignée ; c'est annoncé.
 //  G  Au doigt (390, vrais événements tactiles) et à la souris (1512) : glisser une poignée.
@@ -190,7 +190,7 @@ async function main() {
         await pg.waitForTimeout(400);
         let ed = await editeur(pg);
         await shot(pg, `jp-editeur-${vp.width}-${theme}`);
-        dit(ed && ed.n === 17 && ed.zones.tete.join() === 'phrase,prochain,frise,chiffres' && ed.origine === '1', `E ${T} l'éditeur : 17 cartes en trois zones, au réglage d'origine`, JSON.stringify(ed && ed.zones));
+        dit(ed && ed.n === 18 && ed.zones.afaire.includes('avis-bas') && ed.zones.tete.join() === 'phrase,prochain,frise,chiffres' && ed.origine === '1', `E ${T} l'éditeur : 18 cartes en trois zones, au réglage d'origine`, JSON.stringify(ed && ed.zones));
         dit(ed && ed.petit >= 44, `E ${T} poignées et interrupteurs : 44 px au moins`, String(ed && ed.petit));
         // Cacher « Colis à envoyer » (rien d'urgent dans ces données) ⇒ la carte part, son compteur reste publié.
         await pg.locator('[data-jp-interrupteur="envoyer"]').click(); await pg.waitForTimeout(300);

@@ -21,6 +21,7 @@
 // « Pas su » s'écrit « — » (jamais 0) ; « au moins 0 » ne se dit jamais ; jamais
 // « encaissé ». Exécuté par scripts/audit-chantier-f.cjs.
 
+import { motsVendeur } from './profilVendeur.js';
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 export const libelleMoisBilan = (ym) => { const [y, m] = String(ym || '').split('-').map(Number); return y && m ? `${MOIS[m - 1]} ${y}` : String(ym || ''); };
 export const nomFichierBilan = (ym) => `Bilan-${ym}.pdf`;
@@ -60,7 +61,7 @@ export function bilanDuMois({ ym, vendu = null, recu = null, depense = null, ben
     { cle: 'depense', nom: 'Dépensé', valeur: depense == null ? null : un(depense), auMoins: false, note: 'dépenses, abonnements et packs notés', type: 'eur' },
     { cle: 'benefice', nom: 'Bénéfice', valeur: benefice && benefice.valeur != null ? un(benefice.valeur) : null, auMoins: false,
       note: B && Number.isFinite(B.n) && B.n > 0 ? `prix d’achat connus ${B.nCout}/${B.n}` : (benefice && benefice.raison === 'rien' ? 'aucune vente finalisée ni dépense' : benefice && benefice.raison === 'achats' ? 'il manque des prix d’achat' : 'pas encore calculé'), type: 'eur' },
-    { cle: 'paires', nom: 'Paires vendues', valeur: venduOk ? Number(vendu.n) : null, auMoins: venduOk && partielVendu, note: '', type: 'n' },
+    { cle: 'paires', nom: `${motsVendeur().Noms} vendu${motsVendeur().e}s`, valeur: venduOk ? Number(vendu.n) : null, auMoins: venduOk && partielVendu, note: '', type: 'n' },
   ];
   return {
     ym, mois: libelleMoisBilan(ym), enCours: !!enCours,

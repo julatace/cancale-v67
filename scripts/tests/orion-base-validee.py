@@ -29,6 +29,9 @@ nommément (un autre ajout reste refusé) :
   · politique des hôtes : un hôte RETIRÉ de la base commune (ex.
     cancale-v67-ten.vercel.app) l'est aussi du paquet Orion. Seul un retrait
     passe : un hôte ajouté ou élargi reste refusé.
+  · 5.347 (lot vocabulaire-article) : `vrm-mots.js` (« paire » / « article »)
+    EN TÊTE des blocs de pages qui le portent dans la base commune, juste
+    après compat-orion.js — exactement ces blocs-là, rien d'autre ne bouge.
 """
 from pathlib import Path
 import zipfile
@@ -41,7 +44,7 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     AJOUTS_COMMUNS = [  # blocs de la base commune approuvés après la 5.319 (sans compat-orion.js)
         ['vrm-regles-achat.js', 'vinted-infos.js'],
     ]
-    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b}
+    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'}
     assert membres_attendus == noms, f'Membres ajoutés ou retirés : {sorted(membres_attendus ^ noms)}'
     version = json.loads(nouveau.read('manifest.json'))['version']
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']
@@ -51,6 +54,20 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     m_ancien = json.loads(ancien.read('manifest.json')); m_nouveau = json.loads(nouveau.read('manifest.json'))
     m_ancien.pop('version'); m_nouveau.pop('version')
     commun = json.loads((ext/'manifest.json').read_text('utf8'))
+    # 5.347 : `vrm-mots.js` en tête des blocs qui le portent dans la base commune (et seulement eux).
+    MOTS = 'vrm-mots.js'
+    sans_mots = lambda js: [x for x in js if x != MOTS]
+    avec_mots = sorted(json.dumps(sans_mots(c['js'])) for c in commun['content_scripts'] if MOTS in c['js'])
+    assert all(c['js'][0] == MOTS for c in commun['content_scripts'] if MOTS in c['js']), f'{MOTS} doit ouvrir chaque bloc commun qui le porte'
+    orion_mots = []
+    for c in m_nouveau['content_scripts']:
+        if MOTS in c['js']:
+            assert c['js'][:2] == ['compat-orion.js', MOTS], f'{MOTS} doit suivre compat-orion.js : {c["js"]}'
+            orion_mots.append(json.dumps(sans_mots(c['js'])[1:]))
+            c['js'] = sans_mots(c['js'])
+    assert sorted(orion_mots) == avec_mots, f'{MOTS} : blocs Orion {sorted(orion_mots)} ≠ blocs communs {avec_mots}'
+    for c in commun['content_scripts']:
+        c['js'] = sans_mots(c['js'])
     # Hôtes que la base commune a RETIRÉS depuis la référence (jamais ajoutés).
     hotes_communs = set(commun.get('host_permissions', [])) | {h for c in commun['content_scripts'] for h in c['matches']}
     retires = {h for h in m_ancien['permissions'] if h.startswith('https://') and h not in hotes_communs}

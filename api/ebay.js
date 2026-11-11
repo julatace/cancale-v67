@@ -30,6 +30,7 @@ import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
+import { MAIN_MOTS, poserMotsRequete, motsCourants as MV } from './_lib/mots-vendeur.js';
 import { creerRechercheEbay } from './_lib/ebay-recherche.js';
 import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
 import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
@@ -828,7 +829,7 @@ function avecSku(it) {
   const propre = { ...it, scheduleTime: '', uuid: '', regleOffre: null };
   if (!brut) return { item: { ...propre, sku: '' } };
   const sku = skuDe(brut);
-  if (!sku) return { err: 'Numéro de paire illisible : rien n\'a été envoyé à eBay.' };
+  if (!sku) return { err: `Numéro ${MV().deNom} illisible : rien n'a été envoyé à eBay.` };
   return { item: { ...propre, sku } };
 }
 // ── LE PRIX ET LE PORT, LUS STRICTEMENT (revue « argent » du 19 octobre) ────
@@ -890,7 +891,7 @@ async function comptesAVerifier(ctx, tokenCourant) {
   const cloison = await baseCloisonnee();
   if (!cloison) return { ok: true, liste: [{ compte: ctx.compte, token: tokenCourant }] };
   const reg = await lireComptes(ctx.owner);
-  if (reg === undefined) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire la liste de tes comptes eBay pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.' } } };
+  if (reg === undefined) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: `Je n'ai pas pu relire la liste de tes comptes eBay pour vérifier que ${MV().ce} n'y est pas déjà — rien n'a été envoyé.` } } };
   const liste = [];
   for (const c of comptesActifs(reg)) {
     const memeQueCourant = c.suffixe === (ctx.compte.suffixe || '');
@@ -898,11 +899,11 @@ async function comptesAVerifier(ctx, tokenCourant) {
     // Le principal sous-entendu n'est un compte que s'il est relié.
     if (c.implicite) {
       const has = await hasRefresh(ctx.owner, '');
-      if (has === null) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: PAS_SU_LISTE } } };
+      if (has === null) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: PAS_SU_LISTE() } } };
       if (!has) continue;
     }
     const at = await accessToken(ctx.owner, c.suffixe);
-    if (!at.ok) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', compte: c.pseudo || '', error: `Je n'ai pas pu relire ton compte eBay ${nomCompte(c) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé. Reconnecte-le, ou déconnecte-le s'il n'est plus à toi.` } } };
+    if (!at.ok) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', compte: c.pseudo || '', error: `Je n'ai pas pu relire ton compte eBay ${nomCompte(c) || 'principal'} pour vérifier que ${MV().ce} n'y est pas déjà — rien n'a été envoyé. Reconnecte-le, ou déconnecte-le s'il n'est plus à toi.` } } };
     liste.push({ compte: c, token: at.token });
   }
   return { ok: true, liste };
@@ -918,12 +919,12 @@ async function dejaChezEbay(ctx, tokenCourant, sku, verbe, mk) {
     // Chaque compte relu sur SON marché (eBay.co.uk, .com…) : `compte` vient du
     // registre, il porte son site.
     const L = await avecMarche(marcheDuCompte(compte) || MARCHE_DEFAUT, () => listeVendeur(token));
-    if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: plusieurs ? `Je n'ai pas pu relire tes annonces du compte eBay ${nomCompte(compte) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` : PAS_SU_LISTE } };
-    if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: `Tu as plus de 1 000 annonces sur eBay${ou} : je n'ai pas pu toutes les relire pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` } };
+    if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: plusieurs ? `Je n'ai pas pu relire tes annonces du compte eBay ${nomCompte(compte) || 'principal'} pour vérifier que ${MV().ce} n'y est pas déjà — rien n'a été envoyé.` : PAS_SU_LISTE() } };
+    if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: `Tu as plus de 1 000 annonces sur eBay${ou} : je n'ai pas pu toutes les relire pour vérifier que ${MV().ce} n'y est pas déjà — rien n'a été envoyé.` } };
     const prog = L.programmees.find(meme);
-    if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), debut: prog.depuis || null, error: `La paire ${sku} est déjà programmée sur eBay${ou}${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
+    if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), debut: prog.depuis || null, error: `${MV().Le} ${sku} est déjà programmé${MV().e} sur eBay${ou}${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
     const act = L.actives.find(meme);
-    if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), error: `La paire ${sku} est déjà en vente sur eBay${ou} — rien n'a été ${verbe}.` } };
+    if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), error: `${MV().Le} ${sku} est déjà en vente sur eBay${ou} — rien n'a été ${verbe}.` } };
   }
   return null;
 }
@@ -1070,7 +1071,7 @@ async function handleVerify(b, ctx) {
 // refus) · ajout AVEC l'UUID. La réponse d'eBay (ItemID, StartTime, EndTime)
 // est LA vérité qu'on rend — jamais l'heure qu'on a demandée.
 const UUID_EBAY = /^[0-9A-F]{32}$/;
-const PAS_SU_LISTE = 'Je n\'ai pas pu relire tes annonces eBay pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.';
+const PAS_SU_LISTE = () => `Je n'ai pas pu relire tes annonces eBay pour vérifier que ${MV().ce} n'y est pas déjà — rien n'a été envoyé.`;
 async function handleProgrammer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la programmation : rien n\'a été envoyé à eBay.' } };
   const it00 = b.item || {};
@@ -1081,7 +1082,7 @@ async function handleProgrammer(b, ctx) {
   if (pp.err) return { status: 400, body: { ok: false, reason: pp.reason, error: pp.err } };
   const it0 = pp.item;
   const s = avecSku(it0);
-  if (s.err || !s.item.sku) return { status: 400, body: { ok: false, reason: 'numero', error: 'Pour programmer, la paire doit avoir son N° : sans lui, VRM ne saurait pas la retrouver si elle se vend ailleurs avant l\'heure.' } };
+  if (s.err || !s.item.sku) return { status: 400, body: { ok: false, reason: 'numero', error: `Pour programmer, ${MV().le} doit avoir son N° : sans lui, VRM ne saurait pas ${MV().la} retrouver si ${MV().elle} se vend ailleurs avant l'heure.` } };
   const ro = regleDeItem(it0);
   if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
   let quand = '';
@@ -1352,7 +1353,7 @@ async function handleSku(b, ctx) {
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const sku = skuDe(b.numero);
-  if (!sku) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible (125, ou B125) : rien n\'a été envoyé à eBay.' } };
+  if (!sku) return { status: 400, body: { ok: false, reason: 'numero', error: `Numéro ${MV().deNom} illisible (125, ou B125) : rien n'a été envoyé à eBay.` } };
   // (relecture du 11 octobre) Une annonce qui portait « VRM-12 » à la remise à
   // zéro désigne l'ANCIENNE paire B12 tant qu'elle porte ce SKU. La relier à la
   // NOUVELLE 12 réécrirait le MÊME texte : rien ne permettrait plus de les
@@ -1362,7 +1363,7 @@ async function handleSku(b, ctx) {
     if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
     const voulu = numDeSku(sku);
     if (num.mk && /^\d+$/.test(voulu) && numeroExterne(voulu, itemId, 'ebayAnnonces', null, num.mk) !== voulu) {
-      return { status: 409, body: { ok: false, reason: 'numero-ambigu', error: `Cette annonce eBay portait déjà « ${sku} » à la remise à zéro de tes numéros : elle désigne l'ANCIENNE paire. Pour la nouvelle ${voulu}, termine cette annonce et republie la paire — rien n'a été envoyé à eBay.` } };
+      return { status: 409, body: { ok: false, reason: 'numero-ambigu', error: `Cette annonce eBay portait déjà « ${sku} » à la remise à zéro de tes numéros : elle désigne l'${MV().ancienne}. Pour ${MV().nouvelle} ${voulu}, termine cette annonce et republie ${MV().le} — rien n'a été envoyé à eBay.` } };
     } }
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
@@ -1490,7 +1491,7 @@ async function handleRetirer(b, ctx) {
   let marqueur = null;
   let venduMs = NaN;
   if (auto) {
-    if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
+    if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: `Retrait automatique : ${MV().le} n'est pas identifié${MV().e} par son SKU (VRM-n°) — rien n'a été envoyé à eBay.` } };
     // (31 octobre) La date de la vente Vinted, que l'app a PROUVÉE (sa liste de
     // ventes relue) : la route revérifie elle-même, sur ce qu'eBay dit de
     // l'annonce, qu'elle a été mise en ligne AVANT cette vente (l'app ne juge
@@ -1513,7 +1514,7 @@ async function handleRetirer(b, ctx) {
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   if (auto) {
     const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
-    if (g.status === 0 || !g.ok) return { status: 503, body: { ok: false, reason: 'sku-pas-su', error: 'eBay n\'a pas dit quelle paire porte cette annonce — rien n\'a été retiré.' } };
+    if (g.status === 0 || !g.ok) return { status: 503, body: { ok: false, reason: 'sku-pas-su', error: `eBay n'a pas dit ${MV().quelle} porte cette annonce — rien n'a été retiré.` } };
     const skuEbay = lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'SKU');
     const lu = numeroExterne(numDeSku(skuEbay), itemId, 'ebayAnnonces', null, marqueur);
     if (!lu || lu !== numDeSku(skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
@@ -1522,7 +1523,7 @@ async function handleRetirer(b, ctx) {
     // et republiée). Date de mise en ligne illisible ⇒ « pas su » ⇒ rien.
     const debutMs = Date.parse(lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'StartTime') || '');
     if (!Number.isFinite(debutMs)) return { status: 503, body: { ok: false, reason: 'debut-pas-su', error: 'eBay n\'a pas dit quand l\'annonce a été mise en ligne — rien n\'a été retiré.' } };
-    if (!(debutMs < venduMs)) return { status: 409, body: { ok: false, reason: 'ebay-apres-vente', error: 'L\'annonce eBay a été mise en ligne APRÈS la vente Vinted : ce n\'est pas la paire vendue — rien n\'a été retiré.' } };
+    if (!(debutMs < venduMs)) return { status: 409, body: { ok: false, reason: 'ebay-apres-vente', error: `L'annonce eBay a été mise en ligne APRÈS la vente Vinted : ce n'est pas ${MV().le} vendu${MV().e} — rien n'a été retiré.` } };
   }
   const r = await tradingCall(at.token, 'EndFixedPriceItem', `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`);
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };
@@ -1956,7 +1957,7 @@ async function handleRelance(b, ctx, seulementVerifier) {
   const itemId = String(b.itemId || '');
   if (!ID_ANNONCE_EBAY.test(itemId)) return { status: 400, body: { ok: false, reason: 'invalide', error: 'Annonce inconnue — rien n\'a été envoyé à eBay.' } };
   const voulu = cleNum(b.numero);
-  if (!voulu || !NUM_OK.test(voulu)) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible — rien n\'a été envoyé à eBay.' } };
+  if (!voulu || !NUM_OK.test(voulu)) return { status: 400, body: { ok: false, reason: 'numero', error: `Numéro ${MV().deNom} illisible — rien n'a été envoyé à eBay.` } };
   if (prixLu(b.prixVu) == null) return { status: 400, body: { ok: false, reason: 'prix', error: PRIX_ILLISIBLE } };
   const num = await numerotationVendeur(ctx.owner);
   if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
@@ -2050,6 +2051,8 @@ async function handleApp(req, res) {
   // su » ne coupe pas (couper un vendeur qui paie sur un hoquet lui ferait
   // rater une vente) ; ses DONNÉES, elles, sont tenues par la base.
   if ((await accesVendeur(owner)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', error: "Ton abonnement VRM n'est plus actif." }); return; }
+  // (11 nov., lot vocabulaire-article) « paire » / « article » dans les erreurs rendues à l'app.
+  poserMotsRequete(await lireReglageVendeur(MAIN_MOTS, owner), owner);
   const b = req.body || {};
   const action = String(b.action || '');
   if (!keysReady()) { res.status(503).json({ ok: false, reason: 'no-key', error: 'eBay indisponible : EBAY_APP_ID / EBAY_CERT_ID ne sont pas configurés sur Vercel.' }); return; }
