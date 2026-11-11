@@ -421,4 +421,11 @@ export default {
   "registres.obl.achats.reglement": "Metodo di pagamento (contanti a parte)",
   "registres.obl.achats.piece": "Riferimento del giustificativo",
   "registres.obl.achats.totaux": "Riepilogato per anno",
+  // ── achat · payé en (11 nov., lot livre-registre)
+  "achat.paiement.titre": "Pagato con (facoltativo)",
+  "achat.paiement.especes": "Contanti",
+  "achat.paiement.carte": "Carta",
+  "achat.paiement.virement": "Bonifico",
+  "achat.paiement.cheque": "Assegno",
+  "achat.paiement.autre": "Altro",
 };

@@ -421,4 +421,11 @@ export default {
   "registres.obl.achats.reglement": "Forma de pago (efectivo aparte)",
   "registres.obl.achats.piece": "Referencia del justificante",
   "registres.obl.achats.totaux": "Resumido por año",
+  // ── achat · payé en (11 nov., lot livre-registre)
+  "achat.paiement.titre": "Pagado con (opcional)",
+  "achat.paiement.especes": "Efectivo",
+  "achat.paiement.carte": "Tarjeta",
+  "achat.paiement.virement": "Transferencia",
+  "achat.paiement.cheque": "Cheque",
+  "achat.paiement.autre": "Otro",
 };

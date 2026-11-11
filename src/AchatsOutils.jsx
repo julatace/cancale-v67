@@ -9,6 +9,8 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { etatRepartition, partsEgales } from './achatsSourcing.js';
 import { etatSaisieGros, baseRepartition, eurosC, texteDepense, texteMoyen, texteBeneficeFournisseur, texteCouverture, texteRelies } from './fournisseurs.js';
+import ChoixPaiement from './composants/ChoixPaiement.jsx';   // (11 nov., lot livre-registre) « Payé en »
+import { modePaiementLu } from './modePaiement.js';
 import './styles-annonces-outils.css';
 import './styles-achats-outils.css';
 
@@ -101,7 +103,7 @@ function FormFournisseur({ depart, onEnregistrer, onAnnuler }) {
 }
 
 function FormAchatGros({ depart, onEnregistrer, onAnnuler }) {
-  const [c, setC] = React.useState(() => ({ date: (depart && depart.date) || jourLocal(), paires: depart ? String(depart.paires) : '', total: depart ? enSaisie(depart.total) : '', frais: depart && depart.frais ? enSaisie(depart.frais) : '' }));
+  const [c, setC] = React.useState(() => ({ date: (depart && depart.date) || jourLocal(), paires: depart ? String(depart.paires) : '', total: depart ? enSaisie(depart.total) : '', frais: depart && depart.frais ? enSaisie(depart.frais) : '', paiement: modePaiementLu(depart && depart.paiement) }));
   const [err, setErr] = React.useState('');
   const [envoi, setEnvoi] = React.useState(false);
   const champ = (k) => (v) => { setErr(''); setC((x) => ({ ...x, [k]: v })); };
@@ -112,6 +114,7 @@ function FormAchatGros({ depart, onEnregistrer, onAnnuler }) {
       <Champ label="Nombre de paires" inputMode="numeric" value={c.paires} onChange={champ('paires')} data={{ 'data-fo-champ': 'paires' }}/>
       <Champ label="Montant total (€)" inputMode="decimal" value={c.total} onChange={champ('total')} data={{ 'data-fo-champ': 'total' }}/>
       <Champ label="Frais, transport… (si tu veux, €)" inputMode="decimal" value={c.frais} onChange={champ('frais')} data={{ 'data-fo-champ': 'frais' }}/>
+      <ChoixPaiement value={c.paiement} onChange={champ('paiement')} />
       {err ? <p className="vrm-aso-reste" data-fo-erreur="">{err}</p> : null}
       <button type="button" className="vrm-ao-principal" data-fo-enregistrer="achat" disabled={envoi} onClick={envoyer}>Enregistrer</button>
       <button type="button" className="vrm-ao-second vrm-aso-annuler" data-fo-annuler="" onClick={onAnnuler}>Annuler</button>

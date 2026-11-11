@@ -426,4 +426,11 @@ export default {
   "registres.obl.achats.reglement": "Mode de paiement (espèces à part)",
   "registres.obl.achats.piece": "Référence de la pièce justificative",
   "registres.obl.achats.totaux": "Récapitulé par année",
+  // ── achat · payé en (11 nov., lot livre-registre)
+  "achat.paiement.titre": "Payé en (facultatif)",
+  "achat.paiement.especes": "Espèces",
+  "achat.paiement.carte": "Carte",
+  "achat.paiement.virement": "Virement",
+  "achat.paiement.cheque": "Chèque",
+  "achat.paiement.autre": "Autre",
 };

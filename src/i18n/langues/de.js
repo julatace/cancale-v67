@@ -421,4 +421,11 @@ export default {
   "registres.obl.achats.reglement": "Zahlungsart (bar getrennt)",
   "registres.obl.achats.piece": "Belegnummer",
   "registres.obl.achats.totaux": "Jährlich zusammengefasst",
+  // ── achat · payé en (11 nov., lot livre-registre)
+  "achat.paiement.titre": "Bezahlt mit (optional)",
+  "achat.paiement.especes": "Bar",
+  "achat.paiement.carte": "Karte",
+  "achat.paiement.virement": "Überweisung",
+  "achat.paiement.cheque": "Scheck",
+  "achat.paiement.autre": "Andere",
 };

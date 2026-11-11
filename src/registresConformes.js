@@ -37,6 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { libellePeriode, jourFr, eurosTexte, moisDePeriode } from './registres.js';
 import { cleFactureLigne } from './factureAchat.js';
+import { especesDe } from './modePaiement.js';
 
 // ── LES SOURCES OFFICIELLES ─────────────────────────────────────────────────
 // ⚠️ Le 11 nov. 2026, AUCUNE de ces pages n'a pu être ouverte depuis la session
@@ -184,7 +185,8 @@ export function completerAchats(A, { pseudos = null, recuDe = () => false, factu
     const fournisseurSource = vinted ? (ps && ps.fournisseur ? 'pseudo' : 'defaut') : (fournisseur ? 'saisi' : '');
     const titre = String(l.titre || '').trim();
     const nature = l.gros ? `Achat de marchandise · ${l.paires} paire${Number(l.paires) > 1 ? 's' : ''} en gros` : titre ? `Achat · ${titre}` : 'Achat de marchandise';
-    const reglement = vinted ? 'Paiement via Vinted' : '';
+    // Hors plateforme et en gros : ce qu'IL a choisi (« Payé en »), sinon vide et nommé — jamais deviné.
+    const reglement = vinted ? 'Paiement via Vinted' : String(l.reglement || '');
     const cf = cleFactureLigne(l);
     const fj = cf && facturesJointes ? facturesJointes[cf] : null;
     let piece = '', pieceType = '';
@@ -196,7 +198,7 @@ export function completerAchats(A, { pseudos = null, recuDe = () => false, factu
     if (!fournisseur) manques.push('fournisseur');
     if (!reglement) manques.push('reglement');
     if (!piece) manques.push('piece');
-    return { ...l, fournisseur, fournisseurSource, nature, reglement, especes: reglement ? 'Non' : '', piece, pieceType, manques };
+    return { ...l, fournisseur, fournisseurSource, nature, reglement, especes: vinted ? 'Non' : especesDe(l.paiement), piece, pieceType, manques };
   };
   const lignes = A.lignes.map(une);
   const horsPeriode = A.horsPeriode.map((l) => ({ ...une(l), manques: [...new Set(['date', ...une(l).manques])] }));
@@ -225,7 +227,7 @@ export function manquesNommes(R) {
     const sm = R.sansMontant; if (sm) out.push({ cle: 'montant', n: sm, texte: `${pl(sm, 'achat', 'achats')} sans prix`, geste: 'achats' });
     if (R.articleSeul) out.push({ cle: 'article-seul', n: R.articleSeul, texte: `${pl(R.articleSeul, 'achat', 'achats')} sans port ni frais lus`, geste: 'achats' });
     const fo = compte('fournisseur'); if (fo) out.push({ cle: 'fournisseur', n: fo, texte: `${pl(fo, 'achat', 'achats')} sans fournisseur`, geste: 'achats' });
-    const reg = compte('reglement'); if (reg) out.push({ cle: 'reglement', n: reg, texte: `${pl(reg, 'achat', 'achats')} sans mode de paiement`, geste: 'fichier' });
+    const reg = compte('reglement'); if (reg) out.push({ cle: 'reglement', n: reg, texte: `${pl(reg, 'achat', 'achats')} sans mode de paiement`, geste: 'achats' });
     const pc = compte('piece'); if (pc) out.push({ cle: 'piece', n: pc, texte: `${pl(pc, 'achat', 'achats')} sans pièce justificative`, geste: 'achats' });
     if (R.horsPeriode.length) out.push({ cle: 'sans-date', n: R.horsPeriode.length, texte: `${pl(R.horsPeriode.length, 'achat', 'achats')} sans date : dans aucun mois`, geste: 'achats' });
     if (R.pseudosLus === false) out.push({ cle: 'pseudos', n: 0, texte: 'Pseudos des vendeurs pas lus : « Particulier (Vinted) » partout', geste: '' });

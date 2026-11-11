@@ -47,6 +47,7 @@
 // « encaissé » (§5).
 // ─────────────────────────────────────────────────────────────────────────────
 import { montantPropose } from './prixAchatPropose.js';
+import { modePaiementLu, libellePaiement } from './modePaiement.js';
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 // (9 nov.) + le TRIMESTRE (« AAAA-T1 » … « AAAA-T4 ») pour « Exporter pour mon
@@ -213,7 +214,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const doublon = !!num && numsGros.has(cleNum(num));
     const l = { id: 'hors:' + hid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Hors plateforme',
       fournisseur: rat || String((typeof sourceHors === 'function' ? sourceHors(b.source) : b.source) || ''), montant: p == null ? null : p, source: p == null ? '' : 'saisi', saisi: p == null ? null : p,
-      raison: p == null ? 'prix pas saisi' : (doublon ? 'N° aussi dans un achat en gros : à vérifier' : ''), reglement: '', reference: '', num, compte: '', titre: String(b.title || ''),
+      raison: p == null ? 'prix pas saisi' : (doublon ? 'N° aussi dans un achat en gros : à vérifier' : ''), reglement: libellePaiement(b.paiement), paiement: modePaiementLu(b.paiement), reference: '', num, compte: '', titre: String(b.title || ''),
       paires: '', frais: null, rattache: !!rat, aVerifier: doublon };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); if (doublon) aVerifier += 1; }
@@ -227,7 +228,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const ts = /^\d{4}-\d{2}-\d{2}$/.test(String(a.date || '')) ? Date.parse(a.date + 'T12:00:00') : NaN;
     const reliees = (parGros.get(gid) || []).map((e) => String(e.numero == null ? '' : e.numero).trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, 'fr', { numeric: true }));
     const l = { id: 'gros:' + gid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Achat en gros', fournisseur: nom,
-      montant: (a.total + frais) / 100, source: 'saisi', saisi: (a.total + frais) / 100, raison: '', reglement: '', reference: '', num: reliees.join(' + '), compte: '',
+      montant: (a.total + frais) / 100, source: 'saisi', saisi: (a.total + frais) / 100, raison: '', reglement: libellePaiement(a.paiement), paiement: modePaiementLu(a.paiement), reference: '', num: reliees.join(' + '), compte: '',
       titre: `En gros · ${a.paires} paire${a.paires > 1 ? 's' : ''}${reliees.length ? ` · ${reliees.length} reliée${reliees.length > 1 ? 's' : ''}` : ''}`,
       paires: String(a.paires), frais: frais ? frais / 100 : null, gros: true };
     if (l.ts == null) { sansDate.push(l); continue; }

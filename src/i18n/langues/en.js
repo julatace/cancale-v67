@@ -421,4 +421,11 @@ export default {
   "registres.obl.achats.reglement": "Payment method (cash apart)",
   "registres.obl.achats.piece": "Supporting document reference",
   "registres.obl.achats.totaux": "Summarised per year",
+  // ── achat · payé en (11 nov., lot livre-registre)
+  "achat.paiement.titre": "Paid by (optional)",
+  "achat.paiement.especes": "Cash",
+  "achat.paiement.carte": "Card",
+  "achat.paiement.virement": "Transfer",
+  "achat.paiement.cheque": "Cheque",
+  "achat.paiement.autre": "Other",
 };

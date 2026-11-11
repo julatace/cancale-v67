@@ -61,6 +61,11 @@ const MUTATIONS = {
   'trimestres': ['src/registresConformes.js', "if (tri.size > 1 || /^\\d{4}(-T[1-4])?$/.test(R.periode)) for", "if (false) for"],
   // la carte lit les transactions entières
   'select-data': ['src/registresConformes.js', "export const SELECT_PSEUDOS = 'id,tx:data->payload->transaction->>id,", "export const SELECT_PSEUDOS = 'id,data,tx:data->payload->transaction->>id,"],
+  // (11 nov.) « Payé en » : un mode deviné, ignoré, ou des espèces mal dites
+  'paiement-devine': ['src/registresConformes.js', "const reglement = vinted ? 'Paiement via Vinted' : String(l.reglement || '');", "const reglement = vinted ? 'Paiement via Vinted' : String(l.reglement || 'Carte');"],
+  'paiement-ignore': ['src/registres.js', "reglement: libellePaiement(b.paiement), paiement: modePaiementLu(b.paiement),", "reglement: '', paiement: '',"],
+  'paiement-gros-ignore': ['src/fournisseurs.js', "frais: frais != null && frais > 0 ? frais : 0, paiement: modePaiementLu(a.paiement),", "frais: frais != null && frais > 0 ? frais : 0,"],
+  'especes-faux': ['src/modePaiement.js', "return m ? (m === 'especes' ? 'Oui' : 'Non') : '';", "return m ? 'Non' : '';"],
   // filtre « à compléter » inopérant
   'filtre': ['src/registresConformes.js', "&& (!aCompleter || (l.manques || []).some((m) => m !== 'article'))", ''],
 };
@@ -83,7 +88,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '
 
 // Une copie des modules (mutation appliquée dans la copie).
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'livre-registre-'));
-for (const f of ['src/registres.js', 'src/registresConformes.js', 'src/factureAchat.js', 'src/prixAchatPropose.js', 'src/xlsxSimple.js', 'src/exportDonnees.js']) {
+for (const f of ['src/registres.js', 'src/registresConformes.js', 'src/factureAchat.js', 'src/prixAchatPropose.js', 'src/xlsxSimple.js', 'src/exportDonnees.js', 'src/modePaiement.js', 'src/fournisseurs.js', 'src/achatsSourcing.js']) {
   let s = fs.readFileSync(path.join(R0, f), 'utf8');
   if (MUT && MUTATIONS[MUT] && MUTATIONS[MUT][0] === f) {
     if (!s.includes(MUTATIONS[MUT][1])) { console.log('❌ mutation impossible : motif absent — ' + MUTATIONS[MUT][1].slice(0, 90)); process.exit(2); }
@@ -150,8 +155,12 @@ try { fs.symlinkSync(NM, path.join(dir, 'node_modules')); } catch (_) {}
     { transaction_id: 71002, title: 'Achat inventé', price: { amount: '25', currency_code: 'EUR' }, status: 'Transaction finalisée', date: '2026-11-03T10:00:00Z', _uid: '111', compte: 'compte_a' },
     { transaction_id: 71003, title: 'Achat inventé', price: { amount: '33', currency_code: 'USD' }, status: 'Transaction finalisée', date: '2026-08-03T10:00:00Z', _uid: '111', compte: 'compte_a' },
   ];
-  const hors = [{ id: 'h1', title: 'Hors inventé', price: '', date: '2026-11-04' }, { id: 'h2', title: 'Hors inventé bis', price: '15', date: '2026-11-05' }];
-  const regA = Rg.registreDesAchats({ achats, hors, periode: '2026', montantHors: (b) => (b.price ? Number(b.price) : null), sourceHors: () => 'Brocante inventée' });
+  const hors = [{ id: 'h1', title: 'Hors inventé', price: '', date: '2026-11-04' }, { id: 'h2', title: 'Hors inventé bis', price: '15', date: '2026-11-05' },
+    { id: 'h3', title: 'Hors payé en espèces', price: '30', date: '2026-11-06', paiement: 'especes' }, { id: 'h4', title: 'Hors au mode inconnu', price: '12', date: '2026-11-06', paiement: 'bitcoin' }];
+  // Un achat en gros payé par virement, passé par la VRAIE règle du registre des fournisseurs.
+  const Fo = await imp('src/fournisseurs.js');
+  const gros = Fo.lireRegistre({ personnes: { p1: { nom: 'Grossiste inventé' } }, achats: { g1: { fournisseur: 'p1', date: '2026-11-07', paires: 3, total: 9000, frais: 0, paiement: 'virement' } } });
+  const regA = Rg.registreDesAchats({ achats, hors, periode: '2026', montantHors: (b) => (b.price ? Number(b.price) : null), sourceHors: () => 'Brocante inventée', gros });
   const ps2 = await C.lirePseudosTx(C.idsTxLignes(regA.lignes), { lireTout });
   const A = C.completerAchats(regA, { pseudos: ps2, recuDe: (tx) => tx === '71001', facturesJointes: { hors_h1: { type: 'image', nom: 'ticket.jpg' }, tx_71003: { type: 'pdf', nom: 'facture.pdf' } } });
   const LA = (id) => A.lignes.find((l) => l.id === id);
@@ -160,6 +169,14 @@ try { fs.symlinkSync(NM, path.join(dir, 'node_modules')); } catch (_) {}
   dit(LA('vinted:71001').pieceType === 'recu' && LA('vinted:71002').pieceType === 'reference', 'M4 · reçu relié par SON n° (même titre ⇒ pas de reçu prêté)', [LA('vinted:71001').piece, LA('vinted:71002').piece]);
   dit(LA('hors:h1').pieceType === 'ticket' && LA('vinted:71003').pieceType === 'facture', 'M4 · facture jointe : photo ⇒ ticket, PDF ⇒ facture', [LA('hors:h1').piece, LA('vinted:71003').piece]);
   dit(LA('hors:h2').piece === '' && LA('hors:h2').manques.includes('piece') && LA('hors:h2').reglement === '', 'M4 · hors plateforme sans pièce ni mode : vides et nommés (jamais inventés)', LA('hors:h2'));
+  console.log('── P « Payé en »');
+  dit(LA('hors:h3').reglement === 'Espèces' && LA('hors:h3').especes === 'Oui' && !LA('hors:h3').manques.includes('reglement'), 'P1 · hors payé en espèces : Règlement « Espèces », Espèces = Oui, manque plus nommé', LA('hors:h3'));
+  dit(LA('gros:g1').reglement === 'Virement' && LA('gros:g1').especes === 'Non' && !LA('gros:g1').manques.includes('reglement'), 'P2 · achat en gros par virement (lu par lireRegistre) : « Virement », Espèces = Non', LA('gros:g1'));
+  dit(LA('hors:h4').reglement === '' && LA('hors:h4').especes === '' && LA('hors:h4').manques.includes('reglement'), 'P3 · un mode inconnu n’est jamais pris : vide et nommé', LA('hors:h4'));
+  const g2 = Fo.avecAchatGros({ personnes: { p1: { nom: 'G' } }, achats: {} }, 'g2', { fournisseur: 'p1', date: '2026-11-08', paires: '2', total: '50', paiement: 'cheque' });
+  dit(g2.registre && g2.registre.achats.g2.paiement === 'cheque', 'P4 · l’achat en gros enregistré garde « Chèque »', g2.registre && g2.registre.achats.g2);
+  const Mp = await imp('src/modePaiement.js');
+  dit(Mp.especesDe('') === '' && Mp.especesDe('carte') === 'Non' && Mp.especesDe('especes') === 'Oui' && Mp.libellePaiement('x') === '', 'P5 · pas choisi ⇒ rien (« — »), jamais « Non » par défaut');
 
   console.log('── M5 à dater');
   const mois = C.parMois(R);
@@ -172,7 +189,7 @@ try { fs.symlinkSync(NM, path.join(dir, 'node_modules')); } catch (_) {}
   const mA = C.manquesNommes(A), mR = C.manquesNommes(R);
   const nM = (ms, k) => (ms.find((m) => m.cle === k) || {}).n || 0;
   dit(nM(mA, 'montant') === regA.sansMontant && regA.sansMontant === 2, 'M6 · « 2 achats sans prix » (hors sans prix + autre devise)', mA);
-  dit(nM(mA, 'reglement') === 2, 'M6 · « 2 achats sans mode de paiement » (hors plateforme)', mA);
+  dit(nM(mA, 'reglement') === 3, 'M6 · « 3 achats sans mode de paiement » (hors sans « Payé en » ou mode inconnu) ; les payés ne sont plus comptés', mA);
   dit(nM(mR, 'reglement') === 1 && nM(mR, 'piece') === 1 && nM(mR, 'a-dater') === 1 && nM(mR, 'date') === 1, 'M6 · recettes : règlement, pièce (importée), à dater, déclarée sans date', mR);
 
   console.log('── M7 totaux');

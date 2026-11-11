@@ -123,7 +123,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-registres-'));
   let M = null, V = null;
   try {
-    fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX);
+    fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX); fs.copyFileSync(path.join(R0, 'src', 'modePaiement.js'), path.join(dir, 'modePaiement.js'));   // (11 nov.) importé par registres.js
     fs.writeFileSync(path.join(dir, 'vestiaire-regle.mjs'), VC.replace(/from '\.\/([^']+)\.js'/g, (x, n) => `from '${path.join(R0, 'api', '_lib', n + '.js').replace(/\\/g, '/')}'`));
     if (MOD) { fs.writeFileSync(path.join(dir, 'registres.mjs'), MOD.replace("from './prixAchatPropose.js'", "from './prixAchatPropose.js'")); fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}'); fs.renameSync(path.join(dir, 'registres.mjs'), path.join(dir, 'registres.js')); M = await import('file://' + path.join(dir, 'registres.js')); }
     V = await import('file://' + path.join(dir, 'vestiaire-regle.mjs'));
