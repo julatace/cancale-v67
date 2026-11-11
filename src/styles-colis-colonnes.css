@@ -281,8 +281,11 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { paddin
    discrètes (texte gris, petit), l'heure de la dernière vérification ; le code « sûr » (deux voix
    concordantes) porte une coche ; deux codes différents ⇒ ambre, les deux valeurs dans le détail. */
 html body .vrm-rpf-ligne .vrm-rpf-sources { display: block !important; margin-top: 3px; white-space: normal !important; overflow: visible !important; font-size: 11px !important; line-height: 15px !important; color: var(--p-gris, #86868b) !important; font-weight: 400 !important; letter-spacing: 0; }
-html body .vrm-rpf-ligne .vrm-rpf-source + .vrm-rpf-source::before,
-html body .vrm-rpf-ligne .vrm-rpf-source + .vrm-rpf-verifie::before { content: "·"; margin: 0 4px; opacity: .7; }
+/* (11 nov., webkit-fiable) Le « · » est porté par la marque QUI PRÉCÈDE (::after) : à 390 px la
+   ligne se coupait avant lui et une ligne commençait par « · vérifié hier 14:38 » (nouveau-vendeur,
+   Chromium et WebKit). Il finit désormais la ligne d'avant, jamais n'en commence une. */
+html body .vrm-rpf-ligne .vrm-rpf-source:has(+ .vrm-rpf-source)::after,
+html body .vrm-rpf-ligne .vrm-rpf-source:has(+ .vrm-rpf-verifie)::after { content: "·"; margin: 0 4px; opacity: .7; }
 html body .vrm-rpf-ligne .vrm-rpf-source, html body .vrm-rpf-ligne .vrm-rpf-verifie { display: inline !important; white-space: nowrap; }
 html body .vrm-rpf-ligne .vrm-rpf-verifie { font-variant-numeric: tabular-nums; }
 html body .vrm-rpf-ligne .vrm-rpf-code .vrm-rpf-code-sur { margin-left: 4px; vertical-align: -1px; }

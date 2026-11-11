@@ -163,7 +163,7 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee', bienvenue = true 
 
 // Ce que la personne VOIT : les défauts mesurables d'un écran.
 const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
-  const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05; };
+  const vis = (e) => { if (!e || !e.getClientRects().length) return false; if (e.closest && e.closest('.vrm-sr-seul, .vrm-sr, .sr-only')) return false;   /* (11 nov.) le texte du lecteur d'écran ne se VOIT pas */ const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05; };
   const texte = document.body.innerText || '';
   const mauvais = [];
   for (const re of [/\bNaN\b/, /\bundefined\b/, /Invalid Date/i, /\[object Object\]/, /(^|[\s:(«])null([\s).,»]|$)/m, /\bInfinity\b/]) { const m = re.exec(texte); if (m) mauvais.push(texte.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, ' ')); }
