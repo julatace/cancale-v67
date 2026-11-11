@@ -1838,7 +1838,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
-      { id:'historique', type:'panneau', ic:'archive', lib:'Mon historique Vinted', desc:'Tes anciennes ventes et achats, récupérés une fois.', data:{ 'data-reglage-historique':'' }, el:<HistoriqueVinted comptes={comptes||[]} variante="reglages"/> },
+      { id:'historique', type:'panneau', ic:'box', lib:'Mon historique Vinted', desc:'Tes anciennes ventes et achats, récupérés une fois.', data:{ 'data-reglage-historique':'' }, el:<HistoriqueVinted comptes={comptes||[]} variante="reglages"/> },
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       { id:'vacances', type:'panneau', ic:'sun', lib:'Mode vacances', desc:'Mettre tes comptes en pause pendant ton absence, puis rouvrir.', data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
