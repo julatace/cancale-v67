@@ -2,6 +2,9 @@
    LIGNE GLISSABLE (11 nov. 2026) — src/LigneGlissable.jsx
    Le tiroir vit DANS la ligne, à `left: 100%` : il glisse avec elle. Le parent
    le coupe (`overflow-x: clip`, aucun défilement horizontal de la page).
+   Les actions sont des cases arrondies (rayon des cases, 14), à 8 px de la
+   ligne et 6 px l'une de l'autre : elles se lisent pareil qu'une liste soit à
+   fleur de carte (Ventes) ou en retrait (À retirer, Qui dorment).
    La principale est au bord droit, bleue (l'action principale, §7 : le bleu
    rare) ; la seconde, neutre. Au seuil long, la seconde s'efface et la
    principale prend toute la place révélée (comme Mail).
@@ -14,29 +17,24 @@
 .vrm-lg-tiroir {
   position: absolute; top: 0; bottom: 0; left: 100%;
   width: max(calc(var(--lg-n, 1) * 76px), var(--lg-x, 0px));
-  display: flex; align-items: stretch; box-sizing: border-box; padding-left: var(--lg-gap, 0px);
+  display: flex; align-items: stretch; gap: 6px; box-sizing: border-box; padding: 6px 0 6px 8px;
   pointer-events: auto;
 }
 .vrm-lg-action {
-  flex: 0 0 76px; min-width: 0; min-height: 44px; margin: 0; border: 0; border-radius: 0; padding: 0 6px;
+  flex: 0 0 68px; min-width: 0; min-height: 44px; max-height: 120px; align-self: center; height: 100%; margin: 0; border: 0; border-radius: var(--d-r-case, 14px); padding: 0 3px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   font: 600 13px/1.15 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: -.08px;
   text-align: center; text-decoration: none; cursor: pointer; overflow: hidden; white-space: nowrap;
   background: var(--d-remplir-fort, #e5e5ea); color: var(--d-encre, #1d1d1f);
   transition: flex-basis 220ms cubic-bezier(.25, 1, .5, 1), opacity 160ms ease;
 }
-.vrm-lg-action[data-lg-principale] { flex: 1 0 76px; background: var(--d-accent, #0071e3); color: #fff; }
+.vrm-lg-action[data-lg-principale] { flex: 1 0 68px; background: var(--d-accent, #0071e3); color: #fff; }
 .vrm-lg-icone { display: inline-flex; line-height: 0; }
 .vrm-lg-lib { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .vrm-lg-action:focus-visible { outline: 2px solid var(--d-encre, #1d1d1f); outline-offset: -4px; }
 /* Au seuil long : la principale s'étire seule, son libellé se cale près du doigt (le bord gauche du tiroir). */
 [data-lg][data-lg-pret] .vrm-lg-action:not([data-lg-principale]) { flex-basis: 0; padding: 0; opacity: 0; }
 [data-lg][data-lg-pret] .vrm-lg-action[data-lg-principale] { align-items: flex-start; padding-left: 22px; }
-/* Une CARTE (Achats) plutôt qu'une rangée : les actions sont des cases arrondies, à 8 px de la carte. */
-.vrm-pickup-card[data-lg] { --lg-gap: 8px; }
-.vrm-pickup-card[data-lg] > .vrm-lg-tiroir { gap: 6px; }
-.vrm-pickup-card[data-lg] .vrm-lg-action { border-radius: 12px; flex-basis: 64px; }
-.vrm-pickup-card[data-lg] .vrm-lg-action[data-lg-principale] { flex-basis: 64px; }
 
 /* Le bouton « … » (au clavier et au lecteur d'écran) : 44 px, discret. */
 .vrm-lg-menu {
