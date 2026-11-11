@@ -163,5 +163,6 @@ html body .vrm-recap .vrm-recap-modifier[open] { display: flex; flex-direction: 
 .vrm-recap-lot-sans { font-size: 12px; font-weight: 600; color: var(--recap-warn); padding: 4px 6px; border-radius: 8px; background: var(--recap-soft); flex-shrink: 0; }
 .vrm-recap-lot-relier { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .vrm-recap-lot-relier input { width: 84px; min-height: 44px; font: inherit; font-size: 15px; padding: 0 10px; border: 1px solid var(--recap-line); border-radius: 10px; background: var(--vrm-surface, #fff); color: var(--recap-ink); }
-.vrm-fu-lot { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.vrm-fu-lot { display: inline-flex; align-items: center; gap: 4px; flex-wrap: nowrap; flex-shrink: 0; }
 .vrm-fu-lot-mot { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #636366); white-space: nowrap; }
+.vrm-fu-lot-manque { color: var(--vrm-warn, #B25000); }
