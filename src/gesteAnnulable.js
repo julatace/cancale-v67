@@ -32,6 +32,12 @@
 export const DUREE_PILULE = 5000;          // ms : le temps d'« Annuler »
 export const DUREE_ECHEC = 8000;           // ms : « Pas enregistré — Réessayer » reste plus longtemps
 export const DUREE_ANNULE = 1800;          // ms : « Annulé »
+// (11 nov., lot DJ4 — Julien : « le bouton Annuler reste constamment sur l'app ») Une pause
+// (survol, focus, onglet caché) ne dure JAMAIS plus que ça : au-delà, le temps reprend. Mesuré :
+// le focus du bouton « Annuler » survivait à sa disparition (aucun `blur` quand l'élément
+// focalisé quitte la page) ⇒ pause jamais levée ⇒ « Annulé » puis la pilule du geste SUIVANT
+// restaient à l'écran pour toujours. La pilule relit aussi son focus réel (PiluleAnnuler.jsx).
+export const PAUSE_MAX = 60000;            // ms
 
 // ── La nature d'un échec de synchronisation ─────────────────────────────────
 // `statut` : 'error' | 'refus' (l'état de `_emitSync`) · `raison` : son texte.
@@ -145,13 +151,13 @@ export async function ecrireCas({ lire, ecrire, patch, essais = 4 }) {
 // États d'un geste : 'envoi' · 'enregistre' · 'garde' (pas su : sur l'appareil)
 // · 'echec' (écran revenu en arrière) · 'annulation' · 'annule' ·
 // 'echec-annulation' (l'inverse n'a pas pris : l'écran revient au geste).
-export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter = (t) => clearTimeout(t), dureePilule = DUREE_PILULE, dureeEchec = DUREE_ECHEC, dureeAnnule = DUREE_ANNULE, delaiConfirmation = 12000 } = {}) {
+export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter = (t) => clearTimeout(t), dureePilule = DUREE_PILULE, dureeEchec = DUREE_ECHEC, dureeAnnule = DUREE_ANNULE, delaiConfirmation = 12000, pauseMax = PAUSE_MAX } = {}) {
   let suivant = 0;
   const gestes = new Map();
   const queues = new Map();          // k ⇒ promesse de fin de la dernière écriture de k
   const abonnes = new Set();
   let visible = null;                // id du geste dont la pilule est montrée
-  let timer = null, pause = false, resteMs = 0, depuis = 0;
+  let timer = null, pause = false, resteMs = 0, depuis = 0, garde = null;
   const horloge = () => Date.now();
 
   const instantane = () => {
@@ -161,10 +167,14 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
   };
   const emettre = () => { const s = instantane(); for (const f of abonnes) { try { f(s); } catch (_) {} } };
   const dureeDe = (g) => (g.etat === 'annule' ? dureeAnnule : (g.etat === 'echec' || g.etat === 'echec-annulation') ? dureeEchec : dureePilule);
+  // (11 nov., lot DJ4) Seule une pilule qui porte un geste (« Annuler », « Réessayer ») se met en
+  // pause sous le doigt ou la souris : « Annulation… » et « Annulé » n'ont rien à toucher, elles
+  // partent toujours (mesuré au banc stock-juste : une pause posée au clic d'« Annuler » les figeait).
+  const pausable = () => { const g = visible != null ? gestes.get(visible) : null; return !!g && ['envoi', 'enregistre', 'garde', 'echec', 'echec-annulation'].includes(g.etat); };
   const armer = (ms) => {
     if (timer) { arreter(timer); timer = null; }
     resteMs = ms; depuis = horloge();
-    if (pause || visible == null) return;
+    if ((pause && pausable()) || visible == null) return;
     timer = minuterie(() => { timer = null; fermer(visible); }, ms);
   };
   const montrer = (g) => { gestes.set(g.id, g); visible = g.id; armer(dureeDe(g)); emettre(); };
@@ -267,10 +277,15 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
     fermer,
     // Survol, focus clavier, onglet caché : le temps d'« Annuler » s'arrête.
     suspendre(oui) {
-      if (oui === pause) return;
+      if (!!oui === pause) return;
       pause = !!oui;
-      if (pause) { if (timer) { arreter(timer); timer = null; resteMs = Math.max(0, resteMs - (horloge() - depuis)); } }
-      else if (visible != null) armer(Math.max(1200, resteMs));
+      if (garde) { arreter(garde); garde = null; }
+      if (pause) {
+        if (timer && pausable()) { arreter(timer); timer = null; resteMs = Math.max(0, resteMs - (horloge() - depuis)); }
+        // Jamais une pause sans fin (voir PAUSE_MAX) : le temps reprend tout seul.
+        garde = minuterie(() => { garde = null; if (!pause) return; pause = false; if (visible != null) armer(Math.max(1200, resteMs)); }, pauseMax);
+      }
+      else if (visible != null && !timer) armer(Math.max(1200, resteMs));
     },
     abonner(f) { abonnes.add(f); try { f(instantane()); } catch (_) {} return () => abonnes.delete(f); },
     etat: instantane,
