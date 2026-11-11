@@ -163,6 +163,11 @@ export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, 
     if (j < n.length - 1) setCle(n[j + 1].cle);
   });
   const retour = () => { if (idx > 0) setCle(etapes[idx - 1].cle); };
+  // (11 nov., lot DJ2) Julien : « les gens doivent gagner du temps ». Un choix UNIQUE
+  // (Simple / Complet) : un toucher choisit ET passe à la suite (2 gestes → 1).
+  const avancer = React.useRef(false);
+  const poserEtSuivre = (patch) => { avancer.current = true; poser(patch); };
+  React.useEffect(() => { if (avancer.current) { avancer.current = false; suivant(); } }, [choix]); // eslint-disable-line react-hooks/exhaustive-deps
   const finir = (etat) => avec(async () => {
     if (seule) {   // la question seule : « Plus tard » est retenu (rien d'autre), jamais `vrm_configuration`
       if (onPlusTardSeule && !(await onPlusTardSeule())) { setErreur('Ce choix n’a pas pu être enregistré. Réessaie.'); return; }
@@ -181,7 +186,7 @@ export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, 
   });
 
   const rep = choixRepondu(etape.cle, choix, lus);
-  const corps = corpsEtape(etape.cle, { choix, poser, lus, initial, aller: setCle, contexte, entreprise });
+  const corps = corpsEtape(etape.cle, { choix, poser, poserEtSuivre, lus, initial, aller: setCle, contexte, entreprise });
   const n = etapes.length;
   return createPortal(
     <div className="vrm-cfg" data-configuration={etape.cle} data-configuration-etape={idx + 1} data-configuration-sur={n} data-configuration-seule={seule || undefined}>
@@ -223,7 +228,7 @@ function choixRepondu(cle, c, lus) {
   return true;
 }
 
-function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) {
+function corpsEtape(cle, { choix: c, poser, poserEtSuivre = poser, lus, aller, contexte, entreprise }) {
   if (cle === 'vends') {
     const cats = Array.isArray(c.vends) ? c.vends : [];
     const basculer = (v) => { const n = cats.includes(v) ? cats.filter((x) => x !== v) : [...cats, v]; poser({ vends: n.length ? n : null }); };
@@ -318,7 +323,7 @@ function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) 
     const reco = affichageRecommande(contexte);
     return (<>
       <div className="vrm-cfg-affichage" role="radiogroup" aria-label="Affichage">
-        {CHOIX_AFFICHAGE.map((x) => <CarteAffichage key={x.v} x={x} choisi={c.affichage === x.v} reco={reco === x.v} onClick={() => poser({ affichage: x.v })} />)}
+        {CHOIX_AFFICHAGE.map((x) => <CarteAffichage key={x.v} x={x} choisi={c.affichage === x.v} reco={reco === x.v} onClick={() => poserEtSuivre({ affichage: x.v })} />)}
       </div>
       <p className="vrm-cfg-note" data-configuration-reco={reco || ''}>Rien n’est supprimé. Tu pourras changer dans {CHEMIN_REGLAGE_AFFICHAGE}.</p>
     </>);

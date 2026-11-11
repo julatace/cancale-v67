@@ -30,6 +30,15 @@ l'étape « Simple ou complet ? » n'est pas claire.
 5. **« Quel VRM te ressemble ? »** : deux grandes cartes (Simple / Complet), pour qui,
    3 puces à icône, aperçu, « Tu pourras changer dans Paramètres → Affichage ».
 
+## Gestes avant / après (« les gens doivent gagner du temps »)
+| parcours | avant | après |
+|---|---|---|
+| « Quel VRM te ressemble ? » : choisir Simple ou Complet | 2 (carte + « Continuer ») | **1** (la carte choisit ET passe à la suite) |
+| Recherche eBay (achat) d'un vendeur hors Sneakers | 6 champs, dont « Pointure » inutile | **5** champs (« Pointure » seulement pour Sneakers) |
+| « Tu vends quoi ? » (compte déjà installé) | — (n'existait pas) | 1 tuile + « Continuer » = 2, UNE fois, seule (pas toute la configuration) |
+Le choix multiple (« Tu vends quoi ? », plusieurs tuiles possibles) garde « Continuer » :
+avancer au 1er toucher empêcherait d'en cocher deux.
+
 ## Tranché (Julien : « tranche le reste toi-même »)
 - « Pointure » eBay (veille d'achat) : masquée hors Sneakers (la règle attend 2 chiffres ;
   la taille s'écrit dans les mots), pas renommée.
@@ -49,6 +58,7 @@ l'étape « Simple ou complet ? » n'est pas claire.
 - `audit-vendeur-generaliste --prouve` : **20/20 mutations attrapées** ; rejoué sur le code
   d'avant la reprise (58b559ad, `git archive`) : **3 rouges** (S3 exemples de baskets, S4
   basket des états vides, S5 « Comment marche le Stock »).
+- Banc `configuration-depart` (390 et 1512 px, clair) : 118 OK, « un toucher sur Simple passe seul à l’étape suivante ». Mutation (carte sans avance) ⇒ banc `vendeur-generaliste` V2 ROUGE.
 - Banc `vendeur-generaliste` (390 et 1512 px, clair) : tout vert — 9 écrans sans mot de
   chaussure NI exemple/dessin de basket, explication du Stock avec étiquette (contrôle
   positif, pas vide). Captures regardées (Tu vends quoi ?, Quel VRM te ressemble ?, note

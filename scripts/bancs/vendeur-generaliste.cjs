@@ -213,8 +213,8 @@ async function scenario(nav, nom, W, theme) {
       dit(/Tu pourras changer dans Paramètres/.test(a.texte) && !/Simple ou complet/.test(a.titre) && !/à tout moment/.test(a.texte), `${T} « Tu pourras changer dans Paramètres »`, a.texte.slice(-200));
       dit(a.hauteur.every((h) => h >= 120), `${T} des cartes GRANDES (≥ 120 px)`, a.hauteur.join());
       await capture(o.pg, pref + '-affichage');
-      await o.pg.click('[data-configuration-choix="affichage:simple"]');
-      await o.pg.click('[data-configuration-suivant]');
+      await o.pg.click('[data-configuration-choix="affichage:simple"]');   // un toucher : choisi ET suite
+      dit(await attendre(o.pg, async () => (await etape(o.pg)) === 'notifs', 6000), `${T} un toucher sur « Simple » passe à la suite (1 geste au lieu de 2)`);
       const ok = await attendre(o.pg, async () => ((ligneMain(base).vrm_affichage || {}).choix === 'simple'));
       dit(ok, `${T} « Simple » écrit vrm_affichage`, JSON.stringify(ligneMain(base).vrm_affichage));
     }
