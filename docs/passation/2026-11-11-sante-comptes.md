@@ -88,3 +88,31 @@ note inventée ni de score opaque. **Aucune modification de l'extension.**
   transaction le dit ; dater les avis si Vinted les date un jour.
 - Brancher `vrm_avis_bas` (lot avis-negatif) une fois fusionné, pour un « avis bas » daté par
   l'arrivée (le serveur sait quand il l'a vu) ; la règle a sa place (`indicAvisBas`).
+
+## ÉTAT À LA REPRISE (arrêt demandé par Julien, 11 nov.)
+
+- **Fait et poussé** : règle `src/santeComptes.js`, écran `src/SanteComptes.jsx` + CSS, publication
+  `vrm_sante_envois` dans `App.jsx` (effet « vitesse d'envoi »), Paramètres → Mes comptes, carte
+  Statistiques, carte Ma journée `sante-comptes` (+ catalogue `journeePerso.js`), textes 5 langues,
+  Quoi de neuf, audit, banc, ce récit.
+- **Prouvé** : build vert ; `audit-sante-comptes` 39 verts, `--prouve` 6/6 ; banc `sante-comptes` vert
+  (390/1512, clair/sombre, captures regardées) ; audits voisins verts (traduction, quoi-de-neuf,
+  journee-perso, icones, notes-recues, annulations-compte, fonctions-api).
+- **Pas fini** :
+  1. La passe de TOUS les audits n'a pas abouti (interrompue). Lancée dans le dépôt, elle donnait des
+     KO (annuler-commandes, benefice, centre-aide, chrome-en-dur, coherence, colis-envoi,
+     config-facture, coque-parametres, coque-tablette, donnees-ecrans, export-donnees,
+     frein-relais-vinted, label-latest, lancement, lbc-plus-vue-pause…) — `benefice`, `coherence` et
+     `chrome-en-dur` sont rouges aussi sur `main` (vérifié pour les deux derniers ; le texte « Chrome »
+     signalé n'est pas de ce lot). **À faire** : comparer à `main` dans deux copies (git worktree) :
+     `lancer-audits.cjs` sur la branche et sur `origin/main`, puis `comm -23` des KO. ⚠️ Lancés dans le
+     dépôt, les audits régénèrent `public/*.zip` : `git checkout -- public/` après.
+  2. Vrai `git merge origin/main` (pas fait).
+  3. Ligne §9 de CLAUDE.md (pas faite) : CLAUDE.md pèse 58 606 o, la limite de la mission est
+     59 000 ⇒ déplacer tel quel le plus ancien détail de §9 dans `docs/passation/` avant d'ajouter :
+     « 11 nov. · Santé des comptes (lot sante-comptes) : En forme / À surveiller par compte Vinted, 7
+     points lisibles, seuils écrits (`src/santeComptes.js`), Paramètres · Statistiques · Ma journée si un
+     compte glisse ; aucune notification. `2026-11-11-sante-comptes.md`. Geste : aucun. »
+- **Pièges** : la publication des envois ne se fait que là où `Comptabilite` est monté (Ma journée ;
+  pas l'onglet Ventes « Tous ») ; les bancs doivent poser `locale: 'fr-FR'` (sinon textes anglais) ;
+  le point ambre de Ma journée est le `::before` de `.is-urgent` (le texte reste à l'encre, voulu).
