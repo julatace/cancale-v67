@@ -9,7 +9,7 @@
 //  H. hauteur des cartes de vente (ordinateur ≤ 96 px, téléphone ≤ 190 px) ;
 //  S. « à saisir » n'est écrit sur AUCUNE ligne : une seule invitation en tête (`data-ventes-achats`, « Prix d'achat N/M connus · Compléter ») ;
 //  T. au téléphone, toute cible tactile de la ligne ≥ 44 px ; rien ne déborde ;
-//  E. en-tête de groupe transporteur (s'il existe) : logo ≤ 22 px, hauteur ≤ 40 px ;
+//  E. le transporteur d'une ligne : un logo de 20 px à gauche de l'action (plus de pastille ni de bandeau) ;
 //  A. Achats : aucun bandeau gris pleine largeur avec un logo centré ; ≤ 1 bouton bleu plein ;
 //  Z. aucune erreur de page, l'écran n'est pas tombé sur le garde-fou.
 // Données INVENTÉES (dépôt public), formes réelles (celles de `selection-bordereaux` et `suivi-commandes`).
@@ -212,9 +212,9 @@ const MESURE = () => {
               const saisir = rows.filter((r) => /à saisir/i.test(r.querySelector('.vrm-ledger-sale-toggle') ? [...r.children].filter((c) => !c.matches('.vrm-ledger-drawer-host')).map((c) => c.innerText).join(' ') : r.innerText)).length;
               const invite = document.querySelector('[data-ventes-achats]'); const nInvites = document.querySelectorAll('[data-ventes-achats]').length;
               const petites = tel ? rows.flatMap((r) => [...r.querySelectorAll('button, a[href]')].filter(vis).filter((e) => !e.closest('.vrm-ledger-drawer-host')).map((e) => ({ t: (e.getAttribute('aria-label') || e.innerText || '').trim().slice(0, 24), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h < 44)) : [];
-              const groupes = [...document.querySelectorAll('[data-groupe-transporteur]')].filter(vis).map((g) => { const im = g.querySelector('svg, img'); return { h: Math.round(g.getBoundingClientRect().height), logo: im ? Math.round(im.getBoundingClientRect().height) : 0 }; });
+              const logos = rows.map((r) => { const p = r.querySelector('.vrm-rangee-bord > .vrm-puce-transp:not([data-lu="0"])'); const b = r.querySelector('[data-fu-imprimer]'); if (!p || !b || !vis(p)) return null; const l = p.querySelector('[data-transporteur-logo], svg, img'); const lr = (l || p).getBoundingClientRect(); return { h: Math.round(lr.height), gauche: lr.right <= b.getBoundingClientRect().left + 1 }; }).filter(Boolean);
               const benefs = rows.map((r) => { const b = r.querySelector('.vrm-ledger-sale-benef'); return b ? { etat: b.getAttribute('data-benef-etat'), t: (b.textContent || '').trim() } : null; });
-              return { benefs, nInvites, haut, imp, frises, saisir, invite: invite ? { n: invite.getAttribute('data-ventes-achats'), t: invite.innerText.trim().slice(0, 80) } : null, petites, groupes };
+              return { benefs, nInvites, haut, imp, frises, saisir, invite: invite ? { n: invite.getAttribute('data-ventes-achats'), t: invite.innerText.trim().slice(0, 80) } : null, petites, logos };
             }, tel);
             const maxH = tel ? 190 : 96;
             dit(R.haut.length >= 6 && Math.max(...R.haut) <= maxH, `${k} Ventes : H chaque carte de vente ≤ ${maxH} px`, R.haut.join(','));
@@ -231,7 +231,7 @@ const MESURE = () => {
             dit(R.saisir === 0, `${k} Ventes : S « à saisir » n'est écrit sur aucune ligne`, String(R.saisir));
             dit(R.invite && /^\d+\/\d+$/.test(R.invite.n) && R.nInvites === 1, `${k} Ventes : S une seule invitation groupée en tête (prix d'achat à saisir)`, JSON.stringify(R.invite));
             if (tel) dit(R.petites.length === 0, `${k} Ventes : T toutes les cibles de la ligne ≥ 44 px`, JSON.stringify(R.petites.slice(0, 6)));
-            dit(R.groupes.every((g) => g.h <= 40 && g.logo <= 22), `${k} Ventes : E en-tête de groupe transporteur sobre (logo ≤ 22 px, ≤ 40 px)`, JSON.stringify(R.groupes));
+            dit(R.logos.length >= 2 && R.logos.every((l) => l.h > 0 && l.h <= 22 && l.gauche), `${k} Ventes : E le transporteur de la ligne = un logo ≤ 22 px, à gauche de « Imprimer »`, JSON.stringify(R.logos));
             await sain(pg, `${k} Ventes`);
             // Envoyés : la ligne de suivi (lot suivi-commandes) reste là.
             await pg.click('[data-colis-onglet-choix="envoyes"]').catch(() => {});

@@ -40441,7 +40441,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     {id:'messages-vinted',libelle:'Conversations Vinted',onglet:'cat_msg',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(convs.items)?convs.items.map(c=>({id:c.id,compte:String(c._acc?.vinted_user_id||''),titre:c.description||c.title||c.opposite_user?.login,valeurs:[c.last_message,c.updated_at,c.unread]})):null,charge:convs.loading,erreur:convs.error,echecs:(convs.ko||[]).map(a=>String(a.vinted_user_id)),partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_inbox`])}
   ];
   return (
-    <div style={{padding:'16px 14px 40px'}}>
+    // (11 nov., lot ventes-achats-visuel) En SECTION de Ventes / Achats (`colisDans`), le bas de 40 px de l'ancien
+    // écran Colis laissait un trou avant la suite de l'écran : 12 px suffisent ; les outils de « À retirer »
+    // (montés à part, `retraitsOutils`) n'ajoutent plus que ce qu'ils montrent.
+    <div style={{padding: colisDans ? '16px 14px 12px' : retraitsOutils ? '0 14px' : '16px 14px 40px'}} data-colis-dans={colisDans || undefined}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {emballage && (()=>{
         // (1er nov.) Le mode emballage : un portail plein écran (§7, FermeAuRetour).
