@@ -40283,7 +40283,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const nOk = Object.values(res).filter((r) => r.statut === 'retire').length, nKo = Object.values(res).length - nOk;
       toast(nKo ? `${nOk} retirée${nOk > 1 ? 's' : ''} · ${nKo} pas faite${nKo > 1 ? 's' : ''} — le détail est sur la carte` : `${nOk} annonce${nOk > 1 ? 's' : ''} retirée${nOk > 1 ? 's' : ''} des autres sites`, nKo ? 'err' : 'ok');
       if (nOk && onCycle) onCycle();
-      // La relecture : la même vérification, refaite APRÈS les retraits.
+      // La relecture : eBay se relit chez eBay (la synchro, une lecture — sur SON clic), compte par
+      // compte retiré ; puis la même vérification, refaite APRÈS les retraits. Leboncoin se relit à sa
+      // prochaine lecture complète de « Mes annonces » (l'extension) : d'ici là, « pas encore relu ».
+      for (const ref of [...new Set(Object.values(res).filter((r) => r.statut === 'retire' && r.plateforme === 'eBay').map((r) => r.compte || 'principal'))]) {
+        try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'relire', ...corpsCompteEbay(ref) }) }); } catch (_) { /* pas relu : dit */ }
+      }
       try { await vendusAilleurs.lire(); } catch (_) { /* « pas encore relu » reste dit */ }
     } finally { setRetraitAilleursEnVol(false); }
   };

@@ -91,7 +91,7 @@ export function planRetirerAilleurs(v, o = {}) {
       else if (o.ebayOk !== false) { voie = 'auto'; moyen = 'ebay'; raison = 'annonce terminée chez eBay (sans retour : il faudrait la republier)'; }
       else { voie = 'main'; raison = 'eBay pas joignable depuis ici — à faire sur eBay'; }
     } else { voie = 'main'; raison = 'à faire sur le site'; }
-    art.sites.push({ cle: cleSite(a), plateforme: a.plateforme, id: String(a.id), compte: a.compte, compteNom: a.compteNom || '', lien: a.lien || null, onglet: a.onglet || null, voie, moyen, raison, titre: a.titre || '' });
+    art.sites.push({ cle: cleSite(a), plateforme: a.plateforme, id: String(a.id), compte: a.compte, compteNom: a.compteNom && a.compteNom !== 'principal' ? a.compteNom : '', lien: a.lien || null, onglet: a.onglet || null, voie, moyen, raison, titre: a.titre || '' });
   }
   const liste = [...articles.values()].map((art) => ({ ...art, sites: art.sites.sort((x, y) => ORDRE.indexOf(x.plateforme) - ORDRE.indexOf(y.plateforme)) }))
     .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
@@ -165,7 +165,7 @@ export async function executerRetraits(plan, voies, continuer = () => true, main
       const f = s.moyen && voies && typeof voies[s.moyen] === 'function' ? voies[s.moyen] : null;
       let r;
       try { r = f ? await f(s, art) : { statut: 'refuse', texte: 'pas de voie pour ce site' }; } catch (_) { r = { statut: 'incertain', texte: 'la demande a été coupée — regarde sur le site avant de recommencer' }; }
-      out[s.cle] = { ...r, at: maintenant() };
+      out[s.cle] = { ...r, plateforme: s.plateforme, compte: s.compte, at: maintenant() };
       if (r.statut !== 'retire') stop.add(s.plateforme);
     }
   }
@@ -173,16 +173,19 @@ export async function executerRetraits(plan, voies, continuer = () => true, main
 }
 
 // ── « RETIRÉ ✓ RELU » ───────────────────────────────────────────────────────
-// Après les retraits, la vérification se RELIT (les mêmes lectures). Un retrait
-// accepté dont l'annonce n'apparaît plus dans une lecture faite APRÈS est « relu » ;
-// sinon il reste « accepté, pas encore relu » (la lecture n'est pas encore passée
-// sur le site) — jamais « relu » sur une lecture d'avant, ni sur une lecture ratée.
+// « Relu » veut dire : une lecture COMPLÈTE de CE site et de CE compte, faite APRÈS le
+// retrait (`v.completes` : liste eBay complète, lecture complète de « Mes annonces »
+// Leboncoin, dressing Vinted — la même preuve que `conserverRetraitsNonConfirmes`), ne
+// la montre plus. La note que VRM écrit lui-même après un « oui » du site n'est PAS une
+// relecture. Sinon : « retiré · pas encore relu » (la prochaine lecture du site le
+// dira) — jamais « relu » sur une lecture d'avant, ni sur une lecture ratée.
 export function avecRelecture(resultats, v) {
   const out = {};
   const encore = new Set([...arr(v && v.lignes), ...arr(v && v.peutEtre)].map(cleSite));
-  const relueApres = (r) => !!(v && !v.erreur && Number.isFinite(v.at) && Number.isFinite(r.at) && v.at > r.at);
+  const lueOk = !!(v && !v.erreur && Number.isFinite(v.at));
+  const completeApres = (r) => arr(v && v.completes).some((c) => c && c.plateforme === r.plateforme && String(c.compte) === String(r.compte) && Number.isFinite(c.at) && Number.isFinite(r.at) && c.at > r.at);
   for (const [k, r] of Object.entries(resultats || {})) {
-    out[k] = r.statut === 'retire' && relueApres(r) && !encore.has(k) ? { ...r, relu: true } : { ...r, relu: false };
+    out[k] = r.statut === 'retire' && lueOk && v.at > r.at && completeApres(r) && !encore.has(k) ? { ...r, relu: true } : { ...r, relu: false };
   }
   return out;
 }

@@ -68,6 +68,8 @@ export function useVerifVendusAilleurs({ owner, ownerActuel, charger }) {
           // (11 nov., anti double vente) les annonces à l'état pas confirmé, même
           // identité : « peut-être encore en ligne · vérifier » (src/retirerAilleurs.js).
           peutEtre: lignesPeutEtre(data, lignes),
+          // Les lectures COMPLÈTES par site et compte (la preuve de « retiré ✓ relu »).
+          completes: data.completes || [],
           confirmes: precedents.filter(
             (a) => !lignes.some((x) => cle(x) === cle(a)),
           ).length,

@@ -35,8 +35,10 @@ const MUTATIONS = {
   'peutetre-tu': ['regle', 'const toutes = [...sures, ...douteuses];', 'const toutes = [...sures];'],
   'deux-annonces': ['regle', "else if (parNumSite.get(`${a.numero}|${a.plateforme}`) > 1) {", 'else if (false) {'],
   'aconfirmer-ignore': ['regle', 'if (a.aConfirmer) {', 'if (false) {'],
-  'relu-avant': ['regle', "r.statut === 'retire' && relueApres(r) && !encore.has(k)", "r.statut === 'retire' && !encore.has(k)"],
-  'relu-encore': ['regle', "r.statut === 'retire' && relueApres(r) && !encore.has(k)", "r.statut === 'retire' && relueApres(r)"],
+  'relu-avant': ['regle', "r.statut === 'retire' && lueOk && v.at > r.at && completeApres(r) && !encore.has(k)", "r.statut === 'retire' && lueOk && completeApres(r) && !encore.has(k)"],
+  'relu-encore': ['regle', "r.statut === 'retire' && lueOk && v.at > r.at && completeApres(r) && !encore.has(k)", "r.statut === 'retire' && lueOk && v.at > r.at && completeApres(r)"],
+  'relu-sans-site': ['regle', "r.statut === 'retire' && lueOk && v.at > r.at && completeApres(r) && !encore.has(k)", "r.statut === 'retire' && lueOk && v.at > r.at && !encore.has(k)"],
+  'relu-ratee': ['regle', "const lueOk = !!(v && !v.erreur && Number.isFinite(v.at));", "const lueOk = !!(v && Number.isFinite(v.at));"],
   'stop-ignore': ['regle', "if (r.statut !== 'retire') stop.add(s.plateforme);", ''],
   'main-execute': ['regle', "if (s.voie !== 'auto') continue;", "if (s.voie === 'verifier') continue;"],
   'continuer-ignore': ['regle', "if (!continuer()) {", 'if (false) {'],
@@ -200,15 +202,18 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
       dit(R.issueEbay(200, { ok: true }).statut === 'retire' && R.issueEbay(422, { ok: false, error: 'eBay a refusé' }).statut === 'refuse', 'G4 · eBay : ok / refus');
     });
     await essaie('H · relu', () => {
-      const res = { 'eBay:principal:1': { statut: 'retire', texte: 'ok', at: MAINT }, 'Leboncoin:x:2': { statut: 'retire', texte: 'ok', at: MAINT } };
-      const apres = R.avecRelecture(res, { lignes: [{ plateforme: 'Leboncoin', compte: 'x', id: '2' }], peutEtre: [], at: MAINT + 1000 });
-      dit(apres['eBay:principal:1'].relu === true, 'H1 · absente d’une lecture faite APRÈS : « retiré ✓ relu »');
+      const res = { 'eBay:principal:1': { statut: 'retire', texte: 'ok', plateforme: 'eBay', compte: 'principal', at: MAINT }, 'Leboncoin:x:2': { statut: 'retire', texte: 'ok', plateforme: 'Leboncoin', compte: 'x', at: MAINT } };
+      const completes = [{ plateforme: 'eBay', compte: 'principal', at: MAINT + 500 }, { plateforme: 'Leboncoin', compte: 'x', at: MAINT + 500 }];
+      const apres = R.avecRelecture(res, { lignes: [{ plateforme: 'Leboncoin', compte: 'x', id: '2' }], peutEtre: [], completes, at: MAINT + 1000 });
+      dit(apres['eBay:principal:1'].relu === true, 'H1 · absente d’une lecture COMPLÈTE du site faite APRÈS : « retiré ✓ relu »');
       dit(apres['Leboncoin:x:2'].relu === false, 'H2 · encore lue après : pas « relu »');
-      const avant = R.avecRelecture(res, { lignes: [], peutEtre: [], at: MAINT - 1000 });
-      dit(avant['eBay:principal:1'].relu === false, 'H3 · lecture d’AVANT le retrait : pas « relu »');
-      const ratee = R.avecRelecture(res, { lignes: [], peutEtre: [], erreur: 'x', at: MAINT + 1000 });
-      dit(ratee['eBay:principal:1'].relu === false, 'H4 · lecture ratée : pas « relu »');
-      dit(R.texteResultat({ statut: 'retire', relu: true, texte: 'eBay a terminé l’annonce' }).startsWith('retiré ✓ relu'), 'H5 · le texte « retiré ✓ relu »');
+      const avant = R.avecRelecture(res, { lignes: [], peutEtre: [], completes, at: MAINT - 1000 });
+      dit(avant['eBay:principal:1'].relu === false, 'H3 · vérification d’AVANT le retrait : pas « relu »');
+      const ratee = R.avecRelecture(res, { lignes: [], peutEtre: [], completes, erreur: 'x', at: MAINT + 1000 });
+      dit(ratee['eBay:principal:1'].relu === false, 'H4 · vérification ratée : pas « relu »');
+      const sansSite = R.avecRelecture(res, { lignes: [], peutEtre: [], completes: [{ plateforme: 'eBay', compte: 'principal', at: MAINT - 500 }, { plateforme: 'eBay', compte: 'autre', at: MAINT + 500 }], at: MAINT + 1000 });
+      dit(sansSite['eBay:principal:1'].relu === false && sansSite['Leboncoin:x:2'].relu === false, 'H6 · le site pas relu en entier depuis (sa lecture complète est d’avant, ou c’est un autre compte) : pas « relu » — la note de VRM n’est pas une relecture');
+      dit(R.texteResultat({ statut: 'retire', relu: true, texte: 'eBay a terminé l’annonce' }).startsWith('retiré ✓ relu') && /pas encore relu/.test(R.texteResultat({ statut: 'retire', relu: false, texte: 'x' })), 'H5 · les textes « retiré ✓ relu » / « pas encore relu »');
     });
   }
 
