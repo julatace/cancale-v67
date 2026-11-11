@@ -30,10 +30,13 @@ const lireOrig = fs.readFileSync;
 function fichiersApp(racine) {
   const R = racine || RACINE;
   const liste = [path.join(R, 'src', 'App.jsx')];
-  const dossier = path.join(R, 'src', 'ecrans');
-  let noms = [];
-  try { noms = fs.readdirSync(dossier).filter((f) => /\.jsx?$/.test(f)).sort(); } catch (_) {}
-  for (const f of noms) liste.push(path.join(dossier, f));
+  // (11 nov., découpe 2) src/coeur/ : les modules de scripts/decouper-app-2.cjs (mêmes balises).
+  for (const d of ['ecrans', 'coeur']) {
+    const dossier = path.join(R, 'src', d);
+    let noms = [];
+    try { noms = fs.readdirSync(dossier).filter((f) => /\.jsx?$/.test(f)).sort(); } catch (_) {}
+    for (const f of noms) liste.push(path.join(dossier, f));
+  }
   return liste;
 }
 
@@ -88,10 +91,15 @@ function sourceApp(racine) {
   const sansBalises = [];
   for (const f of fichiers.slice(1)) {
     const t = lireOrig.call(fs, f, 'utf8');
-    const rel = 'ecrans/' + path.basename(f);
+    const rel = path.basename(path.dirname(f)) + '/' + path.basename(f);
+    // (11 nov., découpe 2) Une VUE (branche du rendu d'un composant) : son texte d'origine est entre
+    // `/*⟦← App.jsx #vk⟧*/` et `/*⟦←/⟧*/` (dans l'enveloppe, en tête du module : jamais recollée).
+    const vues = [...t.matchAll(/\/\*⟦← App\.jsx #(v\d+)⟧\*\/([\s\S]*?)\/\*⟦←\/⟧\*\//g)];
     const parts = t.split(/\n\/\/ ⟦← App\.jsx #(\d+)⟧/);
-    if (parts.length < 3) { sansBalises.push(t); continue; }
+    if (parts.length < 3 && !vues.length) { sansBalises.push(t); continue; }
     const m = (morceaux[rel] = {});
+    for (const v of vues) m[v[1]] = v[2];
+    if (parts.length < 3) continue;
     for (let i = 1; i < parts.length; i += 2) m[parts[i]] = parts[i + 1];
     const der = parts[parts.length - 2];
     m[der] = m[der].replace(/\nexport \{[^}]*\};\n*$/, '');
@@ -99,12 +107,19 @@ function sourceApp(racine) {
   // Les racines paresseuses (`const Garage = aLaDemande(() => import('./ecrans/…'))`) : leur vraie
   // déclaration (la fonction) est recollée à sa place — la ligne paresseuse est retirée du texte.
   let out = app.replace(/^const \w+ = aLaDemande\(\(\) => import\('\.\/ecrans\/[^\n]*\n/gm, '');
+  // (11 nov.) Ce que scripts/decouper-app-2.cjs pose dans App.jsx (racines paresseuses, préchargements,
+  // import d'un module « pur », sa marque) : chaque ligne finit par « // ⟦découpe 2⟧ » ou EST la marque.
+  out = out.replace(/^[^\n]*\/\/ ⟦découpe 2⟧[^\n]*\n/gm, '');
   // Chaque balise `// ⟦→ ecrans/X.jsx #k⟧` reprend le morceau qui était là.
   // (Une balise peut voyager DANS un morceau parti plus tard vers un autre écran : on recommence
   // tant qu'une balise trouve son morceau.)
   for (let tour = 0, change = true; change && tour < 20; tour++) {
     change = false;
-    out = out.replace(/\n\/\/ ⟦→ (ecrans\/[^ \n]+) #(\d+)⟧/g, (b, rel, k) => {
+    out = out.replace(/\n\/\/ ⟦→ ((?:ecrans|coeur)\/[^ \n]+) #(\d+)⟧/g, (b, rel, k) => {
+      const m = morceaux[rel]; if (!m || m[k] == null) return b;
+      const t = m[k]; delete m[k]; change = true; return cheminsVusDeSrc(t);
+    });
+    out = out.replace(/\/\*⟦→ ((?:ecrans|coeur)\/[^ ]+) #(v\d+)⟧\*\/[\s\S]*?\/\*⟦→\/⟧\*\//g, (b, rel, k) => {
       const m = morceaux[rel]; if (!m || m[k] == null) return b;
       const t = m[k]; delete m[k]; change = true; return cheminsVusDeSrc(t);
     });

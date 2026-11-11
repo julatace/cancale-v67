@@ -1,0 +1,81 @@
+{
+  "_lisezmoi": "Plan de scripts/decouper-app-2.cjs : des NOMS de blocs, jamais des numéros de ligne (rejouable sur le main du jour). sorte « ecran » = chargé à la demande ; « pur » = importé par App.jsx, ne lit rien d'App. Récit : docs/passation/2026-11-11-decoupe-app.md.",
+  "modules": [
+    {
+      "fichier": "coeur/VueVentes.jsx",
+      "sorte": "ecran",
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "curSub==='ventes'",
+          "nom": "VueVentes"
+        }
+      ],
+      "precharger": true
+    },
+    {
+      "fichier": "coeur/VueAchats.jsx",
+      "sorte": "ecran",
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "curSub==='achats'",
+          "nom": "VueAchats"
+        }
+      ],
+      "precharger": true
+    },
+    {
+      "fichier": "coeur/VueAnnonces.jsx",
+      "sorte": "ecran",
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "curSub==='annonces'",
+          "nom": "VueAnnonces",
+          "laPlusGrande": true
+        }
+      ],
+      "precharger": true
+    },
+    {
+      "fichier": "coeur/VueMessages.jsx",
+      "sorte": "ecran",
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "curSub==='messages' && !filTous",
+          "nom": "VueMessages",
+          "laPlusGrande": true
+        }
+      ],
+      "precharger": true
+    },
+    {
+      "fichier": "coeur/Rapport.jsx",
+      "sorte": "ecran",
+      "vues": [
+        {
+          "composant": "Comptabilite",
+          "condition": "showReport",
+          "nom": "VueRapport"
+        }
+      ]
+    },
+    {
+      "fichier": "coeur/Equipe.jsx",
+      "sorte": "ecran",
+      "racines": [
+        "PorteEquipe",
+        "ColisEquipe"
+      ]
+    },
+    {
+      "fichier": "coeur/HorsLigne.jsx",
+      "sorte": "ecran",
+      "racines": [
+        "JourneeHorsLigne"
+      ]
+    }
+  ]
+}
