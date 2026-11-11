@@ -74,7 +74,7 @@ export const AIDE_ECRANS = {
   garage: { article: 'numeros', questions: [
     ['Comment retrouver une paire ?', 'Cherche son numéro : VRM te dit le meuble et la case.'],
     ['Un numéro peut-il changer ?', 'Presque jamais. Une annonce sans numéro en reçoit un, et un doublon se règle. Les nouveaux numéros à écrire là où tes articles sont rangés restent listés jusqu’à « C’est écrit ».'],
-    ['Pourquoi du rouge ?', 'Deux paires présentes sous le même numéro : c’est le seul risque d’envoyer la mauvaise chaussure. Vérifie les deux là où ils sont rangés.'],
+    ['Pourquoi du rouge ?', 'Deux paires présentes sous le même numéro : c’est le seul risque d’envoyer le mauvais article. Vérifie les deux là où ils sont rangés.'],
   ] },
   settings: { article: 'extension', questions: [
     ['Comment installer l’extension ?', 'Télécharge-la et dézippe-la. Dans chrome://extensions, allume « Mode développeur », puis « Charger l’extension non empaquetée » et choisis le dossier.'],

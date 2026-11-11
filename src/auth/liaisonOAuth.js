@@ -12,7 +12,10 @@ export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cl
   url.search=new URLSearchParams({provider,redirect_to:origine+'/?tab=settings&vue=compte',code_challenge:challenge,code_challenge_method:'s256',skip_http_redirect:'true'}).toString();
   const r=await fetcher(url.href,{headers:{apikey:cle,Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
   const j=await r.json().catch(()=>null);
-  if(!r.ok)return{ok:false,error:r.status===401?'Ta session a expiré. Reconnecte-toi avant de réessayer.':/already.*link|identity.*exists/i.test(j?.msg||j?.message||'')?'Ce compte est déjà relié à un autre compte VRM.':'La liaison n’est pas disponible pour le moment. Ton compte VRM reste inchangé.'};
+  // (11 nov., lot DJ6) « Manual linking » éteint chez Supabase : le DIRE (geste du propriétaire),
+  // jamais retomber sur une connexion qui créerait un compte neuf.
+  const t=String(j?.error_code||'')+' '+String(j?.msg||j?.message||'');
+  if(!r.ok)return{ok:false,error:r.status===401?'Ta session a expiré. Reconnecte-toi avant de réessayer.':/manual.?linking|manual.*link.*disabled/i.test(t)?'La liaison n’est pas encore activée sur VRM. Ton compte reste inchangé.':/already.*link|identity.*(exists|already)/i.test(t)?'Ce compte est déjà relié à un autre compte VRM.':'La liaison n’est pas disponible pour le moment. Ton compte VRM reste inchangé.'};
   const retour=new URL(j?.url||'');const hotes=provider==='google'?['accounts.google.com']:['discord.com','discordapp.com'];
   if(retour.protocol!=='https:'||retour.username||retour.password||!hotes.includes(retour.hostname))throw Error('retour');
   const contexte=JSON.stringify({owner,provider,verifier,at:maintenant});storage.setItem(key,contexte);try{stockageAppareil.setItem(key,contexte);}catch(_){}

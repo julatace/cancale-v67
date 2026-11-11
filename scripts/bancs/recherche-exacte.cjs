@@ -152,9 +152,9 @@ const etat = (pg) => pg.evaluate(() => {
 });
 const ouvrirLoupe = async (pg, tel, { attendre = true } = {}) => {
   // L'app d'abord DEMARRÉE : la loupe (ou la barre) est au-dessus de tout, plus l'écran de chargement.
-  const sel = tel ? 'button[aria-label="Rechercher une paire"]' : '[data-barre-recherche]';
+  const sel = tel ? 'button[data-recherche-loupe]' : '[data-barre-recherche]';
   for (let i = 0; i < 80; i++) { const ok = await pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); if (!r.width) return false; const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(t && (e === t || e.contains(t))); }, sel); if (ok) break; await pg.waitForTimeout(250); }
-  if (tel) await pg.locator('button[aria-label="Rechercher une paire"]').first().tap();
+  if (tel) await pg.locator('button[data-recherche-loupe]').first().tap();
   else { await pg.locator('body').click({ position: { x: 5, y: 400 } }).catch(() => {}); await pg.keyboard.press('ControlOrMeta+k'); }
   for (let i = 0; i < 60; i++) { const v = await pg.evaluate(() => { const p = document.querySelector('[data-recherche-panneau]'); return p ? p.getAttribute('data-recherche-pret') : null; }); if (v === '1' || (!attendre && v != null)) break; await pg.waitForTimeout(250); }
 };

@@ -270,12 +270,12 @@ async function configuration(nav, W, theme) {
   const o = await ouvrir(nav, { W, sombre, base, registre });
   await o.pg.waitForSelector('[data-configuration]', { timeout: 15000 }).catch(() => {});
   let e = await etat(o.pg);
-  dit(!!e && e.etape === 'vends' && /Qu’est-ce que tu vends/.test(e.titre), `${T} C1 la 1re question : « Qu’est-ce que tu vends ? »`, JSON.stringify(e && e.titre));
+  dit(!!e && e.etape === 'vends' && /Tu vends quoi/.test(e.titre), `${T} C1 la 1re question : « Tu vends quoi ? » (11 nov., lot DJ2)`, JSON.stringify(e && e.titre));
   if (!e) { dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ ')); await o.ctx.close(); return; }
   const tuiles = e.cartes.filter((c) => c.cle.startsWith('vends:'));
-  dit(tuiles.length === 18 && tuiles.every((c) => !c.coche && c.h >= 44), `${T} C1 18 tuiles (≥ 44 px), rien de coché d’avance`, JSON.stringify(tuiles.map((c) => c.cle)));
+  dit(tuiles.length === 19 && tuiles.every((c) => !c.coche && c.h >= 44), `${T} C1 19 tuiles (Lunettes depuis le 11 nov.) (≥ 44 px), rien de coché d’avance`, JSON.stringify(tuiles.map((c) => c.cle)));
   const icones = await o.pg.$$eval('.vrm-cfg-tuile svg.vrm-cfg-tuile-icone path', (p) => p.filter((x) => (x.getAttribute('d') || '').length > 10).length);
-  dit(icones === 18, `${T} C1 chaque tuile a son icône au trait (aucun emoji)`, String(icones));
+  dit(icones === 19, `${T} C1 chaque tuile a son icône au trait (aucun emoji)`, String(icones));
   await o.pg.click('[data-configuration-choix="vends:sneakers"]');
   e = await etat(o.pg);
   dit(e.mot === 'paire', `${T} C1 Sneakers seules ⇒ « paire »`, e.mot);
@@ -317,7 +317,7 @@ async function configuration(nav, W, theme) {
   dit(e && e.etape === 'numero' && /numéro de rangement/.test(e.sous) && /étagère/.test(e.sous) && !/dans quel carton/.test(e.texte), `${T} C3 « Où est ton numéro ? » : le numéro de rangement (carton, étagère, bac…)`, e && e.sous);
   await capture(o.pg, `cf-${W}-${theme}-C3a-numero`, true);
   e = await continuer(o.pg);
-  dit(e && e.etape === 'affichage' && !/Simple ou complet/.test(e.titre) && /Prix à baisser/.test(e.texte) && /Stock/.test(e.texte) && /Réglages → Affichage → Affichage/.test(e.texte), `${T} C3 affichage : un titre qui dit l’enjeu, ce que chaque choix cache, le chemin pour changer`, e && `${e.titre} | ${e.texte.slice(0, 300)}`);
+  dit(e && e.etape === 'affichage' && !/Simple ou complet/.test(e.titre) && /Prix à baisser/.test(e.texte) && /Stock/.test(e.texte) && /Paramètres → Affichage/.test(e.texte), `${T} C3 affichage : un titre qui dit l’enjeu, ce que chaque choix cache, le chemin pour changer`, e && `${e.titre} | ${e.texte.slice(0, 300)}`);
   const reco = await o.pg.$$eval('[data-configuration-recommande]', (b) => b.length);
   dit(reco <= 1, `${T} C3 au plus une carte « Recommandé pour toi »`, String(reco));
   await capture(o.pg, `cf-${W}-${theme}-C3b-affichage`, true);

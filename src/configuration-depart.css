@@ -106,6 +106,36 @@
 /* L'étape d'affichage : ce que chaque carte montre ou cache, et la recommandation. */
 .vrm-cfg-puces { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; line-height: 1.4; color: var(--cfg-encre); }
 .vrm-cfg-badge { align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--cfg-accent-texte); background: color-mix(in srgb, var(--cfg-accent) 12%, transparent); border-radius: 999px; padding: 2px 9px; margin-bottom: 2px; }
+/* (11 nov., lot DJ2) « Quel VRM te ressemble ? » : deux grandes cartes côte à côte (en
+   colonne au téléphone), un aperçu du menu en miniature, pour qui, trois puces à icône. */
+.vrm-cfg-affichage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 560px) { .vrm-cfg-affichage { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.vrm-cfg-aff {
+  appearance: none; box-sizing: border-box; position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; align-items: start;
+  width: 100%; min-height: 150px; padding: 16px 16px 16px 14px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--cfg-encre); background: var(--cfg-carte); border: 0; border-radius: 18px;
+  box-shadow: inset 0 0 0 1px var(--cfg-filet); transition: box-shadow .2s ease, transform .12s ease; -webkit-tap-highlight-color: transparent;
+}
+@media (min-width: 560px) { .vrm-cfg-aff { grid-template-columns: minmax(0, 1fr); justify-items: start; padding: 18px; } }
+.vrm-cfg-aff:active { transform: scale(.985); }
+.vrm-cfg-aff[data-choisi="1"] { box-shadow: inset 0 0 0 2px var(--cfg-accent); }
+.vrm-cfg-aff:focus-visible { outline: 2px solid var(--cfg-accent); outline-offset: 3px; }
+.vrm-cfg-aff .vrm-cfg-coche { position: absolute; top: 14px; right: 14px; }
+.vrm-cfg-aff[data-choisi="1"] .vrm-cfg-coche { background: var(--cfg-accent); box-shadow: none; }
+.vrm-cfg-aff-apercu { display: block; width: 64px; }
+.vrm-cfg-aff-ecran {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 5px; width: 56px; height: 92px; padding: 10px 8px;
+  border-radius: 12px; background: var(--cfg-fond); box-shadow: inset 0 0 0 1.5px var(--cfg-filet);
+}
+.vrm-cfg-aff-ecran > span { display: block; height: 4px; border-radius: 999px; background: var(--cfg-gris); opacity: .45; }
+.vrm-cfg-aff-ecran > span:nth-child(odd) { width: 80%; }
+.vrm-cfg-aff[data-choisi="1"] .vrm-cfg-aff-ecran > span:first-child { background: var(--cfg-accent); opacity: 1; }
+.vrm-cfg-aff-texte { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding-right: 26px; }
+.vrm-cfg-aff-texte b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.vrm-cfg-aff-pour { font-size: 15px; font-weight: 500; color: var(--cfg-gris); line-height: 1.3; }
+.vrm-cfg-aff-puces { list-style: none; padding: 0; margin: 8px 0 0; gap: 7px; }
+.vrm-cfg-aff-puces li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; }
+.vrm-cfg-aff-puces svg { width: 18px; height: 18px; margin-top: 1px; fill: none; stroke: var(--cfg-gris); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 /* Le SIRET à l'étape statut (la carte vient de recherche-entreprise.css). */
 .vrm-cfg-siret { margin-top: 22px; display: grid; gap: 10px; }
 .vrm-cfg-siret .vrm-cfg-question { margin: 0; }
@@ -151,6 +181,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .vrm-cfg-corps { animation: none; }
-  .vrm-cfg-carte, .vrm-cfg-tuile, .vrm-cfg-barre > span { transition: none; }
+  .vrm-cfg-carte, .vrm-cfg-tuile, .vrm-cfg-aff, .vrm-cfg-barre > span { transition: none; }
 }
 @media (prefers-contrast: more) { .vrm-cfg-carte { box-shadow: inset 0 0 0 1px var(--cfg-encre); } }
