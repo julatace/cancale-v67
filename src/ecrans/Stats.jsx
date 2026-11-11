@@ -240,19 +240,28 @@ const caVestiaireFinalise = (ventesVc) => {
   if (pasSur) return { ca: null, note: `${pasSur} vente${pasSur > 1 ? 's' : ''} finalisée${pasSur > 1 ? 's' : ''} au montant pas sûr` };
   return n ? { ca: Math.round(ca * 100) / 100, note: 'ventes finalisées (montant versé)' } : { ca: null, note: 'pas encore de vente finalisée' };
 };
-function caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes, ventesVc) {
+// (11 nov., parité) `excluAutre` : le prédicat des comptes écartés (Paramètres → Comptes liés,
+// et l'offre Solo) — le MÊME que `ventesFaites`/`ventesDeclarables`. Avant, cette carte
+// comptait encore les ventes d'un compte Leboncoin, eBay ou Vestiaire écarté de tous
+// les autres totaux.
+function caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes, ventesVc, excluAutre = null) {
+  const garde = (plateforme) => (v) => !(excluAutre && excluAutre(plateforme, v));
   const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
   // ⚠️ CA = VENTES FINALISÉES SEULEMENT (Julien, 1er oct.) : « le CA d'un mois est
   //    la somme des ventes FINALISÉES, pas celles en cours — une vente en cours
   //    peut partir en litige ». Côté Leboncoin on comptait toute vente non
   //    annulée (donc les « en attente d'envoi » aussi) : on restreint aux
   //    finalisées (argent reçu), par le MÊME prédicat que l'écran Ventes (§11).
-  const lbcOk = ((lbcVentes && lbcVentes.ventes) || []).filter(o => !lbcAnnulee(o) && lbcFinalisee(o));
+  const lbcOk = ((lbcVentes && lbcVentes.ventes) || []).filter(garde('leboncoin')).filter(o => !lbcAnnulee(o) && lbcFinalisee(o));
   const lbcPrix = (o) => { const e = o.price != null ? Number(o.price) / 100 : NaN; return Number.isFinite(e) ? e : null; };
   const lbcSansPrix = lbcOk.filter(o => lbcPrix(o) == null).length;
   const caLbc = (lbcOk.length && !lbcSansPrix) ? lbcOk.reduce((s,o)=> s + lbcPrix(o), 0) : null;
-  const vc = caVestiaireFinalise(ventesVc);
-  const caEbay = ebayCa != null ? ebayCa : null;
+  const vc = caVestiaireFinalise(Array.isArray(ventesVc) ? ventesVc.filter(garde('vestiaire')) : ventesVc);
+  // eBay : le total rangé par la coque (`caEbayPayees`) est refait sur les seules commandes
+  // des comptes gardés quand un compte est écarté (la même règle, sur moins de commandes).
+  const caEbay = (excluAutre && Array.isArray(ebayCommandes))
+    ? caEbayPayees(ebayCommandes.filter(garde('ebay')))
+    : (ebayCa != null ? ebayCa : null);
   return [
     { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' + (liveStats && liveStats.nMasque > 0 ? ` · sans ${liveStats.nMasque} masquée${liveStats.nMasque>1?'s':''}` : '') },
     { nom:'Leboncoin', ca:caLbc, note:lbcSansPrix?`${lbcSansPrix} vente${lbcSansPrix>1?'s':''} finalisée${lbcSansPrix>1?'s':''} au prix inconnu`:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
@@ -287,6 +296,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
   const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
+  // (11 nov., parité) Les comptes écartés sortent aussi de « Finalisé par plateforme ».
+  const excluAutreDash=useExcluAutre();
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -493,11 +504,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   //    dataviz), et l'identité portée par les libellés — pas par la couleur seule.
   // Anneau par plateforme — CONSOMME caParPlateforme (§11), ne recalcule rien.
   const platParts=useMemo(()=>{
-    const arr=caParPlateforme(liveStats,lbcVentes,ebayCa,ebayCommandes,ventesVc).filter(p=>p.ca!=null && p.ca>0)
+    const arr=caParPlateforme(liveStats,lbcVentes,ebayCa,ebayCommandes,ventesVc,excluAutreDash).filter(p=>p.ca!=null && p.ca>0)
       .map(p=>({nom:p.nom, court:nomAffichePlat(p.nom), ca:p.ca}));
     const total=arr.reduce((s,p)=>s+p.ca,0);
     return {arr,total};
-  },[liveStats,lbcVentes,ebayCa,ebayCommandes,ventesVc]);
+  },[liveStats,lbcVentes,ebayCa,ebayCommandes,ventesVc,excluAutreDash]);
 
   // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
   // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
@@ -787,7 +798,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {(()=>{
         // §11 : LE MÊME helper que l'onglet Collectif — un seul propriétaire du
         // « CA par plateforme », les deux écrans ne peuvent pas diverger.
-        const plateformes = caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes, ventesVc);
+        const plateformes = caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes, ventesVc, excluAutreDash);
         const caVinted = plateformes[0].ca, caLbc = plateformes[1].ca;
         const parCompte = (liveStats && liveStats.caParCompte) || null;
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.

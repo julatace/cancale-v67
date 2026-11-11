@@ -36144,6 +36144,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) { return null; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, numeros, buyByNum, ventesVc, excluAutre]);
+  // (11 nov., parité) Les ventes Leboncoin, eBay, Vestiaire reliées à leur paire, par leur id
+  // (le même que celui des lignes de `declarables`) : le rapport du mois et le registre
+  // annuel y lisent le prix d'achat et le N°. `autresBenefice` pas su ⇒ carte vide (rien inventé).
+  const autresParIdRapport = useMemo(() => new Map((autresBenefice || []).map((x) => [String(x.id), x])), [autresBenefice]);
   const totals = useMemo(() => {
     // ⚠️ LES TOTAUX SUIVENT LA PÉRIODE AFFICHÉE. Sans ça, filtrer sur « ce mois »
     // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
@@ -37962,6 +37966,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
         if (b!=null && !isNaN(b)) buy = b;
         num = (e && e.numero) || '';
+      } else if (l.plateforme !== 'Vinted') {
+        // (11 nov., parité) Leboncoin, eBay, Vestiaire : le prix d'achat et le N° de la paire
+        // reliée par IDENTITÉ (`autresBenefice`, même id `lbc:`/`ebay:`/`vestiaire:` que la
+        // ligne) — jamais par le titre. Pas relié ⇒ vide, comme une vente Vinted sans prix.
+        const a = autresParIdRapport.get(String(l.id));
+        if (a) { if (a.achat != null && Number.isFinite(Number(a.achat))) buy = Number(a.achat); num = a.num || ''; fee = Number(a.frais) || 0; }
       }
       if (l.masquee) { nMasq+=1; caMasq+=sell; }
       if (l.apres) { nApres+=1; caApres+=sell; }
@@ -37978,7 +37988,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], exclu: venteOffOf, excluAutre, versements: versements || {}, declare: declUrssaf }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], exclu: venteOffOf, excluAutre, versements: versements || {}, declare: declUrssaf }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
@@ -37987,7 +37997,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // arrivé du nuage après la lecture ne fait plus passer un compte en panne
     // pour un compte lu (revue du 6 octobre).
     const comptesEchec = nomsVentesKO;
-    const sourcesKO = [versements === null ? 'Vinted (dates de versement)' : null, comptesEchec.length ? `Vinted (${comptesEchec.join(', ')})` : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
+    const sourcesKO = [versements === null ? 'Vinted (dates de versement)' : null, comptesEchec.length ? `Vinted (${comptesEchec.join(', ')})` : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null, ventesVc === null ? 'Vestiaire' : null].filter(Boolean);
     // Registre des ventes : dans l'ordre du mois, comme le relevé d'un comptable.
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     // Registre d'achats du mois (hors annulés).
@@ -38022,7 +38032,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf, excluAutre]);
+  }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf, excluAutre, autresParIdRapport, ventesVc]);
 
   // ── « J'AI DÉCLARÉ CE MOIS » (6 octobre) ──────────────────────────────────
   // Il note, SUR SON CLIC, ce qu'il a déclaré à l'URSSAF pour un mois : l'app
@@ -38273,6 +38283,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         num = (e && e.numero) || ''; account = l.o._acc ? accName(l.o._acc) : '';
         const uV = String(l.o._acc?.vinted_user_id ?? ''); const qV = vintedParUid[uV] || (vintedParUid[uV] = { n: 0, cts: 0 });
         qV.n += 1; qV.cts += Math.round(sell * 100);
+      } else if (l.plateforme !== 'Vinted') {
+        // (11 nov., parité) Même identité que le rapport du mois (`autresParIdRapport`).
+        const a = autresParIdRapport.get(String(l.id));
+        if (a) { if (a.achat != null && Number.isFinite(Number(a.achat))) buy = Number(a.achat); num = a.num || ''; fee = Number(a.frais) || 0; }
       }
       if (l.masquee) { nMasq+=1; caMasq+=sell; }
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
@@ -38320,7 +38334,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       vintedParUid: declRapport.vinted === 'lu' ? vintedParUid : declRapport.vinted === 'passu' ? null : undefined,
       vintedADater: declRapport.vinted === 'lu' ? (declRapport.aDater || []).filter(l => l.plateforme === 'Vinted') : [] };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAnnual, sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
+  }, [showAnnual, sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, autresParIdRapport]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const [recusPasLus, setRecusPasLus] = useState(0); // comptes dont la lecture du reçu a échoué (pas su ≠ aucun)
   const openAnnual = async () => {
@@ -39507,7 +39521,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
              pas un problème, je reçois les articles après ; ils sont déjà
              dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
-          ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'save', lab:'Exporter en tableur', desc:'CSV, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+          ...(((sales.items&&sales.items.length>0) || ((declRapport && declRapport.lignes) || []).some((l) => l && l.plateforme !== 'Vinted'))?[{k:'csv', icon:'save', lab:'Exporter en tableur', desc:'CSV, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
           /* (30 oct.) La rétrospective est un geste RARE : elle quitte la page
              (un bouton pleine largeur sous l'analyse) pour ce menu. */
           ...((sales.items&&sales.items.some(o=>classifyOrderStatus(o.status)==='completed'))?[{k:'wrap', icon:'spark', lab:`Rétrospective ${new Date().getFullYear()}`, desc:'Ton année en quelques chiffres', on:()=>{ setToolsOpen(false); setWrapStep(0); setShowWrapped(true); }}]:[]),
@@ -39525,7 +39539,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   );
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
-    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Frais renseignés','Bénéfice avant charges générales','Statut','Boost','Commission','Port vendeur','Remboursement','Autres frais','Emballage','Frais confirmés']];
+    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Frais renseignés','Bénéfice avant charges générales','Statut','Boost','Commission','Port vendeur','Remboursement','Autres frais','Emballage','Frais confirmés','Plateforme']];
     (sales.items||[]).filter(o=>!isHidden(o)).forEach(o=>{
       const st = classifyOrderStatus(o.status);
       const e = effEntry(o); const num = e?.numero || '';
@@ -39540,8 +39554,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         fee>0?String(fee.toFixed(2)).replace('.',','):'',
         benef===''?'':String(benef).replace('.',','), st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours',
         ...['fees',...champsCharges.map(([k])=>k)].map(k=>centimes(e?.[k])==null?'':String(centimes(e[k])/100).replace('.',',')),bilan.complet?'oui':'non',
+        'Vinted',
       ]);
     });
+    // (11 nov., parité) LEBONCOIN, eBAY, VESTIAIRE : les ventes à l'argent reçu (`declRapport`, la
+    // règle du CA déclaré — finalisées, comptes écartés hors), datées comme elle (versement, sinon
+    // vente). Prix d'achat et N° : la paire reliée par IDENTITÉ (`autresParIdRapport`), sinon vide.
+    // Le montant est déjà net des frais de la plateforme (eBay, Vestiaire) : aucun frais ajouté.
+    // Une vente en cours ou au montant pas sûr n'est pas ici (elle n'est pas dans le CA) : dite en pied.
+    const virg = (n) => String(Number(n).toFixed(2)).replace('.', ',');
+    let nAutres = 0;
+    for (const l of ((declRapport && declRapport.lignes) || [])) {
+      if (!l || l.plateforme === 'Vinted') continue;
+      const a = autresParIdRapport.get(String(l.id));
+      const buy = a && a.achat != null && Number.isFinite(Number(a.achat)) ? Number(a.achat) : null;
+      const d = l.ts || (l.dateVente ? Date.parse(l.dateVente) : NaN);
+      rows.push([Number.isFinite(d) ? dateFr(new Date(d).toISOString()) : '', l.plateforme, (a && a.num) || '', l.titre || '', virg(l.eur), buy == null ? '' : virg(buy), '',
+        buy == null ? '' : virg(l.eur - buy), 'finalisée', '', '', '', '', '', '', buy == null ? 'non' : 'oui', l.plateforme]);
+      nAutres += 1;
+    }
+    const sourcesAutresKO = [lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null, ventesVc === null ? 'Vestiaire' : null].filter(Boolean);
+    if (sourcesAutresKO.length) rows.push([`Ventes pas lues : ${sourcesAutresKO.join(', ')} — absentes de ce fichier`]);
+    if (nAutres) rows.push([`Leboncoin, eBay et Vestiaire : ventes finalisées seulement (montant reçu) ; en cours ou montant pas sûr : absentes`]);
     const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
     const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
@@ -45919,6 +45953,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // « Aujourd'hui » de cet écran (`vrm_colis_aposter`) — il disait 11 sous une carte à 12.
           const nAutresRecap = (colisAutres.leboncoin ? colisAutres.leboncoin.length : 0) + (colisAutres.vestiaire ? colisAutres.vestiaire.length : 0);
           const tot = aPoster.length + nEb + nAutresRecap;
+          // (11 nov., parité) « au moins » quand UNE source n'a pas pu être lue — eBay comme avant,
+          // et désormais Leboncoin et Vestiaire (`null` = pas su ; `undefined` = encore en lecture).
+          const autresPasLusRecap = [colisEb === null ? 'eBay' : null, colisAutres.leboncoin === null ? 'Leboncoin' : null, colisAutres.vestiaire === null ? 'Vestiaire' : null].filter(Boolean);
           // « À imprimer » = pas encore imprimés (la case de la carte, `bordereauxAImprimer`).
           const nAImprRecap = bordereauxAImprimer(lignesLot()).length;
           // Sans compte relié ni colis : le geste est dit en tête, pas « aucun envoi ».
@@ -45933,7 +45970,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // bloc gris autour d'un bouton seul (l'imprimante est cachée au téléphone).
           const recapSeulBouton = !recapVide && !(nEb>0) && !(uRecap.total && uRecap.total>=aPoster.length) && !lot;
           return (
-            <div data-colis-recap={tot} data-colis-recap-vinted={aPoster.length} data-colis-recap-ebay={colisEb === undefined ? 'encours' : colisEb === null ? 'passu' : String(nEb)} data-colis-recap-vide={recapVide ? '1' : '0'} data-colis-recap-sans-geste={recapSansGeste ? '1' : '0'} data-colis-recap-cadre={recapVide || recapSeulBouton ? '0' : '1'} className={'vrm-colis-recap' + (recapSeulBouton ? ' vrm-colis-recap-nu' : '')} style={recapVide
+            <div data-colis-recap={tot} data-colis-recap-au-moins={autresPasLusRecap.length ? '1' : '0'} data-colis-recap-vinted={aPoster.length} data-colis-recap-ebay={colisEb === undefined ? 'encours' : colisEb === null ? 'passu' : String(nEb)} data-colis-recap-vide={recapVide ? '1' : '0'} data-colis-recap-sans-geste={recapSansGeste ? '1' : '0'} data-colis-recap-cadre={recapVide || recapSeulBouton ? '0' : '1'} className={'vrm-colis-recap' + (recapSeulBouton ? ' vrm-colis-recap-nu' : '')} style={recapVide
               // (2 nov.) Le texte du récapitulatif n'est plus que lu à l'écran (1er nov.) :
               // sans ligne eBay, urgence, « Générer » ni lot, la carte restait une boîte
               // VIDE en haut de Colis (vue au téléphone). Elle garde son texte lu, sans cadre.
@@ -45949,16 +45986,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-colis-recap-texte" style={{flex:1,minWidth:0}}>
                   <div className="vrm-lu-seulement" role="status" data-colis-recap-texte="">
                   <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-                    {tot>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{colisEb === null ? 'au moins ' : ''}{tot}</span>}
-                    <span style={{fontSize:15,fontWeight:600,color:C.text}}>{tot>0 ? 'colis à envoyer' : (sales.error && !(sales.items||[]).length) ? 'Colis à envoyer : pas encore lus' : colisEb === null ? 'Aucun colis Vinted à envoyer' : 'Aucun colis à envoyer'}</span>
+                    {tot>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{autresPasLusRecap.length ? 'au moins ' : ''}{tot}</span>}
+                    <span style={{fontSize:15,fontWeight:600,color:C.text}}>{tot>0 ? 'colis à envoyer' : (sales.error && !(sales.items||[]).length) ? 'Colis à envoyer : pas encore lus' : autresPasLusRecap.length ? 'Aucun colis Vinted à envoyer' : 'Aucun colis à envoyer'}</span>
                   </div>
                   <div style={{fontSize:13,color:C.muted,marginTop:8,lineHeight:1.45}}>
                     {aPoster.length>0
                       ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
                       : `${lectureComplete?'':'au moins '}${nAImprRecap} bordereau${nAImprRecap>1?'x':''} à imprimer${avecPdf.length-nAImprRecap>0?` · ${avecPdf.length-nAImprRecap} déjà imprimé${avecPdf.length-nAImprRecap>1?'s':''}`:''}${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
-                      : nEb ? '' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n\'ont pas pu être lues : « aucun » n\'est pas su (voir dessous).' : 'Vinted ne te demande aucun envoi en ce moment.'}
+                      : (nEb || nAutresRecap) ? '' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n\'ont pas pu être lues : « aucun » n\'est pas su (voir dessous).' : 'Vinted ne te demande aucun envoi en ce moment.'}
                     {nEb>0 && <span>{aPoster.length>0?' · ':''}{nEb} vente{nEb>1?'s':''} eBay</span>}
+                    {/* (11 nov., parité) Leboncoin et Vestiaire dits comme eBay : leur nombre, ou « pas lues ». */}
+                    {[['Leboncoin', colisAutres.leboncoin], ['Vestiaire', colisAutres.vestiaire]].filter(([, l]) => Array.isArray(l) && l.length > 0).map(([nom, l], i) => <span key={nom} data-colis-recap-autre={nom}>{(aPoster.length>0 || nEb>0 || i>0)?' · ':''}{l.length} vente{l.length>1?'s':''} {nom}</span>)}
                     {colisEb === null && <span data-colis-recap-ebay-ligne="passu">{tot>0?' · ':''}ventes eBay pas lues pour l'instant</span>}
+                    {autresPasLusRecap.filter((n) => n !== 'eBay').map((nom) => <span key={nom} data-colis-recap-passu={nom}>{(tot>0 || colisEb === null)?' · ':''}ventes {nom} pas lues pour l'instant</span>)}
                   </div>
                   </div>
                   {/* Ce que les colonnes ne disent pas : OÙ se prend l'étiquette eBay (sans le nombre). */}
