@@ -73,7 +73,10 @@ Un passage vert, puis chaque mutation (une règle réaffaiblie dans une COPIE de
 | `pause-429` | un 429 ne pose plus de pause | extension |
 | `capacite` | l'app croit la baisse arrivée en 5.335 (`EXT_CAPACITES`) | dist |
 
-Résultat du `--prouve` : voir le rapport de fin de session (ligne en tête de CLAUDE.md §9).
+Résultat du `--prouve` (11 nov., ce conteneur) : passage tel quel **vert** ; **7/7 mutations
+rouges** — liaison 25 contrôles, autre-membre 4, compte-capture 2, garde-compte 3 (la
+lecture part avec le cookie 222), plafond 5 (GET+PUT+GET partis), pause-429 3, capacite 4
+(« Baisser » ouvert, 3 requêtes parties pour une 5.335).
 
 ## Un CONSTAT (pas corrigé ici)
 
