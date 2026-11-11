@@ -43,7 +43,11 @@ const FI = [
   { tx: 9621, titre: 'Echo Nike Dunk Low taille 44', num: '81', status: 'Commande finalisée', tus: 'completed', achat: '40' },
   { tx: 9622, titre: 'Foxtrot Puma Suede taille 39', num: '82', status: 'Commande finalisée', tus: 'completed' },
 ];
-const TOUTES = [...AE.map((v) => ({ ...v, status: 'Bordereau d’envoi envoyé au vendeur', tus: 'needs_action' })), ...EN, ...FI];
+// (11 nov., Julien : « si le colis a VRAIMENT été envoyé, le bordereau ne doit plus être là ») 9604 : Vinted dit encore
+// « à envoyer » (relu il y a 10 min, APRÈS la preuve : une lecture en retard sur le colis), mais l'e-mail de dépôt du
+// transporteur pour le n° EXACT de SON bordereau prouve le départ ⇒ ni bordereau, ni carré, « Postée », hors « Tout imprimer ».
+const PARTIE = { tx: 9604, titre: 'Kilo Vans Old Skool taille 42', suivi: '44234564', num: '64', forme: 'mr' };
+const TOUTES = [...[...AE, PARTIE].map((v) => ({ ...v, status: 'Bordereau d’envoi envoyé au vendeur', tus: 'needs_action' })), ...EN, ...FI];
 async function pdfInvente(code, forme) {
   const { PDFDocument, StandardFonts } = require(path.join(NM, 'pdf-lib'));
   const d = await PDFDocument.create();
@@ -64,6 +68,12 @@ async function lignes() {
     ] } } },
     ...TOUTES.map((v) => ({ id: `harvest_111_txn_${v.tx}`, data: { capturedAt: iso(MS - H), payload: { transaction: { id: v.tx, item_id: `i${v.tx}` } } } })),
     ...await Promise.all(AE.map(async (v) => ({ id: 'email_bord_' + v.tx, data: { transaction: String(v.tx), uid: '111', filename: `bordereau-${v.tx}.pdf`, modele: v.titre, article: v.titre, receivedAt: ilYa(1), pdfB64: await pdfInvente(String(v.tx), v.forme), suivi: v.suivi } }))),
+    // (11 nov., Julien : « dans les ventes il MANQUE les logos de transporteur ») Une vente envoyée et une finalisée dont le
+    // bordereau (même n° de transaction) nomme son transporteur (étiquette lue) : logo attendu ; 9622 : rien de lu ⇒ aucun logo.
+    { id: 'email_bord_9604', data: { transaction: '9604', uid: '111', filename: 'bordereau-9604.pdf', modele: PARTIE.titre, article: PARTIE.titre, receivedAt: ilYa(2), suivi: PARTIE.suivi, pdfB64: await pdfInvente('9604', 'mr') } },
+    ...(process.env.VAV_MUTATION === 'sans-preuve' ? [] : [{ id: 'email_track_mondialrelay_44234564', data: { type: 'suivi', carrier: 'mondialrelay', suivi: PARTIE.suivi, status: 'transit', statusLabel: 'Déposé', subject: 'Ton colis est entre de bonnes mains', sens: 'sortant', account: 'compte_a', emailAt: iso(MS - 12 * H), receivedAt: iso(MS - 12 * H + 60e3) } }]),
+    { id: 'email_bord_9611', data: { transaction: '9611', uid: '111', filename: 'bordereau-9611.pdf', modele: 'Delta', article: 'Delta', receivedAt: ilYa(4), transporteurPdf: 'Mondial Relay', suiviPdf: '43234563', pdfLu: '1', pdfB64: await pdfInvente('9611', 'mr') } },
+    { id: 'email_bord_9621', data: { transaction: '9621', uid: '111', filename: 'bordereau-9621.pdf', modele: 'Echo', article: 'Echo', receivedAt: ilYa(8), transporteurPdf: 'Chronopost', suiviPdf: 'XA223456789FR', pdfLu: '1', pdfB64: await pdfInvente('9621', 'chrono') } },
     { id: 'harvest_111_suivi_7101', data: { tx: '7101', suivi: 'XW300000009TS', transporteur: 'Chronopost', capturedAt: iso(MS - 2 * H), dernier: { t: 'Colis en transit', at: ilYa(1) } } },
   ];
 }
@@ -185,6 +195,7 @@ const MESURE = () => {
             dit(MT.pleins.length <= 1, `${k} Ventes (Tous) : B au plus UN bouton bleu plein sur l'écran`, JSON.stringify(MT.pleins));
             if (!tel) dit(MT.larges.length === 0, `${k} Ventes (Tous) : W aucun bouton plus large que la moitié de la liste (${MT.lw} px)`, JSON.stringify(MT.larges));
             await pg.click('[data-filtre-site] button[data-site="vinted"]').catch(() => {});
+            if (process.env.VAV_MUTATION === 'sans-logo') await pg.addStyleTag({ content: '.vrm-sale-row[data-tx="9611"] [data-fu-transp-ligne]{display:none!important}' });
             await pg.waitForFunction(() => document.querySelectorAll('[data-fu-imprimer]').length >= 3 && [...document.querySelectorAll('.vrm-sale-row[data-tx]')].filter((e) => e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden').length >= 6, null, { timeout: 40000 }).catch(() => {});
             await pg.waitForTimeout(1500);
             if (process.env.BANC_EVAL) console.log(await pg.evaluate(process.env.BANC_EVAL));
@@ -214,7 +225,20 @@ const MESURE = () => {
               const petites = tel ? rows.flatMap((r) => [...r.querySelectorAll('button, a[href]')].filter(vis).filter((e) => !e.closest('.vrm-ledger-drawer-host')).map((e) => ({ t: (e.getAttribute('aria-label') || e.innerText || '').trim().slice(0, 24), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h < 44)) : [];
               const logos = rows.map((r) => { const p = r.querySelector('.vrm-rangee-bord > .vrm-puce-transp:not([data-lu="0"])'); const b = r.querySelector('[data-fu-imprimer]'); if (!p || !b || !vis(p)) return null; const l = p.querySelector('[data-transporteur-logo], svg, img'); const lr = (l || p).getBoundingClientRect(); return { h: Math.round(lr.height), gauche: lr.right <= b.getBoundingClientRect().left + 1 }; }).filter(Boolean);
               const benefs = rows.map((r) => { const b = r.querySelector('.vrm-ledger-sale-benef'); return b ? { etat: b.getAttribute('data-benef-etat'), t: (b.textContent || '').trim() } : null; });
-              return { benefs, nInvites, haut, imp, frises, saisir, invite: invite ? { n: invite.getAttribute('data-ventes-achats'), t: invite.innerText.trim().slice(0, 80) } : null, petites, logos };
+              // (11 nov.) L : le logo du transporteur, au MÊME endroit sur chaque ligne (la ligne « Vinted · logo · compte »),
+              // jamais dans la rangée du bordereau ; V : sous la frise, aucun vide réservé quand rien ne suit.
+              const parTx = rows.map((r) => { const lg = r.querySelector('[data-fu-transp-ligne]'); const l2 = r.querySelector('.vrm-fu-vente-l2'); const site = l2 && l2.querySelector('.vrm-fu-site');
+                const lr = lg && vis(lg) ? lg.getBoundingClientRect() : null; const sr = site ? site.getBoundingClientRect() : null;
+                const fr = r.querySelector('[data-frise-ligne], [data-fu-frise]'); const fb = fr && vis(fr) ? fr.getBoundingClientRect().bottom : null;
+                const enfants = [...r.querySelectorAll('[data-rangee-bord], [data-gestes-ligne], [data-vente-notes], .vrm-fu-apres, .vrm-remise-ligne')].filter(vis);
+                const bas = fb == null ? null : Math.max(fb, ...enfants.map((e) => e.getBoundingClientRect().bottom));
+                return { tx: r.getAttribute('data-tx'), cle: lg ? lg.getAttribute('data-fu-transp-ligne') : '', vu: !!lr, dansL2: !!(lg && l2 && l2.contains(lg)), apresSite: !!(lr && sr && lr.left >= sr.right - 1 && Math.abs((lr.top + lr.bottom) / 2 - (sr.top + sr.bottom) / 2) < 6),
+                  dansRangee: !!r.querySelector('[data-rangee-bord] .vrm-puce-transp, [data-rangee-bord] [data-fu-transporteur]'), vide: bas == null ? null : Math.round(r.getBoundingClientRect().bottom - bas), rien: !enfants.length }; });
+              const partie = (() => { const r = document.querySelector('.vrm-sale-row[data-tx="9604"]'); if (!r) return null; const f = r.querySelector('[data-fu-frise]');
+                const seg = (c) => { const e = f && f.querySelector(`[data-fu-etape="${c}"]`); return e ? { fait: e.getAttribute('data-fait'), cours: e.hasAttribute('data-cours') } : null; };
+                return { imprimer: !!r.querySelector('[data-fu-imprimer], [data-rangee-bord], .vrm-depose-bouton'), postee: seg('postee'), logo: (r.querySelector('[data-fu-transp-ligne]') || { getAttribute: () => '' }).getAttribute('data-fu-transp-ligne') }; })();
+              const lot = (document.querySelector('[data-imprimer-prets]') || { getAttribute: () => null }).getAttribute('data-imprimer-prets');
+              return { partie, lot, benefs, nInvites, haut, imp, frises, saisir, invite: invite ? { n: invite.getAttribute('data-ventes-achats'), t: invite.innerText.trim().slice(0, 80) } : null, petites, logos, parTx };
             }, tel);
             const maxH = tel ? 190 : 96;
             dit(R.haut.length >= 6 && Math.max(...R.haut) <= maxH, `${k} Ventes : H chaque carte de vente ≤ ${maxH} px`, R.haut.join(','));
@@ -231,7 +255,17 @@ const MESURE = () => {
             dit(R.saisir === 0, `${k} Ventes : S « à saisir » n'est écrit sur aucune ligne`, String(R.saisir));
             dit(R.invite && /^\d+\/\d+$/.test(R.invite.n) && R.nInvites === 1, `${k} Ventes : S une seule invitation groupée en tête (prix d'achat à saisir)`, JSON.stringify(R.invite));
             if (tel) dit(R.petites.length === 0, `${k} Ventes : T toutes les cibles de la ligne ≥ 44 px`, JSON.stringify(R.petites.slice(0, 6)));
-            dit(R.logos.length >= 2 && R.logos.every((l) => l.h > 0 && l.h <= 22 && l.gauche), `${k} Ventes : E le transporteur de la ligne = un logo ≤ 22 px, à gauche de « Imprimer »`, JSON.stringify(R.logos));
+            // (11 nov., Julien) UNE règle : le logo du transporteur CONNU (par identité) au même endroit sur TOUTES les lignes —
+            // à envoyer, envoyée, finalisée — juste après « Vinted » ; jamais dans la rangée du bordereau ; inconnu ⇒ rien.
+            // 9603 : son étiquette inventée n'est pas lisible ici ⇒ chronopost OU rien, jamais ailleurs (null).
+            const ATT_T = { 9601: 'mondialrelay', 9602: 'mondialrelay', 9603: null, 9611: 'mondialrelay', 9621: 'chronopost', 9622: '' };
+            const mauvaisL = Object.entries(ATT_T).filter(([tx, c]) => { const x = R.parTx.find((y) => y.tx === tx); return !x || (c === null ? (x.cle ? !(x.cle === 'chronopost' && x.vu && x.dansL2 && x.apresSite) : false) : c ? !(x.cle === c && x.vu && x.dansL2 && x.apresSite) : (x.cle || x.vu)) || x.dansRangee; });
+            dit(!mauvaisL.length, `${k} Ventes : L le logo du transporteur connu au MÊME endroit sur chaque ligne (après « Vinted »), rien quand il n'est pas lu, plus dans la rangée du bordereau`, JSON.stringify(mauvaisL.map(([tx]) => R.parTx.find((y) => y.tx === tx) || tx)));
+            // (11 nov.) P : l'envoi PROUVÉ par le transporteur (n° exact de SON bordereau) gagne sur une lecture Vinted
+            // « à envoyer » arrivée APRÈS : plus de bordereau ni de carré sur la ligne, « Postée » allumée, hors du lot.
+            dit(!!R.partie && !R.partie.imprimer && !!R.partie.postee && R.partie.postee.fait === '1' && R.partie.logo === 'mondialrelay' && R.lot === '3', `${k} Ventes : P envoi prouvé ⇒ plus de bordereau sur la ligne, « Postée » allumée, logo gardé, hors de « Tout imprimer » (3)`, JSON.stringify({ partie: R.partie, lot: R.lot }));
+            const vides = R.parTx.filter((x) => x.rien && x.vide != null && x.vide > 16);
+            dit(R.parTx.some((x) => x.rien && x.vide != null) && !vides.length, `${k} Ventes : V sous la frise, ≤ 16 px jusqu'au séparateur quand rien ne suit`, JSON.stringify(R.parTx.filter((x) => x.rien).map((x) => [x.tx, x.vide])));
             await sain(pg, `${k} Ventes`);
             // Envoyés : la ligne de suivi (lot suivi-commandes) reste là.
             await pg.click('[data-colis-onglet-choix="envoyes"]').catch(() => {});
