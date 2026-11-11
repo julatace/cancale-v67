@@ -58,11 +58,16 @@ export function texteManque(m) {
 // Les programmations : undefined (lecture) · null (pas su) · { [uid]: prog }.
 export function useProgrammesRepub(actif = true) {
   const [progs, setProgs] = React.useState(undefined);
+  const progsRef = React.useRef(undefined); progsRef.current = progs;
   const lire = React.useCallback(() => { if (!AUTH.user || !AUTH.user.id) return; lireProgrammes(ctxLigne()).then((p) => setProgs((v) => (p === null && v ? v : p))); }, []);
   React.useEffect(() => {
     if (!actif) return undefined;
     lire();
-    const t = setInterval(() => { if (typeof document === 'undefined' || document.visibilityState === 'visible') lire(); }, 60000);
+    // Une programmation en attente : relue chaque minute (un autre appareil a pu la prendre ou la changer) ;
+    // sinon toutes les 5 min (une programmation posée ailleurs arrive quand même à temps : 2 min d'avance au moins,
+    // et l'heure exacte est guettée par la veille dès qu'elle est lue).
+    let n = 0;
+    const t = setInterval(() => { n++; const enAttente = progsRef.current && Object.values(progsRef.current).some((p) => p.etat === 'attente'); if ((enAttente || n % 5 === 0) && (typeof document === 'undefined' || document.visibilityState === 'visible')) lire(); }, 60000);
     window.addEventListener('vrm:repub-prog', lire);
     const vis = () => { if (document.visibilityState === 'visible') lire(); };
     document.addEventListener('visibilitychange', vis);
