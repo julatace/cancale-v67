@@ -212,9 +212,11 @@ const PLUS_ATTENDUES = (() => {
     const i = src.indexOf('const GROUPES_PLUS=['); if (i < 0) return [];
     const bloc = src.slice(i, src.indexOf('\n];', i));
     const ids = [];
-    for (const g of bloc.split(/\n\s*\{\s*titre:/).slice(1)) {
+    // (11 nov., traduction) les groupes s'écrivent `groupeNav({ cle:'…', nom:'…', items:[ entreeNav({id:'…'}) ] })`
+    // (titre lu par tr()) ; l'ancienne forme `{ titre:'…', items:[ {id:'…'} ] }` reste lue.
+    for (const g of bloc.split(/\n\s*(?:\{\s*titre:|groupeNav\(\{)/).slice(1)) {
       if (/^[^\n]*\bordi\s*:\s*true/.test(g)) continue;
-      for (const l of g.split('\n')) { if (/^\s*\/\//.test(l)) continue; if (/\.\.\.ONGLET_MESSAGES/.test(l)) ids.push('messages'); const m = /\{\s*id:\s*'([a-z_]+)'/.exec(l); if (m) ids.push(m[1]); }
+      for (const l of g.split('\n')) { if (/^\s*\/\//.test(l)) continue; if (/\.\.\.ONGLET_MESSAGES/.test(l)) ids.push('messages'); const m = /(?:\{|entreeNav\(\{)\s*id:\s*'([a-z_]+)'/.exec(l); if (m) ids.push(m[1]); }
     }
     return [...new Set(ids)];
   } catch (_) { return []; }
