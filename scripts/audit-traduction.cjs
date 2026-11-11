@@ -38,6 +38,7 @@ const MIGRES = [
   ['src/profil/MenuProfil.jsx', ['*']],
   ['src/composants/GardeEcran.jsx', ['*']],
   ['src/i18n/ChoixLangue.jsx', ['*']],
+  ['src/PublierPartout.jsx', ['*']],
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
   ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes']],
