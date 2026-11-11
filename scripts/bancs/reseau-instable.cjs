@@ -196,6 +196,7 @@ async function uneTaille(nav, srv, w) {
     dit(!/echec/.test(etatPil), 'D : 429 ⇒ la pilule ne dit pas « Pas enregistré »', etatPil || '(fermée)');
     dit((await lsNote(pg(), 1)) === 'carton du haut', 'D : 429 ⇒ la note n’est PAS défaite', JSON.stringify(await lsNote(pg(), 1)));
     await pg().screenshot({ path: path.join(CAPT, `D-429${suf}.png`) });
+    if (process.env.BANC_DEBUG) console.log('file :', await pg().evaluate(() => { try { return Object.keys(JSON.parse(localStorage.getItem('vrm_file_envoi') || '{}').cles || {}).join(', '); } catch (_) { return '?'; } }));
     A.etat.faute = null;
     await pg().evaluate(() => window.dispatchEvent(new Event('online')));
     dit(await H.attendre(() => noteBase(base, 1) === 'carton du haut', 20000), 'D : 429 fini ⇒ la note arrive en base', JSON.stringify(noteBase(base, 1)));
