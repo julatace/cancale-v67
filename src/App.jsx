@@ -47053,7 +47053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       onClick={()=>openConversation(c)}
                       style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}
                       photo={photo} nom={nom} sensible
-                      compte={(plusieurs||!!messageSearch.trim()) && c._acc ? accName(c._acc) : ''}
+                      compte={(plusieurs||!!messageSearch.trim()) && c._acc && !(prioMsg && !ro && !messageSearch.trim()) ? accName(c._acc) : ''}
                       quand={tsConv||null} couleurHeure={c.unread&&!ro?C.text:C.muted}
                       titre={(paire&&paire.titre)||c.item_title||c.item?.title||''} num={paire&&paire.num?paire.num:''} etat={paire&&paire.etat?paire.etat:null}
                       extrait={offreDer ? <span className="vrm-msg-etat vrm-msg-offre-der" data-offre-derniere={String(offreDer.montant)} data-offre-sens={offreDer.sens} data-offre-etat={offreDer.etat||undefined} style={{color:C.text,borderColor:C.border}}>{libelleOffre(offreDer)} {prix(offreDer.montant,offreDer.devise)}{offreDer.ancien?<> <s className="vrm-msg-offre-ancien" style={{color:C.muted}}>{prix(offreDer.ancien,offreDer.devise)}</s></>:null}{etatOffreCourt(offreDer.etat,offreDer.etatLibelle)?<> · {etatOffreCourt(offreDer.etat,offreDer.etatLibelle)}</>:null}</span> : texteEx} couleurExtrait={c.unread?C.text:C.muted} toi={ex.kind==='message'&&ex.source==='fil'&&(ex.de==='toi'||auteur==='toi')}
