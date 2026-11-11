@@ -71,13 +71,25 @@ srv.listen(0, '127.0.0.1', async () => {
     const zipB = await zip();
     version = 'C'; await visiter();
     const apresC = (await contenu()).filter(p => p.startsWith('/assets/'));
-    const vieux = apresC.filter(p => /-(A|B)\d+\.js$/.test(p));
-    vieux.length === 0
-      ? ok('après trois déploiements, le cache ne garde que la version servie (' + apresC.join(', ') + ')')
-      : nok('le cache garde les anciennes versions', vieux.join(', '));
+    // (11 nov., lot app-installable) La coquille est servie DU CACHE (ouverture
+    // instantanée) : la visite « C » montre encore B, et C est rangée derrière,
+    // prête. Le cache garde donc au plus DEUX versions : celle servie et la
+    // suivante — jamais une plus ancienne (A), jamais une accumulation.
+    const vieux = apresC.filter(p => /-A\d+\.js$/.test(p));
+    const principaux = apresC.filter(p => /\/assets\/index-/.test(p));
+    vieux.length === 0 && principaux.length <= 2
+      ? ok('après trois déploiements, le cache ne garde que la version servie et la suivante (' + apresC.join(', ') + ')')
+      : nok('le cache garde les anciennes versions', apresC.join(', '));
     apresC.includes('/assets/index-C111.js')
-      ? ok('l\'autre sens : la version servie reste en cache (hors-ligne)')
-      : nok('la version servie est en cache', apresC.join(', ') || 'rien');
+      ? ok('l\'autre sens : la dernière version est en cache (prochaine ouverture instantanée et à jour, hors-ligne)')
+      : nok('la dernière version est en cache', apresC.join(', ') || 'rien');
+    // Ouverture suivante : C est servie (depuis le cache), B part.
+    await visiter();
+    const apresC1 = (await contenu()).filter(p => p.startsWith('/assets/'));
+    const servieC = await pg.evaluate(() => window.__principal);
+    servieC === 'C' && !apresC1.some(p => /-(A|B)\d+\.js$/.test(p))
+      ? ok('l\'ouverture suivante sert C et jette B')
+      : nok('l\'ouverture suivante sert C et jette B', servieC + ' · ' + apresC1.join(', '));
 
     // Même version rouverte : le morceau chargé à la demande n'est PAS jeté.
     await visiter();
