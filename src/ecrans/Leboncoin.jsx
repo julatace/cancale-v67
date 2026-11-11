@@ -1054,8 +1054,11 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
         noterFaite(it);
         // 4. RELIRE : « Mes annonces » relue par l'extension ; la NOUVELLE annonce se reconnaît à sa
         //    référence VRM-{N°} (une identité, §5), jamais au titre.
+        // Publiée : la ligne le dit TOUT DE SUITE ; la relecture vient ensuite (5.363 et plus).
+        poser(id, 'fait', tr('lbcplus.repub.pasRelue'));
         if (t) t.etape(id, 'relu');
-        let rl = null; try { rl = await vmrCmd({ cmd: 'lbcRelire', ids: [String(id)], refs: [String(it.numero)] }, 90000); } catch (_) { rl = null; }
+        let rl = null;
+        if (extSait('lbcprix') === 'ok') { try { rl = await vmrCmd({ cmd: 'lbcRelire', ids: [String(id)], refs: [String(it.numero)] }, 60000); } catch (_) { rl = null; } }
         const neuves = rl && rl.parRef ? (rl.parRef[String(it.numero)] || []).filter((x) => x && x.id !== String(id)) : null;
         if (neuves && neuves.length === 1) ecrireCoffreLbc(it, f, { nouvelId: neuves[0].id, reluAt: new Date().toISOString() }).catch(() => {});
         poserS(id, 'fait', neuves && neuves.length === 1 ? tr('lbcplus.repub.relue', { num: it.numero }) : tr('lbcplus.repub.pasRelue'));
