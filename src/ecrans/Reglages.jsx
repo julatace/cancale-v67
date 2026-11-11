@@ -1874,7 +1874,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
-      AUTH.user && { id:'agenda', type:'panneau', ic:'clock', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
+      AUTH.user && { id:'agenda', type:'panneau', ic:'target', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
@@ -1943,7 +1943,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
       { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
-      { id:'importer', type:'panneau', nu:true, ic:'box', lib:'Importer', desc:'Ton stock et tes ventes passées, depuis un tableur ou un autre logiciel.', data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
+      { id:'importer', type:'panneau', nu:true, ic:'copy', lib:'Importer', desc:'Ton stock et tes ventes passées, depuis un tableur ou un autre logiciel.', data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
       { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       // (11 nov.) Revenir en arrière : des points posés tout seuls (avant une action en série, un
       // import, chaque jour) ou une sauvegarde complète ⇒ aperçu précis ⇒ choisir quoi ⇒ confirmer (src/restauration.js).
@@ -1958,7 +1958,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     )},
     {id:'aide',titre:'Aide',items:[
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
-      { id:'verifier', type:'panneau', nu:true, ic:'check', lib:'Vérifier mon installation', desc:'Extension, comptes, boîte e-mail : ce qui manque, et le geste.', data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
+      { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:'Vérifier mon installation', desc:'Extension, comptes, boîte e-mail : ce qui manque, et le geste.', data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM présentés un par un.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
@@ -1970,7 +1970,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
       // (11 nov.) « Quoi de neuf » : les nouveautés qui le concernent depuis son inscription (src/nouveautes.js).
-      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'spark', lib:'Quoi de neuf', desc:'Les nouveautés de VRM qui te concernent.', data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
+      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'soleilLevant', lib:'Quoi de neuf', desc:'Les nouveautés de VRM qui te concernent.', data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
       // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
       { id:'centre-aide', type:'action', ic:'search', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
@@ -3221,7 +3221,7 @@ function DiscordCompte() {
 const texteInvitationEquipe = (email) => `Je t'invite à préparer mes colis sur VRM.\nCrée ton compte sur https://vrm.center avec ${email}.\nConfirme ton e-mail, puis touche « Accepter ».`;
 async function partagerInvitationEquipe(email) {
   const text = texteInvitationEquipe(email);
-  try { if (navigator.share) { await navigator.share({ text }); return 'partage'; } } catch (e) { if (e && e.name === 'AbortError') return 'annule'; }
+  try { if (typeof navigator.share === 'function') { await navigator.share({ text }); return 'partage'; } } catch (e) { if (e && e.name === 'AbortError') return 'annule'; }
   try { await navigator.clipboard.writeText(text); return 'copie'; } catch (_) { return 'montre'; }
 }
 function EquipeSetting() {

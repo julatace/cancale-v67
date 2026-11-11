@@ -26,7 +26,7 @@
    ses plateformes) dans la barre, mais seulement quand ses plateformes sont lues (FiltreSites) :
    la barre passait de 60 à 82 px et tout l'écran — l'instantané compris — descendait de 22 px
    (CLS 0,0107). Sa place est réservée : rangée 50 px + 2 × 8 px de son île + 2 × 8 px de la barre. */
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-main[data-ecran="ventes"] > .vrm-barre-haut { min-height: 82px; }
 }
 /* La tâche qui a envoyé sa rangée dans la barre ne garde pas de vide. */

@@ -211,7 +211,9 @@ const charger = (noms, ctx) => {
     dit(/const dateStr = dateJourFr\(new Date\(\)\);/.test(APPc), 'Ma journée l’écrit par cette règle');
     dit(typeof c.dateFr === 'function' && c.dateFr('pas une date') === 'date inconnue' && c.dateFr(undefined) === 'date inconnue', 'une date illisible : « date inconnue », jamais « Invalid Date »', c.dateFr ? c.dateFr('x') : 'absente');
     dit(typeof c.dateFr === 'function' && /oct/.test(c.dateFr('2026-10-28T10:00:00Z', { day: 'numeric', month: 'short' })), 'une date lue s’écrit normalement');
-    dit(!/new Date\(o\.date\)\.toLocaleDateString\(/.test(APPc.replace(/soldAt: o\.date \? new Date\(o\.date\)\.toLocaleDateString\('fr-FR'\)/g, '')), 'plus aucune date de vente écrite sans garde (hors `soldAt`, stocké, déjà gardé par `o.date ?`)');
+    // (11 nov., ci-vert) La garde des exports (« o.date && Number.isFinite(new Date(o.date).getTime()) ? … : '' »)
+    // vaut celle de `soldAt` : une date illisible sort vide, jamais « Invalid Date ».
+    dit(!/new Date\(o\.date\)\.toLocaleDateString\(/.test(APPc.replace(/soldAt: o\.date \? new Date\(o\.date\)\.toLocaleDateString\('fr-FR'\)/g, '').replace(/o\.date && Number\.isFinite\(new Date\(o\.date\)\.getTime\(\)\) \? new Date\(o\.date\)\.toLocaleDateString\('fr-FR'\) : ''/g, '')), 'plus aucune date de vente écrite sans garde (hors `soldAt` et les exports, gardés par `o.date ?` / `Number.isFinite`)');
   });
 
   console.log('\n── D6 · Les jours et les mois se comptent à l’heure de PARIS');
