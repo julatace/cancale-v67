@@ -19,6 +19,10 @@ const ETAT = { auto: 'VRM le retire', main: 'à faire sur le site', verifier: 'v
 export function RetirerAilleursBloc({ plan, resultats = null, enVol = false, onRetirer, onFini, PhotoVinted = null, compact = false }) {
   if (!plan || !plan.articles || !plan.articles.length) return null;
   const fait = !!(resultats && Object.keys(resultats).length);
+  // Dans la feuille « Vendus ailleurs » (compact), le détail d'en dessous dit déjà chaque
+  // annonce : le bloc ne s'y pose que s'il apporte quelque chose (un retrait possible, un
+  // résultat, un « peut-être »).
+  if (compact && !fait && !plan.nAuto && !plan.nVerifier) return null;
   const n = plan.nAuto;
   return (
     <section className={'vrm-ra' + (compact ? ' is-compact' : '')} data-retirer-ailleurs-bloc="" data-ra-auto={String(n)} data-ra-main={String(plan.nMain)} data-ra-verifier={String(plan.nVerifier)} aria-label="Vendu, encore en ligne ailleurs">
@@ -58,7 +62,7 @@ export function RetirerAilleursBloc({ plan, resultats = null, enVol = false, onR
         </article>
       ))}
       {plan.ambigus > 0 ? <p className="vrm-ra-note" data-ra-ambigus={String(plan.ambigus)}>{plan.ambigus} N° porté{plan.ambigus > 1 ? 's' : ''} par deux paires : aucun retrait proposé (vérifie le N° sur le carton).</p> : null}
-      {plan.manques.length ? <p className="vrm-ra-note" data-ra-manques="">Pas tout relu : {plan.manques.join(', ')}. Ce qui n’est pas lu n’est ni affirmé ni retiré.</p> : null}
+      {plan.manques.length && !compact ? <p className="vrm-ra-note" data-ra-manques="">Pas tout relu : {plan.manques.join(', ')}. Ce qui n’est pas lu n’est ni affirmé ni retiré.</p> : null}
     </section>
   );
 }
