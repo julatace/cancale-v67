@@ -240,11 +240,11 @@ html body .vrm-lot-pied > .vrm-b { margin: 0; }
 html:not([data-colis-outils]) body .vrm-app-shell .vrm-main .vrm-colis-recap.vrm-colis-recap-nu { height: 0 !important; margin: 0 !important; overflow: hidden !important; }
 /* Le titre d'un colis tient sur deux lignes au téléphone (une seule coupait « Samba noir… »). */
 @media (max-width: 767px) {
-  html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 2 !important; }
+  html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 2 !important; }
 }
 /* « Relier » et « Poser le N° » : la pilule discrète de 32 px reste, la CIBLE fait 44 px au doigt
    (6 px de bord transparent autour, le fond s'arrête à la pilule). Fusion-app F5. */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card] .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
+html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
   min-height: 44px !important; border: 6px solid transparent !important; background-clip: padding-box !important; box-sizing: border-box !important;
 }
 /* La pastille N° (`Numero`, inline-flex) se LIT « N°\n31 » (innerText, copier-coller) : dans Colis elle est
@@ -299,3 +299,6 @@ html body .vrm-rpf-ligne .vrm-rpf-code-origine { margin: 4px 0; font-size: 12px;
 .vrm-colis-section-titre { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink, #1D1D1F); }
 .vrm-colis-section-tete .vrm-colis-barre { margin-left: auto; }
 .vrm-colis-resume { margin: 0 2px 10px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
+/* (11 nov., lot DJ3) Les règles de l'écran Colis (`.vrm-main:has(.vrm-fu-colis)`, fusion.css, design-2026,
+   premium) visent aussi `.vrm-main .vrm-colis-section` : la grande carte (`.vrm-fu-colis`) n'est plus rendue
+   en section, l'apparence de Colis reste (outils repliés, cartes, onglets). */

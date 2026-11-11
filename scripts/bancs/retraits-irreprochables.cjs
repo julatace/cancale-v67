@@ -146,7 +146,7 @@ const lire = (pg) => pg.evaluate(() => {
     bouton2: !!l.querySelector('[data-rp-code-desaccord]'),
   }));
   const onglet = document.querySelector('[data-colis-onglet-choix="retirer"]');
-  return { pub, lignes, ongletN: onglet ? onglet.getAttribute('data-colis-onglet-n') : null, deb: document.documentElement.scrollWidth - window.innerWidth };
+  return { pub, lignes, ongletN: (() => { /* (11 nov., lot DJ3) « À retirer » n'a plus d'onglet : le nombre de SA liste (`data-cc-n`) */ const c = document.querySelector('[data-cc-colonne="retirer"]'); return c ? c.getAttribute('data-cc-n') : (onglet ? onglet.getAttribute('data-colis-onglet-n') : null); })(), deb: document.documentElement.scrollWidth - window.innerWidth };
 });
 
 (async () => {
@@ -167,7 +167,7 @@ const lire = (pg) => pg.evaluate(() => {
         const m = await lire(pg);
         const L = (k) => m.lignes.find((l) => l.cle.includes(k)) || null;
         const J = (o) => JSON.stringify(o);
-        dit(m.ongletN === '5' && m.pub && m.pub.total === 5, 'les cinq colis sont À RETIRER (onglet = publication)', J({ onglet: m.ongletN, pub: m.pub && m.pub.total }));
+        dit(m.ongletN === '5' && m.pub && m.pub.total === 5, 'les cinq colis sont À RETIRER (liste = publication)', J({ onglet: m.ongletN, pub: m.pub && m.pub.total }));
         const r1 = L('87660001');
         dit(!!r1 && r1.code === '700001' && r1.sur, 'R1 e-mail + conversation de SA commande au même code ⇒ « sûr »', J(r1 && { code: r1.code, sur: r1.sur }));
         dit(!!r1 && r1.sources === 'vinted,email,message,transporteur' && r1.marques.join('·') === 'Vinted·e-mail·message·transporteur', 'R1 les marques : Vinted · e-mail · message · transporteur', r1 && r1.sources);

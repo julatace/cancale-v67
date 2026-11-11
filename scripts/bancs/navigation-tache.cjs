@@ -203,13 +203,13 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         const { ctx, pg, errs } = await ouvrir(b, tel, 'journee', { local: { vrm_colis_aposter: { total: 2, enRetard: 0, vinted: 2, ebay: 0, at: maintenant.getTime() }, vrm_colis_retirer: { total: 3, prets: 3, sansCode: 0, aVerifier: 0, urgents: 0, at: maintenant.getTime() } } });
         if (tel) {
           const barre = await pg.evaluate(() => [...document.querySelectorAll('.vrm-mobile-nav > button')].map((x) => ({ lib: (x.querySelector('.vrm-nav-label') || x).innerText.trim(), h: Math.round(x.getBoundingClientRect().height), entree: x.getAttribute('data-nav-entree') || '' })));
-          dit(barre.length === 5 && barre.map((x) => x.lib).join('|') === 'Journée|Annonces|Ventes|Colis|Plus', 'A. la barre du bas : Journée · Annonces · Ventes · Colis · Plus', JSON.stringify(barre));
+          dit(barre.length === 5 && barre.map((x) => x.lib).join('|') === 'Journée|Annonces|Ventes|Achats|Plus', 'A. la barre du bas : Journée · Annonces · Ventes · Achats · Plus (11 nov., lot DJ3 : Colis vit dans Ventes et Achats)', JSON.stringify(barre));
           dit(barre.every((x) => x.h >= 44), 'A. chaque onglet ≥ 44 px', JSON.stringify(barre.map((x) => x.h)));
-          const badge = await pg.evaluate(() => { const x = document.querySelector('.vrm-mobile-nav [data-badge-nav="cat_bord"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter')); } catch (_) {} return { n: x ? x.getAttribute('data-badge-n') : '', pub: pub && pub.total }; });
-          dit(badge.n !== '' && badge.n === String(badge.pub) && Number(badge.n) > 0, 'H. badge sur Colis = le nombre PUBLIÉ (`vrm_colis_aposter`), jamais recalculé', JSON.stringify(badge));
+          const badge = await pg.evaluate(() => { const x = document.querySelector('.vrm-mobile-nav [data-badge-nav="ventes"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter')); } catch (_) {} return { n: x ? x.getAttribute('data-badge-n') : '', pub: pub && pub.total }; });
+          dit(badge.n !== '' && badge.n === String(badge.pub) && Number(badge.n) > 0, 'H. badge sur Ventes (colis à poster, lot DJ3) = le nombre PUBLIÉ (`vrm_colis_aposter`), jamais recalculé', JSON.stringify(badge));
           // (9 nov., lot Z) L'icône de VRM porte LE MÊME nombre que le badge de Colis (dernière demande au navigateur).
           const pastille = await pg.evaluate(() => (window.__pastille || []).slice(-1)[0]);
-          dit(badge.n !== '' && pastille === Number(badge.n), 'Z. pastille de l\'icône de VRM = le badge de Colis', JSON.stringify({ pastille, badge: badge.n }));
+          dit(badge.n !== '' && pastille === Number(badge.n), 'Z. pastille de l\'icône de VRM = le badge des colis à poster', JSON.stringify({ pastille, badge: badge.n }));
           await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').tap();
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
@@ -217,23 +217,23 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Argent|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Argent · Moi', JSON.stringify(f && f.groupes));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           // (5 nov.) « E-mails » rejoint « Gérer » (demande du 5 nov., `docs/passation/2026-11-05-onglet-emails.md`).
-          dit(exp.join('|') === 'trancher|garage|achats|emails', 'J. « Gérer » : À trancher (lot AC), Stock, Achats, E-mails ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
+          dit(exp.join('|') === 'trancher|garage|emails|compta', 'J. « Gérer » : À trancher (lot AC), Stock, E-mails, Argent ; Achats est dans la barre (lot DJ3), aucune entrée « Colis à retirer »', exp.join('|'));
           dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
-          dit(!!f && !['journee', 'annonces', 'ventes', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
+          dit(!!f && !['journee', 'annonces', 'ventes', 'achats', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && new Set(f.entrees).size === f.entrees.length, 'I. aucune entrée deux fois', JSON.stringify(f && f.entrees));
           // (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages et Republier dans Annonces »)
           // « Republier » et « Favoris & offres » ne sont plus des entrées : ils vivent DANS Annonces et Messages (banc navigation-fusion).
-          dit(!!f && ['messages', 'achats', 'garage', 'dashboard', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('republier') && !f.entrees.includes('favoris'), 'I. « Plus » porte Messages, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres — plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
+          dit(!!f && ['messages', 'garage', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('republier') && !f.entrees.includes('favoris'), 'I. « Plus » porte Messages, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres — plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
           dit(!!f && f.petits === 0, 'I. rangées ≥ 44 px', String(f && f.petits));
         } else {
-          const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="cat_bord"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
+          const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="ventes"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
-          dit(col.taches.join('|') === 'journee|annonces|ventes|messages|cat_bord', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Colis', col.taches.join('|'));
+          dit(col.taches.join('|') === 'journee|annonces|ventes|messages|achats', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Achats (lot DJ3)', col.taches.join('|'));
           // (9 nov., lot AL) « Vendre » n'avait plus que Republier et Favoris & offres dans la colonne : vide, il disparaît.
           dit(col.groupes.join('|') === 'Gérer|Argent|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'trancher|garage|achats|emails' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : À trancher (lot AC), Stock, Achats, E-mails ; aucune entrée « Colis à retirer »', exp.join('|'));
+          dit(exp.join('|') === 'trancher|garage|emails|compta' && !col.toutes.includes('retraits') && !col.toutes.includes('cat_bord'), 'J. colonne, « Gérer » : À trancher (lot AC), Stock, E-mails, Argent ; aucune entrée « Colis » ni « Colis à retirer » (lot DJ3)', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.length === 0, 'J. colonne sans section « Plateformes », sites dans les tâches', plat.join('|'));
           // (6 nov.) La cloche se calcule après ses lectures (passage asynchrone) : sur une
@@ -246,11 +246,11 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           // s'écrit jamais deux fois sur un écran) : les colis à poster portent le badge de Colis,
           // l'écran qui les envoie ; Ventes ne le recopie plus (`audit-coque-parametres`,
           // mutation « badge double »). Le banc exigeait encore la copie sur Ventes.
-          dit(!cpt.ventes && cpt.cat_bord === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster, sur Colis SEULEMENT — jamais recopié sur Ventes ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
+          dit(!cpt.cat_bord && cpt.ventes === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster, sur Ventes SEULEMENT depuis le lot DJ3 ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
           dit(!cpt.plat_ebay && !cpt.plat_leboncoin && !cpt.messages, 'J. aucun compteur sans nombre connu (eBay, Leboncoin, Messages)', JSON.stringify(cpt));
           dit(new Set(col.toutes).size === col.toutes.length, 'A. aucune entrée deux fois dans la colonne', col.toutes.join('|'));
           dit(col.toutes[col.toutes.length - 1] === 'settings', 'A. Paramètres en bas', col.toutes.join('|'));
-          dit(col.badge !== '' && col.badge === String(col.pub) && Number(col.badge) > 0, 'H. badge sur Colis = le nombre publié', JSON.stringify({ b: col.badge, pub: col.pub }));
+          dit(col.badge !== '' && col.badge === String(col.pub) && Number(col.badge) > 0, 'H. badge des colis à poster (Ventes) = le nombre publié', JSON.stringify({ b: col.badge, pub: col.pub }));
         }
         dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
         await ctx.close();

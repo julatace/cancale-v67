@@ -528,7 +528,7 @@
 /* (9 nov.) Le bloc du compte qui porte « N° en attente » est caché par la maquette Colis
    (fusion.css : `div:has(> .vrm-colis-num)`, le N° se pose par « Poser le N° ») : pas de « · »
    orphelin en tête de la limite. Même condition que la règle qui le cache. */
-.vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child > div:nth-child(2) > div:nth-child(2):has(> .vrm-colis-num) + div::before { content: none !important; }
+:is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child > div:nth-child(2) > div:nth-child(2):has(> .vrm-colis-num) + div::before { content: none !important; }
 .vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:has([data-colis-dates]) {
   display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;
   font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important;

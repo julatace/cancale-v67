@@ -175,8 +175,10 @@ const ouvrir = async (b, vp, sombre) => {
           const lignes = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')];
           const pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null');
           return {
-            pub, onglet: (document.querySelector('[data-colis-onglet-choix="retirer"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'),
-            carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'),
+            // (11 nov., lot DJ3) « À retirer » est la section de tête d'Achats : plus d'onglet ni de grande carte ;
+            // le nombre est celui de SA liste (`data-cc-n`) et de la pastille d'Achats.
+            pub, onglet: (document.querySelector('[data-cc-colonne="retirer"]') || { getAttribute: () => null }).getAttribute('data-cc-n'),
+            carte: ((document.querySelector('[data-nav-entree="achats"] .vrm-nav-badge-n') || {}).textContent || '').replace(/\D/g, '') || null,
             idents: lignes.map((l) => l.getAttribute('data-cc-carte')),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).length,
             points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); if (!d) return 0; const ra = a.getBoundingClientRect(), rd = d.getBoundingClientRect(); return rd.top >= ra.bottom - 2 && a.scrollWidth <= a.clientWidth + 1 && rd.height <= 24 ? 0 : 99; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
@@ -196,7 +198,7 @@ const ouvrir = async (b, vp, sombre) => {
         const N = m.pub && Number.isFinite(m.pub.total) ? m.pub.total : null;
         dit(N === NB_ATTENDU, `le nombre publié (vrm_colis_retirer) = ${NB_ATTENDU} colis du jeu`, JSON.stringify(m.pub));
         dit(m.onglet === String(N), '« À retirer · N » = vrm_colis_retirer', `${m.onglet} / ${N}`);
-        if (N) dit(m.carte === String(N), 'la carte sombre dit le même N', `${m.carte} / ${N}`);
+        if (N) dit(m.carte === String(N), 'la pastille d’Achats dit le même N', `${m.carte} / ${N}`);
         dit(m.comptes === N, 'autant de lignes comptées que N (chaque colis une fois)', `${m.comptes} / ${N}`);
         dit(new Set(m.idents).size === m.idents.length, 'chaque colis UNE fois à l’écran', m.idents.join(','));
         // (6 nov., v36-visuel-2) LA RÈGLE A CHANGÉ (demande du 6 nov. : « l'adresse passe dessous ») : le NOM garde sa ligne,
@@ -251,7 +253,7 @@ const ouvrir = async (b, vp, sombre) => {
           const vC = vil.find((x) => x.v === 'cancale');
           await pg.locator('[data-retirer-villes] [data-ville="cancale"]').first().click(); await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => ({ lignes: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point:not(.is-inconnu) [data-cc-carte]:not([data-hors-compte])')].length, nInconnu: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point.is-inconnu [data-cc-carte]')].length, inconnu: !!document.querySelector('.vrm-rpf-point.is-inconnu'), carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'), memo: localStorage.getItem('vrm_retirer_ville'), pts: [...document.querySelectorAll('.vrm-rpf-point:not(.vrm-rpf-verifier) [data-relais-adresse]')].map((x) => x.textContent) }));
-          dit(vC && f.lignes === Number(vC.n) && f.carte === vC.n && f.pts.every((a) => /Cancale/i.test(a)) && f.inconnu && f.nInconnu === 1, 'Cancale choisie : ses points seuls, la carte sombre dit son nombre, « Lieu à confirmer » (1) reste visible', JSON.stringify(f));
+          dit(vC && f.lignes === Number(vC.n) && f.pts.every((a) => /Cancale/i.test(a)) && f.inconnu && f.nInconnu === 1, 'Cancale choisie : ses points seuls (le nombre de la ville), « Lieu à confirmer » (1) reste visible', JSON.stringify(f));
           dit(f.memo === 'cancale', 'le choix de ville est retenu', f.memo);
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-ville-cancale-${nom}.png`) });
           await pg.locator('[data-retirer-villes] [data-ville=""]').first().click(); await pg.waitForTimeout(400);
