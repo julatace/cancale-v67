@@ -214,26 +214,30 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
           await capture(pg, 'plus-telephone');
-          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Argent|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Argent · Moi', JSON.stringify(f && f.groupes));
+          // (11 nov.) Depuis le 10 nov. (lot AO, Julien : « l'onglet Compta est trop flou, relie-le avec Stats ») UNE entrée « Argent »
+          // (`compta`, dans « Gérer ») remplace Statistiques et Compta : plus de groupe « Argent » à part (src/App.jsx, GROUPES_PLUS).
+          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Moi', JSON.stringify(f && f.groupes));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           // (5 nov.) « E-mails » rejoint « Gérer » (demande du 5 nov., `docs/passation/2026-11-05-onglet-emails.md`).
-          dit(exp.join('|') === 'trancher|garage|achats|emails', 'J. « Gérer » : À trancher (lot AC), Stock, Achats, E-mails ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
+          dit(exp.join('|') === 'trancher|garage|achats|emails|compta', 'J. « Gérer » : À trancher (lot AC), Stock, Achats, E-mails, Argent ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
+          const libArgent = await pg.evaluate(() => { const e = document.querySelector('.vrm-sheet [data-nav-entree="compta"]'); return e ? e.innerText.trim() : ''; });
+          dit(libArgent === 'Argent', 'J. l’entrée `compta` s’appelle « Argent »', libArgent);
           dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
           dit(!!f && !['journee', 'annonces', 'ventes', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && new Set(f.entrees).size === f.entrees.length, 'I. aucune entrée deux fois', JSON.stringify(f && f.entrees));
           // (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages et Republier dans Annonces »)
           // « Republier » et « Favoris & offres » ne sont plus des entrées : ils vivent DANS Annonces et Messages (banc navigation-fusion).
-          dit(!!f && ['messages', 'achats', 'garage', 'dashboard', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('republier') && !f.entrees.includes('favoris'), 'I. « Plus » porte Messages, Achats, Stock, Statistiques, Comptabilité, Communauté, Paramètres — plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
+          dit(!!f && ['messages', 'achats', 'garage', 'compta', 'communaute', 'settings'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('dashboard') && !f.entrees.includes('republier') && !f.entrees.includes('favoris'), 'I. « Plus » porte Messages, Achats, Stock, Argent (Statistiques + Compta, lot AO), Communauté, Paramètres — plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
           dit(!!f && f.petits === 0, 'I. rangées ≥ 44 px', String(f && f.petits));
         } else {
           const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="cat_bord"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
           dit(col.taches.join('|') === 'journee|annonces|ventes|messages|cat_bord', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Colis', col.taches.join('|'));
           // (9 nov., lot AL) « Vendre » n'avait plus que Republier et Favoris & offres dans la colonne : vide, il disparaît.
-          dit(col.groupes.join('|') === 'Gérer|Argent|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
+          dit(col.groupes.join('|') === 'Gérer|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'trancher|garage|achats|emails' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : À trancher (lot AC), Stock, Achats, E-mails ; aucune entrée « Colis à retirer »', exp.join('|'));
+          dit(exp.join('|') === 'trancher|garage|achats|emails|compta' && !col.toutes.includes('retraits') && !col.toutes.includes('dashboard'), 'J. colonne, « Gérer » : À trancher (lot AC), Stock, Achats, E-mails, Argent (lot AO) ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.length === 0, 'J. colonne sans section « Plateformes », sites dans les tâches', plat.join('|'));
           // (6 nov.) La cloche se calcule après ses lectures (passage asynchrone) : sur une
