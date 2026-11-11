@@ -127,3 +127,8 @@ l'étape (`timeout-minutes: 10` sur elle).
   `coque-parametres` (16), `achats-retraits` (8).
 - Le 1er commit de la branche (`f03c9d8`) porte par erreur le lien de session d'une autre session
   dans son pied ; la réécriture a été refusée (pas de push forcé). Les suivants sont justes.
+- **iphone-reprise, après le merge de `main` (15 h)** : une autre session avait corrigé le même banc
+  en parallèle (liste recopiée « ≥ 7 », avec À trancher) ; entre-temps le lot DJ4 a sorti « À
+  trancher » de « Plus » ⇒ 8 rouges de nouveau. Le banc lit désormais les entrées ATTENDUES dans
+  `GROUPES_PLUS` d'`src/App.jsx` (sans les groupes `ordi`) au lieu de les recopier : partie B
+  96 OK / 0. Les correctifs WebKit du banc (horloge une fois, toucher sans constructeur) sont gardés.
