@@ -82,3 +82,42 @@ Voir la fin de ce fichier (sortie des commandes, recopiée telle quelle).
 - Avant la 016 : allumer « Confirm email » chez Supabase (déjà dans la liste).
 - Après déploiement : ouvrir un aperçu de bordereau, lire un ticket, détourer une photo, scanner un
   colis — la CSP resserrée ne doit rien bloquer.
+
+## Sortie des preuves (arbre fusionné avec origin/main, 11 nov.)
+
+```
+BUILD 0
+0 variables :: Aucune variable fantôme : un écran ne peut plus tomber sur un « X is not defi
+0 tdz :: Aucun écran ne peut tomber sur « Cannot access … before initialization ».
+0 coherence :: L'app et l'extension disent la même chose.
+0 identite :: Aucune règle ne peut désigner la mauvaise paire.
+0 icones :: Toutes les icônes appelées existent : aucun trou muet.
+0 textes-courts :: ✅ textes courts : 49 contrôles
+0 fonctions-api :: ✅ tout est vert
+0 secrets :: Aucun secret ni donnée personnelle dans le code source.
+0 csp :: ✅ tout est vert
+0 xss-facture :: ✅ audit-xss-facture : 9 contrôles — une facture n'exécute rien
+0 cors-extension :: ✅ tout vert
+0 comptes-securite :: ✅ audit-comptes-securite : tout est vert
+0 entetes :: 10 contrôles OK, 0 en échec
+0 routes-revue :: 31 ✅ · 0 ❌
+0 cle-service :: ✅ 16 vert(s), 0 rouge(s)
+0 jeton-index :: ✅ 23 vert(s), 0 rouge(s)
+0 abonnement :: ✅ abonnement : 103 contrôles verts.
+0 discord-oauth :: 32 vert(s), 0 rouge(s).
+0 profil-oauth :: 41 vert(s), 0 en échec
+0 facture-pro :: 99 ✅ · 0 ❌
+0 test:securite-routes :: # pass 5 # fail 0 
+0 test:rls-migrations :: # pass 2 # fail 0 
+0 test:connexion-session :: # pass 15 # fail 0 
+0 test:recuperation-auth :: # pass 6 # fail 0 
+0 test:lien-email-session :: # pass 8 # fail 0 
+0 test:securite-revue-11nov :: # pass 6 # fail 0 
+0 test:pdf-bombe :: # pass 1 # fail 0 
+0 test:isolation-comptes :: # pass 9 # fail 0 
+0 test:vinted-connect-extension :: # pass 7 # fail 0 
+banc recuperation-retour : vert · banc csp (Chromium, CSP servie depuis vercel.json) : tout vert
+banc accueil : 166 verts, 3 rouges sans lien avec cette revue (prix des CGV, mention Vestiaire, film)
+audit-a-envoyer-preuves : 2 rouges, déjà rouges sur origin/main ; audit-pagination-ordre : 1 rouge, déjà rouge sur origin/main
+Rouge sur origin/main (git archive + test copié) : lien-email-session 6/7, securite-revue-11nov 6/6, pdf-bombe 1/1
+```
