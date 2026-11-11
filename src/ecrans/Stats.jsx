@@ -14,7 +14,7 @@ import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/c
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
+import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -30,6 +30,7 @@ import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
 // ⟦← App.jsx #4⟧
 import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
 import SourcesAchats from "../SourcesAchats.jsx";
+import MeilleuresSources from "../MeilleuresSources.jsx";
 import MargePlateforme from "../MargePlateforme.jsx";   // (10 nov., lot I) marge par plateforme — un bloc isolé
 import VitesseEnvoi from "../VitesseEnvoi.jsx";   // (10 nov., lot BM) vitesse d'envoi — un bloc isolé
 import AvisLus from "../AvisVinted.jsx";   // (10 nov., lot BN) les avis Vinted lus   // (10 nov., lot BG) d'où viennent mes achats — un bloc isolé
@@ -2077,6 +2078,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
       {/* (10 nov., lot BG) « D'où viennent mes achats » : lu dans `vrm_sources_ventes` (src/sourceAchats.js), sur la période. */}
       <SourcesAchats owner={(AUTH.user && AUTH.user.id) || ''} de={b.de} a={b.a}/>
+      {/* (11 nov.) « Tes meilleures sources » : lu dans `vrm_meilleures_sources` (src/meilleuresSources.js), depuis le début. */}
+      <MeilleuresSources owner={(AUTH.user && AUTH.user.id) || ''} Retour={FermeAuRetour} ici="argent"/>
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
