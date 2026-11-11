@@ -1438,3 +1438,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot equipe-pret)
 
 - **11 nov. · Équipe prête à activer** : la 016 ne referme plus la lecture sans abonnement si la 027 passe avant (les deux ordres marchent) ; « Envoyer l'invitation » à partager (aucun lien secret) ; l'aide sans la 016 lit « le vendeur doit l'activer » ; SQL à coller dans `scripts/equipe-sql/`. `docs/passation/2026-11-11-equipe-pret.md`. Geste : confirmation d'e-mail, puis les 3 SQL (pas à pas §4).
+
+
+## Ligne déplacée de CLAUDE.md §9 (11 nov., restes) — telle quelle
+
+- **11 nov. · Clôturer l'année** : Argent → Déclarer (déc.–mai), 8 étapes CONSTATÉES (règles existantes) + portes ; « J'ai fini » = son clic (`vrm_cloture_annee`) ; Ma journée déc./janv. une fois. Sites officiels injoignables ici : cases/seuils non revérifiés. `2026-11-11-cloture-annee.md`.
+- **11 nov. · iPad (branche `claude/ipad`)** : au doigt dès 744 × 600 px, coque ORDINATEUR (rail, île, liste + fiche) ; règle largeur + pointeur dans `src/coque.js`, recopiée mot pour mot dans les CSS (`audit-coque-tablette`) ; `data-tablette` (large/etroite) ⇒ `styles-tablette.css` : 44 px, rail libellé ≤ 1199, rien au survol ; rotation sans remontage ; iPhone couché = téléphone. Banc `ipad.cjs`. `docs/passation/2026-11-11-ipad.md`. Geste : aucun.
