@@ -6,7 +6,65 @@ Demande de Julien : « pour les retours on doit avoir les bordereaux à imprimer
 **Session ARRÊTÉE sur demande de Julien (relayée par la session principale) avant toute ligne de code.**
 Rien n'a été modifié dans `src/`, `api/` ni l'extension. Aucune écriture en base (lectures SQL seulement).
 
-## ÉTAT À LA REPRISE
+## REPRISE DU 11 NOV. (soir) — FAIT
+
+Code écrit et poussé (branche `claude/retours-litiges`). Extension : **rien** (la 5.359.0 n'est pas prise :
+tout arrive par e-mail). Aucune écriture en base.
+
+### Ce qui change pour lui
+- **Achats → « Retours »** (au-dessus des listes, à côté du bloc « à renvoyer ») : une carte par bordereau
+  de retour reçu par e-mail — N° de la paire (celui de la fiche reliée à CET achat par son clic, sinon
+  « Sans N° »), « À déposer avant le 18 nov. à 23 h 59 » (ambre à moins de 48 h ; « Date limite non lue »
+  sinon), le suivi du colis de retour (statut du transporteur, trois états), « Pas encore remboursé » ou
+  « Remboursé 45,90 € » (« en partie » si moins que payé), **« Imprimer le bordereau »** : SON PDF (lu par
+  son n°, à l'impression seulement), tamponné **« RETOUR · N°31 »** + titre (`src/tamponRetour.js`), ouvert
+  dans la visionneuse (téléchargé sur iPhone). « Voir sur Vinted ↗ ». Remboursés de plus de 30 j : repliés.
+- **« Tout imprimer » → section « Retours »** (après « Étiquette dans eBay ») : les bordereaux de retour pas
+  encore remboursés, imprimés un par un (pas mêlés au PDF des envois : un retour ne passe pas « prêt à
+  déposer » des ventes). Une section AJOUTÉE, la feuille du lot DJ3 n'est pas réécrite.
+- **Litiges → « Pas à pas »** sur chaque carte : feuille avec la PREUVE (transaction / e-mail / les deux /
+  eBay — la vente n'est en retour que si c'est prouvé, règle inchangée de `src/litiges.js`), les **délais avec
+  leur source** (date LUE dans l'e-mail ou par eBay, sinon « Vinted ne l'écrit pas » ; « vérifier la paire :
+  2 jours après réception » = règle écrite par Vinted dans ses e-mails de retour), les étapes (répondre ·
+  attendre · le colis revient · reçu · remboursé · remise au stock), ses preuves (photo du carton, bordereau
+  de départ), **« Préparer mon dossier »** (le PDF du lot BJ), **« Paire revenue · N°21 »** ⇒
+  `remettreDepuisCarte` existant (SON N°, conflit DEMANDÉ, jamais un nouveau N°) — grisé « Sans N° : pose son
+  N° d'abord » sans identité —, **« Pas la bonne paire / abîmée ↗ »** ⇒ SA conversation (« Signale-le sur le
+  site avant le remboursement »).
+- **Compta** : un achat dont le remboursement est PROUVÉ par e-mail (même n°, montant ≥ payé) sort des
+  coûts tout de suite (`avecRemboursementsProuves` posé sur `buysBase` : son statut devient « Remboursement
+  effectué », ce que `achatAnnule` — Dépensé, registre des achats, export — voit) ; partiel ⇒ rien ne bouge.
+  Une vente en retour / remboursée n'entre dans aucun mois du CA déclaré (règle existante, PROUVÉE par l'audit
+  sur `api/_lib/ventes-regle.js`).
+
+### Serveur (`api/email-inbound.js`, avant toute autre branche ; règle pure `api/_lib/retour-email.js`)
+- Sujet `Bordereau de retour…` ⇒ n° de transaction de la pièce `Bon-Retour-Vinted-{tx}.pdf` puis du corps (deux
+  n° différents ⇒ rien), une seule pièce PDF exigée, suivi, limite (corps puis sujet, heure de Paris via
+  `lireDateLimite`), article ⇒ `email_bordretour_{tx}` (PDF ENTIER) + notification « ↩️ Bordereau de retour
+  reçu » (famille colis, ouvre l'achat). Illisible ⇒ `garderInconnu` « bordereau de retour : <raison> »
+  (« à vérifier »), écriture ratée ⇒ 503.
+- « La commande "…" a été remboursée ! » + « paiement que tu as fait » ⇒ `email_rembachat_{tx}` (montant,
+  date estimée — JAMAIS le moyen de paiement ni ses chiffres) ; sans n° ou sans montant ⇒ la famille d'avant.
+- « Retourne ta commande d'ici le … » : inchangé (aucun n°, lu par `src/litiges.js`).
+- App : lecture en PROJECTION (`meta->>`, `_pdf`), cache 5 min (`fetchRetoursAchat`).
+
+### Preuves
+- `scripts/audit-retours-litiges.cjs` (EXÉCUTE la route sur des e-mails INVENTÉS à la forme mesurée + règles
+  de l’app + tampon sur un vrai PDF + compta) : **38/38** ; sur l'arbre d'avant (1c8e0a07, git archive) :
+  **15 rouges** (le bordereau de retour sortait « ignoré », le remboursement « connu-sans-action ») ;
+  `--prouve` : voir ci-dessous.
+- Banc `scripts/bancs/retours-litiges.cjs` (390 tactile clair/sombre, 1512 clair) : voir ci-dessous.
+- Touchés et verts : audit-litiges-ecran, litiges, retours-stock, lbc-suppression, variables, tdz,
+  coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf ; traduction : seul C2
+  rouge, DÉJÀ rouge avant ce lot (clés de navigation, pas ce lot).
+
+### Reste
+- Leboncoin / Vestiaire / eBay : aucun bordereau de retour d'ACHAT jamais vu ⇒ rien (Vinted seul).
+- Le PDF du 8 nov. reste perdu (brut tronqué) : à retélécharger sur Vinted s'il sert encore.
+- Un « Remboursé » d'achat sans bordereau de retour = une annulation : pas de carte « Retours » (il sort des
+  coûts quand même, prouvé par son n°).
+
+## ÉTAT À LA REPRISE (première session, avant tout code — gardé tel quel)
 
 ### Fait
 - Branche créée et poussée (`claude/retours-litiges`, même tête que `claude/revue-colis` + ce récit).
