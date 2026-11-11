@@ -279,3 +279,13 @@ Téléphone : barre d'onglets en bas, icône + libellé, l'actif en bleu, pastil
 - **Don't** deviner un transporteur pour poser un logo : rien lu, rien posé.
 - **Don't** remettre `-webkit-overflow-scrolling: touch` sur un conteneur qui peut contenir une feuille (§7).
 - **Don't** animer plus de 250 ms, ni sans `prefers-reduced-motion` respecté.
+
+## Règles de la revue du 11 nov.
+
+Issues de la revue `docs/passation/2026-11-11-revue-design.md` (captures `docs/revue-design-2026-11-11/`). Elles décrivent la cible : les lots A–F de la revue y mènent.
+
+1. **Le contenu dans le premier écran.** Sur un écran-liste, le premier élément est visible sans défiler à 390 × 844 et à 1512 × 950. Au-dessus : l'en-tête, UNE rangée d'outils, au plus une bande de chiffres de 112 px. Jamais une tuile seule sur sa ligne.
+2. **Un bleu par écran, jamais par ligne.** Une action répétée sur chaque rangée (imprimer, rejoindre, choisir) est secondaire (`--d-remplir`) ; le seul aplat bleu est l'action groupée de l'en-tête. Même règle pour l'ambre : un point de 7 px, jamais un encadré ni un fond sur chaque ligne.
+3. **Aucun contrôle natif nu.** Pas de `<select>`, de case à cocher, d'heure ou de `<details>` au style du navigateur : une rangée de choix qui ouvre une feuille, l'interrupteur iOS, `vrm-repli`. Tous les onglets sont `Segmente` (un seul niveau par écran) ou `vrm-filtres`.
+4. **Les tailles suivent le pointeur.** 44 px est la cible au doigt (`pointer: coarse`) ; à la souris, rangées et pilules en 32–36 px, texte de liste 15 px, grand titre 28 px. L'ordinateur ne reprend pas l'échelle du téléphone agrandie.
+5. **Le vide et le zéro ne s'affichent pas en grand.** Un « — » ou un 0 s'écrit à la taille du texte, avec sa raison ; une section sans donnée se replie dans une phrase ; un même vide se dit une fois par écran ; « (s) » ne s'écrit jamais (pluriel calculé).

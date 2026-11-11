@@ -11,7 +11,7 @@
 // de 3 heures après la fin des heures calmes (un appel GitHub peut être en
 // retard) ; un seul récapitulatif par jour (`push_reveil`, écrit AVANT l'envoi :
 // un envoi raté ne part pas deux fois).
-import { reglageCalme, minutesParis, FAMILLES } from './notif-textes.js';
+import { reglageCalme, minutesParis, FAMILLES, reglageJours, jourCalme } from './notif-textes.js';
 
 export const ID_REVEIL = 'push_reveil';
 export const FENETRE_MIN = 180;
@@ -38,9 +38,18 @@ const accord = (n, id, titre) => (n > 1 ? `${n} ${PLURIEL[id] || titre.toLowerCa
 
 // Rend `{ envoyer: false, raison }` ou `{ envoyer: true, jour, title, body, url, n }`.
 // `lu` : `null` = pas su ⇒ on ne compte rien (« pas su » n'invente pas un nombre).
-export function resumeReveil({ prefs, journal, lu, dejaJour, maintenant }) {
+// (11 nov.) LES JOURS CALMES : un jour calme, rien ne part (le réveil attend le
+// premier matin non calme) ; ce matin-là, tout ce qui a été gardé depuis le
+// dernier récapitulatif (`dejaSeq`, le plus grand numéro déjà dit) est compté —
+// un week-end entier, des congés — au plus 30 jours (la cloche n'en garde pas plus).
+// Sans `dejaSeq` (mémo d'avant) : depuis le dernier récapitulatif (`dejaAt`) ; sans
+// aucun récapitulatif, 30 jours si des jours calmes sont posés, sinon 24 h comme avant.
+// Toujours les seules NON LUES.
+export function resumeReveil({ prefs, journal, lu, dejaJour, dejaSeq = null, dejaAt = null, maintenant }) {
   const c = reglageCalme(prefs);
-  if (!c.actif) return { envoyer: false, raison: 'calme-eteint' };
+  const rj = reglageJours(prefs);
+  if (!c.actif && !rj.jours.length && !rj.conges) return { envoyer: false, raison: 'calme-eteint' };
+  if (jourCalme(prefs, maintenant)) return { envoyer: false, raison: 'jour-calme' };
   const f = minutesDe(c.fin), d = minutesDe(c.debut), m = minutesParis(maintenant);
   if (f == null || d == null || m == null || d === f) return { envoyer: false, raison: 'reglage' };
   const depuisFin = (m - f + 1440) % 1440;
@@ -51,11 +60,17 @@ export function resumeReveil({ prefs, journal, lu, dejaJour, maintenant }) {
   if (lu === null || journal === null) return { envoyer: false, raison: 'pas-su' };
   const entrees = journal && Array.isArray(journal.entrees) ? journal.entrees : [];
   const parFamille = new Map();
-  let seule = null;
+  let seule = null, seqMax = Number.isSafeInteger(dejaSeq) ? dejaSeq : 0, plusVieux = maintenant;
+  const depuis = Date.parse(String(dejaAt || ''));
+  const ageMax = Number.isSafeInteger(dejaSeq) ? 30 * 86400e3
+    : Number.isFinite(depuis) ? Math.min(30 * 86400e3, Math.max(0, maintenant - depuis))
+    : (rj.jours.length || rj.conges) ? 30 * 86400e3 : 86400e3;
   for (const e of entrees) {
     if (!e || e.etat !== 'calme' || !Number.isSafeInteger(e.seq)) continue;
+    if (Number.isSafeInteger(dejaSeq) && e.seq <= dejaSeq) continue;
     const at = Date.parse(e.at);
-    if (!Number.isFinite(at) || at > maintenant || maintenant - at > 86400e3) continue;
+    if (!Number.isFinite(at) || at > maintenant || maintenant - at > ageMax) continue;
+    seqMax = Math.max(seqMax, e.seq); plusVieux = Math.min(plusVieux, at);
     if (estLue(e, lu || {})) continue;
     parFamille.set(e.famille, (parFamille.get(e.famille) || 0) + 1);
     seule = e;
@@ -68,11 +83,12 @@ export function resumeReveil({ prefs, journal, lu, dejaJour, maintenant }) {
   // (8 nov.) UNE seule gardée : elle sonne telle quelle (son titre, son geste, son
   // écran) — « 1 notification · 1 code de retrait » ne disait pas lequel.
   if (n === 1 && seule && seule.titre) {
-    return { envoyer: true, jour, n, title: seule.titre, body: seule.texte || '', url: typeof seule.url === 'string' && seule.url.startsWith('/') ? seule.url : '/?tab=journee&cloche=1' };
+    return { envoyer: true, jour, n, seq: seqMax, title: seule.titre, body: seule.texte || '', url: typeof seule.url === 'string' && seule.url.startsWith('/') ? seule.url : '/?tab=journee&cloche=1' };
   }
   return {
-    envoyer: true, jour, n,
-    title: `Cette nuit : ${n} notification${n > 1 ? 's' : ''}`,
+    envoyer: true, jour, n, seq: seqMax,
+    // Gardées depuis plus d'un jour (week-end, congés) : « Pendant ta pause ».
+    title: `${maintenant - plusVieux > 86400e3 ? 'Pendant ta pause' : 'Cette nuit'} : ${n} notification${n > 1 ? 's' : ''}`,
     body: morceaux.join(' · '),
     url: '/?tab=journee&cloche=1',
   };

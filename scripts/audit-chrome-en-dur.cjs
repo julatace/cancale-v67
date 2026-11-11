@@ -63,8 +63,12 @@ const fichiers = [];
 const trouves = [];
 for (const f of fichiers) {
   const lignes = sansCommentaires(fs.readFileSync(f, 'utf8')).split('\n');
+  // (11 nov., lot traduction) Les textes de la page publique vivent aussi dans les
+  // dictionnaires (`"accueil.…"`, src/i18n/langues/) : hors de l'audit comme Accueil.jsx.
+  const dico = /[\\/]i18n[\\/]langues[\\/]/.test(f);
   lignes.forEach((l, i) => {
     if (/userAgent|User-Agent/.test(l)) return;              // repère d'agent, pas une phrase
+    if (dico && /^\s*"accueil\./.test(l)) return;
     for (const re of FORMES) if (re.test(l)) { trouves.push(`${path.relative(RACINE, f)}:${i + 1} « ${(l.match(new RegExp('.{0,30}' + re.source.replace(/^\\b/, '') + '.{0,20}')) || [l.trim().slice(0, 80)])[0].trim()} »`); break; }
   });
 }

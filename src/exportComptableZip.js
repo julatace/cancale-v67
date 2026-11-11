@@ -138,8 +138,8 @@ export async function zipExportComptable(d, j = { ventes: [], registreCsv: null,
 
 // Le partage natif (feuille de partage du téléphone, du Mac) ; sinon le téléchargement.
 // Rend 'partage' · 'annule' (il a fermé la feuille : rien d'autre) · 'telecharge'.
-export async function partagerOuTelecharger(octets, nom, { nav = globalThis.navigator, telecharger } = {}) {
-  const type = 'application/zip';
+// (11 nov., lot rapport-mois) `type` : le Rapport du mois partage un PDF par la même voie.
+export async function partagerOuTelecharger(octets, nom, { nav = globalThis.navigator, telecharger, type = 'application/zip' } = {}) {
   try {
     if (nav && typeof nav.share === 'function' && typeof nav.canShare === 'function' && typeof File === 'function') {
       const fichier = new File([octets], nom, { type });

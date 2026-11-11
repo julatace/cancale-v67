@@ -287,7 +287,7 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
 
   console.log('── 8. Le branchement dans App.jsx (lu dans le code, sans commentaires)');
   const A = sansCommentaires(APP);
-  dit(/const REGLES_CARTE = \{ bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, beneficeDesJours, debutPeriode, decalerPeriode, fmt \}/.test(A), 'les règles passées à la carte sont les propriétaires');
+  dit(/const REGLES_CARTE = \{ bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, beneficeDesJours, debutPeriode, decalerPeriode, fmt(, progressionObjectif, urssafAPayer: urssafAPayerCarte)? \}/.test(A) && (!/urssafAPayerCarte/.test(A) || /const urssafAPayerCarte = [\s\S]{0,400}montantPeriodeUrssaf\(due, ligne, tauxUrssaf\(\)\)/.test(A)), 'les règles passées à la carte sont les propriétaires');
   dit(/const bilanVentes = React\.useCallback\(\(depuisTs, jusquaTs\) => bilanLignes\(vendus\.lignes, depuisTs, jusquaTs\)/.test(A), 'le vendu de Ventes (`bilanVentes`) passe par la même `bilanLignes`');
   dit(/const B = beneficeDe\(\{ pub, compta, ligneUrssaf, regime \}, periode\);/.test(A) && /beneficeDe: \(p\) => \(\{ B: beneficeDe\(\{ pub, compta, ligneUrssaf, regime \}, p\), etat \}\)/.test(A), 'Compta et la carte lisent le bénéfice par la même `beneficeDe`');
   dit(/lignes: liveStats\.venduLignes/.test(A), 'le vendu de la carte = les lignes de `ventesFaites` de la coque (liveStatsVus)');

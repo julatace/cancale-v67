@@ -18,7 +18,8 @@ import { normaliserSuivi } from './etat-colis-email.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // (10 nov., lot BC) `lundi` : la semaine (AAAA-MM-JJ, un lundi) de l'écran « Ma semaine ».
-const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi', 'session'];
+const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne', 'lundi', 'session', 'rappel'];
+// (11 nov., rappels perso) `rappel` : l'identifiant d'un rappel posé par le vendeur (api/_lib/rappels-perso.js).
 
 export function lienNotif(tab, o = {}) {
   const p = { tab, ...o };
@@ -49,12 +50,16 @@ export const DESTINATIONS = {
   vente: ({ tx } = {}) => lienNotif('ventes', { site: 'vinted', ...(tx ? { cible: 'vente', tx } : {}) }),
   // (5 nov.) Ventes · Vestiaire · la vente (identité = le productId de l'annonce).
   vcVente: ({ id } = {}) => lienNotif('ventes', { site: 'vestiaire', ...(id ? { cible: 'vcvente', vc: id } : {}) }),
-  // Colis · la carte du colis à poster (ou la colonne « Prêts à imprimer »).
-  colis: ({ tx } = {}) => lienNotif('cat_bord', tx ? { cible: 'colis', tx } : { cible: 'colonne', colonne: 'prets' }),
-  // Colis · « À retirer » · la carte (par transaction ou n° de suivi).
-  retrait: ({ tx, suivi } = {}) => lienNotif('cat_bord', (propre(tx) || propre(suivi)) ? { cible: 'retrait', tx, suivi } : { cible: 'colonne', colonne: 'retirer' }),
+  // (11 nov., lots DJ3 et `notifs-groupees`) Les colis vivent dans Ventes (« À expédier »)
+  // et dans Achats (« À retirer ») : une notification n'ouvre plus jamais l'onglet Colis
+  // (src/colisPlace.js — un ancien lien `cat_bord` y est redirigé, mais on n'en fabrique plus).
+  // Ventes · « À expédier » · la carte du colis à poster (ou la colonne « Prêts à imprimer »).
+  colis: ({ tx } = {}) => lienNotif('ventes', tx ? { cible: 'colis', tx } : { cible: 'colonne', colonne: 'prets' }),
+  // Achats · « À retirer » · la carte (par transaction ou n° de suivi).
+  retrait: ({ tx, suivi } = {}) => lienNotif('achats', (propre(tx) || propre(suivi)) ? { cible: 'retrait', tx, suivi } : { cible: 'colonne', colonne: 'retirer' }),
   // Achats (la liste complète) · la ligne de l'achat.
-  achat: ({ tx } = {}) => lienNotif('cat_achats', { vue: 'achats', ...(tx ? { cible: 'achat', tx } : {}) }),
+  // (11 nov.) L'écran Achats lui-même (`cat_achats` mène désormais à « À retirer », src/colisPlace.js).
+  achat: ({ tx } = {}) => lienNotif('achats', { vue: 'achats', ...(tx ? { cible: 'achat', tx } : {}) }),
   // Comptabilité · « Ta déclaration URSSAF ».
   urssaf: () => lienNotif('compta', { cible: 'urssaf' }),
   // L'écran où se règle une double vente : eBay → Annonces (« Retirer d'eBay »)

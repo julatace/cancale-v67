@@ -89,7 +89,7 @@
 .vrm-emb-recap-etat { flex: none; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-emb-recap-ligne[data-emb-complet="1"] .vrm-emb-recap-etat { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
 
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-emb-cadre { padding-top: 24px; }
   .vrm-emb-num { font-size: 168px; }
   .vrm-emb-photo { width: 120px; height: 120px; }
