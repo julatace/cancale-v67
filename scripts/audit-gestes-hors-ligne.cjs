@@ -51,6 +51,20 @@ async function juger(dir, bavard = true) {
   const U = 'uid-julien';
   const opt = (N, extra = {}) => ({ uid: U, lire: lireN(N), ecrire: ecrireN(N), cleNum, ...extra });
 
+  // 16. (11 nov.) La photo d'un achat (ligne à part) : 503 ⇒ elle reste en attente, rien n'est sauté ;
+  //     la panne finie, elle part UNE fois.
+  {
+    const st = G.stockageMemoireGestes();
+    await G.noterLigne(st, U, { ligne: 'achat_hors_photo', id: 'ob_9', valeur: 'data:x' });
+    let n = 0; const envoyerLigne = async () => { n++; return n === 1 ? { status: 503 } : { ok: true }; };
+    const lire = async () => ({ existe: true, data: { rev: 1 }, rev: 1 });
+    const b1 = await G.rejouer({ stockage: st, uid: U, lire, ecrire: async () => ({ ok: true }), cleNum, envoyerLigne });
+    let g = await G.lireGestes(st, U);
+    dit(b1.arret === 503 && g.length === 1 && g[0].etat === 'attente', '16. photo d\'achat : 503 ⇒ en attente, rien sauté', JSON.stringify({ b1, g: g.map((x) => x.etat) }));
+    const b2 = await G.rejouer({ stockage: st, uid: U, lire, ecrire: async () => ({ ok: true }), cleNum, envoyerLigne });
+    g = await G.lireGestes(st, U);
+    dit(b2.envoyes === 1 && g[0].etat === 'envoye' && n === 2, '16. la panne finie, la photo part une fois', JSON.stringify({ b2, n }));
+  }
   // 1. noter
   {
     const st = G.stockageMemoireGestes();
@@ -265,7 +279,9 @@ const MUTATIONS = [
   ['N° pris au pool accepté', (s) => s.replace("if (dansPool && !g.dejaDansPool) return", "if (false) return")],
   ['pool pas complété', (s) => s.replace("if (!dansPool) data2 = { ...data2, [CLE_POOL]: [...pool, g.apres] };", '')],
   ['lecture ratée ⇒ on écrit', (s) => s.replace("if (!snap) { bilan.arret = 'pas-su'; return bilan; }", "if (!snap) snap = { existe: true, data: {}, rev: 0 };")],
-  ['429 ⇒ on saute le geste', (s) => s.replace("bilan.arret = (r && r.status) || 0; return bilan;", "fini = true; break;")],
+  // (11 nov.) La DERNIÈRE occurrence : celle de l'écriture de `main` (la première est celle d'une ligne à part, la photo).
+  ['429 ⇒ on saute le geste', (s) => { const k = "bilan.arret = (r && r.status) || 0; return bilan;"; const i = s.lastIndexOf(k); return i < 0 ? s : s.slice(0, i) + "fini = true; break;" + s.slice(i + k.length); }],
+  ['429 sur la photo ⇒ on la saute', (s) => s.replace("bilan.arret = (r && r.status) || 0; return bilan;", "continue;")],
   ['devancé ⇒ écrase sans relire', (s) => s.replace("snap = s2; continue;", "snap = { ...snap, rev: s2.rev }; continue;")],
   ['avant d\'origine perdu', (s) => s.replace("gestes[i] = { ...g, apres: clone(d.apres), at: maintenant };", "gestes[i] = { ...g, avant: clone(d.avant), apres: clone(d.apres), at: maintenant };")],
   ['« Annuler » envoyé quand même', (s) => s.replace("if (memeVal(g.avant, d.apres)) { gestes.splice(i, 1); continue; }", '')],
