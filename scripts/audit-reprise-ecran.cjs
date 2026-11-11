@@ -124,7 +124,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const menu = (app.match(/function MenuEcrans[\s\S]*?\n\}/) || [''])[0];
     dit(/<FermeAuRetour fermer=\{\(\)=>setOpen\(false\)\}\/>\s*<div ref=\{panneau\} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas/.test(menu), '« Plus » se ferme au geste retour (FermeAuRetour), le retour ne quitte plus VRM');
     dit(/data-plus-ecran=\{courant\?cleEntree\(courant\):''\}/.test(menu), 'la 5ᵉ place dit l’écran de « Plus » où l’on est');
-    dit(/t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système');
+    // (11 nov.) Depuis la décision de Julien du 9 nov. (b6cde2bc) il n'y a plus de changement d'onglet au doigt :
+    // soit aucun balayage d'onglet n'est écouté (`swipeStart`, `slideTab(` au doigt), soit il laisse les bords.
+    const balayageOnglet = /swipeStart\.current=\{x:t\.clientX/.test(app) || /onTouchEnd=\{[^\n]*\n?[\s\S]{0,400}slideTab\(/.test(app);
+    dit(!balayageOnglet || /t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système (aucun balayage d’onglet au doigt depuis le 9 nov.)');
     dit(/const badgesBarre=badges\?\{\.\.\.badges,ventes:undefined\}:badges;/.test(app) && /<BadgeNav t=\{t\} badges=\{badgesBarre\} place="barre"\/>/.test(app), 'dans la barre, Ventes ne répète pas le nombre de Colis (§7)');
     dit(/viderParcours\(sessionStorage,garder\); viderParcours\(localStorage,garder\);/.test(app), 'à la connexion d’un autre vendeur, ses reprises seules restent');
   });

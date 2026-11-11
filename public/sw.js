@@ -62,6 +62,42 @@ async function purgerAncienneVersion(res) {
   await cache.put(REPERE, new Response(principal));
 }
 
+// ── La coquille de l'app (11 nov., lot app-installable) ──────────────────────
+// Les adresses servies par index.html (l'app et la page d'accueil). Le reste
+// (pages statiques) ne touche jamais au cache de la coquille.
+function estCoquille(url) {
+  return url.origin === self.location.origin && (url.pathname === '/' || url.pathname === '/index.html');
+}
+// La coquille gardée, seulement si son script principal ET ses feuilles sont en
+// cache. Une coquille dont un fichier manque n'est pas servie (écran blanc).
+async function coquilleComplete(cache) {
+  const res = await cache.match('/');
+  if (!res || !res.ok) return null;
+  const html = await res.clone().text();
+  const noms = (html.match(/\/assets\/[A-Za-z0-9._-]+\.(?:js|css)/g) || []);
+  const principal = noms.find(n => /\/assets\/index-[^/]+\.js$/.test(n));
+  if (!principal) return null;
+  const requis = [principal, ...noms.filter(n => /\.css$/.test(n) && /\/assets\/index-/.test(n))];
+  for (const n of new Set(requis)) if (!(await cache.match(n))) return null;
+  return res;
+}
+// Relit la coquille au réseau, sans rien servir : rangée pour la prochaine ouverture.
+// Ses fichiers (`/assets/`, immuables) sont rangés AVANT elle : la prochaine
+// ouverture est instantanée ET à jour. Un fichier qui manque ⇒ coquille pas rangée.
+async function relireCoquille(req, cache) {
+  const fresh = await fetch(req.url, { cache: 'no-store', credentials: 'same-origin' });
+  if (!fresh || !fresh.ok || fresh.type !== 'basic') return;
+  const html = await fresh.clone().text();
+  const noms = [...new Set(html.match(/\/assets\/[A-Za-z0-9._-]+\.(?:js|css)/g) || [])].slice(0, 40);
+  for (const n of noms) {
+    if (await cache.match(n)) continue;
+    const r = await fetch(n, { credentials: 'same-origin' });
+    if (!r || r.status !== 200 || r.type !== 'basic') return;
+    await cache.put(n, r);
+  }
+  await cache.put('/', fresh);
+}
+
 // ── Notifications push (ventes en temps réel, même app fermée) ──
 // (5 nov.) Le serveur joint le numéro de l'entrée du centre de notifications
 // (`notif`) : ajouté à l'adresse, l'app marque cette entrée lue à l'ouverture.
@@ -115,14 +151,17 @@ self.addEventListener('notificationclick', event => {
   const d = event.notification.data || {};
   const url = (event.action && d.actions && d.actions[event.action]) || d.url || '/';
   event.waitUntil((async () => {
+    // (11 nov., lot app-installable) Seule une fenêtre de L'APP (la coquille `/`)
+    // sait sauter d'écran : une page statique ouverte (aide, CGU, statut) ne
+    // l'entend pas. La plus récemment vue d'abord. Aucune ⇒ l'app s'ouvre sur
+    // l'adresse (l'app installée sur iPhone et Android, l'onglet ailleurs).
     const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const c of all) {
-      if ('focus' in c) {
-        await c.focus();
-        // App déjà ouverte : on lui dit vers quel onglet sauter.
-        try { c.postMessage({ type: 'open-url', url }); } catch (_) {}
-        return;
-      }
+    const app = all.filter((c) => { try { return estCoquille(new URL(c.url)); } catch (_) { return false; } })
+      .sort((a, b) => (b.focused - a.focused) || ((b.visibilityState === 'visible') - (a.visibilityState === 'visible')));
+    for (const c of app) {
+      try { if ('focus' in c) await c.focus(); } catch (_) {}
+      // App déjà ouverte : on lui dit vers quel onglet sauter.
+      try { c.postMessage({ type: 'open-url', url }); return; } catch (_) {}
     }
     await clients.openWindow(url);
   })());
@@ -277,17 +316,36 @@ self.addEventListener('fetch', event => {
   // remplacé l'app en cache par les CGU. Elles vont au réseau, sans cache.
   if (url.pathname.startsWith('/legal/')) return;
 
-  // 2) Navigation : réseau d'abord, secours cache.
+  // 2) Navigation.
+  //    (11 nov., lot app-installable) Seule la COQUILLE de l'app (`/`, `/index.html`)
+  //    est rangée sous « / ». Une autre page statique (`/statut`, `/f/…`,
+  //    `/extension-retour.html`…) passait par ici et REMPLAÇAIT l'app en cache :
+  //    elle va au réseau, comme les pages légales.
+  if (req.mode === 'navigate' && !estCoquille(url)) return;
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      // (11 nov.) OUVERTURE INSTANTANÉE au 2e lancement : la coquille gardée est
+      // servie tout de suite, SI tous ses fichiers sont là (sinon : page blanche hors
+      // ligne). Le réseau la relit derrière : la suivante est la nouvelle version, et
+      // la page propose « Mettre à jour » (src/miseAJour.js). Les DONNÉES ne passent
+      // jamais par ici (Supabase, /api/ : réseau), elles sont relues par l'app.
+      // Un rechargement demandé (`location.reload`, « Mettre à jour ») va au réseau.
+      const voulueFraiche = req.cache === 'reload' || req.cache === 'no-cache' || req.cache === 'no-store';
+      const gardee = voulueFraiche ? null : await coquilleComplete(cache);
+      if (gardee) {
+        event.waitUntil(relireCoquille(req, cache).catch(() => {}));
+        event.waitUntil(purgerAncienneVersion(gardee.clone()).catch(() => {}));
+        return gardee;
+      }
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(CACHE);
-        cache.put('/', fresh.clone()).catch(() => {});
-        if (fresh.ok) event.waitUntil(purgerAncienneVersion(fresh.clone()).catch(() => {}));
+        if (fresh.ok) {
+          cache.put('/', fresh.clone()).catch(() => {});
+          event.waitUntil(purgerAncienneVersion(fresh.clone()).catch(() => {}));
+        }
         return fresh;
       } catch (_) {
-        const cache = await caches.open(CACHE);
         const cached = (await cache.match('/')) || (await cache.match(req));
         if (cached) return cached;
         // ⚠️⚠️ JAMAIS `Response.error()` SUR UNE NAVIGATION. Mesuré chez Julien :
