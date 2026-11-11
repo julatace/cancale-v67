@@ -750,6 +750,8 @@
 
 @media (min-width: 1024px) {
   .vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row { grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) var(--p-g-montant) 44px !important; padding-right: 10px !important; }
+  /* (11 nov., lot alertes-ebay) Une annonce signalée : photo, contenu, puis ses deux gestes. */
+  .vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row.vrm-alerte-ebay { grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) auto !important; }
 }
 
 /* ══ 11. PHASE 3 (9 nov.) — les écrans restants, la même grammaire ══════════ */
