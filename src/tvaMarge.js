@@ -18,7 +18,7 @@
 // certain. Ce sont les références habituelles du régime, à relire par un humain.
 export const SOURCES_TVA_MARGE = [
   { cle: 'regime', regle: "Régime de la marge : la revente de biens d'occasion achetés à des particuliers (ou à des vendeurs qui n'ont pas facturé de TVA).", ref: 'CGI art. 297 A ; BOFiP BOI-TVA-SECT-90-20-20' },
-  { cle: 'base', regle: "La TVA se calcule sur la marge = prix de vente − prix d'achat de CETTE paire ; la marge est « TVA comprise » : TVA = marge × 20/120.", ref: 'CGI art. 297 A, I-1° ; BOI-TVA-SECT-90-20-20' },
+  { cle: 'base', regle: "La TVA se calcule sur la marge = prix de vente − prix d'achat de ce qui est vendu ; la marge est « TVA comprise » : TVA = marge × 20/120.", ref: 'CGI art. 297 A, I-1° ; BOI-TVA-SECT-90-20-20' },
   { cle: 'taux', regle: 'Taux normal : 20 %.', ref: 'CGI art. 278' },
   { cle: 'negative', regle: "Vente à perte : aucune TVA sur cette vente, et la perte ne se retire pas des autres ventes (calcul au coup par coup).", ref: 'CGI art. 297 A, I-1° ; BOI-TVA-SECT-90-20-20' },
   { cle: 'globale', regle: "La « globalisation » (marge de la période = ventes − achats, où une perte compense) n'est permise que dans des cas précis prévus par la loi : VRM ne la fait pas. Parles-en à ton comptable.", ref: 'CGI art. 297 A, II ; BOI-TVA-SECT-90-20-20 (§ III)' },
@@ -89,7 +89,7 @@ export function venteMarge(x) {
   return { ...r, etat: margeC > 0 ? 'ok' : 'perte' };
 }
 export const RAISON_EXCLUE = {
-  achat: "prix d'achat pas saisi (ou paire pas reliée)",
+  achat: "prix d'achat pas saisi (ou achat pas relié)",
   prix: 'prix de vente payé par l’acheteur pas lu',
   date: 'pas de date de livraison lue',
 };

@@ -138,7 +138,7 @@ export default function HistoriqueSites() {
           }
           return { etat: 'main', raison: 'Lecture longue : elle continue carte ouverte.', geste: 'Garde Paramètres → Mon historique ouvert.' };
         }
-        if (!vmrExtPresent()) return { etat: 'refus', raison: 'L’extension ne répond pas ici : rien n’est parti.', geste: 'Ouvre VRM dans le Chrome où l’extension est installée.' };
+        if (!vmrExtPresent()) return { etat: 'refus', raison: 'L’extension ne répond pas ici : rien n’est parti.', geste: 'Ouvre VRM dans le navigateur où l’extension est installée.' };
         let c = null; try { c = await vmrCmd({ cmd: 'importSiteTout', site: l.site, compte: l.compte }, 20000); } catch (_) { c = null; }
         if (!c || !c.accepte) return { etat: 'refus', raison: (c && c.raison) || 'L’extension n’a pas répondu.', geste: l.site === 'leboncoin' ? 'Ouvre leboncoin.fr sur ce compte, puis réessaie.' : 'Ouvre Vestiaire sur ce compte, puis réessaie.' };
         o.etape('pages', '0 page');

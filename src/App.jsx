@@ -23649,7 +23649,7 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
       // un prix réglé ne partirait pas — on le dit, rien ne part (jamais un autre prix en silence).
       if (saitFiche !== 'ok' && Number(e.apercu.prix) !== Number(p.prix)) return { accepte: false, code: 'fiche-retard', raison: `ton extension ne sait pas encore recevoir la fiche de VRM (${EXT_CAPACITES.lbcfiche}) : le prix réglé ne partirait pas` };
       let r = null; try { r = await vmrCmd({ cmd: 'lbcPublier', id: String(e.id), ...(saitFiche === 'ok' ? { annonce: v.annonce } : {}) }, 30000); } catch (_) { r = null; }
-      if (r && !r.accepte && r.code === 'confirmer') return { accepte: false, code: 'confirmer', raison: 'VRM n’a pas vu la fin d’un dépôt précédent de cette paire : si elle est en ligne, rien à refaire ; sinon relance-la depuis sa fiche Leboncoin' };
+      if (r && !r.accepte && r.code === 'confirmer') return { accepte: false, code: 'confirmer', raison: 'VRM n’a pas vu la fin d’un dépôt précédent : si l’annonce est en ligne, rien à refaire ; sinon relance-la depuis sa fiche Leboncoin' };
       if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() }); __vmrNotifier(); }
       return r;
     },

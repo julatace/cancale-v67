@@ -142,7 +142,7 @@ const dit = (c, m) => { if (c) { verts++; console.log('  ✓ ' + m); } else { ro
   const feuillesCoque = FEUILLES_AIDE.filter((e) => { const i = app.indexOf(`addEventListener('${e}'`); return i > 0 && !reg.includes(`addEventListener('${e}'`); });
   dit(feuillesCoque.length === FEUILLES_AIDE.length, 'les feuilles ouvertes par « M\'y emmener » sont écoutées par la coque');
   dit(/const rg=p\.get\('reglage'\); if\(t==='settings'&&rg&&REGLAGES_AIDE\.includes\(rg\)\)\{ DEMANDE_REGLAGE_SOUS\.id=rg;/.test(app), 'la coque ouvre le panneau `reglage=` (liste fermée)');
-  dit(/if\(id==='abonnement'\)\{ setVueBrute\('abonnement'\)/.test(reg) && /\['appareils','double','equipe'\]\.includes\(id\)\?'compte':'reglages'/.test(reg), 'Réglages sert l’abonnement et les panneaux de « Compte »');
+  dit(/if\(id==='abonnement'\)\{ setVueBrute\('abonnement'\)/.test(reg) && /\['appareils','double','equipe'(?:,'[a-z]+')*\]\.includes\(id\)\?'compte':'reglages'/.test(reg), 'Réglages sert l’abonnement et les panneaux de « Compte »');
   const envois = []; const ok = emmener(FICHES_AIDE.find((f) => f.aller.feuille), { envoyer: (n, d) => envois.push([n, d]), plusTard: (fn) => fn() });
   dit(ok && envois.length === 2 && envois[0][0] === 'vrm:aller' && envois[0][1].startsWith('?tab=') && FEUILLES_AIDE.includes(envois[1][0]), 'emmener : le chemin des liens, puis la feuille');
   dit(emmener({ aller: { lien: 'https://exemple.fr' } }, { envoyer: () => envois.push(1) }) === false, 'emmener refuse un lien qui n’est pas `?tab=`');

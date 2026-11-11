@@ -187,6 +187,16 @@ async function principal() {
   const comp = sansCom(lire('src/composants/SuiviTravail.jsx'));
   dit(/setAttribute\('inert'/.test(comp) && /beforeunload/.test(comp) && /popstate/.test(comp) && /e\.key === 'Escape'/.test(comp), 'B5 la feuille fige le reste (inert), retient le retour, Échap et la fermeture d\'onglet');
   dit(/Z_SUIVI = 15000/.test(comp) && /Z_CONFIRMATION = 20000/.test(app), 'B6 la feuille passe SOUS les confirmations (une question posée pendant le travail reste répondable)');
+  // (11 nov., intégration) Les couleurs de la feuille viennent de jetons que l'app POSE (themeMineral) :
+  // un jeton jamais posé (`--vrm-card`) retombe sur son repli clair ⇒ blanc sur blanc en mode sombre.
+  {
+    const theme = lire('src/themeMineral.js');
+    const poses = new Set([...theme.matchAll(/'(--vrm-[\w-]+)'\s*:/g)].map((m) => m[1]));
+    let css = ''; try { css = lire('src/composants/suivi-travail.css'); } catch (_) {}
+    const vus = [...new Set([...css.matchAll(/var\((--vrm-[\w-]+)/g)].map((m) => m[1]))];
+    const absents = vus.filter((v) => !poses.has(v) && !['--vrm-police', '--vrm-focus'].includes(v));
+    dit(css && !absents.length, 'B7 la feuille n’utilise que des jetons --vrm-* posés par le thème (rien de blanc sur blanc en sombre)', absents);
+  }
 }
 
 function prouver() {

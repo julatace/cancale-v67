@@ -94,7 +94,18 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     fs.mkdirSync(path.join(dir, 'src'));
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'src', 'publierPartout.js'), src.regle);
-    for (const f of ['publierAilleurs.js', 'verifAnnonce.js']) fs.copyFileSync(path.join(RACINE, 'src', f), path.join(dir, 'src', f));
+    // (11 nov., intégration) Les dépendances relatives sont copiées EN CHAÎNE (verifAnnonce lit numeroEcrit,
+    // profilVendeur… depuis d'autres lots) : une liste figée cassait le chargement sans rien dire de la règle.
+    const copies = new Set(['publierPartout.js']);
+    const copier = (f) => {
+      if (copies.has(f)) return; copies.add(f);
+      const txt = fs.readFileSync(path.join(RACINE, 'src', f), 'utf8');
+      fs.mkdirSync(path.dirname(path.join(dir, 'src', f)), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'src', f), txt);
+      for (const m of txt.matchAll(/(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s+['"](\.\/[^'"]+\.js)['"]/g)) copier(path.posix.normalize(path.posix.join(path.posix.dirname(f), m[1])));
+    };
+    for (const f of ['publierAilleurs.js', 'verifAnnonce.js']) copier(f);
+    for (const t of [src.regle, src.prix, src.suivi]) if (t) for (const m of t.matchAll(/(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s+['"]\.\/([^'"]+\.js)['"]/g)) if (!['prixPartout.js', 'publierPartoutSuivi.js'].includes(m[1])) copier(m[1]);
     if (src.prix != null) fs.writeFileSync(path.join(dir, 'src', 'prixPartout.js'), src.prix);
     if (src.suivi != null) fs.writeFileSync(path.join(dir, 'src', 'publierPartoutSuivi.js'), src.suivi);
     try { P = await import(pathToFileURL(path.join(dir, 'src', 'publierPartout.js')).href); } catch (e) { dit(false, 'la règle ne se charge pas : ' + e.message); }

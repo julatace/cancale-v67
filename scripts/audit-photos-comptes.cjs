@@ -214,7 +214,10 @@ const libre = (f) => { delete f.store.vrmEmpreintesDerniere; };
     dit(cap && cap[1] === '5.358.0' && /async function tickEmpreintes|function tickEmpreintes\(/.test(bg), 'C1 · `EXT_CAPACITES.empreintes` = 5.358.0, et `tickEmpreintes` existe', cap && cap[1]);
     const man = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'manifest.json'), 'utf8'));
     const cv = (/const CODE_VERSION = '([\d.]+)'/.exec(bg) || [])[1];
-    dit(man.version === '5.358.0' && cv === '5.358.0', 'C1 · manifeste et CODE_VERSION en 5.358.0', `${man.version} / ${cv}`);
+    // (11 nov., intégration) La capacité est ARRIVÉE en 5.358.0 ; le paquet réuni sert une version plus haute
+    // (5.365.0) : manifeste et CODE_VERSION égaux entre eux et au moins 5.358.0.
+    const vn = (v) => String(v || '').split('.').map(Number).reduce((t, x) => t * 1000 + (x || 0), 0);
+    dit(man.version === cv && vn(cv) >= vn('5.358.0'), 'C1 · manifeste et CODE_VERSION égaux, au moins 5.358.0', `${man.version} / ${cv}`);
   } catch (e) { dit(false, 'exécution', e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : String(e)); }
   console.log(ko ? `\n❌ ${ko} rouge(s)` : '\n✅ photos entre comptes : tout vert');
   process.exit(ko ? 1 : 0);

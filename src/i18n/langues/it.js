@@ -802,7 +802,7 @@ export default {
   "ebay.q.categorie.choisis": "Scegli quella giusta o cerca con altre parole.",
   "ebay.q.categorie.aucune": "eBay non propone categorie per questo titolo. Cerca con altre parole.",
   "ebay.q.categorie.passu": "eBay non ha risposto. Riprova la ricerca.",
-  "ebay.q.categorie.recherche": "Parole della categoria (es. sneakers)",
+  "ebay.q.categorie.recherche": "Parole della categoria (es. giacche, borse)",
   "ebay.q.categorie.autre": "Cerca un'altra categoria",
   "ebay.q.chercher": "Cerca",
   "ebay.q.carac.une": "eBay chiede «{nom}». Scegli il valore.",

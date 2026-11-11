@@ -140,6 +140,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // La liste FERMÉE des <img> qui ne peuvent PAS montrer une photo Vinted.
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
+      'AchatsParEmail :: a.photo': 'photo LUE dans l’e-mail d’achat par photoProduit (api/_lib/achats-email.js) : CDN fermé par site (Leboncoin, i.ebayimg.com, images.vestiairecollective.com), une seule image sinon rien ; jamais une photo Vinted, no-referrer',
       'PhotoOffreVc :: url': 'URL filtrée par urlPhotoVc : HTTPS images.vestiairecollective.com seulement, aucun identifiant dans l’URL ; ce n’est pas une photo Vinted',
       'ComptaPro :: ticketVu.src': 'ticket photographié puis compressé en data:image/jpeg dans choisirTicket, ou lu comme octets du ticket ; aucune URL d’annonce',
       'ComptaPro :: dPhoto': 'aperçu du fichier choisi, compressé en data:image/jpeg par le navigateur ; aucune URL distante',

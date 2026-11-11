@@ -50,6 +50,8 @@ const exemple = {
   // 5.318 (3 nov.) : un fil, la recette d'un envoi fait par lui.
   lbcfil: { conv: 'a1b2c3d4-0000', messages: [{ id: 'm1', t: 'Bonjour', deMoi: false, at: '2026-11-03T08:00:00Z' }], moi: 'abc', page: '/messages' },
   lbcenvoiappris: { recette: { methode: 'POST', hote: 'api.leboncoin.fr', rejouable: false, raison: 'x' } },
+  // 5.365 (11 nov., import-historique-sites) : le modèle d'une liste « Mes transactions ».
+  lbcimportmodele: { url: 'https://api.leboncoin.fr/api/transactions/v1/list?page=2', moi: 'abc' },
 };
 
 let ecoute = null; const envois = [];

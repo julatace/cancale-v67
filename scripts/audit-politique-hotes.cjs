@@ -99,6 +99,10 @@ const COUPLES = {
   'src/profilFiscal.js|www.autoentrepreneur.urssaf.fr': ['lien', LIEN + ' — le site de l’URSSAF (Ma configuration)'],
   'src/ModeVacances.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvre vinted.fr sur ce compte » (mode vacances, sur SON clic)'],
   'src/moderationVinted.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvre l’annonce sur Vinted » / « Vérifie tes messages Vinted » (alerte « Vinted a agi », sur SON clic)'],
+  // (11 nov., intégration 11nov-f) liens ouverts d'un clic arrivés avec photos-comptes, publier-partout (eBay) et vinted-pro.
+  'src/PhotosEntreComptes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir l’annonce » sur Vinted (photos sur deux comptes, sur SON clic)'],
+  'src/ebay/parametres.js|www.ebay.fr': ['lien', LIEN + ' — la page eBay de SES règles de vente (paramètres manquants, sur SON clic)'],
+  'src/vintedPro.js|www.vinted.fr': ['lien', LIEN + ' — les pages officielles Vinted Pro citées comme source (grille, guide)'],
   // (11 nov., intégration 5.355) liens ouverts d'un clic, arrivés avec les lots du paquet (clôture de l'année, « retirer des autres sites »).
   'src/ClotureAnnee.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted ↗ » (clôture de l’année, sur SON clic)'],
   'src/RetirerAilleurs.jsx|www.vinted.fr': ['lien', LIEN + ' — « à faire sur le site ↗ » (vendu ailleurs, sur SON clic)'],
