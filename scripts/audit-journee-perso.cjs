@@ -43,6 +43,7 @@ async function charger(T) {
 async function controles(T, ok) {
   let P = null, PV = null;
   try { ({ P, PV } = await charger(T)); } catch (e) { ok(false, 'R0 la règle se charge', String(e && e.message)); }
+  if (P && typeof P.ordreJournee !== 'function') { ok(false, 'R0 la règle existe (src/journeePerso.js)'); P = null; }
   if (P) {
     const cat = P.CARTES_JOURNEE;
     const zone = (z) => cat.filter((c) => c.zone === z).map((c) => c.id);
