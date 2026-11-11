@@ -34,6 +34,7 @@ import { creerRechercheEbay } from './_lib/ebay-recherche.js';
 import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
 import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
 import { televerserPhotoEbay } from './_lib/ebay-photo.js';
+import { creerRemisesEbay } from './_lib/ebay-remises.js';
 import { optionsPublication, aspectsPropres, xmlOptions, appelTrading, lireAspects, lireConditions, lirePolitiques, lireEmplacements, lirePolitiquesActivees, lireCategories, etatJeton } from './_lib/ebay-parametres.js';
 import { sbCle } from './_lib/cle.js';
 import { lireEtatJeton, keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
@@ -2035,6 +2036,9 @@ const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,api
 // (17 octobre) Après la vente : retours, annulations, promotion, achats.
 // Une annulation ACCEPTÉE marque la commande rangée « CANCELED » (comparer-et-
 // échanger) : elle sort aussitôt des colis à faire, sans attendre la synchro.
+// (11 nov., ebay-complet) Les REMISES (période, quantité) posées et retirées sur SON clic.
+const remisesEbay=creerRemisesEbay({accessToken:jetonDe,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,
+  lireAnnonces:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||'')})).filter(x=>x.itemId):[];}});
 const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,
   lireAnnonces:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),titre:String(x.title||''),prix:x.price??null})).filter(x=>x.itemId):[];},
   marquerCommandeAnnulee:async(orderId,ctx)=>{let vu=false;const r=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,(d)=>{const n=annulerCommandeRangee(d,orderId);vu=!!n;return n;});return r===true?vu:(r===null?null:false);},
@@ -2235,6 +2239,9 @@ async function handleApp(req, res) {
       changertaux:(ctx)=>apresVenteEbay.changerTaux(b,ctx),
       arreterpromo:(ctx)=>apresVenteEbay.arreterPromotion(b,ctx),
       achats:(ctx)=>apresVenteEbay.achats(b,ctx),
+      remises:(ctx)=>remisesEbay.remises(b,ctx),
+      poserremise:(ctx)=>remisesEbay.poser(b,ctx),
+      retirerremise:(ctx)=>remisesEbay.retirer(b,ctx),
       repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
       modifierannonce:(ctx)=>handleModifierAnnonceGestion(b,ctx),
       terminerannonce:async(ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;},
@@ -2284,7 +2291,7 @@ async function handleApp(req, res) {
         :'Je n\'ai pas pu relire sur quel site eBay ton compte est inscrit — rien n\'a été envoyé. Réessaie dans un moment.'});
       return;
     }
-    const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
+    const commerciales=new Set(['poserremise','retirerremise','expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
     // (2 nov., audit « plateformes » P12) Publier et changer un prix ENGAGENT
     // (une annonce mise en vente, un prix qui vend) : comme `programmer`,
     // `retirer`, `regleoffre` et `modifierannonce`, le serveur exige la

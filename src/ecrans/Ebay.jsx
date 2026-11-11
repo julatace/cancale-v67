@@ -31,7 +31,7 @@ import { relanceProposable, numeroSorti } from '../ebayRelance.js';
 // ⟦← App.jsx #6⟧
 import { GroupeIos, RangeeIos } from "../composants/Ios.jsx";
 // (11 nov., lot ebay-complet) Tous les réglages de publication, les questions, les fenêtres guidées.
-import { tr } from '../i18n/index.js';
+import { tr, date as dateTr } from '../i18n/index.js';
 import { CLE_DEFAUTS_EBAY, CLE_GUIDE_VU, defautsDepuis, fusionner as fusionnerReglagesEbay, parametresServeur, apresPublication, resume as resumeReglagesEbay, preRemplir, questions as questionsEbay, traduireErreur, DEFAUTS_USINE as REGLAGES_EBAY_USINE } from '../ebay/parametres.js';
 import FeuilleParametresEbay from '../ebay/FeuilleParametresEbay.jsx';
 import { FenetreGuideeEbay, QuestionsEbay, BoutonGuideEbay } from '../ebay/FenetresEbay.jsx';
@@ -5259,4 +5259,97 @@ function GuidesEbay({ ids = ['offre', 'vente', 'retour'] }) {
     </div>
   );
 }
-export { EbayAnnonces, EbayConnexion, EbayVentes, GuidesEbay };
+// (11 nov., ebay-complet — ajout validé par Julien) LES REMISES eBAY sur SON clic :
+// sur une période (`item_price_markdown`) ou par quantité (`VOLUME_DISCOUNT`), posées
+// et retirées ici, la date de FIN toujours dite. Jamais la livraison gratuite (§2.8 :
+// la route envoie `applyFreeShipping:false`). Route : api/_lib/ebay-remises.js.
+const finTexte = (ms) => dateTr(ms, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+function EbayRemises({ compte = 'principal' }) {
+  const C = EBAY_SKIN;
+  const [liste, setListe] = React.useState(undefined);      // undefined en cours · null pas su · [...]
+  const [raison, setRaison] = React.useState('');
+  const [annonces, setAnnonces] = React.useState(undefined);
+  const [type, setType] = React.useState('periode');
+  const [remise, setRemise] = React.useState('10');
+  const [paliers, setPaliers] = React.useState(['5', '10', '15']);
+  const [jours, setJours] = React.useState('7');
+  const [choisies, setChoisies] = React.useState({});
+  const [msg, setMsg] = React.useState('');
+  const [occupe, setOccupe] = React.useState(false);
+  const relire = React.useCallback(async () => {
+    setListe(undefined);
+    const { j } = await appelEbay({ action: 'remises', ...corpsCompteEbay(compte) });
+    if (j && j.ok) { setListe(Array.isArray(j.remises) ? j.remises : []); setRaison(''); } else { setListe(null); setRaison((j && j.error) || ''); }
+  }, [compte]);
+  React.useEffect(() => { relire(); }, [relire]);
+  React.useEffect(() => { let stop = false; (async () => {
+    const r = await lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', [{ ref: compte, principal: compte === 'principal' }]);
+    if (!stop) setAnnonces(r ? r.items.filter((x) => x && x.itemId) : null);
+  })(); return () => { stop = true; }; }, [compte]);
+  const ids = Object.keys(choisies).filter((k) => choisies[k]);
+  const fin = Date.now() + Math.max(1, Math.min(30, Number(jours) || 0)) * 86400000;
+  const prixApres = (p) => { const n = Number(String(p == null ? '' : p).replace(',', '.')); const r = Number(remise); return Number.isFinite(n) && n > 0 && r > 0 ? Math.round(n * (100 - r)) / 100 : null; };
+  const poser = async () => {
+    setMsg('');
+    if (!ids.length) { setMsg(tr('ebay.remise.aucune')); return; }
+    const corps = { action: 'poserremise', type, listingIds: ids, debut: new Date(Date.now() + 60000).toISOString(), fin: new Date(fin).toISOString(), ...(type === 'periode' ? { remise: Number(remise) } : { paliers: paliers.filter((x) => String(x).trim()).map(Number) }), ...corpsCompteEbay(compte) };
+    const ok = await askConfirm({ title: tr('ebay.remise.conf.titre'), desc: [type === 'periode' ? tr('ebay.remise.conf.periode', { n: ids.length, r: Number(remise) }) : tr('ebay.remise.conf.quantite', { n: ids.length, paliers: corps.paliers.map((p, i) => `${i + 2}+ : −${p} %`).join(' · ') }), tr('ebay.remise.conf.fin', { date: finTexte(fin) }), tr('ebay.remise.conf.port')].join('\n\n'), ok: tr('ebay.remise.conf.ok'), cancel: tr('ebay.conf.annuler') });
+    if (!ok) return;
+    setOccupe(true);
+    const { j } = await appelEbay({ ...corps, confirme: true });
+    setOccupe(false);
+    setMsg(j && j.ok ? tr('ebay.remise.posee', { date: finTexte(Date.parse(j.fin)) }) : erreurEbay(j, (j && j.error) || '').phrase + ' ' + ((j && j.error) || ''));
+    if (j && j.ok) { setChoisies({}); relire(); }
+  };
+  const retirer = async (p) => {
+    const ok = await askConfirm({ title: tr('ebay.remise.retirer.titre', { nom: p.nom }), desc: tr(/RUNNING/i.test(p.etat) ? 'ebay.remise.retirer.pause' : 'ebay.remise.retirer.supprime'), ok: tr('ebay.remise.retirer.ok'), cancel: tr('ebay.conf.annuler') });
+    if (!ok) return;
+    const { j } = await appelEbay({ action: 'retirerremise', id: p.id, confirme: true, ...corpsCompteEbay(compte) });
+    setMsg(j && j.ok ? tr('ebay.remise.retiree') : ((j && j.error) || tr('ebay.err.autre')));
+    relire();
+  };
+  const inp = { boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.card2 || C.card, color: C.text, borderRadius: 12, padding: '9px 11px', fontSize: 17, fontFamily: 'inherit', minHeight: 44 };
+  return (
+    <section data-ebay-remises={liste === undefined ? 'charge' : liste === null ? 'passu' : String(liste.length)} style={{ marginTop: 16, border: `1px solid ${C.border}`, borderRadius: 14, background: C.card, padding: 14 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 17, color: C.text }}>{tr('ebay.remise.titre')}</h3>
+      <p style={{ margin: '0 0 12px', fontSize: 13, color: C.muted }}>{tr('ebay.remise.sous')}</p>
+      {liste === undefined ? <p style={{ fontSize: 13, color: C.muted }}>…</p> : liste === null ? <p data-ebay-remises-passu style={{ fontSize: 13, color: C.muted }}>{tr('ebay.remise.passu')} {raison}</p> : liste.length ? (
+        <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+          {liste.map((p) => (
+            <div key={p.id} data-ebay-remise={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+              <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{p.nom || tr(`ebay.remise.type.${p.type}`)}</div>
+                <div data-ebay-remise-fin={p.fin || ''} style={{ fontSize: 12, color: C.muted }}>{tr(`ebay.remise.type.${p.type}`)} · {p.fin ? tr('ebay.remise.finLe', { date: finTexte(Date.parse(p.fin)) }) : tr('ebay.remise.finPasSu')}</div>
+              </div>
+              {!/ENDED/i.test(p.etat) && <Bouton variante="secondaire" data-ebay-remise-retirer={p.id} onClick={() => retirer(p)}>{tr('ebay.remise.retirer.ok')}</Bouton>}
+            </div>
+          ))}
+        </div>
+      ) : <p data-ebay-remises-vide style={{ fontSize: 13, color: C.muted }}>{tr('ebay.remise.aucuneEnCours')}</p>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+        {['periode', 'quantite'].map((t) => <button key={t} type="button" aria-pressed={type === t} data-ebay-remise-type={t} onClick={() => setType(t)} style={{ minHeight: 44, border: `1px solid ${type === t ? C.accent : C.border}`, background: type === t ? `${C.accent}12` : 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{tr(`ebay.remise.type.${t}`)}</button>)}
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+        {type === 'periode'
+          ? <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: C.text }}>{tr('ebay.remise.pourcent')}<input data-ebay-remise-pct inputMode="numeric" value={remise} onChange={(e) => setRemise(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ ...inp, width: 70 }}/>%</label>
+          : paliers.map((v, i) => <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: C.text }}>{tr('ebay.remise.palier', { n: i + 2 })}<input data-ebay-remise-palier={i} inputMode="numeric" value={v} onChange={(e) => setPaliers((l) => l.map((x, k) => (k === i ? e.target.value.replace(/\D/g, '').slice(0, 2) : x)))} style={{ ...inp, width: 64 }}/>%</label>)}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: C.text }}>{tr('ebay.remise.duree')}<input data-ebay-remise-jours inputMode="numeric" value={jours} onChange={(e) => setJours(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ ...inp, width: 64 }}/></label>
+      </div>
+      <p data-ebay-remise-fin-prevue style={{ fontSize: 13, color: C.text, margin: '0 0 10px' }}>{tr('ebay.remise.finPrevue', { date: finTexte(fin) })}</p>
+      {annonces === undefined ? <p style={{ fontSize: 13, color: C.muted }}>…</p> : annonces === null ? <p style={{ fontSize: 13, color: C.muted }}>{tr('ebay.remise.annoncesPasSu')}</p> : (
+        <div style={{ display: 'grid', gap: 4, maxHeight: 260, overflowY: 'auto', marginBottom: 10 }}>
+          {annonces.slice(0, 200).map((a) => { const id = String(a.itemId); const pa = prixApres(a.price); return (
+            <label key={id} data-ebay-remise-annonce={id} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, fontSize: 14, color: C.text, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!choisies[id]} onChange={(e) => setChoisies((c) => ({ ...c, [id]: e.target.checked }))} style={{ width: 22, height: 22 }}/>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title || id}</span>
+              {type === 'periode' && pa != null ? <span data-ebay-remise-prix={pa} style={{ flexShrink: 0, fontSize: 13, color: C.muted }}>{tr('ebay.remise.prixApres', { prix: eurEbay(pa) })}</span> : null}
+            </label>
+          ); })}
+        </div>
+      )}
+      <Bouton variante="primaire" occupe={occupe} data-ebay-remise-poser="" onClick={poser}>{tr('ebay.remise.poser', { n: ids.length })}</Bouton>
+      {msg && <p role="status" data-ebay-remise-msg style={{ fontSize: 13, color: C.text, marginTop: 8 }}>{msg}</p>}
+    </section>
+  );
+}
+export { EbayAnnonces, EbayConnexion, EbayVentes, GuidesEbay, EbayRemises };

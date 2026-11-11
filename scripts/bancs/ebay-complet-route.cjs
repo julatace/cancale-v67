@@ -49,6 +49,7 @@ const remettre = () => {
     // principal : rangé il y a 530 j pour 548 ⇒ expire dans 18 j ; l'autre : frais.
     ebay_tokens: { refresh_token: 'RT-pro', saved_at: MAINTENANT - 530 * JOUR, refresh_expires_days: 548 },
     ['ebay_tokens_' + CLE_PART]: { refresh_token: 'RT-perso', saved_at: MAINTENANT - 10 * JOUR, refresh_expires_days: 548 },
+    ebay_listings: { items: [{ itemId: '110000000001', title: 'A', price: '50' }, { itemId: '110000000002', title: 'B', price: '80' }], capturedAt: MAINTENANT },
   };
   EB = { suggestions: 'ok', aspects: 'ok', politiques: 'ok' };
   appels = [];
@@ -92,7 +93,14 @@ global.fetch = async (url, opts = {}) => {
     return xml(`<${nom}Response xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack></${nom}Response>`);
   }
   if (u.includes('api.ebay.com') || u.includes('api.sandbox.ebay.com')) {
-    appels.push({ nom: 'REST ' + u.replace(/^https:\/\/[^/]+/, '').split('?')[0] });
+    appels.push({ nom: 'REST ' + u.replace(/^https:\/\/[^/]+/, '').split('?')[0], methode: opts.method || 'GET', corps: opts.body ? JSON.parse(opts.body) : null });
+    if (u.includes('/sell/marketing/v1/promotion?')) return json({ promotions: [
+      { promotionId: '9001', name: 'Soldes', promotionStatus: 'RUNNING', promotionType: 'MARKDOWN_SALE', startDate: '2026-11-01T00:00:00Z', endDate: '2026-11-20T00:00:00Z' },
+      { promotionId: '9002', name: 'Lot', promotionStatus: 'SCHEDULED', promotionType: 'VOLUME_DISCOUNT', startDate: '2026-12-01T00:00:00Z', endDate: '2026-12-10T00:00:00Z' },
+      { promotionId: '9003', name: 'Code', promotionStatus: 'RUNNING', promotionType: 'CODED_COUPON', startDate: '2026-11-01T00:00:00Z', endDate: '2026-11-30T00:00:00Z' }] });
+    if (/\/sell\/marketing\/v1\/(item_price_markdown|item_promotion)$/.test(u.split('?')[0]) && opts.method === 'POST') return new Response('', { status: 201, headers: { location: 'https://api.ebay.com/sell/marketing/v1/item_price_markdown/9100' } });
+    if (/\/promotion\/\d+\/pause$/.test(u)) return new Response(null, { status: 204 });
+    if (/\/sell\/marketing\/v1\/(item_price_markdown|item_promotion)\/\d+$/.test(u) && opts.method === 'DELETE') return new Response(null, { status: 204 });
     if (u.includes('get_default_category_tree_id')) return json({ categoryTreeId: '71' });
     if (u.includes('get_category_suggestions')) {
       if (EB.suggestions === 'muet') return json({ errors: [{ message: 'panne' }] }, 500);
@@ -258,6 +266,42 @@ async function verifier(racine, avant) {
     const r3 = await h({ action: 'status' });
     dit(((r3.corps.comptes || []).find((c) => c.principal) || {}).jeton === null, '    pas de date rangée ⇒ null (« pas su »), jamais « ok »');
   });
+  await essaie('R', async () => {
+    const rest = (re, m) => appels.filter((a) => re.test(a.nom) && (!m || a.methode === m));
+    const base = { listingIds: ['110000000001', '110000000002'], debut: new Date(MAINTENANT + 3600000).toISOString(), fin: new Date(MAINTENANT + 8 * JOUR).toISOString() };
+    remettre();
+    const l = await h({ action: 'remises' });
+    dit(l.code === 200 && (l.corps.remises || []).map((x) => x.id + ':' + x.type).join() === '9001:periode,9002:quantite', 'R. remises lues (période, quantité), avec leur fin ; un code promo n’est pas une remise VRM', JSON.stringify(l.corps.remises));
+    remettre();
+    const r0 = await h({ action: 'poserremise', type: 'periode', remise: 10, ...base });
+    dit(r0.code === 400 && appels.length === 0, '    sans confirmation ⇒ 400, rien demandé à eBay', `HTTP ${r0.code}`);
+    remettre();
+    const r1 = await h({ action: 'poserremise', confirme: true, type: 'periode', remise: 10, ...base });
+    const p1 = rest(/item_price_markdown$/, 'POST')[0];
+    const c1 = (p1 && p1.corps) || {};
+    dit(r1.code === 200 && r1.corps.fin === base.fin && c1.applyFreeShipping === false && c1.selectedInventoryDiscounts[0].discountBenefit.percentageOffItem === '10' && c1.endDate === base.fin && c1.selectedInventoryDiscounts[0].inventoryCriterion.listingIds.join() === base.listingIds.join(), '    remise sur une période : −10 %, ses annonces, date de fin, JAMAIS la livraison gratuite (§2.8)', JSON.stringify(c1).slice(0, 220));
+    remettre();
+    const r2 = await h({ action: 'poserremise', confirme: true, type: 'quantite', paliers: [5, 10], ...base });
+    const c2 = ((rest(/item_promotion$/, 'POST')[0] || {}).corps) || {};
+    dit(r2.code === 200 && c2.promotionType === 'VOLUME_DISCOUNT' && c2.applyFreeShipping === false && c2.discountRules.map((x) => x.discountSpecification.minQuantity + ':' + x.discountBenefit.percentageOffOrder).join() === '1:0,2:5,3:10', '    remise par quantité : 2 ⇒ −5 %, 3 ⇒ −10 %', JSON.stringify(c2.discountRules));
+    const refus = [];
+    for (const [nom, extra] of [['annonce étrangère', { listingIds: ['110000000999'] }], ['40 jours', { fin: new Date(MAINTENANT + 41 * JOUR).toISOString() }], ['paliers décroissants', { type: 'quantite', paliers: [10, 5] }], ['remise 90 %', { remise: 90 }], ['début passé', { debut: new Date(MAINTENANT - JOUR).toISOString() }]]) {
+      remettre();
+      const r = await h({ action: 'poserremise', confirme: true, type: 'periode', remise: 10, ...base, ...extra });
+      if (!(r.code === 400 && rest(/marketing/).length === 0)) refus.push(`${nom} ⇒ ${r.code}`);
+    }
+    dit(refus.length === 0, '    annonce qui n’est pas à lui, 40 jours, paliers décroissants, 90 %, début passé ⇒ 400, rien envoyé', refus.join(' · '));
+    remettre(); ROWS.ebay_listings = 'PANNE';
+    const r3 = await h({ action: 'poserremise', confirme: true, type: 'periode', remise: 10, ...base });
+    dit(r3.code === 503 && rest(/marketing/).length === 0, '    annonces illisibles ⇒ 503 « pas su », rien envoyé', `HTTP ${r3.code}`);
+    remettre();
+    const r4 = await h({ action: 'retirerremise', confirme: true, id: '9001' });
+    const r5 = await h({ action: 'retirerremise', confirme: true, id: '9002' });
+    const r6 = await h({ action: 'retirerremise', confirme: true, id: '9003' });
+    dit(r4.corps.geste === 'pause' && rest(/\/promotion\/9001\/pause$/, 'POST').length === 1, '    retirer une remise EN COURS ⇒ pause chez eBay', JSON.stringify(r4.corps));
+    dit(r5.corps.geste === 'supprimee' && rest(/item_promotion\/9002$/, 'DELETE').length === 1, '    retirer une remise programmée ⇒ supprimée', JSON.stringify(r5.corps));
+    dit(r6.code === 409 && rest(/9003/, 'POST').length + rest(/9003/, 'DELETE').length === 0, '    un code promo (pas une remise VRM) n’est jamais retiré', `HTTP ${r6.code}`);
+  });
   await essaie('A', async () => {
     const P = await import(pathToFileURL(path.join(racine, 'src', 'ebay', 'parametres.js')).href + '?t=' + Math.random());
     const S = await import(pathToFileURL(path.join(racine, 'api', '_lib', 'ebay-parametres.js')).href + '?t=' + Math.random());
@@ -322,6 +366,9 @@ const MUTATIONS = {
   'app-hors-liste': ['src/ebay/parametres.js', '      if (ok.length !== vus.length) {', '      if (ok.length === 0) {'],
   'app-sans-categorie': ['src/ebay/parametres.js', "  if (!p.categoryId) out.push({ type: 'categorie'", "  if (false) out.push({ type: 'categorie'"],
   'app-expedition': ['src/ebay/parametres.js', '  delete pol.expedition;', ''],
+  'remise-port-gratuit': ['api/_lib/ebay-remises.js', "  if (d.type === 'periode') return { ...base, applyFreeShipping: false,", "  if (d.type === 'periode') return { ...base, applyFreeShipping: true,"],
+  'remise-annonces-de-tous': ['api/_lib/ebay-remises.js', '  if (etrangeres.length) return', '  if (false) return'],
+  'remise-en-cours-supprimee': ['api/_lib/ebay-remises.js', "  const enCours = /^(RUNNING)$/i.test(p.etat);", '  const enCours = false;'],
 };
 
 const BASE = () => { try { return execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: RACINE }).toString().trim(); } catch (_) { return ''; } };
