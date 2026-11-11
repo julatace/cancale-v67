@@ -1530,3 +1530,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé de CLAUDE.md §9 (11 nov., lot suivi-travail)
 
 - **11 nov. · VRM figé pendant un travail long (lot `suivi-travail`)** : Republier, Republier sur Leboncoin, Publier Leboncoin/eBay/Vestiaire, Baisser le prix, Retirer des autres sites, Mode vacances ⇒ feuille plein écran (reste `inert`, Échap/retour/onglet retenus), « N sur M » + barre + étape de l'annonce (dite par l'extension), « environ » au rythme réel (« — » avant), pause de sécurité à rebours, jauge 50/h, journal horodaté copiable sans rien de personnel, « Mettre en pause » / « Arrêter » confirmé, récap, gardé dans « Ce que VRM a fait » ; rechargé ⇒ « Interrompu », l'annonce en cours à vérifier (jamais déclarée faite). API : `docs/passation/2026-11-11-suivi-travail.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot sante-comptes)
+
+- **11 nov. · Santé des comptes (lot sante-comptes)** : En forme / À surveiller par compte Vinted, 7 points lisibles, seuils écrits (`src/santeComptes.js`), Paramètres · Statistiques · Ma journée si un compte glisse ; aucune notification. `docs/passation/2026-11-11-sante-comptes.md`. Geste : aucun.

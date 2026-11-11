@@ -521,6 +521,8 @@ import { sourceDeVente, horsParNumero, publierSources } from "./sourceAchats.js"
 import { bilanSources, publierMeilleures } from "./meilleuresSources.js";   // (11 nov.) tes meilleures sources   // (10 nov., lot BG) d'où viennent mes achats
 import { lignesVitesse, publierVitesse } from "./vitesseEnvoi.js";   // (10 nov., lot BM) vitesse d'envoi
 import { LigneVitesse } from "./VitesseEnvoi.jsx";
+import { lignesEnvois, publierEnvois } from "./santeComptes.js";
+import { useSanteComptes, titreJournee, texteRaison } from "./SanteComptes.jsx";   // (11 nov., lot sante-comptes) les envois et leur date limite lue
 import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
 import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
@@ -39174,9 +39176,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         compteDe: (o) => ({ cle: String((o._acc && o._acc.vinted_user_id) || ''), nom: (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '' }),
       });
       if (lignes) publierVitesse(lignes, { owner: AUTH.user?.id || '', partiel: !Array.isArray(tracking) });
+      // (11 nov., lot sante-comptes) Les MÊMES départs + la date limite LUE dans l'e-mail du bordereau
+      // (jamais l'estimée : elle ne prouve aucun retard) + les ventes encore à poster ⇒ `vrm_sante_envois`.
+      const limiteLue = (tx) => { const b = bordsParTxn[tx]; const lim = b ? lireDateLimite(b.dateLimite) : null; return lim && Number.isFinite(lim.at) ? lim.at : null; };
+      const aPoster = ventes.filter((o) => o && o.transaction_id != null && aExpedier(o) && classifyOrderStatus(o.status) !== 'cancelled' && !estParti(o))
+        .map((o) => ({ tx: String(o.transaction_id), compte: String((o._acc && o._acc.vinted_user_id) || ''), vente: Date.parse(String(o.date || '')) }));
+      const env = lignesEnvois({ vitesse: lignes, aPoster, limiteLue });
+      if (env) publierEnvois(env, { owner: AUTH.user?.id || '', partiel: !Array.isArray(tracking) });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, partisVinted, tracking, trackingKO, hiddenSales, hiddenAccts]);
+  }, [sales.items, sales.failedUids, partisVinted, tracking, trackingKO, hiddenSales, hiddenAccts, bordsParTxn]);
   // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
   const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
   const articlesLus = (tx) => {
@@ -41892,6 +41901,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, baseKO, sales.items, sales.loading, listings.items, listings.loading, txnPret, vendusAilleurs.v.at, vendusAilleurs.v.charge]);
   const [feuilleAilleurs, setFeuilleAilleurs] = useState(false);
   const [feuilleDeux, setFeuilleDeux] = useState(false);   // (6 nov.) « en ligne deux fois »
+  // (11 nov., lot sante-comptes) Un compte Vinted qui GLISSE (src/santeComptes.js : un indicateur LU passe
+  // son seuil) : UNE ligne ambre dans « À faire », LA raison et LE geste. Rien de lu ⇒ rien (jamais d'alerte sur « pas su »).
+  const santeJ = useSanteComptes({ comptes: accounts, actif: only === 'journee' && !baseKO });
+  const santeSurv = Array.isArray(santeJ.aSurveiller) ? santeJ.aSurveiller : [];
   // ── (11 nov., anti double vente) VENDU SUR UN SITE ⇒ RETIRÉ DES AUTRES EN UN TOUCHER ──
   // Le plan (src/retirerAilleurs.js) range chaque annonce encore en ligne ailleurs : ce que
   // VRM retire sur SON clic (Leboncoin par l'extension `lbcsupprime`, eBay par la route
@@ -43216,10 +43229,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (avisBasListe.length ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (santeSurv.length ? 1 : 0) + (avisBasListe.length ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
@@ -43245,6 +43258,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <PileVignettes srcs={[]} n={avisBasListe.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="star" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="avis-bas">{detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Lire</span></span>
+                  </button>
+                );
+              };
+              const carteSanteComptes = () => {
+                const titre = titreJournee(santeSurv);
+                const detail = santeSurv.length === 1 ? texteRaison(santeSurv[0].raison) : santeSurv.map((c) => `${c.nom} : ${texteRaison(c.raison)}`).join(' · ');
+                const geste = santeSurv.length === 1 && santeSurv[0].raison ? santeSurv[0].raison.geste : '?tab=settings&section=santecomptes';
+                return (
+                  <button key="sante-comptes" type="button" className="vrm-day-task vrm-fu-tache" data-journee-sante={santeSurv.map((c) => c.uid).join(' ')} data-n={String(santeSurv.length)} data-sc-geste={geste}
+                    title={`${titre}\n${detail}`} aria-label={`${titre} — ${detail}`} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: geste })); } catch (_) {} }}>
+                    <PileVignettes srcs={[]} n={santeSurv.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="pulse" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="sante-comptes">{detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{tr('sante.voir')}</span></span>
                   </button>
                 );
               };
@@ -43411,6 +43437,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, cases.filter((x) => x.id === id).map((x) => carteCase(x))])),
                 'a-relier': comptesARelierJour.length ? [carteARelier()] : [],
                 'stock-sortie': sortiesStock.length ? [carteSortieStock()] : [],
+                'sante-comptes': santeSurv.length ? [carteSanteComptes()] : [],
                 // (11 nov.) Plus de carte « Supprimés de Vinted » : ces articles vivent dans « À trancher » (lot DJ4,
                 // `cyclesJ` est vide) ; « À trancher » est une carte FIXE, rendue en tête de la section.
                 autres: autres.map((j, i) => tache(j, i)),
@@ -54111,6 +54138,7 @@ function AppCoeur() {
       if(t==='settings'&&section==='supprimer'){ DEMANDE_REGLAGE_SOUS.id='fermer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='sante'){ DEMANDE_REGLAGE_SOUS.id='sante'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
+      if(t==='settings'&&section==='santecomptes'){ DEMANDE_REGLAGE_SOUS.id='santecomptes'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris'); else if(vue==='republier') demanderVue('republier');

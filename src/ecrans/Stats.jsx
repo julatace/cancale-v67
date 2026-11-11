@@ -34,7 +34,8 @@ import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
 import SourcesAchats from "../SourcesAchats.jsx";
 import MeilleuresSources from "../MeilleuresSources.jsx";
 import MargePlateforme from "../MargePlateforme.jsx";   // (10 nov., lot I) marge par plateforme — un bloc isolé
-import VitesseEnvoi from "../VitesseEnvoi.jsx";   // (10 nov., lot BM) vitesse d'envoi — un bloc isolé
+import VitesseEnvoi from "../VitesseEnvoi.jsx";
+import SanteComptes from "../SanteComptes.jsx";   // (11 nov., lot sante-comptes)   // (10 nov., lot BM) vitesse d'envoi — un bloc isolé
 import AvisLus from "../AvisVinted.jsx";   // (10 nov., lot BN) les avis Vinted lus   // (10 nov., lot BG) d'où viennent mes achats — un bloc isolé
 // ⟦← App.jsx #5⟧
 import CarteOffres from "../design/CarteOffres.jsx";
@@ -2059,6 +2060,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       <MeilleuresSources owner={(AUTH.user && AUTH.user.id) || ''} Retour={FermeAuRetour} ici="argent"/>
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
+      {/* (11 nov., lot sante-comptes) « Santé des comptes » : chaque compte Vinted, en forme ou à surveiller (src/SanteComptes.jsx). */}
+      <SanteComptes variante="stats"/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
       <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge} sansCompte={sansCompteStats}/>
       {/* (11 nov., lot stats-categories) « Par catégorie » : seulement si DEUX familles sont connues (src/statsCategories.js). */}
