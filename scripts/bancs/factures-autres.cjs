@@ -20,7 +20,7 @@ const cap = maintenant.toISOString();
 const luhn = (s) => { let t = 0; for (let i = 0; i < s.length; i++) { let n = +s[s.length - 1 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } t += n; } return t % 10 === 0; };
 const SIREN = ['900123450', '900123451', '900123452', '900123453', '900123454', '900123455', '900123456', '900123457', '900123458', '900123459'].find(luhn);
 const SIRET = (() => { for (let k = 0; k < 100000; k++) { const s = SIREN + String(k).padStart(5, '0'); if (luhn(s)) return s; } })();
-const CFG = { nom: 'Boutique Banc', forme: 'EI', siret: SIRET, adresse: '1 rue du Banc', codePostal: '35000', ville: 'Rennes', tva_regime: 'franchise', prefixe: 'FA', couleur: '#0071e3', email: 'boutique@banc.test' };
+const CFG = { nom: 'Boutique Banc', forme: 'EI', siret: SIRET, adresse: '1 rue du Banc', codePostal: '35000', ville: 'Rennes', tva_regime: 'franchise', prefixe: 'FA', couleur: '#0071e3', email: 'boutique@banc.test', comptesFacture: { 'leboncoin:compte_banc': true, 'ebay:principal': true } };
 const lbc = (tx, x = {}) => ({ txId: String(tx), title: `Nike Dunk banc ${tx}`, price: 2500, prixListe: 2928, dateVente: '2026-11-03T10:12:00.000Z', account: 'compte_banc', accountName: 'Compte Banc', isSeller: true, stepStatus: 'done', stepLabel: 'Terminé', at: cap, ...x });
 const VENTES = { 123456789: lbc(123456789), 223456789: lbc(223456789, { stepStatus: 'cancelled', stepLabel: '', dateVente: '2026-11-02T10:00:00.000Z' }) };
 let cfg = CFG;
