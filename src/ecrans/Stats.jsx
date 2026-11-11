@@ -2,7 +2,7 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
 import { annulationsParCompte } from '../annulationsCompte.js';
-import { modeleSur, classementRapporte } from '../ceQuiRapporte.js';
+import { modeleSur, classementRapporte, eclaterReleveLots } from '../ceQuiRapporte.js';
 import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBrutCompte, SEUIL_CONCLUSION } from '../vendrePlus.js';   // (9 nov., « vendre plus »)
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
 import React, { useState, useMemo } from 'react';
@@ -1184,10 +1184,13 @@ function useReleveStats() {
   const lignes = React.useMemo(() => {
     if (!releve) return null;
     const x = extras || {};
-    return releve.l.map((r) => {
+    // (11 nov., lot ventes-lot) Une vente en lot : une ligne par article, à SA part du prix et avec
+    // SON annonce (src/ceQuiRapporte.js `eclaterReleveLots`).
+    return eclaterReleveLots(releve.l).map((r) => {
       const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
+      const itemLot = typeof r[10] === 'string' && r[10] ? r[10] : null;
       const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
-      const it = t && t.item && x.items ? x.items[t.item] : null;
+      const it = itemLot ? (x.items ? x.items[itemLot] || null : null) : (t && t.item && x.items ? x.items[t.item] : null);
       return { plateforme, compte, id, ts, eur, achat, frais, titre, ...clesVenteStats(titre, it), marqueLue: String((it && it.brand) || '').trim(), modeleSur: modeleSur((it && it.brand) || '', titre), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
     });
   }, [releve, extras]);
@@ -2421,10 +2424,13 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const lignes = React.useMemo(() => {
     if (!releve) return null;
     const x = extras || {};
-    return releve.l.map((r) => {
+    // (11 nov., lot ventes-lot) Une vente en lot : une ligne par article, à SA part du prix et avec
+    // SON annonce (src/ceQuiRapporte.js `eclaterReleveLots`).
+    return eclaterReleveLots(releve.l).map((r) => {
       const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
+      const itemLot = typeof r[10] === 'string' && r[10] ? r[10] : null;
       const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
-      const it = t && t.item && x.items ? x.items[t.item] : null;
+      const it = itemLot ? (x.items ? x.items[itemLot] || null : null) : (t && t.item && x.items ? x.items[t.item] : null);
       return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
     });
   }, [releve, extras]);
