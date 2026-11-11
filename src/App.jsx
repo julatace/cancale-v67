@@ -59,6 +59,10 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
+import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth} from './auth/compteNeuf.js';   // (11 nov., lot DJ6)
+import PorteSansCompte from './auth/PorteSansCompte.jsx';
+import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
+import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
 import { SqueletteChargement } from "./Chargement.jsx";
 import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.jsx';
 // (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
@@ -603,6 +607,7 @@ import Visionneuse from "./Visionneuse.jsx";
 import { useFacturesAchat, PastilleFacture } from "./FactureAchat.jsx";   // (10 nov., lot AN) facture d'achat jointe
 import { cleFacture } from "./factureAchat.js";
 import "./styles-annonces-grille.css";   // (10 nov., lot AM) Annonces en grille de vignettes, par compte — même couche, après la DA6
+import "./styles-profil.css";   // (11 nov., lot DJ6) la photo du profil et son menu
 import "./styles-achat-hors.css";   // (11 nov., lot DJ5) « Nouvel achat » hors plateforme : photo d'abord, prix en grand
 import "./styles-achats-photos.css";   // (10 nov., lot AN) Achats en rangées DA6 — même couche, après styles-widgets-ios          // (10 nov., lot AN) la photo en grand, partout
 import { enregistrerGaleries } from "./visionneuse.js";
@@ -1962,9 +1967,12 @@ const providerEnabled = (id) => AUTH_SETTINGS?.external?.[id]===true;
 // dit AVANT que la personne tape son mot de passe.
 const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfirm === false);
 
-const oauthStart = async (provider) => {
+const oauthStart = async (provider, intention) => {
   try {
     try{sessionStorage.removeItem('vrm_oauth_liaison');localStorage.removeItem('vrm_oauth_liaison');}catch(_){}
+    // (11 nov., lot DJ6) « connexion » ou « inscription » : au retour, un compte que
+    // le bouton de CONNEXION a fait créer est annulé (src/auth/compteNeuf.js).
+    poserIntentionOAuth([sessionStorage,localStorage],intention,provider);
     const verifier = makeVerifier();
     sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet
     // Téléphone : l'app Discord/Google renvoie souvent le retour dans un NOUVEL
@@ -2011,7 +2019,7 @@ const compteOAuthNeuf=(u)=>{
 // Les refus de Supabase au retour, en français, avec le geste.
 const erreurRetourOAuth=(err,provider)=>{
   const t=String(err||'');const nom=provider==='google'?'Google':'Discord';
-  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce compte ${nom} a déjà son propre compte VRM, il ne peut pas être relié à celui-ci. Connecte-toi avec ${nom}, choisis « J'ai déjà un compte VRM » pour supprimer ce compte vide, puis reviens ici le relier.`;
+  if(/already.*link|identity.*(exists|already)|identity_already_exists/i.test(t))return `Ce ${nom} a déjà son propre compte VRM. Connecte-toi avec ${nom}, puis supprime cet autre compte (Paramètres → Supprimer mon compte). Reviens ensuite ici le relier.`;
   if(/manual.*link.*disabled|manual_linking/i.test(t))return `La liaison de comptes n'est pas encore activée sur le serveur de VRM. Ton compte reste inchangé.`;
   return t;
 };
@@ -2047,7 +2055,11 @@ const consumeAuthRedirect = async () => {
     // repère (créé il y a moins de 10 min, aucune identité email) pour le dire
     // AVANT d'ouvrir l'app — sinon il croit être sur sa boutique, vide.
     const nouveauOAuth=!liaison&&!recovery?compteOAuthNeuf(r.json.user):'';
-    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth };
+    // (11 nov., lot DJ6) Le bouton cliqué était « Continuer avec … » (connexion) :
+    // ce compte neuf n'a été voulu par personne ⇒ `sansCompte` (PorteSansCompte l'annule).
+    const intention=lireIntentionOAuth([sessionStorage,localStorage]);
+    const sansCompte=nouveauOAuth&&intention?.intention==='connexion'&&intention.fournisseur===nouveauOAuth?nouveauOAuth:'';
+    return { ok: true, liaison:liaison?.provider, recovery, nouveauOAuth, sansCompte };
   }
 
   const at = hash.get('access_token');
@@ -14535,9 +14547,12 @@ const GROUPES_PLUS=[
     // restent (`dashboard`, `compta`) : leurs liens mènent à leur segment.
     {id:'compta',    icon:'euro',  label:'Argent'},
   ]},
+  // (11 nov., lot DJ6 — Julien : « qu'on ne voie pas les Paramètres mais que quand on
+  // clique sur le profil ils apparaissent ») Paramètres n'est plus une entrée : la photo
+  // du profil (pied de la colonne, en-tête du téléphone) ouvre le menu du profil
+  // (src/profil/MenuProfil.jsx). « g p », ⌘K et `?tab=settings` y mènent toujours.
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
-    {id:'settings',   icon:'gear', label:'Paramètres'},
   ]},
 ];
 // ⚠️ (2 nov., Julien : « il ne doit pas y avoir des écritures partout à côté des
@@ -14574,7 +14589,7 @@ function titreEcran(tab) {
   if (tab === 'semaine') return 'Ma semaine';
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  return { settings: 'Paramètres', dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
@@ -15650,6 +15665,48 @@ function BadgeNav({ t, badges, place }) {
 // Vendre · Expédier · Gérer · Argent · Plateformes · Moi (Paramètres en
 // dernier) ; un compteur ambre à droite de chaque entrée qui a un geste à faire.
 // Tout tient sans défiler à 900 px de haut (styles-vitrine.css).
+// ── LE MENU DU PROFIL (11 nov., lot DJ6, src/profil/MenuProfil.jsx) ─────────────
+// Un seul menu, monté par la coque ; la carte de la colonne et la photo de l'en-tête
+// du téléphone l'ouvrent (`vrm:profil-ouvrir`).
+const ouvrirMenuProfil = () => { try { window.dispatchEvent(new Event('vrm:profil-ouvrir')); } catch (_) {} };
+// La fiche GoTrue (identités Discord/Google reliées) : projetée, jamais rangée ailleurs qu'en mémoire.
+poserLecteurFiche(async () => {
+  const tok = AUTH.session && AUTH.session.access_token; if (!tok) return null;
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (!j || j.id !== (AUTH.user && AUTH.user.id)) return null;
+  return { identities: (Array.isArray(j.identities) ? j.identities : []).map((i) => ({ provider: i && i.provider, identity_id: i && i.identity_id, last_sign_in_at: i && i.last_sign_in_at, updated_at: i && i.updated_at,
+    identity_data: { avatar_url: i && i.identity_data && i.identity_data.avatar_url, picture: i && i.identity_data && i.identity_data.picture } })) };
+});
+function MenuProfilCoque({ setTab, entreprise }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:profil-ouvrir', f); return () => window.removeEventListener('vrm:profil-ouvrir', f); }, []);
+  const [, rafraichir] = React.useState(0);
+  React.useEffect(() => suivreAbonnement(() => rafraichir((n) => n + 1)), []);
+  if (!ouvert || !AUTH.user || !AUTH.user.id) return null;
+  const planLu = (reglePlanCourante() || {}).plan;
+  const aller = (sous) => { setOuvert(false); if (sous) { DEMANDE_REGLAGE_SOUS.id = sous; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } setTab('settings'); };
+  return <MenuProfil owner={AUTH.user.id} headers={enTeteSession} email={String(AUTH.user.email || '')} nom={(entreprise && entreprise.nom) || ''}
+    offre={planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : ''} theme={C} Feuille={SheetShell} Icon={Icon}
+    onFermer={() => setOuvert(false)} onParametres={() => aller('')} onAppareils={() => aller('appareils')}
+    onDeconnexion={async () => { setOuvert(false); if (await askConfirm({ title: 'Se déconnecter ?', desc: 'Tes données restent dans VRM.', ok: 'Se déconnecter', cancel: 'Annuler' })) authSignOut(); }}/>;
+}
+// La photo du profil dans l'en-tête du téléphone (à droite) : ouvre le même menu.
+function BoutonProfilTete() {
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  if (!uid) return null;
+  return <button type="button" className="vrm-hbtn vrm-hdr-profil" data-profil-tete="" aria-haspopup="dialog" aria-label="Mon profil" onClick={ouvrirMenuProfil}>
+    <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/>
+  </button>;
+}
+// Le nom de l'entreprise dans l'en-tête : rien quand il est masqué (ou pas encore lu).
+function NomEntrepriseCoque({ entreprise, className }) {
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const n = useNomCoque({ owner: uid, headers: enTeteSession, nom: (entreprise && entreprise.nom) || '', email: '' });
+  if (MULTI_USER && uid && n.masque !== false) return null;
+  return <NomEntreprise entreprise={entreprise} className={className}/>;
+}
 function SideBar({ tab, setTab, entreprise, sites, badges }) {
   useProfilVendeur();   // (8 nov.) Simple / Complet : la colonne se redessine au changement
   const groupes = groupesVisibles(sites, t => !t.tel, true);
@@ -15741,14 +15798,18 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   const nomCompte = (entreprise && entreprise.nom) || '';
   const planLu = (reglePlanCourante() || {}).plan;
   const offre = planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : '';
-  const initiale = (nomCompte || mail).trim().charAt(0).toUpperCase();
-  // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE : elle ouvre Paramètres (un bouton, clavier compris).
-  const carteCompte = (nomCompte || mail) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="settings"
-    aria-label={`${nomCompte || mail}${offre ? ' · ' + offre : ''} — ouvrir Paramètres`} title="Paramètres" onClick={() => setTab('settings')}>
-    <span className="vrm-nav-avatar vrm-sensible" aria-hidden="true">{initiale}</span>
+  // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE. (11 nov., lot DJ6) Elle ouvre le
+  // MENU DU PROFIL (Paramètres, Appareils, Se déconnecter) ; la photo est celle du profil, et
+  // « Masquer mon nom » (ou pas encore lu) ⇒ « Mon compte », ni nom ni e-mail.
+  const uidCompte = (AUTH.user && AUTH.user.id) || '';
+  const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
+  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={tab === 'settings' ? 'page' : undefined}
+    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ouvrir mon profil`} title="Mon profil" onClick={() => ouvrirMenuProfil()}>
+    <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
     <span className="vrm-nav-compte-txt">
-      {nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
-      {(offre || (nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
+      {nomCoque.masque !== false ? <span className="vrm-nav-compte-nom" data-nav-compte-masque="">{nomCoque.texte}</span>
+        : nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
+      {(offre || (nomCoque.masque === false && nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCoque.masque === false && nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
     </span>
   </button> : null;
   return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
@@ -16177,7 +16238,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       {etape === 'confirmer' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite :</p>
-        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
+        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
@@ -16187,7 +16248,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       {etape === 'fait' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Le compte vide est supprimé. Ensuite :</p>
-        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</li></ol>
+        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
         <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
       </>}
     </div>
@@ -16396,11 +16457,11 @@ function AuthScreen() {
     if(resetEnvoye){setResetEnvoye('');setFinAttente(0);}
   };
 
-  const oauth = async (p) => {
+  const oauth = async (p, intention) => {
     if(busy||demandeEnCours.current)return;
     demandeEnCours.current=true;setErr('');setInfo('');setBusy(true);setFournisseurEnCours(p);
     try {
-      const r=await oauthStart(p);
+      const r=await oauthStart(p, intention||(mode==='up'?'inscription':'connexion'));
       if (!r.ok) {demandeEnCours.current=false;setErr(r.error);setBusy(false);setFournisseurEnCours('');}
     } catch (_) {demandeEnCours.current=false;setErr('Impossible d’ouvrir cette connexion. Réessaie.');setBusy(false);setFournisseurEnCours('');}
     // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
@@ -16629,6 +16690,12 @@ function AuthScreen() {
               Connecte-toi ici : l'extension {NAV.de} se connecte aussi, rien à taper.
             </div>
           )}
+          {/* (11 nov., lot DJ6) « Continuer avec Discord » sans compte VRM : rien n'a été créé (annulé par le serveur). */}
+          {AUTH_REDIRECT?.sansCompteFournisseur && mode==='in' && (()=>{ const p=AUTH_REDIRECT.sansCompteFournisseur, nom=p==='google'?'Google':'Discord'; return <div role="alert" data-sans-compte={p} style={{fontSize:14,color:C.text,border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'10px 12px',marginBottom:14,lineHeight:1.45}}>
+            <div style={{fontWeight:600}}>Aucun compte VRM relié à ce {nom}.</div>
+            <div style={{color:C.muted,marginTop:2}}>Connecte-toi d’abord, puis relie {nom} dans ton profil.</div>
+            {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Créer un nouveau compte avec {nom}</button>}
+          </div>; })()}
           {lierFournisseurMot && (mode==='in' || mode==='up') && <div role="status" data-lier-fournisseur-mot={lierFournisseur} style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>{lierFournisseurMot}</div>}
           {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>Plus de 10 minutes : l’extension n’est pas connectée.</div><div>Connecte-toi, puis reclique « Continuer avec Google » (ou Discord) dans l’extension.</div></div>}
 
@@ -50995,6 +51062,11 @@ export default function App() {
   // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
   if(MULTI_USER&&!authState.user?.id)return <AuthScreen/>;
+  // (11 nov., lot DJ6) Connexion par Discord/Google sans compte VRM : le compte créé
+  // en silence est annulé (serveur), puis l'écran de connexion le DIT ; refusé ⇒ la porte d'avant.
+  if(MULTI_USER&&AUTH_REDIRECT?.sansCompte)return <PorteSansCompte fournisseur={AUTH_REDIRECT.sansCompte} theme={C} entetes={enTeteSession}
+    onAnnule={()=>{AUTH_REDIRECT={sansCompteFournisseur:AUTH_REDIRECT.sansCompte};writeSession(null);}}
+    onRepli={()=>{AUTH_REDIRECT={...AUTH_REDIRECT,sansCompte:''};setAuthState({...AUTH});}}/>;
   if(MULTI_USER&&AUTH_REDIRECT?.nouveauOAuth)return <PorteNouveauOAuth fournisseur={AUTH_REDIRECT.nouveauOAuth} email={authState.user?.email||''} onContinuer={()=>{AUTH_REDIRECT={...AUTH_REDIRECT,nouveauOAuth:''};setAuthState({...AUTH});}}/>;
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
@@ -54746,6 +54818,8 @@ function AppCoeur() {
       <PiluleAnnulerCoque/>
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
       <RaccourcisClavier Feuille={SheetShell}/>
+      {/* (11 nov., lot DJ6) Le menu du profil (photo de la colonne / de l'en-tête). */}
+      {MULTI_USER && <MenuProfilCoque setTab={setTab} entreprise={entreprise}/>}
       {/* (10 nov., lot AN) La photo d'un article en grand, depuis n'importe quel écran (src/Visionneuse.jsx). */}
       <Visionneuse Photo={PhotoVinted} Retour={FermeAuRetour}/>
       <DefilementPartout/>
@@ -54781,7 +54855,7 @@ function AppCoeur() {
             <VrmLogo size={36} anim={false}/>
           </div>
           {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
-          <NomEntreprise entreprise={entreprise} className="vrm-hdr-entreprise"/>
+          <NomEntrepriseCoque entreprise={entreprise} className="vrm-hdr-entreprise"/>
         </div>
         {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
         {!ordi && gsOpen && champRechercheMobile}
@@ -54814,6 +54888,8 @@ function AppCoeur() {
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label={`Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}
+            {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}
+            {!ordi && MULTI_USER && <BoutonProfilTete/>}
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}

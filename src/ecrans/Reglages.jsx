@@ -75,7 +75,8 @@ import { DEMANDE_APPAREIL } from '../appareilNouveau.js';               // (10 n
 import RaccourcisSiri from '../RaccourcisSiri.jsx';
 import { etatJetonSms } from '../smsColis.js';
 // ⟦← App.jsx #6⟧
-import PhotoProfil,{AvatarCompte} from '../profil/AvatarPersonnel.jsx';
+import PhotoProfil,{AvatarCompte,relireFiche} from '../profil/AvatarPersonnel.jsx';
+import {identitesReliees} from '../profil/identiteProfil.js';
 // ⟦← App.jsx #7⟧
 // (6 nov., vitesse 2) qrMfa (et son générateur de QR, ~50 Ko) : importé à la demande, à l'activation.
 import {conflitAdresseCompte} from '../receptionEmail.js';
@@ -121,7 +122,18 @@ const nomAppareilPris = (nom, verifies) => {
 // ⟦← App.jsx #18⟧
 
 const lireConnexionsOAuth = async()=>{
- try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?j.identities.map(i=>i.provider):null;}catch(_){return null;}
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?identitesReliees(j):null;}catch(_){return null;}
+};
+// (11 nov., lot DJ6) « Délier » Google/Discord : sur son clic, confirmé ; jamais la dernière façon de se connecter.
+const oauthDelier = async (provider, id, nbIdentites) => {
+ const nom=provider==='google'?'Google':'Discord';
+ if(nbIdentites<2)return{ok:false,error:`${nom} est ta seule façon de te connecter : ajoute d’abord un mot de passe (Changer mon mot de passe).`};
+ if(!id)return{ok:false,error:'Je n’ai pas pu lire cette liaison. Recharge la page.'};
+ if(!(await askConfirm({title:`Délier ${nom} ?`,desc:`Tu ne pourras plus te connecter avec ${nom}. Ton compte VRM ne change pas.`,ok:'Délier',cancel:'Annuler'})))return{ok:false};
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user/identities/${encodeURIComponent(id)}`,{method:'DELETE',headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});
+  if(!r.ok){const j=await r.json().catch(()=>({}));return{ok:false,error:/single.identity|last.identity|at least/i.test(String(j?.msg||j?.message||j?.error_code||''))?`${nom} est ta seule façon de te connecter.`:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
+  try{relireFiche(AUTH.user?.id);}catch(_){}return{ok:true};
+ }catch(_){return{ok:false,error:'Le retrait n’a pas pu être confirmé. Réessaie.'};}
 };
 const oauthRelier = async provider => {
   try{const verifier=makeVerifier();const r=await preparerLiaisonOAuth({provider,enabled:providerEnabled(provider),token:AUTH.session?.access_token,owner:AUTH.user?.id,base:SUPABASE_URL,cle:SUPABASE_KEY,origine:window.location.origin,verifier,challenge:await makeChallenge(verifier)});if(r.ok)window.location.assign(r.url);return r;}catch(_){return{ok:false,error:'Impossible de préparer cette connexion. Réessaie.'};}
@@ -1954,8 +1966,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // relié » ou « pas pu lire »). Une seule ligne par compte : Google ici,
     // Discord par `DiscordCompte` (la liaison, qui ouvre aussi « Se connecter avec Discord »).
     AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
-      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS.filter(pr=>pr.id!=='discord')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
-      {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
+      // (11 nov., lot DJ6) Google ET Discord relient une façon de se CONNECTER au compte ouvert
+      // (jamais un nouveau compte) ; la photo du profil vient de là. L'ancienne ligne « Profil
+      // Discord » (pseudo de la carte, `DiscordCompte`) ne s'affiche plus ici : elle faisait croire
+      // que Discord était relié pour se connecter (c'est ainsi que le compte en trop a été créé) ;
+      // le pseudo de la carte se relie dans Communauté.
+      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
     // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran
