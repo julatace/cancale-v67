@@ -16271,12 +16271,10 @@ function CibleNotif({ tab, sub }) {
 // le texte de la phrase ne change pas) ; sans phrase, il reste seul.
 function PhraseEcran({ cle, className = '' }) {
   const p = useProfilVendeur();   // (11 nov., lot DJ2) « paires » seulement pour Sneakers
-  const vendP = p.vend || vendActuel();
-  // (11 nov., traduction) La phrase française vit dans src/phrasesEcran.js (le banc la juge là) ;
-  // hors français, sa traduction (`phrase.<écran>`, `.articles` pour la forme « article »).
-  const kP = cle && ('phrase.' + cle + (vendP !== 'sneakers' && PHRASES_ECRAN_ARTICLES[cle] !== undefined ? '.articles' : ''));
-  const t = cle && (langueCourante() !== 'fr' && aCle(kP) ? tr(kP) : phraseEcranPour(cle, vendP));
   const aide = cle && AIDE_ECRANS[cle] ? <AideEcran cle={cle}/> : null;
+  // (11 nov., traduction) Le français vit dans src/phrasesEcran.js ; hors français, `phrase.<écran>` (`.articles`).
+  const kP = cle && ('phrase.' + cle + ((p.vend || vendActuel()) !== 'sneakers' && PHRASES_ECRAN_ARTICLES[cle] !== undefined ? '.articles' : ''));
+  const t = cle && (langueCourante() !== 'fr' && aCle(kP) ? tr(kP) : phraseEcranPour(cle, p.vend || vendActuel()));
   if (!t) return aide ? <p className={'vrm-phrase-ecran vrm-phrase-ecran-seule' + (className ? ' ' + className : '')}>{aide}</p> : null;
   return <p className={'vrm-phrase-ecran' + (className ? ' ' + className : '')} data-phrase-ecran={cle}>{t}{aide}</p>;
 }
