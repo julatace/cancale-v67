@@ -280,6 +280,8 @@ export default {
   "reglages.numeros.desc.articles": "Cómo se escriben los números de tus próximos artículos.",
   "reglages.numeros.desc.paires": "Cómo se escriben los números de tus próximos pares.",
   "reglages.numeros.lib": "Números de almacenaje",
+  "reglages.ma-journee.desc": "Mostrar, ocultar y ordenar las tarjetas de Mi día.",
+  "reglages.ma-journee.lib": "Mi día",
   "reglages.objectif-mois.desc": "Un importe de ventas a alcanzar cada mes: una barra fina en Mi día.",
   "reglages.objectif-mois.lib": "Objetivo del mes",
   "reglages.objectif.benefice": "{montant} de beneficio",

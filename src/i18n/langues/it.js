@@ -280,6 +280,8 @@ export default {
   "reglages.numeros.desc.articles": "Come si scrivono i numeri dei tuoi prossimi articoli.",
   "reglages.numeros.desc.paires": "Come si scrivono i numeri dei tuoi prossimi paia.",
   "reglages.numeros.lib": "Numeri di magazzino",
+  "reglages.ma-journee.desc": "Mostra, nascondi e ordina le schede de La mia giornata.",
+  "reglages.ma-journee.lib": "La mia giornata",
   "reglages.objectif-mois.desc": "Un importo di venduto da puntare ogni mese: una barra sottile in La mia giornata.",
   "reglages.objectif-mois.lib": "Obiettivo del mese",
   "reglages.objectif.benefice": "{montant} di utile",

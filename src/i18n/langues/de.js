@@ -280,6 +280,8 @@ export default {
   "reglages.numeros.desc.articles": "Wie die Nummern deiner nächsten Artikel aussehen.",
   "reglages.numeros.desc.paires": "Wie die Nummern deiner nächsten Paare aussehen.",
   "reglages.numeros.lib": "Lagernummern",
+  "reglages.ma-journee.desc": "Karten von Mein Tag zeigen, ausblenden und ordnen.",
+  "reglages.ma-journee.lib": "Mein Tag",
   "reglages.objectif-mois.desc": "Ein monatliches Verkaufsziel: ein dünner Balken in Mein Tag.",
   "reglages.objectif-mois.lib": "Monatsziel",
   "reglages.objectif.benefice": "{montant} Gewinn",

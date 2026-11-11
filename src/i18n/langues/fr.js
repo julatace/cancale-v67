@@ -285,6 +285,8 @@ export default {
   "reglages.numeros.desc.articles": "Comment s’écrivent les numéros de tes prochains articles.",
   "reglages.numeros.desc.paires": "Comment s’écrivent les numéros de tes prochaines paires.",
   "reglages.numeros.lib": "Numéros de rangement",
+  "reglages.ma-journee.desc": "Montrer, cacher et ranger les cartes de Ma journée.",
+  "reglages.ma-journee.lib": "Ma journée",
   "reglages.objectif-mois.desc": "Un montant de vendu à viser chaque mois : une barre fine dans Ma journée.",
   "reglages.objectif-mois.lib": "Objectif du mois",
   "reglages.objectif.benefice": "{montant} de bénéfice",

@@ -280,6 +280,8 @@ export default {
   "reglages.numeros.desc.articles": "How your next items’ numbers are written.",
   "reglages.numeros.desc.paires": "How your next pairs’ numbers are written.",
   "reglages.numeros.lib": "Storage numbers",
+  "reglages.ma-journee.desc": "Show, hide and arrange the cards of My day.",
+  "reglages.ma-journee.lib": "My day",
   "reglages.objectif-mois.desc": "A sales amount to aim for each month: a thin bar in My day.",
   "reglages.objectif-mois.lib": "Monthly goal",
   "reglages.objectif.benefice": "{montant} profit",
