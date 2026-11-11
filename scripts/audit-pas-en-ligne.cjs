@@ -36,7 +36,8 @@ async function charger(src) {
 
 const J = 24 * 3600e3;
 const NOW = Date.parse('2026-11-11T12:00:00Z');
-const jour = (n) => new Date(NOW - n * J).toISOString().slice(0, 10);
+// Le jour LOCAL (le calendrier de l'appareil), comme une date saisie « AAAA-MM-JJ ».
+const jour = (n) => { const d = new Date(NOW - n * J); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const frais = (nom, plat = 'vinted') => ({ plateforme: plat, nom, ok: true, lu: NOW - 2 * 3600e3, complet: true });
 
 async function verifier(src) {

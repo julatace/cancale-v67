@@ -51178,8 +51178,9 @@ async function lireEbayEnLigne() {
     const nums = new Set(); const liste = [];
     for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) nums.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
     // (11 nov., lot pas-en-ligne) La date de lecture de CHAQUE compte (`capturedAt` de sa ligne ;
-    // ligne absente ⇒ jamais lu) : « pas en ligne » ne se prouve qu'avec des lectures fraîches.
-    const comptes = (lu.lignes || []).filter((x) => x && x.ligne !== undefined).map(({ compte, ligne }) => ({ nom: nomCompteEbay(compte), lu: ligne && ligne.capturedAt ? Date.parse(ligne.capturedAt) : null }));
+    // ligne absente ⇒ jamais lu) : « pas en ligne » ne se prouve qu'avec des lectures fraîches. Le compte
+    // « principal » IMPLICITE (aucun registre eBay) sans ligne n'est pas un compte : pas d'eBay chez lui.
+    const comptes = (lu.lignes || []).filter((x) => x && x.ligne !== undefined && !(x.ligne === null && x.compte && x.compte.implicite)).map(({ compte, ligne }) => ({ nom: nomCompteEbay(compte), lu: ligne && ligne.capturedAt ? Date.parse(ligne.capturedAt) : null }));
     return { liste, nums, illisibles: (lu.illisibles || []).map((c) => nomCompteEbay(c)), comptes };
   } catch (_) { return null; }
 }

@@ -62,6 +62,7 @@ const dateMs = (d) => {
   const t = /^\d{4}-\d{2}-\d{2}$/.test(s) ? Date.parse(s + 'T12:00:00') : Date.parse(s);
   return Number.isFinite(t) ? t : null;
 };
+const minuit = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const lotDeTitre = (t) => {
   const s = str(t);
   if (!/^lot\b/i.test(s)) return { lot: false, n: null };
@@ -205,7 +206,8 @@ export function jugerPasEnLigne({ candidats, presents, sources = [], seuilJours 
     if (c.sorte === 'num' && presentCles.has(c.cle)) { enLigne++; continue; }
     if (c.sorte === 'achat' && c.tx && !c.lot && presentTxs.has(c.tx)) { enLigne++; continue; }
     if (c.depuis == null) { sansDate++; continue; }
-    const jours = Math.max(0, Math.floor((Number(maintenant) - c.depuis) / JOUR_MS));
+    // En JOURS DU CALENDRIER (minuit local à minuit local) : « acheté le 1er » se lit pareil le matin et le soir.
+    const jours = Math.max(0, Math.round((minuit(Number(maintenant)) - minuit(c.depuis)) / JOUR_MS));
     if (jours < seuil) { recents++; continue; }
     const raisons = sourcesKO.map((e) => ({ sorte: 'source', ...e }));
     if (c.sorte === 'num' && sansNumero > 0) raisons.push({ sorte: 'sans-numero', n: sansNumero });
