@@ -1432,7 +1432,8 @@ function ParCategorie({ vendu, lp, extras, stock, b }) {
   }, [lp, vendu, extras, itemDe]);
   const pl = (n, s1, p) => `${n} ${n > 1 ? (p || s1 + 's') : s1}`;
   const jTxt = (j) => (j < 1 ? '< 1 j' : `${String(Math.round(j * 10) / 10).replace('.', ',')} j`);
-  if (!montre) return <div ref={ref} data-sv-categories-cache={S ? 'une' : 'attente'} hidden/>;
+  // Pas montré : un repère d'un pixel (un `hidden` ne serait jamais « vu » par l'observateur).
+  if (!montre) return <div ref={ref} data-sv-categories-cache={S ? 'une' : 'attente'} aria-hidden="true" style={{ height: 1 }}/>;
   const maxN = Math.max(1, ...S.groupes.map((g) => g.n));
   return (
     <div ref={ref}>
@@ -1441,7 +1442,7 @@ function ParCategorie({ vendu, lp, extras, stock, b }) {
           {S.groupes.map((g) => (
             <div key={g.v} className="vrm-sv-ligne-cat" data-sv-cat={g.v} data-n={g.n} data-eur={Math.round(g.eur * 100)} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-couv={`${g.nCout}/${g.fin}`} data-mediane={g.mediane == null ? '' : g.mediane} data-stock={g.stock == null ? '' : g.stock}>
               <span className="vrm-sv-nom">{g.titre}</span>
-              <span className="vrm-sv-piste"><span style={{ width: `${Math.max(3, g.n / maxN * 100)}%` }}/></span>
+              <span className="vrm-sv-piste"><span style={{ width: g.n ? `${Math.max(3, g.n / maxN * 100)}%` : 0 }}/></span>
               <span className="vrm-sv-chiffre vrm-sv-cat-chiffre">{g.n ? `${pl(g.n, 'vente')} · ${fmt(g.eur)}` : 'aucune vente'}</span>
               <span className="vrm-sv-cat-detail">
                 {g.fin > 0 && <span data-benef-notion="brut" title={`${NOM_BENEFICE_BRUT} : ventes finalisées au prix d’achat connu`}>brut {g.brut == null ? '—' : fmt(g.brut)}{g.nCout < g.fin ? ` · ${pl(g.fin - g.nCout, 'sans prix d’achat', 'sans prix d’achat')}` : ''}</span>}
@@ -1485,7 +1486,7 @@ function PoserCategories({ cles, titres, vendu, main, onClose }) {
         {restent.length === 0
           ? <p className="vrm-cat-fini" data-cat-fini={fait}>Tout est rangé.</p>
           : <>
-            <label className="vrm-cat-ligne vrm-cat-tout"><input type="checkbox" checked={tous} onChange={() => setCoche(tous ? new Set() : new Set(restent))}/> <span>Tout cocher ({restent.length})</span></label>
+            {restent.length > 1 && <label className="vrm-cat-ligne vrm-cat-tout"><input type="checkbox" checked={tous} onChange={() => setCoche(tous ? new Set() : new Set(restent))}/> <span>Tout cocher ({restent.length})</span></label>}
             <div className="vrm-cat-liste">
               {restent.map((k) => { const l = parCle[k] || {}; return (
                 <label key={k} className="vrm-cat-ligne" data-cat-vente={k}>
