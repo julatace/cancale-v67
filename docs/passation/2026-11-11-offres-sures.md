@@ -73,7 +73,38 @@ De haut en bas :
 
 ## Preuves
 
-(complétées en fin de lot, voir plus bas)
+- `npm run build` vert (après le vrai `git merge origin/main`, extension 5.340 comprise).
+- **`scripts/audit-offres-sures.cjs`** (neuf) : 34 contrôles — A la règle exécutée (seuil lu comme le
+  moteur, écriture normalisée, décision, aperçu « ses ventes seulement », historique et piège du
+  LIKE, « pas lu » ⇒ null, alerte 40/45, journée calme) ; **B la parité avec le VRAI moteur** :
+  16 cas joués par `autoAccepterOffres` de `background.js` dans un vm (faux Vinted qui compte les
+  PUT) ET par `decisionMoteur` — mêmes issues partout, virgule comprise ; C le branchement (écran
+  monté, lien depuis Outils, carte normalisée, rien envoyé, « Tout arrêter » n'éteint que).
+  `--prouve` **16/16 mutations rouges** ; sur `origin/main` (`git archive`) : **8 rouges sur 8**.
+- **Banc `scripts/bancs/offres-auto.cjs`** (neuf, jeu inventé de `nouveau-vendeur.cjs`, faux pont,
+  390 tactile / 1512, clair / sombre) : **83 OK, 0 KO** — lien Outils, interrupteur, aperçu des
+  4 offres (la garde PUBLIÉE par l'app juge « Acceptée » ou « Pas acceptée · un site pas relu »),
+  jauge 41/50 + alerte, journée calme, historique (2 offres du 111, jamais celle du 1110),
+  « Corriger » la virgule, saisie « 39,5 » ⇒ 39.5 et l'aperçu suit, série ⇒ feuille Prix mini,
+  « Tout arrêter » ⇒ éteint + `auto_stop`/`arreter` pour chaque compte et rien d'autre, rien
+  vers l'extension, 44 px au doigt, aucun débordement, aucune erreur. Sur `origin/main` (build
+  de 3cb90230) : rouge dès le lien (l'écran n'existe pas).
+- **Banc `republier-kit`** : vert aux 4 vues, + 4 contrôles neufs (ordre des gestes, « Vinted ↗ »
+  d'une carte = le suivi de CETTE paire, conseil avant les suivis, un seul « Tout décocher ») —
+  **les 4 rouges sur origin/main**, le reste vert.
+- **Banc `republier-main`** : vert aux 4 vues, + « Republier à la main » avant les tuiles dans
+  Actions — **rouge ×4 sur origin/main**.
+- Audits verts : `offres-sures`, `offres-auto` (26), `moteur-offres` (24), `offres-garde` (25),
+  `offres`, `republier-kit` (17, `--prouve` 13/13), `republier-main` (36, `--prouve` 22/22),
+  `republier`, `annonces-actions` (69), `textes-courts`, `jauge-journal`, `variables`, `tdz`,
+  `coherence`, `identite`, `icones`, `fonctions-api`.
+- Captures regardées (390 clair/sombre, 1512 clair/sombre) : l'écran, les paires, la série,
+  « Tout arrêter » ; le kit en étapes ; les suivis sous le conseil. Corrigé en les regardant : la
+  puce de décision écrasait le titre au téléphone (passée dessous), le champ du seuil dessinait un
+  champ dans le champ, l'historique disait « commande … » au lieu du titre, le seuil s'affiche
+  « 45,5 » (écrit « 45.5 »).
+- Pas fait : une mutation de rendu des bancs (rebuild par mutation trop long sur la machine
+  partagée) — la logique est tenue par les mutations des audits.
 
 ## Reste / pour la 5.341
 
