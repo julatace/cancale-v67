@@ -5633,7 +5633,7 @@ function alertesDepotVinted(page, d) {
     else if (lu.etat === 'ambigu') out.push({ code: 'numero', texte: 'Deux N° différents dans la description', pourquoi: 'VRM ne saura pas lequel est le bon.' });
   }
   const cle = lu && lu.etat === 'lu' ? lu.cle : '';
-  if (cle && d.enLigne instanceof Set && d.enLigne.has(cle)) out.push({ code: 'enligne', texte: `N°${cle} déjà en ligne sur ce compte`, pourquoi: 'Deux annonces pour une paire : risque de la vendre deux fois.' });
+  if (cle && d.enLigne && typeof d.enLigne.has === 'function' && d.enLigne.has(cle)) out.push({ code: 'enligne', texte: `N°${cle} déjà en ligne sur ce compte`, pourquoi: 'Deux annonces pour une paire : risque de la vendre deux fois.' });
   const p = nombreVerif(page.prix), ac = cle && d.buyByNum ? nombreVerif(d.buyByNum[cle]) : null;
   if (p != null && p > 0 && ac != null && ac > 0 && p < ac) out.push({ code: 'prix', texte: `Prix ${eurosVerif(p)} sous ton prix d’achat ${eurosVerif(ac)}`, pourquoi: 'Tu vendrais moins cher que ce que tu l’as payée.' });
   return out.filter((a) => !coupees.has(a.code));

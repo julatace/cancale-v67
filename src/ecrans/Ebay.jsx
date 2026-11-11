@@ -1037,7 +1037,18 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   //      frais), puis la publication — les gardes de `gardePublier` d'abord.
   // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) : ce qui partira
   // (titre, prix, photos, caractéristiques, catégorie) contre SON prix d'achat connu.
-  const verifEbay = (item, deja = null) => {
+  // (11 nov., lot verif-publication) « La même paire déjà en ligne sur eBay ? » : lu
+  // UNE fois par paire choisie (base VRM, lecture < 24 h) ; pas su ⇒ `null`, rien dit.
+  const dejaEbayRef = React.useRef({ num: '', v: null });
+  React.useEffect(() => {
+    const n = (pairSel && pairSel.num) || ''; dejaEbayRef.current = { num: n, v: null };
+    if (!n) return undefined;
+    let vivant = true;
+    dejaEnLigneEbay(n).then((v) => { if (vivant && dejaEbayRef.current.num === n) dejaEbayRef.current = { num: n, v }; }).catch(() => {});
+    return () => { vivant = false; };
+  }, [pairSel && pairSel.num]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const verifEbay = (item) => {
+    const deja = dejaEbayRef.current && dejaEbayRef.current.num === ((pairSel && pairSel.num) || '') ? dejaEbayRef.current.v : null;
     const aspects = (item && item.aspects) || asp || {};
     const cle = (re) => Object.keys(aspects).find((k) => re.test(k));
     const kMarque = cle(/^(marque|brand)$/i), kTaille = cle(/pointure|taille|size/i);
@@ -1071,7 +1082,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       if (b.err) { setAutoPub(null); setRes({ err: b.err }); return; }
       const g = gardePublier();
       if (g) { setAutoPub(null); setRes({ err: g.t }); return; }
-      if (!(await verifierAvantPublication(verifEbay(b.item, (pairSel && pairSel.num) ? await dejaEnLigneEbay(pairSel.num) : null), { site: 'ebay' }))) { setAutoPub(null); return; }
+      if (!(await verifierAvantPublication(verifEbay(b.item), { site: 'ebay' }))) { setAutoPub(null); return; }
       setVerif(true);
       const { j } = await appelEbay({ action: 'pubverify', item: b.item, ...corpsCompteEbay(comptePub) });
       setVerif(false);
@@ -1097,7 +1108,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const publier = async (opts = {}) => {
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
     const g = gardePublier(); if (g) { setRes({ err: g.t }); return; }
-    if (!(opts && opts.verifie) && !(await verifierAvantPublication(verifEbay(b.item, (pairSel && pairSel.num) ? await dejaEnLigneEbay(pairSel.num) : null), { site: 'ebay' }))) return;
+    if (!(opts && opts.verifie) && !(await verifierAvantPublication(verifEbay(b.item), { site: 'ebay' }))) return;
     // (9 octobre) Une RÈGLE D'OFFRE part avec l'annonce : eBay vendra la paire
     // sans lui demander. TOUJOURS une confirmation qui le dit (même avec un
     // seul compte) — le compte y est nommé s'il y en a plusieurs.
