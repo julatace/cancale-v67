@@ -21,6 +21,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('playwright')); }
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirDetailCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 4612);
@@ -120,7 +121,7 @@ const contexte = async (b, vp, sombre) => {
 };
 const aller = async (pg, tab, attend) => {
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
-  await pg.locator(attend).first().waitFor({ timeout: 30000 });
+  await pg.locator(attend).first().waitFor({ timeout: 30000 }).catch(async (e) => { if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `attente-${tab}.png`) }).catch(() => {}); throw e; });
   await pg.waitForTimeout(2200);
 };
 // La carte d'une page, lue dans le DOM (data-* et nombres rendus).
@@ -266,26 +267,36 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await shot('[data-carte-stats="colis"]', 'carte-colis');
         await aller(pg, 'journee', '[data-carte-stats="journee"]');
         const j = await carte(pg, 'journee');
-        dit(j && j.grand.id === 'vendu' && j.grand.p === 'jour' && j.grand.v === '11000', 'Ma journée : vendu aujourd’hui en grand, tous les sites (70 € Vinted + 40 € Leboncoin)', JSON.stringify(j && j.grand));
+        // (11 nov., rouges A) Ma journée v2 (9 nov.) : le grand chiffre par défaut de la carte (« vendu ·
+        //  aujourd'hui ») EST le chiffre du jour de la frise — il n'est plus écrit deux fois. La carte ne
+        //  rend donc PAS son grand (`tete`), la frise le porte (`data-fu-vendu-jour`, en centimes).
+        const jf = await pg.evaluate(() => { const f = document.querySelector('[data-fu-vendu-jour]'); return f ? f.getAttribute('data-fu-vendu-jour') : null; });
+        dit(!!j && !j.grand && jf === '11000', 'Ma journée : vendu aujourd’hui en grand (dans la frise, une seule fois), tous les sites (70 € Vinted + 40 € Leboncoin)', JSON.stringify({ carte: j && j.grand, frise: jf }));
         dit(await pg.locator('[data-carte-stats="journee"] [data-journee-benef][data-benef-notion="benefice"]').count() === 1, 'Ma journée : la case bénéfice porte la règle unique (`chiffreBenefice`)');
         await shot('.vrm-fu-tete', 'carte-journee');
-        await aller(pg, 'compta', '[data-carte-stats="compta"]');
+        // (11 nov., rouges A) Argent (10–11 nov.) : la carte du bénéfice vit dans le repli « Ton bénéfice »
+        //  du Résumé. Le banc l'ouvre comme lui (un toucher sur son titre, `_compta.cjs`).
+        await aller(pg, 'compta', '[data-carte-stats="compta"], [data-argent-nav]').catch(() => {});
+        await ouvrirDetailCompta(pg);
+        await pg.locator('[data-carte-stats="compta"]').first().waitFor({ timeout: 30000 });
+        await pg.waitForTimeout(800);
         const k = await carte(pg, 'compta');
-        dit(k && k.grand.id === 'benefice' && k.cases.map((x) => x.id).join() === 'declarer,urssaf,finalisees', 'Compta : bénéfice en grand, à déclarer · URSSAF · finalisées', JSON.stringify(k && { g: k.grand, c: k.cases.map((x) => x.id) }));
+        dit(k && !!k.grand && k.grand.id === 'benefice' && k.cases.map((x) => x.id).join() === 'declarer,urssaf,finalisees', 'Compta : bénéfice en grand, à déclarer · URSSAF · finalisées', JSON.stringify(k && { g: k.grand, c: k.cases.map((x) => x.id) }));
         dit(await pg.locator('[data-carte-stats="compta"] [data-compta-chiffre="gagne"]').count() === 1, 'Compta : le grand chiffre garde `data-compta-chiffre="gagne"`');
         await shot('[data-compta-q="gagne"] .vrm-compta-carte', 'carte-compta');
         await aller(pg, 'annonces', '[data-carte-stats="annonces"]');
         const a = await carte(pg, 'annonces');
-        dit(a && a.grand.id === 'enligne' && /Vinted/.test(a.perimetre), 'Annonces : annonces en ligne, sur Vinted', JSON.stringify(a && { p: a.perimetre, g: a.grand }));
+        dit(a && !!a.grand && a.grand.id === 'enligne' && /Vinted/.test(a.perimetre), 'Annonces : annonces en ligne, sur Vinted', JSON.stringify(a && { p: a.perimetre, g: a.grand }));
         await shot('[data-carte-stats="annonces"]', 'carte-annonces');
         await aller(pg, 'achats', '[data-carte-stats="achats"]');
         const h = await carte(pg, 'achats');
         // (3 nov.) La carte d'Achats parle d'achats : Dépensé du mois en grand, jamais « Vendu · mois ».
-        dit(!!h && h.grand.id === 'depense' && h.cases.map((c) => c.id).join(',') === 'enroute,retirer,recus', 'Achats : dépensé en grand, en route · à retirer · reçus', JSON.stringify(h && { g: h.grand, c: h.cases.map((c) => c.id) }));
+        dit(!!h && !!h.grand && h.grand.id === 'depense' && h.cases.map((c) => c.id).join(',') === 'enroute,retirer,recus', 'Achats : dépensé en grand, en route · à retirer · reçus', JSON.stringify(h && { g: h.grand, c: h.cases.map((c) => c.id) }));
         dit(!!h && !/vendu/i.test(JSON.stringify(h.cases.map((c) => c.t))), 'Achats : aucune case « Vendu »');
         await shot('[data-carte-stats="achats"]', 'carte-achats');
         // (3 nov.) Rien de rogné dans une case, jamais « ≥ » sur un chiffre de case.
-        const rog = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-case:not(.is-jour)')].flatMap((c) => [...c.querySelectorAll('b, :scope > span')].filter((e) => e.scrollWidth > e.clientWidth + 1 || /≥/.test(e.textContent)).map((e) => e.textContent)));
+        // (11 nov., rouges A) Sauf le nom lu par VoiceOver (lot P, `.vrm-sr-seul`) : rogné EXPRÈS à 1 px, jamais dessiné.
+        const rog = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-case:not(.is-jour)')].flatMap((c) => [...c.querySelectorAll('b, :scope > span:not(.vrm-sr-seul)')].filter((e) => e.scrollWidth > e.clientWidth + 1 || /≥/.test(e.textContent)).map((e) => e.textContent)));
         dit(!rog.length, 'cases : aucun libellé ni chiffre rogné, aucun « ≥ »', rog.join(' | '));
         const d = await deborde(pg);
         dit(d <= 1, 'aucun débordement horizontal', `${d}px`);
