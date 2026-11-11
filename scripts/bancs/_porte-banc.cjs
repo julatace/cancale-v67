@@ -52,6 +52,10 @@ const SCRIPT = `(() => {
   // (Le script de la porte passe AVANT ceux du banc : demo-bulles.cjs retire
   //  cette marque de banc au premier chargement, puis pose vrm_banc_visite.)
   try { if (ls.getItem('vrm_banc_visite') !== '1' && !ls.getItem('vrm_visite_vue')) Storage.prototype.setItem.call(ls, 'vrm_visite_vue', JSON.stringify({ at: 'banc' })); } catch (_) {}
+  // (11 nov., lot DJ2) De même « Tu vends quoi ? », posée UNE fois à un compte installé
+  // (src/configurationDepart.js, questionVendsAOuvrir) : marquée vue, sauf pour un banc
+  // qui la juge (vrm_banc_vends) — aucun choix posé (choix « auto » reste le défaut d’avant).
+  try { if (ls.getItem('vrm_banc_vends') !== '1' && !ls.getItem('vrm_je_vends')) Storage.prototype.setItem.call(ls, 'vrm_je_vends', JSON.stringify({ choix: 'auto', vu: 'banc' })); } catch (_) {}
   // (6 nov.) Les conseils (src/Conseils.jsx) : une bulle pourrait se poser sur l'écran
   // qu'un banc juge. Coupés sur l'appareil du banc, sauf pour un banc qui les juge
   // (vrm_banc_conseils) — le même drapeau que lit l'app (src/accompagnement.js, CLE_APPAREIL).

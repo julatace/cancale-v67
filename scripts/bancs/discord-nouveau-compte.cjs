@@ -47,7 +47,7 @@ let ko = 0; const dit = (ok, m, d) => { console.log(`  ${ok ? "✅" : "❌"} ${m
         dit(appels.fermer.length === 0, `[${W}] rien n'est supprimé avant la confirmation`);
         await pg.click('[data-nouveau-oauth="supprimer"]'); await pg.waitForTimeout(800);
         dit(appels.fermer.length === 1 && appels.fermer[0].confirmation === "SUPPRIMER", `[${W}] la suppression passe par « Supprimer mon compte » (compte ouvert il y a moins de 10 min : le serveur le juge)`, JSON.stringify(appels.fermer));
-        dit(await pg.locator('[data-porte-nouveau-oauth="fait"]').count() === 1 && /Connecter Discord/.test(await pg.evaluate(() => document.body.innerText)), `[${W}] puis le geste : se connecter par email et relier Discord`);
+        dit(await pg.locator('[data-porte-nouveau-oauth="fait"]').count() === 1 && /Relier Discord/.test(await pg.evaluate(() => document.body.innerText)), `[${W}] puis le geste : se connecter par email et relier Discord`);
         await ctx.close();
       }
       { // Ce Discord est déjà le pseudo vérifié d'un AUTRE compte VRM (la carte) :

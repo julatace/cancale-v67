@@ -183,7 +183,7 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
         // F1 : la page des conversations publie le pseudo « ann » ; sur la même page,
         // la barre de navigation et les écrans écrivent « Annonces », « annonce ».
         await pg.evaluate(() => localStorage.setItem('vrm_stream', '1'));
-        await pg.goto(`http://localhost:${NV.PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 15000 }).catch(() => {}); await attendre(2600);
+        await pg.goto(`http://localhost:${NV.PORT}/?tab=messages&site=vinted`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 15000 }).catch(() => {}); await attendre(2600);
         const f1 = await pg.evaluate(() => {
           const t = document.body.innerText || '';
           const colles = t.match(/[\p{L}\p{N}]•••|•••[\p{L}\p{N}]/gu) || [];

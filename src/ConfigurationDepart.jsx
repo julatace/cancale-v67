@@ -52,6 +52,7 @@ const TRAITS_VENDS = {
   luxe: 'M6 4h12l3 5-9 11L3 9zM3 9h18M9 4l3 16M15 4l-3 16',
   sacs: 'M4.5 8.5h15l-1.2 12h-12.6zM8.5 10.5V7a3.5 3.5 0 0 1 7 0v3.5',
   montres: 'M8 7.5 9 3h6l1 4.5M8 16.5 9 21h6l1-4.5M12 9.5v2.7l1.6 1.3M17.5 12a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z',
+  lunettes: 'M2.5 13.5a3.75 3.75 0 1 0 7.5 0 3.75 3.75 0 0 0-7.5 0zM14 13.5a3.75 3.75 0 1 0 7.5 0 3.75 3.75 0 0 0-7.5 0zM10 13c.6-.6 1.3-.9 2-.9s1.4.3 2 .9M2.9 11.8 5 7h1.6M21.1 11.8 19 7h-1.6',
   accessoires: 'M3 11.5h7M14 11.5h7M3.5 11.5l1 4.5a2 2 0 0 0 2 1.5h1.6a2 2 0 0 0 1.9-1.4l1-3.1h2l1 3.1a2 2 0 0 0 1.9 1.4h1.6a2 2 0 0 0 2-1.5l1-4.5',
   vintage: 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2',
   enfants: 'M7 13.5a5 5 0 0 0 10 0V9.5H7zM9.5 9.5V7a2.5 2.5 0 0 1 5 0v2.5M5 13.5h2M17 13.5h2M10 20.5h4',
@@ -79,11 +80,35 @@ function Tuile({ choisi, onClick, titre, v }) {
   );
 }
 
+// (11 nov., lot DJ2) « Simple ou complet ? » en un coup d'œil : pour qui, ce qu'on voit
+// (3 puces à icône), un aperçu miniature du menu (des lignes, rien d'autre).
+const TRAITS_PUCE = {
+  menu: 'M4 6.5h16M4 12h16M4 17.5h10',
+  plateformes: 'M4.5 5.5h6v6h-6zM13.5 5.5h6v6h-6zM4.5 14.5h6v6h-6zM13.5 14.5h6v6h-6z',
+  journee: 'M5 4.5h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1zM4 9h16M8.5 3v3M15.5 3v3',
+};
+function CarteAffichage({ x, choisi, reco, onClick }) {
+  return (
+    <button type="button" className="vrm-cfg-aff" role="radio" aria-checked={!!choisi} data-choisi={choisi ? '1' : '0'} onClick={onClick} data-configuration-choix={`affichage:${x.v}`}>
+      <span className="vrm-cfg-aff-apercu" data-affichage-apercu={x.apercu} aria-hidden="true">
+        <span className="vrm-cfg-aff-ecran">{Array.from({ length: x.apercu }, (_, i) => <span key={i} data-apercu-ligne="" />)}</span>
+      </span>
+      <span className="vrm-cfg-aff-texte">
+        {reco ? <span className="vrm-cfg-badge" data-configuration-recommande="">Recommandé pour toi</span> : null}
+        <b>{x.titre}</b>
+        <span className="vrm-cfg-aff-pour" data-affichage-pour-qui="">{x.pourQui}</span>
+        <ul className="vrm-cfg-puces vrm-cfg-aff-puces">{x.puces.map((p) => <li key={p.t}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={TRAITS_PUCE[p.ic] || TRAITS_PUCE.menu} /></svg><span>{p.t}</span></li>)}</ul>
+      </span>
+      <span className="vrm-cfg-coche" aria-hidden="true">{choisi ? <svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" /></svg> : null}</span>
+    </button>
+  );
+}
+
 function Groupe({ label, children, multi = false, colonnes }) {
   return <div className="vrm-cfg-grille" role={multi ? 'group' : 'radiogroup'} aria-label={label} data-colonnes={colonnes || undefined}>{children}</div>;
 }
 
-export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, onFin, depart = null, relies = {}, contexte = null, entreprise = null }) {
+export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, onFin, depart = null, relies = {}, contexte = null, entreprise = null, seule = null, onPlusTardSeule = null }) {
   const [lus, setLus] = React.useState(() => ({ ...lus0, relies }));
   const [initial, setInitial] = React.useState(() => choixInitiaux({ ...lus0, relies }));
   const [choix, setChoix] = React.useState(initial);
@@ -107,7 +132,8 @@ export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, 
     return () => { mort = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const etapes = etapesActives(choix);
+  // (11 nov., lot DJ2) `seule` : UNE question (« Tu vends quoi ? » d'un compte déjà installé).
+  const etapes = seule ? etapesActives(choix).filter((e) => e.cle === seule) : etapesActives(choix);
   const idx = Math.max(0, etapes.findIndex((e) => e.cle === cle));
   const etape = etapes[idx];
   React.useEffect(() => { try { titre.current && titre.current.focus({ preventScroll: true }); } catch (_) {} setErreur(''); }, [cle]);
@@ -131,12 +157,22 @@ export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, 
   const avec = async (f) => { if (verrou.current) return; verrou.current = true; setOccupe(true); try { await f(); } finally { verrou.current = false; setOccupe(false); } };
   const suivant = () => avec(async () => {
     if (!(await ecrireEtape())) return;
+    if (seule) { if (choixRepondu(etape.cle, choix, lus)) { onFin && onFin('fait'); return; } if (onPlusTardSeule && !(await onPlusTardSeule())) { setErreur('Ce choix n’a pas pu être enregistré. Réessaie.'); return; } onFin && onFin('plusTard'); return; }
     const n = etapesActives(choix);
     const j = n.findIndex((e) => e.cle === etape.cle);
     if (j < n.length - 1) setCle(n[j + 1].cle);
   });
   const retour = () => { if (idx > 0) setCle(etapes[idx - 1].cle); };
+  // (11 nov., lot DJ2) Julien : « les gens doivent gagner du temps ». Un choix UNIQUE
+  // (Simple / Complet) : un toucher choisit ET passe à la suite (2 gestes → 1).
+  const avancer = React.useRef(false);
+  const poserEtSuivre = (patch) => { avancer.current = true; poser(patch); };
+  React.useEffect(() => { if (avancer.current) { avancer.current = false; suivant(); } }, [choix]); // eslint-disable-line react-hooks/exhaustive-deps
   const finir = (etat) => avec(async () => {
+    if (seule) {   // la question seule : « Plus tard » est retenu (rien d'autre), jamais `vrm_configuration`
+      if (onPlusTardSeule && !(await onPlusTardSeule())) { setErreur('Ce choix n’a pas pu être enregistré. Réessaie.'); return; }
+      onFin && onFin('plusTard'); return;
+    }
     if (etat === 'plusTard' && etape.cle !== 'recap' && !(await ecrireEtape())) return;
     let ok = false;
     try { ok = await ecrire([ecritureFin(etat, choix)]); } catch (_) { ok = false; }
@@ -150,10 +186,10 @@ export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, 
   });
 
   const rep = choixRepondu(etape.cle, choix, lus);
-  const corps = corpsEtape(etape.cle, { choix, poser, lus, initial, aller: setCle, contexte, entreprise });
+  const corps = corpsEtape(etape.cle, { choix, poser, poserEtSuivre, lus, initial, aller: setCle, contexte, entreprise });
   const n = etapes.length;
   return createPortal(
-    <div className="vrm-cfg" data-configuration={etape.cle} data-configuration-etape={idx + 1} data-configuration-sur={n}>
+    <div className="vrm-cfg" data-configuration={etape.cle} data-configuration-etape={idx + 1} data-configuration-sur={n} data-configuration-seule={seule || undefined}>
       <div className="vrm-cfg-panneau" role="dialog" aria-modal="true" aria-labelledby="vrm-cfg-titre">
         <header className="vrm-cfg-tete">
           <button type="button" className="vrm-cfg-lien" data-configuration-retour="" onClick={retour} disabled={idx === 0 || occupe} aria-hidden={idx === 0 ? 'true' : undefined} style={idx === 0 ? { visibility: 'hidden' } : undefined}>Retour</button>
@@ -163,7 +199,7 @@ export default function ConfigurationDepart({ lus: lus0, lirePushPrefs, ecrire, 
           <button type="button" className="vrm-cfg-lien" data-configuration-plus-tard="" onClick={() => finir('plusTard')} disabled={occupe}>Plus tard</button>
         </header>
         <main className="vrm-cfg-corps" key={etape.cle}>
-          <p className="vrm-cfg-sur">{idx + 1} sur {n}</p>
+          {n > 1 ? <p className="vrm-cfg-sur">{idx + 1} sur {n}</p> : null}
           <h1 id="vrm-cfg-titre" className="vrm-cfg-titre" tabIndex={-1} ref={titre}>{etape.titre}</h1>
           <p className="vrm-cfg-sous">{etape.sous}</p>
           {corps}
@@ -192,7 +228,7 @@ function choixRepondu(cle, c, lus) {
   return true;
 }
 
-function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) {
+function corpsEtape(cle, { choix: c, poser, poserEtSuivre = poser, lus, aller, contexte, entreprise }) {
   if (cle === 'vends') {
     const cats = Array.isArray(c.vends) ? c.vends : [];
     const basculer = (v) => { const n = cats.includes(v) ? cats.filter((x) => x !== v) : [...cats, v]; poser({ vends: n.length ? n : null }); };
@@ -209,7 +245,7 @@ function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) 
         ? 'VRM dira « paire » et vérifiera la taille et la marque avant de publier.'
         : mot === 'article'
           ? 'VRM dira « article » ; la taille et la marque sont facultatives.'
-          : 'Plusieurs choix possibles. Tu pourras changer dans Réglages → Affichage → Je vends.'}</p>
+          : 'Plusieurs choix possibles. Tu pourras changer dans Paramètres → Affichage → Je vends.'}</p>
     </>);
   }
   if (cle === 'plateformes') {
@@ -286,14 +322,10 @@ function corpsEtape(cle, { choix: c, poser, lus, aller, contexte, entreprise }) 
   if (cle === 'affichage') {
     const reco = affichageRecommande(contexte);
     return (<>
-      <Groupe label="Affichage">
-        {CHOIX_AFFICHAGE.map((x) => <Carte key={x.v} choisi={c.affichage === x.v} onClick={() => poser({ affichage: x.v })} titre={x.titre} sous={x.sous} puces={x.puces}
-          badge={reco === x.v ? 'Recommandé pour toi' : null} data={{ 'data-configuration-choix': `affichage:${x.v}` }} />)}
-      </Groupe>
-      <p className="vrm-cfg-note" data-configuration-reco={reco || ''}>{reco === 'simple'
-        ? 'Recommandé : un seul compte Vinted et moins de 30 ventes sur 30 jours.'
-        : reco === 'complet' ? 'Recommandé : tu as plusieurs comptes ou beaucoup de ventes.' : ''}
-        {reco ? ' ' : ''}Rien n’est supprimé : chaque écran reste joignable. Tu pourras changer dans {CHEMIN_REGLAGE_AFFICHAGE}.</p>
+      <div className="vrm-cfg-affichage" role="radiogroup" aria-label="Affichage">
+        {CHOIX_AFFICHAGE.map((x) => <CarteAffichage key={x.v} x={x} choisi={c.affichage === x.v} reco={reco === x.v} onClick={() => poserEtSuivre({ affichage: x.v })} />)}
+      </div>
+      <p className="vrm-cfg-note" data-configuration-reco={reco || ''}>Rien n’est supprimé. Tu pourras changer dans {CHEMIN_REGLAGE_AFFICHAGE}.</p>
     </>);
   }
   if (cle === 'notifs') {
