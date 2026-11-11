@@ -73,7 +73,8 @@ export async function lireVenteAutre(owner, plateforme, ref) {
     if (rows === undefined) return undefined;
     const ventes = rows[0] && rows[0].ventes;
     const v = ventes && typeof ventes === 'object' && !Array.isArray(ventes) ? ventes[ref] : null;
-    return v && typeof v === 'object' ? v : null;
+    // (11 nov.) L'identité est la CLÉ relue ici (posée en `id`), jamais un champ du navigateur.
+    return v && typeof v === 'object' ? { ...v, id: String(ref) } : null;
   }
   return null;
 }
