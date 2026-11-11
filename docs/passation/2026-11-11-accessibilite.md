@@ -198,3 +198,26 @@ origin/main` (main bouge vite : chaque fusion a apporté de nouveaux rouges que 
 `audit-coherence` exige l'historique complet (`git fetch --unshallow origin main`) ; ne jamais
 reconstruire `dist/` pendant qu'un banc le sert ; `tout-imprimer` et 4 bancs de navigation sont
 rouges à l'identique sur `main` (pas ce lot) ; durées ~10 et ~6 min sur machine chargée.
+
+## Reprise (11 nov., soir) — le dernier rouge K2
+
+**La vraie règle qui gagnait** (sondée dans la page : toutes les règles qui portent `outline` et
+qui touchent la case, avec leur couche) : `src/styles-bureau.css` l. 66, dans `@media` ordinateur,
+`.vrm-app-shell .vrm-main :is(button,a,input,select,textarea):focus-visible` — spécificité
+**(0,3,1)**, hors couche, `outline: 2px solid var(--vrm-accent)`. Or `--vrm-accent` reste
+**#0071E3 en sombre** : sur la pastille de la vignette (surface 82 % sur #2C2C2E) ⇒ **2,97:1**.
+La règle du lot, `.vrm-serie-case input:focus-visible`, ne pesait que (0,2,1) : sans effet.
+Aucune `@layer`, ni `styles-vitrine.css`, n'y touchait.
+
+**Correctif au plus juste** (`src/selection-serie.css`) : même règle, plus une seconde forme
+`.vrm-app-shell .vrm-main .vrm-serie-case input:focus-visible` (0,4,1), couleur
+`--vrm-accent-texte` (#409CFF en sombre, ≈ 6:1 ; #0066CC en clair). Le jeton global
+`--vrm-accent` n'est PAS changé (il sert partout : un changement de thème n'est pas ce lot).
+
+**Preuves** : `BANC_ECRANS=achats BANC_SEUL=K` rouge sur 233d5e84 (2,97:1), vert après (11/0) ;
+puis fusion `origin/main` (conflit `historique-divers.md` : les deux lignes gardées) et les deux
+bancs complets relancés (chiffres ci-dessous).
+
+**Ce qui reste** : la relecture **VoiceOver sur iPhone par Julien** (noms lus, ordre du focus,
+feuilles) — axe et Chrome ne la remplacent pas ; la langue de la page en anglais (section ⚠️) à
+trancher.
