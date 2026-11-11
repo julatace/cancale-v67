@@ -1,4 +1,5 @@
 require('./_porte-banc.cjs');
+const { ecranPret } = require('./_ecran-pret.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « NOUVEAU VENDEUR » — de l'inscription à un compte qui vit (2 nov.).
 //  Julien : « tu te mets à la place d'une personne qui crée son compte, tu
@@ -278,11 +279,11 @@ async function tournee(nav, { W, sombre, scenario, base }) {
   for (const [ecran, nom] of ECRANS) {
     const [tab, sous] = ecran.split(':');
     await o.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
-    await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
-    await o.pg.waitForTimeout(2800);
+    // (11 nov., webkit-fiable) l'écran PRÊT (monté, chargé, DOM calme), plus 2,8 s fixes (§6.5).
+    await ecranPret(o.pg, '', { max: 20000 });   // (un lien peut mener à un autre écran : aucun nom exigé)
     if (sous) {
       const choix = o.pg.locator(`[data-colis-onglet-choix="${sous}"]`).first();
-      if (await choix.count()) { await choix.click(); await o.pg.waitForTimeout(1500); }
+      if (await choix.count()) { await choix.click(); await ecranPret(o.pg, '', { max: 10000 }); }
       else if (scenario === 'jeu') dit(false, `${T} ${nom} : l'onglet existe`, sous);
     }
     if (process.env.BANC_SONDE) await o.pg.evaluate(() => { window.__bancSonde = 1; });

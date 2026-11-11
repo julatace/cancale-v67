@@ -163,7 +163,9 @@ const ouvrir = async (b, vp, sombre) => {
         await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
         await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
-        await pg.waitForTimeout(2500);
+        // (11 nov., webkit-fiable) Plus de délai fixe (§6.5) : on attend l'ÉTAT — autant de lignes
+        // comptées que le nombre publié, et l'onglet qui le dit (25 s au plus ; sinon les contrôles le disent).
+        await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); const o = document.querySelector('[data-colis-onglet-choix="retirer"]'); return !!p && Number.isFinite(p.total) && document.querySelectorAll('.vrm-rpf [data-cc-carte]:not([data-hors-compte])').length === p.total && !!o && o.getAttribute('data-colis-onglet-n') === String(p.total) && !!document.querySelector('[data-rp-section]'); } catch (_) { return false; } }, null, { timeout: 25000 }).catch(() => {});
         if (process.env.JR_DBG) console.log(await pg.evaluate(() => [document.querySelector('[data-colis-retraits="outils"]'), document.querySelector('[data-colis-retraits="outils"] .vrm-achats'), ...document.querySelectorAll('[data-colis-retraits="outils"] .vrm-achats > *'), document.querySelector('.vrm-rpf-verifier'), document.querySelector('.vrm-rpf')].filter((e) => e && e.getBoundingClientRect().height > 0).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mt${getComputedStyle(e).marginTop} pt${getComputedStyle(e).paddingTop} ${e.tagName}.${String(e.className).slice(0, 30)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')} :: ${e.innerText.slice(0, 90).replace(/\n/g, ' ')}`).join('\n')));
         if (process.env.JR_DBG) console.log('GAP2', await pg.evaluate(() => { const q = (x) => { const e = document.querySelector(x); if (!e) return x + ' —'; const c = getComputedStyle(e), r = e.getBoundingClientRect(); return `${x} top${Math.round(r.top)} h${Math.round(r.height)} mt${c.marginTop} mb${c.marginBottom} pt${c.paddingTop} pb${c.paddingBottom}`; }; return ['.vrm-rpf', '.vrm-colis-retirer', '[data-colis-retraits]', '[data-colis-retraits] > *', '.vrm-achats', '.vrm-achats > *', '.vrm-colis-fraicheur', '.vrm-rpf-verifier'].map(q).join('\n'); }));
         if (process.env.JR_DBG) console.log('GAP', await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); const y0 = d ? d.getBoundingClientRect().bottom : 0; return [...document.querySelectorAll('.vrm-main *')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.top >= y0 - 1 && r.top < y0 + 90 && !e.closest('[data-colis-retraits]'); }).slice(0, 12).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mb${getComputedStyle(e).marginBottom} ${e.tagName}.${String(e.className).slice(0, 40)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')}`).join('\n'); }));
@@ -249,24 +251,26 @@ const ouvrir = async (b, vp, sombre) => {
           const vil = await pg.evaluate(() => [...document.querySelectorAll('[data-retirer-villes] [data-ville]')].map((b) => ({ v: b.getAttribute('data-ville'), n: b.getAttribute('data-ville-n'), txt: b.textContent })));
           dit(vil.length >= 3 && vil[0].v === '' && vil.some((x) => x.v === 'cancale') && vil.some((x) => x.v === 'vannes'), 'sélecteur « Toutes · Cancale · … » (villes lues dans l’adresse)', JSON.stringify(vil));
           const vC = vil.find((x) => x.v === 'cancale');
-          await pg.locator('[data-retirer-villes] [data-ville="cancale"]').first().click(); await pg.waitForTimeout(500);
+          await pg.locator('[data-retirer-villes] [data-ville="cancale"]').first().click();
+          await pg.waitForFunction(() => { const a = [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point:not(.is-inconnu) [data-relais-adresse]')].map((x) => x.textContent); return a.length > 0 && a.every((t) => /Cancale/i.test(t)); }, null, { timeout: 15000 }).catch(() => {});
           const f = await pg.evaluate(() => ({ lignes: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point:not(.is-inconnu) [data-cc-carte]:not([data-hors-compte])')].length, nInconnu: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point.is-inconnu [data-cc-carte]')].length, inconnu: !!document.querySelector('.vrm-rpf-point.is-inconnu'), carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'), memo: localStorage.getItem('vrm_retirer_ville'), pts: [...document.querySelectorAll('.vrm-rpf-point:not(.vrm-rpf-verifier) [data-relais-adresse]')].map((x) => x.textContent) }));
           dit(vC && f.lignes === Number(vC.n) && f.carte === vC.n && f.pts.every((a) => /Cancale/i.test(a)) && f.inconnu && f.nInconnu === 1, 'Cancale choisie : ses points seuls, la carte sombre dit son nombre, « Lieu à confirmer » (1) reste visible', JSON.stringify(f));
           dit(f.memo === 'cancale', 'le choix de ville est retenu', f.memo);
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-ville-cancale-${nom}.png`) });
-          await pg.locator('[data-retirer-villes] [data-ville=""]').first().click(); await pg.waitForTimeout(400);
+          await pg.locator('[data-retirer-villes] [data-ville=""]').first().click();
+          await pg.waitForFunction(() => [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point:not(.is-inconnu) [data-relais-adresse]')].some((x) => !/Cancale/i.test(x.textContent)), null, { timeout: 15000 }).catch(() => {});
           dit(m.relire === '1' && m.puce === 0, '« 1 compte à relire » : nommé par la ligne du haut, plus en puce sur Colis (lot AG)', `${m.relire} · puce ×${m.puce}`);
           // (6 nov., v36-visuel-2) La RÈGLE : la ligne dit « Remboursement à vérifier » (puce) ET son montant (`montantCommande`,
           // écrit par `montant()`), visible — la puce et le montant vivent à part (une puce ne se coupe plus sur 2 lignes).
           dit(m.reparti.some((t) => /^Remboursement à vérifier · 19,64\u00a0?\s?€$/.test(t.replace(/\u202f/g, ' '))), '« Remboursement à vérifier » et son montant 19,64 €', m.reparti.join(' | '));
           // Ouvrir « À vérifier » : le statut en puce.
           await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); if (d) d.open = true; });
-          await pg.waitForTimeout(300);
+          await pg.waitForFunction(() => { const d = document.querySelector('.vrm-rpf-verifier'); return !!d && d.open && [...d.querySelectorAll('[data-rp-statut]')].some((x) => x.getBoundingClientRect().height > 0); }, null, { timeout: 15000 }).catch(() => {});
           const st = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf-verifier [data-rp-statut]')].map((x) => x.textContent));
           dit(st.length === 3 && st.includes('Retour à l’expéditeur ?'), 'À vérifier : statut en puce (« Fin d’instance » ⇒ « Retour à l’expéditeur ? »)', st.join(' | '));
           // Le détail au toucher.
           await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-ouvrir').first().click();
-          await pg.waitForTimeout(300);
+          await pg.waitForFunction(() => !!document.querySelector('[data-cc-carte*="9301"] [data-rp-detail]'), null, { timeout: 15000 }).catch(() => {});
           const det = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte*="9301"]'); const d = l && l.querySelector('[data-rp-detail]'); return d ? { code: !!d.querySelector('[data-code-retrait="012345"], .vrm-rp-gestes'), txt: d.innerText.slice(0, 200) } : null; });
           dit(!!det && det.code, 'toucher la ligne ouvre son détail (code, gestes)', JSON.stringify(det));
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>{window.__codeCopie=t;}}}));
@@ -278,13 +282,13 @@ const ouvrir = async (b, vp, sombre) => {
           await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-code').first().click();
           dit(await pg.locator('[data-cc-carte*="9301"] [data-rp-detail]').count()===1,'un presse-papiers refusé garde le détail disponible');
           await pg.locator('[data-rp-section="route"] > summary').first().click();
-          await pg.waitForTimeout(300);
+          await pg.waitForFunction(() => [...document.querySelectorAll('[data-en-route-liste] [data-en-route-achat]')].some((x) => x.getBoundingClientRect().height > 0), null, { timeout: 15000 }).catch(() => {});
           const nl = await pg.evaluate(() => [...document.querySelectorAll('[data-en-route-liste] [data-en-route-achat]')].filter((x) => x.getBoundingClientRect().height > 0).length);
           dit(nl === 13, 'ouvrir « En route » montre les 13 achats', String(nl));
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); if (d) d.open = false; });
           await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-ouvrir').first().click();
-          await pg.waitForTimeout(300);
+          await pg.waitForFunction(() => !document.querySelector('[data-cc-carte*="9301"] [data-rp-detail]'), null, { timeout: 15000 }).catch(() => {});
         }
         if (SHOTS) {
           const suf = `${nom}${JEU === 'base' ? '' : '-' + JEU}`;
