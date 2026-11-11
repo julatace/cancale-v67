@@ -1040,10 +1040,12 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
       let p = null; try { p = await vmrCmd(Object.assign({ cmd: 'lbcPublier', id: String(it.id) }, saitFiche ? { annonce: f.v.annonce } : {}), 30000); } catch (_) { p = null; }
       if (!p || !p.accepte) { poserS(id, 'echec', `supprimée de Leboncoin, pas encore republiée — ${p ? (p.raison || 'refusé par l’extension') : "l'extension n'a pas répondu"}. Elle est dans « À publier ». Arrêt.`); break; }
       __vmrJobs[jobId] = { etape: p.etape || 'depot', at: Date.now() }; __vmrNotifier();
-      const fin = t ? (await suivreJob(t, id, { jobId, lireJobs: () => __vmrJobs, depuis: t0, delaiMs: REPUB_LBC_ATTENTE_MS })).fin : await (async () => {
+      // (lot lbc-plus) La boucle d'origine (prouvée par lbc-comme-vinted) : la page de confirmation, l'abandon ou le geste attendu.
+      const fin = await (async () => {
         while (Date.now() - t0 < REPUB_LBC_ATTENTE_MS) {
           await attendreRepubLbc(1500);
           const j = __vmrJobs[jobId];
+          if (t && j && j.progres && j.progres.etape) t.etape(id, ['ouverture', 'remplissage', 'photos', 'etapes', 'publication'].includes(j.progres.etape) ? j.progres.etape : 'depot');
           if (j && j.etape === 'fait' && Number(j.at || 0) >= t0) return 'fait';
           if (j && j.etape === 'abandonne') return 'abandonne';
           if (j && j.progres && /^(champ-manquant|publication-refusee)$/.test(j.progres.etape)) return 'geste';
