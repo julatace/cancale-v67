@@ -10,7 +10,7 @@ Pas de repos entre deux comptes : « on s'en fiche ».
 - Extension **5.366.0** réservée dans `docs/passation/COORDINATION-AGENTS.md` (branche `claude/coordination`).
 - Preuve : `node scripts/audit-securite-comptes.cjs` (règle + vrai `background.js` dans un vm, `--mutation=toutes`,
   `--src <ancien background.js>` pour la preuve sur l'avant).
-- Pas fait : le banc de rendu dédié est `scripts/bancs/securite-comptes.cjs` (voir « Preuves » plus bas).
+- Banc `scripts/bancs/securite-comptes.cjs` : 56 verts (390 tactile et 1512, clair et sombre), captures regardées.
 - `agent2-vinted-forme` (5.357 : forme des réponses Vinted + prudence 24 h après un refus) n'est PAS sur `main` :
   rien n'en est repris. À l'intégration, sa prudence doit alimenter `secuObserver` (une seule prudence par compte),
   ou l'inverse : c'est écrit dans le fichier de coordination.
@@ -100,3 +100,8 @@ favoris arrêté par un frein/captcha, tout depuis l'onglet vinted.fr (aucun `Be
 - `--src` sur le `background.js` d'`origin/main` : E1–E10 rouges (la couche n'existait pas).
 - Build, audits `variables tdz coherence identite icones textes-courts fonctions-api secrets quoi-de-neuf traduction`.
 - Banc `scripts/bancs/securite-comptes.cjs` : 390 px tactile et 1512 px, captures regardées.
+- Résultats (11 nov. soir) : audit 35/35, `--mutation=toutes` 14/14 rouges, `--src` d'`origin/main` rouge (C1, E0–E6…),
+  les 74 audits qui exécutent `background.js` verts (avant correction : 12 rougissaient — en-tête `x-datadome` des
+  réponses normales lu comme un contrôle, attente non comptée dans le vm, version Leboncoin ; corrigés, et
+  `audit-moteur-offres` porté à la règle « une offre par passage, pas de rafale »), banc 56/0, build vert.
+- Choix d'affichage : « Tout est arrêté » dit UNE fois en tête (§7), chaque compte garde sa propre phrase.

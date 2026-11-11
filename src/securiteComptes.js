@@ -452,7 +452,7 @@ export function tableauGestes(rows, jours) {
 // que l'extension a vu (état publié, journal ou réglage) — jamais un compte deviné.
 export function comptesSecurite({ comptesVinted = [], rowsEtat = null, tableau = null, reglages = null, noms = {} } = {}) {
   const out = [], vus = new Set();
-  const pousser = (pf, id, nom) => { const cle = secuCle(pf, id); if (!cle || vus.has(cle)) return; vus.add(cle); out.push({ cle, plateforme: pf, compte: String(id), nom: nom || (pf === 'vestiaire' ? 'Vestiaire' : String(id)) }); };
+  const pousser = (pf, id, nom) => { const cle = secuCle(pf, id); if (!cle || vus.has(cle)) return; vus.add(cle); out.push({ cle, plateforme: pf, compte: String(id), nom: nom || (pf === 'vestiaire' ? 'Vestiaire · ' + String(id) : String(id)) }); };
   for (const a of comptesVinted || []) { const u = String((a && a.vinted_user_id) || ''); if (/^\d{1,20}$/.test(u)) pousser('vinted', u, noms[u] || a.login || a.username || ''); }
   const vc = new Set();
   for (const r of Array.isArray(rowsEtat) ? rowsEtat : []) for (const k of Object.keys((r && r.c) || {})) if (/^vestiaire:/.test(k)) vc.add(k.slice(10));
