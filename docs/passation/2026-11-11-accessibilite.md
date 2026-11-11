@@ -216,7 +216,7 @@ Aucune `@layer`, ni `styles-vitrine.css`, n'y touchait.
 
 **Preuves** : `BANC_ECRANS=achats BANC_SEUL=K` rouge sur 233d5e84 (2,97:1), vert après (11/0) ;
 puis fusion `origin/main` (conflit `historique-divers.md` : les deux lignes gardées) et les deux
-bancs complets relancés (chiffres ci-dessous).
+bancs complets relancés sur l’arbre fusionné : `accessibilite` **225 ✅ · 0 ❌**, `accessibilite-clavier` **207 ✅ · 0 ❌** ; audits variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets, quoi-de-neuf, traduction verts ; captures Achats 390/1512 sombre regardées.
 
 **Ce qui reste** : la relecture **VoiceOver sur iPhone par Julien** (noms lus, ordre du focus,
 feuilles) — axe et Chrome ne la remplacent pas ; la langue de la page en anglais (section ⚠️) à
