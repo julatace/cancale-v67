@@ -40,8 +40,23 @@ export function transporteursDuPdf(texte) {
   const colle = sansAccents(texte).toLowerCase().replace(/[^a-z0-9]/g, '');
   for (const [cle, re] of NOMS_COLLES) if (re.test(colle)) out.add(cle);
   if (out.has('shop2shop') && out.has('chronopost')) out.delete('shop2shop');
+  if (out.has('inpost')) { out.delete('inpost'); out.add('mondialrelay'); }   // InPost = réseau Mondial Relay
   return out;
 }
+
+// (11 nov., « transporteurs inconnus » — mesuré sur ses vrais bordereaux) L'étiquette InPost / Mondial
+// Relay ne NOMME personne en texte (les logos sont des images) mais imprime son code-barres en clair :
+// 26 chiffres commençant par « 56 », dont les chiffres 3 à 10 sont le n° Mondial Relay (3 bordereaux sur 3 :
+// le n° de l'e-mail). Une FORME PROPRE, comme XW…TS pour Chronopost : un seul code de cette forme dans le
+// PDF ⇒ Mondial Relay et son n° ; zéro ou plusieurs ⇒ rien (jamais deviné).
+export const RE_CODE_MR = /56\d{24}/g;
+export function codeMondialRelay(texte) {
+  const colle = String(texte == null ? '' : texte).replace(/\s+/g, '');
+  const codes = [...new Set(colle.match(RE_CODE_MR) || [])];
+  return codes.length === 1 ? { code: codes[0], suivi: codes[0].slice(2, 10) } : null;
+}
+// La version de la règle : une décision « aucun » prise AVANT elle est relue une fois (anciens bordereaux).
+export const REGLE_PDF = 2;
 
 const uniques = (l) => [...new Set(l)];
 // Le n° de suivi écrit dans le PDF, de la forme propre de `cle`, unique ; sinon ''.
@@ -68,10 +83,11 @@ export function suiviDuPdf(texte, cle) {
 export function decisionTexteBordereau(texte) {
   if (texte == null) return { etat: 'illisible', t: '', s: '' };
   const noms = transporteursDuPdf(texte);
-  if (noms.size === 0) return { etat: 'aucun', t: '', s: '' };
+  const mr = codeMondialRelay(texte);
+  if (noms.size === 0) return mr ? { etat: 'ok', t: 'mondialrelay', s: mr.suivi } : { etat: 'aucun', t: '', s: '' };
   if (noms.size > 1) return { etat: 'plusieurs', t: '', s: '' };
   const t = [...noms][0];
-  return { etat: 'ok', t, s: suiviDuPdf(texte, t) };
+  return { etat: 'ok', t, s: suiviDuPdf(texte, t) || (t === 'mondialrelay' && mr ? mr.suivi : '') };
 }
 
 // Le PDF (base64 ou octets) ⇒ la décision. Ne lève jamais.

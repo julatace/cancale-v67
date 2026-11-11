@@ -37,7 +37,10 @@ export const ID_LU = 'push_journal_lu';
 export const MAX_ENTREES = 150;
 export const DUREE_MS = 30 * 86400e3;
 // (8 nov.) `discret` : rangée dans la cloche sans sonner (une information sans geste).
-export const ETATS = ['envoyee', 'calme', 'sans-appareil', 'serveur', 'echec', 'discret'];
+export const ETATS = ['envoyee', 'calme', 'sans-appareil', 'serveur', 'echec', 'discret', 'attente', 'groupee'];
+// (11 nov., lot `notifs-groupees`) `attente` : arrivée dans la fenêtre de regroupement,
+// elle partira dans le prochain résumé ; `groupee` : elle est partie DANS un résumé
+// (`dans` : le moment du résumé). Clé d'idempotence `cle` (objet + jour, api/_lib/notif-groupe.js).
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const cle = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -65,6 +68,7 @@ export function ajouterEntree(journal, e, maintenant = Date.now()) {
     texte: propre(e.texte, 240),
     url: urlSure(e.url),
     ...(e.genre && /^[a-z]{1,20}$/.test(e.genre) ? { genre: e.genre } : {}),
+    ...(typeof e.cle === 'string' && e.cle ? { cle: e.cle.slice(0, 160) } : {}),
     etat: ETATS.includes(e.etat) ? e.etat : 'envoyee',
   };
   const garde = [entree, ...avant].filter((x) => !(Date.parse(x.at) < maintenant - DUREE_MS)).slice(0, MAX_ENTREES);
@@ -73,16 +77,77 @@ export function ajouterEntree(journal, e, maintenant = Date.now()) {
   // (plus de 30 jours, au-delà de 150) ne compte plus — la cloche ne dit
   // jamais « 4 » sur une liste qui en montre une.
   const depuis = garde.reduce((m, x) => Math.min(m, x.seq), seq);
-  return { journal: { n: seq, depuis, entrees: garde }, seq, entree };
+  // Les scalaires du regroupement (dernière sonnerie, fin de la fenêtre en cours) sont gardés.
+  const scal = {};
+  if (typeof j.dernierSon === 'string') scal.dernierSon = j.dernierSon;
+  if (typeof j.attenteJusqua === 'string') scal.attenteJusqua = j.attenteJusqua;
+  return { journal: { n: seq, depuis, entrees: garde, ...scal }, seq, entree };
 }
-// Combien d'entrées NON LUES de cette famille dans les dernières 24 h (celle qui
-// part comprise) — pour la notification regroupée. `lu` absent ⇒ on ne compte
-// rien de plus que celle-ci (« pas su » n'invente pas un « +3 »).
-export function nonLuesDeFamille(entrees, famille, lu, maintenant = Date.now()) {
-  if (!lu || typeof lu !== 'object') return 1;
-  const jusqua = Number.isSafeInteger(lu.luJusqua) ? lu.luJusqua : 0;
-  const lus = new Set(Array.isArray(lu.lus) ? lu.lus.filter(Number.isSafeInteger) : []);
-  return Math.max(1, (entrees || []).filter((x) => x && x.famille === famille && x.seq > jusqua && !lus.has(x.seq) && Date.parse(x.at) >= maintenant - 86400e3).length);
+
+// ── (11 nov.) LA DÉCISION DU REGROUPEMENT, DANS LE COMPARER-ET-ÉCHANGER ─────
+// Pure. Prise sur le journal LU, écrite en une fois : deux e-mails arrivés à la
+// même seconde ne peuvent pas « sonner les premiers » tous les deux.
+//   e        : { cat, titre, texte, url, etat, genre, cle }
+//   fenetre  : minutes (0 = aucune) ; `attendre` : l'objet peut attendre (un
+//              événement, pas urgent) ; `maintenant` : ms.
+// Rend :
+//   { doublon: true }                     même objet, même jour : rien
+//   { journal, seq, entree, etat, groupe } sinon ; `groupe` = les entrées en
+//   attente qui partent AVEC celle-ci (fenêtre libre), marquées `groupee`.
+const ETATS_DOUBLON = new Set(['envoyee', 'calme', 'discret', 'attente', 'groupee', 'sans-appareil', 'serveur']);
+export function deciderEntree(journal, e, { fenetre = 0, attendre = false, maintenant = Date.now() } = {}) {
+  const j = journal && typeof journal === 'object' ? journal : {};
+  const avant = Array.isArray(j.entrees) ? j.entrees : [];
+  if (e.cle && avant.some((x) => x && x.cle === e.cle && ETATS_DOUBLON.has(x.etat))) return { doublon: true };
+  const son = Date.parse(j.dernierSon || '');
+  const occupee = fenetre > 0 && Number.isFinite(son) && maintenant - son < fenetre * 60e3 && maintenant >= son;
+  let etat = e.etat;
+  if (etat === 'envoyee' && attendre && occupee) etat = 'attente';
+  const r = ajouterEntree(j, { ...e, etat }, maintenant);
+  const jr = r.journal;
+  let groupe = [];
+  if (etat === 'attente') {
+    // La fenêtre se ferme à `dernierSon + fenetre` : le résumé part alors (jamais repoussé).
+    const fin = new Date(son + fenetre * 60e3).toISOString();
+    if (!(typeof jr.attenteJusqua === 'string' && jr.attenteJusqua <= fin)) jr.attenteJusqua = fin;
+  } else if (etat === 'envoyee') {
+    // Elle sonne. Fenêtre libre ⇒ ce qui attendait part AVEC elle (un seul résumé).
+    if (!occupee) {
+      const at = new Date(maintenant).toISOString();
+      jr.entrees = jr.entrees.map((x) => {
+        if (!x || x.etat !== 'attente') return x;
+        groupe.push(x);
+        return { ...x, etat: 'groupee', dans: at };
+      });
+      delete jr.attenteJusqua;
+    }
+    jr.dernierSon = new Date(maintenant).toISOString();
+  }
+  return { journal: jr, seq: r.seq, entree: r.entree, etat, groupe };
+}
+// La fin d'une fenêtre (passage de 15 min, ou prochain envoi) : ce qui attend
+// part en UN résumé. Pure. `etatPour(entrée)` dit ce que devient chacune :
+// 'groupee' (elle part dans le résumé) ; 'calme' (heures calmes en cours : le
+// récapitulatif du réveil la dira) ; 'sans-appareil' / 'serveur' (rien ne peut
+// sonner). Défaut : 'groupee'. Rend `null` (rien d'échu) ou `{ journal, groupe }`
+// — `groupe` : les entrées qui partent dans le résumé.
+export function vidangerEntrees(journal, { maintenant = Date.now(), etatPour = null } = {}) {
+  const j = journal && typeof journal === 'object' ? journal : null;
+  if (!j || !Array.isArray(j.entrees)) return null;
+  const fin = Date.parse(j.attenteJusqua || '');
+  if (!Number.isFinite(fin) || fin > maintenant) return null;
+  const at = new Date(maintenant).toISOString();
+  const groupe = [];
+  const entrees = j.entrees.map((x) => {
+    if (!x || x.etat !== 'attente') return x;
+    const e = typeof etatPour === 'function' ? etatPour(x) : 'groupee';
+    if (e === 'groupee') { groupe.push(x); return { ...x, etat: 'groupee', dans: at }; }
+    return { ...x, etat: ETATS.includes(e) ? e : 'groupee' };
+  });
+  const { attenteJusqua: _a, rev: _r, ...reste } = j;
+  const out = { ...reste, entrees };
+  if (groupe.length) out.dernierSon = at;
+  return { journal: out, groupe };
 }
 
 // ── LECTURE / ÉCRITURE, AU NOM DU VENDEUR DE LA REQUÊTE ────────────────────
@@ -163,6 +228,25 @@ export async function rangerNotif({ cat, titre, texte, url, etat, genre = null }
   const r = await modifierJournal((d) => ajouterEntree(d, { cat, titre, texte, url, etat, genre }));
   return r ? { seq: r.seq, entrees: r.journal.entrees } : null;
 }
+// (11 nov.) Range ET décide (idempotence, fenêtre), en une écriture.
+// Rend `{ doublon: true }`, `{ seq, entrees, etat, groupe }`, ou `null` (pas su).
+export async function rangerNotifGroupe(e, opts = {}) {
+  let doublon = false;
+  const r = await modifierJournal((d) => {
+    const x = deciderEntree(d, e, { ...opts, maintenant: opts.maintenant || Date.now() });
+    if (x.doublon) { doublon = true; return undefined; }
+    return x;
+  });
+  if (doublon) return { doublon: true };
+  return r ? { seq: r.seq, entrees: r.journal.entrees, etat: r.etat, groupe: r.groupe || [] } : null;
+}
+// (11 nov.) Vide la fenêtre échue (rien d'échu ⇒ `{ groupe: [] }` ; `null` pas su).
+export async function vidangerAttente({ maintenant = Date.now(), etatPour = null } = {}) {
+  let rien = false;
+  const r = await modifierJournal((d) => { const x = vidangerEntrees(d, { maintenant, etatPour }); if (!x) { rien = true; return undefined; } return x; });
+  if (rien) return { groupe: [], rien: true };
+  return r ? { groupe: r.groupe, entrees: r.journal.entrees } : null;
+}
 // Corrige l'état d'une entrée déjà rangée (l'envoi a échoué sur tous les appareils).
 export async function corrigerEtat(seq, etat) {
   if (!Number.isSafeInteger(seq) || !ETATS.includes(etat)) return false;
@@ -171,7 +255,8 @@ export async function corrigerEtat(seq, etat) {
     const i = d.entrees.findIndex((x) => x && x.seq === seq);
     if (i < 0 || d.entrees[i].etat === etat) return undefined;
     const entrees = d.entrees.slice(); entrees[i] = { ...entrees[i], etat };
-    return { journal: { n: d.n, ...(Number.isSafeInteger(d.depuis) ? { depuis: d.depuis } : {}), entrees } };
+    const { rev: _r, ...reste } = d;
+    return { journal: { ...reste, entrees } };
   });
   return !!r;
 }

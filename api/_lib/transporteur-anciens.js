@@ -30,7 +30,7 @@
 import { transporteurDeTexteBordereau, transporteursNommes, suiviMondialRelayLu } from './transporteur-bordereau.js';
 import { TEXTE_MAX } from './resume-email.js';
 import { transporteurDeForme } from './suivi-colis.js';
-import { transporteurDuPdf } from './transporteur-pdf.js';
+import { transporteurDuPdf, REGLE_PDF } from './transporteur-pdf.js';
 
 export const ID_BORD_TRANSPORTEURS = 'vrm_bord_transporteurs';
 export const MAX_PAR_PASSAGE = 20;
@@ -192,9 +192,10 @@ export function candidatsPdf(bords, labels, cur) {
     const tx = String((b && b.tx) || '') || String((b && b.id) || '').replace(/^email_bord_/, '');
     if (!RE_TX.test(tx)) continue;
     avecEmail.add(tx);
-    if (b.pdfLu != null) continue;                                   // lu à la réception
+    // (11 nov.) « aucun » décidé avant la règle du code « 56… » (REGLE_PDF) : relu UNE fois.
+    if (b.pdfLu != null && b.pdfLu !== 'aucun') continue;            // lu à la réception
     if (b.transporteur && String(b.suivi || '').trim()) continue;    // rien à apprendre
-    if (pdf[tx] || vus[tx]) continue;
+    if (pdf[tx] || (vus[tx] && !(vus[tx].r === 'aucun' && vus[tx].v !== REGLE_PDF))) continue;
     out.push({ tx, id: b.id, at: Date.parse(b.recu || '') || 0 });
   }
   for (const l of labels || []) {
@@ -274,7 +275,7 @@ export async function passeTransporteursPdf({ lireTout, getRow, ecrire, lirePdf,
     else {
       const d = await transporteurDuPdf(b64);
       if (d.etat === 'ok') { neufsPdf[c.tx] = { t: d.t, ...(d.s ? { s: d.s } : {}) }; ranges++; }
-      else { neufsVus[c.tx] = { r: d.etat, at }; nVus++; }
+      else { neufsVus[c.tx] = { r: d.etat, at, v: REGLE_PDF }; nVus++; }
     }
     depuisEcriture++;
     if (depuisEcriture >= ECRIRE_TOUS && !(await ecrirePaquet())) { ecritureRatee = true; break; }

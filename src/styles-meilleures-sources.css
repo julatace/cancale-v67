@@ -1,0 +1,32 @@
+/* « Tes meilleures sources » (11 nov., src/MeilleuresSources.jsx) — neutre ; l'accent seulement sur le
+   chiffre de la source en tête du classement (§7) ; aucun rouge. Cibles au doigt ≥ 44 px. */
+.vrm-ms-carte { background: var(--vrm-bg, #fff); border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 14px; padding: 14px 14px 12px; min-width: 0; display: flex; flex-direction: column; color: var(--vrm-ink, #1D1D1F); }
+.vrm-ms-carte .vrm-ms-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.vrm-ms-carte .vrm-sv-carte-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; color: var(--vrm-ink, #1D1D1F); }
+.vrm-ms-seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--vrm-card2, #F2F2F7); border-radius: 10px; }
+.vrm-ms-seg button { min-height: 44px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 14px; cursor: pointer; }
+.vrm-ms-seg button[aria-pressed="true"] { background: var(--vrm-bg, #fff); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+.vrm-ms-lignes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vrm-ms-lignes > li + li { border-top: 1px solid var(--vrm-line, #E5E5EA); }
+.vrm-ms-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom chiffre" "cases cases" "sur sur" "att att"; column-gap: 12px; row-gap: 4px; width: 100%; min-height: 44px; padding: 12px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.vrm-ms-ligne:focus-visible { outline: 2px solid var(--vrm-accent, #0066CC); outline-offset: 2px; border-radius: 8px; }
+.vrm-ms-nom { grid-area: nom; font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-ms-genre { font-weight: 400; color: var(--vrm-muted, #6E6E73); }
+.vrm-ms-chiffre { grid-area: chiffre; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-ms-ligne[data-ms-tete] .vrm-ms-chiffre { color: var(--vrm-accent, #0066CC); }
+.vrm-ms-cases { grid-area: cases; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-ms-cases b { font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-ms-sur { grid-column: 1 / -1; font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-ms-feuille .vrm-ms-resume { margin: 0 0 8px; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-ms-achats { list-style: none; margin: 0; padding: 0; }
+.vrm-ms-achat { padding: 10px 0; border-top: 1px solid var(--vrm-line, #E5E5EA); display: flex; flex-direction: column; gap: 3px; }
+.vrm-ms-achat-l1, .vrm-ms-achat-l2 { display: flex; justify-content: space-between; gap: 10px; min-width: 0; }
+.vrm-ms-achat-titre { font-size: 15px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-ms-achat-prix { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-ms-achat-l2 { font-size: 13px; color: var(--vrm-muted, #6E6E73); flex-wrap: wrap; }
+.vrm-ms-plus { min-height: 44px; margin-top: 8px; }
+.vrm-ms-feuille { max-height: 86vh; overflow-y: auto; }
+/* Les lignes alignées sur le titre (la règle de base des boutons ne leur ajoute rien) ; en sombre,
+   l'accent clair d'Apple (#0A84FF) — le bleu du mode clair y manque de contraste. */
+.vrm-ms-carte .vrm-ms-lignes .vrm-ms-ligne { padding: 12px 0; margin: 0; }
+:root[data-theme="dark"] .vrm-ms-ligne[data-ms-tete] .vrm-ms-chiffre { color: #0A84FF; }

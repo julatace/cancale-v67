@@ -42,6 +42,9 @@ import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeP
 import { preuveAcheteur } from '../../src/facturePro/rattachement.js';
 import { pdfFacture } from '../../src/facturePro/pdf.js';
 import { configurationRelances } from './relances-essai.js';
+// (11 nov., lot ventes-lot) Une vente de plusieurs articles : la règle de l'app (src/venteLot.js),
+// COPIE refabriquée par `node scripts/audit-ventes-lot.cjs --recopie` — jamais modifiée à la main.
+import { resumeVenteLot, lignesFactureLot } from './vente-lot-regle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const sbKey = () => process.env.SUPABASE_SERVICE_KEY || '';
@@ -116,6 +119,21 @@ export async function lireListe(requete, owner) {
     const rows = await r.json();
     return Array.isArray(rows) ? rows : undefined;
   } catch (_) { return undefined; }
+}
+// ── (11 nov., lot ventes-lot) LES LIGNES D'UNE VENTE EN LOT ─────────────────────
+// La transaction de CETTE vente (son n°, le compte de la preuve), relue en projection : ses
+// articles (`order.items`) et leur nombre. Rend undefined (pas su : aucune facture numérotée),
+// null (pas un lot, ou articles pas lus : la ligne unique d'avant), ou les lignes — une par
+// article, à SA part du prix (au prorata des prix affichés, sinon parts égales), somme = prix.
+export async function lignesLotFacture(owner, uid, tx, centimes) {
+  if (!/^\d{1,20}$/.test(String(uid || '')) || !/^\d{4,20}$/.test(String(tx || ''))) return null;
+  const rows = await lireListe(`id=eq.harvest_${uid}_txn_${tx}&select=nb:data->payload->transaction->>items_count,items:data->payload->transaction->order->items`, owner);
+  if (rows === undefined) return undefined;
+  const r = rows[0];
+  if (!r) return null;
+  const lot = resumeVenteLot({ transaction: { items_count: r.nb, ...(Array.isArray(r.items) ? { order: { items: r.items } } : {}) } }, centimes);
+  if (!lot || !lot.lu || !lot.mode) return null;
+  return { n: lot.n, mode: lot.mode, phrase: lot.phrase, lignes: lignesFactureLot(lot.articles, lot.articles.map((a) => a.part)) };
 }
 // ── (6 nov.) LE BON ACHETEUR, PROUVÉ PAR LE SERVEUR LUI-MÊME ──────────────────
 // La règle de src/facturePro/rattachement.js, exécutée sur les lectures du
@@ -285,7 +303,11 @@ export async function emettre(owner, corps, res) {
   const preuve = await lirePreuve(owner, tx, ligne);
   if (preuve === undefined) return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : aucune facture n'a été numérotée. Réessaie." });
   if (!preuve.prouve) return repondre(res, 409, { erreur: 'pas-prouve', code: preuve.code, raison: preuve.raison, message: `Pas de facture : acheteur pas prouvé — ${preuve.raison}.` });
+  // (11 nov.) Une vente EN LOT : une facture, une ligne par article. Pas su ⇒ aucun numéro pris.
+  const lot = await lignesLotFacture(owner, preuve.uid, tx, preuve.centimes);
+  if (lot === undefined) return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : aucune facture n'a été numérotée. Réessaie." });
   const vente = {
+    ...(lot ? { lignes: lot.lignes } : {}),
     acheteur: { nom: preuve.acheteur.nom.slice(0, 200), adresse: preuve.acheteur.adresse.slice(0, 600), email: preuve.acheteur.email.slice(0, 200) },
     designation: (String(corps.designation || '').trim() || preuve.designation).slice(0, 400),
     centimes: preuve.centimes,

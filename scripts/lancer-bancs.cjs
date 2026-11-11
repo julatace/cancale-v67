@@ -11,7 +11,9 @@
 //   BANCS_TIMEOUT_S   durée maximale d'un banc (défaut 1200 : nouveau-vendeur rend
 //                     ~20 écrans × 2 largeurs × 2 thèmes, plus de 10 min sur une machine chargée)
 //   NAVIGATEUR        chromium (défaut) ou webkit : passé aux bancs qui le
-//                     savent (nouveau-vendeur, iphone-reprise, colis-retirer-propre)
+//                     savent (ceux qui passent par _navigateur.cjs : nouveau-vendeur,
+//                     iphone-reprise, colis-retirer-propre, connexion-claire, journee-coherence,
+//                     ventes-e2, retraits-suivi, tout-imprimer…)
 // Sans argument : le lot de la CI (LOT ci-dessous).
 // ═══════════════════════════════════════════════════════════════════════════
 'use strict';
