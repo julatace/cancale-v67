@@ -4,6 +4,8 @@ import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neu
 import { RappelsSetting } from '../App.jsx';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
 import { useObjectifMois } from '../App.jsx';
+// (11 nov., lot journee-perso) « Ma journée » : le MÊME éditeur que « Modifier ma journée ».
+import { JourneePersoSetting } from '../App.jsx';
 import { gesteCorbeille, CorbeilleSetting, lireListeCorbeille } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
 import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrière après une mauvaise manipulation
 import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
@@ -70,9 +72,10 @@ import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
-import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR} from '../../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme} from '../../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
+import {fenetreGroupe,FENETRES as FENETRES_GROUPE} from '../../api/_lib/notif-groupe.js';
 // ⟦← App.jsx #5⟧
 import GuideIphone, { useGuideIphone } from '../GuideIphone.jsx';
 // (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
@@ -111,6 +114,9 @@ import { ligneEmailsCompte } from "../emailsCompteLie.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
+// (11 nov., lot traduction) Les textes de Paramètres passent par `tr()` (src/i18n/index.js).
+import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue } from '../i18n/index.js';
+import { useLangue } from '../i18n/react.js';
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 
 // ⟦← App.jsx #10⟧
@@ -1408,9 +1414,17 @@ function PushPrefsSetting({ comptes, onMuets }) {
   };
   const bascule = (c) => ecrirePrefs({ ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } }, `« ${c.titre} »`);
   const calme = reglageCalme(prefs || {});
-  const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
+  // (11 nov.) La ligne `calme` lue est gardée entière (jours calmes, congés) : un réglage n'efface pas l'autre.
+  const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...((prefs && prefs.calme) || {}), ...calme, ...patch } });
+  const jc = reglageJours(prefs || {});
+  const congesBrut = (prefs && prefs.calme && prefs.calme.conges && typeof prefs.calme.conges === 'object') ? prefs.calme.conges : {};
+  const weekend = jc.jours.includes('sam') && jc.jours.includes('dim');
+  const basculerJour = (id) => poserCalme({ jours: jc.jours.includes(id) ? jc.jours.filter((x) => x !== id) : [...jc.jours, id] });
+  const poserConges = (patch) => { const g = { ...congesBrut, ...patch }; poserCalme({ conges: g.du || g.au ? g : null }); };
+  const aujourdhuiCalme = prefs ? jourCalme(prefs) : false;
   // (8 nov.) Allumé par défaut (api/_lib/notif-textes.js, `regrouper`) : seul un `false` posé l'éteint.
   const regroupe = !(prefs && prefs.regrouper === false);
+  const fenetre = fenetreGroupe(prefs || {});
   // (11 nov., C8) L'heure choisie tombe dans ses heures calmes ⇒ dit (la règle du serveur, `dansHeuresCalmes`).
   const soir = reglageSoir(prefs || {});
   const soirCalme = (() => { if (soir.heure == null || !calme.actif || calme.sauf.includes('rappels')) return false; const mn = (h) => { const [a, b] = String(h).split(':').map(Number); return a * 60 + b; }; const d = mn(calme.debut), f = mn(calme.fin), m = soir.heure * 60; if (d === f) return false; return d < f ? (m >= d && m < f) : (m >= d || m < f); })();
@@ -1468,6 +1482,28 @@ function PushPrefsSetting({ comptes, onMuets }) {
           <Interrupteur on={calme.sauf.includes('doublevente')} onClick={()=>poserCalme({ sauf: calme.sauf.includes('doublevente') ? calme.sauf.filter((x)=>x!=='doublevente') : [...calme.sauf, 'doublevente'] })} disabled={!prefs||busy} label="La double vente sonne pendant les heures calmes"/>
         </div>
       )}
+      {/* (11 nov., lot `notifs-groupees`) Les JOURS calmes (api/_lib/notif-textes.js, `jourCalme`) :
+          seul l'urgent sonne ; le reste part groupé au premier matin non calme. */}
+      <div className="vrm-np-ligne" data-np-weekend={weekend?'on':'off'}>
+        <span className="vrm-np-lib">Week-end calme<small>Samedi et dimanche : seul l’urgent sonne.</small></span>
+        <Interrupteur on={weekend} onClick={()=>poserCalme({ jours: weekend ? jc.jours.filter((x)=>x!=='sam'&&x!=='dim') : [...new Set([...jc.jours,'sam','dim'])] })} disabled={!prefs||busy} label={`Week-end calme : ${weekend?'activé':'désactivé'}`}/>
+      </div>
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-jours={jc.jours.join(',') || 'aucun'} data-np-jour-calme={aujourdhuiCalme?'oui':'non'}>
+        <span className="vrm-np-lib">Jours calmes<small>{aujourdhuiCalme ? 'Aujourd’hui est calme : le reste arrivera groupé.' : 'Seul l’urgent sonne. Le reste arrive groupé ensuite.'}</small></span>
+        <div className="vrm-np-jours" role="group" aria-label="Jours calmes">
+          {JOURS_SEMAINE.map((j)=>(
+            <button key={j.id} type="button" className="vrm-np-jour" aria-pressed={jc.jours.includes(j.id)} aria-label={j.nom} title={j.nom} data-np-jour={j.id} disabled={!prefs||busy} onClick={()=>basculerJour(j.id)}>{j.court}</button>
+          ))}
+        </div>
+      </div>
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-conges={jc.conges ? `${jc.conges.du}_${jc.conges.au}` : 'aucun'}>
+        <span className="vrm-np-lib">Congés<small>Du … au … inclus : seul l’urgent sonne.</small></span>
+        <div className="vrm-np-heures">
+          <label>Du <input type="date" value={congesBrut.du || ''} disabled={!prefs||busy} aria-label="Début des congés" data-np-conges-du="" onChange={(e)=>poserConges({ du: e.target.value || '' })}/></label>
+          <label>au <input type="date" value={congesBrut.au || ''} min={congesBrut.du || undefined} disabled={!prefs||busy} aria-label="Fin des congés" data-np-conges-au="" onChange={(e)=>poserConges({ au: e.target.value || '' })}/></label>
+          {(congesBrut.du || congesBrut.au) ? <Bouton variante="secondaire" data-np-conges-effacer="" disabled={!prefs||busy} onClick={()=>poserCalme({ conges: null })}>Effacer</Bouton> : null}
+        </div>
+      </div>
       {/* (11 nov., décision C8 — Julien : « tranche ») L'heure du résumé du soir : le défaut
           INCHANGÉ (19 h l'hiver, 20 h l'été), ou son heure, de 18 h à 22 h (heure de Paris).
           Rangée dans `push_prefs.soirHeure` ; le serveur la lit (api/_lib/notif-textes.js, `soirALHeure`). */}
@@ -1480,9 +1516,13 @@ function PushPrefsSetting({ comptes, onMuets }) {
         </select>
       </div>
       {soirCalme ? <div className="vrm-np-relance" data-np-soir-calme="">Pendant tes heures calmes : il ne sonnera pas.</div> : null}
-      <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
-        <span className="vrm-np-lib">Regrouper<small>« 3 bordereaux prêts à imprimer » au lieu de trois notifications.</small></span>
-        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper : ${regroupe?'activé':'désactivé'}`}/>
+      {/* (11 nov., lot `notifs-groupees`) La fenêtre du résumé (api/_lib/notif-groupe.js) :
+          la première sonne, les suivantes partent ensemble. L'urgent passe tout de suite. */}
+      <div className="vrm-np-ligne vrm-np-ligne-col" data-np-regrouper={regroupe?'on':'off'} data-np-fenetre={fenetre}>
+        <span className="vrm-np-lib">Regrouper<small>{regroupe ? `Une notification, puis un résumé toutes les ${fenetre >= 60 ? 'heures' : `${fenetre} min`}. L’urgent sonne tout de suite.` : 'Chaque notification sonne seule.'}</small></span>
+        <Segmente label="Regrouper" plein value={regroupe ? String(fenetre || FENETRES_GROUPE[0]) : 'non'} disabled={!prefs||busy}
+          onChange={(v)=>ecrirePrefs(v==='non' ? { ...(prefs || {}), regrouper: false } : { ...(prefs || {}), regrouper: true, groupe: { ...((prefs && prefs.groupe) || {}), fenetre: Number(v) } }, 'Le regroupement')}
+          options={[{ v: 'non', l: 'Non' }, ...FENETRES_GROUPE.map((f) => ({ v: String(f), l: f >= 60 ? '1 h' : `${f} min` }))].map((o) => ({ ...o, data: { 'data-np-fenetre-choix': o.v } }))}/>
       </div>
       <div className="vrm-np-ligne">
         <Bouton variante="secondaire" data-np-voir-centre="" onClick={()=>{ try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }}>Voir les notifications envoyées</Bouton>
@@ -1797,7 +1837,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── TES DONNÉES ET LES CONDITIONS
   const donnees = (
     <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
-      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Supprimer ton compte</b> : « Supprimer mon compte », tout en bas</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
+      <b style={{color:C.text}}>{tr('reglages.donnees.exporter')}</b>{tr('commun.deuxPoints')}{tr(ongletsCompte ? 'reglages.donnees.exporterOu.reglages' : 'reglages.donnees.exporterOu.dessous')}{AUTH.user ? <> · <b style={{color:C.text}}>{tr('reglages.donnees.supprimer')}</b>{tr('commun.deuxPoints')}{tr('reglages.donnees.supprimerOu')}</> : null}. {tr('reglages.donnees.droits')} <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('reglages.donnees.confidentialite')}</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
         {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accentTexte,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
@@ -1812,12 +1852,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const widget = urlWidget ? (
     <div>
       <div style={{fontSize:13,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-        Contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable.
+        {tr('reglages.widget.cle')}
       </div>
       <div style={{fontSize:12,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
         border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',wordBreak:'break-all',lineHeight:1.5,marginBottom:12}}>{urlWidget}</div>
-      <Bouton variante="primaire" icone="copy" onClick={()=>{ try{navigator.clipboard.writeText(urlWidget); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }}>
-        Copier l'adresse
+      <Bouton variante="primaire" icone="copy" onClick={()=>{ try{navigator.clipboard.writeText(urlWidget); toast(tr('reglages.widget.copiee'));}catch(_){ toast(tr('commun.copieImpossible'),'error'); } }}>
+        {tr('reglages.widget.copier')}
       </Bouton>
     </div>
   ) : null;
@@ -1827,7 +1867,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const profilV = useProfilVendeur();
   // (9 nov.) L'objectif du mois, dit à droite de sa ligne (Réglages → Affichage).
   const [objectifR] = useObjectifMois();
-  const valObjectif = objectifR ? (objectifR.type !== 'ventes' ? `${objectifR.valeur.toLocaleString('fr-FR')} €${objectifR.type === 'benefice' ? ' de bénéfice' : ''}` : `${objectifR.valeur} ventes`) : 'Aucun';
+  const valObjectif = objectifR ? (objectifR.type !== 'ventes' ? tr(objectifR.type === 'benefice' ? 'reglages.objectif.benefice' : 'reglages.objectif.vendu', { montant: monnaie(objectifR.valeur, 'EUR', { maximumFractionDigits: 0 }) }) : tr('reglages.objectif.ventes', { n: objectifR.valeur })) : tr('commun.aucun');
   const GROUPES_REGLAGES = [
     // (1er nov.) Le groupe portait « Comptes Vinted » mais rangeait aussi eBay, les
     // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
@@ -1838,175 +1878,179 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // e-mails, Notifications, Mon abonnement, Sécurité et sauvegarde, Aide), et chaque ligne
     // dit en UNE phrase ce que fait le réglage. Les `id` et les attributs `data-*` ne bougent
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
-    { id:'comptes', titre:'Mes comptes', items:[
+    { id:'comptes', titre:tr('reglages.groupe.comptes'), items:[
       // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
-      { id:'toutvabien', type:'panneau', ic:'heart', lib:'Tout va bien ?', desc:'Chaque compte, sa dernière relecture et l’extension de chaque appareil.', data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
+      { id:'toutvabien', type:'panneau', ic:'heart', lib:tr('reglages.toutvabien.lib'), desc:tr('reglages.toutvabien.desc'), data:{ 'data-reglage-toutvabien':'' }, el:<ToutVaBien onComptes={()=>setTab('vintedaccounts')}/> },
       // (11 nov., lot sante-donnees) Tout ce qui cloche dans tes données, le plus grave d'abord, un bouton par ligne (src/SanteDonnees.jsx).
-      { id:'sante', type:'panneau', ic:'check', lib:'Santé de tes données', desc:'Ce qui cloche (numéros, prix d’achat, ventes, e-mails, colis), et où le corriger.', data:{ 'data-reglage-sante':'' }, el:<SanteDonnees/> },
-      { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est à jour, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
+      { id:'sante', type:'panneau', ic:'check', lib:tr('reglages.sante.lib'), desc:tr('reglages.sante.desc'), data:{ 'data-reglage-sante':'' }, el:<SanteDonnees/> },
+      { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
+      { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
-      { id:'historique', type:'panneau', ic:'box', lib:'Mon historique Vinted', desc:'Tes anciennes ventes et achats, récupérés une fois.', data:{ 'data-reglage-historique':'' }, el:<HistoriqueVinted comptes={comptes||[]} variante="reglages"/> },
+      { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<HistoriqueVinted comptes={comptes||[]} variante="reglages"/> },
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
-      { id:'vacances', type:'panneau', ic:'sun', lib:'Mode vacances', desc:'Mettre tes comptes en pause pendant ton absence, puis rouvrir.', data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
+      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
-      ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:'Comptes eBay', desc:'Connecter eBay à VRM et choisir les comptes reliés.', el:ebayCompte },
+      ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
     ]},
-    { id:'emails-reglages', titre:'Mes e-mails', items:[
+    { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
       // l'onglet « Relier ma boîte » de l'écran E-mails ; Paramètres y MÈNE (plus de second écran ici).
-      { id:'adresses', type:'nav', ic:'mail', lib:L.emails, desc:'Relier ta boîte pour que VRM lise tes ventes, colis et codes de retrait.', onClick:()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }, data:{ 'data-reglage-emails':'', 'data-sous-ouvrir':'adresses' } },   // l'attribut d'avant reste : « Paramètres → E-mails » se touche au même endroit
+      { id:'adresses', type:'nav', ic:'mail', lib:L.emails, desc:tr('reglages.adresses.desc'), onClick:()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }, data:{ 'data-reglage-emails':'', 'data-sous-ouvrir':'adresses' } },   // l'attribut d'avant reste : « Paramètres → E-mails » se touche au même endroit
       // (10 nov., lot AQ — demande 6 de Julien) SON adresse VRM, créée par le serveur à la première
       // ouverture (`email-rattacher?mode=adresse-unique`) : une ligne, la feuille fait le reste.
-      { id:'adresse-vrm', type:'nav', ic:'send', lib:'Mon adresse VRM', desc:'Une adresse à toi : tes e-mails Vinted y arrivent seuls.', onClick:()=>setFeuilleAdresseVrm(true), data:{ 'data-reglage-adresse-vrm':'' } },
+      { id:'adresse-vrm', type:'nav', ic:'send', lib:tr('reglages.adresse-vrm.lib'), desc:tr('reglages.adresse-vrm.desc'), onClick:()=>setFeuilleAdresseVrm(true), data:{ 'data-reglage-adresse-vrm':'' } },
       // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
       // (10 nov., Julien : « mets ça avec les e-mails ») Rangé dans « Mes e-mails », sous le transfert des e-mails.
-      { id:'sms-colis', type:'panneau', nu:true, ic:'truck', lib:'SMS de colis', desc:'Transférer à VRM tes SMS Mondial Relay, Vinted Go et Pickup, comme tes e-mails.', val: etatJetonSms(jetonSms) === 'actif' ? 'Activé' : etatJetonSms(jetonSms) === 'coupe' ? 'Coupé' : 'À activer', data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
+      { id:'sms-colis', type:'panneau', nu:true, ic:'truck', lib:tr('reglages.sms-colis.lib'), desc:tr('reglages.sms-colis.desc'), val: etatJetonSms(jetonSms) === 'actif' ? tr('reglages.sms.actif') : etatJetonSms(jetonSms) === 'coupe' ? tr('reglages.sms.coupe') : tr('reglages.sms.aActiver'), data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
         el:<SmsColisSetting jeton={jetonSms} onJeton={(v)=>{ save('vrm_sms_token', v); setJetonSms(v); }} toast={toast}/> },
-      proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des e-mails Vinted', desc:'À partir de quelle date VRM relit tes anciens e-mails.', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
+      proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:tr('reglages.import.lib'), desc:tr('reglages.import.desc'), el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
     ]},
-    { id:'notifications', titre:'Notifications', items:[
-      { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
-        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
+    { id:'notifications', titre:tr('reglages.groupe.notifications'), items:[
+      { id:'push', type:'panneau', ic:'bell2', lib:tr('reglages.push.lib'), titreInterne:true,
+        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{tr('reglages.push.muets', { n: nMuetsPush })}</span> : tr('reglages.push.desc'),
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><BilanMoisSetting/><RelancesEssaiSetting/><MailEssaiSetting/></> },
       // (11 nov.) « Me le rappeler » : les rappels qu'il a posés sur un article, une vente, un achat (api/_lib/rappels-perso.js).
-      { id:'rappels', type:'panneau', ic:'clock', lib:'Rappels', desc:'Ceux que tu as posés avec « Me le rappeler » : à 9 h le jour choisi.', data:{ 'data-reglage-rappels':'' }, el:<RappelsSetting/> },
+      { id:'rappels', type:'panneau', ic:'clock', lib:tr('reglages.rappels.lib'), desc:tr('reglages.rappels.desc'), data:{ 'data-reglage-rappels':'' }, el:<RappelsSetting/> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (10 nov., lot H) Les échéances LUES dans le calendrier du téléphone (lien .ics secret).
-      AUTH.user && { id:'agenda', type:'panneau', ic:'target', lib:'Échéances dans l’agenda', desc:'URSSAF, colis à déposer et à retirer, dans ton calendrier.', data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
-      { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+      AUTH.user && { id:'agenda', type:'panneau', ic:'target', lib:tr('reglages.agenda.lib'), desc:tr('reglages.agenda.desc'), data:{ 'data-reglage-agenda':'' }, el:<AgendaEcheances enTete={enTeteSession} toast={toast} confirmer={askConfirm}/> },
+      { id:'alertes', type:'switch', ic:'alert', lib:tr('reglages.alertes.lib'), desc:tr('reglages.alertes.desc'), on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
-    MULTI_USER && AUTH.user && { id:'abonnement-lien', titre:'Mon abonnement', items:[
-      { id:'abonnement-ouvrir', type:'nav', ic:'wallet', lib:'Mon abonnement', desc:'Ton offre, ta carte, tes factures, et l’arrêt si tu veux.', onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
+    MULTI_USER && AUTH.user && { id:'abonnement-lien', titre:tr('reglages.groupe.abonnement-lien'), items:[
+      { id:'abonnement-ouvrir', type:'nav', ic:'wallet', lib:tr('reglages.abonnement-ouvrir.lib'), desc:tr('reglages.abonnement-ouvrir.desc'), onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
     ]},
-    MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:`Comment s’écrivent les numéros de tes prochain${profilV.vend === 'sneakers' ? 'es paires' : 's articles'}.`, val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
+    MULTI_USER && { id:'stock', titre:tr('reglages.groupe.stock'), items:[
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:tr('reglages.numeros.lib'), desc:tr(profilV.vend === 'sneakers' ? 'reglages.numeros.desc.paires' : 'reglages.numeros.desc.articles'), val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
     // (5 nov., chantier H — revue 2.31) « Organisation » n'est plus une ligne de la
     // liste (inutilisée, 29 oct.) : l'écran reste joignable par SON LIEN, sous le
     // groupe — jamais perdu (`?tab=organisation` aussi).
-    ], pied: <button type="button" className="vrm-lien-action vrm-set-lien" data-reglage-organisation="" onClick={()=>setTab('organisation')}>Organisation<Icon name="chevron" size={13}/></button>},
+    ], pied: <button type="button" className="vrm-lien-action vrm-set-lien" data-reglage-organisation="" onClick={()=>setTab('organisation')}>{tr('ecran.organisation')}<Icon name="chevron" size={13}/></button>},
     // (3 nov.) Les textes types insérés en un tap dans une description.
-    { id:'annonces-reglages', titre:'Annonces', items:[
-      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:'Mes modèles', desc:'Des textes prêts à insérer d’un geste dans une description.', val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
+    { id:'annonces-reglages', titre:tr('reglages.groupe.annonces-reglages'), items:[
+      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:tr('reglages.modeles.lib'), desc:tr('reglages.modeles.desc'), val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
     ]},
-    { id:'impression', titre:'Impression', items:[
-      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Le papier de ton imprimante, pour des bordereaux à la bonne taille.', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
+    { id:'impression', titre:tr('reglages.groupe.impression'), items:[
+      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:tr('reglages.imprimante.lib'), desc:tr('reglages.imprimante.desc'), val: imprimanteChoisie() === 'thermique' ? tr('reglages.imprimante.thermique') : tr('reglages.imprimante.normale'), el:<ImprimanteSetting nu/> },
     ]},
-    { id:'compta', titre:'Compta', items:[
+    { id:'compta', titre:tr('reglages.groupe.compta'), items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
       // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
-      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:L.statut, desc:'Ton statut fiscal : il fixe le taux de tes cotisations URSSAF.', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:L.statut, desc:tr('reglages.regime.desc'), val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       // (1er nov.) Depuis le 29 oct. une VENTE ne se masque plus : la ligne disait
       // encore « Ventes et achats masqués » pour un écran qui ne liste que des achats.
-      { id:'masques', type:'nav', ic:'eyeOff', lib:'Achats masqués', desc:'Les achats que tu as retirés de la compta, à réafficher.', onClick:()=>setTab('masques'), data:{ 'data-reglage-masques':'' } },
+      { id:'masques', type:'nav', ic:'eyeOff', lib:tr('reglages.masques.lib'), desc:tr('reglages.masques.desc'), onClick:()=>setTab('masques'), data:{ 'data-reglage-masques':'' } },
       // (31 oct., soir) La porte « Compléter les prix d'achat » revient ici (retirée par la
       // refonte du 31 oct.) : même destination — Annonces · Vinted, saisie en série ouverte.
-      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", desc:'Les saisir à la suite : sans eux, le bénéfice n’est qu’un minimum.', onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
+      { id:'prixachat', type:'nav', ic:'cash', lib:tr('reglages.prixachat.lib'), desc:tr('reglages.prixachat.desc'), onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
 
     ]},
-    { id:'affichage', titre:'Affichage', items:[
+    { id:'affichage', titre:tr('reglages.groupe.affichage'), items:[
       // (9 nov.) « Ma configuration » EN TÊTE du groupe : la configuration de départ, plein écran,
       // rejouable (src/ConfigurationDepart.jsx) — tes choix pré-sélectionnés, rien n'est écrasé.
-      { id:'configuration', type:'action', ic:'gear', lib:'Ma configuration', desc:'Ventes, plateformes, statut, numéro, affichage : tout en une fois.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
-      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:'Mes plateformes', desc:'Choisir les plateformes visibles dans tes onglets.', el:<PlateformesSetting/> },
+      { id:'configuration', type:'action', ic:'gear', lib:tr('reglages.configuration.lib'), desc:tr('reglages.configuration.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:configuration')); } catch (_) {} }, data:{ 'data-reglage-configuration':'' } },
+      { id:'mes-plateformes', type:'panneau', nu:true, ic:'grid', lib:tr('reglages.mes-plateformes.lib'), desc:tr('reglages.mes-plateformes.desc'), el:<PlateformesSetting/> },
       // (8 nov.) Simple / Complet et « Je vends » (src/profilVendeur.js).
-      { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:'Affichage', desc:'Simple : seulement ce qui te sert déjà. Complet : tout.', val: profilV.mode === 'simple' ? 'Simple' : 'Complet', data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
+      { id:'affichage-mode', type:'panneau', nu:true, ic:'eye', lib:tr('reglages.affichage-mode.lib'), desc:tr('reglages.affichage-mode.desc'), val: profilV.mode === 'simple' ? tr('reglages.affichage.simple') : tr('reglages.affichage.complet'), data:{ 'data-reglage-affichage': profilV.mode }, el:<AffichageSetting/> },
       // (9 nov., Julien) L'objectif du mois : un montant de VENDU à viser (vide par défaut). La barre fine de
       // Ma journée (et de chaque carte qui la montre) lit CE réglage (`vrm_objectif_mois`, synchronisé).
-      { id:'objectif-mois', type:'panneau', nu:true, ic:'chart', lib:'Objectif du mois', desc:'Un montant de vendu à viser chaque mois : une barre fine dans Ma journée.', val: valObjectif, data:{ 'data-reglage-objectif': objectifR ? objectifR.type : 'aucun' }, el:<ObjectifMoisSetting/> },
-      { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:'Je vends', desc:'Ce que tu vends : les mots et les exemples suivent.', val: (() => { const n = nomsCategories(profilV.categories || [], lireReglageJeVends(load(CLE_JE_VENDS, null)).autre); return n.length ? (n.length > 2 ? `${n.slice(0, 2).join(', ')}…` : n.join(', ')) : (profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre'); })(), data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
-      { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : 'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      // (11 nov., lot journee-perso) Ma journée : montrer, cacher, ranger ses cartes (src/journeePerso.js) — synchronisé.
+      { id:'ma-journee', type:'panneau', nu:true, ic:'soleilLevant', lib:tr('reglages.ma-journee.lib'), desc:tr('reglages.ma-journee.desc'), data:{ 'data-reglage-journee-perso':'' }, el:<JourneePersoSetting/> },
+      { id:'objectif-mois', type:'panneau', nu:true, ic:'chart', lib:tr('reglages.objectif-mois.lib'), desc:tr('reglages.objectif-mois.desc'), val: valObjectif, data:{ 'data-reglage-objectif': objectifR ? objectifR.type : 'aucun' }, el:<ObjectifMoisSetting/> },
+      // (11 nov., lot traduction) La langue de VRM (src/i18n/) : Français · English · Español · Italiano · Deutsch.
+      { id:'langue', type:'panneau', nu:true, ic:'langue', lib:tr('reglages.langue.lib'), desc:tr('reglages.langue.desc'), val: NOMS_LANGUES[langueCourante()] || '', data:{ 'data-reglage-langue': langueCourante() }, el:<LangueSetting/> },
+      { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:tr('reglages.je-vends.lib'), desc:tr('reglages.je-vends.desc'), val: (() => { const n = nomsCategories(profilV.categories || [], lireReglageJeVends(load(CLE_JE_VENDS, null)).autre); return n.length ? (n.length > 2 ? `${n.slice(0, 2).join(', ')}…` : n.join(', ')) : (profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre'); })(), data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
+      { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
-      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:'Apparence', desc:'Clair, sombre, comme l’appareil, ou sombre le soir.', val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
       // « Mode stream » n'est plus écrit deux fois dans le sous-écran.
-      { id:'stream-on', type:'switch', ic:'stream', lib:'Mode stream', desc:'Cache tes montants, pseudos et adresses quand tu filmes ton écran.', on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
-      { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', desc:'Choisir les mots, marques et comptes à cacher.', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
-      { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", desc:'Agrandir ou réduire les textes de VRM.', val:valZoom, el:<ZoomSetting nu/> },
-      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
+      { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
+      { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
+      { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
+      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:tr('reglages.widget.lib'), desc:tr('reglages.widget.desc'), el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
-      { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:'Siri et Raccourcis', desc:'Ajouter un achat ou trouver un N° en parlant à Siri.', data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
+      { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
       // (10 nov., lot P) Les raccourcis clavier (src/raccourcisClavier.js) : la même feuille que « ? ».
-      { id:'raccourcis-clavier', type:'action', ic:'key', lib:'Raccourcis clavier', desc:'Sur ordinateur : « g » puis une lettre, « ? » pour la liste.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
+      { id:'raccourcis-clavier', type:'action', ic:'key', lib:tr('reglages.raccourcis-clavier.lib'), desc:tr('reglages.raccourcis-clavier.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:raccourcis-clavier')); } catch (_) {} }, data:{ 'data-reglage-raccourcis-clavier':'' } },
     ]},
-    { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
-      { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
-      { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
+    { id:'sauvegarde', titre:tr('reglages.groupe.sauvegarde'), items:[
+      { id:'securite', type:'panneau', ic:'shield', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), el:<SecuriteSetting/> },
+      { id:'donnees', type:'action', ic:'doc', lib:tr('reglages.donnees.lib'), desc:tr('reglages.donnees.desc'), onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       // (11 nov.) Il arrive d'un tableur ou d'un autre logiciel : son stock (N°, emplacement, prix d'achat) et ses ventes passées.
-      { id:'importer', type:'panneau', nu:true, ic:'copy', lib:'Importer', desc:'Ton stock et tes ventes passées, depuis un tableur ou un autre logiciel.', data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
-      { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      { id:'importer', type:'panneau', nu:true, ic:'copy', lib:tr('reglages.importer.lib'), desc:tr('reglages.importer.desc'), data:{ 'data-reglage-importer':'' }, el:<ImporterSetting/> },
+      { id:'export', type:'action', ic:'archive', lib:tr('reglages.export.lib'), desc:tr('reglages.export.desc'), onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       // (11 nov.) Revenir en arrière : des points posés tout seuls (avant une action en série, un
       // import, chaque jour) ou une sauvegarde complète ⇒ aperçu précis ⇒ choisir quoi ⇒ confirmer (src/restauration.js).
-      { id:'revenir', type:'panneau', nu:true, ic:'undo', lib:'Revenir en arrière', desc:'Après une fausse manip : voir ce qui changera, choisir quoi remettre.', data:{ 'data-reglage-revenir':'' }, el:<RevenirEnArriere/> },
+      { id:'revenir', type:'panneau', nu:true, ic:'undo', lib:tr('reglages.revenir.lib'), desc:tr('reglages.revenir.desc'), data:{ 'data-reglage-revenir':'' }, el:<RevenirEnArriere/> },
       // (10 nov., lot Y) Ce qu'il a supprimé DANS VRM, restaurable 30 jours (src/corbeille.js).
-      { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:'Corbeille', desc:'Ce que tu as supprimé, à restaurer pendant 30 jours.', val:String(lireListeCorbeille().length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
-      { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', desc:'Remettre VRM tel qu’il était dans une sauvegarde.', onClick:onImport },
+      { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:tr('reglages.corbeille.lib'), desc:tr('reglages.corbeille.desc'), val:String(lireListeCorbeille().length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
+      { id:'restaurer', type:'action', ic:'restore', lib:tr('reglages.restaurer.lib'), desc:tr('reglages.restaurer.desc'), onClick:onImport },
     ], pied: (
       <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
-        {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' · à refaire':''}` : 'Jamais sauvegardé — touche « Sauvegarde complète »'}
+        {derniereSauvegarde.t ? tr('reglages.sauvegarde.derniere', { quand: derniereSauvegarde.days===0 ? tr('commun.aujourdhui') : derniereSauvegarde.days===1 ? tr('commun.hier') : tr('commun.ilYaJours', { n: derniereSauvegarde.days }) }) + (derniereSauvegarde.old ? tr('reglages.sauvegarde.aRefaire') : '') : tr('reglages.sauvegarde.jamais')}
       </span>
     )},
-    {id:'aide',titre:'Aide',items:[
+    {id:'aide',titre:tr('reglages.groupe.aide'),items:[
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
-      { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:'Vérifier mon installation', desc:'Extension, comptes, boîte e-mail : ce qui manque, et le geste.', data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
+      { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
-      { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM présentés un par un.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      { id:'visite', type:'action', ic:'play', lib:tr('reglages.visite.lib'), desc:tr('reglages.visite.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
       // « Pas su » (ligne pas lue) : l'interrupteur ne ment pas, la phrase le dit.
-      { id:'conseils', type:'switch', ic:'spark', lib:'Conseils', desc: conseilsOn === null ? 'Pas pu lire ce réglage — touche pour réessayer.' : 'Une bulle sur le bon bouton quand un geste t’aiderait.', on:conseilsOn === true,
-        onClick:()=>{ if (conseilsOn === null) { try { window.dispatchEvent(new Event('vrm:accompagnement')); } catch (_) {} return; } if (conseilsOn === undefined) return; basculerConseils().then((r)=>{ if(r.etat==='ko') toast('Pas pu enregistrer — réessaie.'); }); },
+      { id:'conseils', type:'switch', ic:'spark', lib:tr('reglages.conseils.lib'), desc: conseilsOn === null ? tr('reglages.conseils.pasSu') : tr('reglages.conseils.desc'), on:conseilsOn === true,
+        onClick:()=>{ if (conseilsOn === null) { try { window.dispatchEvent(new Event('vrm:accompagnement')); } catch (_) {} return; } if (conseilsOn === undefined) return; basculerConseils().then((r)=>{ if(r.etat==='ko') toast(tr('commun.pasPuEnregistrer')); }); },
         data:{ 'data-reglage-conseils': conseilsOn === true ? 'on' : conseilsOn === false ? 'off' : 'pas-su' } },
-      { id:'conseils-revoir', type:'action', ic:'sync', lib:'Revoir les conseils', desc:'Ceux que tu as passés ou masqués pourront revenir.', onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? 'Les conseils pourront revenir.' : 'Pas pu enregistrer — réessaie.')); }, data:{ 'data-reglage-conseils-revoir':'' } },
+      { id:'conseils-revoir', type:'action', ic:'sync', lib:tr('reglages.conseils-revoir.lib'), desc:tr('reglages.conseils-revoir.desc'), onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? tr('reglages.conseils.reviendront') : tr('commun.pasPuEnregistrer'))); }, data:{ 'data-reglage-conseils-revoir':'' } },
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
       // (11 nov.) « Quoi de neuf » : les nouveautés qui le concernent depuis son inscription (src/nouveautes.js).
-      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'soleilLevant', lib:'Quoi de neuf', desc:'Les nouveautés de VRM qui te concernent.', data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
+      { id:'quoi-de-neuf', type:'panneau', nu:true, ic:'soleilLevant', lib:tr('reglages.quoi-de-neuf.lib'), desc:tr('reglages.quoi-de-neuf.desc'), data:{ 'data-reglage-quoi-de-neuf':'' }, el:<QuoiDeNeufParametres onNav={setTab}/> },
       // (8 nov.) Le centre d'aide (vrm.center/aide, public/aide/) : des articles courts, une recherche.
-      { id:'centre-aide', type:'action', ic:'search', lib:'Centre d’aide', desc:'Installer l’extension, relier ta boîte, les numéros, l’URSSAF.', onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
+      { id:'centre-aide', type:'action', ic:'search', lib:tr('reglages.centre-aide.lib'), desc:tr('reglages.centre-aide.desc'), onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
-      { id:'statut', type:'nav', ic:'cloud', lib:'État de VRM', desc:'La base, les e-mails et les notifications fonctionnent-ils ?', onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
-      { id:'signaler', type:'action', ic:'chat', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      { id:'statut', type:'nav', ic:'cloud', lib:tr('reglages.statut.lib'), desc:tr('reglages.statut.desc'), onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
+      { id:'signaler', type:'action', ic:'chat', lib:tr('reglages.signaler.lib'), desc:tr('reglages.signaler.desc'), onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
       // voit l'entrée, et la route refuse tout autre compte (403).
-      proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:'Ton entreprise', desc:'Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.', data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
-      proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
-      {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
-      <details data-aide-statut=""><summary>VRM semble en panne</summary><p>Regarde la page d’état. Tout y marche ? Recharge cette page.</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>Voir l’état de VRM</Bouton></details>
-      <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse du compte Vinted, sa confirmation, puis le transfert.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
-      <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte-le sur Vinted, extension reliée à ton VRM, puis actualise.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
-      <details><summary>Mon bordereau s’imprime mal</summary><p>Bon papier, aperçu, échelle. Lot raté : relance seulement les refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
+      proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:tr('reglages.pilotage.lib'), desc:tr('reglages.pilotage.desc'), data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
+      proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
+      <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>
+      <details><summary>{tr('reglages.depannage.emails.q')}</summary><p>{tr('reglages.depannage.emails.r')}</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
+      <details><summary>{tr('reglages.depannage.compte.q')}</summary><p>{tr('reglages.depannage.compte.r')}</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>{tr('reglages.depannage.compte.bouton')}</Bouton></details>
+      <details><summary>{tr('reglages.depannage.bordereau.q')}</summary><p>{tr('reglages.depannage.bordereau.r')}</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>{tr('reglages.depannage.bordereau.bouton')}</Bouton></details>
     </div>}]},
   ];
   // « Mon compte » : la PERSONNE.
   const GROUPES_COMPTE = MULTI_USER ? [
     { id:'profil', titre:null, items:[
       { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
-    ], pied:'Pour te dire bonjour sur l’accueil. Vide : « Bonjour ».' },
+    ], pied:tr('reglages.profil.pied') },
     // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
 
     // (5 nov., chantier H — revue 2.31) Discord était dit DEUX fois : une ligne
     // « Bientôt » (fournisseur de connexion) ET la carte qui le relie (« Discord
     // relié » ou « pas pu lire »). Une seule ligne par compte : Google ici,
     // Discord par `DiscordCompte` (la liaison, qui ouvre aussi « Se connecter avec Discord »).
-    AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
+    AUTH.user && {id:'connexions-rapides',titre:tr('reglages.groupe.connexions-rapides'),items:[
       // (11 nov., lot DJ6) Google ET Discord relient une façon de se CONNECTER au compte ouvert
       // (jamais un nouveau compte) ; la photo du profil vient de là. L'ancienne ligne « Profil
       // Discord » (pseudo de la carte, `DiscordCompte`) ne s'affiche plus ici : elle faisait croire
       // que Discord était relié pour se connecter (c'est ainsi que le compte en trop a été créé) ;
       // le pseudo de la carte se relie dans Communauté.
-      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} delier={oauthDelier} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?tr('reglages.associe',{ nom:'Google' }):AUTH_REDIRECT?.liaison==='discord'?tr('reglages.associe',{ nom:'Discord' }):'')} icone={id=><BrandMark id={id}/>}/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
     // détourage « ne le mets pas dans les paramètres ». Elle vit sur l'écran
@@ -2016,39 +2060,39 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // celle de l'en-tête (l'initiale de l'email), plus un « V » qui ne venait de rien.
     // (5 nov., chantier H) La photo se change DANS la carte du profil (plus d'avatar dessiné deux fois).
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
-    AUTH.user && { id:'boutique', titre:'Ta boutique', items:[
+    AUTH.user && { id:'boutique', titre:tr('reglages.groupe.boutique'), items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
-      { id:'equipe', type:'panneau', ic:'users', lib:'Équipe', desc:'Inviter un aide pour les colis', el:<EquipeSetting/> },
+      { id:'equipe', type:'panneau', ic:'users', lib:tr('reglages.equipe.lib'), desc:tr('reglages.equipe.desc'), el:<EquipeSetting/> },
     ]},
-    { id:'connexion', titre:'Connexion', items:[
-      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon e-mail', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
-      AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
+    { id:'connexion', titre:tr('reglages.groupe.connexion'), items:[
+      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:tr('reglages.email.lib'), onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
+      AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:tr('reglages.motdepasse.lib'), onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
       // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
-      AUTH.user && { id:'appareils', type:'panneau', ic:'device', lib:'Appareils connectés', el:<AppareilsConnectes/> },
+      AUTH.user && { id:'appareils', type:'panneau', ic:'device', lib:tr('reglages.appareils.lib'), el:<AppareilsConnectes/> },
       // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
-      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:'Ce que VRM a fait', el:<JournalVrm/> },
-      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'lock', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? `Activée · ${AUTH.session.totp.length} appareils` : AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
+      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
+      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'lock', lib:tr('reglages.double.lib'), val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? tr('reglages.double.activeN', { n: AUTH.session.totp.length }) : AUTH.session.totp.length ? tr('reglages.double.active') : tr('reglages.double.inactive')) : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
-      { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
-    ], pied:'Vide ce navigateur ; tes données restent dans ton compte.' },
-    { id:'donnees', titre:'Tes données', items:[
+      { id:'deconnexion', type:'action', ic:'door', lib:tr('reglages.deconnexion.lib'), danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
+    ], pied:tr('reglages.deconnexion.pied') },
+    { id:'donnees', titre:tr('reglages.groupe.donnees'), items:[
       // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
-      { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
+      { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
     // (9 nov., RGPD) « Supprimer mon compte » : TOUT EN BAS de Mon compte, seul, discret
     // (le libellé dans la couleur `danger` du thème — le rouge est réservé aux doublons, §7).
     AUTH.user && { id:'supprimer', titre:null, items:[
-      { id:'fermer', type:'panneau', ic:'trash', lib:'Supprimer mon compte', ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
+      { id:'fermer', type:'panneau', ic:'trash', lib:tr('reglages.fermer.lib'), ton:'danger', el:<FermerCompte onExporter={exporterMesDonnees}/> },
     ]},
   ] : [
-    { id:'donnees', titre:'Tes données', items:[
-      { id:'tes-donnees', type:'panneau', ic:'shield', lib:'Ce que VRM lit et fait', desc:'Par site, où c’est rangé, qui y a accès.', data:{ 'data-reglage-tes-donnees':'' },
+    { id:'donnees', titre:tr('reglages.groupe.donnees'), items:[
+      { id:'tes-donnees', type:'panneau', ic:'shield', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees}/> },
-      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
+      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:tr('reglages.conditions.lib'), el:donnees },
     ]},
   ];
   // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
@@ -2058,7 +2102,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
   const ouvert = sous ? panneaux.find((it) => it.id === sous) : null;
-  const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : vue === 'abonnement' ? 'Abonnement' : 'Réglages';
+  const titreRetour = !ongletsCompte ? tr('ecran.settings') : vue === 'compte' ? tr('reglages.onglet.compte') : vue === 'abonnement' ? tr('reglages.onglet.abonnement') : tr('reglages.onglet.reglages');
 
   // ── TON COMPTE VRM ──────────────────────────────────────────────────────
   // Toujours présent en multi-vendeurs, y compris quand on est entré par la
@@ -2072,21 +2116,21 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       <span>
         <span style={{display:'block',fontSize:17,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:'-.01em'}}>{AUTH.user.email}</span>
         <span style={{display:'block',fontSize:13,color:C.muted,marginTop:3}}>
-          {CLOISONNE ? 'Tes données ne sont visibles que par toi.' : 'Connecté — séparation des comptes pas encore activée.'}
+          {CLOISONNE ? tr('reglages.profil.cloisonne') : tr('reglages.profil.pasCloisonne')}
         </span>
       </span>
       <div className="vrm-set-profil-photo"><PhotoProfil key={AUTH.user.id} nu owner={AUTH.user.id} headers={enTeteSession} theme={C} lettre={String(AUTH.user.email||'?').slice(0,1).toUpperCase()}/></div>
     </div>
   ) : (
     <div className="vrm-set-carte" style={{border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:32}}>
-      <div style={{fontSize:17,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
+      <div style={{fontSize:17,fontWeight:600,color:C.text}}>{tr('reglages.sansCompte.titre')}</div>
       <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>
-        Accès temporaire : tes données sont là, mais rattachées à aucun compte.
+        {tr('reglages.sansCompte.texte')}
       </div>
       <Bouton variante="primaire"
         className="vrm-set-connect" onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
         style={{marginTop:12}}>
-        Aller à l'écran de connexion
+        {tr('reglages.sansCompte.bouton')}
       </Bouton>
     </div>
   ));
@@ -2112,15 +2156,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {/* (5 nov., chantier H — revue 2.31) « Enregistrement en cours… » vit dans la
             ligne du titre, à droite : il ne prend plus la place d'un surtitre (le
             titre ne saute plus de 26 px à chaque réglage touché). */}
-        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2><StatutSauvegardeReglages/></div>
+        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2><StatutSauvegardeReglages/></div>
         {PHRASES_ECRAN.settings ? <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}<AideEcran cle="settings"/></p> : null}
         <ReglagesPasLus/>
         {ongletsCompte && (
           // (5 nov., chantier H) Les trois onglets ont LA forme du contrôle segmenté de
           // l'app (`.vrm-seg`, une règle) : avant, un dessin à part dont l'aplat se
           // perdait (l'onglet choisi n'était pas le blanc).
-          <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-seg vrm-seg-plein vrm-set-onglets">
-            {[['reglages','Réglages'],['compte','Mon compte'],...(AUTH.user?[['abonnement','Abonnement']]:[])].map(([k,l]) => (
+          <div role="tablist" aria-label={tr('ecran.settings')} data-onglets-reglages="" className="vrm-seg vrm-seg-plein vrm-set-onglets">
+            {[['reglages',tr('reglages.onglet.reglages')],['compte',tr('reglages.onglet.compte')],...(AUTH.user?[['abonnement',tr('reglages.onglet.abonnement')]]:[])].map(([k,l]) => (
               <button key={k} type="button" role="tab" className="vrm-seg-btn" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}>
                 {l}
               </button>
@@ -2135,10 +2179,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
-        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder="Rechercher un réglage" label="Rechercher dans les paramètres" micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
-          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>Aucun réglage pour « {rechercheReglage.trim()} ». Essaie « e-mail », « numéro » ou « impression ».</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>Effacer la recherche</Bouton></div>;
+          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: filtres.reduce((n,g)=>n+g.items.length,0) })}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q: rechercheReglage.trim() })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>;
         })()}
       </>}
       {panneaux.map(it=><div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>
@@ -3981,6 +4025,27 @@ function ApparenceSetting({ valeur, onChoisir }) {
           data-apparence={m} onClick={() => onChoisir && onChoisir(m)}>
           <span className={'vrm-apparence-apercu is-' + m} aria-hidden="true"><span/></span>
           <span className="vrm-apparence-txt"><b>{LIBELLES_APPARENCE[m]}</b><small>{PHRASES_APPARENCE[m]}</small></span>
+          <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+        </button>
+      ))}
+    </div>
+  );
+}
+// (11 nov., lot traduction) LA LANGUE : la même liste d'iOS que l'Apparence. Chaque langue
+// est écrite DANS sa langue (on la retrouve sans comprendre la langue courante) ; le choix
+// est rangé dans `vrm_langue` (SYNC_KEYS : le même sur tous ses appareils), puis posé.
+// Jamais choisi tout seul : sans choix, la langue du navigateur (parmi les cinq), sinon fr.
+function LangueSetting() {
+  const valeur = useLangue();
+  const [enCours, setEnCours] = React.useState('');
+  const choisir = (l) => { if (l === valeur) return; setEnCours(l); choisirLangue(l, save).then((ok) => { setEnCours(''); if (!ok) toast(tr('reglages.langue.rate'), 'error'); }); };
+  return (
+    <div className="vrm-apparence" role="radiogroup" aria-label={tr('reglages.langue.lib')} data-langue-choix={valeur}>
+      {LANGUES.map((l) => (
+        <button key={l} type="button" role="radio" lang={l} aria-checked={valeur === l} className={'vrm-apparence-ligne' + (valeur === l ? ' is-choisi' : '')}
+          data-langue={l} disabled={!!enCours} onClick={() => choisir(l)}>
+          <span className="vrm-langue-code" aria-hidden="true">{l.toUpperCase()}</span>
+          <span className="vrm-apparence-txt"><b>{NOMS_LANGUES[l]}</b>{enCours === l ? <small>{tr('reglages.langue.chargement')}</small> : null}</span>
           <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
         </button>
       ))}

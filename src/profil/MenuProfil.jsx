@@ -1,3 +1,4 @@
+import { tr } from '../i18n/index.js';
 import React,{useState} from 'react';
 import {AvatarCompte,ChoixPhoto,useNomMasque,poserNomMasque} from './AvatarPersonnel.jsx';
 import {nomAffiche,initialeAffichee,emailMasque} from './identiteProfil.js';
@@ -29,11 +30,11 @@ export default function MenuProfil({owner,headers,email,nom,offre,theme:C,Feuill
  const basculer=async()=>{setOccupe(true);setMsg('');try{await poserNomMasque(owner,headers,!masque);}catch(e){setMsg(e.message);}finally{setOccupe(false);}};
  const ligne=(id,icone,lib,onClick,extra={})=><button type="button" className="vrm-profil-ligne" data-profil-menu={id} onClick={onClick} {...extra}>
   <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name={icone} size={18}/></span><span className="vrm-profil-ligne-lib">{lib}</span><span aria-hidden="true" className="vrm-profil-ligne-fin"><Icon name="chevron" size={15}/></span></button>;
- const nomVu=masque===false?nomAffiche({masque:false,nom,email}):'Nom masqué';
- return <Feuille onClose={onFermer} titre="Mon profil" maxWidth={420} data-menu-profil="">
+ const nomVu=masque===false?nomAffiche({masque:false,nom,email}):tr('profil.nomMasque');
+ return <Feuille onClose={onFermer} titre={tr('coque.monProfil')} maxWidth={420} data-menu-profil="">
   <div className="vrm-profil-menu">
    <div className="vrm-profil-tete">
-    <button type="button" className="vrm-profil-photo" data-profil-photo="" aria-label="Changer ma photo" aria-expanded={photo} onClick={()=>setPhoto(v=>!v)}>
+    <button type="button" className="vrm-profil-photo" data-profil-photo="" aria-label={tr('profil.changerPhoto')} aria-expanded={photo} onClick={()=>setPhoto(v=>!v)}>
      <PastilleProfil owner={owner} headers={headers} nom={nom} email={email} taille={64}/>
     </button>
     <div style={{minWidth:0}}>
@@ -45,19 +46,19 @@ export default function MenuProfil({owner,headers,email,nom,offre,theme:C,Feuill
    {photo&&<div className="vrm-profil-choix-photo" data-profil-choix-photo=""><ChoixPhoto owner={owner} headers={headers} theme={C} compact/></div>}
    {/* (11 nov., lot DJ6) Le geste le plus fréquent d'abord : Paramètres, puis le réglage du nom. */}
    <div className="vrm-profil-groupe">
-    {ligne('parametres','gear','Paramètres',onParametres)}
-    {ligne('appareils','shield','Appareils connectés',onAppareils)}
+    {ligne('parametres','gear',tr('ecran.settings'),onParametres)}
+    {ligne('appareils','shield',tr('profil.appareils'),onAppareils)}
    </div>
    <div className="vrm-profil-groupe">
     <label className="vrm-profil-ligne vrm-profil-bascule" data-profil-menu="masquer">
      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="eye" size={18}/></span>
-     <span className="vrm-profil-ligne-lib">Masquer mon nom</span>
-     <input type="checkbox" role="switch" checked={masque===true} disabled={occupe||masque===undefined} onChange={basculer} aria-label="Masquer mon nom"/>
+     <span className="vrm-profil-ligne-lib">{tr('profil.masquerNom')}</span>
+     <input type="checkbox" role="switch" checked={masque===true} disabled={occupe||masque===undefined} onChange={basculer} aria-label={tr('profil.masquerNom')}/>
     </label>
    </div>
    {msg&&<p role="alert" style={{fontSize:13,margin:'0 4px'}}>{msg}</p>}
    <div className="vrm-profil-groupe">
-    {ligne('deconnexion','door','Se déconnecter',onDeconnexion)}
+    {ligne('deconnexion','door',tr('profil.deconnexion'),onDeconnexion)}
    </div>
   </div>
  </Feuille>;

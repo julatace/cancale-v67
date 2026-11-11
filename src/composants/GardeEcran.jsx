@@ -26,6 +26,7 @@
 // de ce nom — SEULEMENT servi depuis localhost ou 127.0.0.1 (jamais sur
 // vrm.center) ; sert au banc `scripts/bancs/garde-ecrans.cjs`.
 // ═══════════════════════════════════════════════════════════════════════════
+import { tr } from '../i18n/index.js';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { noterPlantage } from '../plantages.js';
@@ -62,18 +63,17 @@ export class GardeEcran extends React.Component {
     const carte = (
       <div role="alert" className="vrm-etat-panne vrm-garde-ecran" data-garde-ecran={String(nom || '')}>
         <div className="vrm-etat-panne-texte">
-          <p className="vrm-etat-panne-phrase">{feuille ? 'Cette fenêtre a un souci' : 'Cet écran a un souci'}</p>
+          <p className="vrm-etat-panne-phrase">{tr(feuille ? 'erreur.garde.feuille.titre' : 'erreur.garde.ecran.titre')}</p>
           <p className="vrm-etat-panne-raison">
-            {feuille ? "Elle n'a pas pu s'afficher. " : "Il n'a pas pu s'afficher. "}
-            Le reste de l'application fonctionne{feuille ? '' : ' : change d’écran en bas'}, tes données ne sont pas touchées. Le souci est noté.
+            {tr(feuille ? 'erreur.garde.feuille.texte' : 'erreur.garde.ecran.texte')}
           </p>
           <p className="vrm-garde-ecran-erreur" data-garde-erreur="">{msg}</p>
         </div>
         <div className="vrm-garde-ecran-gestes">
-          <button type="button" className="vrm-b vrm-b-secondaire" data-garde-reessayer="" onClick={this.reessayer}>Réessayer</button>
+          <button type="button" className="vrm-b vrm-b-secondaire" data-garde-reessayer="" onClick={this.reessayer}>{tr('commun.reessayer')}</button>
           {feuille && onFermer
-            ? <button type="button" className="vrm-b vrm-b-discret" data-garde-fermer="" onClick={() => { this.setState({ err: null }); try { onFermer(); } catch (_) {} }}>Fermer</button>
-            : <button type="button" className="vrm-b vrm-b-discret" data-garde-recharger="" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger l’app</button>}
+            ? <button type="button" className="vrm-b vrm-b-discret" data-garde-fermer="" onClick={() => { this.setState({ err: null }); try { onFermer(); } catch (_) {} }}>{tr('commun.fermer')}</button>
+            : <button type="button" className="vrm-b vrm-b-discret" data-garde-recharger="" onClick={() => { try { window.location.reload(); } catch (_) {} }}>{tr('erreur.rechargerApp')}</button>}
           {/* (6 nov.) « Signaler un problème » en un bouton : l'écran tombé part avec.
               Posé par l'app (`GardeEcran.Signaler`), pour ne pas tirer ici la session. */}
           {GardeEcran.Signaler ? <GardeEcran.Signaler ecran={String(nom || '')} taille="petit"/> : null}

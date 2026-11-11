@@ -1462,3 +1462,20 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée de CLAUDE.md §9 (11 nov., restes) — telle quelle
 
 - **11 nov. · Chaque écran se rouvre comme on l'a laissé, sur tous ses appareils (lot reprise-ecrans)** : clé synchronisée `vrm_reprise_ecrans` (filtre, tri, période, recherche < 10 min après l'avoir quittée, compte par site, site d'une tâche, dernier écran < 30 min ; écrite datée, 1,5 s de délai, jamais au montage) ; défilement sur l'appareil seul ; un lien `?tab=` gagne ; le nuage ne remplace que ce qui n'a pas été touché ; « Affiché avec … · Effacer » + « Réinitialiser l'écran » sous la barre du haut. `audit-reprise-synchro` (15 mutations), banc `reprise-ecrans` (deux appareils). Récit : `2026-11-11-reprise-ecrans.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot `notifs-groupees`, fusion e2)
+## Ligne déplacée de CLAUDE.md §9 (11 nov., lot traduction — taille du fichier)
+
+- **11 nov. · Fiscalité ES/IT/DE/UK/IE (étude, aucun code)** : règles relevées avec leur source officielle (extraits de recherche, pages pas ouvertes : réseau fermé ⇒ tout est à relire avant d'entrer dans `src/`) et conception (`vrm_pays_fiscal`, régimes par pays hors de `vinted_regime`, `src/fiscal/<pays>.js` sourcé, « à vérifier avec ton comptable ») ; ordre : relire les sources → pays + particulier (DAC7) → Italie forfettario → Allemagne → Espagne ; Royaume-Uni exclu (livres). `docs/passation/2026-11-11-fiscalite-pays.md`. Facture Pro hors de France : Allemagne seule, sur le papier, rien de branché avant relecture par un expert local (tranché le 11 nov.). Geste : autoriser les hôtes officiels, confirmer que le 11 nov. remplace « International » (§3).
+
+- **11 nov. · Plus de statistiques (lot stats-plus)** : carte sombre de Ma journée jusqu'à 6 chiffres (ajout, retrait, ordre ; pages 2×2 qui glissent au téléphone ; + valeur du stock, objectif %, URSSAF à payer) ; Statistiques : « En bref » (ventes, panier, marge connue, ± %) et « Plus de chiffres » (vendu et reçu, âge du stock, mes records, comparer deux comptes, 10 meilleures ventes), règles `src/statsPlus.js`. ⚠️ styles des widgets en `@layer vrm-premium`. `docs/passation/2026-11-11-stats-plus.md`. Geste : aucun.
+## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot journee-perso)
+
+- **11 nov. · Ma journée composée (lot journee-perso)** : « Modifier ma journée » (bas de Ma journée, Paramètres → Affichage) : interrupteur + poignée (doigt, clavier) par carte, « Revenir au réglage d’origine » ; `vrm_journee_perso` synchronisé, par-dessus Simple/Complet ; cachée mais urgente ⇒ revient (« Affichée car urgent ») ; alertes jamais cachables ; compteurs cachés publiés. `2026-11-11-journee-perso.md`. Geste : aucun.
+
+- **11 nov. · Robustesse serveur (second agent)** : quarantaine qui garde les PDF (lignes `email_qpj_*`, rendus au rejeu) ; un 2e e-mail sans PJ n'efface plus un bordereau ; versements jamais fondus ; l'enveloppe décide avant To/Cc ; webhook Stripe 503 si pas su, ancien abonnement sans effet ; effacement à 12 mois seulement après l'avis PROUVÉ ; cron : échec retenté ; délais Stripe/eBay/IA. `docs/passation/2026-11-11-robustesse-serveur.md`. Geste : aucun.
+
+
+### Déplacé de CLAUDE.md §9 (11 nov., ci-vert — fichier au-delà de 59 000 octets), tel quel
+
+- **11 nov. · Rouges d'intégration + garde réseau** : contrôles GitHub de `main` remis au vert — défauts de l'app corrigés (barre d'objectif qui débordait, photos du mode relais/scanner hors `PhotoVinted`, rouge du doublon en dur, « · » en tête de ligne, hook mort) ; contrôles portés sur les formes voulues (Ma journée v2, Ma configuration, Argent dans Gérer, alerte nouvel appareil…), chacun rougi par mutation ; **garde réseau** : aucun banc ne joint la production ni Internet (`scripts/bancs/_garde-reseau.cjs`, sinon rouge). `docs/passation/2026-11-11-rouges-integration.md`. Geste : aucun.

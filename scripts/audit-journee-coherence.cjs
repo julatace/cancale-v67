@@ -105,22 +105,32 @@ async function passe(mut) {
   // (`{cond ? carteX() : null}`, `{liste.map(…)}`, `{urssafJob ? tache(…) : null}`) a son terme
   // dans `nGestes` — la carte « Relier la boîte » (6 nov., `comptesARelierJour`) en est une.
   // Les cartes nommées depuis le 4 nov. restent exigées (dont « en ligne deux fois »).
-  const exprGestes = (/const nGestes = ([^;]+);/.exec(z) || [])[1] || '';
+  // (11 nov., lot journee-perso) Le total de TOUTES les cartes s'appelle `nGestesTout` (les cartes qu'il a
+  // cachées en sont retirées ensuite, `nGestes`) ; les cartes vivent dans `blocsAF` (rangées dans SON ordre),
+  // `listeAF` les reprend. La règle est la même : chaque carte rendue a son terme dans le total.
+  const exprGestes = (/const nGestesTout = ([^;]+);/.exec(z) || /const nGestes = ([^;]+);/.exec(z) || [])[1] || '';
   const termes = exprGestes.split('+').map((t) => t.trim().replace(/^\((.*)\)$/, '$1'));
   const compte = (t) => termes.includes(t);
   // (9 nov., Ma journée v2) Les cartes sont rangées dans `listeAF` (la première monte en tête, le
   // reste dans « Ensuite ») : chaque entrée `...(cond ? [{ el: carteX() }] : [])` ou `...liste.map(`
   // a son terme dans `nGestes`, et la liste « Ensuite » ne rend QUE ce qui vient de `listeAF`.
   const listeAFaire = (z.split('const listeAF = [')[1] || '').split('].filter(')[0];
+  const blocsAFaire = (z.split('const blocsAF = {')[1] || '').split('\n              };')[0];
   const rendues = [];
   for (const m of listeAFaire.matchAll(/\.\.\.\((\w+(?:\.length)?) \? \[/g)) rendues.push(m[1] + ' ? 1 : 0');
   for (const m of listeAFaire.matchAll(/\.\.\.(\w+)\.map\(/g)) rendues.push(m[1] + '.length');
+  for (const m of blocsAFaire.matchAll(/: (\w+(?:\.length)?) \? \[(?:carte\w+|tache)\(/g)) rendues.push(m[1] + ' ? 1 : 0');
+  for (const m of blocsAFaire.matchAll(/: (\w+)\.map\(\([^)]*\) => (?:carte\w+|tache)\(/g)) rendues.push(m[1] + '.length');
+  if (/\bcases\.filter\(/.test(blocsAFaire)) rendues.push('cases.length');
+  const tireDeBlocs = !blocsAFaire || /blocsAF\[id\]/.test(listeAFaire.length ? z.split('const listeAF = [')[0].split('const blocsAF = {')[1] || '' : '');
   const ensuite = (z.split('data-barre-jour=""')[1] || '').split('</div>)')[0];
   const horsListe = [...ensuite.matchAll(/carte\w+\(|tache\(/g)].length;
   const nonComptees = rendues.filter((t) => !compte(t));
+  if (process.env.DEBUG_A4) console.log('A4 rendues:', rendues.join(' · '), '| tire:', tireDeBlocs, '| termes:', termes.join(' · '));
   const exigees = ['cases.length', 'alertesArgent.length', 'autres.length', 'urssafJob ? 1 : 0', 'carteAilleurs ? 1 : 0', 'sortiesStock.length ? 1 : 0', 'deuxFois.length ? 1 : 0'];
-  dit(exprGestes && rendues.length >= exigees.length && !nonComptees.length && exigees.every(compte) && !horsListe && /\.\.\.\(deuxFois\.length \? \[\{ el: carteDeuxFois\(\) \}\]/.test(z), 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs », la sortie du Stock et « en ligne deux fois »)', nonComptees.length ? 'rendues sans être comptées : ' + nonComptees.join(', ') : (BAVARD_A4 ? rendues.join(' · ') : ''));
-  dit(/\.\.\.\(carteAilleurs \? \[\{ el: carteVendusAilleurs\(\) \}\]/.test(z) && /\.\.\.\(sortiesStock\.length \? \[\{ el: carteSortieStock\(\) \}\]/.test(z), 'A4 les deux cartes sont rendues DANS la liste « À faire » (en tête si elles viennent en premier)');
+  const formeDeux = /\.\.\.\(deuxFois\.length \? \[\{ el: carteDeuxFois\(\) \}\]/.test(z) || /'deux-fois': deuxFois\.length \? \[carteDeuxFois\(\)\]/.test(blocsAFaire);
+  dit(exprGestes && rendues.length >= exigees.length && !nonComptees.length && exigees.every(compte) && !horsListe && tireDeBlocs && formeDeux, 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs », la sortie du Stock et « en ligne deux fois »)', nonComptees.length ? 'rendues sans être comptées : ' + nonComptees.join(', ') : (BAVARD_A4 ? rendues.join(' · ') : ''));
+  dit((/\.\.\.\(carteAilleurs \? \[\{ el: carteVendusAilleurs\(\) \}\]/.test(z) || /ailleurs: carteAilleurs \? \[carteVendusAilleurs\(\)\]/.test(blocsAFaire)) && (/\.\.\.\(sortiesStock\.length \? \[\{ el: carteSortieStock\(\) \}\]/.test(z) || /'stock-sortie': sortiesStock\.length \? \[carteSortieStock\(\)\]/.test(blocsAFaire)), 'A4 les deux cartes sont rendues DANS la liste « À faire » (en tête si elles viennent en premier)');
   const zoneJournee = (app.split("className=\"vrm-day-layout vrm-fu-ecran vrm-fu-journee\"")[1] || '').split("{!only && (")[0];
   dit(zoneJournee.length > 0 && !/<VendusAilleurs /.test(zoneJournee), 'A4 « Vendus ailleurs » n’est plus un repli posé sous la journée');
   const corpsJ = (app.split('const ICONE_JOURNEE')[1] || '').split('{!only && (')[0];

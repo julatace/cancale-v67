@@ -40,6 +40,8 @@ import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfi
 import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
 import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
+import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
+import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends } from './profilVendeur.js';
 import { exemplesVendeur, motTaille } from './vocabulaireVendeur.js';   // (11 nov., lot DJ2) exemples et petits mots selon ce qu'il vend
 // (9 nov.) Le bandeau discret d'un incident ouvert par les sondes de /statut.
@@ -604,6 +606,7 @@ import "./styles-beaute.css";        // (8 nov., « beauté ») accueil, photos,
 // CSS (`@layer vrm-premium`) qui a le dernier mot sans surenchère de sélecteurs. EN DERNIER.
 import "./styles-premium.css";
 import "./styles-journee-v2.css";   // (9 nov.) Ma journée v2 : la structure (frise qui se touche, prochaine chose en tête, articles supprimés groupés) — même couche, après elle
+import "./styles-journee-perso.css";   // (11 nov.) « Modifier ma journée » : l'éditeur des cartes, la ligne du bas, « Affichée car urgent »
 import "./styles-nav-v2.css";       // (9 nov., direction artistique 5) la colonne de gauche qui flotte, la pastille qui glisse, les boutons — même couche, EN DERNIER
 import "./styles-widgets-ios.css";  // (9 nov., direction artistique 6) « Widgets » à la iOS : cases de la carte sombre en widgets, groupes arrondis, chevrons, pilules — même couche, EN DERNIER
 import "./styles-argent.css";  // (10 nov.) Argent : Statistiques + Compta en un endroit (src/argent.js) — APRÈS la DA6
@@ -653,6 +656,13 @@ import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGarde
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
+// (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
+// `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
+import ChoixLangue from "./i18n/ChoixLangue.jsx";
+import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+// La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
+import frApp from "./i18n/langues/fr.js";
+ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
@@ -2603,6 +2613,8 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
   // (8 nov.) L'apparence choisie (Clair · Sombre · Automatique · Le soir, src/apparence.js).
   'vrm_apparence',
+  // (11 nov., lot traduction) La langue choisie (Paramètres → Langue, src/i18n/) : la même partout.
+  'vrm_langue',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -2623,6 +2635,9 @@ const SYNC_KEYS = [
   'vrm_remise_refus',
   // (8 nov.) Affichage Simple / Complet et « Je vends : Sneakers / Autre » (src/profilVendeur.js) : { choix, at }.
   'vrm_affichage','vrm_je_vends',CLE_PLATEFORMES,
+  // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes qu'il a cachées
+  // (src/journeePerso.js) : { v, ordre, choix, at } — la même sur tous ses appareils.
+  CLE_JOURNEE_PERSO,
   // (9 nov.) La configuration de départ (src/configurationDepart.js) : { etat: 'fait'|'plusTard', at,
   // statut: 'inconnu'|null } ; la TVA d'une société (src/profilFiscal.js). La méthode d'étiquetage
   // est `vrm_numero_ecrit` (actif + `ou`, src/numeroEcrit.js), déjà synchronisée.
@@ -14972,6 +14987,8 @@ const ICON_PATHS = {
   // le cas de `pin` et `nav` juste en dessous depuis leur ajout — les deux
   // repères des points relais ne se dessinaient pas.
   menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
+  // (11 nov., lot traduction) La langue (Paramètres → Langue) : un globe au trait.
+  langue: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></>,
   // Masquer une ligne : l'œil barré. C'était un « 🚫 » nu — un emoji dessiné par
   // le système, au milieu de boutons au trait (§5.55).
   eyeOff: <><path d="M3 3l18 18"/><path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c5 0 9 4.5 9 7a12 12 0 0 1-2.4 3.3"/><path d="M6.5 6.8C4.2 8.2 3 10.3 3 12c0 2.5 4 7 9 7 1.6 0 3-.4 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></>,
@@ -15402,15 +15419,24 @@ function EbayMessagesVolets({ compte, comptesEbay, ...p }) {
 // bon onglet ET au bon filtre (`redirigerOnglet`). Décisions qui tiennent : pas
 // de groupe « Autres outils » ni « Dans Vinted » (17 oct.), Organisation hors du
 // menu (29 oct.), pas de saisie « N° + Entrée » (29 oct.).
+// (11 nov., lot traduction) Le NOM d'une entrée se lit dans la langue au moment du rendu :
+// `label` (et `court`) sont des accesseurs vers `tr('nav.<id>')` — tous les lecteurs de
+// `.label` restent tels quels. ⚠️ Ne pas copier une entrée par `{...e}` au chargement du
+// module (la copie figerait le nom) : `entreeNav({...})` pose les accesseurs.
+const entreeNav=(o)=>{ const court=!!o.court; delete o.label; delete o.court;
+  Object.defineProperty(o,'label',{get(){ return tr('nav.'+(o.cle||o.id)); },enumerable:true,configurable:true});
+  if(court) Object.defineProperty(o,'court',{get(){ return tr('nav.'+(o.cle||o.id)+'.court'); },enumerable:true,configurable:true});
+  return o; };
+const groupeNav=(o)=>{ Object.defineProperty(o,'titre',{get(){ return tr('nav.groupe.'+o.cle); },enumerable:true,configurable:true}); return o; };
 const BOTTOM_TABS=[
-  {id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Journée'},
-  {id:'annonces', icon:'vitrine', label:'Annonces'},
-  {id:'ventes',   icon:'bag',  label:'Ventes'},
-  {id:'cat_bord', icon:'box',  label:'Colis'},
+  entreeNav({id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Journée'}),
+  entreeNav({id:'annonces', icon:'vitrine', label:'Annonces'}),
+  entreeNav({id:'ventes',   icon:'bag',  label:'Ventes'}),
+  entreeNav({id:'cat_bord', icon:'box',  label:'Colis'}),
 ];
 // Messages : dans la colonne de l'ordinateur ; sur téléphone, dans « Plus »
 // (cinq places dans la barre, la cinquième est « Plus »).
-const ONGLET_MESSAGES={id:'messages', icon:'chat', label:'Messages'};
+const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
 const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[1],BOTTOM_TABS[2],ONGLET_MESSAGES,BOTTOM_TABS[3]];
 // (31 oct., soir — Julien, mot pour mot : « je veux qu'il y ait Achats à côté
 // de À retirer », « que dans les deux onglets il n'y ait pas la même chose »,
@@ -15430,34 +15456,34 @@ const GROUPES_PLUS=[
   // chemins (`?tab=republier`, `?tab=favoris`, `vue=republier|favoris`, `demanderVue`)
   // mènent au nouvel endroit (`VUES_DEPLACEES`). Sur l'ordinateur, le groupe « Vendre »
   // devient vide et disparaît (Messages est dans les tâches) ; au téléphone, il garde Messages.
-  { titre:'Vendre', items:[
-    {...ONGLET_MESSAGES, tel:true},
-  ]},
+  groupeNav({ cle:'vendre', nom:'Vendre', items:[
+    entreeNav({...ONGLET_MESSAGES, label:'Messages', tel:true}),
+  ]}),
   // (31 oct., soir — Julien : « l'onglet Colis à retirer sert à rien si dans Colis
   // on a les codes de retrait ») Plus d'entrée « Colis à retirer » ni de groupe
   // « Expédier » : les colis à retirer vivent dans Colis (colonne « À retirer »,
   // et leur détail — codes, QR, dates limites, relais — juste dessous).
-  { titre:'Gérer', items:[
+  groupeNav({ cle:'gerer', nom:'Gérer', items:[
     // (9 nov., lot AC — Julien : « tu ne peux pas avoir d'hésitation ») UN endroit pour
     // tout ce que VRM n'a pas pu décider, une ligne = un geste (src/aTrancher.js).
     // (11 nov., lot DJ4) « À trancher » n'est plus un onglet : sa carte s'ouvre en tête de Ma journée.
-    {id:'garage',     icon:'home', label:'Stock'},
-    {id:'achats',     icon:'cart', label:'Achats'},
+    entreeNav({id:'garage',     icon:'home', label:'Stock'}),
+    entreeNav({id:'achats',     icon:'cart', label:'Achats'}),
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
-    {id:'emails',     icon:'mail', label:'E-mails'},
+    entreeNav({id:'emails',     icon:'mail', label:'E-mails'}),
     // (10 nov., Julien : « L'onglet Compta est trop flou, tu peux peut-être le relier avec
     // Stats ») UNE entrée « Argent » remplace « Statistiques » et « Compta » : un écran à quatre
     // segments (Résumé · Statistiques · Déclarer · Factures, src/argent.js). Les deux écrans
     // restent (`dashboard`, `compta`) : leurs liens mènent à leur segment.
-    {id:'compta',    icon:'euro',  label:'Argent'},
-  ]},
+    entreeNav({id:'compta',    icon:'euro',  label:'Argent'}),
+  ]}),
   // (11 nov., lot DJ6 — Julien : « qu'on ne voie pas les Paramètres mais que quand on
   // clique sur le profil ils apparaissent ») Paramètres n'est plus une entrée : la photo
   // du profil (pied de la colonne, en-tête du téléphone) ouvre le menu du profil
   // (src/profil/MenuProfil.jsx). « g p », ⌘K et `?tab=settings` y mènent toujours.
-  { titre:'Moi', items:[
-    {id:'communaute', icon:'pin',  label:'Communauté'},
-  ]},
+  groupeNav({ cle:'moi', nom:'Moi', items:[
+    entreeNav({id:'communaute', icon:'pin',  label:'Communauté'}),
+  ]}),
 ];
 // ⚠️ (2 nov., Julien : « il ne doit pas y avoir des écritures partout à côté des
 // onglets, c'est vraiment dégueulasse ») UNE ENTRÉE DE NAVIGATION = UNE ICÔNE ET UN
@@ -15489,11 +15515,12 @@ const BAR_GROUPE={
 // Le nom COURT d'un écran, pour l'en-tête de la coque (titre qui apparaît au
 // défilement). Une source : les listes de navigation elles-mêmes (§11).
 function titreEcran(tab) {
-  if (tab === 'journee') return 'Ma journée';
-  if (tab === 'semaine') return 'Ma semaine';
+  if (tab === 'journee') return tr('nav.journee');
+  if (tab === 'semaine') return tr('ecran.semaine');
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  return { settings: 'Paramètres', dashboard: 'Argent', litiges: 'Litiges en cours', cat_expedition: 'Colis', masques: 'Masqués', organisation: 'Organisation', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+  const cle = { settings: 'ecran.settings', dashboard: 'nav.compta', litiges: 'ecran.litiges', cat_expedition: 'nav.cat_bord', masques: 'ecran.masques', organisation: 'ecran.organisation', catalog: 'ecran.catalog', stockvinted: 'ecran.stockvinted', vintedaccounts: 'ecran.vintedaccounts', sales: 'nav.ventes', inventory: 'ecran.inventory' }[tab];
+  return cle ? tr(cle) : 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
 // (31 oct.) Les écrans « par site » mènent à la tâche filtrée sur leur site ;
@@ -16639,7 +16666,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
   // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
   // de l'écran ouvert est ramenée dans la vue à chaque changement.
-  const groupe = g => <section key={g.titre} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.titre}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>;
+  const groupe = g => <section key={g.nom} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.nom}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>;
   const zoneRef = React.useRef(null);
   React.useEffect(() => {
     const el = zoneRef.current; if (!el) return undefined;
@@ -16728,7 +16755,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   const uidCompte = (AUTH.user && AUTH.user.id) || '';
   const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
   const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={tab === 'settings' ? 'page' : undefined}
-    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ouvrir mon profil`} title="Mon profil" onClick={() => ouvrirMenuProfil()}>
+    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ${tr('coque.ouvrirProfil')}`} title={tr('coque.monProfil')} onClick={() => ouvrirMenuProfil()}>
     <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
     <span className="vrm-nav-compte-txt">
       {nomCoque.masque !== false ? <span className="vrm-nav-compte-nom" data-nav-compte-masque="">{nomCoque.texte}</span>
@@ -16736,18 +16763,18 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
       {(offre || (nomCoque.masque === false && nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCoque.masque === false && nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
     </span>
   </button> : null;
-  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label={tr('coque.navigationPrincipale')} style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
     <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
-      {groupes.filter(g => g.titre !== 'Moi').map(groupe)}
+      {groupes.filter(g => g.nom !== 'Moi').map(groupe)}
     </div>
     {/* (1er nov., finition) « Moi » (Communauté, Paramètres) reste posé au pied
         de la colonne : une fenêtre basse fait défiler le reste, jamais
         Paramètres coupé par le bas. Même ordre, mêmes entrées. (9 nov., DA 5)
         Le pied est une carte : le compte, puis Communauté et Paramètres. */}
-    <div className="vrm-rail-pied">{carteCompte}{groupes.filter(g => g.titre === 'Moi').map(groupe)}</div>
+    <div className="vrm-rail-pied">{carteCompte}{groupes.filter(g => g.nom === 'Moi').map(groupe)}</div>
   </nav>;
 }
 
@@ -16819,9 +16846,9 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   };
   if (bottom) return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label="Plus" aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label={tr('nav.plus')} aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
         <span aria-hidden="true" className="vrm-tab-ic" style={{display:'flex',position:'relative'}}>{courant ? <NavigationIcon item={courant} size={22} style={{strokeWidth:2}}/> : <Icon name="more" size={24} style={{strokeWidth:1.6}}/>}{pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>
-        {(() => { const lib = courant ? (courant.court || courant.label) : 'Plus'; return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
+        {(() => { const lib = courant ? (courant.court || courant.label) : tr('nav.plus'); return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
       </button>
       {/* Le PANNEAU « Plus » (5 nov.) : une grille de tuiles posée AU-DESSUS de
           la barre — la barre reste visible et touchable, rien n'est caché sous
@@ -16831,10 +16858,10 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
       {open && (
         <div data-noswipe className="vrm-sheet-voile vrm-plus-voile" onClick={()=>setOpen(false)}>
           <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom vrm-plus-panneau" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
+          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom vrm-plus-panneau" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
             <div className="vrm-plus-grille">
               {groupes.map(g => (
-                <div className="vrm-plus-groupe" key={g.titre} role="group" aria-label={g.titre} data-nav-groupe={g.titre}>{g.items.map(tuile)}</div>
+                <div className="vrm-plus-groupe" key={g.nom} role="group" aria-label={g.titre} data-nav-groupe={g.nom}>{g.items.map(tuile)}</div>
               ))}
             </div>
           </div>
@@ -16844,7 +16871,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   );
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn" aria-label="Tous les écrans" aria-expanded={open}>
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn" aria-label={tr('coque.tousLesEcrans')} aria-expanded={open}>
         <span aria-hidden="true" style={{display:'flex',position:'relative'}}><Icon name={open?'close':'menu'} size={22} style={{strokeWidth:1.6}}/></span>
       </button>
       {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
@@ -16853,16 +16880,16 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
       {open && createPortal(
         <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
           <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-haut" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
+          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-haut" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
             <div className="vrm-sheet-tete">
-              <span className="vrm-sheet-titre">Ton espace</span>
-              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
+              <span className="vrm-sheet-titre">{tr('coque.tonEspace')}</span>
+              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label={tr('coque.fermerMenu')} onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
             </div>
             <div className="vrm-menu-group vrm-sheet-groupe" data-nav-groupe="Tâches">
               <div className="vrm-sheet-carte">{NAV_TACHES.map(rangee)}</div>
             </div>
             {groupes.map(g => (
-              <div className="vrm-menu-group vrm-sheet-groupe" key={g.titre} data-nav-groupe={g.titre}>
+              <div className="vrm-menu-group vrm-sheet-groupe" key={g.nom} data-nav-groupe={g.nom}>
                 <div className="vrm-sheet-label">{g.titre}</div>
                 <div className="vrm-sheet-carte">{g.items.map(rangee)}</div>
               </div>
@@ -17029,7 +17056,7 @@ function BottomBar({tab,setTab,sites,badges}) {
        actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
        seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
        `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
-    <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-en-cours={enCours?'1':undefined} data-plus-ouvert={plusOuvert?'1':'0'} aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
+    <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-en-cours={enCours?'1':undefined} data-plus-ouvert={plusOuvert?'1':'0'} aria-label={tr('coque.navigationPrincipale')} style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
       <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
@@ -17090,16 +17117,19 @@ const BrandMark = ({ id }) => id === 'google' ? (
 
 // Les documents légaux (public/legal/*.html) : liens discrets, sur l'écran de
 // connexion (accessibles SANS compte, comme la loi l'exige) et dans Réglages.
+// (11 nov., lot traduction) Le nom se lit dans la langue au rendu (accesseur `[1]`) ; les
+// documents eux-mêmes restent en français (droit français, à faire relire avant toute traduction).
+const docLegal = (h, cle) => { const d = [h]; Object.defineProperty(d, 1, { get: () => tr(cle), enumerable: true }); return d; };
 const DOCS_LEGAUX = [
-  ['/legal/mentions-legales.html', 'Mentions légales'],
-  ['/legal/cgu.html', 'CGU'],
-  ['/legal/cgv.html', 'CGV'],
-  ['/legal/confidentialite.html', 'Confidentialité'],
-  ['/legal/cookies.html', 'Cookies'],
+  docLegal('/legal/mentions-legales.html', 'legal.mentions'),
+  docLegal('/legal/cgu.html', 'legal.cgu'),
+  docLegal('/legal/cgv.html', 'legal.cgv'),
+  docLegal('/legal/confidentialite.html', 'legal.confidentialite'),
+  docLegal('/legal/cookies.html', 'legal.cookies'),
 ];
 function LiensLegaux() {
   return (
-    <nav aria-label="Documents légaux" style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 14px',marginTop:16,fontSize:12}}>
+    <nav aria-label={tr('legal.documents')} style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 14px',marginTop:16,fontSize:12}}>
       {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.muted,textDecoration:'none'}}>{t}</a>)}
     </nav>
   );
@@ -17302,13 +17332,13 @@ function CaptchaConnexion({ etat }) {
   return (
     <div data-captcha={etat.statut} style={{marginBottom:10}}>
       <div ref={ref} data-captcha-widget="" style={{minHeight:etat.statut==='erreur'?0:65}}/>
-      {etat.statut === 'charge' && <div data-captcha-attente="" style={{fontSize:12,color:C.muted,lineHeight:1.45}}>Vérification anti-robot en cours…</div>}
-      {etat.statut === 'interactif' && <div data-captcha-attente="" style={{fontSize:12,color:C.text,lineHeight:1.45}}>Coche la case de vérification ci-dessus pour continuer.</div>}
+      {etat.statut === 'charge' && <div data-captcha-attente="" style={{fontSize:12,color:C.muted,lineHeight:1.45}}>{tr('auth.captcha.charge')}</div>}
+      {etat.statut === 'interactif' && <div data-captcha-attente="" style={{fontSize:12,color:C.text,lineHeight:1.45}}>{tr('auth.captcha.interactif')}</div>}
       {etat.statut === 'erreur' && (
         <div data-captcha-erreur="" style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',lineHeight:1.45}}>
           {MSG_CAPTCHA_ERREUR}
           <div><button type="button" data-captcha-reessayer="" onClick={() => setEssai((n) => n + 1)}
-            style={{marginTop:8,minHeight:46,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button></div>
+            style={{marginTop:8,minHeight:46,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{tr('commun.reessayer')}</button></div>
         </div>
       )}
     </div>
@@ -17387,7 +17417,7 @@ function AuthScreen() {
     try {
       const r=await oauthStart(p, intention||(mode==='up'?'inscription':'connexion'));
       if (!r.ok) {demandeEnCours.current=false;setErr(r.error);setBusy(false);setFournisseurEnCours('');}
-    } catch (_) {demandeEnCours.current=false;setErr('Impossible d’ouvrir cette connexion. Réessaie.');setBusy(false);setFournisseurEnCours('');}
+    } catch (_) {demandeEnCours.current=false;setErr(tr('auth.err.ouverture'));setBusy(false);setFournisseurEnCours('');}
     // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
     // le libère si l’utilisateur revient en arrière avec le cache du navigateur.
   };
@@ -17405,8 +17435,8 @@ function AuthScreen() {
     if (moyensConnexion.statut === 'pret') {
       __lierConnexion = null;
       if (providerEnabled(lierFournisseur)) { setLierFournisseurMot(''); oauth(lierFournisseur); }
-      else setLierFournisseurMot(`La connexion avec ${nom} n’est pas encore ouverte sur VRM. Connecte-toi ici avec ton e-mail et ton mot de passe VRM : l’extension sera connectée en même temps.`);
-    } else if (moyensConnexion.statut === 'erreur') setLierFournisseurMot(`Je n’ai pas pu vérifier la connexion avec ${nom}. Réessaie les moyens de connexion ci-dessous, ou connecte-toi avec ton e-mail : l’extension sera connectée en même temps.`);
+      else setLierFournisseurMot(tr('auth.lier.pasOuverte', { nom }));
+    } else if (moyensConnexion.statut === 'erreur') setLierFournisseurMot(tr('auth.lier.pasVerifie', { nom }));
     else if (moyensConnexion.statut === 'initial') loadAuthSettings();
   }, [moyensConnexion.statut]);
 
@@ -17418,11 +17448,11 @@ function AuthScreen() {
       if(!r.ok){if(r.recovery){setMode('reset');setNeedConfirm(false);setConfirmLink('');}if(!attendreEmail(r))setErr(r.error);return;}
       if(action==='confirmer'){
         setNeedConfirm(false);setConfirmLink('');
-        setInfo(r.connected?'Compte confirmé. Connexion en cours…':'Adresse confirmée. Tu peux maintenant te connecter avec ton mot de passe.');
+        setInfo(r.connected?tr('auth.info.compteConfirme'):tr('auth.info.adresseConfirmee'));
         if(r.connected)setTimeout(()=>location.reload(),800);
-      } else if(action==='renvoyer')setInfo('Nouvel e-mail envoyé — utilise le plus récent.');
-      else setInfo('Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? ».');
-    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+      } else if(action==='renvoyer')setInfo(tr('auth.info.nouvelEmail'));
+      else setInfo(tr('auth.info.lienEnvoye'));
+    } catch (_) {setErr(tr('auth.err.demande'));}
     finally {demandeEnCours.current=false;setBusy(false);}
   };
 
@@ -17431,29 +17461,29 @@ function AuthScreen() {
     if(busy||demandeEnCours.current)return;
     if (enAttenteEmail && (mode === 'up' || mode === 'reset')) return;
     setErr(''); setInfo('');
-    if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
-    if (mode !== 'reset' && !pw) {setErr('Indique ton mot de passe.');return;}
-    if ((mode === 'up' || mode === 'newpw') && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
+    if (mode !== 'newpw' && !email.trim()) { setErr(tr('auth.err.email')); return; }
+    if (mode !== 'reset' && !pw) {setErr(tr('auth.err.motDePasse'));return;}
+    if ((mode === 'up' || mode === 'newpw') && pw.length < 8) { setErr(tr('auth.err.court')); return; }
     // Un mot de passe qui protège une comptabilité mérite mieux que « 12345678 ».
-    if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr('Mélange lettres et chiffres — ce mot de passe protège ta compta.'); return; }
+    if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr(tr('auth.err.melange')); return; }
     demandeEnCours.current=true;setBusy(true);
     try {
       if (mode === 'newpw') {
         const r = await authSetPassword(pw);
         if (!r.ok) setErr(r.error);
-        else { setInfo('Mot de passe enregistré. Tu es connecté.'); setTimeout(()=>location.reload(), 900); }
+        else { setInfo(tr('auth.info.mdpEnregistre')); setTimeout(()=>location.reload(), 900); }
       } else if (mode === 'reset') {
         const rr = await authReset(email);
         if (rr && rr.captcha) { setErr(rr.error); return; }
         if (rr && !rr.ok && attendreEmail({ attente: delaiDemandeEmail(rr.error) })) return;
-        if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un e-mail, utilise le lien le plus récent.');return;}
+        if(!rr?.ok){setErr(tr('auth.err.envoiLien'));return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
         // (8 nov.) La phrase dit le geste ; « Renvoyer » attend l'intervalle de
         // Supabase (60 s) sur le bouton lui-même.
         const adresse=String(email).trim().toLowerCase();
         setResetEnvoye(adresse);setFinAttente(Date.now()+60*1000);
-        setInfo(`On t’a envoyé un e-mail à ${adresse}. Ouvre-le sur cet appareil.`);
+        setInfo(tr('auth.info.emailEnvoye', { adresse }));
       } else if (mode === 'up') {
         // On l'écrit AVANT de partir : `save` range dans le navigateur et le
         // nuage suivra à la première synchro. Écrit seulement s'il l'a donné —
@@ -17461,7 +17491,7 @@ function AuthScreen() {
         try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
         const r = await authSignUp(email, pw);
         if (!r.ok) { if(attendreEmail(r)){} else if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
-        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo('Ton compte est créé. Confirme ton e-mail, puis connecte-toi ici : inutile de quitter cette page.'); }
+        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo(tr('auth.info.compteCree')); }
         else location.reload();
       } else {
         const r = await authSignIn(email, pw);
@@ -17471,7 +17501,7 @@ function AuthScreen() {
         // pourrait garder en mémoire les données du vendeur précédent.
         else location.reload();
       }
-    } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
+    } catch (_) {setErr(tr('auth.err.demande'));}
     finally { demandeEnCours.current=false;setBusy(false); }
   };
 
@@ -17569,28 +17599,28 @@ function AuthScreen() {
 `}</style>
       <aside className="vrm-cx-marque">
         <div className="vrm-cx-aurore" aria-hidden="true" data-cx-aurore=""><i/><i/><i/></div>
-        <div className="vrm-cx-etiquettes" aria-hidden="true"><span>Colis prêt</span><span>Bordereau imprimé</span><span>Vendu sur Vinted</span><span>Retirée de Leboncoin</span></div>
+        <div className="vrm-cx-etiquettes" aria-hidden="true"><span>{tr('auth.deco.colis')}</span><span>{tr('auth.deco.bordereau')}</span><span>{tr('auth.deco.vendu')}</span><span>{tr('auth.deco.retiree')}</span></div>
         <div className="vrm-cx-haut">
-          <a href="/" className="vrm-cx-logo" aria-label="VRM — page d'accueil">
+          <a href="/" className="vrm-cx-logo" aria-label={tr('auth.logoAccueil')}>
             <img src="/vrm-logo-v5-192.png" alt="" width="36" height="36"/><b>VRM</b>
           </a>
           {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
               pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
-          <a href="/" data-retour-accueil="" className="vrm-cx-retour">← Découvrir VRM</a>
+          <a href="/" data-retour-accueil="" className="vrm-cx-retour">← {tr('auth.decouvrir')}</a>
         </div>
-        <h1 className="vrm-cx-titre">{mode==='up' ? <>Bienvenue sur VRM.<span>Ton espace de revendeur.</span></> : <>Content de te revoir.<span>Ta boutique t'attend.</span></>}</h1>
+        <h1 className="vrm-cx-titre">{mode==='up' ? <>{tr('auth.marque.bienvenue')}<span>{tr('auth.marque.espace')}</span></> : <>{tr('auth.marque.revoir')}<span>{tr('auth.marque.attend')}</span></>}</h1>
         <ul className="vrm-cx-points">
-          <li><i>1</i><span><b>Tes colis du jour</b>, dans le bon ordre, avec leur bordereau.</span></li>
-          <li><i>2</i><span><b>Vendu ici, à retirer ailleurs</b> : Vinted, Leboncoin et eBay au même endroit.</span></li>
-          <li><i>3</i><span><b>Tes chiffres</b>, prêts pour l'URSSAF, mois par mois.</span></li>
+          <li><i>1</i><span><b>{tr('auth.point1.titre')}</b>{tr('auth.point1.texte')}</span></li>
+          <li><i>2</i><span><b>{tr('auth.point2.titre')}</b>{tr('auth.point2.texte')}</span></li>
+          <li><i>3</i><span><b>{tr('auth.point3.titre')}</b>{tr('auth.point3.texte')}</span></li>
         </ul>
-        <div className="vrm-cx-pied vrm-cx-points">Aucun mot de passe Vinted demandé.</div>
+        <div className="vrm-cx-pied vrm-cx-points">{tr('auth.pied')}</div>
       </aside>
       <main className="vrm-cx-main">
       <div className="vrm-cx-boite">
         <form onSubmit={submit} className="vrm-cx-form" aria-busy={busy} aria-labelledby="vrm-cx-titre-formulaire">
           <h2 id="vrm-cx-titre-formulaire" style={{fontSize:20,fontWeight:700,color:C.text,letterSpacing:-0.4,margin:'0 0 4px'}}>
-            {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
+            {mode==='up' ? tr('auth.titre.up') : mode==='reset' ? tr('auth.titre.reset') : mode==='newpw' ? tr('auth.titre.newpw') : tr('auth.titre.in')}
           </h2>
           <div style={{fontSize:15,color:C.muted,marginBottom:mode==='in'?14:18,lineHeight:1.5}}>
             {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
@@ -17601,32 +17631,32 @@ function AuthScreen() {
                 personne qui s'inscrit que ses données seront partagées — seul un
                 « colonne absente » MESURÉ (400) le dit ; sinon, rien. */}
             {mode==='up' ? (CLOISONNE
-              ? 'Tes données (annonces, stock, compta) ne seront visibles que par toi.'
-              : SCHEMA_MESURE ? 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.' : null)
-             : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
-             : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
+              ? tr('auth.sous.cloisonne')
+              : SCHEMA_MESURE ? tr('auth.sous.pasCloisonne') : null)
+             : mode==='reset' ? tr('auth.sous.reset')
+             : mode==='newpw' ? tr('auth.sous.newpw')
              : null /* « Ta boutique t'attend » est déjà dit au-dessus (§7) */}
           </div>
           {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
               UNE connexion pour les deux : l'app connecte l'extension juste après. */}
           {__lier && (mode==='in' || mode==='up') && (
             <div data-lier-connexion="" style={{fontSize:13,color:C.text,background:`${C.accent}12`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>
-              Connecte-toi ici : l'extension {NAV.de} se connecte aussi, rien à taper.
+              {tr('auth.lier.extension', { navigateur: NAV.de })}
             </div>
           )}
           {/* (11 nov., lot DJ6) « Continuer avec Discord » sans compte VRM : rien n'a été créé (annulé par le serveur). */}
           {AUTH_REDIRECT?.sansCompteFournisseur && mode==='in' && (()=>{ const p=AUTH_REDIRECT.sansCompteFournisseur, nom=p==='google'?'Google':'Discord'; return <div role="alert" data-sans-compte={p} style={{fontSize:14,color:C.text,border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'10px 12px',marginBottom:14,lineHeight:1.45}}>
-            <div style={{fontWeight:600}}>Aucun compte VRM relié à ce {nom}.</div>
-            <div style={{color:C.muted,marginTop:2}}>Connecte-toi d’abord, puis relie {nom} dans ton profil.</div>
-            {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Créer un nouveau compte avec {nom}</button>}
+            <div style={{fontWeight:600}}>{tr('auth.sansCompte.titre', { nom })}</div>
+            <div style={{color:C.muted,marginTop:2}}>{tr('auth.sansCompte.texte', { nom })}</div>
+            {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.sansCompte.creer', { nom })}</button>}
           </div>; })()}
           {lierFournisseurMot && (mode==='in' || mode==='up') && <div role="status" data-lier-fournisseur-mot={lierFournisseur} style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>{lierFournisseurMot}</div>}
-          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>Plus de 10 minutes : l’extension n’est pas connectée.</div><div>Connecte-toi, puis reclique « Continuer avec Google » (ou Discord) dans l’extension.</div></div>}
+          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>{tr('auth.perime.1')}</div><div>{tr('auth.perime.2')}</div></div>}
 
-          {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
+          {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>{tr('auth.moyens.chargement')}</div>}
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12}}>
-            Les autres moyens de connexion n’ont pas pu être chargés. L’e-mail reste disponible.
-            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Réessayer les moyens de connexion</button>
+            {tr('auth.moyens.erreur')}
+            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.moyens.reessayer')}</button>
           </div>}
 
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
@@ -17644,12 +17674,12 @@ function AuthScreen() {
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
                     border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
                     fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? `Ouverture de ${p.label}…` : mode==='up' ? `Créer mon compte avec ${p.label}` : `Continuer avec ${p.label}`}
+                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? tr('auth.fournisseur.ouverture', { nom: p.label }) : mode==='up' ? tr('auth.fournisseur.creer', { nom: p.label }) : tr('auth.fournisseur.continuer', { nom: p.label })}
                 </button>
               ))}
               <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
                 <span style={{flex:1,height:1,background:C.border}}/>
-                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>ou par e-mail</span>
+                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{tr('auth.ouEmail')}</span>
                 <span style={{flex:1,height:1,background:C.border}}/>
               </div>
             </>);
@@ -17659,7 +17689,7 @@ function AuthScreen() {
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
           {mode==='up' && confirmRequired() && (
             <div style={{fontSize:12,color:C.text,background:`${C.accent}08`,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px',marginBottom:14,lineHeight:1.5}}>
-              Après l’inscription, <b>confirme ton adresse</b> avec le lien reçu par email.
+              {tr('auth.confirmer.avant')}<b>{tr('auth.confirmer.gras')}</b>{tr('auth.confirmer.apres')}
             </div>
           )}
 
@@ -17670,76 +17700,76 @@ function AuthScreen() {
               du monde. Facultatif : un champ obligatoire de plus pour un
               bonjour serait un péage. */}
           {mode==='up' && (
-            <label className="vrm-cx-champ"><span>Prénom <span style={{fontWeight:400,color:C.muted}}>(facultatif)</span></span>
-              <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
+            <label className="vrm-cx-champ"><span>{tr('auth.champ.prenom')} <span style={{fontWeight:400,color:C.muted}}>{tr('auth.champ.facultatif')}</span></span>
+              <input type="text" autoComplete="given-name" placeholder={tr('auth.champ.prenomPlaceholder')}
                 disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={field}/>
             </label>
           )}
           {mode!=='newpw' && (
-            <label className="vrm-cx-champ"><span>Adresse e-mail</span>
-              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" required
+            <label className="vrm-cx-champ"><span>{tr('auth.champ.email')}</span>
+              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={tr('auth.champ.emailPlaceholder')} required
                 disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);setResetEnvoye('');}} style={field}/>
             </label>
           )}
           {mode!=='reset' && (
             <div className="vrm-cx-champ"><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
-                <label htmlFor="vrm-cx-password">{mode==='newpw'?'Nouveau mot de passe':'Mot de passe'}</label>
-                {mode==='in' && <button type="button" disabled={busy} onClick={()=>changerMode('reset')} className="vrm-cx-oublie">Mot de passe oublié ?</button>}
+                <label htmlFor="vrm-cx-password">{mode==='newpw'?tr('auth.titre.newpw'):tr('auth.champ.mdp')}</label>
+                {mode==='in' && <button type="button" disabled={busy} onClick={()=>changerMode('reset')} className="vrm-cx-oublie">{tr('auth.oublie')}</button>}
               </div>
               <span className="vrm-cx-secret">
                 <input id="vrm-cx-password" type={motDePasseVisible?'text':'password'} autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'} required
                   aria-describedby={(mode==='up'||mode==='newpw')?'vrm-cx-regles':undefined}
-                  placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
+                  placeholder={mode==='newpw'?tr('auth.champ.nouveauMdpPlaceholder'):tr('auth.champ.mdp')}
                   disabled={busy} value={pw} onChange={e=>{setPw(e.target.value);setErr('');}} style={{...field,paddingRight:88}}/>
-                <button type="button" disabled={busy} aria-label={motDePasseVisible?'Masquer le mot de passe':'Afficher le mot de passe'} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?'Masquer':'Afficher'}</button>
+                <button type="button" disabled={busy} aria-label={motDePasseVisible?tr('auth.mdp.masquerLabel'):tr('auth.mdp.afficherLabel')} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?tr('commun.masquer'):tr('commun.afficher')}</button>
               </span>
             </div>
           )}
-          {(mode==='up'||mode==='newpw') && <ul id="vrm-cx-regles" className="vrm-cx-regles" aria-label="Conditions du mot de passe">
-            <li data-valide={pw.length>=8}>8 caractères minimum</li>
-            <li data-valide={pw.length>0&&!/^(\d+|[a-z]+)$/i.test(pw)}>Mélange de caractères</li>
+          {(mode==='up'||mode==='newpw') && <ul id="vrm-cx-regles" className="vrm-cx-regles" aria-label={tr('auth.regles.label')}>
+            <li data-valide={pw.length>=8}>{tr('auth.regles.huit')}</li>
+            <li data-valide={pw.length>0&&!/^(\d+|[a-z]+)$/i.test(pw)}>{tr('auth.regles.melange')}</li>
           </ul>}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
           {err  && <div role="alert" style={{fontSize:13,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {/* Le décompte vit sur le bouton qui envoie (inscription, mot de passe
               oublié, « Renvoyer » d'un compte pas confirmé) ; sinon dans la phrase. */}
-          {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? TEXTE_DELAI_EMAIL_BOUTON : texteDelaiEmail(resteAttente)}</div>}
+          {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? tr('auth.delai.bouton') : tr('auth.delai.secondes', { n: resteAttente })}</div>}
           {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
-              Ton compte <b>{email}</b> attend sa confirmation.
+              {tr('auth.attente.avant')}<b>{email}</b>{tr('auth.attente.apres')}
               <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
                 <button type="button" data-auth-renvoyer="" disabled={busy||enAttenteEmail}
                   onClick={()=>actionConfirmation('renvoyer')}
                   style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
                     borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
-                  {enAttenteEmail ? `Renvoyer dans ${resteAttente} s` : "Renvoyer l'email"}
+                  {enAttenteEmail ? tr('auth.renvoyerDans', { s: resteAttente }) : tr('auth.renvoyerEmail')}
                 </button>
                 <button type="button" data-auth-lien-connexion="" disabled={busy||enAttenteEmail}
                   onClick={()=>actionConfirmation('lien')}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
                     borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
-                  Recevoir un lien de connexion
+                  {tr('auth.lienConnexion')}
                 </button>
               </div>
               <details className="vrm-cx-aide-confirmation">
-                <summary>Le lien de confirmation ne s’ouvre pas ?</summary>
+                <summary>{tr('auth.lienAide.q')}</summary>
               <div style={{marginTop:8,fontSize:12,color:C.muted,lineHeight:1.5}}>
                 {/* « il renvoie vers une adresse de test » : vrai le 5 octobre (Site URL
                     resté sur localhost:3000, mesuré dans les journaux), faux dès que
                     Julien règle Supabase. La phrase ne dit plus que ce qui reste vrai
                     dans les deux cas. */}
-                Si le lien du mail affiche « <i>impossible d'accéder au site</i> »,
-                <b style={{color:C.text}}> copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
+                {tr('auth.lienAide.1')}<i>{tr('auth.lienAide.2')}</i>{tr('auth.lienAide.3')}
+                <b style={{color:C.text}}>{tr('auth.lienAide.4')}</b>{tr('auth.lienAide.5')}
               </div>
-              <input aria-label="Lien de confirmation reçu par e-mail" value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
+              <input aria-label={tr('auth.lienAide.label')} value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder={tr('auth.lienAide.placeholder')}
                 style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:12,
                   padding:'10px 11px',fontSize:17,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
                 <button type="button" disabled={busy||!confirmLink.trim()}
                   onClick={()=>actionConfirmation('confirmer')}
                   style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'9px 13px',
                     fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
-                  Confirmer avec ce lien
+                  {tr('auth.lienAide.confirmer')}
                 </button>
               </details>
             </div>
@@ -17754,15 +17784,15 @@ function AuthScreen() {
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
           <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? (fournisseurEnCours?'Ouverture de la connexion…':mode==='up'?'Création du compte…':mode==='reset'?'Envoi du lien…':mode==='newpw'?'Enregistrement…':'Connexion…') : (enAttenteEmail && mode==='reset' && resetEnvoye) ? `Renvoyer dans ${resteAttente} s` : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? (resetEnvoye ? 'Renvoyer l’e-mail' : 'Envoyer le lien') : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+            {busy ? (fournisseurEnCours?tr('auth.bouton.ouverture'):mode==='up'?tr('auth.bouton.creation'):mode==='reset'?tr('auth.bouton.envoiLien'):mode==='newpw'?tr('auth.bouton.enregistrement'):tr('auth.bouton.connexion')) : (enAttenteEmail && mode==='reset' && resetEnvoye) ? tr('auth.renvoyerDans', { s: resteAttente }) : (enAttenteEmail && (mode==='up'||mode==='reset')) ? tr('auth.reessaieDans', { s: resteAttente }) : attendCaptcha ? (captcha.statut==='erreur' ? tr('auth.captcha.indisponible') : captcha.statut==='interactif' ? tr('auth.captcha.coche') : tr('auth.captcha.enCours')) : mode==='up' ? tr('auth.bouton.creer') : mode==='reset' ? (resetEnvoye ? tr('auth.bouton.renvoyer') : tr('auth.bouton.envoyerLien')) : mode==='newpw' ? tr('commun.enregistrer') : tr('auth.titre.in')}
           </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
               collecte). */}
           {mode==='up' && (
             <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginTop:10,textAlign:'center'}}>
-              En créant ton compte, tu acceptes les <a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>conditions d’utilisation</a> et
-              tu as pris connaissance de la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
+              {tr('auth.cgu.1')}<a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('auth.cgu.2')}</a>{tr('auth.cgu.3')}
+              <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('auth.cgu.4')}</a>.
             </div>
           )}
 
@@ -17774,20 +17804,22 @@ function AuthScreen() {
             {mode!=='reset' && ((CLOISONNE || mode==='up') ? (
               <button type="button" disabled={busy} onClick={()=>changerMode(mode==='up'?'in':'up')}
                 style={{border:'none',background:'transparent',color:C.accentTexte,fontSize:15,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-                {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
+                {mode==='up' ? tr('auth.dejaCompte') : tr('auth.creerCompte')}
               </button>
             ) : (
-              <span style={{fontSize:15,color:C.muted,fontWeight:500}}>Inscriptions bientôt ouvertes</span>
+              <span style={{fontSize:15,color:C.muted,fontWeight:500}}>{tr('auth.inscriptionsBientot')}</span>
             ))}
             {mode==='reset' && (
               <button type="button" disabled={busy} onClick={()=>changerMode('in')}
                 style={{border:'none',background:'transparent',color:C.muted,fontSize:15,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-                Retour
+                {tr('commun.retour')}
               </button>
             )}
           </div>
         </form>
         <LiensLegaux/>
+        {/* (11 nov., lot traduction) La langue, avant même d'avoir un compte. */}
+        <div style={{display:'flex',justifyContent:'center',color:C.muted,fontSize:12}}><ChoixLangue/></div>
         {/* ⚠️⚠️ CETTE PHRASE AFFIRMAIT UNE PROTECTION QUE `CLOISONNE` NE MESURE
             PAS. `CLOISONNE` dit seulement que la colonne `owner` EXISTE — et la
             migration autorise explicitement de s'arrêter là (« garde RLS
@@ -17802,11 +17834,11 @@ function AuthScreen() {
             ne dit rien tant qu'on ne sait pas : « pas su » ne vaut pas « oui ». */}
         <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:16,lineHeight:1.5,minHeight:32}}>
           {!CLOISONNE
-            ? <><b style={{color:C.warn}}>Séparation des comptes pas encore activée.</b><br/>Connecte-toi pour retrouver tes données — mais n'invite personne tant que la migration n'est pas passée.</>
+            ? <><b style={{color:C.warn}}>{tr('auth.isolation.inactive.titre')}</b><br/>{tr('auth.isolation.inactive.texte')}</>
             : ouverte === true
-            ? <><b style={{color:C.warn}}>Séparation des comptes pas encore verrouillée.</b><br/>La clé publique de cette page lit encore les données. Connecte-toi pour retrouver les tiennes — mais n'invite personne tant que le verrou (RLS) n'est pas posé.</>
+            ? <><b style={{color:C.warn}}>{tr('auth.isolation.ouverte.titre')}</b><br/>{tr('auth.isolation.ouverte.texte')}</>
             : ouverte === false
-            ? <>Chaque vendeur ne voit que ses propres données.<br/>L'isolation est appliquée par la base, pas par l'application.</>
+            ? <>{tr('auth.isolation.fermee.1')}<br/>{tr('auth.isolation.fermee.2')}</>
             : null /* en cours, ou pas su : on n'affirme rien */}
         </div>
       </div>
@@ -22377,12 +22409,12 @@ function relireTransporteursSiVieux({ force = false } = {}) {
 // (commodité d'appareil) ; refus ⇒ recul. Une étiquette lue ⇒ `vrm:etiquettes-lues` (Colis,
 // Ventes, Ma journée relisent leurs bordereaux). Le serveur décide (même règle que le cron).
 const etiquetteALire = (b) => {
-  if (!b || !b.hasPdf || b.pdfLu != null && b.pdfLu !== '' && b.pdfLu !== 'None') return false;
+  if (!b || !b.hasPdf || b.pdfLu != null && b.pdfLu !== '' && b.pdfLu !== 'None' && b.pdfLu !== 'aucun') return false;   // (11 nov.) « aucun » d'avant le code « 56… » : relu
   if (b.transporteurPdf || (b.transporteur && String(b.suivi || '').trim())) return false;   // la règle de `candidatsPdf`
   const tx = String(b.transaction || '');
   if (!tx) return false;
   const et = pdfEtiquettesParTx(), vus = pdfVusParTx();
-  return !(et && et[tx]) && !(vus && vus[tx]);
+  return !(et && et[tx]) && !(vus && vus[tx] && !(vus[tx].r === 'aucun' && vus[tx].v !== 2));
 };
 let _etiquettesVol = null;
 function lireEtiquettesManquantes(bords) {
@@ -32005,7 +32037,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // doubler : la moitié est « sans doute le même colis, fini » (api/_lib/achat-arrive-relais.js).
       const temoinFini = (w) => !!w && (finis.has('e:' + suiviDeLigne(w)) || w.status === 'delivered' || w.status === 'retour' || !!(collected && collected.has(colisKey(w))));
       const commandeDe = (t) => cmdParColis.get(colisKey(t)) || commandeDuColis(t) || null;
-      const r = regrouperArrivees(emailList, { commandeDe, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi, temoins, sansIdentite, temoinActif: (w) => !temoinFini(w) });
+      // (11 nov.) Un achat que SA commande Vinted dit encore au point relais n'est jamais « fini » avec un autre colis.
+      const attendEncore = (c) => !!c && isAtRelayStatus(c.status);
+      const r = regrouperArrivees(emailList, { commandeDe, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi, temoins, sansIdentite, temoinActif: (w) => !temoinFini(w), attendEncore });
       r.liste.forEach((t, i) => { if (r.commandes[i]) cmdParColis.set(colisKey(t), r.commandes[i]); });
       // (9 nov., 17 h 24) « Compté avec » : la moitié et SON témoin (le colis compté) — une ligne tranchée.
       r.doutes.forEach((t, i) => { const w = r.doutesTemoins && r.doutesTemoins[i]; aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais', avecSuivi: w ? suiviDeLigne(w) : '', avecCarrier: (w && w.carrier) || '' }, o: (r.doutesCommandes && r.doutesCommandes[i]) || null }); });
@@ -32018,7 +32052,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const t = x.kind === 'email' ? x.t : null;
         if (t && t.source === 'vinted-commande' && x.e && estAVerifier(x.e) && sansIdentite(t, x.o || null) && true) {
           const ws = temoinsDe(t, x.o || null, temoins, { commandeDe });
-          if (ws.length && ws.every(temoinFini)) { noterProbable(t, x.o || null, ws[0]); continue; }
+          if (ws.length && ws.every(temoinFini) && !attendEncore(x.o || null)) { noterProbable(t, x.o || null, ws[0]); continue; }
         }
         garderV.push(x);
       }
@@ -40692,8 +40726,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for(const [cle,empreinte] of empreintes){const l=actuelles.get(cle);if(!l||lotActuel.current.sig(l)!==empreinte)throw Error('Un article, son numéro ou son état a changé. Vérifie la sélection avant de préparer les PDF.');}
     };
     setBatchBusy(true);
-    const controle=controlePreparation(aImprimer.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),new Set(aImprimer.map(l=>l.cle)),lot?.verifications||{});
-    if(controle.reste && !await askConfirm({title:'Vérifier les articles avant impression',desc:`${controle.verifies} sur ${controle.selection} article(s) contrôlé(s). Vérifie la photo, le numéro et le bon compte avant de préparer les PDF. Cette action ne marque aucun colis expédié.`,ok:'Préparer quand même les PDF',cancel:'Revenir aux articles'})){setBatchBusy(false);libererOngletPdf();return;}
+    // (11 nov., Julien) Plus de confirmation « N sur M contrôlés » à chaque impression : le N° et la photo sont sur
+    // chaque ligne de la feuille ; `verifierContexte` refuse toujours un lot dont un article a changé.
     const echecs = [], faits = [];let documentPrepare=false;
     if(choisis)setLot(x=>(AUTH.user?.id||null)===proprietaire&&x?{...x,erreur:''}:x);
     setBatchBusy(true);setProgressionLot({etape:'lecture',fait:0,total:aImprimer.length});
@@ -41675,6 +41709,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return <RetirerAilleursBloc plan={affiche} resultats={retraitsAilleurs ? avecRelecture(retraitsAilleurs.res, vendusAilleurs.v) : null} enVol={retraitAilleursEnVol}
       onRetirer={retirerDesAutresSites} onFini={() => setRetraitsAilleurs(null)} PhotoVinted={PhotoVinted} compact={compact}/>;
   };
+  // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes cachées (src/journeePerso.js),
+  // et la feuille « Modifier ma journée ».
+  const [persoJ] = useJourneePerso();
+  const [feuillePerso, setFeuillePerso] = useState(false);
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
@@ -42850,7 +42888,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const AF = (baseKO || premierJour) ? { prochain: null, section: null } : (() => {
               // (8 nov.) Affichage Simple : le conseil « Prix à baisser » se tait (src/profilVendeur.js) ;
               // son compteur reste publié dans le bloc caché ci-dessous (aucun nombre ne change).
-              const cases = T.filter((x) => !x.pasSu && x.t && x.t.n > 0 && caseJourneeMontree(x.id, PROFIL_VENDEUR.mode));
+              // (11 nov., lot journee-perso) Par-dessus : SES choix (« Modifier ma journée »). Une case qu'il a
+              // cachée revient d'elle-même quand elle porte un geste DÛ urgent (`urgencesJournee` : colis en
+              // retard ou à sa date limite, dernier jour de retrait) ; cachée, son compteur reste publié dans le
+              // MÊME bloc caché (aucun nombre ne change pour les autres écrans ni le widget).
+              const urgJ = urgencesJournee({ tuiles, alertes: alertesArgent });
+              const visJ = (id) => visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode, urgent: !!urgJ[id] });
+              const cases = T.filter((x) => !x.pasSu && x.t && x.t.n > 0 && visJ(x.id).montree);
+              const casesCachees = T.filter((x) => !x.pasSu && x.t && x.t.n > 0 && !visJ(x.id).montree);
               const nPretsJournee = (tuiles.envoyer && tuiles.envoyer.emballer && tuiles.envoyer.emballer.n) || 0;
               // « Emballer » est le geste de la carte « Colis à poster » : pas une seconde carte.
               // (3 nov., Julien : « vente Vestiaire Collective : tout va être ensemble ») La vente Vestiaire à
@@ -42908,7 +42953,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
+              // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0 };
+              const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
+              const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
               // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
               const carteARelier = () => {
@@ -43029,20 +43080,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               };
               const carteCase = (x) => {
                 const so = sousCase(x);
+                const forceJ = visJ(x.id).force;   // cachée par lui, revenue parce qu'elle est urgente
                 const presse = !!(x.t && x.t.presses && (x.t.presses.urgent || x.t.presses.nAuj > 0)) || !!(x.t && x.t.alerte);
                 return (
-                  <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id}
+                  <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id} data-jp-force={forceJ ? '' : undefined}
                     data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
                     title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
                     <PileVignettes srcs={photosCase[x.id]} n={x.t.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={icCase[x.id] || x.ic} size={20}/>}/>
-                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note" data-journee-a-imprimer={nPretsJournee} data-exact={tuiles.envoyer.emballer.exact ? '1' : '0'}>{tuiles.envoyer.emballer.exact ? '' : 'au moins '}{nPretsJournee} à imprimer</span> : null}</span>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{forceJ ? <span className="vrm-jp-urgent">Affichée car urgent</span> : null}{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note" data-journee-a-imprimer={nPretsJournee} data-exact={tuiles.envoyer.emballer.exact ? '1' : '0'}>{tuiles.envoyer.emballer.exact ? '' : 'au moins '}{nPretsJournee} à imprimer</span> : null}</span>
                     <span className={'vrm-day-task-action' + (x.id === 'envoyer' && nPretsJournee > 0 ? ' is-principal' : '')} data-fu-principal={x.id === 'envoyer' && nPretsJournee > 0 ? '' : undefined}><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || VERBES.voir}</span></span>
                   </button>
                 );
               };
               // (9 nov., Ma journée v2) Pendant la lecture, la PLACE de la prochaine chose est gardée dans la tête :
               // elle arrive sans pousser la frise (banc `chargement`, CLS).
-              const placeProchain = <div className="vrm-jv2-prochain-attente" aria-hidden="true" data-jv2-prochain-attente=""/>;
+              const placeProchain = !visibiliteCarte('prochain', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? null : <div className="vrm-jv2-prochain-attente" aria-hidden="true" data-jv2-prochain-attente=""/>;
               if (loading) return { prochain: placeProchain, section: null };
               // (6 nov.) Les actions du jour de la coque (la cloche) pas encore rangées : la liste
               // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
@@ -43056,6 +43108,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (5 nov., chantier E1, §5) « Rien à faire » ne se dit que sur ce qui a été LU : une case
               // pas lue (« — ») n'est pas une case à zéro. Sinon la ligne nomme ce qui manque.
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
+              // Les cases à zéro ET celles qu'il a cachées restent lisibles par les autres écrans et les bancs
+              // (mêmes compteurs), sans place à l'écran — aussi quand tout ce qui reste à faire est caché.
+              const compteursCaches = (<>
+                  <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
+                  {/* (11 nov., lot journee-perso) Les autres cartes qu'il a cachées : leur nombre reste lisible, sans place. */}
+                  {cacheesHorsCases.length ? <div hidden data-jp-cachees="">{cacheesHorsCases.map((id) => <span key={id} data-jp-cachee={id} data-n={String(nParCarteAF[id])}/>)}</div> : null}
+              </>);
+              if (nGestes === 0 && nCacheesAF > 0) return { prochain: null, section: (
+                <section className="vrm-fu-afaire" aria-label="À faire" data-jp-rien-affiche={nCacheesAF}>
+                  <p className="vrm-fu-vide" data-tout-a-jour="">Rien à faire dans tes cartes affichées · {nCacheesAF} geste{nCacheesAF > 1 ? 's' : ''} dans les cartes cachées</p>
+                  {compteursCaches}
+                </section>
+              ) };
               if (nGestes === 0) return { prochain: null, section: pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
                 : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96} vend={vendActuel()}/><p>Rien à faire</p></div> };
@@ -43063,26 +43128,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // dans la carte sombre, avant l'argent (Julien : l'ordre = ce qu'il faut faire maintenant, puis
               // l'argent, puis le reste). L'ordre de toujours (le plus pressé d'abord) la désigne ; les
               // mêmes éléments, les mêmes attributs, dits une seule fois (elle n'est plus redite dans la liste).
+              // (11 nov., lot journee-perso) SON ordre (« Modifier ma journée ») : les alertes urgentes toujours en
+              // premier (on ne peut ni les cacher ni les déplacer), puis les cartes cachées revenues parce
+              // qu'elles sont urgentes (« Affichée car urgent »), puis les cartes dans l'ordre qu'il a choisi.
+              // Sans réglage, l'ordre d'origine (`CARTES_JOURNEE`) : celui d'avant, carte pour carte.
+              const blocsAF = {
+                ailleurs: carteAilleurs ? [carteVendusAilleurs()] : [],
+                'deux-fois': deuxFois.length ? [carteDeuxFois()] : [],
+                ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, cases.filter((x) => x.id === id).map((x) => carteCase(x))])),
+                'a-relier': comptesARelierJour.length ? [carteARelier()] : [],
+                'stock-sortie': sortiesStock.length ? [carteSortieStock()] : [],
+                // (11 nov.) Plus de carte « Supprimés de Vinted » : ces articles vivent dans « À trancher » (lot DJ4,
+                // `cyclesJ` est vide) ; « À trancher » est une carte FIXE, rendue en tête de la section.
+                autres: autres.map((j, i) => tache(j, i)),
+                urssaf: urssafJob ? [tache(urssafJob, 99)] : [],
+              };
+              const forcesAF = [], montresAF = [];
+              for (const id of ordreJournee('afaire', persoJ)) {
+                const v = visJ(id); if (!v.montree) continue;
+                for (const el of (blocsAF[id] || [])) (v.force ? forcesAF : montresAF).push({ el, carte: id });
+              }
               const listeAF = [
                 ...alertesArgent.map((j, i) => ({ el: tache(j, i), alerte: true })),
-                ...(carteAilleurs ? [{ el: carteVendusAilleurs() }] : []),
-                ...(deuxFois.length ? [{ el: carteDeuxFois() }] : []),
-                ...cases.map((x) => ({ el: carteCase(x) })),
-                ...(comptesARelierJour.length ? [{ el: carteARelier() }] : []),
-                ...(sortiesStock.length ? [{ el: carteSortieStock() }] : []),
-                ...(cyclesJ.length ? [{ el: carteCycles(cyclesJ) }] : []),
-                ...autres.map((j, i) => ({ el: tache(j, i) })),
-                ...(urssafJob ? [{ el: tache(urssafJob, 99) }] : []),
+                ...forcesAF, ...montresAF,
               ].filter((x) => x.el && React.isValidElement(x.el));
               // Une carte de gestes groupés (un choix par rangée) reste dans la liste : la tête porte UN geste.
-              const premierAF = listeAF.find((x) => !(x.el.props && x.el.props['data-cycle-groupe'] != null)) || null;
+              // (11 nov., lot journee-perso) « La prochaine chose à faire » cachée par lui ⇒ rien ne monte en tête.
+              const premierAF = !visibiliteCarte('prochain', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? null : (listeAF.find((x) => !(x.el.props && x.el.props['data-cycle-groupe'] != null)) || null);
               const prochainAF = premierAF ? React.cloneElement(premierAF.el, { className: ((premierAF.el.props && premierAF.el.props.className) || '') + ' is-prochain', 'data-prochain': '' }) : null;
               const resteAF = listeAF.filter((x) => x !== premierAF);
               const alertesReste = resteAF.filter((x) => x.alerte), autresReste = resteAF.filter((x) => !x.alerte);
               return { prochain: prochainAF, section: (
                 <section className="vrm-fu-afaire" aria-label="À faire">
                   {/* (11 nov., lot DJ4) « À trancher » en tête de la liste, ouvert en place. */}
-                  {jobTrancher ? carteTrancher(jobTrancher) : null}
+                  {/* (11 nov., lot journee-perso) Carte FIXE (toujours en tête, ouverte en place) : il peut la cacher. */}
+                  {jobTrancher && visJ('trancher').montree ? carteTrancher(jobTrancher) : null}
                   {/* (9 nov., Ma journée v2) « Ensuite » : le reste, après la prochaine chose (posée en tête).
                       Le nombre de gestes compte TOUT (la prochaine comprise) : le même compte qu'avant. */}
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">{resteAF.length ? 'Ensuite' : 'À faire'}</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
@@ -43105,7 +43185,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </SheetShell>
                   ) : null}
                   {/* Les cases à zéro restent lisibles par les autres écrans et les bancs (mêmes compteurs), sans place à l'écran. */}
-                  <div hidden>{T.filter((x) => !cases.includes(x)).map((x) => <span key={x.id} data-tuile={x.id} data-n={x.pasSu ? '' : String(x.t ? x.t.n : 0)}/>)}</div>
+                  {compteursCaches}
                 </section>
               ) };
         })();
@@ -43125,16 +43205,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete" data-fu-carte="" aria-label="Ta journée">
                 <div className="vrm-day-hello vrm-fu-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
                 <h1 className="vrm-fu-titre-tete">Ma journée</h1>
+                {/* (11 nov., lot journee-perso) La tête suit SON ordre et SES choix (« Modifier ma journée ») ;
+                    une carte cachée qui publie un chiffre (frise, chiffres du mois) reste rendue dans un bloc caché :
+                    ses `data-*` et ses publications ne changent pas. Sans réglage : l'ordre d'avant. */}
+                {(() => {
+                  const blocsTete = {
+                    phrase: (<>
                 {/* (8 nov., « beauté ») LA PHRASE DU JOUR : les cases publiées (« À envoyer », « À retirer »,
                     leur limite) mises en mots, le ton selon l'heure (src/phraseJour.js) ; rien de lu ⇒ la
                     phrase fixe de l'écran. Aucun nombre recalculé. */}
                 {(() => { const pj = loading ? null : phraseDuJour({ envoyer: { n: T[0].t ? T[0].t.n : 0, pasSu: !!T[0].pasSu, presses: T[0].t && T[0].t.presses }, retirer: { n: T[1].t ? T[1].t.n : 0, pasSu: !!T[1].pasSu } }, h);
                   return pj ? <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-phrase-jour={pj} data-phrase-jour-env={T[0].pasSu ? '' : String(T[0].t ? T[0].t.n : 0)} data-phrase-jour-ret={T[1].pasSu ? '' : String(T[1].t ? T[1].t.n : 0)}>{pj}{AIDE_ECRANS.journee ? <AideEcran cle="journee"/> : null}</p>
                     : <PhraseEcran cle="journee" className="vrm-fu-phrase-tete"/>; })()}
+                    </>),
+                    prochain: (<>
                 {/* (9 nov., Ma journée v2) LA PROCHAINE CHOSE À FAIRE, en tête : avant l'argent. La carte de
                     « À faire » qui vient en premier dans l'ordre de toujours (le plus pressé d'abord), avec son
                     geste ; elle n'est plus redite dans la liste « Ensuite ». */}
                 {AF.prochain ? <div className="vrm-jv2-prochain" data-jv2-prochain="">{AF.prochain}</div> : null}
+                    </>),
+                    frise: (<>
                 {/* (9 nov., Ma journée v2) L'ARGENT : la frise des sept jours, qui se TOUCHE (un jour ⇒ ce jour-là ;
                     « Semaine du … » ⇒ la semaine passée — l'ancienne carte « Semaine », fondue ici), puis les
                     cases du mois choisies par Julien (« Modifier »). Le grand chiffre par défaut de la carte
@@ -43147,6 +43237,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
                       .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>
                 )}
+                    </>),
+                    chiffres: (<>
                 {/* (3 nov., carte réglable par page) Les chiffres de la tête : un grand chiffre + trois
                     cases, choisis par Julien (« Modifier »). Défaut = vendu aujourd'hui (porté par la frise
                     ci-dessus), bénéfice du mois (`chiffreBenefice`, la lecture de Compta), vendu du mois, reçu du
@@ -43162,6 +43254,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       return null;
                     }}/>
                 )}
+                    </>),
+                  };
+                  return ordreJournee('tete', persoJ).map((id) => {
+                    if (id === 'prochain') return <React.Fragment key={id}>{blocsTete.prochain}</React.Fragment>;
+                    const v = visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode });
+                    if (v.montree) return <React.Fragment key={id}>{blocsTete[id]}</React.Fragment>;
+                    return id === 'phrase' ? null : <div key={id} hidden data-jp-cachee={id}>{blocsTete[id]}</div>;
+                  });
+                })()}
               </section>
               ); })()}
 
@@ -43169,8 +43270,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 passée se touche dans la frise de la tête (« Semaine du … »), avec les MÊMES règles
                 (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
             {/* (11 nov.) « Quoi de neuf » : une ligne discrète après une mise en ligne, jamais une fenêtre. */}
+            {/* (11 nov., lot journee-perso) « Quoi de neuf » n'est pas une carte réglable : une ligne PASSAGÈRE (après
+                une mise en ligne seulement), toujours à sa place. Les notifications coupées vivent « En bas ». */}
             {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}
-            {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
             {AF.section}
 
@@ -43211,7 +43313,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {/* (6 nov.) Un compte relié : le guide reste tant qu'une étape est à faire
                 (boîte e-mail, numéros), et se masque d'un geste. */}
-            {!loading && !baseKO && !premierJour && accountsReady && Array.isArray(accounts) ? <GuideDemarrageApp onNav={onNav} comptes={accounts}/> : null}
+            {/* (11 nov., lot journee-perso) « En bas » : les notifications coupées et le guide de démarrage, dans
+                SON ordre ; cachés par lui, ils ne s'affichent plus (rien n'est publié par eux). La première visite
+                (`premierJour`) garde son guide plein écran : c'est tout l'écran, il ne se cache pas. */}
+            {!baseKO && !premierJour ? ordreJournee('bas', persoJ).map((id) => {
+              if (!visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree) return null;
+              if (id === 'notifs') return <NotifsMuettes key={id} onNav={onNav}/>;
+              if (id === 'guide') return !loading && accountsReady && Array.isArray(accounts) ? <GuideDemarrageApp key={id} onNav={onNav} comptes={accounts}/> : null;
+              return null;
+            }) : null}
+            {/* (11 nov., lot journee-perso) « Modifier ma journée » : en bas, toujours (aussi dans Paramètres → Affichage). */}
+            {!baseKO && !premierJour ? (() => { const nc = nCartesCachees(persoJ, PROFIL_VENDEUR.mode); return (
+              <div className="vrm-jp-bas" data-jp-bas="">
+                <Bouton variante="secondaire" icone="pencil" data-jp-modifier="" onClick={() => setFeuillePerso(true)}>Modifier ma journée</Bouton>
+                {nc ? <span className="vrm-jp-bas-note" data-jp-n-cachees={nc}>{nc} carte{nc > 1 ? 's' : ''} cachée{nc > 1 ? 's' : ''}</span> : null}
+              </div>
+            ); })() : null}
+            {feuillePerso ? (
+              <SheetShell titre="Modifier ma journée" sousTitre="Montre, cache et range tes cartes" onClose={() => setFeuillePerso(false)} maxWidth={560} data-feuille-journee-perso="">
+                <JourneePersoSetting/>
+              </SheetShell>
+            ) : null}
             {/* (11 nov., lot import-depart) L'historique Vinted qui arrive : une barre fine par compte, seulement pendant l'import (src/ImportDepart.jsx). */}
             {!loading && !baseKO && accountsReady && Array.isArray(accounts) && accounts.length ? <ImportDepart comptes={accounts} variante="journee"/> : null}
 
@@ -47527,7 +47649,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {lot && (()=>{
                   const L = lot.lignes || lignesLotTous();
                   const nb=L.filter(l=>lot.coches.has(l.cle)).length;
-                  const controle=controlePreparation(L.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),lot.coches,lot.verifications||{});
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
                   return (
@@ -47535,25 +47656,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        titre, croix de 44 px, retour du navigateur) au lieu d'un calque fait main. */
                     <SheetShell onClose={()=>setLot(null)} maxWidth={560} z={9000} className="vrm-lot" data-noswipe="1" data-lot={L.length} aria-label="Bordereaux à imprimer"
                       titre={lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}>
-                        <>{lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont repris.</p>}</><div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
+                        {/* (11 nov., capture de Julien : « inadmissible ») La feuille dit l'essentiel, une fois : plus d'étapes
+                            « 1 · 2 · 3 », plus de récapitulatif qui redisait « 7 sélectionnés » quatre fois, plus de
+                            case « Contrôlé » par ligne ni de confirmation à chaque impression. Le N° et la photo de
+                            chaque ligne SONT la vérification ; le contexte (même compte, même N°, même état) reste
+                            vérifié au lancement (`verifierContexte`). */}
+                        {lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont repris.</p>}
                         {lot.erreur&&<p className="vrm-preparation-note" role="alert" data-lot-erreur="">{lot.erreur}</p>}
-                        <RecapSelection lignes={L} coches={lot.coches}/>
-                        <p className="vrm-preparation-note">Compare le N° et la photo avec l’article. « Contrôlé » ≠ expédié.</p>
                         {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
-                        <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 0',fontSize:12,color:C.muted,alignItems:'center'}} className="vrm-lot-outils">
-                          <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
-                          <span>Décocher ne supprime aucun bordereau.</span>
-                        </div>
+                        {L.length>1&&(()=>{ const cochables=L.filter(l=>l.cochable!==false); const tout=cochables.length>0&&cochables.every(l=>lot.coches.has(l.cle));
+                          return <div className="vrm-lot-outils" style={{display:'flex',gap:12,padding:'4px 0 8px',fontSize:13,color:C.muted,alignItems:'center',justifyContent:'space-between'}}>
+                            <span role="status" data-lot-selection={nb}>{nb} sur {L.length}</span>
+                            <Bouton variante="discret" disabled={batchBusy} data-lot-tout={tout?'decocher':'cocher'} onClick={()=>setLot(x=>({...x,coches:tout?new Set():new Set(cochables.map(l=>l.cle))}))}>{tout?'Tout décocher':'Tout sélectionner'}</Bouton>
+                          </div>; })()}
                         <div className="vrm-lot-liste" style={{padding:'4px 0'}}>
                           {L.map((l, il) => {
                             const o = l.e ? l.e.o : null, coche = lot.coches.has(l.cle);
                             const num = l.num || '';
                             const photo = l.photo || null;
-                            let emplacement='Emplacement non vérifié';
+                            let emplacement='';   // dit seulement quand il est CONNU (plus « non vérifié » sur chaque ligne)
                             if(num){try{const plan=load('vrm_room_plan',null),place=plan?ouEstNumero(normalizePlan(plan),num):null;if(place)emplacement=[place.roomName,place.itemName,place.nom].filter(Boolean).join(' · ');}catch(_){}}
-                            const verifie=lot.verifications?.[l.cle]===sigLigneLot(l);
                             // (3 nov.) Un en-tête par transporteur, dans l'ordre du PDF (celui des groupes de l'écran).
                             const ouvreT = il === 0 || L[il-1].trNom !== l.trNom;
                             return (
@@ -47565,15 +47687,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                 <span style={{flex:1,minWidth:0}}>
                                   <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{l.titre}</span>
                                   <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>
-                                    {l.sous}{l.site === 'vinted' ? ` · vendue le ${fmtD(o)}` : ''}
+                                    <span style={{display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.sous}{l.site === 'vinted' ? ` · ${fmtD(o)}` : ''}</span>
                                     {l.pdf === false && l.cochable !== false ? <b data-lot-sans-bordereau="1" style={{color:C.warn,fontWeight:600}}> · Sans bordereau</b> : null}
                                     {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
                                     {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
                                     {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
-                                    <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
+                                    {num ? (emplacement ? <span style={{display:'block',marginTop:2}} data-lot-emplacement="">{emplacement}</span> : null) : <span style={{display:'block',marginTop:2,color:C.warn,fontWeight:600}} data-lot-sans-num="">Sans N° : vérifie avec la photo</span>}
                                   </span>
                                 </span>
-                                {l.cochable === false ? <span className="vrm-preparation-controle" data-lot-ebay="1" style={{fontSize:12,color:C.muted,fontWeight:600}}>eBay</span> : <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>}
+                                {l.cochable === false ? <span className="vrm-preparation-controle" data-lot-ebay="1" style={{fontSize:12,color:C.muted,fontWeight:600}}>eBay</span> : null}
                               </div>
                               </React.Fragment>
                             );
@@ -51785,6 +51907,28 @@ function useProfilVendeur() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesProfil.add(maj); return () => { _ecoutesProfil.delete(maj); }; }, []);
   return PROFIL_VENDEUR.uid === (AUTH.user?.id || '') ? PROFIL_VENDEUR : { mode: 'complet', usage: {}, relies: {}, contexte: {}, plateformes: null };
+}
+// (11 nov., lot journee-perso) SA Ma journée (src/journeePerso.js) : lue au montage, relue
+// quand le nuage arrive (seulement s'il n'y a pas touché ici) ou qu'un autre écran l'écrit.
+const _ecoutesPerso = new Set();
+function useJourneePerso() {
+  const [r, setR] = useState(() => lireJourneePerso(load(CLE_JOURNEE_PERSO, null)));
+  useEffect(() => { _ecoutesPerso.add(setR); return () => { _ecoutesPerso.delete(setR); }; }, []);
+  const touche = useRef(false);
+  useEffect(() => onCloudReady(() => { if (!touche.current) setR(lireJourneePerso(load(CLE_JOURNEE_PERSO, null))); }), []);
+  useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_JOURNEE_PERSO) setR(lireJourneePerso(load(CLE_JOURNEE_PERSO, null))); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  // Toutes les instances (Ma journée et sa feuille, Paramètres) suivent le geste tout de suite.
+  const poser = React.useCallback((n) => { touche.current = true; const x = lireJourneePerso(n); [..._ecoutesPerso].forEach((f) => f(x)); save(CLE_JOURNEE_PERSO, x); }, []);
+  return [r, poser];
+}
+// Le contenu de « Modifier ma journée » (feuille de Ma journée, et Paramètres → Affichage).
+function JourneePersoSetting() {
+  const p = useProfilVendeur();
+  const [r, poser] = useJourneePerso();
+  return <JourneePersoEditeur reglage={r} poser={poser} mode={p.mode} accent={C.accent} eteint={`${C.text}26`} toast={toast}/>;
 }
 // (9 nov.) LE PROFIL FISCAL (src/profilFiscal.js) : ce que son statut permet de montrer
 // et de calculer, pour Comptabilité, Ma journée, Statistiques et la configuration.
@@ -57214,6 +57358,7 @@ function AppCoeur() {
 }
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
 export { useProfilFiscal, profilFiscalLu };
+export { useJourneePerso, JourneePersoSetting };
 export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
