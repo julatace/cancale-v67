@@ -88,7 +88,9 @@ export const CONSEILS = [
   {
     cle: 'comptes-muets', chiffre: 'colis.comptesMuets',
     quand: (v) => fini(v) && v >= 1,
-    cibles: ['[data-colis-comptes-muets-ouvrir]'],
+    // (11 nov.) La phrase de Colis est partie (10 nov., Julien : « déjà marqué au-dessus ») : le conseil
+    // pointe le geste de la ligne de fraîcheur du haut (src/LigneFraicheur.jsx), source « emails ».
+    cibles: ['[data-fraicheur-geste="emails"]', '[data-fraicheur-rangee="emails"]'],
     titre: (v) => (v > 1 ? 'Des comptes sans e-mail' : 'Un compte sans e-mail'),
     texte: (v) => `${v > 1 ? 'Leurs' : 'Ses'} codes de retrait et bordereaux n’arrivent pas jusqu’ici.`,
     geste: 'Relier maintenant',

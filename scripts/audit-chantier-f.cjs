@@ -41,7 +41,8 @@ const MUTATIONS = {
   anneau_vide:     ['src/RepartitionAnneau.jsx', " if(!valeurs.length||!(Number(total)>0))return null;\n", ''],
   recu_zero:       ['src/App.jsx', "  if (!(r.valeur > 0)) return { valeur: null, partiel: false, manque, raison: 'aDater', nAd };", ''],
   statut_deux:     ['src/App.jsx', "P.etat === 'aucune' || P.etat === 'statut') return null;", "P.etat === 'aucune') return null;"],
-  date_surtitre:   ['src/App.jsx', '<ScreenHead icon="euro" title={L.compta} desc=', '<ScreenHead icon="euro" title={L.compta} date="Novembre 2026" desc='],
+  // (11 nov.) l'en-tête s'appelle « Argent » depuis la fusion Statistiques + Compta (da3446a4) : même règle, pas de date en surtitre
+  date_surtitre:   ['src/App.jsx', '<ScreenHead icon="euro" title={L.argent} phrase="compta" ', '<ScreenHead icon="euro" title={L.argent} phrase="compta" date="Novembre 2026" '],
   survol_colle:    ['src/styles-statut.css', '@media (hover: hover) and (pointer: fine) {\n  .vrm-statut-option:hover', '@media all {\n  .vrm-statut-option:hover'],
 };
 
@@ -135,7 +136,7 @@ async function verifier(mutation) {
   const profil = extraire(app, 'function ProfilFiscalCarte(', '\n// ── FACTURATION ÉLECTRONIQUE');
   dit(!!profil && !/data-regime-choix/.test(profil) && !/save\('vinted_regime'/.test(profil), 'R « Ton entreprise » ne choisit plus le régime');
   const pro = extraire(app, 'function ComptaPro(', '\n/* ── Comptabilité (onglet dédié');
-  dit(!!pro && /<ScreenHead icon="euro" title=\{L\.compta\}/.test(pro) && !/<ScreenHead icon="euro"[^>]*\bdate=/.test(pro), 'R « Compta » sans date en surtitre');
+  dit(!!pro && /<ScreenHead icon="euro" title=\{L\.(compta|argent)\}/.test(pro) && !/<ScreenHead icon="euro"[^>]*\bdate=/.test(pro), 'R « Compta » sans date en surtitre');
   // ── C. le survol ──
   const css = texte('src/styles-statut.css', mutation);
   const horsMedia = css.replace(/@media \(hover: hover\)[^{]*\{[\s\S]*?\n\}/g, '');
