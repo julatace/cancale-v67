@@ -567,6 +567,7 @@ import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, re
 import { ImportStockReglage } from "./composants/ImportStock.jsx";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
+import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "./grosLot.js";
 import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
@@ -16095,6 +16096,89 @@ async function dupliquerNumero(rn, extra) {
   emettreClesRelues(['vinted_used_numeros', 'vrm_fiches_neuves']);
   return { ok: true, numero: r.fiche.numero, id: r.id, fiche: r.fiche };
 }
+// (11 nov., lot gros-lot) TOUS les N° déjà servis (pool, fiches, ventes corrigées, Leboncoin, fiches
+// neuves, hors écran, réservés relus en base) — la même liste que « Dupliquer ». null = pas su.
+async function numerosServisRelus() {
+  if (!numerotationPermise() || !isCloudReady()) return null;
+  if (!(await assurerVersionNumerotation())) return null;
+  let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
+  if (!Array.isArray(jr)) return null;
+  const pris = new Set(), prisK = new Set();
+  const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
+  (load('vinted_used_numeros', []) || []).forEach(add);
+  Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
+  (load('vinted_offvinted_buys', []) || []).forEach((b) => add(b && b.numero));
+  ajouterNumerosHorsEcran(pris, prisK);
+  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+  return { int: pris, cles: prisK };
+}
+// L'APERÇU des N° d'un lot (le formulaire, avant « Ajouter ») : la suite après le plus haut connu ICI,
+// sans rien réserver. La coque relit tout à « Ajouter » ; si la suite a bougé, rien n'est écrit et c'est dit.
+function apercuNumerosLot(n) {
+  if (numeroEcritActif() || !numerotationPermise()) return null;
+  const pris = new Set(), prisK = new Set();
+  const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
+  (load('vinted_used_numeros', []) || []).forEach(add);
+  Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  (load('vinted_offvinted_buys', []) || []).forEach((b) => add(b && b.numero));
+  ajouterNumerosHorsEcran(pris, prisK);
+  try { return numerosDuLot(n, { pris: { int: pris, cles: prisK }, pref: prefixeNumeros(), prochainLibre, cleNum }); } catch (_) { return null; }
+}
+// Une photo d'article du lot : SA ligne (jamais `main`, §4.4), vidée par « Annuler ».
+const ecrirePhotoLot = async (id, b64) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id: PREFIXE_PHOTO_LOT + String(id).replace(/[^\w-]/g, ''), data: b64 ? { b64, at: new Date().toISOString() } : { b64: null, supprime: true, at: new Date().toISOString() } })]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+};
+// « Ajouter le lot » : la répartition REJOUÉE (la même règle que l'écran), les N° relus en base et
+// consécutifs (ou tapés et vérifiés), le pool d'abord (append-only, gardé même après « Annuler »),
+// les photos dans leurs lignes, puis UN geste annulable 5 s : l'achat (une ligne), les N fiches, les N coûts.
+// Rend { ok, id, numeros } ou { ok:false, raison, erreurs? }. Rien n'est écrit sur un refus.
+async function creerGrosLot(d, setters = {}) {
+  const articles = Array.isArray(d && d.articles) ? d.articles : [];
+  const n = articles.length;
+  const rep = repartirGrosLot({ total: d.total, frais: d.frais, n, mode: d.mode, visees: articles.map((a) => centimesLotTapes(a.visee)), manuels: articles.map((a) => centimesLotTapes(a.main)) });
+  if (!rep.ok) return { ok: false, raison: 'repartition' };
+  const pris = await numerosServisRelus();
+  if (!pris) return { ok: false, raison: 'lecture' };
+  let numeros;
+  if (numeroEcritActif()) {
+    const v = verifierNumerosTapes(articles.map((a) => a.numero), { pris: pris.cles, archive: archiveNumeros(), cleNum });
+    if (!v.ok) return { ok: false, raison: 'numeros', erreurs: v.erreurs };
+    numeros = articles.map((a) => cleNum(a.numero));
+  } else {
+    try { numeros = numerosDuLot(n, { pris, pref: prefixeNumeros(), prochainLibre, cleNum }); } catch (_) { return { ok: false, raison: 'lecture' }; }
+    // L'aperçu montré n'est plus le bon (un autre appareil a pris des N°) : il le revoit avant d'écrire.
+    if (Array.isArray(d.apercu) && d.apercu.join(',') !== numeros.join(',')) return { ok: false, raison: 'decale' };
+  }
+  const lotId = 'ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const ids = numeros.map((_, i) => 'n' + Date.now().toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5));
+  const photosOk = await Promise.all(articles.map((a, i) => (a.photo ? ecrirePhotoLot(ids[i], a.photo) : Promise.resolve(false))));
+  let plan;
+  try {
+    plan = planGrosLot({ lotId, titre: d.titre, date: d.date, source: d.source, ref: d.ref, total: d.total, frais: d.frais, mode: d.mode,
+      articles: articles.map((a, i) => ({ titre: a.titre, taille: a.taille, visee: centimesLotTapes(a.visee), photo: !!photosOk[i] })), numeros, repartition: rep, ids });
+  } catch (_) { return { ok: false, raison: 'lecture' }; }
+  // Le pool d'abord : ces N° ont pu être écrits sur les cartons pendant la saisie (§5).
+  const pool = (load('vinted_used_numeros', []) || []).slice();
+  for (const x of numeros) { const ep = entreePool(x); if (ep != null && !pool.some((y) => cleNum(y) === cleNum(ep))) pool.push(ep); }
+  save('vinted_used_numeros', pool.sort(triPool));
+  emettreClesRelues(['vinted_used_numeros']);
+  const texte = tr('groslot.ajoute', { de: numeros[0], a: numeros[numeros.length - 1] });
+  gesteMorceaux(texte, morceauxGrosLot(plan), setters, (sens) => {
+    if (sens === 'avant') ids.forEach((id, i) => { if (photosOk[i]) ecrirePhotoLot(id, null); });
+  });
+  return { ok: true, id: lotId, numeros };
+}
 // ⟦→ ecrans/Loupe.jsx #1⟧
 // (26 oct.) Le titre de la barre du haut (téléphone), posé par la coque à chaque
 // rendu : un grand titre d'écran IDENTIQUE se tait sur téléphone (§7, un mot écrit
@@ -31051,15 +31135,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const items = [...lotSel].map(id => (listings.items||[]).find(x=>x.id===id)).filter(Boolean);
     const total = eur(lotTotal); const n = items.length;
     if (!n || total<=0) return {};
-    const out = {}; let acc = 0;
-    const sumPrice = items.reduce((s,x)=>s+(Number(x.price)||0),0);
-    const usePrice = lotMode==='price' && sumPrice>0;
-    items.forEach((x,i)=>{
-      let sh = i===n-1 ? +(total-acc).toFixed(2)
-             : usePrice ? +((total*(Number(x.price)||0)/sumPrice)).toFixed(2)
-             : Math.floor((total/n)*100)/100;
-      acc = +(acc+sh).toFixed(2); out[x.id] = sh;
-    });
+    // (11 nov., lot gros-lot) La règle du centime partagée (src/grosLot.js → venteLot.js, plus grand reste) :
+    // l'ancienne arrondissait chaque part et faisait absorber tout l'écart par le dernier article.
+    if (n < 2) return n === 1 ? { [items[0].id]: total } : {};
+    const cents = (p) => { const c = centimesLotTapes(String(p && typeof p === 'object' ? p.amount : p ?? '')); return Number.isSafeInteger(c) ? c : null; };
+    const usePrice = lotMode==='price' && items.every((x)=>cents(x.price)>0);
+    const r = repartirGrosLot({ total: Math.round(total*100), n, mode: usePrice ? 'revente' : 'egal', visees: items.map((x)=>cents(x.price)) });
+    const out = {}; if (r.ok) items.forEach((x,i)=>{ out[x.id] = r.parts[i]/100; });
     return out;
   };
   const applyLot = () => {
@@ -45406,7 +45488,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
-          prochainNumero={nextNumero} onReserverNumero={recordUsed} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
+          prochainNumero={nextNumero} onReserverNumero={recordUsed}
+          lot={{ creer: (d) => creerGrosLot(d, { vinted_offvinted_buys: setOffBuys, vinted_buyprice_by_num: setBuyByNum }), moiMeme: numeroEcritActif(), apercu: apercuNumerosLot, cleNum }} stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
           chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
           onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
