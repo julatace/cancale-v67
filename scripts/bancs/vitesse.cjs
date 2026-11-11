@@ -133,7 +133,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   if (opts.rendus) await pg.addInitScript(crochetRendus, opts.rendus);
   if (opts.initScript) await pg.addInitScript(opts.initScript);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  if (vp.width < 600 && (CPU > 1 || RESEAU)) { const cdp = await ctx.newCDPSession(pg); if (CPU > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); if (RESEAU) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', RESEAU); } }
+  // (11 nov.) `opts.cpu` : le ralentissement de CETTE ouverture (budget-vitesse relève à ×1 et ×4).
+  const cpu = opts.cpu != null ? opts.cpu : CPU;
+  if (vp.width < 600 && (cpu > 1 || RESEAU)) { const cdp = await ctx.newCDPSession(pg); if (cpu > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu }); if (RESEAU) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', RESEAU); } }
   servis = [];
   const req = [];
   let fige = false;   // après la mesure d'ouverture : les lectures du signal ne comptent pas dans le bilan

@@ -27,7 +27,7 @@
 //  RELEVER UN BUDGET VOLONTAIREMENT (un écran lit plus parce qu'il montre plus) :
 //    BUDGET_RELEVER=1 BUDGET_RAISON="Messages lit les avis (lot X)" \
 //      node scripts/bancs/budget-vitesse.cjs [écran…]
-//  ⇒ 3 passages, le plus haut de chaque mesure + la marge, réécrits dans le .json
+//  ⇒ 4 passages (2 processeur ×1, 2 ×4), le plus haut de chaque mesure + la marge, réécrits dans le .json
 //  (seulement les écrans nommés, ou tous), la raison et la date notées dans
 //  `releves`. Puis UN commit qui ne touche que le .json, message « budget-vitesse :
 //  relever <écran> — <raison> ». Un budget qui monte sans commit justifié est un
@@ -155,14 +155,18 @@ const ESSAIS = Number(process.env.BUDGET_ESSAIS) || 3;
   const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
   const brut = {};
   try {
-    const passages = RELEVER ? 3 : 1;
+    // Le relevé couvre le processeur RAPIDE et LENT : 2 passages à ×1, 2 à ×4. Les adresses
+    // lues en double selon le temps processeur (le partage de 2 s) sont ainsi toutes connues
+    // et permises à leur plus haut ; le contrôle, lui, tourne à ×1.
+    const CPUS = RELEVER ? [1, 1, 4, 4] : [Number(process.env.VITESSE_CPU) || 1];
+    const passages = CPUS.length;
     for (const [tab, nom, attendre] of ECRANS) {
       if (seuls && !seuls.includes(tab)) continue;
       const series = { neuf: [], deuxieme: [] }, erreurs = { neuf: [], deuxieme: [] }, affiche = { neuf: false, deuxieme: false };
       let essai = 0, verdicts = [];
       for (;;) {
         for (let p = 0; p < passages; p++) {
-          const r = await V.ouvrir(b, { width: 390, height: 844 }, tab, attendre, null, { memoire: false, deuxieme: true, fenetre: FENETRE, ...(MUTATION === 'doublon' ? { initScript: mutationDoublon } : {}) });
+          const r = await V.ouvrir(b, { width: 390, height: 844 }, tab, attendre, null, { cpu: CPUS[p], memoire: false, deuxieme: true, fenetre: FENETRE, ...(MUTATION === 'doublon' ? { initScript: mutationDoublon } : {}) });
           for (const [cle, rr] of [['neuf', r], ['deuxieme', r.deuxieme]]) {
             if (!rr) { erreurs[cle].push('pas mesuré'); continue; }
             if (rr.errs.length) erreurs[cle].push(...rr.errs);
