@@ -94,5 +94,29 @@ surtout PRATIQUE ».
   est lu aussi par `visibiliteCarte` / `nCartesCachees`, qui partent de `caseJourneeMontree`).
 - `scripts/bancs/journee-perso.cjs` (neuf).
 
+### Une carte fixe : les chiffres du mois
+Vu sur les captures : sur Ma journée, les cases du mois sont TOUJOURS posées sous la carte sombre (la
+grille des widgets, `styles-widgets-ios.css`, `grid-row: 31`). Les déplacer dans la tête ne changeait rien
+à l'écran : « Les chiffres du mois » est donc `fixe` (un interrupteur, pas de poignée) ; les trois autres
+cartes du haut se rangent entre elles (`ordreMobile`).
+
 ## Preuves
-Voir la fin de ce fichier (complétée en fin de session).
+- `npm run build` vert.
+- Audits verts : variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets,
+  vendeurs-differents (14/14 mutations), journee-coherence (30), boutons ; **journee-perso** (nouveau) :
+  vert, **20/20 mutations rouges**, et **15 rouges sur `origin/main`** (arbre extrait par `git archive`).
+  `audit-violet` : 3 rouges (logos FedEx / Relais Colis), les mêmes sur `origin/main`.
+- **Banc `journee-perso`** (390 tactile et 1512, clair et sombre, + Paramètres) : **99 verts, 0 rouge**.
+  Sur la construction de `origin/main` (ed0529c) : 0 vert, 9 rouges. Mutation de données
+  (`JP_MUTATION=1`, le colis n'est plus en retard) : 8 rouges (U), comme attendu.
+  Deux faux rouges du banc corrigés en route (pas de l'app) : le doigt posé hors de la vue touchait
+  `<html>` ; la base du banc est « non cloisonnée », l'app n'y écrit jamais `main` ⇒ la synchro se juge
+  sur la file d'envoi (`vrm_file_envoi`), le sens nuage → appareil par U. Deux vrais défauts trouvés et
+  corrigés : compteurs cachés absents quand tout ce qui reste est caché ; `touch-action: manipulation`
+  global (hors couche) qui volait le glisser au doigt (posé en ligne sur la poignée).
+- Bancs voisins sur cette construction : `journee-v2` 4 rouges (P « la pile ouvre Ventes ») et
+  `vendeurs-differents` 6 rouges (A5/A6 navigation) — **les mêmes, en même nombre, sur `origin/main`**.
+- Captures regardées (scratchpad du banc, `/tmp/banc-journee-perso/`) : l'éditeur clair/sombre 390/1512,
+  Ma journée modifiée (« Rien à faire dans tes cartes affichées · 1 geste dans les cartes cachées »,
+  « 1 carte cachée »), « Affichée car urgent » en ambre en tête de « Ensuite », juste après l'alerte.
+- Aucune écriture en base réelle ; aucune PR, aucun merge dans `main`.
