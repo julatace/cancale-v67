@@ -18,7 +18,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { PAS_SU, VERBES } from '../libelles.js';
-import { tr } from '../i18n/index.js';
 
 export function EtatPanne({ quoi, raison, onReessayer, compact = false, className = '', ...rest }) {
   const [occupe, setOccupe] = React.useState(false);

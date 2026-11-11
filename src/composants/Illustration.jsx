@@ -10,7 +10,6 @@
 // Les noms d'icônes de l'app y mènent (`depuisIcone`), un nom inconnu ⇒ la basket.
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { tr } from '../i18n/index.js';
 
 const T = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round' };
 const A = { fill: 'var(--vrm-card2, #F2F2F7)' };
