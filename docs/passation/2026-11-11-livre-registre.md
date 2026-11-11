@@ -110,7 +110,8 @@ Le mot « conforme » n'est jamais écrit (audit M8).
   plateforme, mode ignoré en gros, espèces mal dites) ; audits qui copient `registres.js` /
   `fournisseurs.js` mis à jour (registres 64, livre-police 34, achats-export 58,
   achats-sourcing 32, fournisseurs 52, export-zip 31, mois-boucle 53) ; banc `livre-registre`
-  étendu (fiche de l'achat : mode relu, changé, rangé ; capture `paye-en-*`).
+  **56 verts** (fiche de l'achat : mode relu, changé, rangé ; cinq choix de 44 px ; capture
+  `paye-en-*` 390/1512 regardée).
 - Le choix « Ouvrir le mode de paiement manquant » d'un achat Vinted ne se pose pas : le
   paiement passe par Vinted (« Paiement via Vinted »).
 
