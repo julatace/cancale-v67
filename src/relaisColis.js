@@ -39,24 +39,29 @@ export const cpDe = (s) => { const m = /\b(\d{5})\b/.exec(String(s || '')); retu
 //     quand l'e-mail ne donne que « 40 RUE DU PORT 35260 CANCALE » (« Cancale »).
 // Le nom propre est rendu, ou '' : un point sans nom reste un point (son
 // adresse le désigne), jamais un nom inventé.
-const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?(?:\s+vinted\s*go)?|casier|vinted\s*go|mondial\s+relay|relais\s+colis|chronopost(?:\s+pick-?up)?)\b\s*[:,\-–]?\s*/i;
+const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?(?:\s+vinted\s*go)?|casier|vinted\s*go|mondial\s+relay|relais\s+colis|chrono\s*relais|relais\s+shop2shop|chronopost(?:\s+pick-?up)?)\b\s*[:,\-–]?\s*/i;
 // (1er nov., « plus fiable ») Le TYPE peut aussi venir EN QUEUE : « Kusmi Tea -
 // Consigne Vinted Go », « TABAVAP (Point Relais) ». Il est retiré de la même façon.
 const TYPE_EN_QUEUE = /\s*(?:[,\-–(]\s*)(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up)?|locker(?:\s+vinted\s*go)?|vinted\s*go)\s*\)?\s*$/i;
 const PAS_UN_POINT = /^(?:mondialrelay|chronopost|chronopostpickup|vinted|vintedgo|relaiscolis|laposte|colissimo|pickup|relaispickup|ups|dpd|gls|inpost|pointrelais|pointderetrait|consigne|consignevintedgo|consignepickup|locker|casier|lieunonindique)$/;
+// (11 nov., retraits fiables) « un UPS Access Point », « votre relais Shop2Shop » : que des articles,
+// des types de lieu et des noms de réseau ⇒ aucun nom (la même liste qu'api/_lib/retrait-colis.js,
+// `lieuGenerique` ; ce module reste sans import).
+const MOTS_TYPE = new Set(['votre', 'vos', 'ton', 'ta', 'un', 'une', 'le', 'la', 'les', 'l', 'au', 'aux', 'en', 'dans', 'du', 'de', 'des', 'd', 'point', 'points', 'relais', 'retrait', 'pickup', 'pick', 'up', 'consigne', 'locker', 'casier', 'automatique', 'colis', 'bureau', 'poste', 'station', 'mondial', 'relay', 'inpost', 'chronopost', 'shop2shop', 'vinted', 'go', 'colissimo', 'laposte', 'dpd', 'ups', 'access', 'gls', 'parcelshop', 'dhl', 'servicepoint', '24', '7']);
+const queDesMotsDeType = (s) => { const w = String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’']/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean); return w.length > 0 && w.every((x) => MOTS_TYPE.has(x)); };
 export function nomRelaisPropre(nom, ville = '') {
   let s = String(nom || '').replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
   for (let i = 0; i < 2; i++) {
     const m = TYPE_EN_TETE.exec(s);
     if (!m) break;
     const reste = s.slice(m[0].length).trim();
-    if (!reste) break;
+    if (!reste) { s = ''; break; }   // (11 nov.) le TYPE seul (« Point relais », « votre Relais Pickup ») n'est pas un nom
     s = reste;
   }
   { const q = TYPE_EN_QUEUE.exec(s); if (q && s.slice(0, q.index).trim()) s = s.slice(0, q.index).trim(); }
   s = s.replace(/^[\s,;:\-–]+|[\s,;:\-–]+$/g, '').trim();
   const n = normNomRelais(s);
-  if (!n || n.replace(/[0-9]/g, '').length < 2 || PAS_UN_POINT.test(n)) return '';
+  if (!n || n.replace(/[0-9]/g, '').length < 2 || PAS_UN_POINT.test(n) || queDesMotsDeType(s)) return '';
   if (ville && n === normNomRelais(ville)) return '';
   // « le Narval » (l'article mis en minuscule par la mise en forme du lieu) : la
   // première lettre d'un nom reste une majuscule.
@@ -154,9 +159,21 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     const nom = nom0 && /^Casier(?: 24\/7)?$/.test(String(x.lieuType || '')) ? `${x.lieuType} ${nom0}` : nom0;
     // L'identité d'un LIEU : son nom propre + son code postal ; sans nom, sa rue
     // + son code postal (une adresse est un endroit) ; sans rien, « pas connu ».
-    const cle = nom ? normNomRelais(nom) + '|' + cp : (rueOk && cp ? 'adr:' + normNomRelais(rueOk) + '|' + cp : CLE_INCONNU);
+    // (11 nov., retraits fiables — Julien : « là tu me regroupes tout à Super U ») LA RUE FAIT PARTIE DE
+    // L'IDENTITÉ quand elle est lue : deux « Super U » au même code postal, à deux rues, sont deux points
+    // (avant : un seul, nom + code postal). Un lieu SANS code postal, SANS rue et SANS ville (le nom
+    // seul, « Locker 24/7 Super U ») ne désigne pas UN endroit : il reste SEUL sur sa carte (« adresse
+    // pas lue »), jamais rangé avec un autre colis du même nom — c'est ce qui mettait sous un même
+    // « Super U » des colis de plusieurs villes. Un nom qui n'est que le type de lieu (« votre Relais
+    // Pickup ») n'est pas un nom.
+    const rueCle = rueOk ? normRue(rueOk) : '';
+    const villeLue = String(morceaux.ville || '').trim();
+    const nomSeul = !!nom && !cp && !rueCle && !villeLue;
+    const cle = nom
+      ? (nomSeul ? `seul:${normNomRelais(nom)}:${idc || points.size}` : normNomRelais(nom) + '|' + cp + '|' + rueCle + (cp ? '' : '|' + normNomRelais(villeLue)))
+      : (rueOk && cp ? 'adr:' + normNomRelais(rueOk) + '|' + cp : CLE_INCONNU);
     const inconnu = cle === CLE_INCONNU;
-    const p = points.get(cle) || { cle, nom: inconnu ? '' : nom, nomConnu: !!nom, inconnu, rue: '', cp, ville: '', transporteurs: [], arrives: [], attendus: [] };
+    const p = points.get(cle) || { cle, nom: inconnu ? '' : nom, nomConnu: !!nom, inconnu, adressePasLue: nomSeul, rue: '', cp, ville: '', transporteurs: [], arrives: [], attendus: [] };
     if (!inconnu) { p.rue = p.rue || rueOk || ''; p.ville = p.ville || morceaux.ville || ''; }
     if (x.transporteur && !p.transporteurs.includes(x.transporteur)) p.transporteurs.push(x.transporteur);
     const reste = { ...x };
@@ -168,25 +185,19 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
   };
   for (const x of arrives) poser(x, 'arrive');
   for (const x of attendus) poser(x, 'attendu');
-  // Un lieu SANS code postal rejoint le point du même nom s'il est le SEUL à le
-  // porter — ou le seul de ce nom dans SA ville, ou à SA rue (une identité de
-  // plus, jamais une ressemblance). « Speed Queen - Vannes » (consigne Vinted Go,
-  // sans code postal) est « Speed Queen » à Vannes.
+  // (11 nov., retraits fiables) LES ÉCRITURES D'UN MÊME ENDROIT SE REJOIGNENT PAR SON ADRESSE, JAMAIS PAR
+  // SON NOM SEUL : (a) même nom + même code postal, l'un sans rue lue ⇒ il rejoint le point de ce nom et de
+  // ce code postal s'il est le SEUL (sinon il reste à part : on ne choisit pas) ; (b) sans code postal ⇒
+  // il ne rejoint qu'un point de même nom, à la MÊME rue ET dans la MÊME ville (une adresse). Avant : « le
+  // seul point de ce nom », même sans rue ni ville — un « Super U » sans adresse partait chez le seul
+  // Super U connu, dans une autre ville.
   const nomDe = (cle) => cle.split('|')[0];
   for (const [cle, p] of [...points.entries()]) {
-    if (p.cp || p.inconnu || cle.startsWith('adr:')) continue;
-    const autres = [...points.values()].filter((q) => q !== p && q.cp && !q.inconnu && !q.cle.startsWith('adr:'));
-    // (3 nov.) Jamais dans une AUTRE ville, jamais à une AUTRE rue : quand le lieu les donne, ils
-    // doivent être ceux du point rejoint (avant : « le seul autre point du même nom », même ailleurs).
-    let memes = autres.filter((q) => nomDe(q.cle) === nomDe(cle)
-      && (!p.ville || !q.ville || normNomRelais(q.ville) === normNomRelais(p.ville))
-      && (!p.rue || !q.rue || normRue(q.rue) === normRue(p.rue)));
-    if (memes.length > 1 && p.ville) memes = memes.filter((q) => normNomRelais(q.ville) === normNomRelais(p.ville));
-    if (memes.length > 1 && p.rue) memes = memes.filter((q) => normNomRelais(q.rue) === normNomRelais(p.rue));
-    if (!memes.length) {
-      const tiret = /^(.*?)\s+[-–]\s+(.{2,40})$/.exec(p.nom);
-      if (tiret) memes = autres.filter((q) => nomDe(q.cle) === normNomRelais(tiret[1]) && normNomRelais(q.ville) === normNomRelais(tiret[2]));
-    }
+    if (p.inconnu || p.adressePasLue || cle.startsWith('adr:')) continue;
+    const autres = [...points.values()].filter((q) => q !== p && !q.inconnu && !q.adressePasLue && !q.cle.startsWith('adr:') && nomDe(q.cle) === nomDe(cle));
+    let memes = [];
+    if (p.cp && !p.rue) memes = autres.filter((q) => q.cp === p.cp && q.rue);
+    else if (!p.cp && p.rue && p.ville) memes = autres.filter((q) => q.rue && normRue(q.rue) === normRue(p.rue) && q.ville && normNomRelais(q.ville) === normNomRelais(p.ville) && (q.cp || q !== p));
     if (memes.length !== 1) continue;
     const q = memes[0];
     q.arrives.push(...p.arrives); q.attendus.push(...p.attendus);
