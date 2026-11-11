@@ -101,7 +101,9 @@ const hauteur = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const capture = async (pg, nom) => { if (!CAPTURES) return; try { await pg.screenshot({ path: path.join(CAPTURES, nom + '.png'), fullPage: false }); } catch (_) {} };
 const ECRANS = [['journee', '?tab=journee'], ['colis', '?tab=cat_bord'], ['settings', '?tab=settings']];
-const ecritsUtiles = (ecrits) => ecrits.filter((e) => !/^(ext_|vrm_vu_|vrm_presence|vrm_lecture|perf_|vrm_session)/.test(e.id));
+// L'app publie d'elle-même au chargement (widget, comptes reliés, « à retirer », `main`) : hors de ça,
+// et sans aucune clé d'aide dans `main`, rien n'a été écrit par l'aide.
+const ecritsUtiles = (ecrits) => ecrits.filter((e) => !/^(ext_|vrm_vu|vrm_presence|vrm_lecture|perf_|vrm_session|widget_stats$|vrm_comptes_relies$|lbc_a_retirer$|main$)/.test(e.id) || (e.id === 'main' && Object.keys(e.data || {}).some((k) => /aide/i.test(k))));
 
 async function main() {
   let b;

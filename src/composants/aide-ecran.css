@@ -60,7 +60,8 @@
 
 /* ── L'animation : une maquette SVG, jetons seulement (clair et sombre) ── */
 .vrm-aa { position: relative; margin: 4px 0 12px; padding: 0; border-radius: 18px; background: var(--vrm-card2, #F2F2F7); overflow: hidden; }
-.vrm-aa svg { display: block; width: 100%; height: auto; max-height: 220px; }
+.vrm-aa > svg { display: block; width: 100%; height: auto; max-height: 220px; }
+.vrm-aa-pause svg { display: block; width: 14px; height: 14px; }
 .vrm-aa-ecran { fill: var(--vrm-surface, #fff); stroke: var(--vrm-line, rgba(60,60,67,.18)); stroke-width: 1; }
 .vrm-aa-fond { fill: var(--vrm-card2, #F2F2F7); }
 .vrm-aa-cadre .vrm-aa-fond { fill: var(--vrm-bg, #F5F5F7); }
