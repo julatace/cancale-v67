@@ -148,6 +148,9 @@ async function passe(b, { nom, largeur, hauteur, mobile, sombre }) {
   for (const p of passes) {
     if (p === '390') await passe(b, { nom: '390', largeur: 390, hauteur: 844, mobile: true, sombre: false });
     if (p === '1512') await passe(b, { nom: '1512', largeur: 1512, hauteur: 945, mobile: false, sombre: true });
+    // PASSES=390s,1512c : les mêmes contrôles, thèmes inversés (captures).
+    if (p === '390s') await passe(b, { nom: '390s', largeur: 390, hauteur: 844, mobile: true, sombre: true });
+    if (p === '1512c') await passe(b, { nom: '1512c', largeur: 1512, hauteur: 945, mobile: false, sombre: false });
   }
   await b.close(); srv.close();
   console.log(`\n${verts} verts, ${rouges} rouges`);

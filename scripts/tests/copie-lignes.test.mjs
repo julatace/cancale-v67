@@ -114,3 +114,10 @@ test('versionDe : scalaires seulement, vides égaux', () => {
   assert.notEqual(versionDe({ updated_at: 't', rev: '1' }), versionDe({ updated_at: 't', rev: '2' }));
   assert.notEqual(versionDe({ updated_at: 't', sup: 'true' }), versionDe({ updated_at: 't' }));
 });
+
+test('relecture qui ne rend pas une ligne que les versions disent exister : incohérent, rien deviné ni gardé', async () => {
+  const srv = serveur([ligne('a', 1, 'A'), ligne('b', 4, 'B')]); const st = stockageMemoire();
+  srv.lireLignes = async () => [];          // un serveur qui ne comprend pas `in.(…)`
+  const r = await lire(srv, st);
+  assert.equal(r.ok, false); assert.equal(r.incoherent, true); assert.equal(st.m.size, 0);
+});

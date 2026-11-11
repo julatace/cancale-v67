@@ -2367,6 +2367,7 @@ const prechargerDemarrage = () => {
           const r = await lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids, stockage: stockageApp(), local: localStorage,
             lireVersions: memo ? (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null) : async () => versMotif,
             lireLignes: lireCommandes });
+          if (r.incoherent) return lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
           return r.ok ? r.rows : null;
         })()
       : lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }))
@@ -5186,7 +5187,7 @@ const _groupeMoisson = creerLectureGroupee(async (ids, cle) => {
   if (uidCopie) {
     const lire = async (sel, l) => { try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${l.join(',')})&select=${sel}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}), cache: 'no-store' }); if (!res.ok) return null; const j = await res.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
     const r = await lireAvecCopie({ uid: uidCopie, famille, ids, stockage: stockageApp(), local: localStorage, lireVersions: (l) => lire(SEL_VERSION, l), lireLignes: (l) => lire(SEL_MOISSON, l) });
-    return r.ok ? { ok: true, rows: r.rows } : { ok: false, statut: 0 };
+    return r.ok ? { ok: true, rows: r.rows } : { ok: false, statut: r.incoherent ? 400 : 0 };
   }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });

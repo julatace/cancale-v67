@@ -199,6 +199,10 @@ export async function lireAvecCopie({ uid, famille, ids, lireVersions, lireLigne
     frais = r;
   }
   const parId = new Map(frais.filter((x) => x && x.id != null).map((x) => [String(x.id), x]));
+  // Des lignes que les versions disent exister et que la relecture ne rend pas : la
+  // réponse ne se comprend pas (un serveur qui ignore `in.(…)` rend `[]`, §4.1) ⇒ on
+  // ne devine pas, l'appelant relit comme avant (`incoherent`). Rien n'est gardé.
+  if (aRelire.some((id) => !parId.has(id))) return { ok: false, incoherent: true };
   const rows = [];
   for (const id of tous) {
     if (!v.has(id)) { if (parId.has(id)) rows.push(parId.get(id)); continue; }
@@ -207,9 +211,8 @@ export async function lireAvecCopie({ uid, famille, ids, lireVersions, lireLigne
   }
   // Ranger : seulement une ligne relue dont la version a été lue AVANT elle.
   const aGarder = aRelire.filter((id) => parId.has(id) && gardable(parId.get(id))).map((id) => ({ id, v: v.get(id), row: parId.get(id) }));
-  const sansLigne = aRelire.filter((id) => !parId.has(id));
   try { if (aGarder.length) await stockage.ecrire(uid, famille, aGarder); } catch (_) {}
-  try { if (disparues.length || sansLigne.length) await stockage.retirer(uid, famille, [...disparues, ...sansLigne]); } catch (_) {}
+  try { if (disparues.length) await stockage.retirer(uid, famille, disparues); } catch (_) {}
   noterRelu(tous);
   if (local) noterVu(local, uid, maintenant());
   return { ok: true, rows, telecharges: aRelire, depuisCopie: tous.filter((id) => v.has(id) && !aRelire.includes(id)) };
