@@ -147,7 +147,8 @@ if (MUTATION && !M) { console.log('❌ mutation inconnue : ' + MUTATION); proces
 
 // ── LES SOURCES (éventuellement mutées) ─────────────────────────────────────
 let APP = require("./_source-app.cjs").sourceAppDe(path.join(RACINE, 'src/App.jsx'));
-let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8');
+let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8')
+  .replace("'./fetch-delai.js'", JSON.stringify(require('url').pathToFileURL(path.join(RACINE, 'api/_lib/fetch-delai.js')).href));   // (11 nov.) la copie importe le vrai fetch à délai
 let ROUTE = fs.readFileSync(path.join(RACINE, 'api/email-inbound.js'), 'utf8');
 let EXT = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');
 try { if (M && M.app) APP = M.app(APP); if (M && M.lib) LIB = M.lib(LIB); if (M && M.route) ROUTE = M.route(ROUTE); if (M && M.ext) EXT = M.ext(EXT); }

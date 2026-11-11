@@ -60,6 +60,7 @@ import { sbCle } from './cle.js';
 import { baseCloisonnee } from './session.js';
 import { lireDonnee, modifierDonnee } from './ebay.js';
 import { coffrePret as coffrePretCommun, chiffrerCoffre, dechiffrerCoffre } from './coffre.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 export const SUPERPDP_API = 'https://api.superpdp.tech';
@@ -88,7 +89,7 @@ export const dechiffrer = (owner, s) => dechiffrerCoffre('superpdp-v1', owner, s
 export async function lireConnexion(owner) {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${ID_CLE}&owner=eq.${encodeURIComponent(owner)}&select=env:data->>env,depuis:data->>depuis,chiffre:data->>chiffre`, { headers: { ...sbCle(sbKey()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${ID_CLE}&owner=eq.${encodeURIComponent(owner)}&select=env:data->>env,depuis:data->>depuis,chiffre:data->>chiffre`, { headers: { ...sbCle(sbKey()) } });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -101,7 +102,7 @@ async function rangerConnexion(owner, env, cred) {
   const chiffre = chiffrer(owner, cred);
   if (!chiffre) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id: ID_CLE, data: { v: 1, env, depuis: new Date().toISOString(), chiffre } }]),
@@ -111,7 +112,7 @@ async function rangerConnexion(owner, env, cred) {
 }
 async function effacerConnexion(owner) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${ID_CLE}&owner=eq.${encodeURIComponent(owner)}`, { method: 'DELETE', headers: { ...sbCle(sbKey()), Prefer: 'return=minimal' } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${ID_CLE}&owner=eq.${encodeURIComponent(owner)}`, { method: 'DELETE', headers: { ...sbCle(sbKey()), Prefer: 'return=minimal' } });
     return r.ok;
   } catch (_) { return false; }
 }
@@ -138,7 +139,7 @@ export const oublierJetons = () => jetons.clear();
 async function avecDelai(url, opts) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), DELAI_MS);
-  try { return await fetch(url, { ...opts, signal: ctrl.signal }); } finally { clearTimeout(t); }
+  try { return await fetchAvecDelai(url, { ...opts, signal: ctrl.signal }); } finally { clearTimeout(t); }
 }
 // `{ok, token}` · `{ok:false, refuse:true, raison}` (identifiants refusés) ·
 // `{ok:false, refuse:false}` (pas de réponse : on ne sait pas).

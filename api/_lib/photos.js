@@ -1,4 +1,5 @@
 // Secours des photos publiques des places de marché, sans transmettre la session VRM.
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 const TYPES = new Set(['image/jpeg','image/png','image/webp','image/avif','image/gif']);
 const MAX_OCTETS = 6 * 1024 * 1024;
 export function urlPhotoAdmise(value) {
@@ -11,7 +12,7 @@ export function urlPhotoAdmise(value) {
     return u.href;
   } catch (_) { return null; }
 }
-export async function lirePhoto(value, fetchPhoto = fetch) {
+export async function lirePhoto(value, fetchPhoto = fetchAvecDelai) {
   let url = urlPhotoAdmise(value);
   if (!url) return {status:400};
   const controle = new AbortController();

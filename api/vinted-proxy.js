@@ -26,6 +26,7 @@
 import './_lib/sans-bruit.js';
 import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur } from './_lib/session.js';
 import { prendrePlaceServeur } from './_lib/frein-relais-serveur.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 // ⚠️⚠️ 4 OCTOBRE — CE PROXY ÉTAIT UN RELAIS OUVERT. N'importe qui pouvait lui
 // envoyer un jeton Vinted (volé ou non) et n'importe quelle adresse Vinted,
@@ -114,7 +115,7 @@ function readSetCookie(resHeaders, name) {
 async function refreshTokens({ siteHost, token, refreshToken, anonId, csrfToken }) {
   if (!refreshToken) return null;
   try {
-    const res = await fetch(`https://${siteHost}/web/api/auth/refresh`, {
+    const res = await fetchAvecDelai(`https://${siteHost}/web/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Cookie': buildCookie({ token, refreshToken, anonId }),
@@ -195,7 +196,7 @@ export default async function handler(req, res) {
   const isApiSubdomain = targetHost.startsWith('api.');
 
   // Effectue l'appel Vinted (LECTURE) avec un access_token donne.
-  const doCall = (accessToken, refreshTok) => fetch(url, {
+  const doCall = (accessToken, refreshTok) => fetchAvecDelai(url, {
     method: 'GET',
     headers: {
       ...buildHeaders({ token: accessToken, anonId, csrfToken, isApiSubdomain, hasBody: false }),
@@ -230,7 +231,7 @@ export default async function handler(req, res) {
 
     const text = await vintedRes.text();
     let json;
-    try { json = JSON.parse(text); } catch { json = { raw: text }; }
+    try { json = JSON.parse(text); } catch { json = { raw: text.slice(0, 2048) }; }   // (11 nov., B121) une page HTML n'est pas renvoyée entière
 
     res.status(200).json({
       status: vintedRes.status,
@@ -241,6 +242,7 @@ export default async function handler(req, res) {
       refreshed,
     });
   } catch (err) {
-    res.status(500).json({ error: 'Échec de la requête vers Vinted', detail: String(err) });
+    console.warn('vinted-proxy :', err && err.name);
+    res.status(500).json({ error: 'Échec de la requête vers Vinted', detail: (err && err.name === 'TimeoutError') ? 'délai dépassé' : 'erreur réseau' });   // (11 nov., B122) message fixe
   }
 }

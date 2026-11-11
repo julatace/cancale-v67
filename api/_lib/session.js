@@ -9,6 +9,7 @@
 // confirmation automatique à l'inscription). Seule la session de l'extension
 // s'en sert (api/compte.js) : elle ne fabrique jamais de session sur une
 // adresse que la personne n'a pas prouvée.
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -19,7 +20,7 @@ export async function utilisateurDe(req) {
   // Un JWT a trois morceaux ; tout le reste est refusé sans appel réseau.
   if (!jeton || jeton.split('.').length !== 3 || jeton.length > 4096) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal:AbortSignal.timeout(10000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/user`, { signal:AbortSignal.timeout(10000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
     // Trois états : un refus (4xx) vaut `null` ; le service de connexion qui ne
     // répond pas (panne, délai, 5xx, 429) vaut `undefined` — « pas su ». Les deux
     // restent « pas de session » pour qui teste `!u` ; seules les routes qui le
@@ -40,7 +41,7 @@ let _cloisonnee = null;
 export async function baseCloisonnee() {
   if (_cloisonnee !== null) return _cloisonnee;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
     if (r.ok) _cloisonnee = true;
     else if (r.status === 400) _cloisonnee = false;
     else return true;
@@ -67,7 +68,7 @@ export async function modifierCommeVendeur(req, chemin, corps) {
   const jeton = jetonDe(req);
   if (!jeton) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, {
       method: 'PATCH',
       headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify(corps),
@@ -82,7 +83,7 @@ export async function lireCommeVendeur(req, chemin) {
   const jeton = jetonDe(req);
   if (!jeton) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -96,7 +97,7 @@ export async function insererCommeVendeur(req, table, ligne) {
   const jeton = jetonDe(req);
   if (!jeton) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${table}`, {
       method: 'POST',
       headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify(ligne),

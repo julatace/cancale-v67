@@ -36,6 +36,7 @@ import { sbCle } from './cle.js';
 // (8 nov.) Les messages d'erreur passent AUSSI par le nettoyage du journal des
 // plantages (valeur citée, prix, suites de chiffres) : un module sans Node.
 import { nettoyer } from '../../src/plantages.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // ⚠️ Aucun import de module Node ici : l'app importe ce fichier (l'aperçu).
 // La route passe `pousser(notif, proprio)`, qui ouvre le contexte du vendeur.
 
@@ -214,7 +215,7 @@ const heureDe = (t) => new Date(t).toISOString().slice(0, 13).replace(/\D/g, '')
 export const idSignalement = (t, uid, k) => `${PREFIXE}${heureDe(t)}_${String(uid).replace(/-/g, '').slice(0, 12)}_${k}`;
 
 // Le propriétaire de l'installation : `null` = pas su.
-export async function proprietaireInstallation({ env = process.env, fetcher = fetch } = {}) {
+export async function proprietaireInstallation({ env = process.env, fetcher = fetchAvecDelai } = {}) {
   const e = String(env.VRM_OWNER_UID || '').trim().toLowerCase();
   if (UUID.test(e) && e !== NEUTRE) return e;
   const { url, service } = cfg(env);
@@ -286,7 +287,7 @@ const resumeValide = (r) => {
 const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume'].join(',');
 
 // POST (session) : envoyer. `utilisateur` = SA session (api/_lib/session.js).
-export async function envoyerSignalement({ utilisateur, corps, env = process.env, fetcher = fetch, pousser = null, maintenant = Date.now() }) {
+export async function envoyerSignalement({ utilisateur, corps, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const s = normaliserSignalement(corps);
   if (!s) return { code: 400, corps: { ok: false, raison: 'texte' } };
@@ -315,7 +316,7 @@ export async function envoyerSignalement({ utilisateur, corps, env = process.env
 
 // GET (session, PROPRIÉTAIRE seulement) : la liste. Les lignes sont légères
 // (un texte borné, 5 plantages au plus) : on lit `data`, projeté champ par champ.
-export async function listerSignalements({ utilisateur, unId = null, env = process.env, fetcher = fetch }) {
+export async function listerSignalements({ utilisateur, unId = null, env = process.env, fetcher = fetchAvecDelai }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
@@ -344,7 +345,7 @@ export async function listerSignalements({ utilisateur, unId = null, env = proce
 
 // POST {action:'traite', id, traite} (PROPRIÉTAIRE seulement) : lire, puis
 // réécrire la MÊME ligne — une lecture ratée n'écrit rien.
-export async function marquerTraite({ utilisateur, corps, env = process.env, fetcher = fetch, maintenant = Date.now() }) {
+export async function marquerTraite({ utilisateur, corps, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
@@ -373,7 +374,7 @@ export async function marquerTraite({ utilisateur, corps, env = process.env, fet
 // ── CÔTÉ APP : l'envoi, et ce qu'il dit ─────────────────────────────────────
 // `envoye: true` SEULEMENT sur une réponse `ok:true` du serveur qui porte l'id
 // rangé ; tout le reste (réseau, 5xx, réponse illisible) est « pas envoyé ».
-export async function posterSignalement(signalement, { entetes = {}, fetcher = (typeof fetch === 'function' ? fetch : null) } = {}) {
+export async function posterSignalement(signalement, { entetes = {}, fetcher = (typeof fetchAvecDelai === 'function' ? fetchAvecDelai : null) } = {}) {
   try {
     const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...entetes }, body: JSON.stringify(signalement) });
     const j = await r.json().catch(() => null);

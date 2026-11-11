@@ -65,6 +65,7 @@ import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU, ID_ESSAI, codeEssaiDe } from './_lib/adresse-reception.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -229,7 +230,7 @@ async function garderHtmlOrigine(cle, type, resume, html) {
     if (!id || !owner) return false;
     const data = ligneHtml({ type, resume, html, at: new Date().toISOString() });
     if (!data) return false;
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id, data }]),
@@ -242,7 +243,7 @@ async function supabaseUpsert(rows) {
   const owner = proprietaireCourant();
   if (!owner) { marquerEcritureRatee(); return false; }
   rows = rows.map(r => ({ ...r, owner }));
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+  const res = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
     method: 'POST',
     headers: {
       ...sbCle(SUPABASE_KEY),
@@ -307,11 +308,11 @@ export function compteDeLEmail(raw, accts, emails) {
 async function detectAccount(raw) {
   try {
     const headers = { ...sbCle(SUPABASE_KEY) };
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`), { headers });
+    const res = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`), { headers });
     const accts = res.ok ? await res.json() : [];
     let emails = {};
     try {
-      const r2 = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`), { headers });
+      const r2 = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`), { headers });
       if (r2.ok) { const rows = await r2.json(); emails = (rows[0] && rows[0].vinted_account_emails) || {}; }
     } catch (_) {}
     return compteDeLEmail(raw, accts, emails);
@@ -545,7 +546,7 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
 
 async function supabaseGetRow(id) {
   try {
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
+    const res = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
@@ -560,7 +561,7 @@ async function supabaseGetRow(id) {
 // Rend `{ lu: true, data }` (data `null` si absente) ou `{ lu: false }`.
 async function supabaseLireRow(id) {
   try {
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
+    const res = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return { lu: false };
@@ -825,7 +826,7 @@ async function findNumeroByTitle(title, size) {
     const normSz = s => String(s == null ? '' : s).toLowerCase().replace(',', '.').replace(/[^0-9.]/g, '').replace(/\.0+$/, '').trim();
     const t = norm(title);
     if (!t) return '';
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
+    const res = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return '';
@@ -864,7 +865,7 @@ async function marqueurVendeur() {
 }
 async function fichesVendeur() {
   try {
-    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=f:data->vinted_annonce_numeros`), { headers: { ...sbCle(SUPABASE_KEY) } });
+    const r = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=f:data->vinted_annonce_numeros`), { headers: { ...sbCle(SUPABASE_KEY) } });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -898,7 +899,7 @@ async function lirePagine(requete) {
   const out = []; const page = 1000;
   for (let from = 0; from < 100000; from += page) {
     let r;
-    try { r = await fetch(await duVendeur(ordreStable(`${SUPABASE_URL}/rest/v1/app_data?${requete}`)), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    try { r = await fetchAvecDelai(await duVendeur(ordreStable(`${SUPABASE_URL}/rest/v1/app_data?${requete}`)), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
@@ -1047,7 +1048,7 @@ export function jugerPrixParTitre(title, map) {
 async function prixAchatParTitre(title) {
   if (!title) return { etat: 'aucune' };
   try {
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
+    const res = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
@@ -1475,7 +1476,7 @@ let _cloisonnee = null;
 async function baseCloisonnee() {
   if (_cloisonnee !== null) return _cloisonnee;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (r.ok) _cloisonnee = true;
@@ -1504,7 +1505,7 @@ async function lirePreuvesProuvees(signal) {
   let debut = 0;
   for (let page = 0; page < 500; page++) {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
         headers: { ...sbCle(SUPABASE_KEY), Range: `${debut}-${debut + taille - 1}`, 'Range-Unit': 'items' },
         signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
       });
@@ -1562,7 +1563,7 @@ async function chargerRegistreEmails() {
   // millième ligne doit être détectée aussi. Jamais de résultat partiel.
   for(let page=0;page<100;page++){
     try {
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=owner,data&order=owner.asc`,{
+      const r=await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=owner,data&order=owner.asc`,{
         headers:{...sbCle(SUPABASE_KEY),Range:`${debut}-${debut+taille-1}`,'Range-Unit':'items'},
         signal:AbortSignal.any([signal,AbortSignal.timeout(10000)]),
       });
@@ -1658,7 +1659,7 @@ async function adresseUniqueDe(corpsBrut, mail) {
 async function noterVuAdresse(owner, mail) {
   try {
     const at = new Date().toISOString();
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id: ID_VU, data: { at, sujet: String((mail && mail.subject) || '').slice(0, 200), de: String((mail && mail.from) || '').slice(0, 200) }, updated_at: at }]),
     });
@@ -1672,7 +1673,7 @@ async function noterEssaiAdresse(owner, mail) {
   if (!code) return;
   try {
     const at = new Date().toISOString();
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id: ID_ESSAI, data: { code, at }, updated_at: at }]),
     });
@@ -1695,7 +1696,7 @@ export const idPieceQuarantaine = (idQuarantaine, i) => PREFIXE_PJ_QUARANTAINE +
 // true · false · null (pas su). Ne transfère jamais le PDF.
 async function bordereauADejaUnPdf(id) {
   try {
-    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&data->>pdfB64=not.is.null&select=id&limit=1`), { headers: { ...sbCle(SUPABASE_KEY) } });
+    const r = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&data->>pdfB64=not.is.null&select=id&limit=1`), { headers: { ...sbCle(SUPABASE_KEY) } });
     if (!r || !r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j.length > 0 : null;
@@ -1722,7 +1723,7 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
       const p = { filename: a.filename, contentType: a.contentType };
       if (b64 && b64.length <= MAX_OCTETS_PJ_B64) {
         const idPj = idPieceQuarantaine(id, i);
-        const rp = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+        const rp = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
           method: 'POST',
           headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id: idPj, data: { quarantaine: id, i, filename: a.filename || '', contentType: a.contentType || '', contentB64: b64 } }]),
@@ -1758,7 +1759,7 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
         ...(mid ? { messageId: mid.slice(0, 300) } : {}),
       },
     };
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: {
         ...sbCle(SUPABASE_KEY),
@@ -2002,7 +2003,7 @@ function cleValide(req) {
 // appartient à UNE boîte, donc à un vendeur.
 async function lireLignes(requete) {
   try {
-    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(SUPABASE_KEY) } });
+    const r = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(SUPABASE_KEY) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -2049,7 +2050,7 @@ export async function modeScript(mode, req, res) {
     const maintenant = Date.now();
     let lignes = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.attente&data->>envoyeLe=is.null&data->>abandonLe=is.null&data->>expire=gt.${encodeURIComponent(new Date(maintenant).toISOString())}&select=id,data&order=data->>demandeLe.asc,id.asc&limit=20`, { headers: { ...sbCle(SUPABASE_KEY) } });
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.attente&data->>envoyeLe=is.null&data->>abandonLe=is.null&data->>expire=gt.${encodeURIComponent(new Date(maintenant).toISOString())}&select=id,data&order=data->>demandeLe.asc,id.asc&limit=20`, { headers: { ...sbCle(SUPABASE_KEY) } });
       if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lignes = j; }
     } catch (_) { lignes = null; }
     if (lignes === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
@@ -2078,7 +2079,7 @@ export async function modeScript(mode, req, res) {
     if (!/^vrm_email_preuve_[0-9a-f]{40}$/.test(id)) { res.status(400).json({ ok: false, error: 'identifiant invalide' }); return; }
     let lignes = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
       if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lignes = j; }
     } catch (_) { lignes = null; }
     if (lignes === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
@@ -2090,7 +2091,7 @@ export async function modeScript(mode, req, res) {
     const nouv = { ...d, echecs, dernierEchec: iso, ...(echecs >= MAX_ECHECS_ENVOI ? { abandonLe: iso } : {}) };
     let n = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&data->>etat=eq.attente&data->>nonce=eq.${encodeURIComponent(d.nonce || '')}&data->>demandeLe=eq.${encodeURIComponent(d.demandeLe || '')}`, {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&data->>etat=eq.attente&data->>nonce=eq.${encodeURIComponent(d.nonce || '')}&data->>demandeLe=eq.${encodeURIComponent(d.demandeLe || '')}`, {
         method: 'PATCH', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=representation' },
         body: JSON.stringify({ data: nouv }),
       });
@@ -2107,7 +2108,7 @@ export async function modeScript(mode, req, res) {
     if (!/^vrm_email_preuve_[0-9a-f]{40}$/.test(id)) { res.status(400).json({ ok: false, error: 'identifiant invalide' }); return; }
     let lignes = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
       if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lignes = j; }
     } catch (_) { lignes = null; }
     if (lignes === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
@@ -2119,7 +2120,7 @@ export async function modeScript(mode, req, res) {
     //    le lien entre la lecture et l'écriture ne doit jamais être défait.
     let n = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&data->>etat=eq.attente&data->>nonce=eq.${encodeURIComponent(d.nonce || '')}`, {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&data->>etat=eq.attente&data->>nonce=eq.${encodeURIComponent(d.nonce || '')}`, {
         method: 'PATCH', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=representation' },
         body: JSON.stringify({ data: { ...d, envoyeLe: new Date().toISOString() } }),
       });
@@ -2658,7 +2659,7 @@ export async function traiterEmail(req, res) {
       if (lu && lu.s && !String(data.suivi || '').trim()) { data.suivi = lu.s; data.suiviSource = 'pdf'; }
       if (pdf) {
         try {
-          const rf = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`), {
+          const rf = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`), {
             headers: { ...sbCle(SUPABASE_KEY) },
           });
           const rfRows = rf.ok ? await rf.json() : [];

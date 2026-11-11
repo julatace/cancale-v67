@@ -29,6 +29,7 @@ import { lireMentions } from './mentions-legales.js';
 import { inventaire, lireProprietaire, noterJournal, mailSuppression } from './suppression-compte.js';
 import { effacerCompte, purgerFacturesGardees } from './effacer-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const URL_BASE = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -110,7 +111,7 @@ const jourFr = (ms) => new Date(ms).toLocaleDateString('fr-FR', { timeZone: 'Eur
 
 async function lire(url, service, chemin) {
   try {
-    const r = await fetch(`${url}/rest/v1/${chemin}`, { headers: sbCle(service) });
+    const r = await fetchAvecDelai(`${url}/rest/v1/${chemin}`, { headers: sbCle(service) });
     if (!r.ok) return null;
     const j = await r.json().catch(() => null);
     return Array.isArray(j) ? j : null;
@@ -118,7 +119,7 @@ async function lire(url, service, chemin) {
 }
 async function ecrireAvis(url, service, owner, data) {
   try {
-    const r = await fetch(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id: ID_AVIS, data, updated_at: new Date().toISOString() }]),
     });

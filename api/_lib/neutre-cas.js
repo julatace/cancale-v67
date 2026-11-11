@@ -17,6 +17,7 @@
 // n'agit pas.
 import { sbCle } from './cle.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 
@@ -30,7 +31,7 @@ export async function modifierNeutre(id, decider, { essais = 12 } = {}) {
   for (let n = 0; n < essais; n++) {
     let rows;
     try {
-      const r = await fetch(`${base}?${filtre}&select=data`, { headers: lecture });
+      const r = await fetchAvecDelai(`${base}?${filtre}&select=data`, { headers: lecture });
       if (!r.ok) return null;
       rows = await r.json();
     } catch (_) { return null; }
@@ -43,12 +44,12 @@ export async function modifierNeutre(id, decider, { essais = 12 } = {}) {
     const data = { ...choix.data, rev: (rev0 == null ? 0 : rev0) + 1 };
     try {
       if (!present) {
-        const w = await fetch(base, { method: 'POST', headers: { ...ecriture, Prefer: 'return=minimal' }, body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id, data }]) });
+        const w = await fetchAvecDelai(base, { method: 'POST', headers: { ...ecriture, Prefer: 'return=minimal' }, body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id, data }]) });
         if (w.ok) return { valeur: choix.valeur };
         if (w.status !== 409) return null;            // créée entre-temps : on relit
       } else {
         const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
-        const w = await fetch(`${base}?${filtre}&${cond}&select=id`, { method: 'PATCH', headers: { ...ecriture, Prefer: 'return=representation' }, body: JSON.stringify({ data }) });
+        const w = await fetchAvecDelai(`${base}?${filtre}&${cond}&select=id`, { method: 'PATCH', headers: { ...ecriture, Prefer: 'return=representation' }, body: JSON.stringify({ data }) });
         if (!w.ok) return null;
         const out = await w.json().catch(() => null);
         if (!Array.isArray(out)) return null;

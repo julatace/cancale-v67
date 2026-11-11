@@ -21,6 +21,7 @@
 import { sbCle } from './cle.js';
 import { regleVentes, venteHorsPlan } from './plan-regle.js';
 import { proprietaireInstallation } from './signalement.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,7 +48,7 @@ export async function regleDuVendeur(owner) {
     // (9 nov., Solo par plateforme) + `comptes_vendeurs` (migration 030) : le compte vendeur
     // de Leboncoin, eBay, Vestiaire. 030 absente (colonne inconnue) ⇒ relu SANS elle : la règle
     // Vinted s'applique comme avant, les autres plateformes sont « pas su » (rien bridé).
-    const lire = (cols) => fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=${cols}&limit=1`, { headers: sbCle(SERVICE) });
+    const lire = (cols) => fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=${cols}&limit=1`, { headers: sbCle(SERVICE) });
     let r = await lire('statut,plan,compte_vendeur,comptes_vendeurs');
     if (!r.ok && r.status === 400) r = await lire('statut,plan,compte_vendeur');
     if (!r.ok) return null;                          // 028 absente : colonne inconnue ⇒ pas su

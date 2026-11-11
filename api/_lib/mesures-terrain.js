@@ -31,6 +31,7 @@ import { normaliserLot, fusionnerHisto, resumeJour, jourParis, LOTS_MAX_JOUR, to
 // (8 nov.) Les alertes de plantage voyagent avec le lot (`p`) : src/alertesPlantages.js.
 import { normaliserEvenements } from '../../src/alertesPlantages.js';
 import { recevoirAlertesPlantages, listerPlantagesTerrain } from './alertes-plantages.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const PREFIXE_MESURES = 'mesures_jour_';
 export const JOURS_LUS = 14;
@@ -113,7 +114,7 @@ export function jourApres(avant, lot, empreinte, minute) {
 }
 
 // POST : ranger un lot. `verifierJeton(jeton)` → { id } · null (refusé) · undefined (pas su).
-export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, env = process.env, fetcher = fetch, maintenant = Date.now(), pousser = null }) {
+export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now(), pousser = null }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const c = lireCorpsMesures(corps);
   if (!c) return { code: 400, corps: { ok: false, raison: 'corps' } };
@@ -172,7 +173,7 @@ export function joursPourPanneau(rows) {
 // projetés et bornés : (1) les IDENTIFIANTS seuls (`select=id`, paginés), pour
 // trouver les `n` jours les plus récents ; (2) les lignes de ces jours-là
 // seulement (`id=in.(…)`, ancienne forme et éclats).
-export async function lireDerniersJours({ env = process.env, fetcher = fetch, proprio, n = JOURS_LUS }) {
+export async function lireDerniersJours({ env = process.env, fetcher = fetchAvecDelai, proprio, n = JOURS_LUS }) {
   const { url, service } = cfg(env);
   const nb = Math.max(1, Math.min(60, n));
   try {
@@ -213,7 +214,7 @@ export async function histosDesJours({ lire, proprio, jours }) {
 }
 
 // GET (PROPRIÉTAIRE seulement) : les agrégats des derniers jours.
-export async function listerMesures({ utilisateur, quoi = '', env = process.env, fetcher = fetch }) {
+export async function listerMesures({ utilisateur, quoi = '', env = process.env, fetcher = fetchAvecDelai }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
@@ -268,7 +269,7 @@ export function idsMesuresAPurger(ids, maintenant = Date.now()) {
 // `{ url, headers }` : la base et les en-têtes de la clé de service (ceux du cron).
 // Rend { fait, lues, retirees, seuil } ou { fait:false, raison, statut|erreur } :
 // une purge ratée ne fait échouer rien d'autre (le cron la dit dans sa réponse).
-export async function purgerMesuresAnciennes({ url, headers, proprietaire, fetcher = fetch, maintenant = Date.now() }) {
+export async function purgerMesuresAnciennes({ url, headers, proprietaire, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   const seuil = seuilPurgeMesures(maintenant);
   const p = String(proprietaire || '').trim().toLowerCase();
   if (!RE_UUID.test(p)) return { fait: false, raison: 'proprietaire', seuil };

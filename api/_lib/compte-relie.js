@@ -26,6 +26,7 @@ import { sendPushToAll, pushCategorieActive } from './push.js';
 import { DESTINATIONS } from './lien-notif.js';
 import { LIGNE_COMPTES_RELIES, CAT_COMPTE_RELIE, comptesPresents, fusionnerComptes, aNotifier, marquer, normaliserMemoire, texteCompteRelie, decouperCle } from '../../src/compteRelie.js';
 import { comptesLbcLies, comptesVcLies, comptesEbayLies } from '../../src/comptesLies.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const cle = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -36,7 +37,7 @@ async function lire(chemin) {
   const owner = proprietaireCourant();
   if (!owner || !cle()) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(cle()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(cle()) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -81,7 +82,7 @@ async function modifierLigne(modifier, essais = 5) {
     const data = { ...nouveau, rev: (rev0 || 0) + 1 };
     try {
       if (!present) {
-        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+        const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
           method: 'POST', headers: { ...tete, Prefer: 'resolution=ignore-duplicates,return=representation' },
           body: JSON.stringify([{ owner, id: LIGNE_COMPTES_RELIES, data }]),
         });
@@ -92,7 +93,7 @@ async function modifierLigne(modifier, essais = 5) {
         continue;
       }
       const garde = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
-      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_COMPTES_RELIES}&owner=eq.${encodeURIComponent(owner)}&${garde}&select=id`, {
+      const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_COMPTES_RELIES}&owner=eq.${encodeURIComponent(owner)}&${garde}&select=id`, {
         method: 'PATCH', headers: { ...tete, Prefer: 'return=representation' }, body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
       });
       if (!w.ok) return null;

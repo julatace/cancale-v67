@@ -13,6 +13,7 @@
 // paie parce que la base a hoqueté lui ferait rater une vente. Le verrou qui
 // compte — ses données — est tenu par la base elle-même, pas par cette lecture.
 import { sbCle } from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,7 +21,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Une minute de mémoire par instance : un rappel d'expédition qui pousse trois
 // notifications ne pose pas trois fois la question. Un abonnement qui change
 // est vu au plus une minute plus tard.
+// (11 nov., B136) un « oui » ne se garde que 15 s : un abonnement coupé ne garde
+// pas l'accès une minute par instance. Un « non » se garde la minute.
 const TTL_MS = 60 * 1000;
+const TTL_OUI_MS = 15 * 1000;
 const memo = new Map();
 
 export async function accesVendeur(owner) {
@@ -28,17 +32,20 @@ export async function accesVendeur(owner) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return null;
   const vu = memo.get(owner);
-  if (vu && Date.now() - vu.t < TTL_MS) return vu.v;
+  if (vu && Date.now() - vu.t < (vu.v ? TTL_OUI_MS : TTL_MS)) return vu.v;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_acces_pour`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/vrm_acces_pour`, {
       method: 'POST',
       headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json' },
       body: JSON.stringify({ u: owner }),
-    });
+    }, 5000);   // (11 nov., M45) appelée à CHAQUE notification : 5 s au plus
     if (!r.ok) return null;
     const v = await r.json();
     if (typeof v !== 'boolean') return null;          // un 522 renvoie du HTML
-    if (memo.size > 1000) memo.clear();
+    // (11 nov., M90) éviction de la PLUS ANCIENNE entrée, jamais tout le cache d'un coup
+    // (toutes les requêtes suivantes refaisaient la RPC en même temps).
+    memo.delete(owner);
+    if (memo.size >= 1000) memo.delete(memo.keys().next().value);
     memo.set(owner, { v, t: Date.now() });
     return v;
   } catch (_) { return null; }

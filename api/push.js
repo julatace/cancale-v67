@@ -14,7 +14,7 @@
 
 import './_lib/sans-bruit.js';
 import {nettoyerAbonnementPush} from './_lib/abonnement-push.js';
-import { loadSubs, modifierSubs, sendPushToAll, pushConfigure } from './_lib/push.js';
+import { loadSubs, modifierSubs, sendPushToAll, pushConfigure, PUSH_MAX_APPAREILS } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
@@ -110,7 +110,9 @@ async function traiter(req, res) {
     if (body.action === 'subscribe') {
       const sub = nettoyerAbonnementPush(body.sub);
       if (!sub || !sub.endpoint) { res.status(400).json({ error: 'abonnement invalide' }); return; }
-      const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub]));
+      // (11 nov., M49) au plus PUSH_MAX_APPAREILS : un navigateur qui renouvelle son
+      // abonnement en boucle ne fait pas grossir la ligne sans fin (les plus récents gardés).
+      const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub].slice(-PUSH_MAX_APPAREILS)));
       if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
       res.status(200).json({ ok: true, devices: r.subs.length });
       return;
@@ -140,6 +142,7 @@ async function traiter(req, res) {
 
     res.status(400).json({ error: 'action inconnue' });
   } catch (e) {
+    console.warn('push : erreur interne', e && e.name, String((e && e.message) || '').slice(0, 120));   // (11 nov., B126) une panne se voit
     res.status(500).json({ error: 'Erreur interne. Réessaie dans un instant.' });
   }
 }

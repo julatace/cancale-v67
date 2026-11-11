@@ -38,6 +38,7 @@ import { sbCle } from './_lib/cle.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { idIndexJeton } from './_lib/jeton-index.js';
 import { domaineReception, nouveauJeton, jetonValide, adresseDeJeton, ecrireIndexReception, marquerRemplacee, ID_ADRESSE, ID_VU, ID_CODE, ID_ESSAI, etatMiseEnService } from './_lib/adresse-reception.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -52,19 +53,23 @@ const enc = encodeURIComponent;
 async function utilisateurDuJeton(jeton) {
   if (!jeton) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: ANON, Authorization: `Bearer ${jeton}` },
     });
-    if (!r.ok) return null;
+    // (11 nov., M43) trois états, comme `utilisateurDe` (_lib/session.js) : un refus
+    // vaut `null` (« reconnecte-toi ») ; une panne du service de connexion vaut
+    // `undefined` (« pas su » ⇒ 503 « réessaie » — se reconnecter ne répare rien).
+    if (!r.ok) return (r.status >= 500 || r.status === 429) ? undefined : null;
     const j = await r.json();
     const id = String((j && j.id) || '');
     // Le propriétaire neutre n'est la session de personne (Supabase n'émet pas
     // d'identifiant nul) — mais on ne laisse pas une réponse étrange l'ouvrir.
     if (!id || id === NEUTRE) return null;
     return { id, email: String(j.email || ''), email_confirmed_at: j.email_confirmed_at || j.confirmed_at || null, confirmation_sent_at: j.confirmation_sent_at || null };
-  } catch (_) { return null; }
+  } catch (_) { return undefined; }
 }
-async function vendeurDuJeton(jeton) { const u = await utilisateurDuJeton(jeton); return u ? u.id : ''; }
+async function vendeurDuJeton(jeton) { const u = await utilisateurDuJeton(jeton); return u === undefined ? undefined : u ? u.id : ''; }
+const connexionInjoignable = (res) => res.status(503).json({ ok: false, error: 'connexion-injoignable', message: 'Le service de connexion ne répond pas — réessaie dans un instant.' });
 const jetonDe = (req) => String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '').replace(/^Bearer\s+/i, '');
 const indispo = (res) => res.status(503).json({ ok: false, error: 'base-injoignable', message: "Le serveur de données ne répond pas — rien n'est perdu, réessaie." });
 
@@ -83,7 +88,7 @@ async function lirePages(requete, compte) {
     let r;
     try {
       if (compte) compte.n++;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc,owner.asc`, {
+      r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc,owner.asc`, {
         headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` },
       });
     } catch (_) { return null; }
@@ -100,12 +105,14 @@ async function lirePages(requete, compte) {
 // absente (une seule boutique) · le reste = pas su. Seul un « oui » se
 // mémorise : une colonne ne disparaît pas, une panne si.
 let _cloisonnee = false;
+let _nonCloisonneeJusqua = 0;   // (11 nov., B112) un « non » est gardé 60 s : plus une sonde par requête
 async function sondeCloisonnee() {
   if (_cloisonnee) return true;
+  if (Date.now() < _nonCloisonneeJusqua) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
     if (r.ok) { _cloisonnee = true; return true; }
-    if (r.status === 400) return false;
+    if (r.status === 400) { _nonCloisonneeJusqua = Date.now() + 60000; return false; }
     return null;
   } catch (_) { return null; }
 }
@@ -206,7 +213,7 @@ async function compterPersonne(lu, compte) {
     let r;
     try {
       compte.n++;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${VIVANTES}&owner=eq.${NEUTRE}&select=id,dest:meta->>destinataires&order=id.asc`, {
+      r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?${VIVANTES}&owner=eq.${NEUTRE}&select=id,dest:meta->>destinataires&order=id.asc`, {
         headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${p * PAGE_COMPTE}-${(p + 1) * PAGE_COMPTE - 1}` },
       });
     } catch (_) { return null; }
@@ -235,6 +242,7 @@ async function compterPersonne(lu, compte) {
 
 async function lister(req, res) {
   const owner = await vendeurDuJeton(jetonDe(req));
+  if (owner === undefined) { connexionInjoignable(res); return; }
   if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
   const compte = { n: 0 };
   const lu = await emailsReclamables(owner, compte);
@@ -261,7 +269,7 @@ async function lister(req, res) {
 async function ligneReclamable(id, owner) {
   const lire = async (filtre) => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${filtre}&select=data`, { headers: HEADERS });
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${filtre}&select=data`, { headers: HEADERS });
       if (r.status === 400) return { status: 400 };
       if (!r.ok) return null;
       const j = await r.json();
@@ -299,7 +307,7 @@ async function ligneReclamable(id, owner) {
 // lire ni les écrire (RLS). « Pas su » ⇒ 503, jamais un état deviné.
 const lireNeutre = async (id) => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${enc(id)}&select=data`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${enc(id)}&select=data`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? { data: (j[0] && j[0].data) || null } : null;
@@ -307,7 +315,7 @@ const lireNeutre = async (id) => {
 };
 const ecrireNeutre = async (id, data) => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner: NEUTRE, id, data }]),
     });
@@ -318,7 +326,7 @@ const ecrireNeutre = async (id, data) => {
 // mais filtrée sur LUI). `null` = pas su.
 async function adressesDeclarees(owner) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.vrm_email_owners&select=data`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.vrm_email_owners&select=data`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -332,6 +340,7 @@ const installation = () => String(process.env.VRM_OWNER_UID || '').trim();
 
 async function preuves(req, res) {
   const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
   if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
   const cl = await sondeCloisonnee();
   if (cl === null) { indispo(res); return; }
@@ -355,7 +364,7 @@ async function preuves(req, res) {
   // (écrit par le script) — `null` si pas su, `{ at: null }` si jamais vu.
   let collecteur = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=in.(vrm_email_collecteur_passage,vrm_email_collecteur_succes)&select=id,at:data->>at`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=in.(vrm_email_collecteur_passage,vrm_email_collecteur_succes)&select=id,at:data->>at`, { headers: HEADERS });
     if (r.ok) { const j = await r.json(); if (Array.isArray(j)) { const ats = j.map((x) => x && x.at).filter((x) => Number.isFinite(Date.parse(x || ''))).sort(); collecteur = { at: ats.length ? ats[ats.length - 1] : null }; } }
   } catch (_) { collecteur = null; }
   res.status(200).json({ ok: true, cloisonnee: true, installation: u.id === installation(), adresses, collecteur });
@@ -363,6 +372,7 @@ async function preuves(req, res) {
 
 async function preuveDemander(req, res) {
   const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
   if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
   const corps = corpsDe(req);
   if (!corps) { res.status(400).json({ ok: false, error: 'corps illisible' }); return; }
@@ -426,6 +436,7 @@ async function preuveDemander(req, res) {
 
 async function preuveConfirmer(req, res) {
   const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
   if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
   const corps = corpsDe(req);
   const l = corps && lireLien(corps.lien);
@@ -451,7 +462,7 @@ async function preuveConfirmer(req, res) {
   // Écriture CONDITIONNELLE : la même demande (même aléa), encore en attente.
   let n = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${enc(id)}&data->>etat=eq.attente&data->>nonce=eq.${enc(d.nonce)}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${enc(id)}&data->>etat=eq.attente&data->>nonce=eq.${enc(d.nonce)}`, {
       method: 'PATCH', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify({ data: { owner: u.id, adresse: normAdresse(d.adresse), etat: 'prouvee', via: 'lien', prouveeLe: new Date().toISOString() } }),
     });
@@ -480,7 +491,7 @@ async function preuveConfirmer(req, res) {
 // sur l'ancien jeton (deux appareils ne peuvent pas fabriquer deux adresses).
 const lireLigneVendeur = async (owner, id, select = 'data') => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&select=${select}&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&select=${select}&limit=1`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const j = await r.json();
     return Array.isArray(j) ? (j[0] ? (j[0].data || null) : null) : undefined;
@@ -491,7 +502,7 @@ const ecrireLigneVendeur = async (owner, id, data, siJeton) => {
     const at = new Date().toISOString();
     if (siJeton !== undefined) {
       // Comparer-et-échanger : seulement si la ligne porte encore l'ancien jeton.
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&data->>jeton=eq.${enc(siJeton)}`, {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&data->>jeton=eq.${enc(siJeton)}`, {
         method: 'PATCH', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
         body: JSON.stringify({ data, updated_at: at }),
       });
@@ -499,7 +510,7 @@ const ecrireLigneVendeur = async (owner, id, data, siJeton) => {
       const j = await r.json();
       return Array.isArray(j) ? j.length > 0 : null;
     }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' },
       body: JSON.stringify([{ owner, id, data, updated_at: at }]),
     });
@@ -509,6 +520,7 @@ const ecrireLigneVendeur = async (owner, id, data, siJeton) => {
 };
 async function adresseUnique(req, res) {
   const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
   if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
   const domaine = domaineReception();
   if (!domaine) {
@@ -535,7 +547,7 @@ async function adresseUnique(req, res) {
   //    neuve est fabriquée.
   const indexDe = async (jeton) => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${idIndexJeton('reception', jeton)}&select=o:data->>owner,r:data->>remplaceeLe&limit=1`, { headers: HEADERS });
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${idIndexJeton('reception', jeton)}&select=o:data->>owner,r:data->>remplaceeLe&limit=1`, { headers: HEADERS });
       if (!r.ok) return undefined;
       const j = await r.json();
       if (!Array.isArray(j)) return undefined;
@@ -601,6 +613,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && mode === 'preuve-confirmer') return preuveConfirmer(req, res);
   if (req.method === 'GET' && mode === 'reception') {
     const owner = await vendeurDuJeton(jetonDe(req));
+    if (owner === undefined) {connexionInjoignable(res);return;}
     if (!owner) {res.status(401).json({ok:false,error:'connexion requise'});return;}
     // Pas de repli sans filtre : cet écran est réservé à la base cloisonnée.
     if (await sondeCloisonnee() !== true) {indispo(res);return;}
@@ -613,6 +626,7 @@ export default async function handler(req, res) {
   // session prouvée, base cloisonnée, filtre par SON owner ; pas su ⇒ 503.
   if (req.method === 'GET' && mode === 'journal') {
     const owner = await vendeurDuJeton(jetonDe(req));
+    if (owner === undefined) {connexionInjoignable(res);return;}
     if (!owner) {res.status(401).json({ok:false,error:'connexion requise'});return;}
     if (await sondeCloisonnee() !== true) {indispo(res);return;}
     const q = req.query || {};
@@ -633,6 +647,7 @@ export default async function handler(req, res) {
   // rattachement sans jeton ; la base est cloisonnée et l'app n'appelle plus
   // cette route que connectée. Sans jeton, l'appel repartait dans la
   // résolution — et chaque appel créait une copie de plus en quarantaine.)
+  if (owner === undefined) { connexionInjoignable(res); return; }
   if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
   let corps = {};
   try { corps = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); }
@@ -691,10 +706,10 @@ export default async function handler(req, res) {
     const leSien = trouve.cloisonnee ? `&owner=eq.${enc(trouve.proprio)}` : '';
     const vide = { id, data: { supprime: true, rejoueLe: new Date().toISOString(), type: resultat.type || 'traité' } };
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${leSien}`, { method: 'DELETE', headers: HEADERS });
+      await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${leSien}`, { method: 'DELETE', headers: HEADERS });
     } catch (_) {}
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
+      await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
         method: 'POST',
         headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify(trouve.cloisonnee ? [{ owner: trouve.proprio, ...vide }] : withOwnerAll([vide])),
@@ -704,7 +719,7 @@ export default async function handler(req, res) {
     const soeurs = (Array.isArray(ligne.pieces) ? ligne.pieces : []).map((p) => p && p.ligne).filter((x) => typeof x === 'string' && x.startsWith('email_qpj_'));
     if (soeurs.length) {
       try {
-        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
+        await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
           method: 'POST',
           headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify(soeurs.map((x) => (trouve.cloisonnee ? { owner: NEUTRE, id: x, data: { supprime: true, quarantaine: id } } : { id: x, data: { supprime: true, quarantaine: id } }))),
@@ -724,7 +739,7 @@ async function piecesGardees(ligne, trouve) {
   if (!ids.length) return [];
   const filtre = trouve && trouve.cloisonnee ? `&owner=eq.${NEUTRE}` : '';
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.map(enc).join(',')})${filtre}&select=id,data`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.map(enc).join(',')})${filtre}&select=id,data`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;

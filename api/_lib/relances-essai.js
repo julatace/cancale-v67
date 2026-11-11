@@ -44,6 +44,7 @@ import { sbCle } from './cle.js';
 import { envoyerSmtp, emailSur, hoteValide } from './smtp.js';
 import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
 import { lireMentions } from './mentions-legales.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const SITE = 'https://vrm.center';
 export const ID_ENVOIS = 'relances_essai';
@@ -180,7 +181,7 @@ export function texteRelance(etape, { fin, annule = false, relie = {}, lien = ''
 async function lire(chemin) {
   if (!SERVICE()) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL()}/rest/v1/${chemin}`, { headers: { ...sbCle(SERVICE()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL()}/rest/v1/${chemin}`, { headers: { ...sbCle(SERVICE()) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -210,7 +211,7 @@ export async function proprietaires() {
 export async function adresseDuCompte(owner) {
   if (!SERVICE() || !UUID.test(String(owner))) return { etat: 'passu' };
   try {
-    const r = await fetch(`${SUPABASE_URL()}/auth/v1/admin/users/${encodeURIComponent(owner)}`, { headers: { ...sbCle(SERVICE()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL()}/auth/v1/admin/users/${encodeURIComponent(owner)}`, { headers: { ...sbCle(SERVICE()) } });
     if (r.status === 404) return { etat: 'absent' };
     if (!r.ok) return { etat: 'passu' };
     const u = await r.json();
@@ -231,7 +232,7 @@ export const lireChoix = (owner) => ligneDe(owner, ID_CHOIX);
 async function ecrire(owner, id, data) {
   if (!SERVICE()) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL()}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL()}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(SERVICE()), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify([{ owner, id, data }]),

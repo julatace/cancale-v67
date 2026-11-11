@@ -38,6 +38,7 @@ import { lireAutreSms, rangerAutreSms, messageAutre, resumeEssaiAutre } from './
 // Le texte aplati et le code d'AUTHENTIFICATION (jamais rangé, d'où qu'il vienne,
 // jugé AVANT tout le reste) : api/_lib/sms-commun.js, partagé par chaque lecteur (9 nov.).
 import { plat, AUTHENTIFICATION } from './sms-commun.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 export { plat, AUTHENTIFICATION };
 const MARQUE_MR = /mondial\s*relay|mondialrelay\.|mrcolis|\bMRELAY\b/i;
 const N_COLIS = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\b/i;
@@ -207,7 +208,7 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   // Base cloisonnée exigée (comme la réception des e-mails) : sans colonne
   // `owner`, on ne saurait pas à qui ranger.
   let cl = null;
-  try { const r = await fetch(`${url}/rest/v1/app_data?select=owner&limit=1`, { headers: H }); cl = r.ok ? true : (r.status === 400 ? false : null); } catch (_) { cl = null; }
+  try { const r = await fetchAvecDelai(`${url}/rest/v1/app_data?select=owner&limit=1`, { headers: H }); cl = r.ok ? true : (r.status === 400 ? false : null); } catch (_) { cl = null; }
   if (cl !== true) { res.status(503).json({ ok: false, erreur: cl === false ? 'cloisonnement-requis' : 'base-injoignable' }); return; }
   // LE VENDEUR DU JETON. (7 nov., audit « 1 000 vendeurs ») D'abord l'INDEX
   // (api/_lib/jeton-index.js : une ligne lue par sa clé, le jeton re-comparé en
@@ -222,7 +223,7 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   if (!owner) {
     let lignes = null;
     try {
-      const r = await fetch(`${url}/rest/v1/app_data?id=eq.main&data->>vrm_sms_token=eq.${k}&select=owner,t:data->>vrm_sms_token&limit=2`, { headers: H });
+      const r = await fetchAvecDelai(`${url}/rest/v1/app_data?id=eq.main&data->>vrm_sms_token=eq.${k}&select=owner,t:data->>vrm_sms_token&limit=2`, { headers: H });
       const j = r.ok ? await r.json() : null; lignes = Array.isArray(j) ? j : null;
     } catch (_) { lignes = null; }
     if (lignes === null) { res.status(503).json({ ok: false, erreur: 'base-injoignable' }); return; }
@@ -239,7 +240,7 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   const autre = lu.type === 'ignore' && lu.raison === 'pas-mondial-relay' ? lireAutreSms(corps, smsAt) : null;
   const lireLigne = async (id) => {
     try {
-      const r = await fetch(`${url}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&${ow}&select=data`, { headers: H });
+      const r = await fetchAvecDelai(`${url}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&${ow}&select=data`, { headers: H });
       if (!r.ok) return { lu: false };
       const j = await r.json(); if (!Array.isArray(j)) return { lu: false };
       return { lu: true, data: (j[0] && j[0].data) || null };
@@ -247,7 +248,7 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   };
   const ecrire = async (id, data) => {
     try {
-      const r = await fetch(`${url}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST',
+      const r = await fetchAvecDelai(`${url}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST',
         headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([{ owner, id, data }]) });
       return !!(r && r.ok);
@@ -273,7 +274,7 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   if (!(await ecrire('vrm_sms_compteur', { heure: h, n: n + 1 }))) { res.status(503).json({ ok: false, erreur: 'ecriture-ratee' }); return; }
   if (autre) {
     const lireListe = async (path) => {
-      try { const r = await fetch(`${url}/rest/v1/${path}&${ow}`, { headers: H }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+      try { const r = await fetchAvecDelai(`${url}/rest/v1/${path}&${ow}`, { headers: H }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
     };
     const r = await rangerAutreSms(autre, { lireLigne, lireListe, ecrire, smsAt, maintenant: nowMs });
     res.status(r.code).json(r.corps);

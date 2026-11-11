@@ -28,6 +28,7 @@ import { repondreSansCleService } from './_lib/cle-service.js';
 // à envoyer ne sont pas bridés (l'app non plus : « un colis caché est un colis perdu »).
 import { regleDuVendeur } from './_lib/plan-vendeur.js';
 import { venteHorsPlan } from './_lib/plan-regle.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -63,7 +64,7 @@ async function fetchPaginated(path) {
   for (let from = 0; from < 500000; from += page) {
     let r;
     // (7 nov.) Un ordre TOTAL : sans `order=`, une ligne peut sauter ou revenir d'une page à l'autre.
-    try { r = await fetch(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    try { r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
@@ -91,7 +92,7 @@ function scoped(path) {
 // le 4 octobre dans push.js et ship-reminders, resté ici.
 async function cloisonnee() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
     if (r.ok) return true;
     if (r.status === 400) return false;
     return null;
@@ -134,7 +135,7 @@ async function ownerDuToken(req, res) {
   if (!given) {
     let deux = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
       const j = r.ok || r.status === 206 ? await r.json() : null; deux = Array.isArray(j) ? j.slice(0, 2) : null;
     } catch (_) { deux = null; }
     if (deux === null) { res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." }); return null; }
@@ -163,7 +164,7 @@ async function ownerDuToken(req, res) {
   //    choisit pas. Seuls deux scalaires sont projetés (§4.4).
   let lignes = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&data->>vrm_widget_token=eq.${given}&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&data->>vrm_widget_token=eq.${given}&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
     const j = r.ok ? await r.json() : null; lignes = Array.isArray(j) ? j : null;
   } catch (_) { lignes = null; }
   // « Pas su lire » ne vaut pas « aucun vendeur » : on ne devine pas, on le dit.
@@ -207,7 +208,7 @@ const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction
 async function ligneProjetee(id, cles) {
   try {
     const sel = cles.map((k) => `${k}:data->${k}`).join(',');
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const j = await r.json();
     return Array.isArray(j) ? (j[0] || null) : undefined;
@@ -345,7 +346,7 @@ async function harvestOrders(kind, vivants) {
 // Une lecture ratée ⇒ aucun colis e-mail (pas su), jamais un colis inventé.
 async function lignePanneauComptes() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped('app_data?id=eq.panel_accounts_off&select=data')}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped('app_data?id=eq.panel_accounts_off&select=data')}`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const j = await r.json();
     return Array.isArray(j) ? ((j[0] && j[0].data) || {}) : undefined;
@@ -654,7 +655,7 @@ function colisVintedDepuis(pub, txBuy, pickupDone, masques, today) {
 async function main() {
   try {
     const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.main&select=${sel}`)}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.main&select=${sel}`)}`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -719,7 +720,7 @@ export function recuDuMoisPublie(publie, ym, maintenant = Date.now()) {
 // PRIORITAIRE pour l'encaissé/ventes du mois, pour coller EXACTEMENT à l'app.
 async function snapshot() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.widget_stats&select=data`)}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.widget_stats&select=data`)}`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json(); return (j[0] && j[0].data) || null;
   } catch (_) { return null; }

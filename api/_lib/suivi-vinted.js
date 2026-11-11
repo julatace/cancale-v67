@@ -47,6 +47,7 @@ import { cleCodeRetrait } from '../email-inbound.js';
 import { clesEtapeTx, jourParis } from './transporteurs.js';
 import { DESTINATIONS } from './lien-notif.js';
 import { texteArrivee } from './notif-textes.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -62,7 +63,7 @@ async function lire(chemin, ownerForce = '') {
   const owner = ownerForce || proprietaireCourant();
   if (!owner) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(SUPABASE_KEY) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(SUPABASE_KEY) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -72,7 +73,7 @@ async function ecrire(id, data) {
   const owner = proprietaireCourant();
   if (!owner) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id, data }]),
@@ -106,7 +107,7 @@ export async function modifierCas(id, modifier, essais = 6, { owner: ownerForce 
     const data = { ...nouveau, rev: (rev0 || 0) + 1 };
     try {
       if (!present) {
-        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+        const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
           method: 'POST', headers: { ...tete, Prefer: 'resolution=ignore-duplicates,return=representation' },
           body: JSON.stringify([{ owner, id, data }]),
         });
@@ -117,7 +118,7 @@ export async function modifierCas(id, modifier, essais = 6, { owner: ownerForce 
         continue;                                   // créée entre-temps : on relit
       }
       const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
-      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
+      const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
         method: 'PATCH', headers: { ...tete, Prefer: 'return=representation' }, body: JSON.stringify({ data }),
       });
       if (!w.ok) return null;

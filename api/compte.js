@@ -108,6 +108,7 @@ import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur } from './_lib/plan-regle.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const config = { api: { bodyParser: false } };
 
@@ -133,7 +134,7 @@ export const abonnementActif = (statut) => STATUTS_ACTIFS.has(String(statut || '
 // `undefined` = pas su (on ne devine pas une réponse sur l'accès).
 async function accesDe(req) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_acces`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/vrm_acces`, {
       method: 'POST',
       headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}`, 'Content-Type': 'application/json' },
       body: '{}',
@@ -154,7 +155,7 @@ const repondre = (res, code, corps) => { res.status(code).json(corps); };
 // su (lecture ratée), `null` = aucune ligne, sinon la ligne.
 async function ligneDe(req) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?select=statut,client_stripe,abonnement_stripe,fin_periode,annule_fin_periode,mode_test&limit=1`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?select=statut,client_stripe,abonnement_stripe,fin_periode,annule_fin_periode,mode_test&limit=1`, {
       headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` },
     });
     if (!r.ok) return undefined;
@@ -339,7 +340,7 @@ async function ecrireStatut(owner, ligne, evenementTs) {
   // « active » arrivé avant lui).
   let avant = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis,abonnement_stripe,statut`, { headers: h, signal: AbortSignal.timeout(8000) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis,abonnement_stripe,statut`, { headers: h, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return { ok: false, code: 'lecture' };
     const j = await r.json();
     if (!Array.isArray(j)) return { ok: false, code: 'lecture' };
@@ -355,7 +356,7 @@ async function ecrireStatut(owner, ligne, evenementTs) {
     ? ((avant && avant.impaye_depuis) || new Date((evenementTs || Math.floor(Date.now() / 1000)) * 1000).toISOString())
     : null;
   try {
-    const ecrire = (l) => fetch(`${SUPABASE_URL}/rest/v1/abonnements?on_conflict=owner`, {
+    const ecrire = (l) => fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?on_conflict=owner`, {
       method: 'POST',
       headers: { ...h, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, ...l, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() }]),
@@ -404,7 +405,7 @@ async function proprietaireDe(sub, client) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?client_stripe=eq.${encodeURIComponent(client)}&select=owner&limit=1`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?client_stripe=eq.${encodeURIComponent(client)}&select=owner&limit=1`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
     if (!r.ok) return undefined;
     const j = await r.json();
     if (!Array.isArray(j)) return undefined;
@@ -429,7 +430,7 @@ async function lireVintedIds(owner) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE || !owner) return [];
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?owner=eq.${encodeURIComponent(owner)}&select=vinted_user_id`, { headers: sbCle(SERVICE) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?owner=eq.${encodeURIComponent(owner)}&select=vinted_user_id`, { headers: sbCle(SERVICE) });
     if (!r.ok) return [];
     const j = await r.json();
     return Array.isArray(j) ? j.map((x) => x && x.vinted_user_id).filter(Boolean).map(String) : [];
@@ -445,7 +446,7 @@ async function essaiDejaUtilise(email, ids) {
   const cles = clesEssai(email, ids);
   if (!cles.length) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/essais_gratuits?cle=in.(${enListe(cles)})&select=cle&limit=1`, { headers: sbCle(SERVICE) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/essais_gratuits?cle=in.(${enListe(cles)})&select=cle&limit=1`, { headers: sbCle(SERVICE) });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -461,7 +462,7 @@ async function enregistrerEssai(owner, email, ids, subId) {
   if (!cles.length) return true;   // rien à marquer (aucune clé) : ce n’est pas un échec
   const lignes = cles.map((cle) => ({ cle, owner: owner || null, abonnement_stripe: subId || null, cree: new Date().toISOString() }));
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/essais_gratuits?on_conflict=cle`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/essais_gratuits?on_conflict=cle`, {
       method: 'POST',
       headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
       body: JSON.stringify(lignes),
@@ -485,7 +486,7 @@ async function vintedPris(req, res) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return repondre(res, 200, { ok: true, pris: false });
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(id)}&select=owner`, { headers: sbCle(SERVICE) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(id)}&select=owner`, { headers: sbCle(SERVICE) });
     if (!r.ok) return repondre(res, 200, { ok: true, pris: false });
     const j = await r.json();
     const pris = Array.isArray(j) && j.some((row) => row && row.owner && String(row.owner) !== String(u.id));
@@ -824,7 +825,7 @@ async function comptesAutresDe(req, plateforme, owner) {
   try {
     // RLS ne lui montre que ses lignes ; base cloisonnée : on filtre AUSSI sur lui (ceinture et bretelles).
     const filtre = (await baseCloisonnee()) ? `&owner=eq.${encodeURIComponent(owner)}` : '';
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${d.ligne}${filtre}&select=${d.select}`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${d.ligne}${filtre}&select=${d.select}`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -883,7 +884,7 @@ async function compteVendeur(req, res) {
   // Le compte est-il à LUI ? Lu avec SON jeton (la base ne lui montre que les siens).
   let siens = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
     const j = r.ok ? await r.json() : null;
     siens = Array.isArray(j) ? new Set(j.map((x) => String(x && x.vinted_user_id))) : null;
   } catch (_) { siens = null; }
@@ -1119,7 +1120,7 @@ function freinFork(uid) {
 // ⚠️ Le corps de la réponse n'est JAMAIS journalisé (il porte des secrets).
 async function appelAuth(chemin, entetes, corps) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/${chemin}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/${chemin}`, {
       method: 'POST',
       headers: { ...entetes, 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
@@ -1136,7 +1137,7 @@ async function appelAuth(chemin, entetes, corps) {
 async function fermerSession(jeton) {
   if (typeof jeton !== 'string' || jeton.split('.').length !== 3) return;
   try {
-    await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
       method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jeton}` }, signal: AbortSignal.timeout(FORK_DELAI),
     });
   } catch (_) {}
@@ -1189,7 +1190,7 @@ async function journalVrm(req, res) {
   if (!u) return;
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   const lireService = SERVICE ? async (chemin) => {
-    try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(12000) }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+    try { const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(12000) }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
   } : null;
   const j = await lireJournal({ userId: u.id, lireVendeur: (c) => lireCommeVendeur(req, c), lireService, neutre: PROPRIETAIRE_NEUTRE });
   return repondre(res, 200, { ok: true, ...j });
@@ -1305,7 +1306,7 @@ async function lireCorpsJson(req) {
 // Ferme TOUTES ses sessions (app, extension, autres appareils).
 async function fermerSessions(req) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=global`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/logout?scope=global`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
     return r.ok;
   } catch (_) { return false; }
 }
@@ -1329,7 +1330,7 @@ async function discordDeja(req, res) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!jeton || !SERVICE) return repondre(res, 200, { trouve: null });
   try {
-    const ru = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal: AbortSignal.timeout(8000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    const ru = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/user`, { signal: AbortSignal.timeout(8000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
     if (!ru.ok) return repondre(res, ru.status === 401 ? 401 : 200, { trouve: null });
     const u = await ru.json();
     const ident = (Array.isArray(u && u.identities) ? u.identities : []).find(i => i && i.provider === 'discord');
@@ -1337,7 +1338,7 @@ async function discordDeja(req, res) {
     const did = String((ident.identity_data && (ident.identity_data.provider_id || ident.identity_data.sub)) || ident.id || '');
     const pseudo = String((ident.identity_data && (ident.identity_data.name || ident.identity_data.full_name)) || '').replace(/#0$/, '').toLowerCase();
     const h = sbCle(SERVICE);
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_discord&data->>verifie=eq.true&select=owner,discord:data->>discord,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar&limit=1000`, { headers: h, signal: AbortSignal.timeout(8000) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_discord&data->>verifie=eq.true&select=owner,discord:data->>discord,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar&limit=1000`, { headers: h, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return repondre(res, 200, { trouve: null });
     const rows = await r.json();
     if (!Array.isArray(rows)) return repondre(res, 200, { trouve: null });
@@ -1347,7 +1348,7 @@ async function discordDeja(req, res) {
     // foi — sinon n'importe qui « portait » le Discord d'un autre.
     const meme = rows.find(x => x && x.owner !== u.id && avatarPublicVerifie(x.owner, x) && ((/^\d{5,25}$/.test(did) && String(x.avatar || '').includes(`/avatars/${did}/`)) || (pseudo && String(x.discord || '').toLowerCase() === pseudo)));
     if (!meme) return repondre(res, 200, { trouve: false });
-    const ra = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(meme.owner)}`, { headers: h, signal: AbortSignal.timeout(8000) });
+    const ra = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(meme.owner)}`, { headers: h, signal: AbortSignal.timeout(8000) });
     const a = ra.ok ? await ra.json() : null;
     const email = masquerEmail(a && a.email);
     if (!email) return repondre(res, 200, { trouve: null });
@@ -1481,7 +1482,7 @@ async function annulerCompteOAuthNeuf(req, res) {
   const REFUS = (raison) => repondre(res, 409, { ok: false, annule: false, raison, message: NON_TOUCHE });
   let fiche = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
     if (!r.ok) return repondre(res, 503, { ok: false, annule: false, raison: 'fiche', message: NON_TOUCHE });
     fiche = await r.json();
   } catch (_) { return repondre(res, 503, { ok: false, annule: false, raison: 'fiche', message: NON_TOUCHE }); }

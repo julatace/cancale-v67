@@ -29,6 +29,7 @@
 import crypto from 'crypto';
 import { sbCle } from './cle.js';
 import { coffrePret, chiffrerCoffre, dechiffrerCoffre } from './coffre.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 export const ID_CLE = 'photoroom_cle';
@@ -52,7 +53,7 @@ const ligne = (id, owner) => `${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner
 async function lireLigneCoffre(owner) {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${ligne(ID_CLE, owner)}&select=chiffre:data->>chiffre,fin:data->>fin,at:data->>at,verif:data->>verif,verifAt:data->>verifAt,restant:data->restant,migreeLe:data->>migreeLe,rev:data->>rev`, { headers: enTetes() });
+    const r = await fetchAvecDelai(`${ligne(ID_CLE, owner)}&select=chiffre:data->>chiffre,fin:data->>fin,at:data->>at,verif:data->>verif,verifAt:data->>verifAt,restant:data->restant,migreeLe:data->>migreeLe,rev:data->>rev`, { headers: enTetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -65,7 +66,7 @@ async function lireLigneCoffre(owner) {
 async function lireAncienne(owner) {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${ligne(ID_ANCIENNE, owner)}&select=cle:data->>cle,at:data->>at`, { headers: enTetes() });
+    const r = await fetchAvecDelai(`${ligne(ID_ANCIENNE, owner)}&select=cle:data->>cle,at:data->>at`, { headers: enTetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -91,7 +92,7 @@ async function rangerCoffre(owner, cle, info) {
   const chiffre = chiffrerCoffre(USAGE, owner, { cle });
   if (!chiffre) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...enTetes(), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id: ID_CLE, data: corpsCoffre(chiffre, cle, info, nouveauRev()) }]),
@@ -106,7 +107,7 @@ async function creerCoffre(owner, cle, info) {
   if (!chiffre) return { ok: 'ko' };
   const rev = nouveauRev();
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data`, {
       method: 'POST',
       headers: { ...enTetes(), 'content-type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify([{ owner, id: ID_CLE, data: corpsCoffre(chiffre, cle, info, rev) }]),
@@ -119,7 +120,7 @@ async function creerCoffre(owner, cle, info) {
 // (la ligne a changé ou disparu entre-temps : RIEN n'est écrit) · 'ko'.
 async function modifierCoffreSi(owner, revLu, data) {
   try {
-    const r = await fetch(`${ligne(ID_CLE, owner)}&${condRev(revLu)}&select=id`, {
+    const r = await fetchAvecDelai(`${ligne(ID_CLE, owner)}&${condRev(revLu)}&select=id`, {
       method: 'PATCH',
       headers: { ...enTetes(), 'content-type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify({ data: { ...data, rev: nouveauRev() } }),
@@ -132,7 +133,7 @@ async function modifierCoffreSi(owner, revLu, data) {
 }
 async function effacer(id, owner) {
   try {
-    const r = await fetch(ligne(id, owner), { method: 'DELETE', headers: { ...enTetes(), Prefer: 'return=minimal' } });
+    const r = await fetchAvecDelai(ligne(id, owner), { method: 'DELETE', headers: { ...enTetes(), Prefer: 'return=minimal' } });
     return r.ok;
   } catch (_) { return false; }
 }
@@ -140,7 +141,7 @@ async function effacer(id, owner) {
 // lue (même date). Rend 'ok' (effacée) · 'absente' (plus là, ou réécrite) · 'ko'.
 async function effacerAncienneLue(owner, a) {
   try {
-    const r = await fetch(`${ligne(ID_ANCIENNE, owner)}&${condAt(a.at)}&select=id`, { method: 'DELETE', headers: { ...enTetes(), Prefer: 'return=representation' } });
+    const r = await fetchAvecDelai(`${ligne(ID_ANCIENNE, owner)}&${condAt(a.at)}&select=id`, { method: 'DELETE', headers: { ...enTetes(), Prefer: 'return=representation' } });
     if (!r.ok) return 'ko';
     const out = await r.json().catch(() => null);
     if (!Array.isArray(out)) return 'ko';
@@ -149,7 +150,7 @@ async function effacerAncienneLue(owner, a) {
 }
 // Défaire NOTRE création (et elle seule : filtrée sur notre `rev`).
 async function defaireCreation(owner, rev) {
-  try { await fetch(`${ligne(ID_CLE, owner)}&${condRev(rev)}`, { method: 'DELETE', headers: { ...enTetes(), Prefer: 'return=minimal' } }); } catch (_) {}
+  try { await fetchAvecDelai(`${ligne(ID_CLE, owner)}&${condRev(rev)}`, { method: 'DELETE', headers: { ...enTetes(), Prefer: 'return=minimal' } }); } catch (_) {}
 }
 
 // ── LA CLÉ, POUR LE SERVEUR SEUL (détourage) ────────────────────────────────
@@ -186,7 +187,7 @@ export async function verifierChezPhotoroom(cle) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), DELAI_MS);
   try {
-    const r = await fetch(PHOTOROOM_COMPTE, { method: 'GET', signal: ctrl.signal, headers: { 'x-api-key': cle, accept: 'application/json' } });
+    const r = await fetchAvecDelai(PHOTOROOM_COMPTE, { method: 'GET', signal: ctrl.signal, headers: { 'x-api-key': cle, accept: 'application/json' } });
     if (r.status === 401 || r.status === 403) return { verif: 'refusee', restant: null };
     if (r.status === 402) return { verif: 'sans-forfait', restant: null };
     if (!r.ok) return { verif: 'pas-su', restant: null };

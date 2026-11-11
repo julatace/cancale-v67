@@ -45,6 +45,7 @@ import { configurationRelances } from './relances-essai.js';
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles : la règle de l'app (src/venteLot.js),
 // COPIE refabriquée par `node scripts/audit-ventes-lot.cjs --recopie` — jamais modifiée à la main.
 import { resumeVenteLot, lignesFactureLot } from './vente-lot-regle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const sbKey = () => process.env.SUPABASE_SERVICE_KEY || '';
@@ -83,7 +84,7 @@ export const idFacture = (tx, avoir = false) => `email_invoice_${avoir ? 'av' : 
 export async function lireLigne(id, owner, select = 'data') {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${url(id, owner)}&select=${select}`, { headers: enTetes() });
+    const r = await fetchAvecDelai(`${url(id, owner)}&select=${select}`, { headers: enTetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -94,7 +95,7 @@ export async function lireLigne(id, owner, select = 'data') {
 // Créer seulement si absente : 'ok' · 'conflit' · 'ko'.
 export async function creer(id, owner, data) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([{ owner, id, data }]) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([{ owner, id, data }]) });
     if (r.ok) return 'ok';
     return r.status === 409 ? 'conflit' : 'ko';
   } catch (_) { return 'ko'; }
@@ -103,7 +104,7 @@ export async function creer(id, owner, data) {
 // 'ok' · 'conflit' · 'ko'.
 export async function modifierSi(id, owner, filtre, data) {
   try {
-    const r = await fetch(`${url(id, owner)}&${filtre}&select=id`, { method: 'PATCH', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data }) });
+    const r = await fetchAvecDelai(`${url(id, owner)}&${filtre}&select=id`, { method: 'PATCH', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data }) });
     if (!r.ok) return 'ko';
     const out = await r.json().catch(() => null);
     if (!Array.isArray(out)) return 'ko';
@@ -114,7 +115,7 @@ export async function modifierSi(id, owner, filtre, data) {
 export async function lireListe(requete, owner) {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     return Array.isArray(rows) ? rows : undefined;
@@ -241,7 +242,7 @@ async function boitePoser(owner, corps, res) {
   if (!chiffre) return repondre(res, 503, { erreur: 'coffre', message: "Le coffre n'a pas pu chiffrer : rien n'a été rangé." });
   const data = { v: 1, chiffre, adresse: s.adresse, fournisseur: s.fournisseur, hote: s.hote, port: s.port, at: new Date().toISOString(), rev: nouveauRev() };
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify([{ owner, id: ID_BOITE, data }]) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify([{ owner, id: ID_BOITE, data }]) });
     if (!r.ok) return repondre(res, 503, { erreur: 'base', message: "La base n'a pas pu ranger ta boîte : rien n'a changé. Réessaie." });
   } catch (_) { return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu : rien n'a changé. Réessaie." }); }
   return repondre(res, 200, { ok: true, boite: boitePublique(data) });
@@ -275,7 +276,7 @@ async function boiteEssai(owner, res) {
 async function boiteRetirer(owner, corps, res) {
   if (!corps || corps.confirme !== true) return repondre(res, 400, { erreur: 'confirmation' });
   try {
-    const r = await fetch(url(ID_BOITE, owner), { method: 'DELETE', headers: enTetes({ Prefer: 'return=minimal' }) });
+    const r = await fetchAvecDelai(url(ID_BOITE, owner), { method: 'DELETE', headers: enTetes({ Prefer: 'return=minimal' }) });
     if (!r.ok) return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu : ta boîte est peut-être toujours connectée. Réessaie." });
   } catch (_) { return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu. Réessaie." }); }
   return repondre(res, 200, { ok: true, boite: { etat: 'aucune' } });

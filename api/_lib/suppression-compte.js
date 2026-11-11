@@ -26,6 +26,7 @@ import crypto from 'crypto';
 import { gabaritMail, SITE } from './mail-gabarit.js';
 import { sbCle } from './cle.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const MOT_CONFIRMATION = 'SUPPRIMER';
 export const FENETRE_RECENTE_MS = 10 * 60 * 1000;
@@ -49,7 +50,7 @@ export function derniereConnexion(jeton) {
 
 // Le mot de passe du compte DU JETON, vérifié par Supabase : true · false (faux)
 // · undefined (pas su : service muet, captcha, trop d'essais).
-export async function verifierMotDePasse({ url, anon, email, motDePasse, id, fetcher = fetch }) {
+export async function verifierMotDePasse({ url, anon, email, motDePasse, id, fetcher = fetchAvecDelai }) {
   if (!email || !motDePasse) return false;
   try {
     const r = await fetcher(`${url}/auth/v1/token?grant_type=password`, {
@@ -120,7 +121,7 @@ export function requetes(owner, proprio) {
 }
 
 // Tout compter. `null` si UNE lecture rate (rien ne sera effacé).
-export async function inventaire({ url, service, owner, proprio, fetcher = fetch }) {
+export async function inventaire({ url, service, owner, proprio, fetcher = fetchAvecDelai }) {
   if (!UUID.test(String(owner || ''))) return null;
   const q = requetes(owner, proprio);
   const sel = { donnees: 'select=id', facturesPro: 'select=id', comptesVinted: 'select=owner', preuvesAdresse: 'select=id', indexJetons: 'select=id', signalements: 'select=id' };
@@ -135,7 +136,7 @@ export async function inventaire({ url, service, owner, proprio, fetcher = fetch
 }
 
 // Le propriétaire de l'installation : son UUID · '' (aucun déclaré) · undefined (pas su).
-export async function lireProprietaire({ url, service, env = process.env, fetcher = fetch }) {
+export async function lireProprietaire({ url, service, env = process.env, fetcher = fetchAvecDelai }) {
   const e = String(env.VRM_OWNER_UID || '').trim().toLowerCase();
   if (UUID.test(e) && e !== PROPRIETAIRE_NEUTRE) return e;
   try {
@@ -157,7 +158,7 @@ export function ligneJournal({ ok, nombres, maintenant = Date.now() }) {
   for (const [k, v] of Object.entries(nombres || {})) if (Number.isInteger(v) && v >= 0) n[k] = v;
   return { at: new Date(maintenant).toISOString(), issue: ok ? 'supprime' : 'incomplet', nombres: n };
 }
-export async function noterJournal({ url, service, owner, ok, nombres, maintenant = Date.now(), fetcher = fetch }) {
+export async function noterJournal({ url, service, owner, ok, nombres, maintenant = Date.now(), fetcher = fetchAvecDelai }) {
   const at = new Date(maintenant).toISOString();
   let ecrit = false;
   try {

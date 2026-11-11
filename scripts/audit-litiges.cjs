@@ -84,7 +84,7 @@ if (arg.includes('--prouve')) {
   // La lecture des retours eBay est PURE ; seul `lireXmlEbay` (inutile ici) tire
   // fast-xml-parser, absent de certains conteneurs : il est remplacé par un bouchon.
   const fE = path.join(dir, 'ebay-apres-vente.mjs');
-  fs.writeFileSync(fE, fs.readFileSync(EBAY, 'utf8').replace(/import \{lireXmlEbay\} from '\.\/ebay-gestion\.js';/, 'const lireXmlEbay = () => null;'));
+  fs.writeFileSync(fE, fs.readFileSync(EBAY, 'utf8').replace(/import \{lireXmlEbay\} from '\.\/ebay-gestion\.js';/, 'const lireXmlEbay = () => null;').replace("'./fetch-delai.js'", JSON.stringify(pathToFileURL(path.join(RACINE, 'api', '_lib', 'fetch-delai.js')).href)));
   try { E = await import(pathToFileURL(fE).href); } catch (e) { console.log('❌ la lecture eBay ne se charge pas : ' + e.message); process.exit(1); }
   let ko = 0, n = 0;
   const dit = (c, msg, det) => { n++; if (c) console.log('✅ ' + msg); else { ko++; console.log('❌ ' + msg + (det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 400) : '')); } };

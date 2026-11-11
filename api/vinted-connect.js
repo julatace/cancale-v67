@@ -21,6 +21,7 @@ import { vendeurExige } from './_lib/session.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { accesVendeur } from './_lib/abonnement.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // ⚠️⚠️ (9 nov., défaut #5, décision de Julien) C'EST ICI, ET SEULEMENT ICI,
 //    QU'UN COMPTE VINTED NEUF SE RELIE. La migration 029 interdit à l'API de la
 //    base (rôle `authenticated`) de créer une ligne `vinted_accounts` ou d'en
@@ -83,7 +84,7 @@ async function refresh({ host, accessToken, refreshToken, anonId, csrfToken }) {
     `refresh_token_web=${refreshToken}`,
     anonId ? `anon_id=${anonId}` : '',
   ].filter(Boolean).join('; ');
-  const res = await fetch(`https://${host}/web/api/auth/refresh`, {
+  const res = await fetchAvecDelai(`https://${host}/web/api/auth/refresh`, {
     method: 'POST',
     headers: {
       'Cookie': cookie,
@@ -115,7 +116,7 @@ async function fetchProfile({ host, accessToken, anonId, csrfToken }) {
   const ctrl = new AbortController();
   const minuteur = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(`https://${host}/api/v2/users/current`, {
+    const res = await fetchAvecDelai(`https://${host}/api/v2/users/current`, {
       signal: ctrl.signal,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -139,7 +140,7 @@ async function fetchProfile({ host, accessToken, anonId, csrfToken }) {
 // seul champ lu). `null` = pas su ⇒ rien n'est écrit.
 async function autresProprietaires(vintedUserId, owner) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(vintedUserId)}&select=owner`, { headers: { ...sbCle(SUPABASE_KEY) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(vintedUserId)}&select=owner`, { headers: { ...sbCle(SUPABASE_KEY) } });
     if (!r.ok) return null;
     const j = await r.json().catch(() => null);
     if (!Array.isArray(j)) return null;
@@ -151,7 +152,7 @@ async function autresProprietaires(vintedUserId, owner) {
 // jamais l'autre propriétaire, aucun jeton) : le support le retrouve.
 async function noterLitige(owner, vintedUserId, source) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ id: `vrm_vinted_litige_${vintedUserId}`, owner, data: { vinted_user_id: vintedUserId, at: new Date().toISOString(), source: source === 'extension' ? 'extension' : 'app' } }]),
@@ -165,7 +166,7 @@ async function upsertAccount(row, owner) {
   // Multi-vendeurs : la clé d'unicité devient (owner, vinted_user_id) — deux
   // vendeurs peuvent très bien avoir lié le même compte Vinted.
   const lignes = Array.isArray(row) ? row : [row];
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=owner,vinted_user_id`, {
+  const res = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=owner,vinted_user_id`, {
     method: 'POST',
     headers: {
       ...sbCle(SUPABASE_KEY),

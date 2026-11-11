@@ -3,6 +3,7 @@ import {filtreBoite,rubriqueConnue,rubriqueEmail,RUBRIQUES_BOITE,PIECES_MAX} fro
 import {TEXTE_MAX} from './resume-email.js';
 import {LUS_ID,etatLus,estLu} from './emails-lus.js';
 import {origineLue,PREFIXE_HTML} from './email-html.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // Une règle (§11) : à quel compte Vinted une adresse de réception appartient.
 // Lue par la réception ET par le journal — l'adresse décide, jamais le texte.
 function reglesComptes({registre,main,comptes,etats}){
@@ -55,7 +56,7 @@ export function filtreRecherche(q){
 // null = la ligne des lus n'a pas pu être lue — jamais « lu » par défaut).
 export const PAGES_PERMISES=[20,50];
 const lireLus=async(lire,o)=>{try{const l=await lire(`owner=eq.${o}&id=eq.${LUS_ID}&select=data&limit=1`);return etatLus(l[0]&&l[0].data&&typeof l[0].data==='object'?l[0].data:undefined);}catch(_){return null;}};
-export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',boite='',cherche='',compteSeul=false,nonlus=false,parPage=JOURNAL_PAGE}){
+export async function lireJournalEmail({owner,url,headers,fetcher=fetchAvecDelai,page=0,etat='',type='',adresse='',boite='',cherche='',compteSeul=false,nonlus=false,parPage=JOURNAL_PAGE}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const lire=lecteur({url,headers,fetcher}),o=encodeURIComponent(owner);
  const p=Math.max(0,Math.min(50,Number.parseInt(page,10)||0));
@@ -123,7 +124,7 @@ function compter(l,el){
 // Le texte gardé d'UN email (sur son clic). L'id est celui de SA ligne de
 // suivi ; la lecture est filtrée par son propriétaire. Absent ⇒ null (classé
 // avant le 31 oct., ou email sans texte) — jamais un texte inventé.
-export async function lireTexteEmail({owner,url,headers,fetcher=fetch,id}){
+export async function lireTexteEmail({owner,url,headers,fetcher=fetchAvecDelai,id}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const m=/^email_reception_([0-9a-f]{16,64})$/.exec(String(id||''));
  if(!m)throw Error('identifiant');
@@ -142,7 +143,7 @@ export async function lireTexteEmail({owner,url,headers,fetcher=fetch,id}){
 // e-mail (jamais par une liste), pas en mode stream. Lecture ratée ⇒ `origine:null`
 // (pas su) : l'e-mail s'ouvre quand même, avec son texte.
 const PROJECTION_HTML='html:data->>html,trop:data->>trop,octets:data->>octets,pixels:data->>pixels,at:data->>at';
-export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id,html=false,maintenant=Date.now()}){
+export async function lireEmailBoite({owner,url,headers,fetcher=fetchAvecDelai,id,html=false,maintenant=Date.now()}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const m=/^email_reception_([0-9a-f]{16,64})$/.exec(String(id||''));
  if(!m)throw Error('identifiant');
@@ -171,7 +172,7 @@ export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id,html=fa
 
 // Lecture exclusivement sous le propriétaire authentifié. Aucun corps d’email,
 // document ou compteur d’un autre utilisateur ne quitte cette projection.
-export async function lireReceptionEmail({owner,url,headers,fetcher=fetch}) {
+export async function lireReceptionEmail({owner,url,headers,fetcher=fetchAvecDelai}) {
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const lire=async(query,table='app_data')=>{
   const r=await fetcher(`${url}/rest/v1/${table}?${query}`,{headers});

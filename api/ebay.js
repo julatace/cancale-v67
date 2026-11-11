@@ -38,6 +38,7 @@ import { sbCle } from './_lib/cle.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 // ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
 // COMPTE eBAY (9 octobre, plusieurs comptes par vendeur). `ctx.compte.suffixe`
@@ -61,7 +62,7 @@ const EBAY_API = 'https://api.ebay.com';
 const DELAI_EBAY_MS = 10000, DELAI_TRADING_MS = 25000;
 async function ebayJson(url, token, extra) {
   try {
-    const r = await fetch(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}), signal: AbortSignal.timeout(DELAI_EBAY_MS) });
+    const r = await fetchAvecDelai(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}), signal: AbortSignal.timeout(DELAI_EBAY_MS) });
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (_) {}
     return { status: r.status, ok: r.ok, data: j, raw: txt.slice(0, 400) };
@@ -163,7 +164,7 @@ async function tradingCall(token, callName, inner) {
   const body = '<?xml version="1.0" encoding="utf-8"?>'
     + `<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">${inner}</${callName}Request>`;
   try {
-    const r = await fetch(`${EBAY_API}/ws/api.dll`, {
+    const r = await fetchAvecDelai(`${EBAY_API}/ws/api.dll`, {
       method: 'POST',
       headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': marcheCourant().siteId, 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
       body, signal: AbortSignal.timeout(DELAI_TRADING_MS),
@@ -1433,7 +1434,7 @@ async function handleOffre(b, ctx) {
   if (message) corps.message = message;
   let r;
   try {
-    r = await fetch(`${NEGO}/send_offer_to_interested_buyers`, {
+    r = await fetchAvecDelai(`${NEGO}/send_offer_to_interested_buyers`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${at.token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Language': marcheCourant().langue, ...enteteMarche() },
       body: JSON.stringify(corps),
@@ -2225,12 +2226,16 @@ async function handleApp(req, res) {
       : ACTIONS[action](ctx));
     res.status(r.status).json(r.body);
   } catch (e) {
-    res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });
+    // (11 nov., B120) une panne d'eBay (réseau, délai) n'est pas une panne de base ou de code.
+    const reseau = e && (e.name === 'TimeoutError' || e.name === 'AbortError' || e.name === 'TypeError' && /fetch/i.test(String(e.message)));
+    if (!reseau) console.warn('ebay : erreur interne', e && e.name);
+    res.status(reseau ? 502 : 500).json({ ok: false, error: reseau ? 'eBay injoignable' : 'Erreur de VRM — réessaie', detail: String((e && e.message) || '').slice(0, 200) });
   }
 }
 
 export default async function handler(req, res) {
   const mode = (req.query && req.query.mode) || '';
+  if (mode !== 'deletion') res.setHeader('Cache-Control', 'no-store');   // (11 nov., B118) un état par vendeur ne se met pas en cache
   if (mode === 'deletion') return handleDeletion(req, res);
   if (mode === 'callback') return handleCallback(req, res);
   return handleApp(req, res);

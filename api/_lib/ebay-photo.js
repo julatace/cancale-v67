@@ -30,6 +30,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { estUneImage } from './detourage.js';
 import { URL_PHOTO_EBAY } from '../../src/photosEbayAjout.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const PHOTO_MAX_B64 = 3000000;              // ~2,2 Mo d'octets
 export { URL_PHOTO_EBAY };
@@ -77,7 +78,7 @@ export function octetsPhoto(b64) {
 
 // Le geste complet, avec ses dépendances passées (jeton, site, adresse de l'API)
 // pour que la route garde SON appel au marché du compte.
-export async function televerserPhotoEbay(b, { jeton, siteId, api, fetchImpl = fetch }) {
+export async function televerserPhotoEbay(b, { jeton, siteId, api, fetchImpl = fetchAvecDelai }) {
   const o = octetsPhoto(b && b.image);
   if (o.err) return { status: 400, body: { ok: false, reason: 'photo', error: o.err } };
   const at = await jeton();

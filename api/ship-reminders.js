@@ -95,6 +95,7 @@ import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET
 import { passageSondes } from './_lib/statut-sondes.js';
 import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie, purgerErreursAnciennes } from './_lib/alertes-production.js';
 import { pushConfigure } from './_lib/push.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
 const RELANCES_JUSQUA_MS = 60000;
@@ -120,7 +121,7 @@ function parisDate(offsetDays = 0) {
 // `undefined` = la base n'a pas répondu (« rien lu » ne vaut pas « rien »).
 async function getRow(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=data`)}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=data`)}`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -149,7 +150,7 @@ function scoped(path) {
 // défaut, corrigé le 4 octobre.)
 async function cloisonnee() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
     if (r.ok) return true;
     if (r.status === 400) return false;
     return null;
@@ -175,7 +176,7 @@ async function ecrireDedup(id, data) {
   // Rend VRAI seulement si la base a confirmé : le bilan de la semaine ne part
   // QUE si son mémo est rangé (sinon il repartirait le lendemain — deux bilans).
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflict}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflict}`, {
       method: 'POST',
       headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([row]),
@@ -193,7 +194,7 @@ async function fetchPaginated(path) {
   for (let from = 0; from < 500000; from += page) {
     let r;
     // (7 nov.) Un ordre TOTAL : sans `order=`, une ligne peut sauter ou revenir d'une page à l'autre.
-    try { r = await fetch(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    try { r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
@@ -210,7 +211,7 @@ async function fetchPaginated(path) {
 async function getRowProjete(id, cles) {
   try {
     const sel = cles.map((k) => `${k}:data->${k}`).join(',');
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -1398,7 +1399,7 @@ async function alerterColis(r) {
 // Trois états : objet · `null` (absente) · `undefined` (pas su).
 async function lireNeutre(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}&select=data&limit=1`, { headers: HEADERS });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}&select=data&limit=1`, { headers: HEADERS });
     if (!r.ok) return undefined;
     const j = await r.json();
     if (!Array.isArray(j)) return undefined;
@@ -1407,7 +1408,7 @@ async function lireNeutre(id) {
 }
 async function ecrireNeutre(id, data) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id, data, updated_at: new Date().toISOString() }]),
@@ -1417,7 +1418,7 @@ async function ecrireNeutre(id, data) {
 }
 async function retirerNeutre(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { ...HEADERS, Prefer: 'return=minimal' } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { ...HEADERS, Prefer: 'return=minimal' } });
     return !!(r && r.ok);
   } catch (_) { return false; }
 }

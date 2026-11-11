@@ -28,6 +28,7 @@ import { sbCle } from './cle.js';
 import { utilisateurDe } from './session.js';
 import { accesVendeur } from './abonnement.js';
 import { lireClePhotoroom } from './photoroom-cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const PHOTOROOM_URL = 'https://sdk.photoroom.com/v1/segment';
@@ -63,7 +64,7 @@ export function estUneImage(buf) {
 async function lireCache(owner, sha) {
   if (!service()) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${cheminCache(owner, sha)}`, { headers: sbCle(service()) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${cheminCache(owner, sha)}`, { headers: sbCle(service()) });
     if (r.status === 404 || r.status === 400) return null;      // Storage répond 400 « not found » sur un objet absent
     if (!r.ok) return undefined;
     const buf = Buffer.from(await r.arrayBuffer());
@@ -74,7 +75,7 @@ async function lireCache(owner, sha) {
 async function ecrireCache(owner, sha, buf) {
   if (!service()) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${cheminCache(owner, sha)}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${cheminCache(owner, sha)}`, {
       method: 'POST',
       headers: { ...sbCle(service()), 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
       body: buf,
@@ -87,7 +88,7 @@ async function ecrireCache(owner, sha, buf) {
 async function reserver(owner, mois, plafond) {
   if (!service()) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_detourage_reserver`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/vrm_detourage_reserver`, {
       method: 'POST', headers: { ...sbCle(service()), 'Content-Type': 'application/json' },
       body: JSON.stringify({ u: owner, m: mois, plafond }),
     });
@@ -100,7 +101,7 @@ async function reserver(owner, mois, plafond) {
 async function rendre(owner, mois) {
   if (!service()) return;
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_detourage_rendre`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/vrm_detourage_rendre`, {
       method: 'POST', headers: { ...sbCle(service()), 'Content-Type': 'application/json' },
       body: JSON.stringify({ u: owner, m: mois }),
     });
@@ -135,7 +136,7 @@ async function lireCleVendeur(owner) {
 async function lireUsage(owner, mois) {
   if (!service()) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/detourage_usage?owner=eq.${encodeURIComponent(owner)}&mois=eq.${encodeURIComponent(mois)}&select=n`, { headers: sbCle(service()) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/detourage_usage?owner=eq.${encodeURIComponent(owner)}&mois=eq.${encodeURIComponent(mois)}&select=n`, { headers: sbCle(service()) });
     if (!r.ok) return undefined;
     const j = await r.json();
     if (!Array.isArray(j)) return undefined;
@@ -146,7 +147,7 @@ async function appelerPhotoroom(cle, b64) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), DELAI_MS);
   try {
-    const r = await fetch(PHOTOROOM_URL, {
+    const r = await fetchAvecDelai(PHOTOROOM_URL, {
       method: 'POST', signal: ctrl.signal,
       headers: { 'x-api-key': cle, 'Content-Type': 'application/json', Accept: 'image/jpeg' },
       // Fond BLANC et JPEG (jamais transparent par défaut : un PNG transparent est
@@ -279,7 +280,7 @@ export async function autorise(uid) {
   if (String(process.env.PHOTOROOM_POUR || '').toLowerCase() !== 'tous') return false;
   if (!service()) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(uid)}&select=statut,impaye_depuis`, { headers: sbCle(service()) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(uid)}&select=statut,impaye_depuis`, { headers: sbCle(service()) });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
