@@ -1,0 +1,52 @@
+/* VRM installée (11 nov., lot app-installable) : « Mettre à jour » et l'aide
+   d'installation. Neutres ; l'accent seulement sur LE geste (§7). Zones sûres
+   respectées (encoche en haut, barre d'accueil en bas). */
+.vrm-maj {
+  position: fixed; z-index: 2147482000; left: 50%; transform: translateX(-50%);
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  display: flex; align-items: center; gap: 4px; max-width: calc(100vw - 24px); box-sizing: border-box;
+  padding: 4px 4px 4px 14px; border-radius: 999px;
+  background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, #1D1D1F);
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); box-shadow: 0 6px 24px rgba(0,0,0,.12);
+  font-size: 14px; line-height: 1.2; animation: vrmMajEntree .28s var(--vrm-ease-out, ease) both;
+}
+.vrm-maj-texte { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--vrm-muted, #6E6E73); }
+.vrm-maj-oui {
+  min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; font: inherit; font-weight: 600;
+  background: transparent; color: var(--vrm-accent-texte, #0071E3); cursor: pointer; white-space: nowrap;
+}
+.vrm-maj-non, .vrm-inst-fermer {
+  display: grid; place-items: center; width: 36px; height: 36px; min-height: 36px; padding: 0; border: 0;
+  border-radius: 999px; background: transparent; color: var(--vrm-muted, #6E6E73); cursor: pointer;
+}
+/* Le doigt : 44 px de cible même si le rond dessiné fait 36 px. */
+.vrm-maj-oui, .vrm-maj-non, .vrm-inst-fermer { position: relative; }
+.vrm-maj-oui::after, .vrm-maj-non::after, .vrm-inst-fermer::after { content: ''; position: absolute; inset: -4px; }
+@keyframes vrmMajEntree { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+.vrm-inst {
+  position: fixed; z-index: 2147481000; left: 12px; right: 12px; margin: 0 auto; max-width: 420px; box-sizing: border-box;
+  bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 12px; align-items: flex-start; padding: 16px 16px 14px;
+  border-radius: 20px; background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, #1D1D1F);
+  border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); box-shadow: 0 12px 40px rgba(0,0,0,.16);
+  font-size: 15px; line-height: 1.4; animation: cancaleToast .28s var(--vrm-ease-out, ease) both;
+}
+@media (min-width: 900px) { .vrm-inst { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); } }
+.vrm-inst-fermer { position: absolute; top: 6px; right: 6px; }
+.vrm-inst-icone { flex: none; width: 44px; height: 44px; border-radius: 10px; }
+.vrm-inst-corps { flex: 1; min-width: 0; display: grid; gap: 8px; padding-right: 24px; }
+.vrm-inst-titre { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.vrm-inst-texte { margin: 0; color: var(--vrm-muted, #6E6E73); }
+.vrm-inst-gestes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vrm-inst-gestes li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vrm-inst-gestes b { font-weight: 600; }
+.vrm-inst-n {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; flex: none;
+  background: var(--vrm-card2, #F2F2F7); color: var(--vrm-muted, #6E6E73); font-size: 13px; font-weight: 600;
+}
+.vrm-inst-glyphe { color: var(--vrm-accent-texte, #0071E3); flex: none; }
+.vrm-inst-boutons { display: flex; gap: 8px; flex-wrap: wrap; }
+.vrm-inst-ok { min-height: 44px; justify-self: start; }
+html[data-theme="dark"] .vrm-maj, html[data-theme="dark"] .vrm-inst { box-shadow: 0 12px 40px rgba(0,0,0,.6); }
+@media (prefers-reduced-motion: reduce) { .vrm-maj, .vrm-inst { animation: none; } }
