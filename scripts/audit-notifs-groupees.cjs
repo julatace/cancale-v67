@@ -59,6 +59,8 @@ global.fetch = async (url, o = {}) => {
       .filter((l) => (!id || l.id === id) && (!owner || l.owner === owner) && passe(l.data, fd));
     if (!id) return rep([]);
     if (sel === 'owner') return rep(lignes.map((l) => ({ owner: l.owner })));
+    // Projection `cle:data->cle` (getRowProjete) : seulement les clés demandées.
+    if (/^[a-z_]+:data->[a-z_]+(,[a-z_]+:data->[a-z_]+)*$/i.test(sel)) return rep(lignes.map((l) => Object.fromEntries(sel.split(',').map((c) => { const [n, ch] = c.split(':data->'); return [n, l.data ? l.data[ch] : undefined]; }))));
     if (sel === 'data' || sel === 'id,data') return rep(lignes.map((l) => ({ id: l.id, data: l.data })));
     return rep(lignes.map((l) => ({ id: l.id, data: l.data, owner: l.owner })));
   }
@@ -254,6 +256,19 @@ const plus = (iso, min) => new Date(Date.parse(iso) + min * 60e3).toISOString();
     await aHeure(parisA(12, 0, 2), () => comme(() => P.sendPushToAll(OFFRE('35'))));
     await aHeure(parisA(12, 0, 4), () => comme(() => P.sendPushToAll(OFFRE('36'))));
     dit(pushes.length === 1 && /banc 36/.test(pushes[0].body || ''), 'J9 congés du … au … : calme pendant, de nouveau après', pushes.map((p) => p.body).join(','));
+    // Les rappels posés par lui (« Me le rappeler ») passent par la MÊME règle : un jour calme, ils attendent.
+    const RP = await import('file://' + path.join(R, 'api', '_lib', 'rappels-perso.js')).catch(() => null);
+    if (RP && RP.nouveauRappel) {
+      const r = RP.nouveauRappel({ cible: { sorte: 'article', num: '124', item: '5551234567' }, choix: 'demain', note: 'Rebaisser le prix' }, Date.parse(parisA(12, 0, dSam - 1)), 'rbanc0201');
+      prepare({ calme: { jours: ['sam', 'dim'] } });
+      base.set(k(J, 'main'), { vinted_accounts: [], vrm_rappels: { [r.id]: r } });
+      const s1 = await aHeure(parisA(9, 30, dSam), () => appeler('reveil'));
+      const b1 = (s1.corps.bilans || [])[0] || {};
+      dit(pushes.length === 0 && b1.rappels && b1.rappels.etat === 'heures-calmes', 'J11 un rappel perso du samedi ne sonne pas le week-end calme', JSON.stringify(b1.rappels));
+      const s2 = await aHeure(parisA(9, 30, dSam + 2), () => appeler('reveil'));
+      const b2 = (s2.corps.bilans || [])[0] || {};
+      dit(b2.rappels && b2.rappels.etat === 'envoye' && pushes.some((p) => /124|Rebaisser/.test(`${p.title} ${p.body}`)), 'J12 … il sonne lundi matin (premier moment non calme)', JSON.stringify(b2.rappels) + ' · ' + pushes.map((p) => p.title).join(' | '));
+    } else dit(false, 'J11 rappels perso : module absent', '');
     // La fenêtre qui finit un jour calme : les entrées passent « heures calmes ».
     prepare({ calme: { jours: ['sam'] } });
     const v = parisA(23, 50, dSam - 1);
