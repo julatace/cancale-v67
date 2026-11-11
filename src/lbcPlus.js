@@ -12,6 +12,8 @@
 // ⚠️ « Pas su » ne vaut pas « oui » (§5) : des statistiques jamais relevées, trop
 //    vieilles ou illisibles ne proposent RIEN (et le disent), jamais « 0 favori ».
 
+import { marquerRemise, jourParisRemise, CLE_REMISES } from '../api/_lib/remises-main-propre.js';
+
 export const JOURS_SANS_FAVORI = 30;
 export const PCT_PROPOSE = 5;
 export const STATS_FRAICHES_MS = 7 * 86400000;
@@ -95,3 +97,34 @@ export function deplacer(ordre, id, sens) {
   [o[i], o[j]] = [o[j], o[i]];
   return o;
 }
+
+// ── Remise en main propre : « Remis » (src/RemiseMainPropre.jsx) ──────────────
+// Les opérations d'UN geste annulable : la remise faite ; la vente datée d'aujourd'hui
+// (Paris) seulement si aucune date n'est LUE ni déjà saisie ; la paire sortie du stock
+// seulement si son N° (identité, déjà décidé) désigne UNE fiche — sinon rien de deviné.
+// `cle` : la clé d'un N° (`cleNum` de l'app). Rend { ops, carteApres, date, stock } ou null.
+// Les opérations de « Remis » (un geste annulable) — exportées pour l'audit.
+export function opsRemis({ carte, remise, vente, num, fiches, dates, decisions, vendus, cle: cleNum, maintenant = Date.now() }) {
+  const apres = marquerRemise(carte, remise.id, maintenant);
+  if (!apres) return null;
+  const ops = [{ k: CLE_REMISES, type: 'cle', id: remise.id, apres: apres[remise.id], avant: carte[remise.id] }];
+  const jour = jourParisRemise(maintenant);
+  const tx = String(vente.txId);
+  let date = 'deja';
+  if (!vente.dateVente && !(dates && dates[tx])) { ops.push({ k: 'vrm_lbc_dates', type: 'cle', id: tx, apres: jour, avant: undefined }); date = 'datee'; }
+  let stock = 'sans-numero';
+  const k = num ? cleNum(num) : '';
+  if (k) {
+    const ids = Object.entries(fiches || {}).filter(([, f]) => f && f.numero != null && cleNum(f.numero) === k).map(([id]) => id);
+    if (ids.length === 1) {
+      const id = ids[0];
+      const montant = vente.price != null && Number.isFinite(Number(vente.price)) ? Math.round(Number(vente.price)) / 100 : null;
+      const dec = { choix: 'vendu-main', numero: String(fiches[id].numero), at: new Date(maintenant).toISOString(), via: 'remise-lbc', tx, ...(montant != null ? { montant } : {}) };
+      ops.push({ k: 'vrm_cycle_decisions', type: 'cle', id, apres: dec, avant: decisions ? decisions[id] : undefined });
+      if (!(vendus || []).map(String).includes(String(id))) ops.push({ k: 'vinted_annonces_vendues', type: 'ensemble', id, apres: true, avant: false });
+      stock = 'sortie';
+    } else stock = ids.length ? 'plusieurs' : 'aucune-fiche';
+  }
+  return { ops, carteApres: apres, date, stock };
+}
+

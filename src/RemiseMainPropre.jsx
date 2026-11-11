@@ -16,6 +16,7 @@ import { tr, date as dateLoc } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { lireRemises, remiseSaisie, remiseDeVente, remiseFaiteDeVente, poserRemise, marquerRemise, annulerRemise, purgerRemises, finRemises,
   instantRemise, jourParisRemise, CLE_REMISES, CLE_REMISE_FIN, LIEU_MAX } from '../api/_lib/remises-main-propre.js';
+import { opsRemis } from './lbcPlus.js';
 import { C, SheetShell, askConfirm, cleNum, gesteVrm, load, save, toast } from './App.jsx';
 
 const EVT = 'vrm:remises';
@@ -85,31 +86,6 @@ function FeuilleRemise({ o, num, avant, lieux, onFermer }) {
   );
 }
 
-// Les opérations de « Remis » (un geste annulable) — exportées pour l'audit.
-export function opsRemis({ carte, remise, vente, num, fiches, dates, decisions, vendus, maintenant = Date.now() }) {
-  const apres = marquerRemise(carte, remise.id, maintenant);
-  if (!apres) return null;
-  const ops = [{ k: CLE_REMISES, type: 'cle', id: remise.id, apres: apres[remise.id], avant: carte[remise.id] }];
-  const jour = jourParisRemise(maintenant);
-  const tx = String(vente.txId);
-  let date = 'deja';
-  if (!vente.dateVente && !(dates && dates[tx])) { ops.push({ k: 'vrm_lbc_dates', type: 'cle', id: tx, apres: jour, avant: undefined }); date = 'datee'; }
-  let stock = 'sans-numero';
-  const k = num ? cleNum(num) : '';
-  if (k) {
-    const ids = Object.entries(fiches || {}).filter(([, f]) => f && f.numero != null && cleNum(f.numero) === k).map(([id]) => id);
-    if (ids.length === 1) {
-      const id = ids[0];
-      const montant = vente.price != null && Number.isFinite(Number(vente.price)) ? Math.round(Number(vente.price)) / 100 : null;
-      const dec = { choix: 'vendu-main', numero: String(fiches[id].numero), at: new Date(maintenant).toISOString(), via: 'remise-lbc', tx, ...(montant != null ? { montant } : {}) };
-      ops.push({ k: 'vrm_cycle_decisions', type: 'cle', id, apres: dec, avant: decisions ? decisions[id] : undefined });
-      if (!(vendus || []).map(String).includes(String(id))) ops.push({ k: 'vinted_annonces_vendues', type: 'ensemble', id, apres: true, avant: false });
-      stock = 'sortie';
-    } else stock = ids.length ? 'plusieurs' : 'aucune-fiche';
-  }
-  return { ops, carteApres: apres, date, stock };
-}
-
 export default function RemiseMainPropre({ o, num = '', eligible = true }) {
   useLangue();
   const carte = useRemises();
@@ -125,7 +101,7 @@ export default function RemiseMainPropre({ o, num = '', eligible = true }) {
     if (!ok) return;
     const c0 = lireCarte();
     const r = opsRemis({ carte: c0, remise: prevue, vente: o, num, fiches: load('vinted_annonce_numeros', {}) || {}, dates: load('vrm_lbc_dates', {}) || {},
-      decisions: load('vrm_cycle_decisions', {}) || {}, vendus: load('vinted_annonces_vendues', []) || [] });
+      decisions: load('vrm_cycle_decisions', {}) || {}, vendus: load('vinted_annonces_vendues', []) || [], cle: cleNum });
     if (!r) return;
     const texte = r.stock === 'sortie' ? tr('lbcplus.remise.faiteStock', { num }) : tr('lbcplus.remise.faiteSansStock');
     gesteVrm(texte, r.ops, {}, (sens) => {
