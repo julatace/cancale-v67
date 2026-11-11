@@ -83,14 +83,14 @@ async function ouvrir(b, largeur, sc) {
     localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
     for (const [k, v] of Object.entries(stock || {})) localStorage.setItem(k, v);
     sessionStorage.setItem('banc_init', '1'); } } catch (_) {} }, [sc.session || null, sc.stock || {}]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/cdn\.discordapp\.com|googleusercontent\.com/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: PNG_1 });
     // Chez Discord / Google (liaison) : il autorise, Supabase renvoie vers VRM.
     if (/^https:\/\/(discord\.com|accounts\.google\.com)\//.test(u)) { const red = sc.lienRetour; const rep = sc.retourLiaison || { code: 'code-liaison-' + (++sc.n) }; if (rep.code) sc.flux[rep.code] = sc.defiLiaison; return r.fulfill({ status: 302, headers: { location: adresseRetour(red, rep) } }); }
     return r.abort();
   });
-  await pg.route('**/auth/v1/**', async (r) => {
+  await ctx.route('**/auth/v1/**', async (r) => {
     const u = new URL(r.request().url()), m = r.request().method();
     if (/\/auth\/v1\/settings$/.test(u.pathname)) return json(r, { external: { email: true, google: true, discord: true }, mailer_autoconfirm: false });
     if (/\/auth\/v1\/user\/identities\/authorize$/.test(u.pathname)) {
@@ -127,8 +127,8 @@ async function ouvrir(b, largeur, sc) {
     if (/\/auth\/v1\/token$/.test(u.pathname)) return json(r, { error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' }, 400);
     return json(r, {});
   });
-  await pg.route('**/rest/v1/**', (r) => { const u = r.request().url(); if (/select=owner&limit=1/.test(u)) return json(r, [{ owner: UID }]); return json(r, []); });
-  await pg.route('**/api/**', (r) => {
+  await ctx.route('**/rest/v1/**', (r) => { const u = r.request().url(); if (/select=owner&limit=1/.test(u)) return json(r, [{ owner: UID }]); return json(r, []); });
+  await ctx.route('**/api/**', (r) => {
     const u = r.request().url();
     if (/mode=oauth-sans-compte/.test(u)) { j.annuler++; return sc.apiAnnule ? json(r, { ok: true, annule: true, fournisseur: 'discord' }) : json(r, { ok: false, annule: false, raison: 'pas-vide' }, 409); }
     if (/mode=profil-avatar/.test(u)) return json(r, { ok: true, image: '', partageCarte: false, nomMasque: false });
@@ -158,7 +158,7 @@ async function parBouton(b, largeur, sc, libelle, { inscription = false } = {}) 
 
 async function parcours(b, largeur) {
   const mobile = largeur < 700, tag = String(largeur);
-  const essai = async (nom, fn) => { try { await fn(); } catch (e) { dit(false, `${tag} · ${nom} : joué jusqu'au bout`, String(e && e.message).replace(/\x1b\[[0-9;]*m/g, '').slice(0, 500)); } };
+  const essai = async (nom, fn) => { if (process.env.SEULS && !process.env.SEULS.split(',').some((x) => nom.startsWith(x))) return; try { await fn(); } catch (e) { dit(false, `${tag} · ${nom} : joué jusqu'au bout`, String(e && e.message).replace(/\x1b\[[0-9;]*m/g, '').slice(0, 500)); } };
 
   await essai('P1', async () => {
     const neuf = { id: UID_NEUF, email: 'neuve@gmail.test', created_at: ilYa(0.02), last_sign_in_at: ilYa(0.02), identities: [ident('google', 'neuve@gmail.test', { cree: ilYa(0.02) })] };
@@ -302,7 +302,12 @@ async function parcours(b, largeur) {
     dit(o.j.tokens.length === 1 && !o.j.refusVerif && /Ton compte Discord est associé/.test(await texte(o.pg)), `${tag} · P14 liaison Discord réussie`, JSON.stringify({ t: o.j.tokens.length, r: o.j.refusVerif }));
     // Déconnexion par le menu du profil (le vrai geste), sinon par l'app elle-même.
     let deco = false;
-    try { await toucher(o.pg, o.pg.locator(mobile ? '[data-profil-tete]' : '[data-nav-compte]'), mobile); await o.pg.waitForTimeout(500); await toucher(o.pg, o.pg.getByRole('button', { name: /Se déconnecter/ }), mobile); await o.pg.waitForTimeout(800); const c = o.pg.getByRole('button', { name: /^Se déconnecter$/ }).filter({ visible: true }); if (await c.count()) { await toucher(o.pg, c.last(), mobile); } await o.pg.waitForTimeout(1500); deco = !(await sessionDe(o.pg)); } catch (_) {}
+    try {
+      await toucher(o.pg, o.pg.locator(mobile ? '[data-profil-tete]' : '[data-nav-compte]'), mobile); await o.pg.waitForTimeout(600);
+      await toucher(o.pg, o.pg.locator('[data-profil-menu="deconnexion"]'), mobile); await o.pg.waitForTimeout(800);
+      { const ok = o.pg.getByRole('button', { name: /^Se déconnecter$/ }).last(); if (mobile) await ok.tap({ timeout: 8000 }); else await ok.click({ timeout: 8000 }); } await o.pg.waitForTimeout(1500);
+      deco = !(await sessionDe(o.pg));
+    } catch (e) { await capture(o.pg, `${tag}-p14-deconnexion`); console.log('     (déconnexion : ' + String(e && e.message).replace(/\x1b\[[0-9;]*m/g, '').split('\n').slice(0, 3).join(' ') + ')'); }
     dit(deco, `${tag} · P14 déconnecté par « Se déconnecter »`);
     await o.pg.goto(`http://localhost:${srv.address().port}/?connexion`, { waitUntil: 'domcontentloaded' }); await o.pg.waitForTimeout(2500);
     const avant = o.j.tokens.length;

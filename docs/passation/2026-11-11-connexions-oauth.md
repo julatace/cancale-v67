@@ -4,6 +4,40 @@ Demande de Julien : « je veux qu'il n'y ait aucun bug sur les connexions Google
 Discord ». Audit complet de l'app (ordinateur, iPhone Safari/PWA) et de l'extension
 (fenêtre, carte du logo, Orion), puis correction de chaque défaut trouvé.
 
+## ⚠️ En tête : le bug MESURÉ en production (11 nov., signalé par une autre session)
+Journaux d'auth Supabase (lus en lecture seule), Edge macOS : liaison Discord réussie
+(11:56:34 `identities/authorize` → 11:56:40 `/token` PKCE 200) ; déconnexion ;
+« Continuer avec Discord » (11:57:03 `/authorize`, `redirect_to=https://vrm.center/`) →
+11:57:08 `/token` PKCE **400 « code challenge does not match previously saved code
+verifier »**, envoyé PAR LA PAGE vrm.center (referer `https://vrm.center/`, pas
+l'extension) ; le 2e essai passe.
+
+**Cause dans le code** : au retour, l'app prenait UN vérificateur à l'aveugle —
+celui de la liaison, sinon celui de l'onglet (`sessionStorage`), et seulement en
+dernier celui de l'appareil — sans savoir à quelle tentative le code appartenait.
+Un retour qui arrive dans un autre contexte que le départ (fenêtre de l'app installée
+qui capte le lien, onglet dupliqué, autre onglet) garde un VIEUX vérificateur d'onglet,
+qui passe devant le bon. Supabase garde le code après ce refus (`token.go` : le flux
+n'est pas effacé), mais l'app n'essayait pas l'autre.
+
+**Correctif** (`src/auth/essaisPkce.js`) : chaque départ (connexion ET « Relier »)
+reçoit un identifiant `vrm_essai`, porté par l'adresse de retour, et SON vérificateur
+rangé 10 min sous cet identifiant (onglet + appareil). Au retour : le vérificateur de
+CETTE tentative d'abord ; sans identifiant (Supabase retombé sur la Site URL), les
+autres dans l'ordre ; nouvel essai **seulement** sur `bad_code_verifier`, 3 au plus ;
+tout est effacé après l'échange ; une vieille liaison ne transforme plus une connexion
+en liaison (elle n'est en jeu que si SON vérificateur est celui qui marche).
+
+**Preuve** : banc P14. Sur `origin/main` compilé : « retour dans une autre fenêtre avec
+un vieux vérificateur » ⇒ **1 échange, refusé `bad_code_verifier`, pas connecté** —
+exactement l'erreur de production (rouge, avec et sans identifiant). Ici : connecté du
+1er coup avec l'identifiant ; sans identifiant, le bon trouvé au 2e échange. Mutation
+« pas de nouvel essai » ⇒ rouge. Audit K1–K2 (ordre, durée, effacement, liaison).
+⚠️ Honnête : la suite « liaison → Se déconnecter → Continuer avec Discord » DANS LE
+MÊME onglet passait déjà sur `origin/main` au banc ; la production avait donc un
+contexte en plus (le plus probable : la fenêtre de l'app installée sur Edge, ou un
+second onglet vrm.center). Le banc la joue quand même (verte), 390 et 1512.
+
 ## Comment j'ai audité
 Le comportement de Supabase n'a pas été supposé : j'ai lu son code (dépôt public
 `supabase/auth`, fichiers `internal/models/linking.go`, `internal/api/external.go`,
@@ -79,6 +113,8 @@ avec sa règle d'e-mail), chaque parcours joué au doigt (390 tactile) et à la 
 | Annulé chez Google | « Connexion avec Google annulée. Rien n'a changé. » (plus « Discord ») | banc P7, audit M1 |
 | Code déjà servi / expiré / autre vérificateur | « Cette connexion a expiré ou a déjà servi. Reclique « Continuer avec Google ». » | banc P8, audit M1, X1 |
 | Retour dans un autre onglet sans vérificateur | rien échangé, la phrase nomme le bouton | banc P9 |
+| Liaison Discord → Se déconnecter → Continuer avec Discord | connecté du 1er coup, un seul échange | banc P14 |
+| Retour dans une autre fenêtre qui garde un vieux vérificateur (bug de prod) | connecté (avec l'identifiant : 1er coup ; sans : 2e échange) ; rouge sur `origin/main` | banc P14, audit K1–K2 |
 | Relier Discord (manual linking allumé) | liaison avec SA session, jamais `/authorize`, même compte, « relié » | banc P10, profil-photo R6 |
 | Relier, manual linking éteint | « La liaison n'est pas encore activée sur VRM » | profil-photo R6, audit M1 |
 | Relier, Discord pris par un autre compte VRM | le chemin en 3 gestes ; reste connecté à SON compte | banc P11, audit M2 |
