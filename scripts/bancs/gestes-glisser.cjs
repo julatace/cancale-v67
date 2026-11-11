@@ -12,8 +12,8 @@
 //      V3 « Déposé » du tiroir ⇒ la barre « Annuler » (la MÊME que le bouton) ; rien d'écrit pendant 5 s ;
 //      V4 un défilement vertical, un appui au bord gauche (retour iOS) : rien ne bouge ;
 //      V5 mouvement réduit : la ligne se pose sans ressort (transition 'none').
-//   A. Achats 390 : glisser long sur le colis ⇒ « Colis retiré » + « Annuler » (le geste annulable) ;
-//      « Annuler » ⇒ le colis revient ; glisser court ⇒ « Le code » est le lien de la conversation.
+//   A. À retirer 390 : « Le code » du tiroir ⇒ la ligne s'ouvre, le code est copié (le geste de « Code ») ;
+//      glisser long ⇒ « Retiré » (le colis sort, pilule « Annuler ») ; « Annuler » ⇒ il revient.
 //   Q. Qui dorment 390 : « Baisser » du tiroir ⇒ la FEUILLE de baisse (1 annonce), AUCUNE commande
 //      partie ; glisser long ⇒ la feuille aussi, toujours rien d'envoyé.
 //   K. 1512 (souris, clavier) : un glisser à la souris ne bouge rien ; le tiroir fermé est `inert` +
@@ -106,6 +106,8 @@ async function preparer(b, vp, { indiceVu = true, reduit = false } = {}) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ indiceVu }) => { try { if (sessionStorage.getItem('__banc')) return; sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); if (indiceVu) localStorage.setItem('vrm_glisse_indice_vu', '1'); } catch (_) {} }, { indiceVu });
   await pg.addInitScript(PONT);
+  // L'indice est noté au moment où il se pose (il ne dure que 0,9 s) : un observateur, posé avant l'app.
+  await pg.addInitScript(() => { window.__indices = []; const t0 = performance.now(); new MutationObserver((ms) => { for (const m of ms) if (m.target.getAttribute('data-lg-indice') === '1') window.__indices.push([Math.round(performance.now() - t0), m.target.getAttribute('data-lg-id')]); }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-lg-indice'] }); });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -131,11 +133,10 @@ const ouvrirVentes = async (pg) => {
   await pg.locator('[data-tx="9201"]').first().waitFor({ timeout: 25000 });
   await pg.waitForTimeout(400);
 };
+const SEL_RETRAIT = '.vrm-rpf-ligne[data-lg]';
 const ouvrirAchats = async (pg) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('.vrm-pickup-card[data-lg], [data-cc-colonne="retirer"] .vrm-rpf-ouvrir').first().waitFor({ timeout: 25000 });
-  if (!(await pg.locator('.vrm-pickup-card[data-lg]').count())) await pg.locator('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir').first().click().catch(() => {});
-  await pg.locator('.vrm-pickup-card[data-lg]').first().waitFor({ timeout: 12000 });
+  await pg.locator(SEL_RETRAIT).first().waitFor({ timeout: 25000 });
   await pg.waitForTimeout(400);
 };
 const ouvrirQD = async (pg) => {
@@ -182,10 +183,11 @@ async function main() {
     await essaie('V1', async () => {
       const { ctx, pg, errs } = await preparer(b, T, { indiceVu: false });
       await ouvrirVentes(pg);
-      const vu = await pg.waitForFunction(() => document.querySelectorAll('[data-lg-indice]').length === 1, null, { timeout: 4000 }).then(() => true).catch(() => false);
-      const n = await pg.evaluate(() => document.querySelectorAll('[data-lg-indice]').length);
-      await shot(pg, 'v1-indice-390');
-      dit(vu && n === 1, 'V1 la première fois, UNE ligne montre ses actions (data-lg-indice)', String(n));
+      await pg.waitForFunction(() => window.__indices.length > 0, null, { timeout: 5000 }).catch(() => {});
+      await pg.waitForTimeout(200); await shot(pg, 'v1-indice-390');
+      await pg.waitForTimeout(1200);
+      const ind = await pg.evaluate(() => window.__indices.slice());
+      dit(ind.length === 1, 'V1 la première fois, UNE seule ligne montre ses actions (data-lg-indice), une fois', JSON.stringify(ind));
       await pg.waitForTimeout(1400);
       const apres = await etatLigne(pg, '[data-tx="9201"]');
       dit(apres && !apres.indice && !apres.actif, 'V1 puis elle revient en place toute seule', JSON.stringify(apres && { i: apres.indice, a: apres.actif, t: apres.translate }));
@@ -193,7 +195,7 @@ async function main() {
       await pg.reload({ waitUntil: 'domcontentloaded' });
       await pg.locator('[data-tx="9201"]').first().waitFor({ timeout: 25000 });
       await pg.waitForTimeout(2200);
-      const encore = await pg.evaluate(() => document.querySelectorAll('[data-lg-indice]').length);
+      const encore = await pg.evaluate(() => window.__indices.length);
       dit(encore === 0, 'V1 rechargée : plus jamais d’indice', String(encore));
       dit(!errs.length, 'V1 aucune erreur d’app', errs[0]);
       await ctx.close();
@@ -250,28 +252,32 @@ async function main() {
       dit(!errs.length, 'V5 aucune erreur d’app', errs[0]);
       await ctx.close();
     });
-    // ── A. Achats : « Retiré » au glisser long, annulable ─────────────────────
+    // ── A. À retirer : « Le code » et « Retiré » au glisser ───────────────────
     await essaie('A', async () => {
       const { ctx, pg, errs } = await preparer(b, T);
+      await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
       await ouvrirAchats(pg);
-      const sel = '.vrm-pickup-card[data-lg]';
+      const sel = SEL_RETRAIT;
       await glisser(pg, sel, { part: 0.3 });
       let e = await etatLigne(pg, sel);
       await shot(pg, 'a-tiroir-390');
-      dit(e && e.ouvert === '1' && e.acts.map((a) => a.k).join(',') === 'code,retire', 'A1 glisser court : « Le code » puis « Retiré »', JSON.stringify(e && e.acts));
-      dit(e && /vinted\.fr\/inbox\/7001/.test((e.acts.find((a) => a.k === 'code') || {}).href || ''), 'A1 « Le code » ouvre la conversation où est le code (le même lien que la carte)', e && JSON.stringify(e.acts.map((a) => a.href)));
+      dit(e && e.ouvert === '1' && e.acts.map((a) => a.k).join(',') === 'code,retire', 'A1 glisser court : « Le code » puis « Retiré » au bord droit', JSON.stringify(e && e.acts));
       dit(e && e.acts.every((a) => a.w >= 44 && a.h >= 44 && a.dedans) && e.deb <= 0, 'A1 actions ≥ 44 px, dans l’écran, aucun débordement', e && JSON.stringify(e.acts));
-      await toucher(pg, 'body');
-      await glisser(pg, sel, { part: 0.75 });
-      const pilule = await pg.waitForFunction(() => /Colis retiré/.test(document.body.innerText) && /Annuler/.test(document.body.innerText), null, { timeout: 4000 }).then(() => true).catch(() => false);
+      await toucher(pg, `${sel} [data-lg-action="code"]`);
+      const ouverte = await pg.evaluate((s) => { const l = document.querySelector(s); return { o: l && l.getAttribute('data-ouvert'), lg: l && l.getAttribute('data-lg-ouvert') }; }, sel);
+      let presse = ''; try { presse = await pg.evaluate(() => navigator.clipboard.readText()); } catch (_) {}
+      dit(ouverte.o === '1' && !ouverte.lg, 'A2 « Le code » ⇒ la ligne s’ouvre sur le code (le même geste que « Code »), le tiroir se referme', JSON.stringify(ouverte));
+      dit(presse === '012345', 'A2 … et le code est copié tel quel (zéro de tête)', presse);
+      await shot(pg, 'a-code-390');
+      await glisser(pg, sel, { part: 0.8 });
+      const pilule = await pg.waitForFunction(() => /retiré/i.test(document.body.innerText) && [...document.querySelectorAll('button')].some((b) => /^Annuler$/.test(b.textContent.trim())), null, { timeout: 4000 }).then(() => true).catch(() => false);
       await shot(pg, 'a-retire-annuler-390');
-      const fait = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_pickup_done') || '{}'); } catch (_) { return {}; } });
-      dit(pilule, 'A2 glisser long ⇒ « Colis retiré » avec « Annuler » (le geste annulable du bouton)');
+      const parti = (await pg.locator(sel).count()) === 0;
+      dit(pilule && parti, 'A3 glisser long ⇒ « Retiré » : le colis sort de la liste, la pilule offre « Annuler »', JSON.stringify({ pilule, parti }));
       const btnAnn = pg.locator('button', { hasText: /^Annuler$/ }).last();
       if (await btnAnn.count()) await btnAnn.click();
       await pg.waitForTimeout(1500);
-      const apres = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_pickup_done') || '{}'); } catch (_) { return {}; } });
-      dit(!apres['9301'] && (await pg.locator(sel).count()) > 0, 'A3 « Annuler » ⇒ le colis revient dans « à retirer », rien de retenu', JSON.stringify({ fait, apres }));
+      dit((await pg.locator(sel).count()) > 0, 'A4 « Annuler » ⇒ le colis revient dans « à retirer »');
       dit(!errs.length, 'A aucune erreur d’app', errs[0]);
       await ctx.close();
     });
@@ -321,7 +327,8 @@ async function main() {
       dit(b9201.depose && b9201.imprimer, 'K3 Ventes : « Déposé » et « Imprimer » existent en boutons de la ligne', JSON.stringify(b9201));
       await shot(pg, 'k-ventes-1512');
       await ouvrirAchats(pg);
-      dit((await pg.locator('.vrm-pickup-card[data-lg] .vrm-pickup-collect').count()) > 0, 'K3 Achats : « J’ai retiré » existe en bouton de la carte');
+      const rt = await pg.evaluate((s) => { const l = document.querySelector(s); return { retire: !!(l && l.querySelector('[data-colis-retire]')), code: !!(l && l.querySelector('[data-rp-code]')) }; }, SEL_RETRAIT);
+      dit(rt.retire && rt.code, 'K3 À retirer : « J’ai retiré » et « Code » existent en boutons de la ligne', JSON.stringify(rt));
       await shot(pg, 'k-achats-1512');
       await ouvrirQD(pg);
       const qd = await pg.evaluate(() => ({ agir: !!document.querySelector('[data-qd-agir="900001"]'), cases: !!document.querySelector('[data-qd-case="900001"]'), baisser: !!document.querySelector('[data-qd-baisser]') }));
