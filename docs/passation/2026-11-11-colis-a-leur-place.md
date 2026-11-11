@@ -219,6 +219,17 @@ mesuré au banc). Banc : scrollWidth/scrollHeight/ellipsis sur le rendu, 390 et 
 | `audit-raccourcis-clavier` (+ `--prouve`) | vert | — |
 | audits communs (variables, tdz, coherence, identite, icones, textes-courts, fonctions-api, secrets) | verts | — |
 
+Bancs voisins (branche, après merge) : `selection-bordereaux` 54 conformes ; `lot-bordereaux` 17 conformes ;
+`tout-imprimer` 24/26 (les 2 rouges « groupes de l'écran » : `data-groupe-transp` n'existe plus nulle part, rouges
+identiques sur origin/main) ; `colis-retirer-propre` 129 verts ; `retraits-irreprochables` 26 verts ;
+`logos-bordereaux` 16 verts ; `achats-retraits` 76 verts, 8 rouges = 2 contrôles × 4 vues (« Peut-être en double · 9 »
+rend 3, « à vérifier » 0/3), identiques sur origin/main — logique des retraits, lot « retraits-fiables ».
+Portés honnêtement (même règle, nouvelle cible) : `lot-bordereaux`, `tout-imprimer`, `selection-bordereaux` (plus de
+case « Contrôlé » : l'aperçu A4 la remplace, jugé), `achats-retraits` (pastille d'Achats = publication ; section en
+tête au lieu du lien « → Colis »), `colis-retirer-propre` (« une ligne » ⇒ « en entier »), `ecrans-gardes` (Achats
+gardé à la place de Colis), `audit-plateformes-logo`, `audit-raccourcis-clavier`, `audit-garde-ecrans`,
+`audit-reprise-ecran`. « Tout sélectionner / Tout décocher » restent dans la feuille (liens).
+
 Rouges identiques sur origin/main (pas de ce lot) : `audit-violet` (3, FedEx/Relais Colis), `audit-garde-ecrans`
 (Capture*), `audit-reprise-ecran` (balayage du bord), `audit-colis-envoi` (1), `audit-achats-export`,
 `audit-facture-achat`, `audit-donnees-ecrans`, `audit-journee-hors-ligne` ; banc `ecrans-gardes` : 1 défaut
