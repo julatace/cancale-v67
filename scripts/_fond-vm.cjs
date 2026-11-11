@@ -73,7 +73,7 @@ function filtreOk(row, u) {
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false, ecritureKO = () => false, retardLecture = () => 0,
   connecte = '111', comptes = null, store = {}, cdn = null, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null,
-  transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined } = {}) {
+  transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined, vraisComptes = false, globales = null } = {}) {
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
@@ -280,6 +280,10 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     };
   }
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
+  // 5.361 : `self.addEventListener` du service worker (ex. `unhandledrejection`), noté dans `j.globales`.
+  j.globales = {};
+  ctx.addEventListener = (type, fn) => { (j.globales[type] = j.globales[type] || []).push(fn); };
+  if (globales) Object.assign(ctx, globales);
   // `retirer` (20 octobre) : imite un navigateur à qui il MANQUE des API
   // (Orion iPhone, Safari, Firefox pour Android) — chaque chemin pointé
   // (`alarms`, `windows.update`, `runtime.onMessageExternal`…) est SUPPRIMÉ
@@ -313,7 +317,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   if (firefox && firefox.compat) vm.runInContext(firefox.compat, ctx, { filename: 'compat-firefox.js' });
   vm.runInContext(SRC, ctx, { filename: 'background.js' });
   // Les portes du monde extérieur, remplacées pour COMPTER.
-  ctx.getStoredAccounts = async () => (comptes || [{ vinted_user_id: connecte || '111', login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }]).map(a=>({...a,owner:store.vrmSession?.user_id}));
+  // 5.361 : `vraisComptes` garde le VRAI `getStoredAccounts` (lecture de `vinted_accounts`
+  // par la fausse base) — pour juger sa réponse « pas su » (null) ; sinon remplacé comme avant.
+  if (!vraisComptes) ctx.getStoredAccounts = async () => (comptes || [{ vinted_user_id: connecte || '111', login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }]).map(a=>({...a,owner:store.vrmSession?.user_id}));
   ctx.activeAccountId = async () => connecte;
   ctx.activeUidForDomain = async () => connecte;
   ctx.noterDiag = async (k) => { j.diags.push(k); };
