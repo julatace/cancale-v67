@@ -19,6 +19,9 @@
 //      s'ouvre UNE fois, RIEN de pré-coché ; tant qu'il n'a pas choisi, VRM parle
 //      toujours de « paires » (rien changé sans son clic) ; « Plus tard » ⇒ retenue
 //      (`vu`), elle ne revient pas au rechargement ; il choisit Sneakers ⇒ inchangé.
+//  V5  (lot vocabulaire-article) vendeuse « Lunettes » : écrans SECONDAIRES (Leboncoin, eBay, Stats,
+//      Ma semaine, À trancher, Inventaire, E-mails…) et l'aide du « ? » : aucun « paire(s) ».
+//  V6  vendeur « Sneakers », mêmes écrans : « paire » toujours là (contrôle positif).
 //  Chaque fois : aucune erreur JS, rien ne déborde. `SHOTS=dossier` range les captures
 //  (à REGARDER). `LARGEURS=390,1512` / `THEMES=clair,sombre` / `SCENARIOS=V1,V2,V3,V4`.
 // ════════════════════════════════════════════════════════════════════════════
@@ -34,7 +37,7 @@ const SHOTS = process.env.SHOTS || '';
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
-const SCENARIOS = liste('SCENARIOS', 'V1,V2,V3,V4');
+const SCENARIOS = liste('SCENARIOS', 'V1,V2,V3,V4,V5,V6');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 const UID = '7a1e0c55-2b1d-4c3e-9f00-0000000000d2';
 const SESSION = { access_token: 'jeton-generaliste', refresh_token: 'r', totp: [], expires_at: Date.now() + 3600e3, user: { id: UID, email: 'vendeuse.lunettes@exemple.test', totp: [] } };
@@ -262,6 +265,48 @@ async function scenario(nav, nom, W, theme) {
       await capture(o.pg, `${pref}-note`);
       await o.pg.keyboard.press('Escape').catch(() => {});
     } else dit(false, `${T} le bouton « note » d’un article est trouvé`);
+    dit(!(await deborde(o.pg)), `${T} rien ne déborde`);
+    dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' | '));
+    await o.ctx.close();
+    return;
+  }
+  // (11 nov., lot vocabulaire-article) V5 : les écrans SECONDAIRES et l'aide du « ? » d'une
+  // vendeuse « Lunettes » : aucun « paire(s) » (VRM dit « article »). V6 : le même parcours pour un
+  // vendeur « Sneakers » — « paire » est toujours là (le test n'est pas vide, les textes d'avant).
+  if (nom === 'V5' || nom === 'V6') {
+    const sneakers = nom === 'V6';
+    const base = sneakers ? baseLunettes({ vend: { choix: 'sneakers', categories: ['sneakers'], at: '2026-11-01T10:00:00.000Z' } }) : baseLunettes();
+    if (sneakers) for (const r of base.rows) { const p = r.data && r.data.payload; if (p && Array.isArray(p.items)) for (const it of p.items) it.title = 'Air Max 90 blanches taille 42'; }
+    const o = await ouvrir(nav, { W, sombre, base, proprio: false });
+    await attendre(o.pg, async () => (await etape(o.pg)) === null, 12000);
+    const ecrans = ['leboncoin', 'ebay_annonces', 'vinted_annonces', 'dashboard', 'semaine', 'trancher', 'inventory', 'emails', 'litiges', 'stockvinted', 'cat_msg'];
+    const vus = [];
+    for (const t of ecrans) {
+      await o.pg.goto(`http://localhost:${PORT}/?tab=${t}`, { waitUntil: 'domcontentloaded' });
+      await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
+      await o.pg.waitForTimeout(2200);
+      const tx = await releveTexte(o.pg);
+      const avec = phrasesAvec(tx, /\bpaires?\b/i);
+      vus.push(...avec.map((x) => `${t}: ${x}`));
+      if (!sneakers) dit(avec.length === 0, `${T} ${t} : aucun « paire »`, avec.slice(0, 6).join(' ¦ '));
+      if (t === 'leboncoin' || t === 'semaine') await capture(o.pg, `${pref}-${t}`);
+    }
+    // L'aide du « ? » (étapes et questions) sur Annonces et Colis.
+    for (const t of ['annonces', 'cat_bord', 'garage']) {
+      await o.pg.goto(`http://localhost:${PORT}/?tab=${t}`, { waitUntil: 'domcontentloaded' });
+      await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
+      const b = await attendre(o.pg, async () => !!(await o.pg.$('[data-aide-ouvrir]')), 9000);
+      if (!b) { dit(false, `${T} ${t} : le « ? » de l’aide est là`); continue; }
+      await o.pg.evaluate(() => document.querySelector('[data-aide-ouvrir]').click());
+      const ouvert = await attendre(o.pg, async () => !!(await o.pg.$('[data-aide-questions]')), 5000);
+      if (ouvert) await o.pg.evaluate(() => document.querySelectorAll('.vrm-aide-q').forEach((d) => { d.open = true; }));
+      const aide = ouvert ? await o.pg.$eval('[data-aide-questions]', (e) => (e.closest('[role="dialog"]') || e.parentElement).innerText) : '';
+      const avec = phrasesAvec(aide, /\bpaires?\b/i);
+      vus.push(...avec.map((x) => `aide ${t}: ${x}`));
+      if (!sneakers) dit(ouvert && aide.length > 40 && avec.length === 0, `${T} aide « ? » de ${t} : ouverte, aucun « paire »`, avec.slice(0, 4).join(' ¦ ') || `ouvert=${ouvert}`);
+      if (t === 'annonces') await capture(o.pg, `${pref}-aide-annonces`);
+    }
+    if (sneakers) dit(vus.length > 0, `${T} vendeur Sneakers : VRM dit toujours « paire » sur ces écrans (${vus.length} phrases)`, 'aucune');
     dit(!(await deborde(o.pg)), `${T} rien ne déborde`);
     dit(!o.journal.erreurs.length, `${T} aucune erreur JS`, o.journal.erreurs.join(' | '));
     await o.ctx.close();
