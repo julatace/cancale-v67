@@ -97,7 +97,7 @@
 /* Une vignette d'article se touche pour l'ouvrir en grand. */
 @media (hover: hover) and (pointer: fine) { .vrm-main img[data-vrm-vignette] { cursor: zoom-in; } }
 /* (11 nov., clics-directs) Pas de loupe au survol là où le toucher fait autre chose qu'un zoom :
-   la photo d'une vente (elle s'ouvre en grand), la pile de Ma journée (elle mène à Ventes). */
-@media (hover: hover) and (pointer: fine) { .vrm-main :is(.vrm-photo-open, [data-sans-visionneuse]) img[data-vrm-vignette] { cursor: pointer; } }
+   la photo d'une vente (elle s'ouvre en grand, Ventes et son détail), la pile de Ma journée (elle mène à Ventes). */
+@media (hover: hover) and (pointer: fine) { .vrm-main :is(.vrm-photo-open, [data-sans-visionneuse], .vrm-ventes-liste) img[data-vrm-vignette] { cursor: pointer; } }
 
 } /* fin @layer vrm-premium */
