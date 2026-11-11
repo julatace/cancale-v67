@@ -47,7 +47,7 @@ function Choix({ valeur, options, onChange, C, label, attr = {} }) {
     <div role="group" aria-label={label} {...attr} style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 12, background: C.card2 || C.bg, flexWrap: 'wrap' }}>
       {options.map(([v, lib]) => (
         <button key={String(v)} type="button" aria-pressed={valeur === v} data-ebay-choix={String(v)} onClick={() => onChange(v)}
-          style={{ minHeight: 38, minWidth: 44, border: 'none', borderRadius: 10, background: valeur === v ? C.card : 'transparent', boxShadow: valeur === v ? '0 1px 3px rgba(0,0,0,.12)' : 'none', color: C.text, fontSize: 14, fontWeight: valeur === v ? 600 : 500, padding: '0 12px', cursor: 'pointer', fontFamily: 'inherit' }}>{lib}</button>
+          style={{ minHeight: 44, minWidth: 44, border: 'none', borderRadius: 10, background: valeur === v ? C.card : 'transparent', boxShadow: valeur === v ? '0 1px 3px rgba(0,0,0,.12)' : 'none', color: C.text, fontSize: 14, fontWeight: valeur === v ? 600 : 500, padding: '0 12px', cursor: 'pointer', fontFamily: 'inherit' }}>{lib}</button>
       ))}
     </div>
   );

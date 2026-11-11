@@ -1189,6 +1189,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         typeof achatP === 'number' && offre.accepte < achatP && `C'est sous ton prix d'achat (${eurEbay(achatP)}), avant frais eBay.`,
         offre.sousMoitie && `C'est ${Math.round(offre.accepte / prixP * 100)}\u00a0% du prix de l'annonce — tu l'as confirmé.`,
         b.item.numero && plusieursPub && `VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.`,
+        ...lignesReglagesConfirmation(),
       ].filter(Boolean);
       const ok = await askConfirm({ title: `Publier, et laisser eBay accepter les offres dès ${eurEbay(offre.accepte)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, publier', cancel: 'Annuler' });
       if (!ok) return;
@@ -1200,7 +1201,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Plusieurs comptes : la confirmation NOMME le compte où elle part.
       const ok = await askConfirm({
         title: `Publier sur ton compte eBay « ${nomComptePub} » ?`,
-        desc: `« ${titre || 'cet article'} » sera mis en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}`,
+        desc: [`« ${titre || 'cet article'} » sera mis en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}`, ...lignesReglagesConfirmation()].filter(Boolean).join('\n\n'),
         ok: 'Oui, publier', cancel: 'Annuler',
       });
       if (!ok) return;
