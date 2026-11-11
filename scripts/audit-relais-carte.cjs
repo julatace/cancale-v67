@@ -81,10 +81,14 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
     dit(!!vannes && vannes.nArrives === 2 && vannes.nAttendus === 1, "« TABA'VAP » (e-mail) et « TABAVAP » (conversation), même code postal : UN point — deux colis arrivés, un attendu", JSON.stringify(g.map((x) => [x.cle, x.nArrives, x.nAttendus])));
     dit(!!vannes && vannes.arrives.filter((c) => c.id === 'e:MR1').length === 1, 'un même colis (même identité) ne compte qu’une fois', JSON.stringify(vannes && vannes.arrives));
     dit(!!par['tabacduport|35260'] && !!par['tabacduport|29200'] && par['tabacduport|29200'].nAttendus === 1, 'le même NOM dans deux villes : deux points (jamais fusionnés à la ressemblance)', JSON.stringify(Object.keys(par)));
-    dit(!!par['superu|'] && par['superu|'].attendus[0].estimee === null && par['superu|'].geocode === null, 'une date d’arrivée illisible n’est pas dite ; une adresse sans rue ni code postal n’a pas de repère', JSON.stringify(par['superu|']));
+    // (11 nov., retraits fiables) Un nom SEUL (ni code postal, ni rue, ni ville) est un point à part, « adresse pas lue ».
+    const su = g.find((x) => x.adressePasLue && x.nom === 'Super U');
+    dit(!!su && su.attendus[0].estimee === null && su.geocode === null, 'une date d’arrivée illisible n’est pas dite ; une adresse sans rue ni code postal n’a pas de repère', JSON.stringify(su));
     dit(!!vannes && vannes.prochaineEstimee === '2026-11-03' && g[0].nArrives > 0 && g[g.length - 1].nArrives === 0, 'les points où des colis ATTENDENT d’abord ; la prochaine arrivée estimée est dite', JSON.stringify(g.map((x) => x.cle)));
     const seul = M.regrouperRelais({ arrives: [{ id: 'e:1', nom: 'Kusmi Tea', adresse: '13 Rue Saint-Vincent, 56000 Vannes' }], attendus: [{ id: 'v:2', nom: 'Kusmi Tea', rue: '', cp: '', ville: '' }] });
-    dit(seul.length === 1 && seul[0].nArrives === 1 && seul[0].nAttendus === 1, 'un lieu sans code postal rejoint le SEUL point qui porte ce nom', JSON.stringify(seul.map((x) => x.cle)));
+    // (11 nov., retraits fiables — Julien : « aucune hypothèse », « tu me regroupes tout à Super U ») INVERSÉ : un nom
+    // SEUL (ni code postal, ni rue, ni ville) ne rejoint plus « le seul point de ce nom » — une ressemblance de nom.
+    dit(seul.length === 2 && seul.some((x) => x.adressePasLue && x.nAttendus === 1) && seul.some((x) => !x.adressePasLue && x.nArrives === 1), 'un lieu au NOM SEUL ne rejoint jamais un autre point de ce nom (point à part, « adresse pas lue »)', JSON.stringify(seul.map((x) => x.cle)));
     const deux = M.regrouperRelais({ arrives: [{ id: 'e:1', nom: 'Kusmi Tea', adresse: '13 Rue X, 56000 Vannes' }, { id: 'e:2', nom: 'Kusmi Tea', adresse: '2 Rue Y, 35000 Rennes' }], attendus: [{ id: 'v:3', nom: 'Kusmi Tea' }] });
     dit(deux.length === 3, '…et reste à part quand DEUX points portent ce nom (on ne choisit pas)', JSON.stringify(deux.map((x) => x.cle)));
     dit(M.adresseGeocodable({ rue: '40 rue du Port', cp: '35260', ville: 'Cancale' }) === '40 rue du Port, 35260 Cancale' && M.adresseGeocodable({ rue: '', cp: '35260', ville: 'Cancale' }) === null && M.adresseGeocodable({ rue: 'Centre commercial', cp: '35260' }) === null, 'une adresse à chercher = une rue avec son numéro + code postal ou ville ; une ville seule, jamais (épingle au centre de la ville = faux)', '');

@@ -16,6 +16,7 @@ import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
 
 export const JOURS_RELAIS_CHANGE = 21;   // au-delà, l'alerte n'a plus de sens (le colis est arrivé ou reparti)
 
+const codeOk = (c) => /^[A-Z0-9]{4,10}$/i.test(String(c || '').trim()) && /\d/.test(String(c || ''));
 const msDe = (v) => { const t = Date.parse(String(v || '')); return Number.isFinite(t) ? t : null; };
 
 // « INTERMARCHE, 4 AVENUE …, 35350 VILLE » ⇒ { nom, adresse } (le nom = la 1re partie lue).
@@ -69,7 +70,13 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
     if (arriveApres(n, at)) continue;
     vus.add(n);
     const lieu = String(t.lieu || '').trim();
-    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at });
+    // (11 nov., retraits fiables — Julien : « ceux qui ont changé de point relais… tu ne donnes pas les
+    // codes ») LE CODE DE CE COLIS, PAR SON N° : celui de l'e-mail du changement, sinon le plus récent des
+    // autres e-mails / SMS du MÊME n° (une identité) ; aucun ⇒ '' (« code pas encore reçu »).
+    const avecCode = lignes.filter((x) => x && normaliserSuivi(x.suivi) === n && codeOk(x.code))
+      .sort((a, b) => (msDe(b.emailAt) || msDe(b.receivedAt) || 0) - (msDe(a.emailAt) || msDe(a.receivedAt) || 0));
+    const code = codeOk(t.code) ? String(t.code).trim() : (avecCode[0] ? String(avecCode[0].code).trim() : '');
+    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at, code, codeDe: codeOk(t.code) ? 'changement' : (code ? 'autre-email' : '') });
   }
   return out.sort((a, b) => (b.at || 0) - (a.at || 0));
 }

@@ -441,8 +441,8 @@ import { ecouterPartage } from "./communaute/accompagnement.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
-import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur, lieuTransporteurRepare } from "./relaisColis.js";
-import { registrePointsConnus, completerParPointConnu, lieuLePlusComplet, memePoint, completudeLieu, cleTransporteurLieu } from "./villeRelais.js";
+import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
+import { lieuLePlusComplet, memePoint, completudeLieu } from "./villeRelais.js";
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais.jsx";
 import AlerteRelaisChange from "./AlerteRelaisChange.jsx";
@@ -20163,6 +20163,8 @@ const raisonAVerifier = (x) => {
   if (x.e.etat==='sms_inconnu' && x.t && x.t.carrier === 'vinted' && x.t.code) return `SMS Vinted Go : code ${x.t.code} pas encore relié à un de tes colis${x.t.limite ? ` — à retirer avant le ${new Date(String(x.t.limite).slice(0,10)+'T12:00:00Z').toLocaleDateString('fr-FR',{day:'numeric',month:'short',timeZone:'Europe/Paris'})}` : ''}`;
   if (x.e.etat==='sms_inconnu' && x.t && x.t.carrier === 'chronopost') return "SMS de Chronopost pas encore reconnu : regarde le SMS ou le site Chronopost";
   if (x.e.etat==='sms_inconnu') return "SMS de Mondial Relay pas reconnu : regarde le SMS ou l'app Mondial Relay";
+  // (11 nov., retraits fiables) Un e-mail « disponible » avec son code mais SANS n° de suivi : un colis, pas une pub.
+  if (x.e.etat==='sans_suivi') return `E-mail sans n° de suivi : code ${x.t && x.t.code ? x.t.code : ''} — vérifie le point dans l’e-mail`;
   if (x.e.etat==='doute_meme_relais') return x.e.avecSuivi ? `compté avec le n°…${String(x.e.avecSuivi).slice(-4)}` : 'compté avec un autre colis de ce point';
   if (x.e.etat==='delai_depasse' && x.e.heurePassee && x.e.limiteAt) return `délai de retrait passé aujourd'hui à ${heureParis(x.e.limiteAt)}`;
   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : (x.e.limite || null); const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
@@ -30811,6 +30813,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       sortis.push({ kind: 'email', t, o: o || null, cle, fin, via: 'doute', probable: true, temoinSuivi: kw,
         texte: `Fini avec le n°…${String(kw).slice(-4)} — ${coche ? 'coché « J’ai retiré »' : texteSortie(fin, {})}` });
     };
+    // Les codes des lignes « disponible » (identités) : une relance sans n° au même code est CE colis.
+    const codesDispo = new Set(lignesColis.filter((w) => w && w.status === 'available' && !w.sansSuivi).map(codeLigne).filter(Boolean));
     const finVinted = (o, fin) => ({ source: 'vinted', etat: fin, at: null, statut: (o && ((etatTxn(o.transaction_id) || {}).ss || o.status)) || '' });
     for (const t of lignesColis) {
       if (t && t.status === 'available' && sensColis(t, suivisEnvoyes) !== 'sortant') { const k = suiviDeLigne(t); if (k) nJuges.add(k); }
@@ -30822,6 +30826,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const k = suiviDeLigne(t) || (t.code ? 'code:' + String(t.code).toUpperCase() : '');
         if (!k || nDispoEmail.has(k) || nJuges.has(k) || (collected && collected.has(colisKey(t))) || sortiParSuivi(t, fins)) continue;
         nJuges.add(k); aVerifier.push({ kind: 'email', t, e: { etat: 'sms_inconnu' }, o: commandeDuColis(t) }); continue;
+      }
+      // (11 nov., retraits fiables) UN E-MAIL « DISPONIBLE » AVEC SON CODE MAIS SANS N° (rangé « info »
+      // `sansSuivi` par la route) : « à vérifier », visible avec son code, jamais compté — sauf si son
+      // CODE (une identité) est celui d'un colis déjà montré (une relance ne fait jamais un 2e colis).
+      if (t && t.sansSuivi && t.status === 'info' && codeLigne(t)) {
+        const kc = 'code:' + codeLigne(t);
+        const ageJ = (maintenant - (Date.parse(t.emailAt || t.receivedAt || '') || maintenant)) / 86400000;
+        if (nJuges.has(kc) || codesDispo.has(codeLigne(t)) || ageJ > 30 || (collected && collected.has(colisKey(t)))) continue;
+        nJuges.add(kc); aVerifier.push({ kind: 'email', t, e: { etat: 'sans_suivi' }, o: commandeDuColis(t) }); continue;
       }
       if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
       { const so = sortiParSuivi(t, fins);
@@ -38957,16 +38970,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // les lieux LUS (e-mails, conversations, lectures chez le transporteur), quel que soit l'état
     // du colis. Un lieu sans code postal reprend l'adresse du MÊME point s'il est le seul de ce nom
     // (`completerParPointConnu`, src/villeRelais.js) ; deux points du même nom ⇒ rien.
-    const registre = registrePointsConnus([
-      ...(Array.isArray(tracking) ? tracking : []).map(t => ({ ...lieuDe(t && t.lieu), transporteur: (t && t.carrier) || '', compte: (t && t.account) || '' })),
-      ...Object.values(colisRelais || {}).map(r => ({ ...lieuDe(r && r.lieu), transporteur: (r && r.transporteur) || '', compte: '' })),
-      ...(tpmC && typeof tpmC.values === 'function' ? [...tpmC.values()] : []).map(x => { const r = lieuTransporteurRepare(x) || {}; return { lieuNom: r.lieuNom || '', lieuAdresse: [r.lieuRue, [r.lieuCp, r.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', '), transporteur: r.carrier || '' }; }),
-    ]);
-    const completer = (lu, transporteur, compte) => completerParPointConnu(lu, registre, { transporteur: cleTransporteurLieu(transporteur), compte: compte || '' });
+    // (11 nov., retraits fiables — Julien : « aucune hypothèse », « le point d'un colis vient UNIQUEMENT de ce
+    // qui est lu pour CE colis ») Le registre des points DÉJÀ connus (`registrePointsConnus`) ne complète plus
+    // un colis : un « Super U » sans adresse recevait l'adresse du seul Super U connu — une ressemblance de
+    // nom, pas une identité. Seules les sources du MÊME colis complètent son lieu (le suivi du même n°, la
+    // conversation de SA commande, le texte gardé de SON e-mail).
+    const completer = (lu) => lu;
     // Le lieu d'un e-mail : complété par le suivi du MÊME n°, puis par la conversation de SON
     // achat (relié par identité) quand elle nomme le même point avec une adresse plus complète,
     // puis par le même point déjà connu.
-    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); let lu = lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null));
+    const lieuDeLigne = (t, a) => { const k = suiviDeLigne(t); let lu = lieuCompleteParTransporteur(lieuDe(t && t.lieu), (t && t.transp) || (tpmC && k ? tpmC.get(k) : null), Date.parse((t && (t.emailAt || t.receivedAt)) || '') || null);
       const ra = a ? relaisDe(a) : null; if (ra && ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
       return completer(lu, t && t.carrier, t && t.account); };
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
@@ -39001,7 +39014,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       } catch (_) { return null; }
     };
     const codeDesSources = (sc, repli) => (sc && sc.code ? (sc.code.desaccord ? '' : (codeRetrait(sc.code.code) || repli || '')) : (repli || ''));
-    const champsSources = (sc) => (sc ? { sources: sc.marques, verifieMs: sc.verifieMs, codeSur: !!(sc.code && sc.code.sur), codeSources: (sc.code && sc.code.sources) || [], codesDesaccord: (sc.code && sc.code.desaccord) || null, codeRemplace: (sc.code && sc.code.remplace) || null } : {});
+    const champsSources = (sc) => (sc ? { sources: sc.marques, verifieMs: sc.verifieMs, verifiePar: sc.verifiePar || null, codeSur: !!(sc.code && sc.code.sur), codeSources: (sc.code && sc.code.sources) || [], codesDesaccord: (sc.code && sc.code.desaccord) || null, codeRemplace: (sc.code && sc.code.remplace) || null } : {});
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const scE = sourcesCarte({ t, o: a || (pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))) || null }); const code = codeDesSources(scE, scE && scE.code && scE.code.desaccord ? '' : codeDeLigne(t));
