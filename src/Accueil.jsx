@@ -372,7 +372,7 @@ export default function Accueil({ onEntrer }) {
         <section className="av-hero" data-section="hero">
           <div className="av-in">
             <h1 className="av-h1" data-definition="">Tes ventes, tes colis et ta compta, au même endroit.</h1>
-            <p className="av-sous">Vinted, Leboncoin, eBay, Vestiaire : VRM te dit chaque matin quoi faire, sans erreur de paire.</p>
+            <p className="av-sous">Vinted, Leboncoin, eBay, Vestiaire : chaque matin, quoi faire, sans erreur de paire.</p>
             <div className="av-actions">
               {creer({ ref: ctaHaut })}
               {connexion({ 'data-cta': 'connexion' })}
