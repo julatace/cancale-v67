@@ -252,3 +252,13 @@ suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 e
   achats-retraits 84, achats-retirer-site 24, colis-relier-carte 20, colis-a-leur-place 184, journee-perso, selection-bordereaux 54,
   lot-bordereaux 17 : verts. `colis-fiables` : les 4 rouges déjà rouges sur `main` (ordre des points « Récents » par décision du
   9 nov., défaut 6) + la garde réseau (appels `auth/v1` vers l'hôte réel, bloqués : le banc ne sert pas `auth/v1`).
+* **Fin de session (21 h 20)** : `retraits-fiables` 24/24 (F4 sur l'arbitrage d), `retrait-relais-carte` vert, `tout-imprimer` 28,
+  `colis-retirer-propre` 126 ; `navigation-tache` 161/162 (J : « Argent » lu en anglais au banc — porté sur la clé
+  `nav.compta`, pas relancé) ; `colis-colonnes` 1 rouge réel trouvé et corrigé (« sur Vinted ↗ » écrasé dans un rond de
+  44 px sur la carte d'À envoyer au téléphone ; CSS corrigée, relance en cours) ; `colis-envoi` B porté (comparaison
+  symétrique, relance en cours). Machine saturée (16 agents, 3 créneaux) : ces trois relances tournaient encore au départ.
+* **Reste rouge, et pourquoi** : `colis-fiables` 4 (rouges aussi sur `main` : ordre « Récents » par décision du 9 nov.,
+  défaut 6) + garde réseau du banc (`auth/v1` vers l'hôte réel, bloqué) ; `annonces-ventes-brouillon` 2 à 1512 (sections
+  colis en tête, décision DJ3) ; beaucoup d'autres bancs cherchent encore « Plus » / des libellés FRANÇAIS par
+  `aria-label` alors que le navigateur du banc est en anglais (lot Traduction : `garde-ecrans`, `iphone-reprise`,
+  `menu-range`, `messagerie`, `tous-boutons`…) — à porter par ce lot (juger par classe / data-* / clé du dictionnaire).
