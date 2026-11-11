@@ -47,8 +47,8 @@ export default function AchatsParEmail({ lireTout, offBuys = [], onAjouter, onMo
           <div key={a.id} data-achat-email={a.id} data-etat={etat} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: `1px solid ${C.border}` }}>
             {a.photo ? <img src={a.photo} alt="" referrerPolicy="no-referrer" loading="lazy" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flex: 'none' }}/> : <div style={{ width: 48, height: 48, borderRadius: 8, background: C.border, flex: 'none' }}/>}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><LogoSite site={a.site}/> {a.titre || nomSiteAchat(a.site)}</div>
-              <div style={{ fontSize: 12, color: C.muted }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere' }}><LogoSite site={a.site}/> {a.titre || nomSiteAchat(a.site)}</div>
+              <div style={{ fontSize: 12, color: C.muted, overflowWrap: 'anywhere' }}>
                 {a.prix.total != null ? <span data-prix-lu="">{monnaie(a.prix.total)} · {tr('achatsEmail.luDansEmail')}</span> : '—'}
                 {' · '}{tr('achatsEmail.commande', { n: a.commande })}
                 {a.suivi ? ' · ' + tr('achatsEmail.suivi', { n: a.suivi }) : ''}

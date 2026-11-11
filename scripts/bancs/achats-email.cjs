@@ -138,13 +138,14 @@ async function main() {
         dit((await deborde(pg)) <= 0, `${T} aucun débordement horizontal`);
         await pg.locator('[data-achats-email="lu"]').scrollIntoViewIfNeeded();
         await capture(pg, 'achats-email-' + vp.width);
+        const attendre = async (f) => { for (let i = 0; i < 60; i++) { const v = f(); if (v) return v; await pg.waitForTimeout(250); } return null; };
         await tap(pg, '[data-completer]');
-        await pg.waitForTimeout(400);
+        await attendre(() => ((dernierMain() || {}).vinted_offvinted_buys || []).find((x) => x.id === 'ob_main1' && x.title));
         let l = (dernierMain() || {}).vinted_offvinted_buys || [];
         const v = l.find((x) => x.id === 'ob_main1');
         dit(!!v && v.price === '130,00' && v.title === 'Sac en toile beige (banc)' && v.achatEmail === 'achat_email_vestiaire_55512345', `${T} « Compléter » : ses vides remplis, SON prix reste`, JSON.stringify(v || null).slice(0, 200));
         await tap(pg, '[data-ajouter]');
-        await pg.waitForTimeout(400);
+        await attendre(() => ((dernierMain() || {}).vinted_offvinted_buys || []).find((x) => x.ref === '12-34567-89012'));
         l = (dernierMain() || {}).vinted_offvinted_buys || [];
         const e = l.find((x) => x.ref === '12-34567-89012');
         dit(!!e && e.price === '51,50' && e.prixSource === 'email' && e.source === 'eBay' && l.length === 2, `${T} « Ajouter » : UNE entrée, prix lu 51,50 marqué e-mail`, JSON.stringify(e || null).slice(0, 200));
