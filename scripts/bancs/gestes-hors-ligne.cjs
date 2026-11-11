@@ -183,6 +183,8 @@ async function main() {
       const A = await appareil(nav, base, vp, 'A');
       let pg = await A.page();
       await ouvrirAnnonces(pg);
+      // La 2e ouverture (comme chez lui) : la navigation passe par le service worker, qui range la coquille.
+      await pg.goto(URL0() + '/?tab=cat_annonces', { waitUntil: 'domcontentloaded' }).catch(() => {});
       // Le service worker range les morceaux de l'app (liste du build) : un écran jamais ouvert s'ouvre hors ligne.
       const rang = async () => pg.evaluate(async () => { try { const c = await caches.open('vrm-shell-v6'); const r = await c.match('/hors-ligne-assets.json'); if (!r) return { n: 0, sur: -1 }; const l = (await r.json()).fichiers || []; let n = 0; for (const f of l) if (await c.match(f)) n++; return { n, sur: l.length }; } catch (e) { return { n: 0, sur: -1 }; } }).catch(() => ({ n: 0, sur: -1 }));
       await attendre(async () => { const r = await rang(); return r.sur > 0 && r.n === r.sur; }, 30000, 500);
