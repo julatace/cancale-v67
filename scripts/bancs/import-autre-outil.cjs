@@ -223,6 +223,22 @@ async function main() {
           await ctx.close();
         });
 
+        // ── L'étape facultative de « Démarrer avec VRM » ────────────────────────
+        if (!sombre) await essaie(`${T} guide`, async () => {
+          const { ctx, pg, errs } = await preparer(b, vp, sombre);
+          await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+          await pg.locator('[data-guide-importer-geste]').first().waitFor({ timeout: 20000 });
+          dit((await pg.locator('[data-guide-etape]').count()) === 5, `${T} le guide garde ses 5 étapes comptées (l’import est à part)`);
+          dit((await hauteur(pg, '[data-guide-importer-geste]')) >= 44, `${T} « Importer mon stock » ≥ 44 px`);
+          await pg.locator('[data-guide-importer]').first().scrollIntoViewIfNeeded();
+          await capture(pg, `guide-importer-${suffixe}`);
+          await tap(pg, '[data-guide-importer-geste]');
+          await pg.locator('[data-imps]').first().waitFor({ timeout: 15000 });
+          dit(true, `${T} « Importer mon stock » ouvre Paramètres → Importer`);
+          dit(errs.length === 0, `${T} aucune erreur de page`, errs.join(' | ').slice(0, 160));
+          await ctx.close();
+        });
+
         // ── 2 000 lignes ───────────────────────────────────────────────────────
         if (!sombre) await essaie(`${T} 2000`, async () => {
           const { ctx, pg, errs } = await preparer(b, vp, sombre);

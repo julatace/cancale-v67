@@ -19468,6 +19468,7 @@ function GuideDemarrageCarte({ onNav, comptes, plein = false, etape }) {
       numerotation={demanderNum ? <ChoixNumerotation choix={choixNumerotation(vendActuel())} mot={motsArticle(vendActuel()).noms} onChoisir={choisirNum} onPlusTard={() => reporter('numerotation')}/> : null}
       verification={verifOuverte ? <VerifierInstallationApp comptes={comptes} onNav={onNav} onFermer={() => setVerifOuverte(false)}/> : null}
       onOuvrirVerification={verifOuverte ? null : () => setVerifOuverte(true)}
+      onImporter={() => { DEMANDE_REGLAGE_SOUS.id = 'importer'; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} onNav('settings'); }}
       onExemple={sansCompte ? () => entrerModeExemple() : null}
       onMasquer={!plein ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
   );

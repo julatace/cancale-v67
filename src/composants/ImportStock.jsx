@@ -177,11 +177,11 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
           ) : (
             <>
               <div className="vrm-imps-resume" data-imps-ok={res.ok} data-imps-conflits={res.conflits} data-imps-doubles={res.doubles} data-imps-averifier={res.averifier} data-imps-ecartees={res.ecartees} data-imps-adater={res.aDater}>
-                <span className="vrm-imps-pastille"><b>{res.ok}</b> à importer</span>
-                {res.conflits > 0 && <span className="vrm-imps-pastille vrm-imps-ambre"><b>{res.conflits}</b> en conflit</span>}
+                <span className="vrm-imps-pastille"><b>{res.ok.toLocaleString('fr-FR')}</b> à importer</span>
+                {res.conflits > 0 && <span className="vrm-imps-pastille vrm-imps-ambre"><b>{res.conflits.toLocaleString('fr-FR')}</b> en conflit</span>}
                 {res.doubles > 0 && <span className="vrm-imps-pastille"><b>{res.doubles}</b> déjà là</span>}
                 {res.averifier > 0 && <span className="vrm-imps-pastille vrm-imps-ambre"><b>{res.averifier}</b> à vérifier</span>}
-                {res.ecartees > 0 && <span className="vrm-imps-pastille vrm-imps-ambre"><b>{res.ecartees}</b> ignorée{res.ecartees > 1 ? 's' : ''}</span>}
+                {res.ecartees > 0 && <span className="vrm-imps-pastille vrm-imps-ambre"><b>{res.ecartees.toLocaleString('fr-FR')}</b> ignorée{res.ecartees > 1 ? 's' : ''}</span>}
               </div>
               {mode === 'ventes' && res.aDater > 0 && <p className="vrm-imps-note" data-imps-note-adater={res.aDater}>{pl(res.aDater, 'vente sans date de versement', 'ventes sans date de versement')} : à dater, dans aucun mois déclaré.</p>}
               {(res.averifier > 0 || avecSansRef) && (
