@@ -43,8 +43,12 @@ try { ({ chromium } = require(path.join(RACINE, 'node_modules', 'playwright')));
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const DIST = path.join(RACINE, 'dist');
 const PORT = Number(process.env.BANC_PORT || 5011);
+const SORTIE = process.env.BANC_SORTIE || path.join(os.tmpdir(), 'vrm-banc-equipe'); fs.mkdirSync(SORTIE, { recursive: true });
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 
+// (11 nov.) Le vendeur a déjà fait « Ma configuration » et vu l'accueil : sans ça,
+// la feuille « Qu'est-ce que tu vends ? » couvre les Réglages (banc rouge depuis le 9 nov.).
+const DEJA_VU = { vrm_configuration: { etat: 'fait', at: '2026-11-01T10:00:00.000Z' }, vrm_bienvenue_vue: { at: '2026-11-01T10:00:00.000Z' }, vrm_visite_vue: { at: '2026-11-01T10:00:00.000Z' } };
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).split('\n')[0].slice(0, 180)); } };
@@ -83,7 +87,7 @@ const reset = ({ installe = true, statutM = 'actif', W_membre = true } = {}) => 
     ],
     vinted_accounts: [{ owner: V, vinted_user_id: '111', login: 'boutique_v', access_token: 'tokV' }, { owner: W, vinted_user_id: '333', login: 'boutique_w', access_token: 'tokW' }],
     app_data: [
-      ligne(V, 'main', { vinted_ship_done: { 9003: 1760000000000 }, vinted_annonce_numeros: { 1: { buyPrice: 31 } }, vrm_numerotation: { version: 2 } }),
+      ligne(V, 'main', { vinted_ship_done: { 9003: 1760000000000 }, vinted_annonce_numeros: { 1: { buyPrice: 31 } }, vrm_numerotation: { version: 2 }, ...DEJA_VU }),
       ligne(V, 'harvest_111_orders_sold', { capturedAt: '2026-10-17T08:00:00Z', payload: { my_orders: [
         { transaction_id: 9001, item_id: 5001, title: 'Nike Air Max 90 blanche taille 42', status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: '2026-10-16T09:00:00Z', price: { amount: '42.00', currency_code: 'EUR' }, photo: { url: 'https://images1.vinted.net/t/banc/f800/1.jpeg' } },
         { transaction_id: 9002, item_id: 5002, title: 'Adidas Samba noire taille 40', status: 'Commande finalisée', transaction_user_status: 'completed', date: '2026-10-01T09:00:00Z', price: { amount: '55.00', currency_code: 'EUR' } },
@@ -103,7 +107,7 @@ const reset = ({ installe = true, statutM = 'actif', W_membre = true } = {}) => 
       ligne(V, 'email_track_mondialrelay_30000102', { type: 'suivi', status: 'available', statusLabel: 'Arrivé au point de retrait', carrier: 'mondialrelay', suivi: '30000102', subject: 'Votre colis 30000102 est disponible', receivedAt: new Date(Date.now() - 10 * 864e5).toISOString(), code: '424242', lieu: 'Presse du Port, 2 Rue Exemple, 35260 Cancale', limite: null }),
       ligne(V, 'email_sale_9001', { prix: '42.00', acheteur: 'acheteur_secret' }),
       // W a SA boutique : un bordereau à elle (jamais mêlé à ceux de V).
-      ligne(W, 'main', { vrm_prenom: 'Wendy' }),
+      ligne(W, 'main', { vrm_prenom: 'Wendy', ...DEJA_VU }),
       ligne(W, 'email_bord_7001', { numero: '3', filename: 'b.pdf', transaction: '7001', modele: 'Converse W', receivedAt: '2026-10-16T10:00:00Z', pdfB64: PDF_B64 }),
     ],
     journal: [],
@@ -351,6 +355,7 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         const v = await pg.evaluate(() => [...document.querySelectorAll('[data-equipe-vente]')].map((e) => e.getAttribute('data-equipe-vente')));
         dit(v.length === 1 && v[0] === '9001', 'à expédier : la vente à poster, ni la finalisée ni celle déjà cochée « posté »', JSON.stringify(v));
         dit(/Nike Air Max 90/.test(t) && /N°12/.test(t), 'le titre et le N° du bordereau sont dits');
+        await pg.screenshot({ path: path.join(SORTIE, `equipe-aide-${L}.png`), fullPage: true }).catch(() => {});
         const code = await pg.evaluate(() => { const e = document.querySelector('[data-equipe-code="8001"]'); return e ? e.innerText.trim() : ''; });
         dit(code === '734512', 'à retirer : le code de retrait est affiché', code);
         // (revue du 23 oct., défaut 15) Un colis d'e-mail gardé plus longtemps que ne
@@ -389,7 +394,7 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         const { ctx, pg, erreurs } = await ouvrir(nav, { qui: M, largeur: L, vue: V, cache: { membreDe: [{ id: 'e0000000-0000-4000-8000-000000000001', vendeur: V, de: 'vendeur@exemple.test' }], aBoutique: false } });
         const t = await texte(pg);
         dit(!/Nike Air Max|734512|New Balance/.test(t), 'aucun colis du vendeur n’est affiché', (t.match(/Nike Air Max|734512|New Balance/) || [''])[0]);
-        dit(/plus accès/i.test(t), 'l’écran dit que l’accès a été retiré', t.replace(/\n/g, ' ').slice(0, 120));
+        dit(/plus d['’]accès/i.test(t), 'l’écran dit que l’accès a été retiré', t.replace(/\n/g, ' ').slice(0, 120));
         dit(!MONTANTS.test(t), 'aucun montant affiché');
         dit(erreurs.length === 0, 'aucune erreur de page', erreurs.join(' | ').slice(0, 160));
         await ctx.close();
@@ -401,6 +406,8 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         const { ctx, pg, erreurs } = await ouvrir(nav, { qui: M, largeur: L, vue: V });
         const t = await texte(pg);
         dit(/Le mode équipe n'est pas encore activé sur ta base\./.test(t), 'l’écran de l’équipe dit « le mode équipe n’est pas encore activé sur ta base »', t.replace(/\n/g, ' ').slice(0, 120));
+        await pg.screenshot({ path: path.join(SORTIE, `equipe-non-installe-${L}.png`) }).catch(() => {});
+        dit(/Le vendeur doit l'activer\. Rien à faire de ton côté\./.test(t), 'et le geste : c’est au vendeur, rien à faire pour l’aide', t.replace(/\n/g, ' ').slice(0, 160));
         dit(!/PGRST|404|Could not find/i.test(t), 'jamais une erreur brute');
         dit(erreurs.length === 0, 'aucune erreur de page', erreurs.join(' | ').slice(0, 160));
         await ctx.close();
@@ -424,12 +431,22 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         const etat = await pg.evaluate(() => { const x = document.querySelector('[data-equipe-reglage]'); return x ? x.getAttribute('data-equipe-reglage') : null; });
         dit(etat === 'lu', 'Réglages → Mon compte → Équipe est lu', etat);
         const tt = await pg.evaluate(() => { const x = document.querySelector('[data-equipe-reglage]'); return x ? x.innerText : ''; });
-        dit(/aide@exemple\.test/.test(tt) && /aucun montant/i.test(tt) && /missions qui lui sont attribuées/i.test(tt) && /validation finale/i.test(tt), 'il voit son équipe et ce qu’un membre voit / ne voit pas', tt.replace(/\n/g, ' ').slice(0, 160));
+        dit(/aide@exemple\.test/.test(tt) && /aucun montant/i.test(tt) && /missions que tu lui confies/i.test(tt) && /validation finale/i.test(tt), 'il voit son équipe et ce qu’un membre voit / ne voit pas', tt.replace(/\n/g, ' ').slice(0, 160));
         await pg.fill('[data-equipe-email]', 'nouvelle@exemple.test');
         await pg.click('[data-equipe-inviter]'); await pg.waitForTimeout(1500);
         const inv = B.equipe.find((x) => x.email === 'nouvelle@exemple.test');
         dit(!!inv && inv.vendeur === V && inv.statut === 'invitee', 'inviter par email crée l’invitation (chez LUI)');
         dit(/nouvelle@exemple\.test/.test(await pg.evaluate(() => document.querySelector('[data-equipe-reglage]').innerText)), 'la liste la montre aussitôt');
+        // (11 nov.) VRM n'envoie aucun e-mail : le vendeur PARTAGE le message (feuille du téléphone).
+        await pg.evaluate(() => { window.__partage = null; navigator.share = (d) => { window.__partage = d && d.text; return Promise.resolve(); }; });
+        const bp = pg.locator(`[data-equipe-partager="${inv && inv.id}"]`);
+        dit(await bp.count() === 1, '« Envoyer l’invitation » est proposé à côté de l’invitée');
+        if (await bp.count()) { await bp.click(); await pg.waitForTimeout(400); }
+        const part = await pg.evaluate(() => window.__partage);
+        dit(typeof part === 'string' && /nouvelle@exemple\.test/.test(part) && /https:\/\/vrm\.center/.test(part) && /Accepter/.test(part) && !/[0-9a-f]{8}-[0-9a-f]{4}-/.test(part),
+          'le message partagé dit l’adresse, vrm.center et « Accepter » — aucun identifiant secret', String(part).replace(/\n/g, ' ¦ ').slice(0, 160));
+        dit(await pg.locator('[data-equipe-partager="e0000000-0000-4000-8000-000000000001"]').count() === 0, 'pas de « Envoyer l’invitation » pour un membre déjà actif');
+        await pg.screenshot({ path: path.join(SORTIE, `equipe-reglage-${L}.png`) }).catch(() => {});
         // Retirer l'aide (confirmation dans la feuille de l'app).
         await pg.click('[data-equipe-revoquer="e0000000-0000-4000-8000-000000000001"]'); await pg.waitForTimeout(700);
         // Le bouton de confirmation a le focus (feuille de l'app) : Entrée confirme.

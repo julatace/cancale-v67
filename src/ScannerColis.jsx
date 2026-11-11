@@ -71,32 +71,69 @@ export async function creerLecteur() {
 // (10 nov., lot AU) LA CAMÉRA DU SCANNER, partagée avec le mode « dépôt » (src/ModeDepot.jsx) : le flux
 // arrière, le lecteur (`creerLecteur`), une même lecture comptée une fois (2,5 s), le flux COUPÉ en
 // sortant. Rend l'état : 'demarrage' · 'active' · 'sans' (pas de caméra, refus, lecteur absent).
+// (11 nov., « la caméra ne marche pas sur iPhone ») La raison d'une caméra absente est GARDÉE et dite
+// (`raisonCamera()`), pour qu'un refus d'autorisation ne ressemble pas à « pas de caméra » :
+// 'refus' (autorisation refusée), 'absente' (aucune caméra), 'occupee' (prise par une autre app),
+// 'lecteur' (le lecteur de codes n'a pas pu se charger), 'autre'.
+let derniereRaison = '';
+export const raisonCamera = () => derniereRaison;
+const raisonDe = (e) => {
+  const n = e && e.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'refus';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError' || n === 'DevicesNotFoundError') return 'absente';
+  if (n === 'NotReadableError' || n === 'AbortError' || n === 'TrackStartError') return 'occupee';
+  return e && e.message === 'pas de caméra' ? 'absente' : 'autre';
+};
+// Les contraintes de l'iPhone : la caméra arrière d'abord ; si Safari refuse la taille demandée, on
+// redemande sans taille, puis n'importe quelle caméra (une contrainte trop précise ne doit rien bloquer).
+async function ouvrirFlux() {
+  const essais = [
+    { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+    { video: { facingMode: { ideal: 'environment' } }, audio: false },
+    { video: true, audio: false },
+  ];
+  let derniere = null;
+  for (const c of essais) {
+    try { return await navigator.mediaDevices.getUserMedia(c); }
+    catch (e) { derniere = e; if (raisonDe(e) === 'refus') break; }
+  }
+  throw derniere || new Error('pas de caméra');
+}
+// Branche le flux sur l'élément <video> ACTUEL : la vue peut être remontée (nouvelle lecture), et
+// l'iPhone n'affiche rien tant que la vidéo n'est pas inline, muette et relancée par play().
+const brancher = (v, flux) => {
+  if (!v || !flux) return;
+  if (v.srcObject !== flux) v.srcObject = flux;
+  v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', ''); v.muted = true;
+  const p = v.play(); if (p && p.catch) p.catch(() => {});
+};
 export function useLectureCamera(video, traiter) {
   const [camera, setCamera] = React.useState('demarrage');
   React.useEffect(() => {
     let vivant = true, flux = null, minuterie = null;
     const nouveau = filtreRepetition(2500);
+    derniereRaison = '';
     (async () => {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('pas de caméra');
-        flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+        flux = await ouvrirFlux();
         if (!vivant) { flux.getTracks().forEach((t) => t.stop()); return; }
-        const v = video.current; if (!v) return;
-        v.srcObject = flux; v.setAttribute('playsinline', ''); v.muted = true;
-        try { await v.play(); } catch (_) {}
+        if (!video.current) return;
+        brancher(video.current, flux);
         const lecteur = await creerLecteur();
         if (!vivant) return;
-        if (!lecteur) { setCamera('sans'); return; }
+        if (!lecteur) { derniereRaison = 'lecteur'; setCamera('sans'); return; }
         setCamera('active');
         const tour = async () => {
           if (!vivant) return;
+          const v = video.current;
           try {
-            if (v.readyState >= 2) { const vals = await lecteur.detect(v); for (const x of vals) if (nouveau(x)) traiter(x); }
+            if (v) { brancher(v, flux); if (v.readyState >= 2) { const vals = await lecteur.detect(v); for (const x of vals) if (nouveau(x)) traiter(x); } }
           } catch (_) {}
           if (vivant) minuterie = setTimeout(tour, 220);
         };
         tour();
-      } catch (_) { if (vivant) setCamera('sans'); }
+      } catch (e) { derniereRaison = raisonDe(e); if (vivant) setCamera('sans'); }
     })();
     // La caméra est COUPÉE en sortant (le flux est rendu au système).
     const v0 = video.current;
@@ -105,6 +142,14 @@ export function useLectureCamera(video, traiter) {
   return camera;
 }
 
+// La phrase quand la caméra manque : un refus dit OÙ l'autoriser (iPhone : Réglages › Safari › Caméra).
+export const phraseSansCamera = (defaut) => {
+  const r = raisonCamera();
+  if (r === 'refus') return 'Caméra refusée. iPhone : Réglages › Safari › Caméra › Autoriser, puis rouvre. Ou tape le n°.';
+  if (r === 'occupee') return 'Caméra prise par une autre app : ferme-la, puis rouvre. Ou tape le n°.';
+  if (r === 'lecteur') return 'Lecteur de codes pas chargé (réseau ?). Rouvre, ou tape le n°.';
+  return defaut;
+};
 export const vibrer = (motif) => { try { if (navigator.vibrate) navigator.vibrate(motif); } catch (_) {} };
 // Un bip discret (WebAudio, si le navigateur le permet) — jamais un fichier, rien n'est chargé.
 export const creerBip = () => {
@@ -144,7 +189,7 @@ const euros = (v) => (Number.isFinite(v) ? v.toFixed(2).replace('.', ',') + ' �
 // (9 nov., lot AD) `attendu` : la clé du colis que « Préparer mes colis » montre. Le scan dit alors
 // si le bordereau est le BON (la même identité : n° de suivi ⇒ SA vente) ; un bordereau d'un autre
 // colis est dit (« celui du N°… »), sans bouton — rien n'est coché sur la mauvaise vente.
-export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null, attendu = '', note = null }) {
+export default function ScannerColis({ Photo = null, mode = 'envoi', trouver, onConfirmer, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null, attendu = '', note = null }) {
   const M = MOTS[mode] || MOTS.envoi;
   const video = React.useRef(null);
   const saisieRef = React.useRef(null);
@@ -221,12 +266,12 @@ export default function ScannerColis({ mode = 'envoi', trouver, onConfirmer, onD
       </div>
       <div className={'vrm-scan-vue' + (res ? ' is-' + res.etat : '')} key={res ? res.n : 0}>
         <video ref={video} playsInline muted autoPlay aria-hidden="true"/>
-        {camera === 'sans' ? <p className="vrm-scan-sans" data-scan-sans-camera="">{M.sansCamera}</p> : <span className="vrm-scan-viseur" aria-hidden="true"/>}
+        {camera === 'sans' ? <p className="vrm-scan-sans" data-scan-sans-camera={raisonCamera() || ''}>{phraseSansCamera(M.sansCamera)}</p> : <span className="vrm-scan-viseur" aria-hidden="true"/>}
       </div>
       <div className={'vrm-scan-res' + (verif ? ' is-verif' : '')} role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
         {montrePaire ? (
           <div className="vrm-scan-paire" data-scan-paire={String(c.cle)} data-scan-paire-num={c.num || ''}>
-            <div className="vrm-scan-photo">{c.photo ? <img src={c.photo} alt="" data-vrm-vignette="" referrerPolicy="no-referrer" decoding="async"/> : <span aria-hidden="true"/>}</div>
+            <div className="vrm-scan-photo">{c.photo && Photo ? <Photo src={c.photo} alt="" data-vrm-vignette="" decoding="async"/> : <span aria-hidden="true"/>}</div>
             <div className="vrm-scan-infos">
               <span className={'vrm-scan-kicker is-' + res.etat} data-scan-bon={attendu ? '1' : undefined}>{res.etat === 'deja' ? M.deja : res.etat === 'fait' ? M.fait + ' ✓' : attendu ? 'C’est le bon bordereau' : M.tete}</span>
               <span className="vrm-scan-ligne1">{c.num ? <b className="vrm-scan-num" data-scan-num={c.num}>N°{c.num}</b> : verif ? <b className="vrm-scan-num is-sans" data-scan-num="">Sans N°</b> : null}<span className="vrm-scan-titre" data-scan-titre="">{c.titre}</span></span>

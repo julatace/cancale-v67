@@ -46,7 +46,7 @@
 .vrm-prep-bord-note { font-size: 15px; color: var(--vrm-muted, #6E6E73); line-height: 1.4; }
 .vrm-prep-fait { margin: 0; font-size: 17px; font-weight: 700; }
 .vrm-prep-fleche { flex: 0 0 56px; font-size: 26px; padding: 0; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-prep-photo { max-height: 420px; }
 }
 

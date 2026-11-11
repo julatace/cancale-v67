@@ -12,7 +12,7 @@
 //      une URL `javascript:` n'est jamais posée dans un lien ;
 //   3. jamais « encaissé » ; jamais « 0,00 € » pour un chiffre pas su (« — ») ;
 //   4. UN seul bouton (un seul lien d'action avant le filet du pied) ;
-//   5. la forme commune : préentête caché, largeur 520, `color-scheme`, logo
+//   5. la forme commune : préentête caché, largeur 600 (11 nov. ; 520 avant), `color-scheme`, en-tête en mots (11 nov. ; logo avant)
 //      avec texte de remplacement (ou le NOM du vendeur pour sa facture) ;
 //   6. « Gérer mes e-mails » au pied des e-mails FACULTATIFS seulement ;
 //   7. l'identité de l'éditeur au pied seulement si elle est remplie ;
@@ -111,8 +111,10 @@ async function banc(R, { silencieux = false } = {}) {
     dit(!/<script/i.test(m.html) && !/<script/i.test(m.tete), `${nom} : aucun <script> dans le HTML`);
     dit(!/encaiss/i.test(m.texte + m.html + m.sujet), `${nom} : jamais « encaissé »`);
     dit(boutons(m.html) === bouton, `${nom} : ${bouton ? 'UN seul bouton' : 'aucun bouton'} (liens avant le pied)`, boutons(m.html));
-    dit(/display:none;max-height:0/.test(m.html) && /max-width:520px/.test(m.html) && /<meta name="color-scheme" content="light dark">/.test(m.html) && /prefers-color-scheme:dark/.test(m.html), `${nom} : préentête caché, largeur 520, mode sombre toléré`);
-    dit(marque ? !/vrm-logo/.test(m.html) : /<img src="https:\/\/vrm\.center\/vrm-logo-v5-192\.png"[^>]*alt="VRM"/.test(m.html), `${nom} : ${marque ? 'le nom du vendeur en tête, pas le logo VRM' : 'le logo VRM avec son texte de remplacement'}`);
+    dit(/display:none;max-height:0/.test(m.html) && /max-width:600px/.test(m.html) && /<!--\[if mso\]><table role="presentation" width="600"/.test(m.html) && /<meta name="color-scheme" content="light dark">/.test(m.html) && /prefers-color-scheme:dark/.test(m.html), `${nom} : préentête caché, largeur 600 (Outlook compris, 11 nov.), mode sombre toléré`);
+    // (11 nov., lot emails-envoyes) Plus aucune image : l'en-tête est un MOT — « VRM » en
+    // petit pour ses propres e-mails, le nom de la boutique pour la facture (rien de VRM).
+    dit(!/<img\b/i.test(m.html) && (marque ? !/>VRM</.test(m.html) : />VRM<\/div>/.test(m.html)), `${nom} : ${marque ? 'le nom du vendeur en tête, rien de VRM' : 'le mot « VRM » en tête'}, aucune image`);
     if (facultatif !== undefined) dit(/Gérer mes e-mails/.test(m.html) === facultatif && /Gérer mes e-mails/.test(m.texte) === facultatif, `${nom} : « Gérer mes e-mails » ${facultatif ? 'au pied (e-mail facultatif)' : 'absent (e-mail non facultatif)'}`);
     dit(m.sujet.length > 0 && m.sujet.length <= 60, `${nom} : sujet court (${m.sujet.length} car.)`, m.sujet);
   };

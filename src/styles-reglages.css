@@ -213,7 +213,7 @@ button.vrm-set-ligne { transition: background-color .12s ease; }
 .vrm-set-chev { transition: transform .15s ease; }
 /* L'icône de la ligne : même gris que le texte secondaire, jamais une couleur. */
 .vrm-set-ic svg { stroke-width: 1.7; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   /* La largeur des autres écrans (styles-bureau.css : 1360) — Paramètres était à
      1120, CENTRÉ : sa colonne commençait 46 px plus à droite que tous les titres. */
   :root .vrm-app-shell .vrm-main[data-ecran="settings"] { --vrm-largeur-contenu: 1360px; }
