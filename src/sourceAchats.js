@@ -42,6 +42,9 @@ export function sourceSaisie(texte) {
   if (!t) return null;
   if (/^(leboncoin|le bon coin|lbc)\b/.test(t)) return { cle: 'leboncoin', libelle: LIB.leboncoin };
   if (/^vinted\b/.test(t)) return { cle: 'vinted', libelle: LIB.vinted };
+  // (11 nov., meilleures sources) eBay et Vestiaire écrits à la main : la même source que leur site.
+  if (/^e ?bay\b/.test(t)) return { cle: 'ebay', libelle: 'eBay' };
+  if (/^vestiaire\b/.test(t)) return { cle: 'vestiaire', libelle: 'Vestiaire Collective' };
   if (/^vide grenier/.test(t)) return { cle: 'vide-grenier', libelle: LIB['vide-grenier'] };
   for (const [cle, lib] of SOURCES_CONNUES) if (t === sansAccents(lib).replace(/[^a-z0-9]+/g, ' ')) return { cle, libelle: lib };
   if (t === 'autre') return { cle: 'autre', libelle: 'Autre' };

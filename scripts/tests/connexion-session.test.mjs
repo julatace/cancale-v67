@@ -4,6 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 // (11 nov., lot DJ6) Le retour OAuth lit l'intention du clic (src/auth/compteNeuf.js) : la vraie règle, pas une copie.
 import { lireIntention as lireIntentionOAuth } from "../../src/auth/compteNeuf.js";
+import * as lienEmail from "../../src/lienEmail.js";
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source = fs.readFileSync(
@@ -159,7 +160,13 @@ function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
     MULTI_USER: true,
     window: { location: { search, hash } },
     sessionStorage: { getItem: () => "verificateur", removeItem() {} },
-    localStorage: { getItem: () => null, removeItem() {} },
+    // (11 nov.) Le lien a été demandé depuis CE navigateur (src/lienEmail.js) :
+    // sinon un fragment n'est plus adopté (lien-email-session.test.mjs).
+    localStorage: { getItem: (k) => (k === "vrm_lien_demande" ? String(Date.now()) : null), removeItem() {}, setItem() {} },
+    ...lienEmail,
+    readSession: () => null,
+    lireIntentionOAuth: () => null,
+    compteOAuthNeuf: () => "",
     PKCE_KEY: "pkce",
     AUTH: ancienne,
     RECOVERY_PENDING: false,
