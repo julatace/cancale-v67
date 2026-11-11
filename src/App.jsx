@@ -522,6 +522,7 @@ import { colisDepotHorsLigne } from "./modeDepot.js";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
+import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
 import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
@@ -2603,6 +2604,9 @@ const SYNC_KEYS = [
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
   'vrm_urssaf_declare',
+  // (11 nov.) « Clôturer l'année » : { [AAAA]: { at, etapes } } posé par SON clic « J'ai fini » ;
+  // et l'année dont la carte de Ma journée a été ouverte (`vrm_cloture_vue`, une fois). src/clotureAnnee.js.
+  'vrm_cloture_annee', 'vrm_cloture_vue',
   // Retirer d'eBay, sans demander, une paire PROUVÉE vendue sur Vinted
   // (proposition 8). Éteint par défaut ; la route le relit elle-même.
   'vrm_ebay_retrait_auto',
@@ -10794,7 +10798,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_notes_paires', 'vrm_achats_hors_masques', 'vrm_urssaf_declare', 'vrm_cloture_annee', 'vrm_cloture_vue', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -40732,6 +40736,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nI = inventaireJournee.n;
           jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: 'Inventaire en cours', detail: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, title: 'Inventaire en cours', sub: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
         }
+        // (11 nov.) « CLÔTURER L'ANNÉE » : en décembre et janvier, UNE fois (src/clotureAnnee.js) —
+        // « Voir » ouvre Argent → Déclarer sur la liste, et note l'année vue (SON clic). Neutre.
+        { const cj = carteJourneeCloture({ maintenant: Date.now(), cloture: load(CLE_CLOTURE, {}), vue: load(CLE_CLOTURE_VUE, {}), regime: isCloudReady() ? regimeFiscal() : undefined });
+          if (cj) { const court = `Clôturer ${cj.annee}`;
+            jobs.push({ id: 'cloture-annee', icon: 'doc', color: C.text, court, detail: 'Une liste guidée : ventes à dater, inventaire, chiffre d’affaires, URSSAF, impôts, export', title: court, tab: 'argent_declarer', prio: 3.4, action: 'Voir',
+              avant: () => { DEMANDE_CLOTURE.at = Date.now(); const v = load(CLE_CLOTURE_VUE, {}); save(CLE_CLOTURE_VUE, { ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}), [String(cj.annee)]: Date.now() }); } }); } }
         // (10 nov., lot N) L'ATELIER (Organisation) : des paires qui attendent > 7 j à une étape — ambre.
         if (atelierJournee) jobs.push({ id: 'atelier-attente', n: atelierJournee.n, icon: 'box', color: C.warn, court: atelierJournee.court, detail: atelierJournee.detail || null, title: atelierJournee.court, tab: 'organisation', prio: 2.45 });
         // (9 nov., lot AC) « À TRANCHER » : UNE ligne, seulement s'il y a quelque chose

@@ -56,6 +56,8 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
+import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'année »
+import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -1954,6 +1956,13 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
 // Rien n'est lu tant qu'il n'a pas ouvert la carte (« Préparer »).
 function ExportComptableCarte(props) {
   const [ouvert, setOuvert] = React.useState(false);
+  // (11 nov.) « Clôturer l'année » → « Export pour ton comptable » : la carte s'ouvre sur l'année
+  // demandée (rien n'est lu ni téléchargé avant son clic sur Tableur / PDF).
+  const [periodeVoulue, setPeriodeVoulue] = React.useState('');
+  React.useEffect(() => {
+    const f = () => { const p = DEMANDE_COMMANDE.exportPeriode; if (p && /^\d{4}$/.test(p)) { DEMANDE_COMMANDE.exportPeriode = ''; setPeriodeVoulue(p); setOuvert(true); } };
+    f(); window.addEventListener('vrm:export-comptable', f); return () => window.removeEventListener('vrm:export-comptable', f);
+  }, []);
   return (
     <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -1963,18 +1972,19 @@ function ExportComptableCarte(props) {
         </div>
         {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
       </div>
-      {ouvert && <ExportComptableCorps {...props} />}
+      {ouvert && <ExportComptableCorps key={periodeVoulue || 'x'} {...props} anneeVoulue={periodeVoulue} />}
     </div></Card>
   );
 }
-function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, anneeVoulue = '' }) {
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   const ventesVcER = useVentesVestiaire();
   const ligne = useLigneUrssaf();
   const regime = useRegimeFiscal();
-  const [type, setType] = React.useState('trimestre');
+  const anneeOk = anneeVoulue && periodesExport('annee').includes(anneeVoulue) ? anneeVoulue : '';
+  const [type, setType] = React.useState(anneeOk ? 'annee' : 'trimestre');
   const choix = React.useMemo(() => periodesExport(type), [type]);
-  const [periode, setPeriode] = React.useState(() => periodesExport('trimestre')[0]);
+  const [periode, setPeriode] = React.useState(() => anneeOk || periodesExport('trimestre')[0]);
   React.useEffect(() => { if (!choix.includes(periode)) setPeriode(choix[0]); }, [choix, periode]);
   const [achats, setAchats] = React.useState(undefined);
   const [recus, setRecus] = React.useState(undefined);
@@ -3896,6 +3906,26 @@ function DelaiPaiementCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, ac
     </div>
   );
 }
+// (11 nov.) Les portes de « Clôturer l'année » : chacune OUVRE l'écran existant qui règle
+// l'étape (rien n'est fait à sa place). Un écran d'un autre segment : on y va d'abord.
+const viserCompta = (sel, ouvrirDetails = true, essai = 0) => {
+  try {
+    const d = document.querySelector(sel);
+    if (!d) { if (essai < 20) setTimeout(() => viserCompta(sel, ouvrirDetails, essai + 1), 80); return; }
+    if (ouvrirDetails && d.tagName === 'DETAILS' && !d.open) d.open = true;
+    d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (_) {}
+};
+const portesCloture = ({ onNav }) => ({
+  adater: () => ouvrirRepliCompta('compta-ca'),
+  prix: () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); },
+  inventaire: () => { DEMANDE_INVENTAIRE_ANNUEL.at = Date.now(); if (onNav) onNav('garage'); },
+  ca: () => ouvrirRepliCompta('compta-ca'),
+  urssaf: () => viserCompta('#compta-urssaf', false),
+  revenus: () => viserCompta('[data-micro-repli]'),
+  seuils: () => viserCompta('[data-micro-repli]'),
+  export: (annee) => { DEMANDE_COMMANDE.export = Date.now(); DEMANDE_COMMANDE.exportPeriode = String(annee); try { window.dispatchEvent(new Event('vrm:export-comptable')); } catch (_) {} },
+});
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false, vue = 'resume', allerVue = null, argentNav = null }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -4388,6 +4418,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <div className="vrm-compta-q-tete">
           <h2 className="vrm-compta-question" data-compta-question="declarer">Combien je dois déclarer ?</h2>
         </div>
+        {/* (11 nov.) « Clôturer l'année » : de décembre à mai, la liste guidée (src/clotureAnnee.js, lecture et liens). */}
+        <ClotureAnnee portes={portesCloture({ onNav })} />
         <PrevisionUrssafCarte onNav={onNav} />
         {/* (10 nov., lot BK) « Mois bouclé » : ce qui manque avant de déclarer le mois choisi (src/moisBoucle.js). */}
         <MoisBoucle portes={portesMoisBoucle({ onNav, ouvrirRepli: ouvrirRepliCompta })} />

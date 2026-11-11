@@ -21,6 +21,7 @@ import StockExplication from "../StockExplication.jsx";
 // ⟦← App.jsx #2⟧
 import { InventaireStock } from "../InventaireStock.jsx";
 import { InventaireAnnuel } from "../InventaireAnnuel.jsx";   // (10 nov., lot W) l'inventaire de fin d'année
+import { DEMANDE_INVENTAIRE_ANNUEL } from "../inventaireAnnuel.js";   // (11 nov.) ouverte depuis « Clôturer l'année »
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
 
 // ⟦← App.jsx #3⟧
@@ -247,7 +248,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // le réseau (changement d'écran), elle ne se rouvrira pas toute seule.
   // (10 nov., lot W) L'INVENTAIRE DE FIN D'ANNÉE (src/InventaireAnnuel.jsx) ; « Je vérifie mes
   // cartons » ouvre l'inventaire ci-dessus, et le referme sur la fin d'année.
-  const [annuel, setAnnuel] = React.useState(false);
+  const [annuel, setAnnuel] = React.useState(() => { const t = DEMANDE_INVENTAIRE_ANNUEL.at; DEMANDE_INVENTAIRE_ANNUEL.at = 0; return !!t && Date.now() - t < 30000; });
   const retourAnnuel = React.useRef(false);
   React.useEffect(() => { INVENTAIRE_FEUILLE.ouverte = !!inventaire; }, [inventaire]);
   React.useEffect(() => () => { try { if (typeof navigator === 'undefined' || navigator.onLine !== false) INVENTAIRE_FEUILLE.ouverte = false; } catch (_) {} }, []);
