@@ -1783,7 +1783,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null }) {
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
-      <MargePlateforme sansCompte={sansCompteStats} liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge}/>
+      <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge} sansCompte={sansCompteStats}/>
       {/* (11 nov., lot stats-categories) « Par catégorie » : seulement si DEUX familles sont connues (src/statsCategories.js). */}
       <ParCategorie vendu={Array.isArray(vendu) ? vendu.filter(dansP) : vendu} lp={lp} extras={extras} stock={stock} b={b}/>
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
