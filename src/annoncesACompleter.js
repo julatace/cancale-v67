@@ -28,11 +28,13 @@ import { lectureRecue } from './numeroEcrit.js';
 export const MIN_PHOTOS = 5;
 
 // L'ordre d'affichage des manques (ceux de Vinted d'abord, puis celui de VRM).
-export const MANQUES = ['photos', 'marque', 'taille', 'etat', 'numero', 'achat'];
+// (11 nov., décision C10) + titre, prix et description : l'ancien bloc « Annonces à compléter »
+// d'Outils (`bilanAnnonce`) est FONDU ici — un seul endroit, une seule règle.
+export const MANQUES = ['titre', 'prix', 'description', 'photos', 'marque', 'taille', 'etat', 'numero', 'achat'];
 // Où se fait le geste : 'vinted' (modifier l'annonce sur le site) · 'vrm'.
-export const OU_MANQUE = { photos: 'vinted', marque: 'vinted', taille: 'vinted', etat: 'vinted', numero: 'vinted', achat: 'vrm' };
+export const OU_MANQUE = { titre: 'vinted', prix: 'vinted', description: 'vinted', photos: 'vinted', marque: 'vinted', taille: 'vinted', etat: 'vinted', numero: 'vinted', achat: 'vrm' };
 // Le nom court d'un manque (une pastille), et la phrase du « pas su ».
-export const NOM_MANQUE = { photos: 'photos', marque: 'Sans marque', taille: 'Sans taille', etat: 'Sans état', numero: 'Pas de N° à la fin', achat: 'Sans prix d’achat' };
+export const NOM_MANQUE = { titre: 'Sans titre', prix: 'Sans prix', description: 'Sans description', photos: 'photos', marque: 'Sans marque', taille: 'Sans taille', etat: 'Sans état', numero: 'Pas de N° à la fin', achat: 'Sans prix d’achat' };
 export const NOM_PAS_SU = { photos: 'photos pas lues', marque: 'marque pas lue', taille: 'taille pas lue', etat: 'état pas lu', numero: 'description pas lue' };
 
 const vide = (v) => v == null || String(v).trim() === '';
@@ -54,6 +56,12 @@ export function texteManque(m) {
 export function manquesAnnonce(a, { minPhotos = MIN_PHOTOS, numeroEcrit = false } = {}) {
   const manques = [], pasSu = [];
   if (!a || typeof a !== 'object') return { manques, pasSu: ['photos', 'marque', 'taille', 'etat'] };
+  // (11 nov., C10) Titre et prix : lus avec l'annonce ; vides ⇒ manques. La description
+  // n'est un manque que LUE vide (texte vide, ou `descLen` 0) ; pas lue ⇒ rien n'est dit.
+  // Un champ ABSENT (undefined) n'a pas été lu : rien n'est dit ; présent et vide ⇒ manque.
+  if (a.titre !== undefined && vide(a.titre)) manques.push({ cle: 'titre' });
+  if (a.prix !== undefined && prixDe(a.prix) == null) manques.push({ cle: 'prix' });
+  if (typeof a.desc === 'string' ? !a.desc.trim() : a.descLen === 0) manques.push({ cle: 'description' });
   const n = a.nPhotos;
   if (typeof n === 'number' && Number.isFinite(n) && n >= 0) { if (n < minPhotos) manques.push({ cle: 'photos', n, min: minPhotos }); }
   else pasSu.push('photos');
@@ -102,6 +110,7 @@ export function annoncesACompleter(annonces, opts = {}) {
       id, titre: String(a.titre || ''), photo: String(a.photo || ''), num: String(a.num || ''), compte: String(a.compte || ''),
       prix: prixDe(a.prix), ts: Number(a.ts) || 0, manques: r.manques,
       vinted: r.manques.some((m) => OU_MANQUE[m.cle] === 'vinted'), achat: r.manques.some((m) => m.cle === 'achat'),
+      brouillon: r.manques.some((m) => m.cle === 'titre' || m.cle === 'prix' || m.cle === 'description'),
       lien: lienModifier(id, a.domaine),
     });
   }

@@ -55,6 +55,7 @@ export const NEUTRE = '00000000-0000-0000-0000-000000000000';
 export const COMPOSANTS = Object.freeze(['base', 'connexion', 'emails', 'envoi', 'notifications', 'extension']);
 export const ETATS = Object.freeze(['ok', 'degrade', 'pas_su']);
 export const ECHECS_POUR_INCIDENT = 2;
+export const MUETTES_POUR_ALERTE = 3;
 export const SONDE_MS = 4000;
 export const SMTP_TOUS_LES_MS = 55 * 60e3;
 export const PERIME_MS = 45 * 60e3;
@@ -212,7 +213,7 @@ export function etatApres(precedent, resultats, maintenant = Date.now()) {
   const jours = { ...objet(p.jours) };
   const jourCourant = { ...objet(jours[jour]) };
   let incidents = Array.isArray(p.incidents) ? p.incidents.filter((x) => x && COMPOSANTS.includes(x.composant) && ms(x.debut) && ms(x.fin)) : [];
-  const aNotifier = [];
+  const aNotifier = [], muettes = [];
   for (const c of COMPOSANTS) {
     const avant = objet(objet(p.composants)[c]);
     const r = objet(resultats[c]);
@@ -233,7 +234,18 @@ export function etatApres(precedent, resultats, maintenant = Date.now()) {
       // 'pas_su' : ni compté, ni effacé.
     }
     if (incident && !incident.notifie) { incident.notifie = true; aNotifier.push(c); }
+    // (11 nov.) MUETTE : la sonde n'a pas répondu (« sans-reponse ») ; 3 de suite
+    // ⇒ dit UNE fois, comme « pas de réponse » (jamais une panne). Une réponse
+    // (ok, dégradé, ou une autre raison) remet à zéro.
+    let muette = Number(avant.muette) || 0;
+    let muetteDite = !!avant.muetteDite;
+    if (!garde) {
+      if (r.raison === 'sans-reponse') muette += 1; else { muette = 0; muetteDite = false; }
+      if (muette >= MUETTES_POUR_ALERTE && !muetteDite) { muetteDite = true; muettes.push(c); }
+    }
     const x = { etat, raison: RAISONS[r.raison] ? r.raison : 'pas-sonde', at: garde ? (avant.at || at) : at, echecs, premierEchec, incident };
+    if (muette) x.muette = muette;
+    if (muetteDite) x.muetteDite = true;
     if (r.sondeA || avant.sondeA) x.sondeA = r.sondeA || avant.sondeA;
     for (const k of ['http', 'silenceH', 'seuilH']) if (Number.isFinite(r[k])) x[k] = r[k];
     composants[c] = x;
@@ -249,7 +261,7 @@ export function etatApres(precedent, resultats, maintenant = Date.now()) {
   incidents = incidents.filter((x) => maintenant - ms(x.fin) <= INCIDENTS_GARDES_MS).slice(-INCIDENTS_MAX);
   return {
     etat: { v: 1, rev: (Number(p.rev) || 0) + 1, at, composants, activite, jours: Object.fromEntries(gardes.map((k) => [k, jours[k]])), incidents },
-    aNotifier,
+    aNotifier, muettes,
   };
 }
 
@@ -360,7 +372,19 @@ export const oublierStatutPublic = () => { memoPublic = null; };
 
 // ── LE PASSAGE COMPLET (le cron le branche ; l'audit le joue sur une fausse base) ──
 //   envoyer(notif) → résultat de l'envoi (au propriétaire seul).
-export async function passageSondes({ env = process.env, fetcher = fetch, pushPret = false, smtp = null, configSmtp = null, envoyer = null, proprietaire = '', maintenant = Date.now() } = {}) {
+// (11 nov.) `alerter(signaux)` : le journal des alertes de production
+// (api/_lib/alertes-production.js — interrupteurs, regroupement, 30 jours).
+// Donné, c'est LUI qui prévient ; sinon l'envoi direct d'avant.
+export function signauxSondes({ aNotifier = [], muettes = [] }, etat) {
+  const out = [];
+  for (const c of aNotifier) {
+    const t = texteIncident([c], etat);
+    if (t) out.push({ type: c === 'emails' ? 'emails' : 'sante', cle: 'sonde:' + c, titre: t.title, corps: t.body, tag: t.tag });
+  }
+  for (const c of muettes) if (NOMS[c]) out.push({ type: c === 'emails' ? 'emails' : 'sante', cle: 'muette:' + c, nature: 'muette', titre: `Pas de réponse : ${NOMS[c]}`.slice(0, 60), corps: `${MUETTES_POUR_ALERTE} vérifications de suite sans réponse. Pas su : ce n’est pas une panne prouvée.` });
+  return out;
+}
+export async function passageSondes({ env = process.env, fetcher = fetch, pushPret = false, smtp = null, configSmtp = null, envoyer = null, alerter = null, proprietaire = '', maintenant = Date.now() } = {}) {
   const url = env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
   const service = env.SUPABASE_SERVICE_KEY || '';
   if (!service) return { fait: false, raison: 'clé de service absente : rien sondé, rien écrit' };
@@ -368,15 +392,20 @@ export async function passageSondes({ env = process.env, fetcher = fetch, pushPr
   const precedent = await lireEtat({ url, headers, fetcher });
   if (precedent === undefined) return { fait: false, raison: 'état illisible : rien écrit, rien envoyé (« rien lu » ne vaut pas « rien »)' };
   const resultats = await sonder({ env, fetcher, pushPret, smtp, configSmtp, etat: precedent || {}, maintenant });
-  const { etat, aNotifier } = etatApres(precedent, resultats, maintenant);
+  const { etat, aNotifier, muettes } = etatApres(precedent, resultats, maintenant);
   const ecrit = await ecrireEtat({ url, headers, fetcher, precedent, etat });
   const resume = Object.fromEntries(COMPOSANTS.map((c) => [c, etat.composants[c].etat]));
   if (!ecrit) return { fait: false, raison: 'état pas écrit (un autre passage, ou la base) : rien envoyé', etats: resume };
   let envoi = null;
-  if (aNotifier.length) {
+  if (typeof alerter === 'function') {
+    try { envoi = await alerter(signauxSondes({ aNotifier, muettes }, etat)); } catch (e) { envoi = { fait: false, erreur: String((e && e.message) || e).slice(0, 120) }; }
+  }
+  // Le journal n'a pas pu écrire (base, propriétaire) : l'incident est déjà marqué
+  // « dit » dans l'état — l'envoi direct d'avant le dit quand même (jamais perdu).
+  if ((typeof alerter !== 'function' || !(envoi && envoi.fait)) && aNotifier.length) {
     const notif = texteIncident(aNotifier, etat);
     if (!proprietaire || typeof envoyer !== 'function') envoi = { envoye: false, raison: 'VRM_OWNER_UID absent : personne à prévenir' };
     else { try { envoi = { envoye: true, r: await envoyer(notif) }; } catch (e) { envoi = { envoye: false, erreur: String((e && e.message) || e).slice(0, 120) }; } }
   }
-  return { fait: true, etats: resume, ouverts: aNotifier, envoi, incidentsOuverts: COMPOSANTS.filter((c) => etat.composants[c].incident) };
+  return { fait: true, etats: resume, ouverts: aNotifier, muettes, envoi, incidentsOuverts: COMPOSANTS.filter((c) => etat.composants[c].incident) };
 }

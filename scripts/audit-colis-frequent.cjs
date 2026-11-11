@@ -224,7 +224,7 @@ const transp = (owner, carrier, suivi, o = {}) => base.set(`${owner}|transp_${ca
     pannes.add('meta->>etat=eq.disponible');
     const res2 = faireRes(); const l1 = lectures.length; const a1 = appels.length;
     await route({ method: 'GET', query: { moment: 'colis' }, headers: { authorization: 'Bearer cle-banc-cron' } }, res2);
-    const vus2 = lectures.slice(l1).map((x) => x.owner).filter((o) => o && o !== NEUTRE);
+    const vus2 = lectures.slice(l1).filter((x) => !/id=eq\.alertes_production/.test(x.chemin)).map((x) => x.owner).filter((o) => o && o !== NEUTRE);   // (11 nov.) le journal des alertes du PROPRIÉTAIRE n'est pas une visite
     dit(res2.code === 503 && vus2.length === 0 && appels.length === a1, 'C4 une sélection qui ne répond pas ⇒ 503 et AUCUN vendeur visité (jamais « rien à faire »)', `${res2.code} · ${vus2.length} lecture(s) de vendeur`);
     pannes.clear();
   });

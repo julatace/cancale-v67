@@ -8,25 +8,35 @@
 //  conclue), le manque NOMMÉ ; un site pas lu ⇒ « — » et la raison.
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useMemo } from 'react';
-import { margeParPlateforme, texteMarge } from './margePlateforme.js';
+import { margeParPlateforme, texteMarge, sitesMontres, sitesLusDeLignes } from './margePlateforme.js';
 import './styles-marge-plateforme.css';
 
 const NOM = { Vinted: 'Vinted', Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire: 'Vestiaire Co' };
 
 // liveStats : la coque (vendu) ; releve : les lignes du relevé DÉJÀ bornées à la
 // période (null = pas publié) ; de, a : la période ; onSaisirPrix : la porte de saisie.
-export default function MargePlateforme({ liveStats, releve = null, de, a, onSaisirPrix = null }) {
+// (11 nov., C11) `lireLignesSites()` → Promise des lignes (id + premier élément), ou null (pas lu).
+export default function MargePlateforme({ liveStats, releve = null, de, a, onSaisirPrix = null, lireLignesSites = null }) {
+  const [lus, setLus] = React.useState(undefined);   // undefined en cours · null pas su · { plat: bool }
+  React.useEffect(() => {
+    if (typeof lireLignesSites !== 'function') { setLus(null); return undefined; }
+    let mort = false;
+    Promise.resolve().then(lireLignesSites).then((r) => { if (!mort) setLus(sitesLusDeLignes(r)); }, () => { if (!mort) setLus(null); });
+    return () => { mort = true; };
+  }, [lireLignesSites]);
   const vendu = !liveStats ? undefined : liveStats.venduPasSu ? null : liveStats.venduLignes;
   const R = useMemo(() => margeParPlateforme({
     vendu, manque: (liveStats && liveStats.venduManque) || [], nonComptees: (liveStats && liveStats.venduNonComptees) || [], releve, de, a,
   }), [vendu, liveStats, releve, de, a]);
+  const montres = sitesMontres({ vendu, manque: (liveStats && liveStats.venduManque) || [], nonComptees: (liveStats && liveStats.venduNonComptees) || [], lus });
+  const lignes = R.plateformes.filter((p) => montres.has(p.plat));
   const max = Math.max(0, ...R.plateformes.map((p) => (p.etat === 'lu' && p.mediane > 0 ? p.mediane : 0)));
   const sansAchat = R.plateformes.reduce((s, p) => s + (p.etat === 'lu' ? p.nSansAchat : 0), 0);
   return (
-    <section className="vrm-sv-carte vrm-mp-carte" data-stats-carte="marge-plateforme" data-mp-etat={R.etat} data-mp-releve={R.releveLu ? '1' : '0'}>
+    <section className="vrm-sv-carte vrm-mp-carte" data-stats-carte="marge-plateforme" data-mp-etat={R.etat} data-mp-releve={R.releveLu ? '1' : '0'} data-mp-caches={R.plateformes.filter((p) => !montres.has(p.plat)).map((p) => p.plat).join(',')}>
       <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">Marge par plateforme</h2><span className="vrm-sv-note">bénéfice par paire</span></div>
       <ol className="vrm-mp-liste">
-        {R.plateformes.map((p) => {
+        {lignes.map((p) => {
           const t = texteMarge(p);
           const w = p.etat === 'lu' && p.mediane != null && p.mediane > 0 && max > 0 ? Math.max(3, (p.mediane / max) * 100) : 0;
           return (
