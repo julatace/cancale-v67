@@ -22,7 +22,7 @@ const APP = require("./_source-app.cjs").sourceApp();
 let MODULE = lire('src/fraisPlateformes.js');
 const muter = (avant, apres) => { if (!MODULE.includes(avant)) { console.log('❌ mutation impossible : ' + avant.slice(0, 80)); process.exit(2); } MODULE = MODULE.replace(avant, apres); };
 if (MUT === 'couverture') muter('if (du == null || f == null) continue;', 'if (du == null) continue; if (f == null) { S.nLus += 1; S.cBase += c(du); continue; }');
-else if (MUT === 'vcpct') { muter("const pct = S.plateforme === 'Vestiaire' || ", 'const pct = '); muter(' || (couverture && couverture.lus === 0) ? null', ' ? null'); }
+else if (MUT === 'vcpct') { muter("const pct = S.plateforme === 'Vestiaire' ? (S.passu || !S.nLus || !(S.cPrixLus > 0) ? null : Math.round((S.cFrais / S.cPrixLus) * 1000) / 10)", "const pct = S.plateforme === 'Vestiaire' ? Math.round((S.cFrais / S.cBase) * 1000) / 10"); }
 else if (MUT === 'periode') muter('const dans = (t) => Number.isFinite(t) && t >= de && t < a;', 'const dans = (t) => Number.isFinite(t);');
 else if (MUT === 'packs') muter('S.cPacks += c(m); S.nPacks += 1;', '');
 else if (MUT === 'ebayfrais') muter("if (plat === 'eBay' || !ORDRE.includes(plat)) continue;", "if (!ORDRE.includes(plat)) continue;");
@@ -86,7 +86,7 @@ const charger = async (texte, nom) => {
     dit(G.sites.every((x) => x.passu && x.frais == null), 'rien de publié ni lu ⇒ « pas lu », jamais 0 €');
   }
   const A0 = sansCommentaires(APP);
-  dit(/<FraisParSiteCarte periode=\{periodeStats\} ebayCommandes=\{ebayCommandes\}\/>/.test(A0), 'Statistiques monte « Frais par site » sur la période choisie');
+  dit(/<FraisParSiteCarte periode=\{periodeStats\} ebayCommandes=\{ebayCommandes\}( ventesVc=\{ventesVc\})?\/>/.test(A0), 'Statistiques monte « Frais par site » sur la période choisie');
   dit(/fraisParPlateforme\(\{ releve: releve \? releve\.l : null, ebay: Array\.isArray\(ebayCommandes\) \? ebayCommandes : null, packs: compta && compta\.packs/.test(A0), 'avec le relevé de Ventes, les commandes eBay et les packs de Comptabilité');
   console.log(`\n${ko ? '❌' : '✅'} audit-frais-plateformes : ${ok} vert(s), ${ko} rouge(s)${MUT ? ' [mutation ' + MUT + ']' : ''}`);
   process.exit(ko ? 1 : 0);
