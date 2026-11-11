@@ -10,7 +10,7 @@
 }
 .vrm-moderation-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
 .vrm-moderation-titre { margin: 0; font-size: 17px; font-weight: 600; color: var(--w-encre, #1D1D1F); letter-spacing: -0.2px; }
-.vrm-moderation-tout { min-height: 44px; }
+.vrm-moderation-tout { min-height: 44px; padding: 0 4px; border: none; background: transparent; color: var(--w-gris, #6E6E73); font: inherit; font-size: 14px; cursor: pointer; }
 .vrm-moderation-ligne {
   display: flex; align-items: flex-start; gap: 12px; padding: 10px 0;
   border-top: 0.5px solid var(--w-filet, rgba(60,60,67,.18));
@@ -25,7 +25,8 @@
   min-height: 44px; padding: 0 14px; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 600;
   display: flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; white-space: nowrap;
 }
-.vrm-moderation-geste { background: var(--vrm-warn, #B25000); color: #fff; border: none; }
+/* Le geste : teinte ambre douce, texte ambre — lisible en clair ET en sombre, sans trois aplats d'accent. */
+.vrm-moderation-geste { background: color-mix(in srgb, var(--vrm-warn, #B25000) 14%, transparent); color: var(--vrm-warn, #B25000); border: none; }
 .vrm-moderation-vu { background: transparent; color: var(--w-gris, #6E6E73); border: none; font-weight: 500; }
 @media (max-width: 560px) {
   .vrm-moderation-ligne { flex-direction: column; gap: 8px; }

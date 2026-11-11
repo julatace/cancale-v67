@@ -228,7 +228,8 @@ export function texteEvenement(e, { numero = null, nom = '' } = {}) {
   const compte = nom ? ` · ${nom}` : '';
   const article = numero ? `N°${numero}` : (e && e.a ? `l'annonce ${e.a}` : '');
   const lien = e && e.a ? `https://www.vinted.fr/items/${e.a}` : 'https://www.vinted.fr/inbox';
-  const entre = e && e.av ? `vue entre le ${heureParis(e.av)} et le ${heureParis(e.t)}` : `vue le ${heureParis(e && e.t)}`;
+  const jour = (ms) => heureParis(ms).split(' à ')[0];
+  const entre = e && e.av ? (jour(e.av) === jour(e.t) ? `vue le ${jour(e.t)} entre ${heureParis(e.av).split(' à ')[1]} et ${heureParis(e.t).split(' à ')[1]}` : `vue entre le ${heureParis(e.av)} et le ${heureParis(e.t)}`) : `vue le ${heureParis(e && e.t)}`;
   if (!e) return null;
   if (e.s === 'masquee') return { titre: `Vinted a masqué ${article}${compte}`, quand: entre,
     detail: 'Elle n’est plus visible des acheteurs. Si tu ne l’as pas masquée toi-même, la raison est écrite sur l’annonce.',
