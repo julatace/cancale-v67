@@ -26,7 +26,8 @@ export const IMPORT_SILENCE_MS = 20 * 60000;
 // « Tout est récupéré ✓ » reste sur Ma journée un jour, puis s'efface.
 export const IMPORT_FINI_VISIBLE_MS = 24 * 3600000;
 
-const nombre = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+// `null` / '' (champ absent) n'est PAS 0 : un total pas donné reste « pas su ».
+const nombre = (v) => { if (v === null || v === undefined || String(v).trim() === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 function typeLu(t) {
   if (!t || typeof t !== 'object') return null;
   const lus = Math.max(0, nombre(t.lus) || 0);

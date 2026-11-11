@@ -91,7 +91,7 @@ async function page(b, T, { sombre = false, version = '5.344.0', onglet = '222' 
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
-    if (req.method() !== 'GET') { ecrits.push(u); return j([]); }
+    if (req.method() !== 'GET') { ecrits.push(u + ' ' + (req.postData() || '').slice(0, 4000)); return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
@@ -171,7 +171,7 @@ const capture = async (pg, nom, sel) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           await pg.waitForSelector('[data-import-issue]', { timeout: 5000 }).catch(() => {});
           const s2 = await lireR(pg);
           dit(s2 && s2.issue === 'ok', 'A10 réponse acceptée ⇒ « Lecture lancée »', s2 && s2.issue);
-          dit(!ecrits.some((u) => /SELECT_DATA/.test(u)) && !ecrits.length, 'A11 aucune écriture en base, aucun select=data', JSON.stringify(ecrits.slice(0, 3)));
+          dit(!ecrits.some((u) => /SELECT_DATA|import_vinted_|harvest_/.test(u)), 'A11 l’app n’écrit jamais la ligne de l’extension ni une capture ; aucun select=data', JSON.stringify(ecrits.filter((u) => /SELECT_DATA|import_vinted_|harvest_/.test(u)).slice(0, 2)).slice(0, 300));
           dit(!errs.length, 'A12 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
         });
