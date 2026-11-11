@@ -142,13 +142,19 @@ async function rendre(b, { tel, sombre, tab, base, vide = false, vib = false }) 
     // Le compte 222 : sa lecture RATE (pas su).
     if (/harvest_222_/.test(u)) return j({ message: 'panne' }, 500);
     const forme = (r) => (sel && !/^id,data$|^data$/.test(sel) ? projette(r, sel) : { ...r, updated_at: new Date(AUJ).toISOString() });
+    // (11 nov.) Les lectures groupées `id=in.(…)` (dressings revalidés par leur version, lot K) servies
+    // comme PostgREST ; une requête qui porte le compte 222 rate en entier (ci-dessus), comme un serveur.
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(ROWS().filter((r) => ids.includes(r.id)).map(forme)); }
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS().filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS().filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  // (11 nov.) La route d'abonnement servie à sa vraie forme (comme mode-depot.cjs) : sans l'état de
+  // l'abonnement rangé sur l'appareil, l'ouverture hors ligne à froid refuse (« abonnement-inconnu »).
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: /mode=abonnement/.test(r.request().url()) ? JSON.stringify({ ok: true, acces: true, statut: 'active', configure: true }) : '{"pret":true}' }));
   // (9 nov.) La vibration relevée (le banc n'a pas de moteur) : la forme de chaque appel.
   if (vib) await pg.addInitScript(() => { try { Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, value: function (p) { (window.__vib = window.__vib || []).push(p); return true; } }); } catch (_) {} });
   await pg.addInitScript(({ m, sombre, vide }) => {

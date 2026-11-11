@@ -5239,9 +5239,13 @@ const _groupeMoisson = creerLectureGroupee(async (ids, cle) => {
   const famille = String(cle).slice(String(cle).lastIndexOf('|') + 1);
   const uidCopie = (famille === 'listings' || famille === 'inbox') && AUTH.user?.id && auth === (sbAuth().Authorization || '') ? AUTH.user.id : '';
   if (uidCopie) {
-    const lire = async (sel, l) => { try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${l.join(',')})&select=${sel}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}), cache: 'no-store' }); if (!res.ok) return null; const j = await res.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+    // (11 nov.) Le statut HTTP d'une lecture ratée est rendu à la lecture groupée, comme sur
+    // l'autre chemin : un 5xx (peut-être dû à UNE ligne) fait relire chaque ligne seule — avant,
+    // tout échec valait « réseau » et un seul compte illisible rendait TOUS les dressings « pas su ».
+    let statutRate = 0;
+    const lire = async (sel, l) => { try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${l.join(',')})&select=${sel}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}), cache: 'no-store' }); if (!res.ok) { statutRate = res.status; return null; } const j = await res.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
     const r = await lireAvecCopie({ uid: uidCopie, famille, ids, stockage: stockageApp(), local: localStorage, lireVersions: (l) => lire(SEL_VERSION, l), lireLignes: (l) => lire(SEL_MOISSON, l) });
-    return r.ok ? { ok: true, rows: r.rows } : { ok: false, statut: r.incoherent ? 400 : 0 };
+    return r.ok ? { ok: true, rows: r.rows } : { ok: false, statut: r.incoherent ? 400 : statutRate };
   }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });
