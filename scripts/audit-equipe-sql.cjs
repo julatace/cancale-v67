@@ -571,6 +571,15 @@ const lusDe = (u, owner, entete = owner) => lignes(en(u, `select id from public.
     DB = 'base';
   });
 
+  // (11 nov.) Julien n'a pas de terminal : les deux SQL à coller sont dans le dépôt.
+  // Ils doivent être EXACTEMENT ce que fabrique l'outil depuis la 016 d'aujourd'hui.
+  if (!MUTATION) {
+    for (const [f, a] of [['016-1-essai-annule.sql', []], ['016-3-verifier.sql', ['--verifier']]]) {
+      const g = spawnSync(process.execPath, [OUTIL_SRC, ...a], { encoding: 'utf8' });
+      let fichier = ''; try { fichier = fs.readFileSync(path.join(__dirname, 'equipe-sql', f), 'utf8'); } catch (_) {}
+      dit(g.status === 0 && fichier === g.stdout, `scripts/equipe-sql/${f} est à jour (refabriquer : node scripts/equipe-sql/essai-annule.cjs${a.length ? ' --verifier' : ''} > …)`);
+    }
+  }
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);
   process.exit(ko === 0 ? 0 : 1);
 })();
