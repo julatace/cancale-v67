@@ -65,7 +65,10 @@ aucun rappel d'évaluation n'est ajouté.
   rouge, dont E1/E3 sur le vrai comportement de l'extension 5.342.
 - `scripts/bancs/avis-negatif.cjs` : **96 verts**, 390 tactile et 1512, clair et sombre (carte comptée,
   ambre, ≥ 44 px ; feuille ; lien Vinted ; « Voir la vente » seulement avec le n° ; « C'est vu » écrit et
-  efface ; panne 522 ⇒ rien ; compte retiré ou déjà vu ⇒ rien). Captures regardées.
+  efface ; panne 522 ⇒ rien ; compte retiré ou déjà vu ⇒ rien). Captures regardées. **28 rouges** sur le
+  build du point de départ ; **4 rouges** sous la mutation « Voir la vente sans n° de transaction » (le banc
+  a d'abord laissé passer ce mutant : React omettait `data-avis-voir-vente={undefined}` — l'attribut est
+  désormais toujours posé, vide sans n°).
 - Audits mis à jour pour la 9e famille : `audit-notifications` (F5), `audit-compte-pas-relu` (A26),
   `audit-notifs-belles` (X2 : « avis » permis seulement comme ce mot exact — un avis REÇU — ; toute
   catégorie qui rappellerait d'évaluer reste interdite).
