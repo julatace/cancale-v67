@@ -13,7 +13,7 @@ Légende : ⏱ durée · ✅ ce que tu dois voir · ⚠️ attention · 🆘 si 
 
 ## Partie 1 — Ce soir, 15 minutes, le plus utile
 
-### 1. Installer l'extension 5.336.0 (⏱ 5 min, dans CHAQUE Chrome)
+### 1. Installer l'extension 5.339.0 (⏱ 5 min, dans CHAQUE Chrome)
 1. Sur l'ordinateur, ouvre **https://vrm.center/VRM-extension.zip** : le fichier se télécharge.
 2. Ouvre le dossier **Téléchargements**, double-clique sur `VRM-extension.zip` :
    il donne **un seul dossier** `VRM-extension`.
@@ -27,7 +27,7 @@ Légende : ⏱ durée · ✅ ce que tu dois voir · ⚠️ attention · 🆘 si 
    ouvre-le dans l'app **Fichiers** (ça donne un dossier `VRM-Orion`), puis Orion →
    Extensions → **+** → « depuis un fichier » → choisis ce dossier.
 
-✅ Sur `chrome://extensions`, la carte VRM affiche **5.336.0**. Dans VRM → Paramètres,
+✅ Sur `chrome://extensions`, la carte VRM affiche **5.339.0**. Dans VRM → Paramètres,
 plus de bandeau « Ton extension VRM est en retard ».
 🆘 Toujours l'ancienne version : tu as rechargé sans remplacer le dossier, ou remplacé sans
 cliquer ⟳. Il faut les DEUX, dans cet ordre.
@@ -79,7 +79,7 @@ conversation. Aujourd'hui ces logos sont leur nom en couleurs, pas le vrai dessi
 
 ## Partie 2 — La base de données (Supabase), ⏱ 20 min
 
-⚠️ Fais d'abord l'étape 1 (extension 5.336) : la 029 en a besoin.
+⚠️ Fais d'abord l'étape 1 (extension 5.339) : la 029 en a besoin.
 ⚠️ Fais-le à un moment calme (le soir, personne d'autre sur VRM).
 
 **La méthode, la même pour chaque fichier :**

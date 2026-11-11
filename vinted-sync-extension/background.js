@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.337.0';
+const CODE_VERSION = '5.339.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3569,6 +3569,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // (11 nov., 5.339) vinted-infos.js : la ligne sous SES annonces, l'encart d'achat.
+    if (msg && msg.from === 'cancale-vinfos') {
+      (async () => {
+        try {
+          if (msg.action === 'infos') { sendResponse(await infosVintedPage(sender, msg)); return; }
+          if (msg.action === 'stockModele') { sendResponse(await stockPourModele()); return; }
+          sendResponse({ ok: false, error: 'action inconnue' });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     // PONT LEBONCOIN : le script lbc.js (sur leboncoin.fr) demande la liste des
     // annonces Vinted prêtes à publier, ou marque une annonce comme publiée.
     if (msg && msg.from === 'cancale-ebay') {
@@ -4118,6 +4129,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 29 oct. : un brouillon mis en ligne sur Vinted (2xx de `…/completion`),
     // à la main ou ailleurs — VRM ne le garde plus « à mettre en ligne ».
     if (msg.draftId) noterBrouillonPublie(msg.draftId, msg.status, domain, sender);
+  } else if (msg.kind === 'vacances') {
+    // 10 nov. (5.338) : SON geste « vacances » sur vinted.fr (2xx) — VRM apprend la recette (`apprendreVacances`).
+    apprendreVacances(msg, sender, domain);
   } else if (msg.kind === 'fiche') {
     // 22 oct. : la description et les codes qu'il vient d'ENREGISTRER sur Vinted
     // (2xx, identifiant de l'adresse ou de la réponse) — voir `noterFicheVinted`.
@@ -4659,6 +4673,115 @@ function numerosDuCompte(m, uid, msg) {
   const u = String(uid || '');
   const pick = (src, comptes, ids) => { const o = {}; if (!u) return o; for (const id of (Array.isArray(ids) ? ids.slice(0, 400) : [])) { const k = String(id); if (src[k] && comptes && comptes[k] === u) o[k] = src[k]; } return o; };
   return { items: pick(m.parItem, m.cItem, msg.items), convs: pick(m.parConv, m.cConv, msg.convs), txs: pick(m.parTx, m.cTx, msg.txs) };
+}
+// ── SUR VINTED : « N°124 · acheté 60 € · en ligne depuis 23 j » ET L'ENCART D'ACHAT
+// (11 nov., lot AA, propositions 40 et 41 validées par Julien — 5.339).
+// LECTURE SEULE : rien n'est envoyé à Vinted, aucune requête Vinted (la base VRM
+// et le cookie de l'onglet seulement). Une annonce est À LUI par IDENTITÉ :
+// l'identifiant d'annonce dans SA fiche (`accountId` du compte connecté) ou dans
+// le dressing capté de CE compte (`harvest_{uid}_listings`) — jamais un titre.
+// Un autre compte (le sien ou pas) ⇒ rien. Pas su ⇒ le champ manque (jamais 0).
+// Le prix d'achat part BRUT (la fiche et `vinted_buyprice_by_num` du N°) : la page
+// le lit par `prixAchatDe`, la règle de l'app recopiée (vrm-regles-achat.js).
+let _infosPage = null;
+async function donneesInfosPage(uid) {
+  const owner = String((await loadSession())?.user_id || '');
+  if (!owner || !uid) return null;
+  if (_infosPage && _infosPage.owner === owner && _infosPage.uid === uid && Date.now() - _infosPage.at < 120000) return _infosPage;
+  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit']);
+  if (main === null) return null;
+  const dates = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
+  if (dates === null) return null;
+  const dr = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
+  if (dr === null) return null;
+  const parId = {};
+  for (const it of ((dr && dr[0] && Array.isArray(dr[0].items)) ? dr[0].items : [])) if (it && it.id != null) parId[String(it.id)] = it;
+  if (String((await loadSession())?.user_id || '') !== owner) return null;
+  _infosPage = { owner, uid, at: Date.now(), fiches: main.vinted_annonce_numeros || {}, buyByNum: main.vinted_buyprice_by_num || {},
+    ecrit: numeroEcritAllume(main), dates: (dates && dates[0] && dates[0].data) || {}, parId };
+  return _infosPage;
+}
+function infosDuCompte(d, uid, ids) {
+  const u = String(uid || ''), out = {};
+  if (!d || !u) return out;
+  const ms = (v) => { const n = Number(v); return v != null && v !== '' && isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : null; };
+  for (const x of (Array.isArray(ids) ? ids.slice(0, 400) : [])) {
+    const id = String(x == null ? '' : x); if (!/^\d{4,15}$/.test(id)) continue;
+    const f = d.fiches[id] && typeof d.fiches[id] === 'object' ? d.fiches[id] : null, it = d.parId[id] || null;
+    const compte = f && f.accountId != null && String(f.accountId) ? String(f.accountId) : (it ? u : '');
+    if (compte !== u) continue;   // l'annonce d'un autre compte, ou d'on ne sait qui : rien
+    const o = {};
+    const num = f && f.numero != null ? String(f.numero).trim() : '';
+    if (num) o.numero = num;
+    else if (d.ecrit && it && it.numEcrit && it.numEcrit.etat === 'lu' && it.numEcrit.cle) { o.numero = String(it.numEcrit.cle); o.ecrit = true; }
+    if (f && f.buyPrice != null && String(f.buyPrice).trim() !== '') o.buyPrice = String(f.buyPrice);
+    if (num && d.buyByNum[num] != null && String(d.buyByNum[num]).trim() !== '') o.buyNum = String(d.buyByNum[num]);
+    // La date de mise en ligne, dans l'ordre de l'écran Annonces (`listedAgeDays`) :
+    // « Ajouté il y a… » lu sur la page, puis la date Vinted du dressing.
+    const lu = d.dates[id] && ms(d.dates[id].ts);
+    const cree = it ? (ms(it.created_at_ts) || ms(it.createdTs) || ms(it.photo && it.photo.high_resolution && it.photo.high_resolution.timestamp)) : null;
+    if (lu || cree) o.depuis = lu || cree;
+    out[id] = o;
+  }
+  return out;
+}
+// Ses identifiants de PROFIL, tous comptes (`harvest_{uid}_profile`). `null` = pas su.
+async function sesProfils() {
+  const rows = await sbGet('app_data?id=like.harvest_*_profile&select=id,pid:data->payload->user->>id');
+  if (rows === null || !Array.isArray(rows)) return null;
+  const s = new Set(); for (const r of rows) if (r && r.pid != null && String(r.pid)) s.add(String(r.pid));
+  return s;
+}
+// La page d'une annonce d'un AUTRE vendeur ? Seulement si c'est SÛR : son profil
+// connecté est connu, la page montre un profil qui n'est aucun des siens, et
+// l'annonce n'est dans aucune de ses fiches. Sinon `false` (pas su ⇒ rien).
+function annonceDUnAutre(membres, profils, pid, fiches, id) {
+  if (!profils || !pid || !profils.has(String(pid))) return false;
+  if (fiches && Object.prototype.hasOwnProperty.call(fiches, String(id))) return false;
+  const autres = (Array.isArray(membres) ? membres : []).map(String).filter((m) => /^\d{1,15}$/.test(m) && !profils.has(m));
+  return autres.length > 0;
+}
+async function infosVintedPage(sender, msg) {
+  let u; try { u = new URL(sender?.tab?.url || sender?.url || ''); } catch { return { ok: true, portee: 'hors_compte' }; }
+  if (u.protocol !== 'https:' || !/^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname)) return { ok: true, portee: 'hors_compte' };
+  const uid = await activeAccountId(u.host);
+  if (!uid) return { ok: true, portee: 'hors_compte' };
+  const pid = await profilIdRange(uid);
+  if (pid === null) return { ok: false };
+  const membre = /^\/member\/(\d+)(?:[-/]|$)/.exec(u.pathname);
+  const article = /^\/items\/(\d{4,15})(?:[-/]|$)/.exec(u.pathname);
+  if (/^\/member(?:\/|$)/.test(u.pathname) && (!membre || !pid || String(pid) !== membre[1])) return { ok: true, portee: 'hors_compte' };
+  if (!membre && !article) return { ok: true, portee: 'hors_page' };
+  const d = await donneesInfosPage(String(uid));
+  if (!d) return { ok: false };
+  const infos = infosDuCompte(d, uid, msg && msg.items);
+  let achat = false;
+  if (article && !infos[article[1]]) {
+    const profils = await sesProfils();
+    achat = annonceDUnAutre(msg && msg.membres, profils, pid, d.fiches, article[1]);
+  }
+  return { ok: true, portee: 'compte', infos, achat };
+}
+// « Peut-être N paires proches » : SES paires EN LIGNE (la règle « en ligne »,
+// `lireDressingsEnLigne`, la même que l'app), tous comptes — titre, marque, taille
+// seulement. Une PROPOSITION (§5) : la page compare par `pairesDuModele` (lot F),
+// jamais une liaison, rien n'est écrit. Lu seulement quand il ouvre l'encart.
+let _stockModele = null;
+async function stockPourModele() {
+  const owner = String((await loadSession())?.user_id || '');
+  if (!owner) return { ok: false };
+  if (_stockModele && _stockModele.owner === owner && Date.now() - _stockModele.at < 300000) return _stockModele.r;
+  const L = await lireDressingsEnLigne();
+  if (!L || L.echec) return { ok: false };
+  const stock = [];
+  for (const [, res] of L.parCompte) for (const it of (res.enLigne || [])) {
+    if (!it || it.id == null || stock.length >= 2000) continue;
+    stock.push({ id: String(it.id), titre: String(it.title || ''), marque: String(it.brand_title || (typeof it.brand === 'string' ? it.brand : '') || ''), taille: String(it.size_title || (typeof it.size === 'string' ? it.size : '') || '') });
+  }
+  const r = { ok: true, stock, aConfirmer: L.aConfirmer.size > 0 };
+  if (String((await loadSession())?.user_id || '') !== owner) return { ok: false };
+  _stockModele = { owner, at: Date.now(), r };
+  return r;
 }
 // <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
 // `audit-supprimees.cjs`. Une annonce `id` lue dans un dressing capturé à `capTs`
@@ -11130,6 +11253,192 @@ async function baisserPrixVinted(msg) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// LE MODE VACANCES (10 nov., 5.338, lot O — proposition 16, validée par Julien)
+// ══════════════════════════════════════════════════════════════════════════════
+// « Mode vacances sur tous les comptes en un clic, puis retour en un clic » —
+// SON clic, compte par compte, dans les 50 actions/h.
+// MESURÉ avant d'écrire (sa base, lecture seule, 10 nov.) :
+//   · L'ÉTAT : le profil `GET /api/v2/users/current` que l'extension range déjà
+//     (`harvest_{uid}_profile`) porte `user.is_on_holiday`, un BOOLÉEN (false sur
+//     tous ses comptes). Trois états : true · false · null (absent = pas su).
+//   · LE GESTE : jamais vu. Aucune écriture « holiday » ni « vacation » dans ses
+//     requêtes rangées (`harvest_*_wreq_*`). ⇒ AUCUN chemin n'est deviné : VRM
+//     APPREND la recette sur SON propre geste sur vinted.fr (comme `vc_envoi` /
+//     `lbc_envoi`). inject.js transmet une écriture 2xx de la page dont le corps
+//     porte « holiday/vacation » ; `recetteVacances` la juge :
+//       – chemin `/api/vN/users/{current|son n° de profil}[/…]` seulement (rien
+//         d'autre ne se rejoue : jamais une annonce, une transaction, un paiement) ;
+//       – UN seul booléen vacances dans le corps (JSON ≤ 4 Ko) ; aucune date, aucun
+//         long texte, aucune liste (une date d'il y a un mois rejouée serait fausse) ;
+//       – un numéro dans le chemin n'est rejouable que s'il EST son n° de profil
+//         (`{moi}`, relu dans l'onglet au moment de rejouer), jamais un nombre inconnu ;
+//       – chaque SENS s'apprend : « mettre en vacances » (true) et « rouvrir »
+//         (false) sont deux recettes. Un sens jamais vu ne se rejoue pas.
+//   · Rien n'est programmé ni répété : `mettreVacancesVinted` ne tourne que sur
+//     SON clic dans l'app (commande `vacancesVinted`, confirmée), pour UN compte :
+//     celui connecté dans l'onglet (`gardeStricte`), une action dans l'heure
+//     (réserve 5), dans la file (`avecVinted`), depuis l'onglet (`vintedPage`,
+//     pause sur 429/403). L'état est LU avant (déjà dans cet état ⇒ rien envoyé,
+//     place rendue) et RELU après : « fait » seulement si Vinted montre l'état voulu.
+// Exécuté par scripts/audit-mode-vacances.cjs (le vrai fichier, dans un vm).
+const VACANCES_RECETTE = 'vinted_vacances_recette';
+const VACANCES_ETAT = 'vinted_vacances_etat';
+const RE_VACANCES_CHEMIN = /^\/api\/v\d+\/users\/(current|\d{1,15})((?:\/[a-z_]{1,40}){0,3})\/?$/;
+const CLE_VACANCES = /holiday|vacation/i;
+const RE_DATE_VACANCES = /\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}/;
+// L'état lu dans un profil `users/current` : true · false · null (pas su).
+function vacancesDuProfil(json) {
+  const u = json && typeof json === 'object' ? (json.user && typeof json.user === 'object' ? json.user : null) : null;
+  if (!u) return null;
+  return typeof u.is_on_holiday === 'boolean' ? u.is_on_holiday : null;
+}
+const idDuProfil = (json) => { const u = json && json.user; const v = u && u.id != null ? String(u.id) : ''; return /^\d{1,15}$/.test(v) ? v : ''; };
+// Les booléens « vacances » d'un corps (profondeur 4 au plus) et ce qui le rend
+// impossible à rejouer tel quel (une date, un long texte, une liste).
+function lireCorpsVacances(o) {
+  const drapeaux = [], obstacles = [];
+  const voir = (v, chemin, prof) => {
+    if (prof > 4) { obstacles.push('trop de niveaux'); return; }
+    if (v === null || typeof v === 'number') return;
+    if (typeof v === 'boolean') { if (CLE_VACANCES.test(String(chemin[chemin.length - 1] || ''))) drapeaux.push({ cle: chemin.slice(), valeur: v }); return; }
+    if (typeof v === 'string') { if (v.length > 200) obstacles.push('un long texte'); else if (RE_DATE_VACANCES.test(v)) obstacles.push('une date'); return; }
+    if (Array.isArray(v)) { if (v.length) obstacles.push('une liste'); return; }
+    if (typeof v === 'object') { for (const k of Object.keys(v)) voir(v[k], chemin.concat(k), prof + 1); return; }
+    obstacles.push('une valeur inconnue');
+  };
+  voir(o, [], 0);
+  return { drapeaux, obstacles };
+}
+// La recette tirée de SON geste, ou la raison pour laquelle elle ne se rejoue pas.
+function recetteVacances({ methode, chemin, corps, profilId }) {
+  const mt = String(methode || '').toUpperCase();
+  const base = { methode: mt, chemin: String(chemin || '').slice(0, 200) };
+  if (!/^(PUT|POST|PATCH)$/.test(mt)) return { ...base, rejouable: false, raison: 'méthode inconnue' };
+  const m = RE_VACANCES_CHEMIN.exec(String(chemin || ''));
+  if (!m) return { ...base, rejouable: false, raison: 'chemin hors du profil' };
+  let gabarit = String(chemin);
+  if (m[1] !== 'current') {
+    if (!profilId || m[1] !== String(profilId)) return { ...base, rejouable: false, raison: 'numéro inconnu dans le chemin' };
+    gabarit = gabarit.replace(`/users/${m[1]}`, '/users/{moi}');
+  }
+  if (typeof corps !== 'string' || !corps || corps.length > 4000) return { ...base, rejouable: false, raison: 'corps illisible' };
+  let o = null; try { o = JSON.parse(corps); } catch (_) { o = null; }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return { ...base, rejouable: false, raison: 'corps illisible' };
+  const { drapeaux, obstacles } = lireCorpsVacances(o);
+  if (drapeaux.length !== 1) return { ...base, rejouable: false, raison: drapeaux.length ? 'plusieurs réglages vacances' : 'aucun réglage vacances' };
+  if (obstacles.length) return { ...base, rejouable: false, raison: `le corps porte ${obstacles[0]}` };
+  return { rejouable: true, raison: '', methode: mt, chemin: gabarit, corps, cle: drapeaux[0].cle, valeur: drapeaux[0].valeur };
+}
+// Le corps appris, où SEUL le réglage vacances prend la valeur voulue.
+function corpsVacancesPour(recette, voulu) {
+  let o = null; try { o = JSON.parse(recette.corps); } catch (_) { return null; }
+  const cle = Array.isArray(recette.cle) ? recette.cle : [];
+  if (!cle.length || !o || typeof o !== 'object') return null;
+  let p = o; for (const k of cle.slice(0, -1)) { if (!p || typeof p !== 'object') return null; p = p[k]; }
+  if (!p || typeof p !== 'object' || typeof p[cle[cle.length - 1]] !== 'boolean') return null;
+  p[cle[cle.length - 1]] = !!voulu;
+  return JSON.stringify(o);
+}
+// L'état LU d'un compte, rangé pour l'app (lire-fusionner-réécrire ; une lecture
+// ratée n'écrit rien). `via` : 'geste' (son geste accepté par Vinted) · 'relu'.
+let _chaineVacances = Promise.resolve();
+function noterEtatVacances(uid, vacances, via) {
+  const k = String(uid || '');
+  if (!/^\d{1,20}$/.test(k) || typeof vacances !== 'boolean') return Promise.resolve(false);
+  const suite = _chaineVacances.then(async () => {
+    const rows = await sbGet(`app_data?id=eq.${VACANCES_ETAT}&select=data`);
+    if (rows === null) { noterDiag('vacances_etat_lecture_ratee'); return false; }
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const comptes = cur.comptes && typeof cur.comptes === 'object' ? { ...cur.comptes } : {};
+    comptes[k] = { vacances, at: new Date().toISOString(), via: String(via || '') };
+    const ok = await supabaseUpsert('app_data', [{ id: VACANCES_ETAT, data: { comptes, majAt: new Date().toISOString() } }], 'id');
+    try { if (ok !== false) notifierApp({ type: 'maj', quoi: 'vacances', uid: k }); } catch (_) {}
+    return ok !== false;
+  });
+  _chaineVacances = suite.then(() => {}, () => {});
+  return suite;
+}
+// SON geste sur vinted.fr (inject.js, `kind: 'vacances'`), jugé sur l'ONGLET qui
+// l'envoie : le compte est celui connecté dans ce Chrome, jamais ce que dit le message.
+let _chaineRecetteVacances = Promise.resolve();
+function apprendreVacances(msg, sender, domain) {
+  const suite = _chaineRecetteVacances.then(async () => {
+    try {
+      if (!sender || !sender.tab || sender.frameId > 0) return false;
+      if (!VINTED_HOTE.test(String(domain || '').replace(/:\d+$/, ''))) return false;
+      const st = Number(msg && msg.status);
+      if (!(st >= 200 && st < 300)) return false;
+      const uid = await activeAccountId(domain);
+      if (!uid) return false;
+      const profilId = await profilIdRange(uid);
+      const r = recetteVacances({ methode: msg.methode, chemin: msg.chemin, corps: msg.corps, profilId: profilId || '' });
+      const rows = await sbGet(`app_data?id=eq.${VACANCES_RECETTE}&select=data`);
+      if (rows === null) { noterDiag('vacances_recette_lecture_ratee'); return false; }
+      const cur = (rows && rows[0] && rows[0].data) || {};
+      const recettes = cur.recettes && typeof cur.recettes === 'object' ? { ...cur.recettes } : {};
+      const at = new Date().toISOString();
+      if (r.rejouable) recettes[r.valeur ? 'on' : 'off'] = { methode: r.methode, chemin: r.chemin, corps: r.corps, cle: r.cle, at, uid: String(uid), ver: CODE_VERSION };
+      const dernier = { at, rejouable: !!r.rejouable, raison: r.raison || '', chemin: r.chemin, methode: r.methode, sens: r.rejouable ? (r.valeur ? 'on' : 'off') : '' };
+      const ok = await supabaseUpsert('app_data', [{ id: VACANCES_RECETTE, data: { recettes, dernier, ver: CODE_VERSION } }], 'id');
+      noterDiag(r.rejouable ? 'vacances_appris_' + (r.valeur ? 'on' : 'off') : 'vacances_pas_rejouable');
+      if (r.rejouable) await noterEtatVacances(uid, r.valeur, 'geste');
+      try { notifierApp({ type: 'maj', quoi: 'vacances', uid: String(uid) }); } catch (_) {}
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+  _chaineRecetteVacances = suite.then(() => {}, () => {});
+  return suite;
+}
+async function mettreVacancesVinted(msg) {
+  const uid = String((msg && msg.uid) || '');
+  if (!/^\d{1,20}$/.test(uid) || typeof (msg && msg.vacances) !== 'boolean') return { accepte: false, code: 'invalide', raison: 'demande incomplète — rien n’est parti' };
+  if (msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'le mode vacances demande ton clic — rien n’est parti' };
+  const voulu = msg.vacances, sens = voulu ? 'on' : 'off';
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable dans cette extension' };
+  let rows; try { rows = await sbGet(`app_data?id=eq.${VACANCES_RECETTE}&select=${voulu ? 'r:data->recettes->on' : 'r:data->recettes->off'}`); } catch (_) { rows = null; }
+  if (rows === null) return { accepte: false, code: 'recette-lecture', raison: "je n'ai pas pu lire ce que VRM a appris — rien n’est parti" };
+  const recette = rows && rows[0] && rows[0].r;
+  if (!recette || !recette.chemin || !recette.corps) return { accepte: false, code: 'pas-appris', sens, raison: voulu ? 'Mets un compte en vacances une fois à la main sur vinted.fr : VRM apprend.' : 'Rouvre un compte une fois à la main sur vinted.fr : VRM apprend.' };
+  const corps = corpsVacancesPour(recette, voulu);
+  if (!corps || !/^(PUT|POST|PATCH)$/.test(String(recette.methode || '')) || !RE_VACANCES_CHEMIN.test(String(recette.chemin).replace('{moi}', '1'))) return { accepte: false, code: 'recette-illisible', raison: 'ce que VRM a appris n’est pas exploitable : refais-le une fois à la main — rien n’est parti' };
+  // Le compte de l'onglet ET le plafond : UNE place réservée.
+  const recu = {};
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu });
+  if (stop) return { accepte: false, code: stop.code, actif: stop.actif, raison: stop.error };
+  const rendre = async () => { if (recu.at) await rendreActions(uid, recu.at, 1); };
+  return await avecVinted(async () => {
+    // À SON TOUR dans la file : le compte de l'onglet est relu.
+    { const s2 = await gardeStricte(uid, acc, { lecture: true }); if (s2) { await rendre(); return { accepte: false, code: s2.code, actif: s2.actif, raison: s2.error }; } }
+    // 1. L'ÉTAT ACTUEL, LU chez Vinted (jamais supposé).
+    const rl = await vintedPage(acc, 'GET', '/api/v2/users/current', null, { timeoutMs: 30000 });
+    if (pasParti(rl)) { await rendre(); return { accepte: false, code: rl.pause ? 'vinted-pause' : 'onglet-vinted', raison: rl.pause ? (rl.raison || 'Vinted demande de ralentir') : raisonSansPage(rl) }; }
+    if (!rl || !rl.ok) { await rendre(); return { accepte: false, code: 'lecture-refusee', status: (rl && rl.status) || 0, raison: `Vinted n'a pas montré ton profil (${(rl && rl.status) || 'pas de réponse'}) — rien n’est parti` }; }
+    const avant = vacancesDuProfil(rl.json), moi = idDuProfil(rl.json);
+    if (avant === null || !moi) { noterDiag('vacances_forme_inconnue'); await rendre(); return { accepte: false, code: 'forme', raison: 'VRM ne sait pas lire l’état vacances de ce compte — rien n’est parti' }; }
+    if (avant === voulu) { await rendre(); await noterEtatVacances(uid, avant, 'relu'); return { accepte: true, etape: 'deja', vacances: avant }; }
+    const chemin = String(recette.chemin).replace('{moi}', moi);
+    if (!RE_VACANCES_CHEMIN.test(chemin)) { await rendre(); return { accepte: false, code: 'recette-illisible', raison: 'ce que VRM a appris n’est pas exploitable — rien n’est parti' }; }
+    await wait(600 + Math.floor(Math.random() * 900));
+    // 2. LE GESTE APPRIS, seul le réglage vacances changé.
+    const r = await vintedPage(acc, String(recette.methode), chemin, corps, { timeoutMs: 30000 });
+    if (pasParti(r)) { await rendre(); return { accepte: false, code: r.pause ? 'vinted-pause' : 'onglet-vinted', raison: r.pause ? (r.raison || 'Vinted demande de ralentir') : raisonSansPage(r) }; }
+    if (!r || !r.ok) { noterDiag('vacances_refus_' + ((r && r.status) || 0)); return { accepte: true, etape: 'echec', status: (r && r.status) || 0, vacances: avant, raison: `Vinted a refusé (${(r && r.status) || 'pas de réponse'}) — rien n’a changé` }; }
+    // 3. LA RELECTURE : l'état dit est celui que Vinted montre.
+    await wait(400 + Math.floor(Math.random() * 600));
+    const rr = await vintedPage(acc, 'GET', '/api/v2/users/current', null, { timeoutMs: 30000 });
+    const apres = rr && rr.ok ? vacancesDuProfil(rr.json) : null;
+    if (apres === null) { noterDiag('vacances_pas_relu'); return { accepte: true, etape: 'incertain', vacances: null, raison: 'Vinted a accepté, mais VRM n’a pas pu relire : regarde ton profil' }; }
+    await noterEtatVacances(uid, apres, 'relu');
+    if (apres !== voulu) { noterDiag('vacances_ecart'); return { accepte: true, etape: 'ecart', vacances: apres, raison: apres ? 'Vinted montre toujours le compte en vacances' : 'Vinted montre toujours le compte ouvert' }; }
+    noterDiag('vacances_ok_' + sens);
+    logActivity(voulu ? '🏖 Compte mis en vacances sur Vinted, relu' : '🏖 Compte rouvert sur Vinted, relu');
+    return { accepte: true, etape: 'fait', vacances: apres };
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // SUPPRIMER ET RECRÉER UNE ANNONCE (28 octobre, 5.248) — sa décision
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien : « je veux que ça supprime et recrée l'annonce », « en modifiant les
@@ -13831,6 +14140,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'republierVinted') { const r = await republierVinted(msg); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted(msg); await journalCommande(msg, r); return r; }
+  // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).
+  if (msg && msg.cmd === 'vacancesVinted') return await mettreVacancesVinted(msg);
   if (msg && msg.cmd === 'recreerVinted') { const r = await recreerVinted(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'publierBrouillon') { const r = await publierBrouillon(msg); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'refaireBrouillon') { const r = await refaireBrouillon(msg); await journalCommande(msg, r); return r; }
