@@ -6813,6 +6813,7 @@ const fetchWalletEscrow = async (uidsVivants) => {
     const rows = await fetchBillingRows();
     if (rows === null) return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null };
     let total = 0, accounts = 0, plusVieux = 0, dispo = 0;
+    const autreDevise = [];        // (12 nov., point 50) uid d'un solde en GBP/USD : hors total, NOMMÉ (§3 International)
     const avecSolde = new Set();   // uid des porte-monnaie RÉELLEMENT lus
     const parCompte = [];          // le DÉTAIL, compte par compte (Julien veut voir le décompte)
     // ⚠️ TROIS FORMES DIFFÉRENTES en base, vérifiées sur les 8 lignes réelles :
@@ -6840,6 +6841,8 @@ const fetchWalletEscrow = async (uidsVivants) => {
       // champs existent côte à côte (`balance` 0 € / `pending_balance` 0 € /
       // `previous_balance` 54 €). On ne mélange plus jamais les deux.
       const val = (o) => (o && o.amount != null) ? parseFloat(o.amount) : NaN;
+      const devise = [p.main, p.escrow, p.balance, p.pending_balance].some((o) => o && typeof o === 'object' && o.currency_code && String(o.currency_code).toUpperCase() !== 'EUR');
+      if (devise) { if (uid) autreDevise.push(uid); continue; }   // jamais additionné aux euros, jamais converti
       const attente = !isNaN(val(p.escrow)) ? val(p.escrow) : val(p.pending_balance);
       const dispoN  = !isNaN(val(p.main))   ? val(p.main)   : val(p.balance);
       if (isNaN(attente) && isNaN(dispoN)) continue;    // pas un porte-monnaie
@@ -6865,7 +6868,7 @@ const fetchWalletEscrow = async (uidsVivants) => {
       }
     }
     parCompte.sort((x, y) => (y.attente || 0) - (x.attente || 0));
-    return { total, dispo, accounts, avecSolde, parCompte, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
+    return { total, dispo, accounts, avecSolde, parCompte, autreDevise, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
   } catch (_) { return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null }; }
 };
 // OÙ DÉPOSER SES COLIS — la liste des points relais autour de chez toi, avec
@@ -8151,6 +8154,8 @@ const montantCommande = (o) => {
 const montantCommandeLu = (o) => {
   const p = o && o.price;
   if (p == null) return null;
+  // (11 nov., famille « pas su ≠ 0 ») une commande dans une autre devise n'est pas sue EN EUROS : écartée, jamais convertie.
+  if (typeof p === 'object' && p.currency_code && String(p.currency_code).toUpperCase() !== 'EUR') return null;
   const v = (typeof p === 'object') ? (p.amount ?? p.value) : p;
   if (v == null || String(v).trim() === '') return null;
   const n = Number(String(v).replace(',', '.'));
@@ -37888,7 +37893,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let spent=0, nSpent=0;
     for (const o of buysBase) {
       if (classifyOrderStatus(o.status) === 'cancelled') continue;
-      const amt = o.price?.amount!=null ? Number(o.price.amount) : 0;
+      // (12 nov., revue de robustesse, point 37) Un prix illisible ou dans une autre devise n'entre
+      //    pas dans « dépensé » (ni NaN, ni des livres comptées en euros) : il est compté à part.
+      const amt = montantCommandeLu(o);
+      if (amt == null) continue;
       spent += amt; nSpent += 1;
     }
     for (const b of offBuys) { const p = parseFloat(String(b.price).replace(',','.')); if (!isNaN(p)) { spent += p; nSpent += 1; } }
@@ -49211,7 +49219,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.warn,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
                 <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)}&nbsp;€</div>
-                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
+                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.{(walletEscrow.autreDevise||[]).length>0?<span data-tresor-devise={walletEscrow.autreDevise.length}> {walletEscrow.autreDevise.length} compte{walletEscrow.autreDevise.length>1?'s':''} dans une autre devise : hors total.</span>:null}</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
               </div>
               ); })()}
               {/* LITIGES EN COURS (paires qui reviennent : retour / remboursement / suspension) */}
@@ -49234,7 +49242,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>🛒 Argent dépensé (tous comptes)</div>
                 <div style={{fontSize:28,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{buys.items===null && offBuys.length===0 ? '…' : `${Math.round(treasury.spent)}\u00a0€`}</div>
-                <div style={{fontSize:12,color:C.muted}}>{treasury.nSpent} achat{treasury.nSpent>1?'s':''} (Vinted + hors Vinted){buys.items===null?' · chargement…':''}</div>
+                <div style={{fontSize:12,color:C.muted}}>{treasury.nSpent} achat{treasury.nSpent>1?'s':''} (Vinted + hors Vinted){buys.items===null?' · chargement…':''}{(()=>{ const nA=buysBase.filter(o=>classifyOrderStatus(o.status)!=='cancelled'&&montantCommandeLu(o)==null).length; return nA>0?<span data-tresor-depense-a-part={nA}> · au moins : {nA} achat{nA>1?'s':''} à part (prix pas lu ou autre devise)</span>:null; })()}</div>
               </div>
               <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Basé sur le statut Vinted de chaque commande (fiable, se met à jour tout seul).</div>
             </div>
