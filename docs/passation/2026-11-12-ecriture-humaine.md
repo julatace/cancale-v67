@@ -129,3 +129,29 @@ Orion) régénérés.
 
 Installer l'extension 5.369 (⟳ dans chaque Chrome), puis écrire ses versions : Offres
 auto → Message de refus → « + Ajouter une variante » ; Favoris → Message → idem.
+
+## Fusion de `origin/main` (5.365, intégration 11nov-f) — pour l'intégrateur
+
+Vrai `git merge origin/main` (184f46c2f). Conflits résolus en gardant LES DEUX côtés :
+- `background.js` : `saveDate`/`saveDetail` gardés « à soi » (5.357/5.362) **+** `verifDepot`
+  (main) ; `numeroPourPublier` par l'hôte de l'onglet (5.362) ; `fullSync` = `vendExtAJour()`
+  (main) + `sansRejet` (5.361) ; réveils `vrm-import` (+ `tickImportSites`) et
+  `vrm-empreintes` passés par `lance(…)`/`sansRejet` ; message de confirmation avec
+  `motsExt()` (main) + comptes relus « pas su » (5.356).
+- `lbc-relay.js` : les résultats d'envoi Leboncoin restent sur le canal privé (5.362) ;
+  l'import Leboncoin de main (`lbcimportmodele`, `lbcimportresultat`) reste sur
+  `window.postMessage` comme dans main. ⚠️ À FAIRE (hors de ce lot) : passer l'ordre
+  `importpage` et son résultat par le canal privé, comme les autres ordres (5.362).
+- `App.jsx` : `EXT_CAPACITES` = union ; `AlerteFormeVinted` (5.357) **et**
+  `AlerteModeration` (main) en tête de Ma journée.
+- **`formevinted` et `prudence` passent de 5.357.0 à 5.369.0** : la 5.365 publiée par
+  main ne les a pas (`audit-coherence` le refusait) ; c'est la renumérotation que
+  l'intégrateur prévoyait (5.366) — avec cette branche, la 1re version qui les porte est
+  la 5.369.
+- CLAUDE.md : §8 union, §9 réordonné par date puis les plus anciennes lignes déplacées
+  telles quelles dans `historique-divers.md` (58 953 octets).
+- `audit-import-sites` (main) devenait rouge au hasard sur l'arbre fusionné : le délai
+  des requêtes à la base (`signalDelai`, 5.356, un `setTimeout`) est ramené à 2 ms par
+  `_fond-vm.cjs` et la fausse base répond en 3 ms. Dans un navigateur rien ne change
+  (10/20 s réels). L'audit neutralise ce signal (il juge les pages) ; F1/F2 de
+  `audit-robustesse-extension` jugent toujours le délai.
