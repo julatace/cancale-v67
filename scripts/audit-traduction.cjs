@@ -51,6 +51,7 @@ const MIGRES = [
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
+  ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;

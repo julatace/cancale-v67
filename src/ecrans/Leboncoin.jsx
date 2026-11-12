@@ -18,6 +18,10 @@ import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_
 
 // ⟦← App.jsx #1⟧
 import AnnoncesLeboncoin from '../AnnoncesLeboncoin.jsx';
+// (11 nov., lot quoi-republier) « Quelles annonces republier ? » dans « Republier sur Leboncoin » : la MÊME règle et la même carte que Vinted.
+import QuoiRepublier from '../design/QuoiRepublier.jsx';
+import { quoiRepublier, ageDepuis, lireReglage as lireReglageQR, CLE_REGLAGE as CLE_REGLAGE_QR } from '../quoiRepublier.js';
+import { tr } from '../i18n/index.js';
 
 // ⟦← App.jsx #2⟧
 
@@ -925,6 +929,13 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
   const [mode, setMode] = useState('idle');        // idle | run | fini
   const [st, setSt] = useState({});                // id LBC → { etat, texte }
   const stop = React.useRef(false);
+  // (11 nov., lot quoi-republier) Les annonces anciennes et peu vues PROPOSÉES (src/quoiRepublier.js) : l'âge depuis
+  // la date de mise en ligne LUE (`publieeLe`), les vues et favoris LUS (`lbc.vues`, `lbc.favoris`, null = pas lus) ;
+  // identité = l'identifiant Leboncoin. Un toucher coche ; c'est lui qui continue et lance. Mêmes seuils que Vinted.
+  const [qrReglage, setQrReglageEtat] = useState(() => { try { return lireReglageQR(JSON.parse(localStorage.getItem(CLE_REGLAGE_QR) || 'null')); } catch (_) { return lireReglageQR(null); } });
+  const setQrReglage = (r) => { const x = lireReglageQR(r); setQrReglageEtat(x); try { localStorage.setItem(CLE_REGLAGE_QR, JSON.stringify(x)); } catch (_) {} };
+  const quoiRep = React.useMemo(() => (Array.isArray(liste) ? quoiRepublier(liste.map((it) => ({ cle: String(it.lbc.id), id: String(it.lbc.id), age: ageDepuis(it.lbc.publieeLe), vues: it.lbc.vues, favoris: it.lbc.favoris,
+    titre: it.lbc.titre || it.title || '', numero: it.numero ? String(it.numero) : '', photo: it.lbc.photo || it.vignette || '' })), qrReglage) : null), [liste, qrReglage]);
   const fiche = (it) => {
     const d = defautsFicheLbc(it);
     const base = it.lbc && it.lbc.prix != null ? it.lbc.prix : it.prix;
@@ -1041,6 +1052,11 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>
             Supprimée puis remise comme neuve. {REPUB_LBC_MAX} au plus par passage.
           </div>
+          {(liste || []).length > 0 && mode !== 'run' ? <QuoiRepublier site="leboncoin" res={quoiRep} reglage={qrReglage} onReglage={setQrReglage} Photo={PhotoVinted} pasLu={tr('qr.pasLuLbc')}
+            estCoche={(l) => sel.has(l.cle)}
+            onBasculer={(l) => { if (!sel.has(l.cle) && sel.size >= REPUB_LBC_MAX) { toast(tr('qr.lbcPlein', { n: REPUB_LBC_MAX })); return; } basculer(l.cle); }}
+            onCocherTout={(ls) => { const place = REPUB_LBC_MAX - sel.size; if (place < ls.length) toast(tr('qr.lbcPlein', { n: REPUB_LBC_MAX }));
+              setSel((s0) => { const s1 = new Set(s0); for (const l of ls) { if (s1.size >= REPUB_LBC_MAX) break; s1.add(l.cle); } return s1; }); }}/> : null}
           {nbExclues > 0 && (
             <details className="vrm-repli" data-repub-lbc-exclues={nbExclues} style={{ marginBottom: 8 }}>
               <summary style={{ fontSize: 13 }}>{nbExclues} annonce{nbExclues > 1 ? 's' : ''} en ligne ne {nbExclues > 1 ? 'peuvent' : 'peut'} pas être republiée{nbExclues > 1 ? 's' : ''} d'ici</summary>

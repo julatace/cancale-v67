@@ -193,6 +193,9 @@ import RaccourcisClavier from "./RaccourcisClavier.jsx";
 import { MQ_ORDINATEUR, MQ_TABLETTE_LARGE, MQ_TABLETTE_ETROITE, dispositionTablette } from "./coque.js";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
 import QuiDorment from "./design/QuiDorment.jsx";
+// (11 nov., lot quoi-republier) « Quelles annonces republier ? » : la règle (sur `articlesQuiDorment`) et sa carte.
+import QuoiRepublier from "./design/QuoiRepublier.jsx";
+import { quoiRepublier, lireReglage as lireReglageQR, CLE_REGLAGE as CLE_REGLAGE_QR, ligneJourneeRepublier } from "./quoiRepublier.js";
 import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
 // ⟦→ ecrans/Vestiaire.jsx #2⟧
 // ⟦→ ecrans/Compta.jsx #2⟧
@@ -32305,6 +32308,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [seuilDort, setSeuilDortEtat] = useState(() => { try { return seuilValide(localStorage.getItem('vrm_qd_seuil')); } catch (_) { return 30; } });
   const setSeuilDort = (v) => { const x = seuilValide(v); setSeuilDortEtat(x); try { localStorage.setItem('vrm_qd_seuil', String(x)); } catch (_) {} };
   const [dortAgir, setDortAgir] = useState(null);
+  // (11 nov., lot quoi-republier) Les seuils de « Quelles annonces republier ? » (jours, favoris, vues) : SON réglage,
+  // un confort de cet appareil (comme le seuil « qui dort ») ; illisible ⇒ le défaut (`lireReglage`).
+  const [qrReglage, setQrReglageEtat] = useState(() => { try { return lireReglageQR(JSON.parse(localStorage.getItem(CLE_REGLAGE_QR) || 'null')); } catch (_) { return lireReglageQR(null); } });
+  const setQrReglage = (r) => { const x = lireReglageQR(r); setQrReglageEtat(x); try { localStorage.setItem(CLE_REGLAGE_QR, JSON.stringify(x)); } catch (_) {} };
   // (9 nov., « vendre plus ») La même vue porte deux listes : « Qui dorment » et
   // « Favoris sans vente » (src/vendrePlus.js) ; le choix et le seuil de favoris
   // sont des conforts de CET appareil.
@@ -36700,6 +36707,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { dort: listingDatesLu === true && d ? d.n : null, favoris: f ? f.n : null, favorisPasLus: f ? f.favorisPasLus : 0 };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, listings.items, listings.error, listingDates, listingDatesLu, seuilDort, seuilFav]);
+  // (11 nov., lot quoi-republier) « QUELLES ANNONCES REPUBLIER ? » : la base EN LIGNE de la grille (`annBase`),
+  // l'âge LU (`listedAgeDays`), les vues et favoris LUS ; LA règle `quoiRepublier` (src/quoiRepublier.js,
+  // sur `articlesQuiDorment`). Identité : compte + identifiant Vinted (jamais le titre). Pas lues ⇒ `null` (« — »).
+  const quoiRep = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.error) return null;
+    return quoiRepublier(annBase.map((it) => { const uid = String((it._acc && it._acc.vinted_user_id) || it._uid || ''); const e = numeros[it.id] || {};
+      return { cle: uid + ':' + String(it.id), id: String(it.id), uid, age: listedAgeDays(it), vues: Number.isFinite(it.views) ? it.views : null, favoris: Number.isFinite(it.favourites) ? it.favourites : null,
+        titre: it.title || '', numero: e.numero ? String(e.numero) : '', photo: photoArticle(it) || '', compte: it._acc ? accNameOf(it._acc) : '' }; }), qrReglage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, listings.items, listings.error, listingDates, numeros, qrReglage]);
   // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
   // Même motif que `vrm_colis_aposter` (§11) : l'écran qui a toutes les sources
   // publie, le serveur lit — il ne recalcule jamais `annBase`. ⚠️ On ne publie
@@ -42788,6 +42805,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (9 nov., lot AL) « Republier » est une vue d'Annonces : tout chemin vers elle (ancienne entrée du menu, lien, `?tab=republier`) l'ouvre.
       if(only==='annonces' && prendreVue('republier')) setAnnSort('republier');
       if(only==='annonces' && prendreVue('dorment')) { setModeDort('dort'); setAnnSort('sleeping'); }
+      // (11 nov., lot quoi-republier) Ma journée « N annonces anciennes et peu vues » ⇒ la vue Republier (la carte en tête).
+      if(only==='annonces' && prendreVue('quoirepublier')) setAnnSort('republier');
       // (6 nov., vague 2) Ma journée : « N annonces sans achat relié » et « N ventes annulées avant l'envoi ».
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
       if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
@@ -43869,6 +43888,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (cD) { const mA = motsArticle(vendActuel()); const nom = cD.n > 1 ? mA.noms : mA.nom;
             const court = `${cD.partiel ? 'Au moins ' : ''}${cD.n} ${nom} en ligne depuis ${cD.seuil}\u00a0j ou plus`;
             jobs.push({ id: 'paires-dorment', n: cD.n, icon: 'sleep', color: C.text, court, detail: 'Republier, préparer ailleurs ou changer le prix toi-même : tu choisis, rien ne part seul', title: court, tab: 'cat_annonces', prio: 3.6, avant: () => demanderVue('dorment') }); } }
+        // (11 nov., lot quoi-republier) « QUELLES ANNONCES REPUBLIER ? » : UNE ligne, seulement s'il y en a (la liste LUE de
+        // `quoiRepublier`, ses seuils ; les « à vérifier » — vues ou favoris pas lus — n'y comptent pas : pas su ≠ peu).
+        // Dates pas lues ⇒ rien (comme la carte « qui dort »). « Voir » ouvre Annonces → Republier, la carte en tête :
+        // c'est LUI qui coche et qui lance. Carte « republier » de « Modifier ma journée » (src/journeePerso.js).
+        { const lq = listingDatesLu === true ? ligneJourneeRepublier(quoiRep) : null;
+          if (lq) { const court = tr('qr.journee.court', { n: lq.n });
+            jobs.push({ id: 'quoi-republier', n: lq.n, icon: 'sync', color: C.text, court, detail: tr('qr.journee.detail', { j: lq.jours }), title: court, tab: 'cat_annonces', prio: 3.62, action: VERBES.voir, avant: () => demanderVue('quoirepublier') }); } }
         // (6 nov.) UN INVENTAIRE DU STOCK EN COURS (src/inventaire.js, sa ligne
         // `vrm_inventaire`) : « Reprendre » ouvre le Stock sur l'inventaire. Neutre :
         // rien ne presse, c'est lui qui l'a commencé.
@@ -44602,7 +44628,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // « supprimes-vinted », publiée par la coque) : plus de seconde carte ici (un doute, une fois).
               const jobTrancher = autres0.find((j) => j.id === 'a-trancher') || null;
               const cyclesJ = [];
-              const autres = autres0.filter((j) => !j.cycle && j.id !== 'a-trancher');
+              // (11 nov., lot quoi-republier) « Quoi republier » est SA carte (cachable dans « Modifier ma journée »).
+              const jobRepublier = autres0.find((j) => j.id === 'quoi-republier') || null;
+              const autres = autres0.filter((j) => !j.cycle && j.id !== 'a-trancher' && j.id !== 'quoi-republier');
               // (3 nov.) Le nombre revient dans le titre : la vignette montre DE QUOI il s'agit (les photos),
               // plus un chiffre en pastille colorée (Julien : « les couleurs… j'aime pas trop »).
               const libCase = (id, n) => ({ envoyer: `${n} colis ${Lbas.aEnvoyer}`, retirer: `${n} colis ${Lbas.aRetirer}`, messages: `${n} message${n > 1 ? 's' : ''}`, prix: `${n} prix à baisser` })[id];
@@ -44649,10 +44677,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const photosDouble = photosComptes && photosComptes.groupes.length ? photosComptes.groupes : [];
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
-              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
+              const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, republier: jobRepublier ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
               const cacheesHorsCases = Object.keys(nParCarteAF).filter((id) => nParCarteAF[id] > 0 && !visJ(id).montree);
               const nCacheesAF = casesCachees.length + cacheesHorsCases.reduce((t, id) => t + nParCarteAF[id], 0);
-              const nGestesTout = cases.length + alertesArgent.length + autres.length + (nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0) + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (photosDouble.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (santeSurv.length ? 1 : 0) + (avisBasListe.length ? 1 : 0) + (aVerifier.n ? 1 : 0);
+              const nGestesTout = cases.length + alertesArgent.length + autres.length + (nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0) + (cyclesJ.length ? 1 : 0) + (jobTrancher ? 1 : 0) + (jobRepublier ? 1 : 0) + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (photosDouble.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0) + (santeSurv.length ? 1 : 0) + (avisBasListe.length ? 1 : 0) + (aVerifier.n ? 1 : 0);
               const nGestes = nGestesTout - (nCacheesAF - casesCachees.length);
               const carteAVerifier = () => {
                 const tous = [...aVerifier.ventes, ...aVerifier.achats];
@@ -44886,6 +44914,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 'avis-bas': avisBasListe.length ? [carteAvisBas()] : [],
                 'photos-comptes': photosDouble.length ? [cartePhotosComptes()] : [],
                 ...Object.fromEntries(['envoyer', 'retirer', 'messages', 'prix'].map((id) => [id, cases.filter((x) => x.id === id).map((x) => carteCase(x))])),
+                republier: jobRepublier ? [tache(jobRepublier, 97)] : [],
                 'a-relier': comptesARelierJour.length ? [carteARelier()] : [],
                 // (11 nov., lot suivi-commandes, intégré à « Modifier ma journée ») Les commandes à vérifier.
                 suivi: aVerifier.n ? [carteAVerifier()] : [],
@@ -47819,6 +47848,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
         <FichesNeuves/>
+        {/* (11 nov., lot quoi-republier) « Quelles annonces republier ? » en tête de la vue Republier : un toucher COCHE
+            l'annonce dans la liste ci-dessous (la même sélection `selAnn`, par compte + identifiant) ; rien ne part,
+            c'est lui qui choisit ensuite « À la main » ou « Par VRM » et qui lance (§3). */}
+        {annSort==='republier' && !(listings.items==null && listings.loading) ? (
+          <QuoiRepublier site="vinted" res={quoiRep && annUnCompte ? { ...quoiRep, liste: quoiRep.liste.map((l)=>({ ...l, compte:'' })), aVerifier: quoiRep.aVerifier.map((l)=>({ ...l, compte:'' })) } : quoiRep}
+            reglage={qrReglage} onReglage={setQrReglage} Photo={PhotoVinted} pasLu={tr('qr.pasLuVinted')}
+            estCoche={(l)=>selAnn.some((x)=>x.uid===l.uid && x.id===l.id)}
+            onBasculer={(l)=>{ const a = annSelectionnables.find((x)=>x.uid===l.uid && x.id===l.id);
+              // La même règle que la case de la liste : une annonce que l'atelier refuse (en vérification…) dit pourquoi.
+              if (!a || a.raisonPas || a.etat!=='en-ligne') { toast((a && a.raisonPas) || tr('qr.pasCochable')); return; }
+              setSelAnn((v)=>(v.some((x)=>x.uid===l.uid && x.id===l.id) ? v.filter((x)=>!(x.uid===l.uid && x.id===l.id)) : [...v, { id:a.id, uid:a.uid, etat:a.etat }])); }}
+            onCocherTout={(ls)=>{ const ok = new Map(annSelectionnables.filter((a)=>!a.raisonPas && a.etat==='en-ligne').map((a)=>[a.uid+':'+a.id, a]));
+              setSelAnn((v)=>{ const deja = new Set(v.map((x)=>x.uid+':'+x.id)); return [...v, ...ls.map((l)=>ok.get(l.uid+':'+l.id)).filter((a)=>a && !deja.has(a.uid+':'+a.id)).map((a)=>({ id:a.id, uid:a.uid, etat:a.etat }))]; }); }}/>
+        ) : null}
         {(annSort==='selection' || annSort==='brouillons' || annSort==='republier') ? (
           <ChoixAnnoncesVinted filtre={annSort==='brouillons' ? 'brouillon' : annSort==='republier' ? 'republier' : 'tout'} annonces={annSelectionnables} sel={selAnn} setSel={setSelAnn}
             charge={listings.items==null && listings.loading} brLecture={brVinted.liste==null}
