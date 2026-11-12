@@ -8930,9 +8930,74 @@ function dernierePageCommandes(json, page, parPage) {
   if (Number.isFinite(tp) && tp > 0) return page >= tp;
   return lot.length < parPage;
 }
-async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
+// ══ UNE FOIS LE COMPTE CAPTÉ EN ENTIER, ON NE RELIT QUE LE NOUVEAU (12 nov., 5.370) ══
+// Julien, mot pour mot : « On fait la relecture comme avant, mais une fois que tu as
+// capté tout le compte, tu ne fais que ce qu'il y a de nouveau. »
+// MESURÉ avant (5.369) : la relecture des ventes de CHAQUE visite (`rafraichirVentes`,
+// au plus 1 / 90 s) lisait jusqu'à 8 pages de 40, et la moisson (`pageActiveFetch`)
+// 10 pages de 100 ventes + 10 d'achats — même quand tout était déjà rangé. La fusion
+// (5.323) évitait de RÉÉCRIRE une fenêtre inchangée, pas de la RELIRE chez Vinted.
+// LA RÈGLE : un type (ventes, achats) est COMPLET pour ce compte quand l'import de
+// départ l'a fini (`vrmImport`, « Tout est récupéré ») ou quand une lecture de CE
+// Chrome est allée d'elle-même jusqu'à la dernière page ET a été rangée. Complet ⇒
+// on lit la page 1 (triée par date, la plus récente d'abord) et on S'ARRÊTE dès
+// qu'une page porte une transaction déjà connue DANS LE MÊME ÉTAT (même n°, même
+// statut) — sauf si une vente EN COURS connue (ni finalisée ni annulée) n'a pas
+// encore été revue : son état peut avoir changé, on continue jusqu'à elle (dans
+// le plafond de pages d'avant). Pas complet, mémoire vide ou illisible ⇒ la lecture
+// d'avant. Rien n'est perdu : la lecture courte se FUSIONNE (5.323,
+// `fusionnerCommandes`) ; une lecture ratée n'apprend rien (la mémoire ne bouge que
+// sur un rangement réussi : « écrit » ou « déjà identique »).
+// La relecture des ventes de chaque visite RESTE pendant la prudence (anti double vente).
+// La mémoire (`vrmCmdConnus`, chrome.storage.local, §4.9) : par compte et par type,
+// `complet` et l'état des 1 500 dernières transactions lues (n° → statut).
+const CMD_CONNUS = 'vrmCmdConnus';
+const CMD_CONNUS_MAX = 1500;
+function etatCommande(o) { return String((o && o.transaction_user_status) || '') + '|' + String((o && o.status) || ''); }
+function commandeFinie(etat) { return /^(completed|failed)\|/.test(String(etat || '')); }
+// Assez lu ? `inc` = { complet, etats } · `vus` : les n° déjà lus dans CETTE lecture.
+function assezLuCommandes(lot, inc, vus) {
+  if (!inc || inc.complet !== true || !inc.etats || typeof inc.etats !== 'object') return false;
+  let connuMeme = false;
+  for (const o of Array.isArray(lot) ? lot : []) {
+    const k = cleTxCommande(o); if (!k) continue;
+    vus.add(k);
+    if (inc.etats[k] === etatCommande(o)) connuMeme = true;
+  }
+  if (!connuMeme) return false;
+  for (const k of Object.keys(inc.etats)) if (!commandeFinie(inc.etats[k]) && !vus.has(k)) return false;
+  return true;
+}
+// Ce que CE Chrome sait d'un type de ce compte, ou `null` (lecture d'avant).
+async function incCommandes(uid, type) {
+  try {
+    const m = (await chrome.storage.local.get(CMD_CONNUS))[CMD_CONNUS] || {};
+    const e = m[`${uid}_${type}`] || null;
+    let complet = !!(e && e.complet);
+    if (!complet) { const st = await lireImport(uid); const k = type === 'orders_sold' ? 'sold' : 'purchased'; if (st && st[k] && st[k].fini) complet = true; }
+    if (!complet || !e || !e.etats || !Object.keys(e.etats).length) return null;
+    return { complet: true, etats: e.etats };
+  } catch (_) { return null; }
+}
+// Une lecture RANGÉE (écrite ou déjà identique en base) : la mémoire apprend ses états ;
+// `finNaturelle` (la dernière page atteinte d'elle-même) la rend complète.
+async function noterCommandesConnues(uid, type, lot, finNaturelle) {
+  try {
+    const m = (await chrome.storage.local.get(CMD_CONNUS))[CMD_CONNUS] || {};
+    const cle = `${uid}_${type}`;
+    const e = m[cle] && typeof m[cle] === 'object' ? m[cle] : { complet: false, etats: {} };
+    const etats = Object.assign({}, e.etats || {});
+    for (const o of Array.isArray(lot) ? lot : []) { const k = cleTxCommande(o); if (k) { delete etats[k]; etats[k] = etatCommande(o); } }
+    const cles = Object.keys(etats);
+    const garde = cles.length > CMD_CONNUS_MAX ? Object.fromEntries(cles.slice(-CMD_CONNUS_MAX).map((k) => [k, etats[k]])) : etats;
+    m[cle] = { complet: !!(e.complet || finNaturelle), etats: garde, at: Date.now() };
+    await chrome.storage.local.set({ [CMD_CONNUS]: bornerRegistre(m, 60 * 864e5, 40) });
+  } catch (_) {}
+}
+async function fetchAllOrders(acc, type, maxPages = 8, suivi, inc = null) {
   let all = []; let pagination = null;
-  if (suivi) suivi.pagesLues = 0;
+  if (suivi) { suivi.pagesLues = 0; suivi.finNaturelle = false; suivi.assezLu = false; }
+  const vus = new Set();
   for (let page = 1; page <= maxPages; page++) {
     const r = await vintedGet(acc, `/api/v2/my_orders?type=${type}&page=${page}&per_page=40`);
     if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) { if (suivi) { suivi.statut = r && r.status; if (r && r.pause) suivi.pause = true; } break; }
@@ -8942,7 +9007,9 @@ async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
     // ⚠️ 5.362 (revue, moyenne 46) : la DERNIÈRE page est celle que Vinted annonce
     //    (`total_pages`) ; la longueur du lot ne sert que s'il ne le dit pas (Vinted
     //    peut plafonner `per_page` plus bas : 1re page seule, sans le dire).
-    if (dernierePageCommandes(r.json, page, 40)) break;
+    if (dernierePageCommandes(r.json, page, 40)) { if (suivi) suivi.finNaturelle = true; break; }
+    // 5.370 : compte déjà capté en entier ⇒ on s'arrête dès qu'on retombe sur le connu.
+    if (assezLuCommandes(r.json.my_orders, inc, vus)) { if (suivi) suivi.assezLu = true; noterDiag(`commandes_nouveau_seul_${type}`); break; }
     await wait(1200); // pause entre pages (discret)
   }
   return { my_orders: all, pagination };
@@ -9069,6 +9136,8 @@ async function pageActiveFetch() {
   if (!activeUid0) return false;
   let knownPid = null;
   try { knownPid = await lastProfileId(activeUid0); } catch (_) {}
+  // 5.370 : ce que CE Chrome sait déjà des ventes et des achats de ce compte (null = tout relire).
+  const incPage = { sold: await incCommandes(String(activeUid0), 'orders_sold'), purchased: await incCommandes(String(activeUid0), 'orders_purchased') };
   // ⚠️ 5.162 : toute la série faite dans la page occupe UNE place de la file
   // Vinted (aucune autre requête de l'extension ne part pendant ce temps), et
   // un 429/403 reçu dans la page ARRÊTE la série sur place (`frein`) — avant,
@@ -9076,7 +9145,7 @@ async function pageActiveFetch() {
   // boîte, porte-monnaie, une trentaine de requêtes après le refus.
   const rep = await requeteVinted('page', async () => {
    try {
-    const res = await executerMain(tab.id, async (csrfTok, knownPidArg, __relais) => {
+    const res = await executerMain(tab.id, async (csrfTok, knownPidArg, incArg, __relais) => {
         // Hors de Chrome (sans monde MAIN), ses requêtes partent par la page.
         const fetch = __relais ? __relais.fetch : globalThis.fetch;
         let frein = 0;                        // Vinted a dit « ralentis » : plus rien ne part
@@ -9120,8 +9189,22 @@ async function pageActiveFetch() {
         // capture écrase la précédente, la version tronquée EFFAÇAIT la
         // complète : des ventes disparaissaient toutes seules. Même faute que
         // le dressing (§5.13), sur les commandes.
-        const toutesCommandes = async (type) => {
+        // 5.370 : `inc` (le compte déjà capté en entier) ⇒ on s'arrête dès qu'une page porte
+        // une transaction connue DANS LE MÊME ÉTAT, sauf vente en cours connue pas encore revue
+        // (règle recopiée de `assezLuCommandes` : cette fonction tourne DANS la page).
+        const fin = {};
+        const toutesCommandes = async (type, inc) => {
           const MAX = 10; let out = null;
+          const vus = new Set();
+          const etat = (o) => String((o && o.transaction_user_status) || '') + '|' + String((o && o.status) || '');
+          const assez = (lot) => {
+            if (!inc || inc.complet !== true || !inc.etats) return false;
+            let connu = false;
+            for (const o of lot) { const t = o && o.transaction_id; if (t == null || String(t).trim() === '') continue; const k = String(t); vus.add(k); if (inc.etats[k] === etat(o)) connu = true; }
+            if (!connu) return false;
+            for (const k of Object.keys(inc.etats)) if (!/^(completed|failed)\|/.test(String(inc.etats[k] || '')) && !vus.has(k)) return false;
+            return true;
+          };
           for (let pg = 1; pg <= MAX; pg++) {
             const r = await get('/api/v2/my_orders?type=' + type + '&page=' + pg + '&per_page=100');
             const lot = r && Array.isArray(r.my_orders) ? r.my_orders : null;
@@ -9130,13 +9213,14 @@ async function pageActiveFetch() {
             // 5.362 (revue, moyenne 46) : `total_pages` d'abord (règle recopiée de
             // `dernierePageCommandes` : cette fonction tourne DANS la page).
             const tp = Number(r.pagination && r.pagination.total_pages);
-            if (!lot.length || (Number.isFinite(tp) && tp > 0 ? pg >= tp : lot.length < 100)) break;
+            if (!lot.length || (Number.isFinite(tp) && tp > 0 ? pg >= tp : lot.length < 100)) { fin[type] = 'fin'; break; }
+            if (assez(lot)) { fin[type] = 'connu'; break; }
             await new Promise(res => setTimeout(res, 700));
           }
           return out;
         };
-        const sold = await toutesCommandes('sold');
-        const bought = await toutesCommandes('purchased');
+        const sold = await toutesCommandes('sold', incArg && incArg.sold);
+        const bought = await toutesCommandes('purchased', incArg && incArg.purchased);
         const inbox = await get('/api/v2/inbox?page=1&per_page=30');
         // PORTE-MONNAIE. Julien : « l'extension n'a pas moyen de capter tout
         // Vinted sans que j'aie besoin de tout ouvrir ? » — si, justement.
@@ -9151,8 +9235,8 @@ async function pageActiveFetch() {
         //    (toujours UN appel, le même que la page) — le relevé du mois en cours
         //    (`storeReleve`), et le solde s'il le porte.
         const wallet = await get('/api/v2/wallet/invoices/current');
-        return { who: who || null, listings: listings || null, listingsComplet, pid: pid || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein };
-      }, [csrf, knownPid]);
+        return { who: who || null, listings: listings || null, listingsComplet, pid: pid || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein, fin };
+      }, [csrf, knownPid, incPage]);
     const o = res && res[0] && res[0].result;
     // Le statut que la file regarde : le frein reçu dans la page, sinon « lu ».
     return { status: (o && o.frein) || (o ? 200 : 0), ok: !!o, out: o || null };
@@ -9197,8 +9281,15 @@ async function pageActiveFetch() {
     && out.listings && Array.isArray(out.listings.items));
   if (out.who) await range('profile', out.who);
   if (plein(out.listings, 'items') || dressingComplet) await range('listings', out.listings, dressingComplet ? { complet: true } : undefined);
-  if (plein(out.sold, 'my_orders')) await range('orders_sold', out.sold);
-  if (plein(out.bought, 'my_orders')) await range('orders_purchased', out.bought);
+  // 5.370 : rangées (écrites ou déjà identiques) ⇒ la mémoire du « déjà connu » apprend ;
+  //    la dernière page atteinte d'elle-même rend le type complet.
+  const rangeCmd = async (type, o, cle) => {
+    const r = await storeHarvestRow(uid, type, o, domain);
+    if (r === 'ecrit' || r === 'inchange' || r === 'hors-sujet') stored = true; else if (r !== 'erreur-vinted' && r !== 'plus-pauvre' && r !== 'forme-inconnue') ratees++;
+    if (r === 'ecrit' || r === 'inchange') await noterCommandesConnues(String(uid), type, o.my_orders, !!(out.fin && out.fin[cle] === 'fin'));
+  };
+  if (plein(out.sold, 'my_orders')) await rangeCmd('orders_sold', out.sold, 'sold');
+  if (plein(out.bought, 'my_orders')) await rangeCmd('orders_purchased', out.bought, 'purchased');
   if (plein(out.inbox, 'conversations')) await range('inbox', out.inbox);
   // Le solde n'est pas une liste : on le range des qu'il porte un montant.
   // `payouts` renvoie `{balance}` là où le porte-monnaie renvoie `{main,escrow}` :
@@ -10262,7 +10353,9 @@ async function rafraichirVentes(uid) {
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, ecrit: false, raison: 'compte' };
   const suivi = { pagesLues: 0 };
-  const sold = await fetchAllOrders(acc, 'sold', undefined, suivi);
+  // 5.370 : le compte déjà capté en entier ⇒ seulement le nouveau (`incCommandes`).
+  const inc = await incCommandes(String(uid), 'orders_sold');
+  const sold = await fetchAllOrders(acc, 'sold', undefined, suivi, inc);
   // Aucune page rendue par Vinted : c'est une lecture RATÉE, pas « aucune vente ».
   if (!sold || !Array.isArray(sold.my_orders) || !suivi.pagesLues) {
     noterDiag('ventes_lecture_ratee');
@@ -10278,6 +10371,8 @@ async function rafraichirVentes(uid) {
   if (!sold.my_orders.length) return { ok: true, ecrit: false, raison: 'aucune' };
   const issue = await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
   if (issue === 'ignore') return { ok: true, ecrit: false, raison: 'compte-supprime' };
+  // 5.370 : rangée (écrite ou déjà identique) ⇒ la mémoire du « déjà connu » apprend.
+  if (issue === 'ecrit' || issue === 'inchange') await noterCommandesConnues(String(uid), 'orders_sold', sold.my_orders, !!suivi.finNaturelle);
   if (issue === 'plus-pauvre') return { ok: true, ecrit: false, raison: 'plus-pauvre' };
   // 5.323 : la même fenêtre, déjà rangée par nous il y a moins d'une heure — rien de neuf.
   if (issue === 'inchange') return { ok: true, ecrit: false, raison: 'inchange' };
