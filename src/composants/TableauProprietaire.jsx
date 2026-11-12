@@ -26,6 +26,7 @@ const RAISONS = {
   'stripe-muet': 'Stripe n’a pas répondu',
   'sondes-absentes': 'les sondes de /statut n’ont encore rien rangé',
   concurrence: 'écrit en même temps ailleurs',
+  'migration-041': 'migration 041 pas appliquée (Supabase, éditeur SQL)',
 };
 const NOMS_COMPOSANTS = { base: 'la base', connexion: 'la connexion', emails: 'la réception des e-mails', envoi: 'l’envoi des e-mails', notifications: 'les notifications', extension: 'l’extension' };
 const nombre = (n) => new Intl.NumberFormat('fr-FR').format(n);
@@ -113,6 +114,8 @@ export function Courbe({ cle, titre, points, format = nombre, vide }) {
   );
 }
 
+const mo = (o) => `${(o / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: o < 10485760 ? 1 : 0 })} Mo`;
+
 export function TableauProprietaire({ entetes, fetcher = (typeof fetch === 'function' ? fetch : null), PanneEl = null }) {
   const [d, setD] = React.useState(undefined);
   const [raison, setRaison] = React.useState('');
@@ -189,6 +192,25 @@ export function TableauProprietaire({ entetes, fetcher = (typeof fetch === 'func
         <Tuile cle="plantages" lib="Plantages sur 7 jours" valeur={pl ? nombre(pl.n) : null} alerte={!!(pl && pl.tombes)}
           sous={pl ? (pl.n ? `${nombre(pl.types)} sorte${pl.types > 1 ? 's' : ''} d’erreur${pl.tombes ? ` · ${nombre(pl.tombes)} écran${pl.tombes > 1 ? 's' : ''} tombé${pl.tombes > 1 ? 's' : ''}` : ''} · détail : Sécurité des données` : 'aucun remonté') : pasSu(R, 'plantages')}/>
       </div>
+
+      <h3 style={S.titre}>Usage par vendeur</h3>
+      {!d.usage ? <p style={S.muet} data-pilotage-usage="pas-su">— {pasSu(R, 'usage')}</p> : (
+        <div style={S.carte} data-pilotage-usage={d.usage.lignes.length} data-usage-vendeurs={d.usage.vendeurs == null ? '' : d.usage.vendeurs}>
+          <p style={S.lib}>Les plus gros d’abord · {d.usage.vendeurs == null ? '—' : nombre(d.usage.vendeurs)} vendeurs · {d.usage.octetsTotal == null ? '—' : mo(d.usage.octetsTotal)} en tout</p>
+          {d.usage.lignes.length ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, fontVariantNumeric: 'tabular-nums', marginTop: 6 }}>
+              <thead><tr>{['Vendeur', 'Lignes', 'Stocké', 'Part'].map((t, k) => <th key={t} style={{ textAlign: k ? 'right' : 'left', fontWeight: 600, color: 'var(--vrm-muted)', padding: '4px 0' }}>{t}</th>)}</tr></thead>
+              <tbody>{d.usage.lignes.map((u) => (
+                <tr key={u.vendeur} data-usage-ligne={u.vendeur} data-usage-octets={u.octets == null ? '' : u.octets} style={{ borderTop: '.5px solid var(--vrm-line)' }}>
+                  <td style={{ padding: '6px 0', color: 'var(--vrm-ink)' }}>{u.vendeur}</td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', color: 'var(--vrm-ink)' }}>{u.lignes == null ? '—' : nombre(u.lignes)}</td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', color: 'var(--vrm-ink)' }}>{u.octets == null ? '—' : mo(u.octets)}</td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', color: 'var(--vrm-muted)' }}>{u.octets == null || !d.usage.octetsTotal ? '—' : `${Math.round((u.octets / d.usage.octetsTotal) * 100)} %`}</td>
+                </tr>))}</tbody>
+            </table>
+          ) : <p style={S.muet}>Aucun vendeur pour l’instant.</p>}
+        </div>
+      )}
 
       <h3 style={S.titre}>Satisfaction</h3>
       {!sat ? <p style={S.muet} data-pilotage-satisfaction="pas-su">— {pasSu(R, 'satisfaction')}</p> : (

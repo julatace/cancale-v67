@@ -20,6 +20,7 @@ import { routeSms } from './_lib/sms-mondialrelay.js';
 import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
+import { prendreDebit, refuserTropVite } from './_lib/debit-vendeur.js';   // (11 nov.) un vendeur ne mange pas l'égress des autres
 import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 // (9 nov., suites serveur) L'offre Solo / Pro : la règle (api/_lib/plan-regle.js, la même que l'app)
@@ -761,6 +762,8 @@ export default async function handler(req, res) {
     //    balayages voyaient TOUS les vendeurs : B aurait lu les chiffres de A.
     const owner = await ownerDuToken(req, res);
     if (owner === null) return; // ownerDuToken a déjà répondu (503/401)
+    // (11 nov., limites-client) Un débit PAR VENDEUR : un raccourci qui boucle ⇒ 429 propre, rien lu.
+    { const d = prendreDebit('widget', owner); if (!d.ok) return refuserTropVite(res, d); }
     // ⚠️ QUI NE PAIE PLUS NE VOIT PLUS SES CHIFFRES (Julien, 4 octobre) : la
     //    même règle que la base (`vrm_acces_pour`). Aucun nombre, comme une
     //    lecture ratée — un widget sans `ship` affiche un tiret, jamais « 0 ».

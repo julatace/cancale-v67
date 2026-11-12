@@ -382,6 +382,7 @@ import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
+import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
 import { PhotoVide } from "./composants/PhotoVide.jsx";
 import { Numero } from "./composants/Numero.jsx";
 import { EtatPanne } from "./composants/EtatPanne.jsx";
@@ -36553,6 +36554,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les comptes, les totaux et l'en-tête de chaque compte portent TOUJOURS sur l'ensemble.
   const [annMax, setAnnMax] = useVueSession('annonces-limite', 60);
   const annGroupesVus = useMemo(() => { let reste = annMax; return annGroupes.map((g) => { const items = g.items.slice(0, Math.max(0, reste)); reste -= items.length; return { ...g, tous: g.items.length, items }; }).filter((g) => g.items.length); }, [annGroupes, annMax]);
+  // (11 nov., limites-client) La grille se rend par paquets : la suite arrive au défilement (SuitePaquets).
+  const annPlus = React.useCallback(() => setAnnMax((m) => m + PAQUET_LISTE), []);   // eslint-disable-line react-hooks/exhaustive-deps
   // Les annonces que l'alerte « même paire en ligne deux fois » nomme (lot AF, mêmes groupes, §11) : une marque sur leur vignette.
   const annEnDouble = useMemo(() => new Set(groupesDeuxFois.filter((g) => g.length > 1).flat()), [groupesDeuxFois]);
   // La grille de vignettes est montrée pour « Toutes » et ses tris (pas pour les vues à cocher ni les files).
@@ -48501,7 +48504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <span className="vrm-ann-compte-nom" title={nomG || undefined}>{nomG || 'Compte Vinted'}</span>
             <span className="vrm-ann-compte-n">{g.tous} annonce{g.tous>1?'s':''}</span>
           </div>,
-          ...g.items.map(it=>{
+          ...g.montres.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
             //    reconstruit avec 5 champs, la pastille « prête » valait
             //    « à capter » sur toutes les cartes, par construction.
@@ -48740,11 +48743,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })]; })}
         </div>
-        {annShown.length > annMax && (
-          <Bouton variante="secondaire" plein data-ann-suite="" onClick={()=>React.startTransition(()=>setAnnMax(n=>n+120))} style={{marginTop:16}}>
-            Afficher {Math.min(120,annShown.length-annMax) > 1 ? `les ${Math.min(120,annShown.length-annMax)} suivantes` : 'la suivante'}{annShown.length-annMax > 120 ? ` · encore ${annShown.length-annMax-120} après` : ''}
-          </Bouton>
-        )}
+        <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
           </>)}
         {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>

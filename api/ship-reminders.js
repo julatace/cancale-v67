@@ -95,7 +95,7 @@ import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.j
 import { proprietaireInstallation } from './_lib/signalement.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { reserverMemo } from './_lib/cas.js';   // (11 nov.) mémos par comparer-et-échanger
-import { passerVendeurs, BUDGET_VENDEURS_MS, prendreBail, rendreBail } from './_lib/cron-lots.js';
+import { passerVendeurs, BUDGET_VENDEURS_MS, TEMPS_VENDEUR_MS, prendreBail, rendreBail } from './_lib/cron-lots.js';
 import { modifierNeutre } from './_lib/neutre-cas.js';   // (11 nov., H14) le bail du passage
 import { passageColisFrequent, MAX_LECTURES_VENDEUR, MAX_DEPARTS_VENDEUR, BUDGET_VENDEUR_MS, passageEtiquettes, MAX_PDF_VENDEUR_FREQUENT, BUDGET_ETIQUETTES_MS } from './_lib/colis-frequent.js';
 // (9 nov.) Les sondes de vrm.center/statut et leurs incidents automatiques (api/_lib/statut-sondes.js).
@@ -1750,12 +1750,13 @@ async function passageDuCron(req, res, moment, bailEtat) {
     const budget = Number(process.env.VRM_CRON_BUDGET_MS) > 0 ? Number(process.env.VRM_CRON_BUDGET_MS) : BUDGET_VENDEURS_MS;
     const lot = await passerVendeurs({
       owners, moment: momentCurseur, jour: parisDate(0), debut: debutCron, budgetMs: budget, parallele: VENDEURS_EN_PARALLELE,
+      tempsVendeurMs: Number(process.env.VRM_CRON_VENDEUR_MS) > 0 ? Number(process.env.VRM_CRON_VENDEUR_MS) : TEMPS_VENDEUR_MS,   // (11 nov.) un vendeur énorme ne garde pas sa place
       traiter: (o) => contexteVendeur.run({ owner: o, compteurBilan }, () => traiter()),
       lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre, retirerCurseur: retirerNeutre,
     });
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(bailEtat === 'pas-su' ? { bail: 'pas-su' } : {}), ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
-      lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
+      lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, reportes: lot.reportes, curseur: lot.curseur },
       bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :

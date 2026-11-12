@@ -33,6 +33,7 @@
 //     point noté et l'écran dit depuis quand. Comparer-et-échanger sur `data.rev` ;
 //     une lecture ratée n'écrit RIEN ; une valeur pas sue reste `null`.
 // ═══════════════════════════════════════════════════════════════════════════
+import crypto from 'crypto';
 import { sbCle } from './cle.js';
 import { ordreStable, finALaFrontiere } from './ordre-stable.js';   // (11 nov.) chaque page Range porte un tri total
 import { proprietaireInstallation } from './signalement.js';
@@ -218,6 +219,28 @@ export function resumerIncidents(data, maintenant) {
   };
 }
 
+// ── (11 nov., lot « limites-client ») L'USAGE PAR VENDEUR ─────────────────
+// `rpc/vrm_usage_vendeurs` (migration 041, clé de service seule) : lignes et
+// octets stockés par vendeur, les plus gros d'abord. Jamais un identifiant
+// dehors : une étiquette tirée d'une empreinte (« V-3fa9c2 »), stable d'une
+// lecture à l'autre. Rend { lignes, vendeurs, octetsTotal } · { absente } · null.
+export const etiquetteVendeur = (owner) => 'V-' + crypto.createHash('sha256').update('vrm-usage|' + String(owner).toLowerCase()).digest('hex').slice(0, 6);
+export async function lireUsage(env, fetcher, exclus, max = 20) {
+  const { url, service } = cfg(env);
+  let r;
+  try { r = await fetcher(`${url}/rest/v1/rpc/vrm_usage_vendeurs`, { method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_max: max + 2 }) }); } catch (_) { return null; }
+  if (!r) return null;
+  if (r.status === 404) return { absente: true };   // migration 041 pas appliquée (PGRST202)
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+  if (!Array.isArray(j)) return null;
+  const n = (x) => (Number.isFinite(Number(x)) ? Number(x) : null);
+  const premiere = j[0] || {};
+  const lignes = j.filter((x) => x && x.owner && !exclus(String(x.owner).toLowerCase())).slice(0, max)
+    .map((x) => ({ vendeur: etiquetteVendeur(x.owner), lignes: n(x.lignes), octets: n(x.octets) }));
+  return { lignes, vendeurs: n(premiere.vendeurs), octetsTotal: n(premiere.octets_total) };
+}
+
 // ── L'HISTORIQUE ───────────────────────────────────────────────────────────
 async function lireLigne(env, fetcher, proprio, id) {
   const { url, service } = cfg(env);
@@ -279,7 +302,7 @@ export async function calculerPilotage({ proprio, env = process.env, fetcher = f
   const exclus = (id) => !id || id === proprio || id === NEUTRE;
   const pasMoi = `owner=not.in.(${proprio},${NEUTRE})`;
 
-  const [comptes, vus, appareils, abos, essais, notes, sondes, plantages, subs] = await Promise.all([
+  const [comptes, vus, appareils, abos, essais, notes, sondes, plantages, subs, usageLu] = await Promise.all([
     lireComptes(env, fetcher),
     lireTout(env, fetcher, `app_data?id=eq.${ID_VU}&${pasMoi}&select=owner,jour:data->>jour`),
     lireTout(env, fetcher, `app_data?id=like.ext_appareil_*&${pasMoi}&select=owner,at:meta->>at`),
@@ -290,6 +313,7 @@ export async function calculerPilotage({ proprio, env = process.env, fetcher = f
     lireTout(env, fetcher, `app_data?owner=eq.${NEUTRE}&id=eq.${ID_STATUT}&select=data&limit=1`),
     listerPlantagesTerrain({ proprio, env, fetcher }),
     stripeBranche ? lireAbonnementsStripe(stripeApi) : Promise.resolve(undefined),
+    lireUsage(env, fetcher, exclus),
   ]);
 
   // Inscrits
@@ -366,6 +390,10 @@ export async function calculerPilotage({ proprio, env = process.env, fetcher = f
     plantagesBloc = { types, n, tombes };
   } else raisons.plantages = 'base';
 
+  // (11 nov.) L'usage par vendeur — « pas su » et « migration absente » dits, jamais 0.
+  let usage = null;
+  if (usageLu && !usageLu.absente) usage = usageLu; else raisons.usage = usageLu && usageLu.absente ? 'migration-041' : 'base';
+
   // Satisfaction
   let satisfaction = null;
   if (notes) satisfaction = agregerNotes(notes); else raisons.satisfaction = 'base';
@@ -387,7 +415,7 @@ export async function calculerPilotage({ proprio, env = process.env, fetcher = f
     if (avant === undefined) raisons.historique = 'base'; else historique = courbesHistorique(avant, maintenant);
   }
 
-  return { ok: true, at: new Date(maintenant).toISOString(), inscrits, actifs, essais: essaisBloc, abonnes, revenus, desabonnements, incidents, plantages: plantagesBloc, satisfaction, historique, point, raisons };
+  return { ok: true, at: new Date(maintenant).toISOString(), inscrits, actifs, essais: essaisBloc, abonnes, revenus, desabonnements, incidents, plantages: plantagesBloc, usage, satisfaction, historique, point, raisons };
 }
 
 // ── LA ROUTE ───────────────────────────────────────────────────────────────

@@ -33,6 +33,16 @@ export const BUDGET_VENDEURS_MS = DUREE_MAX_MS - MARGE_MS;
 export const SAUVER_TOUS = 50;
 // Les curseurs d'il y a `GARDER_JOURS` jours s'effacent (une ligne par moment et par jour).
 export const GARDER_JOURS = 3;
+// (11 nov., lot « limites-client ») LE TEMPS D'UN VENDEUR EST BORNÉ. Julien :
+// « un client qui a 5 000 annonces ne doit pas ralentir l'app pour les autres ».
+// Un vendeur énorme (ou une base qui peine sur SES lignes) gardait sa place
+// jusqu'au bout : la fonction pouvait être coupée net à 300 s AVANT d'écrire le
+// curseur — les petits, déjà servis, n'étaient notés nulle part. Passé
+// `TEMPS_VENDEUR_MS`, on n'attend plus ce vendeur : il est REPORTÉ (jamais noté
+// « fait »), sa place passe au suivant, et il est repris au passage suivant
+// (relance du jour, ou le lendemain en premier). Ses propres mémos évitent tout
+// doublon de rappel. Réglable par `VRM_CRON_VENDEUR_MS`.
+export const TEMPS_VENDEUR_MS = 60000;
 
 export const idCurseur = (moment, jour) => `cron_curseur_${moment}_${jour}`;
 export const jourAvant = (jour, n) => new Date(Date.parse(jour + 'T12:00:00Z') - n * 86400000).toISOString().slice(0, 10);
@@ -44,6 +54,7 @@ export function ordreDuJour(owners, jour) {
   return [...new Set((owners || []).map(String))].map((o) => [cle(o), o]).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map((x) => x[1]);
 }
 
+const REPORTE = Symbol('reporte');
 const liste = (c) => (c && Array.isArray(c.faits) ? c.faits.map(String) : []);
 
 // Qui passe, et dans quel ordre. `curseurJour` / `curseurVeille` : objet,
@@ -65,7 +76,7 @@ export function planDuPassage({ owners, jour, curseurJour, curseurVeille }) {
 // comptée en échec, le suivant passe). `lireCurseur(id)` rend objet · null ·
 // undefined ; `ecrireCurseur(id, data)` rend vrai si la base a confirmé ;
 // `retirerCurseur(id)` (facultatif) efface un vieux curseur.
-export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseur, ecrireCurseur, retirerCurseur, debut = Date.now(), budgetMs = BUDGET_VENDEURS_MS, parallele = 8, maintenant = () => Date.now() }) {
+export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseur, ecrireCurseur, retirerCurseur, debut = Date.now(), budgetMs = BUDGET_VENDEURS_MS, parallele = 8, maintenant = () => Date.now(), tempsVendeurMs = TEMPS_VENDEUR_MS }) {
   const id = idCurseur(moment, jour);
   const [curseurJour, curseurVeille] = await Promise.all([lireCurseur(id), lireCurseur(idCurseur(moment, jourAvant(jour, 1)))]);
   const { aFaire, deja, prioritaires } = planDuPassage({ owners, jour, curseurJour, curseurVeille });
@@ -74,6 +85,17 @@ export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseu
   const enEchec = [];
   const bilans = [];
   let echecs = 0, suivant = 0, budgetAtteint = false, depuisSauve = 0, derniereOk = null;
+  const reportes = [];
+  // Le travail d'un vendeur, borné : au-delà, `{ reporte: true }` (le travail
+  // lancé n'est pas annulé — il finit seul, idempotent — mais on ne l'attend plus).
+  const borne = (o) => {
+    let minuteur = null;
+    const travail = Promise.resolve().then(() => traiter(o, { tempsMs: tempsVendeurMs }));
+    travail.catch(() => {});   // un vendeur reporté qui plante plus tard ne fait rien tomber
+    if (!(tempsVendeurMs > 0) || !Number.isFinite(tempsVendeurMs)) return travail;
+    const delai = new Promise((ok) => { minuteur = setTimeout(() => ok(REPORTE), tempsVendeurMs); });
+    return Promise.race([travail, delai]).finally(() => clearTimeout(minuteur));
+  };
   // Les écritures du curseur passent l'une après l'autre (jamais une vieille
   // liste écrite après une plus récente) ; seule la DERNIÈRE dit l'état final.
   let chaine = Promise.resolve();
@@ -91,10 +113,14 @@ export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseu
       //    en échec entrait dans le curseur du jour et n'était plus retenté : ses
       //    rappels « à expédier » perdus pour la journée. Il reste à faire (relance
       //    du même jour, ou en tête le lendemain : le curseur n'est pas « complet »).
-      let reussi = false;
-      try { bilans.push({ owner: o, ...(await traiter(o)) }); reussi = true; }
-      catch (e) { echecs++; bilans.push({ owner: o, erreur: String((e && e.message) || e).slice(0, 200) }); }
-      if (reussi) faits.push(o); else enEchec.push(o);
+      // (11 nov., limites-client) Et un vendeur trop long est REPORTÉ (pas fait non plus).
+      const t0 = maintenant();
+      let r, reussi = false;
+      try { r = await borne(o); }
+      catch (e) { echecs++; bilans.push({ owner: o, erreur: String((e && e.message) || e).slice(0, 200), ms: maintenant() - t0 }); enEchec.push(o); continue; }
+      if (r === REPORTE) { reportes.push(o); bilans.push({ owner: o, reporte: true, raison: 'temps-vendeur', ms: maintenant() - t0 }); continue; }
+      bilans.push({ owner: o, ...r, ms: maintenant() - t0 }); reussi = true;
+      if (reussi) faits.push(o);
       // Rangé et ATTENDU (une coupure nette ne perd plus les vendeurs faits depuis le dernier rangement).
       if (++depuisSauve >= SAUVER_TOUS) { depuisSauve = 0; await sauver(false); }
     }
@@ -104,7 +130,7 @@ export async function passerVendeurs({ owners, traiter, moment, jour, lireCurseu
   await sauver(restants === 0);
   if (peutEcrire && retirerCurseur) { try { await retirerCurseur(idCurseur(moment, jourAvant(jour, GARDER_JOURS))); } catch (_) { /* un vieux curseur oublié ne gêne rien */ } }
   return {
-    bilans, echecs, enEchec, traites: faits.length - deja.size, dejaFaits: deja.size, restants, prioritaires, budgetAtteint,
+    bilans, echecs, enEchec, traites: faits.length - deja.size, dejaFaits: deja.size, restants, prioritaires, budgetAtteint, reportes: reportes.length,
     curseur: !peutEcrire ? 'pas-su' : derniereOk === true ? 'ecrit' : 'non-ecrit',
   };
 }

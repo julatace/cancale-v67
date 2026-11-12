@@ -215,7 +215,7 @@ function creerBase({ vendeurs = 10, gabarit = null, cleService = 'cle-service-ba
       else { for (const o of owners) L.push(...lignesDe(o, predId)); for (const r of neutre.values()) if (!predId || predId(r.id)) L.push(r); }
     } else if (table === 'vinted_accounts') {
       const os = cibles || owners;
-      for (const o of os) { if (!setOwners.has(o)) continue; const c = couches.get(o); const ret = c && c.get('__comptes_retires'); for (const a of comptesGabarit) if (!(ret && ret.data.includes(a.vinted_user_id))) L.push({ ...a, owner: o }); }
+      for (const o of os) { if (!setOwners.has(o)) continue; const c = couches.get(o); const ret = c && c.get('__comptes_retires'); for (const a of comptesGabarit) if (!(ret && ret.data.includes(a.vinted_user_id))) L.push({ ...a, owner: o }); const plus = c && c.get('__comptes_en_plus'); if (plus) for (const a of plus.data) L.push({ ...a, owner: o }); }   // (11 nov., limites-client) les comptes d'un vendeur plus gros que le gabarit
     } else if (table === 'abonnements') {
       const os = cibles || owners;
       for (const o of os) if (setOwners.has(o)) L.push(abonnements.get(o) || { owner: o, statut: 'actif', client_stripe: null, abonnement_stripe: null, fin_periode: null, annule_fin_periode: false, mode_test: true, evenement_ts: null, impaye_depuis: null });

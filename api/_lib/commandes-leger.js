@@ -33,6 +33,7 @@
 //     temps : comparer-et-échanger sur `data.rev` et `data.capturedAt` (une
 //     extension ancienne qui réécrit la ligne fait échouer l'échange ⇒ relu) ;
 //   · AU NOM du vendeur (son jeton, RLS) : jamais la clé de service.
+import { prendreDebit, refuserTropVite } from './debit-vendeur.js';
 import { cleTxCommande, fusionnerCommandes, lectureDuHaut, empreinteCommande } from '../../src/commandesFusion.js';
 import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur, baseCloisonnee, rpcCommeVendeur } from './session.js';
 
@@ -202,6 +203,8 @@ export async function routeCommandes(req, res, { maintenant = () => Date.now() }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, erreur: 'POST seulement' });
   const u = await vendeurExige(req, res);
   if (!u) return;
+  // (11 nov., limites-client) Un débit PAR VENDEUR (l'extension prend un 429 comme « rien rangé, au prochain passage »).
+  { const d = prendreDebit('commandes', u.id); if (!d.ok) return refuserTropVite(res, d); }
   const envoi = req.body;
   if (!envoi || typeof envoi !== 'object' || !TYPES.has(envoi.type) || !/^\d{1,20}$/.test(String(envoi.uid || ''))) return res.status(400).json({ ok: false, erreur: 'envoi' });
   const rowId = `harvest_${envoi.uid}_${envoi.type}`;
