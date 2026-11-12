@@ -43,7 +43,7 @@ export function VenduAilleurs({ carte, deja = null, onValider, Bouton }) {
     setFaux('');
     onValider && onValider({ montant: m, date });
   };
-  const B = Bouton || ((p) => <button type="button" {...p}/>);
+  const B = Bouton || ((p) => <button type="button" aria-label={p['aria-label']} {...p}/>);   // repli : le nom vient de l'appelant
   if (!ouvert) {
     return <div className="vrm-sr-bloc" data-vendu-ailleurs={carte.id}>
       <B variante="secondaire" className="vrm-sr-ouvrir" data-vendu-ailleurs-ouvrir="" onClick={() => setOuvert(true)}>Vendu ailleurs</B>
@@ -79,7 +79,7 @@ export function FeuillePrixAchat({ ventes, onEnregistrer, onFermer, Feuille, Bou
   const [vals, setVals] = React.useState({});
   const [faux, setFaux] = React.useState({});
   const l = Array.isArray(ventes) ? ventes : [];
-  const B = Bouton || ((p) => <button type="button" {...p}/>);
+  const B = Bouton || ((p) => <button type="button" aria-label={p['aria-label']} {...p}/>);   // repli : le nom vient de l'appelant
   const valider = (e) => {
     if (e) e.preventDefault();
     const f = {}; const ok = [];

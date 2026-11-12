@@ -395,7 +395,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/repriseDe: String\(r\.orphan\.key\)/.test(A) && /repriseDe: String\(autres\[0\]\)/.test(A), 'une reprise dit QUELLE fiche elle remplace (`repriseDe`) : la base ne la prend pas pour une fiche perdue');
     dit(/if \(code\) \{ _pushBloque = true; _emitSync\('refus'(?:, '[^']*')?\); signalerNumerosPerimes\(code\);/.test(A), 'un refus nommé de la base (numéros périmés) arrête les envois et ouvre le bloc « recharger »');
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
-    dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
+    dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');
     const reglage = corps('function NumerosSetting(', '\n}\n');
     dit(/if \(n && arch && n === arch\) \{ setRefusee\(n\);[^}]*return; \}/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');
