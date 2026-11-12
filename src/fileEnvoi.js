@@ -137,6 +137,9 @@ export const compterEnAttente = (stock, owner) => {
     // un prix tapé écrit les deux. Quand la fiche attend aussi, ce n'est qu'UN changement
     // (« 1 changement » pour un prix, banc file-envoi). Seul (Stock, Vestiaire), il compte.
     if (k === 'vinted_buyprice_by_num' && f.cles.vinted_annonce_numeros) continue;
+    // La reprise des écrans (dernier écran, filtres, recherche) voyage avec la ligne mais n'est
+    // pas une saisie : elle part avec le reste, on ne la compte pas (« 1 changement » = un prix).
+    if (k === 'vrm_reprise_ecrans') continue;
     const b = baseDe(f.cles[k]), l = lireLocal(stock, k);
     if (memeValeur(b, l)) continue;
     if (estObjet(b) || estObjet(l)) {

@@ -164,7 +164,7 @@ const ecrireAilleurs = (base, maj) => {
     A.etat.faute = COUPE;
     dit(await saisirPrix(o.pg, 2, '42'), 'R : prix du N°2 saisi pendant la coupure');
     await o.pg.waitForTimeout(2500);
-    dit((await mention(o.pg)) === 1, 'R : la mention est là', String(await mention(o.pg)));
+    dit((await mention(o.pg)) === 1, 'R : la mention est là', String(await mention(o.pg)) + (process.env.BANC_DEBUG ? ' ' + await o.pg.evaluate(() => { const f = JSON.parse(localStorage.getItem('vrm_file_envoi') || '{}'); return JSON.stringify(Object.entries(f.cles || {}).map(([k, e]) => [k, String(JSON.stringify(e.base)).slice(0, 80), (localStorage.getItem(k) || '').slice(0, 80)])); }) : ''));
     A.etat.faute = null;
     await o.pg.evaluate(() => window.dispatchEvent(new Event('online')));
     await H.attendre(() => prixFiche(H.dataMain(base), IDS[1]) === '42', 20000);
