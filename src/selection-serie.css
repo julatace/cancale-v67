@@ -29,7 +29,7 @@
   background-color: var(--vrm-accent, #0071E3);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
-:root:root body .vrm-serie-case.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo input:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 1px; }
+:root:root body .vrm-serie-case.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo input:focus-visible { outline: 2px solid var(--vrm-accent-texte, #0066CC); outline-offset: 1px; }   /* (12 nov.) le bleu de TEXTE : ≥ 3:1 aussi en sombre (accessibilite-clavier K2) */
 /* Sélection fermée : invisible (au doigt, pas rendue du tout — plus bas). */
 :root:root body .vrm-serie-case.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo[data-serie-actif="0"] { opacity: 0; transition: opacity .12s ease; }
 @media (hover: hover) and (pointer: fine) {
