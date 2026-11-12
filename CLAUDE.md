@@ -537,6 +537,9 @@ sans la fonction.
 | `empreintes` | `tickEmpreintes` | **5.358.0** (11 nov.) | « photos en double entre tes comptes » : une image par tour (45 s), budget de LECTURE, empreinte seule rangée (`photo_emprunte_{uid}`) |
 | `importsites` | `importerSite` | **5.365.0** (11 nov.) | « Ton historique Leboncoin / Vestiaire » : pages que le SITE a paginées (modèle vu, jamais deviné), compte de l'onglet, 12 des 20 lectures/h, reprise, fusion par n° ; `import_{site}_{compte}` |
 | `vcprix` | `baisserPrixVestiaire` | **5.364.0** (11 nov.) | « Baisser des prix » Vestiaire sur son clic : recette APPRISE de son propre changement de prix (relu) sur vestiairecollective.com (`vc_prix_recette`), compte de l'annonce = celui de l'onglet, prix lu avant (aperçu) et RELU après, 45/h, pause 429/403 |
+| `offresgarde` | `offreGardeDit` | **5.308.0** | (ajoutée à la table le 12 nov.) |
+| `offrespage` | `seuilOffreLu` | **5.342.0** | (ajoutée à la table le 12 nov.) |
+| `lbcprix` | `baisserPrixLbc` | **5.363.0** (11 nov.) | « Baisser le prix » Leboncoin en série sur son clic : recette APPRISE de son propre changement de prix, prix relu, 45/h, compte de l'onglet ; passe par la sécurité des comptes (12 nov.) |
 | `securite` | `secuGeste` | **5.366.0** (11 nov.) | « Sécurité des comptes » : repos de nuit, plafonds jour/type, prudence, arrêt anti-robot, « si tu es là », « Tout arrêter » — Vinted et Vestiaire, avant le 50/h inchangé |
 | `creervinted` | `creerVintedFiche` | **5.367.0** (11 nov.) | « Créer sur Vinted » depuis une fiche « À publier » : sur son clic, UN brouillon par fiche depuis l'onglet vinted.fr (compte de l'onglet, 1 action dans les 45/h) ; champ du catalogue pas au libellé exact ⇒ DEMANDÉ (valeurs de Vinted) ; N° lié à l'id rendu ; il publie |
 | `repubdepart` | `etatDepartRepub` | **5.368.0** (11 nov.) | « Programmer » Republier : l'état dit l'onglet vinted.fr ouvert et le frein de republication du compte (lecture seule, « pas su » ⇒ rien ne part) |
