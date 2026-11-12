@@ -61,7 +61,9 @@ const LIGNES = [
 // La table officielle (Base Adresse, `type=municipality`) : la forme de api-adresse.data.gouv.fr.
 const commune = (nom, cp, insee) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [-3.7, 48.3] }, properties: { label: nom, score: 0.9, type: 'municipality', name: nom, postcode: cp, citycode: insee, city: nom } });
 const COMMUNES = { 29690: [commune('Huelgoat', '29690', '29081')], 35350: [commune('Saint-Méloir-des-Ondes', '35350', '35299'), commune('Saint-Benoît-des-Ondes', '35350', '35255'), commune('Saint-Coulomb', '35350', '35263')] };
-const ATTENDU = { cancale: 4, vannes: 2, 'saint malo': 2, huelgoat: 1, 'cp:35350': 1 };
+// (11 nov., intégration colis — décision « aucune hypothèse », lot retraits-fiables) Le point lu au NOM seul
+// (« LOCKER 24/7 HYPER DU PORT ») n'emprunte plus l'adresse d'un autre colis : il n'est dans AUCUNE ville (« Autres »).
+const ATTENDU = { cancale: 3, vannes: 2, 'saint malo': 2, huelgoat: 1, 'cp:35350': 1 };
 const TOTAL = 12;
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
@@ -142,9 +144,9 @@ const mesurer = (pg) => pg.evaluate(() => ({
       console.log(`\n— Colis → À retirer · villes · ${nom}`);
       const { ctx, pg, errs, banDemandes } = await ouvrir(b, vp);
       try {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => document.querySelectorAll('[data-retirer-villes] [data-ville]').length >= 6, null, { timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(600);
         const m = await mesurer(pg);
@@ -153,7 +155,7 @@ const mesurer = (pg) => pg.evaluate(() => ({
         const parV = Object.fromEntries(m.villes.filter((x) => x.v).map((x) => [x.v, Number(x.n)]));
         for (const [v, n] of Object.entries(ATTENDU)) dit(parV[v] === n, `bouton « ${v} » : ${n} colis`, JSON.stringify(m.villes));
         // (8 nov.) + « Autres » : le point CONNU sans ville lue (nom seul, homonyme) a son bouton, à la fin (`selecteurVilles`).
-        dit(m.villes.length === Object.keys(ATTENDU).length + 2 && m.villes[m.villes.length - 1].v === '__autres' && m.villes[m.villes.length - 1].n === '1', 'une ville = un bouton (« CANCALE » = « Cancale », « ST MALO » = « Saint-Malo »), puis « Autres · 1 », rien d’autre', JSON.stringify(m.villes.map((x) => x.txt)));
+        dit(m.villes.length === Object.keys(ATTENDU).length + 2 && m.villes[m.villes.length - 1].v === '__autres' && m.villes[m.villes.length - 1].n === '2', 'une ville = un bouton (« CANCALE » = « Cancale », « ST MALO » = « Saint-Malo »), puis « Autres · 2 » (l’homonyme et le nom seul), rien d’autre', JSON.stringify(m.villes.map((x) => x.txt)));
         dit(m.villes.some((x) => x.v === 'cp:35350' && /^35350\b/.test(x.txt)), 'le code postal à plusieurs communes dit « 35350 », jamais une ville devinée', '');
         for (const v of Object.keys(ATTENDU)) { const n = m.points.filter((p) => p.ville === v).reduce((t, p) => t + p.n, 0); dit(n === ATTENDU[v], `les points de « ${v} » portent ${ATTENDU[v]} colis (= le bouton)`, String(n)); }
         const carrefour = m.points.find((p) => /carrefour/i.test(p.nom));
@@ -167,12 +169,14 @@ const mesurer = (pg) => pg.evaluate(() => ({
         await pg.locator('[data-retirer-villes] [data-ville="vannes"]').first().click(); await pg.waitForTimeout(500);
         const v = await mesurer(pg);
         const nV = v.points.filter((p) => p.ville === 'vannes').reduce((t, p) => t + p.n, 0);
-        dit(v.ville === 'vannes' && nV === 2 && v.carte === '2', 'Vannes choisie : ses 2 colis (les consignes sans code postal), la carte sombre dit 2', JSON.stringify({ ville: v.ville, nV, carte: v.carte }));
+        // (lot DJ3) La carte sombre n'est plus rendue en section d'Achats : le nombre de la ville est celui de SON bouton.
+        const bV = (v.villes.find((x) => x.v === 'vannes') || {}).n;
+        dit(v.ville === 'vannes' && nV === 2 && bV === '2', 'Vannes choisie : ses 2 colis (les consignes sans code postal), son bouton dit 2', JSON.stringify({ ville: v.ville, nV, bouton: bV }));
         dit(v.points.filter((p) => p.ville && p.ville !== 'vannes').length === 0, '… aucun point d’une autre ville', JSON.stringify(v.points.filter((p) => p.ville && p.ville !== 'vannes').map((p) => p.ville)));
         dit(v.points.some((p) => p.inconnu) && v.points.some((p) => /carrefour/i.test(p.nom)), '… « Lieu à confirmer » et le point sans ville restent VISIBLES', JSON.stringify(v.points.map((p) => p.nom || p.cle)));
         const secs = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-rp-section]')].map((x) => [x.getAttribute('data-rp-section'), Number(x.getAttribute('data-rp-section-n'))])));
         const carrefourSec = await pg.evaluate(() => { const p = [...document.querySelectorAll('.vrm-rpf .vrm-rpf-nom')].find((e) => /carrefour/i.test(e.textContent)); return p ? (p.closest('[data-rp-section]') || { getAttribute: () => '' }).getAttribute('data-rp-section') : null; });
-        dit(carrefourSec === 'lieu' && secs.lieu === 2 && (secs.prets || 0) + (secs.avenir || 0) + (secs.aujourdhui || 0) === 2, '… sous « Lieu à confirmer » (2, avec son nom), et les sections de la ville disent 2 comme la carte', JSON.stringify({ secs, carrefourSec }));
+        dit(carrefourSec === 'lieu' && secs.lieu === 3 && (secs.prets || 0) + (secs.avenir || 0) + (secs.aujourdhui || 0) === 2, '… sous « Lieu à confirmer » (3 : l’homonyme, le nom seul, le sans-lieu), et les sections de la ville disent 2 comme son bouton', JSON.stringify({ secs, carrefourSec }));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `villes-vannes-${nom}.png`) });
         dit(m.deb <= 1 && v.deb <= 1, 'rien ne déborde', `${m.deb} / ${v.deb}`);
         dit(!errs.length, 'aucune erreur de page', errs.join(' | '));

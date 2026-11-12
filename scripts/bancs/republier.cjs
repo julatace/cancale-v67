@@ -474,7 +474,7 @@ const projette = (row, sel) => {
         dit(e3.length === 1 && e3[0].cmd === 'recreerVinted' && e3[0].versBrouillon === true && e3[0].id === '9103', '… la commande est la recréation arrêtée au brouillon (versBrouillon)', JSON.stringify(e3));
         await fermer();
         // « Plus sur Vinted » : retiré de la liste, et « Les remettre ».
-        await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();   // (chantier C) « Voir mes brouillons » = « Un par un » de la vue Brouillons
+        await fermerAtelier(pg); await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();   // (chantier C) « Voir mes brouillons » = « Un par un » de la vue Brouillons
         await pg.locator('[data-brouillon="9202"] [data-brouillon-ecarter]').click();
         dit(await pg.locator('[data-brouillon="9202"]').count() === 0 && await pg.locator('[data-brouillons-ecartes="1"]').count() === 1, '« Plus sur Vinted » : le brouillon sort de la liste, et c’est dit');
         await pg.locator('[data-brouillons-remettre]').click();

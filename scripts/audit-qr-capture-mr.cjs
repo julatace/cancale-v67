@@ -142,7 +142,10 @@ async function verifier(src, bavard) {
     const vueGrand = (() => { const i = app.indexOf('{qrView && (()=>{'); return i < 0 ? '' : app.slice(i, app.indexOf('</SheetShell>', i)); })();
     const cstCk = (vueGrand.match(/const (\w+) = carrierKey\(qrView\.carrier\)(?: \|\| '')?;/) || [])[1];
     const grandOk = /titreQrAbsent\(carrierKey\(qrView\.carrier\)\)/.test(vueGrand) || (!!cstCk && new RegExp('<strong>\\{titreQrAbsent\\(' + cstCk + '\\)\\}</strong>').test(vueGrand));
-    dit(/titreQrAbsent\(carrierKey\(tr\)\)/.test(app) && grandOk && !/<strong>QR pas reçu<\/strong>/.test(app), 'E2 carte et vue en grand : « QR dans l’app Mondial Relay » (plus « QR pas reçu » écrit en dur)');
+    // (intégration g1) Julien, 11 nov. (« des QR codes dans tous les sens », lot journee-perso / revue-colis) : la
+    // LIGNE ne commente plus un QR absent ; seule la vue en grand le dit (par `titreQrAbsent` de CE colis), et
+    // « Ajouter le QR (capture) » reste sur la ligne d'un colis Mondial Relay.
+    dit(grandOk && !/<strong>QR pas reçu<\/strong>/.test(app) && /data-colis-qr-ajouter=""/.test(app) && !/data-colis-qr-absent=/.test(app), 'E2 la vue en grand dit « QR dans l’app Mondial Relay » ; la ligne ne commente plus un QR absent, elle propose « Ajouter le QR »');
     dit(/data-colis-qr-ajouter=""/.test(app) && /data-qr-plein-ajouter=""/.test(app) && /qrParCapture\(carrierKey\(t\.carrier\)\)/.test(app), 'E3 « Ajouter le QR (capture) » sur la carte et dans « En grand », Mondial Relay seulement');
     // (6 nov., v36) Les espaces autour de la flèche ne sont pas la règle : le bouton
     // « Retirer ce QR » de la vue en grand appelle `retirerQrPose` sur CE colis, à son clic.

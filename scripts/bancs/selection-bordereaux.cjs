@@ -142,7 +142,7 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
   L = await lignes();
   const tous = L.filter((l) => l.coche).map((l) => l.site);
   dit(L.filter((l) => l.coche).length === 6 && !tous.includes('ebay'), `${nom} : C « Tout sélectionner » coche tout sauf eBay`, JSON.stringify(L.map((l) => l.cle + ':' + l.coche)));
-  for (const l of L.filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check().catch(() => {});
+  for (const l of L.filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check({ timeout: 1500 }).catch(() => {});   // (11 nov., lot DJ3) plus de case « Contrôlé » : sans effet
   // D : imprimer ; une feuille par type.
   const imprimer = async (bouton, { annuler = false, deplacer = false } = {}) => {
     const avant = await pg.evaluate(() => window.__pdfs.length);
@@ -198,13 +198,13 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
   // F : second lot — le type gardé ne redemande pas ; « Placer le tampon » redemande tout.
   if (!(await pg.$('[data-lot]'))) await ouvrir();
   await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-lot] button')].find((x) => x.innerText.trim() === 'Tout sélectionner'); if (b) b.click(); });
-  for (const l of (await lignes()).filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check().catch(() => {});
+  for (const l of (await lignes()).filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check({ timeout: 1500 }).catch(() => {});   // (11 nov., lot DJ3) plus de case « Contrôlé » : sans effet
   await pg.evaluate(() => { window.__avant = window.__pdfs.length; });
   const f1 = await imprimer('button[data-lot-imprimer]');
   dit(f1.formes.length === 1 && /chronopost/.test(f1.formes[0]), `${nom} : F le type gardé (Mondial Relay) ne redemande pas`, JSON.stringify(f1.formes));
   if (!(await pg.$('[data-lot]'))) await ouvrir();
   await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-lot] button')].find((x) => x.innerText.trim() === 'Tout sélectionner'); if (b) b.click(); });
-  for (const l of (await lignes()).filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check().catch(() => {});
+  for (const l of (await lignes()).filter((x) => x.coche)) await pg.locator(`[data-lot-ligne="${l.cle}"] input`).nth(1).check({ timeout: 1500 }).catch(() => {});   // (11 nov., lot DJ3) plus de case « Contrôlé » : sans effet
   await pg.evaluate(() => { window.__avant = window.__pdfs.length; });
   const f2 = await imprimer('button[data-lot-placer]');
   dit(f2.formes.length === 2, `${nom} : F « Placer le tampon » rouvre la feuille de chaque type`, JSON.stringify(f2.formes));

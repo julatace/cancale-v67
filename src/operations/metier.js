@@ -44,6 +44,18 @@ export function veillesDuFil(veilles){
  actives.sort((a,b)=>String(b.cree||'').localeCompare(String(a.cree||'')));
  return {fil:actives.slice(0,MAX_VEILLES_ACTIVES),horsFil:Math.max(0,actives.length-MAX_VEILLES_ACTIVES)};
 }
+// Les critères qu'une recherche enregistrée envoie à eBay — UNE forme pour le fil
+// (src/ebayRecherche.jsx) et pour les alertes du serveur (api/_lib/ebay-alertes.js).
+export const criteresDeVeille=(v)=>({
+ mots:v.mots,exclus:v.exclus||'',pointure:v.pointure||'',minimum:v.minimum??null,maximum:v.maximum??null,
+ etat:v.etatArticle||'tous',pays:v.pays||'tous',categorie:v.categorie||'',achatImmediat:v.achatImmediat!==false,livraisonFR:v.livraisonFR!==false,
+});
+// (11 nov., lot alertes-ebay — validé par Julien, eBay SEULEMENT) Les ALERTES :
+// une recherche active dans le fil, allumée par SON clic (`veille.alerte`), que
+// le SERVEUR relit sans l'app ouverte. Jamais un achat : une notification et une
+// liste dans eBay → Achats.
+export const SITES_REVENTE=['vinted','leboncoin','ebay','vestiaire'];
+export function veillesEnAlerte(veilles){return veillesDuFil(veilles).fil.filter(v=>v&&v.alerte===true);}
 export function criteresVeille(p){
  const minimum=p.minimum===null||p.minimum===undefined?null:entier(p.minimum),maximum=entier(p.maximum,1);
  exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
@@ -150,6 +162,17 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   const x=trouve(d.veilles,p.cible),archiver=type==='veille.archiver';exige(x.etat===(archiver?'preparee':'archivee'),'Cette recherche a déjà changé d’état.');if(!archiver)placeVeille(d);
   exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
   (x.evenements??=[]).push({...commun,nature:archiver?'archivage':'restauration'});x.etat=archiver?'archivee':'preparee';break;
+ }
+ case 'veille.alerte':{
+  // Allumer ou éteindre l'alerte d'une recherche, et le prix de revente qu'IL indique
+  // (facultatif : sans lui, l'écran prend la médiane de SES ventes du modèle si elle est connue).
+  const x=trouve(d.veilles,p.cible);exige(typeof p.alerte==='boolean','Choix invalide.');
+  if(p.alerte)exige(x.etat==='preparee','Restaure cette recherche avant d’allumer son alerte.');
+  exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
+  const revente=p.revente===null||p.revente===undefined||p.revente===''?null:entier(p.revente,1,100000000);
+  const site=choix(p.site||'vinted',SITES_REVENTE);
+  (x.evenements??=[]).push({...commun,nature:p.alerte?'alerte':'alerte-arretee'});
+  x.alerte=p.alerte;x.revente=revente;x.reventeSite=site;break;
  }
  case 'dossier.creer':{
   d.dossiers??=[];ajoute(d.dossiers,{...commun,reference:texte(p.reference),titre:texte(p.titre),nature:choix(p.nature,['retour','litige','manquant','autre']),echeance:p.echeance?date(p.echeance):null,note:texte(p.note||'',1500,true),etat:'ouvert',evenements:[]});break;

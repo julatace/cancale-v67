@@ -18,7 +18,7 @@ function corpsNatif(trace,uid){
 export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations=[],traces=[],lectures=[],parametresAilleurs=[],parametresSeuls=false}){
  if(capture?.type!=='notifications'||String(capture.uid)!==String(uid)||String(trace?.uid)!==String(uid)||trace?.method!=='POST'||trace?.path!=='/api/v2/conversations')throw new RefusFavoris('Ouvre un favori sur Vinted avec ce compte, puis actualise : le raccordement natif doit être confirmé.');
  const corps=corpsNatif(trace,uid);if(!corps)throw new RefusFavoris('La création native de conversation ne confirme pas le format attendu.');
- if(!Array.isArray(selection)||!selection.length||selection.length>10||new Set(selection).size!==selection.length||selection.some(x=>typeof x!=='string'||!x||x.length>160))throw new RefusFavoris('Sélectionne de 1 à 10 favoris différents.',400);
+ if(!Array.isArray(selection)||!selection.length||selection.length>500||new Set(selection).size!==selection.length||selection.some(x=>typeof x!=='string'||!x||x.length>160))throw new RefusFavoris('Sélectionne au moins un favori, sans doublon.',400);   // 500 = la capacité de la file (jamais un plafond de messages)
  const notifications=capture.payload?.notifications,favoris=favorisDepuisNotifications(capture.payload,capture.domain),idsFavoris=new Set(favoris.lignes.map(x=>x.id));
  const candidats=(Array.isArray(notifications)?notifications:[]).filter(n=>idsFavoris.has(n.id));
  const infos=candidats.map(n=>({n,l:lien(n,capture.domain),user:id(n.user_id)})),parUrl=new Map(),parId=new Map();

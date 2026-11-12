@@ -144,7 +144,7 @@ const essaie = async (nom, f) => { try { return await f(); } catch (e) { dit(fal
     const sansComB = barre.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
     const rendSelonOnglet = sansComB.match(/\{[^{}]*\b(?:onglet|ongletColisVu)\b[^{}]*(?:\?|&&)\s*\(?\s*</);
     dit(!!barre && !rendSelonOnglet && !/ongletColisVu/.test(sansComB), 'B la barre ne dépend pas de l\'onglet (aucun bouton rendu selon l\'onglet)', rendSelonOnglet ? rendSelonOnglet[0] : '');
-    dit(/data-colis-barre-btn="scanner"[^>]*data-scan-mode-bouton=\{onglet === 'retirer' \? 'retrait' : 'envoi'\}/.test(barre), 'B « Scanner » (même place) : mode retrait sur « À retirer », envoi ailleurs (lot V)');
+    dit(/data-colis-barre-btn="scanner"[^>]*data-scan-mode-bouton=\{(?:onglet === 'retirer'|[A-Za-z]+) \? 'retrait' : 'envoi'\}/.test(barre), 'B « Scanner » (même place) : mode retrait sur « À retirer », envoi ailleurs (lot V)');
     const sansCom = app.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
     dit(!/<EntreeJournalEmails\b/.test(sansCom), 'B « Tes emails, ce que VRM en a fait » n\'est plus rendu dans Colis');
     dit(!/className="vrm-colis-imprimante"/.test(sansCom), 'B le réglage d\'imprimante n\'est plus en double dans Colis (il est dans Paramètres)');

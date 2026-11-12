@@ -52,7 +52,7 @@ import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVc
 import { numVcVente, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
-import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR, nouveauPointDansTexte } from './_lib/retrait-colis.js';
+import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR, nouveauPointDansTexte, lieuGenerique } from './_lib/retrait-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
@@ -67,6 +67,7 @@ import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle,
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { transporteurDeTexteBordereau, suiviMondialRelayDuTexte } from './_lib/transporteur-bordereau.js';
+import { estBordereauRetour, lireBordereauRetour, estRemboursementAchat, lireRemboursementAchat } from './_lib/retour-email.js';
 import { domaineReception, enveloppeDe, jetonsDesAdresses, vendeurDeJeton, adresseDeJeton, lireCodeTransfert, RAISON_QUARANTAINE, ID_CODE, ID_VU, ID_ESSAI, codeEssaiDe } from './_lib/adresse-reception.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -1113,6 +1114,13 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     const m = all.match(/\b([A-Z]{2}\d{9}[A-Z]{2})\b/); // format international XX123456789XX
     if (m) suivi = m[1];
   }
+  // (11 nov., retraits fiables) « Votre colis n° … » (le mot « colis » AVANT le « n° », La Poste,
+  // GLS, Relais Colis) et les formes propres d'un n° postal : Colissimo « 6A12345678901 » (chiffre,
+  // lettre, 11 chiffres) et l'international S10 « AB123456789FR » — pour TOUS les transporteurs
+  // (avant : Chronopost seul). Sans lui, l'e-mail « disponible » de Colissimo / La Poste était
+  // rangé « info » (aucun n°) et le colis n'était nulle part.
+  if (!suivi) { const m = all.match(/\bcolis\s+(?:n[°o]|num[ée]ro)\s*[:：\-]?\s*([A-Z0-9]{8,20})\b/i); if (m && /\d{6}/.test(m[1])) suivi = m[1].toUpperCase(); }
+  if (!suivi) { const m = all.match(/\b(\d[A-Z]\d{11}|[A-Z]{2}\d{9}[A-Z]{2})\b/); if (m) suivi = m[1]; }
   if (!suivi) { const m = all.match(/\b(\d{8,14})\b/); if (m) suivi = m[1]; }
 
   // ── ÉTAPE DU COLIS ────────────────────────────────────────────────────────
@@ -1131,7 +1139,11 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   // Anti-faux-colis : un vrai « colis disponible » a TOUJOURS un n° de suivi.
   // Sans suivi (emails pub « ton compte évolue », newsletters…), on ne compte
   // PAS comme un colis à retirer.
-  if (status === 'available' && !suivi) { status = 'info'; label = 'Info'; }
+  // (11 nov., retraits fiables) …SAUF s'il porte un CODE de retrait : c'est un colis, pas une pub.
+  // Il n'a pas d'identité (aucun n°) : rangé « à vérifier » (`sansSuivi`), visible avec son code,
+  // jamais compté « à retirer » — jamais « info » invisible (§5 : un colis caché est un colis perdu).
+  let sansSuivi = false;
+  if (status === 'available' && !suivi) { status = 'info'; label = 'Info'; sansSuivi = true; }
   // (23 oct.) Un colis reparti chez l'expéditeur, dit par le transporteur pour
   // CE n° de suivi (une identité). Sans n° de suivi, il ne désigne rien.
   if (status === 'retour') { if (suivi) label = 'Reparti chez l’expéditeur'; else { status = 'info'; label = 'Info'; } }
@@ -1211,18 +1223,27 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   //    autre ville) : la règle vit dans api/_lib/retrait-colis.js (`lieuSousEnTete`),
   //    la même que l'app relit sur le texte gardé d'un e-mail déjà rangé (§11).
   { const l = lieuSousEnTete(txt); if (l) lieu = l; }
-  if (!lieu) for (const pat of [
-    /point\s+relais\s*[:\-]?\s*([^\n]{5,90})/i,
-    /(?:disponible|à retirer|retire[rz]?(?:\s+ton\s+colis)?)\s+(?:chez|au|à|dans)\s+([^\n]{5,90})/i,
-    /adresse\s+du\s+point\s*[:\-]?\s*([^\n]{5,90})/i,
-    /\bchez\s+([A-Z][^\n]{4,80})/,
-  ]) {
-    const m = all.match(pat);
-    // (23 oct.) « disponible dans les prochains jours dans votre Relais Pickup »
-    // donnait le lieu « les prochains jours dans votre Relais Pickup » : le
-    // FUTUR n'est pas un endroit.
-    if (m && LIEU_AU_FUTUR.test(m[1])) continue;
-    if (m) { lieu = m[1].trim().replace(/\s+/g, ' ').replace(/[.,;]\s*$/, ''); break; }
+  // (11 nov., retraits fiables) Les motifs d'une ligne sont lus dans le CORPS d'abord, puis le
+  // sujet : « … disponible dans votre Relais Pickup » du SUJET était pris pour le lieu (mesuré au
+  // banc : DPD, UPS, Relais Colis, Shop2Shop rangés « votre Relais Pickup », « un UPS Access
+  // Point »…) — et l'app rangeait sous ce faux point TOUS les colis de ce réseau, quelle que soit
+  // leur ville. Un lieu qui n'est que le TYPE de lieu (`lieuGenerique`) n'est pas un lieu.
+  if (!lieu) for (const src of [txt, all]) {
+    for (const pat of [
+      /^\s*(?:relais|point\s+relais|point\s+de\s+retrait|adresse\s+du\s+point|bureau\s+de\s+poste)\s*[:\-]\s*([^\n]{5,120})/im,
+      /point\s+relais\s*[:\-]?\s*([^\n]{5,90})/i,
+      /(?:disponible|à retirer|retire[rz]?(?:\s+ton\s+colis)?)\s+(?:chez|au|à|dans)\s+([^\n]{5,90})/i,
+      /adresse\s+du\s+point\s*[:\-]?\s*([^\n]{5,90})/i,
+      /\bchez\s+([A-Z][^\n]{4,80})/,
+    ]) {
+      const m = src.match(pat);
+      // (23 oct.) « disponible dans les prochains jours dans votre Relais Pickup »
+      // donnait le lieu « les prochains jours dans votre Relais Pickup » : le
+      // FUTUR n'est pas un endroit.
+      if (m && LIEU_AU_FUTUR.test(m[1])) continue;
+      if (m) { const l = m[1].trim().replace(/\s+/g, ' ').replace(/[.,;:]\s*$/, ''); if (lieuGenerique(l)) continue; lieu = l; break; }
+    }
+    if (lieu) break;
   }
   // Consigne Pickup (casier automatique) : « Consigne Pickup <enseigne> » + adresse
   // « RUE … 35260 CANCALE ». Format réel des emails de casier (août 2026).
@@ -1331,7 +1352,9 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     if (bouts.length) extraitCode = [...new Set(bouts)].join(' | ').slice(0, 400);
   }
 
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(relaisChange ? { relaisChange: true } : {}), ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
+  // Le drapeau ne tient que si un code (ou un QR, vu par la route) prouve le colis.
+  if (sansSuivi && !code) sansSuivi = false;
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(sansSuivi ? { sansSuivi: true } : {}), ...(relaisChange ? { relaisChange: true } : {}), ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -1809,7 +1832,8 @@ export function detecterTransporteur(mail) {
     : /relais\s*colis|relaiscolis/.test(carrierSrc) ? 'relaiscolis'
     : /colissimo|\bla\s*poste\b|laposte/.test(carrierSrc) ? 'colissimo'
     : /shop\s*2\s*shop|shop2shop/.test(carrierSrc) ? 'shop2shop'
-    : /inpost/.test(carrierSrc) ? 'inpost'
+    // (11 nov., lot DJ3) « InPost » = le réseau Mondial Relay en France (« Mondial Relay by InPost »).
+    : /inpost/.test(carrierSrc) ? 'mondialrelay'
     : /\bups\b/.test(carrierSrc) ? 'ups'
     : /\bdpd\b/.test(carrierSrc) ? 'dpd'
     : /\bgls\b/.test(carrierSrc) ? 'gls'
@@ -2361,6 +2385,43 @@ export async function traiterEmail(req, res) {
   const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();
 
   try {
+    // 000) (11 nov., lot retours-litiges) LE BORDEREAU DE RETOUR D'UN ACHAT — par le SUJET
+    // d'abord (api/_lib/retour-email.js). Avant : « aucune règle ne le reconnaît », gardé
+    // TRONQUÉ ⇒ le PDF était perdu. Rangé par SON n° de transaction (`email_bordretour_{tx}`),
+    // le PDF tel quel (l'app le tamponne « RETOUR · N°… » à l'impression, par identité) ;
+    // sans n° ou sans PDF ⇒ gardé entier « à vérifier », jamais jeté ; écriture ratée ⇒ 503.
+    if (estBordereauRetour(subject)) {
+      const lu = lireBordereauRetour({ subject, text: corpsTexte, attachments: mail.attachments });
+      if (!lu.ok) {
+        await garderInconnu(corpsBrut, mail, 'bordereau de retour : ' + lu.raison, '');
+        await repondre(res, 200, { ok: false, type: 'bordereau-retour', garde: true, raison: lu.raison });
+        return;
+      }
+      const ok = await supabaseUpsert([{ id: `email_bordretour_${lu.transaction}`, data: {
+        type: 'bordereau-retour', sens: 'achat', transaction: lu.transaction, suivi: lu.suivi,
+        dateLimite: lu.dateLimite, dateLimiteJour: lu.dateLimiteJour, dateLimiteIso: lu.dateLimiteIso, article: lu.article,
+        account: acc.login || '', uid: acc.uid || '', pdfB64: lu.pdf.contentB64, filename: lu.pdf.filename || `Bon-Retour-Vinted-${lu.transaction}.pdf`,
+        receivedAt: now } }]);
+      if (ok) try { await pushOnce({ title: '↩️ Bordereau de retour reçu', body: `${lu.article ? court(lu.article, 50) + ' · ' : ''}${lu.dateLimite ? 'à déposer avant le ' + lu.dateLimite.split(' ')[0] : 'imprime-le depuis Achats'}`,
+        tag: `bordretour-${lu.transaction}`, url: DESTINATIONS.achat({ tx: lu.transaction }) }, 'colis'); } catch (_) {}
+      await logEmail({ type: 'bordereau-retour', subject, from: mail.from, transaction: lu.transaction });
+      await repondre(res, 200, { ok: true, type: 'bordereau-retour', transaction: lu.transaction, suivi: lu.suivi, dateLimite: lu.dateLimiteIso || null, pdf: true });
+      return;
+    }
+    // 000b) « La commande "…" a été remboursée ! » — un de SES achats : la PREUVE du
+    // remboursement par SON n° de transaction (`email_rembachat_{tx}` : montant, date estimée ;
+    // JAMAIS le moyen de paiement ni ses chiffres). Illisible ⇒ la famille d'avant (gardé).
+    if (estRemboursementAchat(subject, corpsTexte)) {
+      const lu = lireRemboursementAchat({ subject, text: corpsTexte });
+      if (lu.ok) {
+        await supabaseUpsert([{ id: `email_rembachat_${lu.transaction}`, data: {
+          type: 'remboursement-achat', sens: 'achat', transaction: lu.transaction, montant: lu.montant, estime: lu.estime,
+          article: lu.article, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+        await logEmail({ type: 'remboursement-achat', subject, from: mail.from, transaction: lu.transaction });
+        await repondre(res, 200, { ok: true, type: 'remboursement-achat', transaction: lu.transaction, montant: lu.montant });
+        return;
+      }
+    }
     // 00) VESTIAIRE COLLECTIVE (2 nov.) — AVANT les colis et les ventes Vinted :
     // « Votre article vient d'être vendu » contient « vendu » (la branche vente
     // Vinted le prenait et le gardait tronqué, « analyse impossible ») et parle
@@ -2514,7 +2575,10 @@ export async function traiterEmail(req, res) {
       // colis est arrivé : sans code, ni QR, ni lieu, l'e-mail reste « info »
       // (comme avant que ce n° soit lu) — le n° reste rangé, pour l'identité.
       if (track.status === 'available' && track.suiviDuSujetSeul && !track.code && !qr.qrB64 && !qr.qrUrl && !track.lieu) { track.status = 'info'; track.label = 'Info'; }
-      const rowId = `email_track_${carrier}_${track.suivi || shortHash(subject)}`;
+      // (11 nov., retraits fiables) Sans n°, deux e-mails au même sujet (« Votre colis est disponible »)
+      // partageaient UNE ligne : le second effaçait le premier colis. Un colis sans n° mais avec son code
+      // a sa ligne à lui (sujet + code) ; un rappel du même code retombe sur la même.
+      const rowId = `email_track_${carrier}_${track.suivi || shortHash(track.sansSuivi && track.code ? `${subject}|${track.code}` : subject)}`;
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
@@ -2602,6 +2666,7 @@ export async function traiterEmail(req, res) {
         ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, emailAt || now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,
+        ...(track.sansSuivi && track.status === 'info' && track.code ? { sansSuivi: true } : {}),
         // (10 nov.) Point relais changé : le nouveau point (lu) et l'ancien (la ligne d'avant), rangés
         // tels quels. Un e-mail suivant du même n° (arrivé, retiré) réécrit la ligne sans eux.
         ...(track.relaisChange && track.status === 'transit' ? { relaisChange: true, ...(prevLigne && prevLigne.lieu && prevLigne.lieu !== track.lieu ? { ancienLieu: String(prevLigne.lieu).slice(0, 200) } : {}) } : {}),

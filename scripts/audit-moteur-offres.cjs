@@ -10,7 +10,8 @@
 //    · offre ≥ mini  ⇒ UNE acceptation part (PUT …/accept), et elle est mémorisée ;
 //    · offre < mini · interrupteur éteint · « pas su » · autre compte connecté ·
 //      pause Vinted · offre déjà traitée  ⇒ RIEN ne part ;
-//    · volume borné (OFFRES_MAX_PAR_VISITE) : 4 offres éligibles ⇒ 3 acceptées.
+//    · volume borné (OFFRES_MAX_PAR_VISITE) : 4 offres éligibles ⇒ 3 au plus ; depuis la 5.366
+//      (pas de rafale) une seule par passage.
 //
 //  §6.1 — `--prouve` rejoue la scène « offre ≥ mini » sur le background.js de
 //  `origin/main` (où le moteur n'existe pas) : 0 acceptation ⇒ la preuve est
@@ -53,7 +54,7 @@ function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, co
     nums[String(o.item)] = { num: String(o.item), min: o.min, refuse: o.refuse };
     lignes[`harvest_${UID}_conv_${o.oid}`] = conv(o);
   }
-  lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus };
+  lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus, vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (garde !== undefined) lignes.main.vinted_offres_garde = garde;
   return faireFond({
     src, lignes, connecte, store, lectureKO,
@@ -139,7 +140,10 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
   // H — volume borné : 4 offres éligibles, OFFRES_MAX_PAR_VISITE plafonne à 3.
   { const quatre = [0, 1, 2, 3].map((i) => ({ item: 500 + i, tx: 9100 + i, oid: 7100 + i, price: 60, min: 40 }));
     const { f } = await run({ offres: quatre });
-    dit(accepts(f.j) === 3, "volume borné : 4 offres éligibles ⇒ 3 acceptées au plus (OFFRES_MAX_PAR_VISITE)", `accepts=${accepts(f.j)}`); }
+    // (11 nov., 5.366, Julien : « jamais de rafale ») 40 s au moins (+ tirage) entre deux gestes
+    // AUTOMATIQUES d'un même compte : un passage n'en accepte plus qu'UNE, les suivantes au
+    // passage suivant (chaque minute) — et jamais plus de 3 par visite (OFFRES_MAX_PAR_VISITE).
+    dit(accepts(f.j) === 1, "volume borné : 4 offres éligibles ⇒ 1 par passage (pas de rafale), jamais plus de 3", `accepts=${accepts(f.j)}`); }
 
   // I — offre SOUS le seuil de refus : UN refus part ; pas de message si aucun texte.
   { const { f } = await run({ offres: [{ item: 444, tx: 9001, oid: 7001, price: 20, refuse: 30 }] });  // 20 < 30

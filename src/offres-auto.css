@@ -10,15 +10,22 @@
 }
 .vrm-oa-tete { padding: 8px 10px 10px 14px; display: flex; flex-direction: column; gap: 8px; }
 .vrm-oa-ligne { display: flex; align-items: center; gap: 10px; min-height: 52px; }
-.vrm-oa-icone { flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--w-remplir, var(--vrm-card2)); color: var(--w-gris, var(--vrm-muted)); }
+.vrm-oa-icone { flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--w-remplir, var(--vrm-card2)); color: var(--w-gris, var(--vrm-muted)); transition: background-color .2s ease, color .2s ease; }
+.vrm-oa-icone.is-on { background: var(--w-accent, var(--vrm-accent, #0071E3)); color: #fff; }
 .vrm-oa-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.vrm-oa-texte b { font-size: 16px; font-weight: 700; }
+.vrm-oa-texte b { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .vrm-oa-texte span { font-size: 13px; color: var(--w-gris, var(--vrm-muted)); overflow-wrap: anywhere; }
 .vrm-oa-alerte { margin: 0; font-size: 13px; line-height: 1.4; color: var(--w-encre, var(--vrm-ink)); padding: 8px 10px; border-radius: 12px;
   background: color-mix(in srgb, var(--vrm-warn, #B25E09) 12%, transparent); border-left: 3px solid var(--vrm-warn, #B25E09); }
 .vrm-oa-arret { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .vrm-oa-muet { font-size: 12.5px; color: var(--w-gris, var(--vrm-muted)); line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
-.vrm-oa-titre { margin: 8px 4px 0; font-size: 13px; font-weight: 600; color: var(--w-gris, var(--vrm-muted)); text-transform: none; letter-spacing: 0; }
+.vrm-oa-titre { margin: 14px 4px 0; font-size: 20px; font-weight: 700; letter-spacing: -.015em; color: var(--w-encre, var(--vrm-ink)); text-transform: none; }
+/* La règle du moteur en trois lignes, une idée par ligne. */
+.vrm-oa-regles { list-style: none; margin: 0; padding: 2px 0 2px; display: flex; flex-direction: column; gap: 0; border-top: .5px solid var(--w-filet, var(--vrm-line)); }
+.vrm-oa-regles li { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 14px; line-height: 1.3; color: var(--w-encre, var(--vrm-ink)); border-bottom: .5px solid var(--w-filet, var(--vrm-line)); }
+.vrm-oa-regles li:last-child { border-bottom: 0; }
+.vrm-oa-regle-icone { flex-shrink: 0; width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--w-remplir, var(--vrm-card2)); color: var(--w-gris, var(--vrm-muted)); }
+.vrm-oa-regle-icone.is-oui { color: var(--w-accent, var(--vrm-accent, #0071E3)); background: color-mix(in srgb, var(--w-accent, #0071E3) 12%, transparent); }
 .vrm-oa-vide { margin: 10px 0; font-size: 14px; color: var(--w-gris, var(--vrm-muted)); line-height: 1.4; }
 .vrm-oa-pied { margin: 4px 0 6px; font-size: 12.5px; color: var(--w-gris, var(--vrm-muted)); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .vrm-oa-offre, .vrm-oa-histo {
@@ -79,3 +86,64 @@ html body .vrm-oa .vrm-oa-seuil-champ input { flex: 1 1 auto; min-width: 0; widt
 @layer vrm-premium {
   :root:root body .vrm-app-shell .vrm-oa .vrm-oa-seuil-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 44px !important; height: 44px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   « PRIX MINI MANQUANTS » (11 nov., lot prix-mini) — src/PrixMiniManquants.jsx
+   Une rangée par annonce : photo · N° et titre (prix · acheté) · champ · bénéfice.
+   Le champ est le geste (44 px) ; le bénéfice en direct, encre ; « Sous ton coût »
+   en AMBRE (un geste à regarder) ; aucune autre couleur.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-pmm { background: var(--w-carte, var(--vrm-surface)); border-radius: var(--w-r, 16px); box-shadow: var(--w-ombre, none); padding: 10px 14px 12px; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-pmm-tete { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.vrm-pmm-nombre { flex-shrink: 0; min-width: 40px; height: 40px; padding: 0 8px; box-sizing: border-box; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--vrm-warn, #B25E09); background: color-mix(in srgb, var(--vrm-warn, #B25E09) 12%, transparent); }
+.vrm-pmm-coche { flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--w-remplir, var(--vrm-card2)); color: var(--w-gris, var(--vrm-muted)); }
+.vrm-pmm-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-pmm-texte b { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.vrm-pmm-texte span { font-size: 13px; color: var(--w-gris, var(--vrm-muted)); line-height: 1.35; }
+.vrm-pmm-liste { list-style: none; margin: 0; padding: 0; }
+.vrm-pmm-ligne { display: grid; grid-template-columns: 48px minmax(0, 1fr) 104px; grid-template-areas: "photo centre champ" "photo centre benef"; gap: 2px 12px; align-items: center;
+  padding: 10px 0; border-top: .5px solid var(--w-filet, var(--vrm-line)); min-width: 0; }
+.vrm-pmm-photo { grid-area: photo; width: 48px; height: 48px; border-radius: 10px; object-fit: cover; display: block; background: var(--w-remplir, var(--vrm-card2)); }
+.vrm-pmm-photo-vide { display: inline-flex; align-items: center; justify-content: center; color: var(--w-gris, var(--vrm-muted)); }
+.vrm-pmm-centre { grid-area: centre; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vrm-pmm-nom { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 15px; font-weight: 600; }
+.vrm-pmm-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-pmm-sous { font-size: 13px; color: var(--w-gris, var(--vrm-muted)); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-pmm-sous [data-pmm-prix] { color: var(--w-encre, var(--vrm-ink)); font-weight: 600; }
+.vrm-pmm-champ { grid-area: champ; display: flex; align-items: center; gap: 4px; height: 44px; border-radius: 12px; padding: 0 10px; background: var(--w-remplir, var(--vrm-card2)); box-sizing: border-box; min-width: 0; cursor: text; }
+html body .vrm-pmm .vrm-pmm-champ input { flex: 1 1 auto; min-width: 0; width: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; font: inherit; font-size: 17px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; color: var(--w-encre, var(--vrm-ink)); outline: none; min-height: 44px !important; height: 44px; padding: 0 !important; margin: 0; }
+.vrm-pmm-champ > span[aria-hidden] { color: var(--w-gris, var(--vrm-muted)); font-size: 15px; }
+.vrm-pmm-champ:focus-within { box-shadow: 0 0 0 2px var(--w-accent, var(--vrm-accent)); }
+html body .vrm-pmm .vrm-pmm-champ input:focus, html body .vrm-pmm .vrm-pmm-champ input:focus-visible { outline: none !important; box-shadow: none !important; }
+/* Au téléphone : le titre sur toute la largeur, puis « prix · acheté » à côté du champ,
+   le bénéfice dessous (le centre se fond dans la grille) ; le compte seulement sur ordinateur. */
+@media (max-width: 899px) {
+  .vrm-pmm-ligne { grid-template-columns: 48px minmax(0, 1fr) 112px; grid-template-areas: "photo nom nom" "photo sous champ" "photo . benef"; gap: 4px 12px; }
+  .vrm-pmm-centre { display: contents; }
+  .vrm-pmm-nom { grid-area: nom; }
+  .vrm-pmm-sous { grid-area: sous; white-space: normal; }
+  .vrm-pmm-compte { display: none; }
+  .vrm-pmm-photo { align-self: start; margin-top: 2px; }
+}
+.vrm-pmm-ligne[data-pmm-etat="sous"] .vrm-pmm-champ, .vrm-pmm-ligne[data-pmm-etat="erreur"] .vrm-pmm-champ { box-shadow: inset 0 0 0 1.5px var(--vrm-warn, #B25E09); }
+.vrm-pmm-benef { grid-area: benef; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; min-height: 18px; font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; min-width: 0; }
+.vrm-pmm-benef b { font-size: 14px; font-weight: 700; color: var(--w-encre, var(--vrm-ink)); }
+.vrm-pmm-note { font-size: 12px; font-weight: 600; color: var(--vrm-warn, #B25E09); line-height: 1.25; }
+.vrm-pmm-muet { font-size: 12.5px; color: var(--w-gris, var(--vrm-muted)); line-height: 1.3; min-width: 0; }
+.vrm-pmm-plus { width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--w-accent, var(--vrm-accent)); font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; border-top: .5px solid var(--w-filet, var(--vrm-line)); }
+.vrm-pmm-pied { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 72px); z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin: 6px -6px 0; padding: 8px 8px 8px 14px; border-radius: 16px; background: var(--w-carte, var(--vrm-surface)); box-shadow: 0 6px 24px -8px rgba(0,0,0,.28); }
+.vrm-pmm-pied .vrm-pmm-muet { flex: 1 1 140px; }
+.vrm-pmm-ok .vrm-pmm-tete { min-height: 48px; }
+@media (min-width: 900px) {
+  .vrm-pmm-ligne { grid-template-columns: 52px minmax(0, 1fr) 120px 150px; grid-template-areas: "photo centre champ benef"; }
+  .vrm-pmm-photo { width: 52px; height: 52px; }
+  .vrm-pmm-pied { bottom: 16px; }
+}
+@layer vrm-premium {
+  :root:root body .vrm-app-shell .vrm-pmm .vrm-pmm-champ input { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; min-height: 44px !important; height: 44px; }
+  :root:root body .vrm-app-shell .vrm-pmm .vrm-pmm-champ input:focus, :root:root body .vrm-app-shell .vrm-pmm .vrm-pmm-champ input:focus-visible { outline: none !important; box-shadow: none !important; }
+}
+/* Rien de tapé : le pied reste à sa place (pas de barre flottante pour rien). */
+.vrm-pmm-pied[data-pmm-pied="0"] { position: static; box-shadow: none; margin: 4px 0 0; padding: 6px 0 0; border-radius: 0; background: transparent; border-top: .5px solid var(--w-filet, var(--vrm-line)); }

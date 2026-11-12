@@ -101,6 +101,12 @@ const projette = (row, sel) => {
         const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
         const eq = /id=eq\.([^&]*)/.exec(u);
         if (eq) { if (/pdfB64/.test(sel || '')) pdfDemandes.push(eq[1]); return j(rows.filter((r) => r.id === eq[1]).map(forme)); }
+        // (11 nov., lbc-rouges) `id=in.(…)` : la coque lit ainsi quels sites ont des lignes
+        // (`sitesLus`, select=id). Servi vide, Leboncoin passait « pas relié » : « Mes
+        // plateformes » le retirait et `?tab=leboncoin` retombait sur Annonces · Vinted
+        // — le banc mesurait l'écran Vinted (§6.3 : servir la vraie forme).
+        const inn = /id=in\.\(([^)]*)\)/.exec(u);
+        if (inn) { const ids = inn[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
         const lk = /id=like\.([^&]*)/.exec(u);
         if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
         return j([]);

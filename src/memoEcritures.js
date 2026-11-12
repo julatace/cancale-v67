@@ -18,7 +18,7 @@
 //  Dans le doute, on vide : une lecture relue pour rien coûte un aller-retour ;
 //  une lecture gardée à tort montrerait l'état d'AVANT une écriture.
 // ════════════════════════════════════════════════════════════════════════════
-import { idsEcrits, lecturePeutPorter } from './lecturesPartagees.js';
+import { idsEcrits, lecturePeutPorter, lecturePeutPorterPrefixes, prefixesDeclares } from './lecturesPartagees.js';
 
 // La clé de `fetchMemo` est `url|Authorization|Range` (ni l'en-tête ni la page ne
 // portent de `|`) : l'adresse est ce qui précède les deux derniers `|`.
@@ -50,6 +50,13 @@ export function fonctionVidage(memo, url, methode, init, base) {
   // de Colis : six POST `mode=photo` vidaient la mémoire et les transactions
   // repartaient. Une écriture vers la BASE vide toujours, drapeau ou pas.
   if (init && init.vrmInvalideSiChange === true && estRouteApi(url)) return () => {};
+  // (intégration g1) Une route qui déclare les lignes qu'elle écrit (`vrmEcritLignes`, préfixes) : seules
+  // les lectures mémorisées qui peuvent les porter sont retirées (la règle de `lecturesPartagees`).
+  const pref = estRouteApi(url) ? prefixesDeclares(init) : null;
+  if (pref) return () => {
+    const prefixe = String(base || '').replace(/\/+$/, '') + '/rest/v1/';
+    for (const cle of [...memo.keys()]) { const u = urlDeCle(cle); if (!base || u.indexOf(prefixe) !== 0 || lecturePeutPorterPrefixes(u.slice(prefixe.length), pref)) memo.delete(cle); }
+  };
   const ids = lignesEcrites(url, methode, init, base);
   if (!ids) return () => memo.clear();
   return () => viderLignesMemo(memo, ids, base);

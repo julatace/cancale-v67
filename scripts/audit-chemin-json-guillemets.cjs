@@ -69,7 +69,7 @@ for (const f of fichiers) {
 dit(fautes.length === 0, 'aucun identifiant interpolé NU dans un chemin JSON (app, extension, serveur)', fautes.join(' · '));
 const bg = lire(path.join('vinted-sync-extension', 'background.js'));
 const n = (bg.match(/select=a:data->items->"\$\{id\}"/g) || []).length;
-dit(n === 2, 'Leboncoin « Supprimer » et « Mettre en pause » relisent l\'annonce par sa clé entre guillemets', `${n} appel(s)`);
+dit(n === 3, 'Leboncoin « Supprimer », « Mettre en pause » et « Baisser le prix » (5.363) relisent l\'annonce par sa clé entre guillemets', `${n} appel(s)`);
 
 // 2. La fausse base.
 dit(C.appliquerSegment({ 3290: { a: 1 } }, '"3290"') && C.appliquerSegment({ 3290: { a: 1 } }, '"3290"').a === 1, 'fausse base : `->"3290"` est une clé');

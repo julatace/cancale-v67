@@ -141,8 +141,14 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const remBloc = app.slice(app.indexOf('const remettreDepuisCarte = async'), app.indexOf('const remettreEnStock = async'));
   const cles = [...remBloc.matchAll(/save\('([a-z_]+)'/g)].map((x) => x[1]).sort().join(',');
   dit(cles === 'vinted_retours_recus,vinted_retours_remis', '3g le tap n’écrit QUE « reçu » et « remis » (ni la vente, ni le pool, ni une fiche)', cles);
-  const appels = (app.match(/remettreDepuisCarte/g) || []).length;
-  dit(appels === 2 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app), '3h rien sans tap : un seul appelant, le bouton « Remettre en stock »', String(appels));
+  // (intégration g1) retours-litiges ajoute UN appelant, lui aussi sur un tap : « Paire revenue » de la feuille
+  // pas à pas (src/RetoursLitiges.jsx, `faireRevenue` sur onClick). Commentaires retirés avant de compter.
+  const sansCom = app.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const appels = (sansCom.match(/remettreDepuisCarte/g) || []).length;
+  const rl = (() => { try { return fs.readFileSync(path.join(__dirname, '..', 'src', 'RetoursLitiges.jsx'), 'utf8'); } catch (_) { return ''; } })();
+  dit(appels === 3 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app)
+    && /onRevenue=\{async \(\) => \{ if \(retour && !retour\.remis\) await remettreDepuisCarte\(retour\)/.test(app) && /onClick=\{faireRevenue\}/.test(rl),
+    '3h rien sans tap : deux appelants, chacun un bouton (« Remettre en stock », « Paire revenue »)', String(appels));
   dit(/for \(const n of JSON\.parse\(numsRemisCle \|\| '\[\]'\)\) if \(n\) vivants\.add/.test(app), '3i App : les N° remis entrent dans les paires présentes (`vinted_nums_physiques`)');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-colis-trois : ${n - ko}/${n}`);

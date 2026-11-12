@@ -62,7 +62,7 @@ export const CHIFFRES = {
   // (5 nov., chantier E1, revue 1.2) Le mot de l'app : « À envoyer » (src/libelles.js). L'id reste
   // `aposter` (les réglages rangés le gardent).
   aposter:    { nom: 'À envoyer', court: 'à envoyer', type: 'n', periodes: null, sites: SITES, compte: false, aller: 'cat_bord' },
-  retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'cat_bord' },
+  retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'retraits' }, // (11 nov., lot DJ3) « À retirer » vit en tête d'Achats
   // (4 nov.) « Argent à venir » : ce que TES SITES te doivent encore (src/argentAVenir.js,
   // `liveStats.aVenir`) — toutes plateformes, par compte Vinted. L'id reste `attente`
   // (les réglages rangés le gardent) ; il ne lit plus le seul porte-monnaie Vinted.
@@ -92,8 +92,8 @@ export const AIDE_CHIFFRES = {
   declarer: 'Le chiffre d’affaires à déclarer à l’URSSAF : l’argent reçu (le calcul de Compta).',
   urssaf: CHIFFRES.urssaf.titre,
   finalisees: 'Tes ventes finalisées sur la période (Compta).',
-  aposter: 'Les colis à envoyer, comptés par l’écran Colis (tous tes sites). Ouvre Colis pour les imprimer.',
-  retirer: 'Les colis à aller chercher, comptés par l’écran Colis (e-mails des transporteurs et suivis Vinted).',
+  aposter: 'Les colis à envoyer (tous tes sites), en tête de Ventes : touche pour les imprimer.',
+  retirer: 'Les colis à aller chercher, en tête d’Achats (e-mails des transporteurs et suivis Vinted).',
   attente: 'L’argent que tes sites te doivent encore : les ventes en cours, pas encore versées.',
   dispo: 'Le solde disponible de ton porte-monnaie Vinted, relu par l’extension.',
   enligne: 'Tes annonces en ligne, d’après la dernière lecture complète de ton dressing (de moins de 24 h).',

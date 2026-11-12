@@ -5,7 +5,8 @@
   const pausesEnAttente=new Map();     // jeton → réponse au fond (22 oct.)
   const importsEnAttente=new Map();    // 5.365 : jeton → réponse au fond (une page de l'historique)
   const envoisEnAttente=new Map();     // 5.318 : jeton → réponse au fond (répondre dans un fil)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.365.0',capteurVersion});}catch(_){}};
+  const prixEnAttente=new Map();       // 5.363 : jeton → réponse au fond (changer un prix)
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.368.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
@@ -109,6 +110,10 @@
     else if (d.kind === 'lbcimportresultat' && typeof d.jeton === 'string') { const r = importsEnAttente.get(d.jeton); if (r) { importsEnAttente.delete(d.jeton); r({ ok: true, statut: Number(d.statut) || 0, erreur: String(d.erreur || '').slice(0, 40), url: typeof d.url === 'string' ? d.url.slice(0, 600) : '', corps: typeof d.corps === 'string' ? d.corps.slice(0, 200000) : '', session: typeof d.session === 'string' ? d.session.slice(0, 80) : '', moi: /^[a-z0-9_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '' }); } }
     else if (d.kind === 'lbcenvoiappris' && d.recette && typeof d.recette === 'object') { try { transmettre({ from: 'cancale-lbc', action: 'lbcEnvoiAppris', recette: d.recette }); } catch (_) {} }
     else if (d.kind === 'lbcenvoiresultat' && typeof d.jeton === 'string') { const r = envoisEnAttente.get(d.jeton); if (r) { envoisEnAttente.delete(d.jeton); r({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), idMsg: /^[\w-]{1,64}$/.test(String(d.idMsg || '')) ? String(d.idMsg) : '', erreur: String(d.erreur || '').slice(0, 80) }); } }
+    // 5.363 (11 nov.) : la RECETTE d'un changement de prix fait par lui sur la page, et la réponse
+    // de Leboncoin à un changement demandé par le fond (statut, forme, prix montré — jamais autre chose).
+    else if (d.kind === 'lbcprixappris' && d.recette && typeof d.recette === 'object') { try { transmettre({ from: 'cancale-lbc', action: 'lbcPrixAppris', recette: d.recette }); } catch (_) {} }
+    else if (d.kind === 'lbcprixresultat' && typeof d.jeton === 'string') { const r = prixEnAttente.get(d.jeton); if (r) { prixEnAttente.delete(d.jeton); const pv = Number(d.prixVu); r({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), prixVu: d.prixVu != null && Number.isFinite(pv) && pv > 0 ? pv : null, erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); } }
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
   }, false);
   // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre) ───────────────────────────
@@ -156,6 +161,20 @@
     const t=setTimeout(()=>{if(envoisEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},20000);
     envoisEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
     window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:'repondre',jeton,conv,texte,recette:msg.recette,compte:String(msg.compte||'')},'*');
+    return true;
+  });}catch(_){}
+  // 5.363 (11 nov.) : CHANGER UN PRIX, sur SON clic. L'ordre ne vient QUE du fond (jamais
+  // de la page), pour le cadre principal ; pas de réponse en 20 s ⇒ « muet » (le fond dit
+  // qu'il ne SAIT PAS si le prix a changé — jamais « fait »).
+  try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
+    if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcPrixAnnonce')return;
+    if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
+    const id=String(msg.id||''),prix=Number(msg.prix);
+    if(!/^\d{6,12}$/.test(id)||!Number.isFinite(prix)||prix<1){sendResponse({ok:false,code:'invalide'});return;}
+    const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
+    const t=setTimeout(()=>{if(prixEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},20000);
+    prixEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
+    window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:'prix',jeton,id,prix,recette:msg.recette,compte:String(msg.compte||'')},'*');
     return true;
   });}catch(_){}
   window.postMessage({__tag:'CANCALE_LBC_RELAY',kind:'pret'},'*');

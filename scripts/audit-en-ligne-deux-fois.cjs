@@ -240,7 +240,7 @@ if (arg.includes('--prouve')) {
   await essaie('J · Ma journée et la feuille', () => {
     const sans = (s) => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
     const app = sans(appSrc);
-    const comp = app.slice(app.indexOf('function Comptabilite('), app.indexOf('function Comptabilite(') + 700000);   // (9 nov., lot AC) fenêtre élargie : Comptabilite a grandi
+    const comp = app.slice(app.indexOf('function Comptabilite('), app.indexOf('function Comptabilite(') + 1200000);   // (9 nov., lot AC ; 12 nov., intégration g1) fenêtre élargie : Comptabilite a grandi
     const dMemo = comp.indexOf('const enLigneDeux = useMemo(');
     const memo = dMemo >= 0 ? comp.slice(dMemo, comp.indexOf('}, [listings, numeros', dMemo)) : '';
     dit(/enLigneDeuxFois\(\{ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum(?: \}\)|, dateDe: )/.test(memo), 'Ma journée passe par la règle avec la VRAIE clé de photo et cleNum');

@@ -80,13 +80,14 @@ const ouvrirPlus = (pg, geste) => pg.evaluate((g) => { for (const c of document.
     const A = await H.appareil(nav, base, { nom, vp, init: { vinted_dark: JSON.stringify(!!sombre) } });
     const { pg, errs } = await A.ouvrir(nom);
     await pg.goto(srv.url + '/?tab=cat_bord', { waitUntil: 'domcontentloaded' });
-    await H.attendre(async () => (await pg.locator('[data-colis-onglet-choix="retirer"]').count()) > 0, 30000);
+    // (11 nov., intégration colis) `?tab=cat_bord` ouvre Ventes, section « À expédier » (lot DJ3).
+    await H.attendre(async () => (await pg.locator('[data-colis-section]').count()) > 0, 30000);
     // Ce que l'app publie à l'ouverture est parti (la file d'envoi est vide) : on mesure SES gestes.
     await H.attendre(async () => (await pg.evaluate(() => localStorage.getItem('vrm_file_envoi'))) == null, 15000);
     await pg.waitForTimeout(1200);
 
     await essaie('G1', async () => {
-      await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
       await H.attendre(async () => (await nbRetirer(pg)) > 0, 15000);
       const n0 = await nbRetirer(pg);
       dit(n0 >= 1, 'G1 le colis au relais est à retirer', String(n0));
@@ -105,7 +106,8 @@ const ouvrirPlus = (pg, geste) => pg.evaluate((g) => { for (const c of document.
       const enr = await attendreEtat(pg, ['enregistre']);
       const lu = dataMain(base).vrm_colis_collected || [];
       dit(enr && lu.length === 1, 'G1 « enregistré » seulement quand la base a la valeur', `${(await pilule(pg)).etat} · base ${JSON.stringify(lu)}`);
-      const ong = () => pg.evaluate(() => (document.querySelector('[data-colis-onglet-choix="retirer"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'));
+      // (11 nov., intégration colis) Le nombre « À retirer » est porté par l'entrée « Achats » de la navigation (même publication).
+      const ong = () => pg.evaluate(() => (document.querySelector('[data-badge-nav="achats"]') || { getAttribute: () => null }).getAttribute('data-badge-n') || '0');
       dit(await H.attendre(async () => (await ong()) === '0', 3000), 'G1 le compte « À retirer · N » suit (0)', await ong());
       await pg.locator('[data-pilule-annuler]').first().click();
       const n2 = await nbRetirer(pg);
@@ -119,6 +121,8 @@ const ouvrirPlus = (pg, geste) => pg.evaluate((g) => { for (const c of document.
     });
 
     await essaie('G2', async () => {
+      // (11 nov., intégration colis) Retour aux colis à envoyer, en tête de Ventes (lot DJ3).
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' }))); await pg.locator('[data-colis-section="ventes"]').first().waitFor({ timeout: 30000 });
       await pg.locator('[data-colis-onglet-choix="envoyer"]').first().click();
       const sel = '[data-bord-card] button[data-geste="imprime"]';
       await H.attendre(async () => (await pg.locator(sel).count()) > 0, 15000);

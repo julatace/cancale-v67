@@ -77,6 +77,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
+  // (5.366) « N'agir que si tu es là » : par défaut, le banc est quelqu'un qui vient d'utiliser
+  // l'onglet (un audit qui juge la présence pose lui-même `vrmSecu`).
+  if (store.vrmSecu === undefined) { const t = Date.now(); store.vrmSecu = { presence: { vinted: t, vestiaire: t, leboncoin: t } }; }
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
   const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [],
@@ -146,7 +149,14 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     let r;
     try { r = await vinted(entree); } finally { j.enVol--; }
     r = r || { status: 404, body: {} };
-    return rep(r.status, r.body, typeof r.body === 'string' ? 'text/html' : 'application/json');
+    // (5.366) Un faux Vinted peut rendre des EN-TÊTES (`headers` : Retry-After, x-datadome…) ;
+    // sans eux, seul `content-type` répond (avant : tout en-tête rendait le type — un
+    // `x-datadome` aurait toujours été « présent »).
+    const ct = typeof r.body === 'string' ? 'text/html' : 'application/json';
+    const base = rep(r.status, r.body, ct);
+    const h = {}; for (const k of Object.keys(r.headers || {})) h[k.toLowerCase()] = String(r.headers[k]);
+    base.headers = { get: (k) => { const c = String(k).toLowerCase(); return h[c] !== undefined ? h[c] : (c === 'content-type' ? ct : null); } };
+    return base;
   };
   const ctx = {
     console: { log() {}, warn() {}, error() {} },

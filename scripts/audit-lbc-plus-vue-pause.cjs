@@ -514,7 +514,7 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
   // d’App.jsx, extraite par Babel, exécutée sur des annonces INVENTÉES.
   await essaie('numerosLbcSortis', async () => {
     const parser = require(path.join(racine, 'node_modules', '@babel', 'parser'));
-    const ast = parser.parse(APP, { sourceType: 'module', plugins: ['jsx'] });
+    const ast = parser.parse(APP, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });   // (11 nov., lot lbc-plus) la source réunie (App.jsx + écrans) déclare deux fois un même import paresseux : on lit quand même
     const decl = new Map();
     for (const n of ast.program.body) {
       const d = n.type === 'ExportNamedDeclaration' ? n.declaration : n;

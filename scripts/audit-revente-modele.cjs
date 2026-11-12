@@ -111,7 +111,7 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   dit(!/onClick|fetch\(|save\(|<button|Bouton/.test(RJ) && /<details/.test(RJ), 'E1 aucune action ni écriture : toucher déplie, c’est tout');
   dit(!/C\.warn|C\.red|C\.danger|#D70015|#FF3B30/.test(RJ), 'E2 aucune couleur d’alerte (une information)');
   const AC = sansCommentaires(fs.readFileSync(path.join(SRC, 'ecrans', 'Achats.jsx'), 'utf8'));
-  dit(/\{titreForm\.trim\(\)\.length >= 3 && <ReventeModele C=\{C\} cible=\{\{ titre: titreForm \}\} lireReleve=\{lireReleveVentes\}/.test(AC), 'E3 saisie d’un achat hors plateforme : à côté de « Tu as déjà N paires »');
+  dit(/\{(?:!enLot && )?titreForm\.trim\(\)\.length >= 3 && <ReventeModele C=\{C\} cible=\{\{ titre: titreForm \}\} lireReleve=\{lireReleveVentes\}/.test(AC), 'E3 saisie d’un achat hors plateforme : à côté de « Tu as déjà N paires »');
   const A = sansCommentaires(fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8'));
   dit(/<ReventeModele C=\{C\} cible=\{\{ titre: r\.titre\|\|'', marque: r\.marque\|\|'' \}\} lireReleve=\{lireReleveVentes\}/.test(A), 'E4 « Prix d’achat à compléter » : sous « déjà N »');
   dit(/data-achat-revente=\{tid\}[^\n]*setReventeVue\(\{ titre: String\(o\.title\|\|''\) \}\)/.test(A) && /\{reventeVue && <SheetShell[^\n]*/.test(A) && /<ReventeModele ouvert C=\{C\} cible=\{\{ titre: reventeVue\.titre \}\}/.test(A), 'E5 fiche d’un achat Vinted : ⋯ « Revendu combien ? » ⇒ la feuille, dépliée');
