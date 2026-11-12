@@ -1,5 +1,8 @@
 # Coordination entre agents — à lire par tout nouvel agent (11 nov. 2026)
 
+> ⚠️⚠️ **12 nov. ~5 h : l'agent principal est à 100 % d'utilisation (Julien) ; la session youthful-wozniak (second agent, `session_012bXttmKqZkj54mz4qbazy2`) reprend l'intégration sur `main`. Si l'agent principal revient, lire ce fichier avant toute fusion.** Journal de l'intégrateur : section « Intégration (second agent) » en bas.
+
+
 Deux agents (ou plus) travaillent sur VRM en même temps. Pour ne jamais se marcher dessus :
 
 ## Qui fait quoi
@@ -242,3 +245,7 @@ await secuObserver('vestiaire', compte, { status, defi, retryAfter }); // 'robot
 - `lbc-plus` : la présence (« si tu es là ») n'est pas encore signalée par `lbc.js` — copier le bloc « 5.366 » de `vc.js`.
 - `agent2-vinted-forme` (5.357, prudence 24 h après un refus) : à l'intégration, UNE prudence par compte —
   sa pose doit passer par `secuObserver` (ou l'inverse), jamais deux états.
+
+
+## Intégration (second agent, à partir du 12 nov. ~6 h UTC)
+- 06:25 UTC : reprise. Plan : #1137 (f, contient e4) → `integration-11nov-g2` (+ securite-vinted) → 3e paquet de l'agent principal → branches agent2 (paquets `claude/integration-12nov-*`) → `agent2-extension-moyennes` renumérotée en dernier.
