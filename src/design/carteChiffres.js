@@ -517,7 +517,9 @@ export const raisonCourte = (x) => {
   if (!x) return '';
   // (9 nov., capture de Julien : « + 1756 » sans unité, € ou ventes ?) Le manque dit son UNITÉ :
   // un nombre de VENTES sans date de versement, jamais un montant.
-  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater` : '';
+  // (12 nov., revue fin) Un montant PARTIEL le dit sous son libellé (« au moins ») : sur une case, le titre
+  // (survol) ne se voit pas au doigt — « Vendu · mois 30 € » se lisait complet avec une vente au prix inconnu.
+  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater` : x.partiel ? 'au moins' : '';
   if (x.hors) return x.hors;
   // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
   if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;

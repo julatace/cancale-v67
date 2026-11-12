@@ -49,6 +49,14 @@ const debord = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - 
         });
         dit(r.v === '30' && /au moins/i.test(r.txt + ' ' + r.carte), `L1 ${tag} : Leboncoin, un prix inconnu ⇒ « au moins 30 € » (jamais complet, jamais 0 €)`, r);
         dit(!/\b0\s?€/.test(r.txt || ''), `L2 ${tag} : aucun « 0 € » pour le prix inconnu`, r.txt);
+        // (12 nov., revue fin) La carte de la coque, case « vendu · mois » de Leboncoin : la même vente au
+        // prix inconnu ⇒ PARTIELLE (« au moins »), jamais 30 € présenté complet.
+        const vm = await pg.evaluate(() => {
+          const e = document.querySelector('[data-carte-site="leboncoin"] [data-carte-chiffre="vendu"][data-carte-p="mois"]');
+          const r = e && e.querySelector('[data-carte-raison]');
+          return e ? { v: e.getAttribute('data-carte-valeur'), partiel: e.getAttribute('data-carte-partiel'), raison: r ? r.textContent.trim() : '' } : null;
+        });
+        dit(!!vm && vm.partiel === '1' && vm.v === '3000' && /au moins/i.test(vm.raison), `L3 ${tag} : carte Leboncoin, case « vendu · mois » : « 30 € » + « au moins » VISIBLE sous le libellé`, vm);
         dit(await debord(pg) <= 1 && journal.erreurs.length === 0, `F ${tag} : aucun débordement, aucune erreur`, { d: await debord(pg), e: journal.erreurs });
         await pg.screenshot({ path: path.join(SHOTS, `lbc-ventes-${tag}.png`) });
       } catch (e) { dit(false, `L ${tag} : le parcours`, e.message.split('\n')[0]); await pg.screenshot({ path: path.join(SHOTS, `lbc-ventes-${tag}-ko.png`) }).catch(() => {}); }
