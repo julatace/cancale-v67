@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { DEMANDE_OUVRIR_ACHAT } from '../pasEnLigne.js';   // (11 nov., lot pas-en-ligne)
 import { prixAchatSaisi } from '../prixAuNumerotage.js';
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -387,6 +388,18 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', paiement: modePaiementLu(b.paiement), photo: null, photoAvant: !!b.photo, facture: null });
   };
   const fermer = () => { ticketJeton.current++; setForm(null); setEditId(null); setErreur(''); };
+  // (11 nov., lot pas-en-ligne) « Ouvrir l'achat » depuis « Achetés, pas en ligne » : CET achat
+  // (par son identifiant) s'ouvre en modification, où il peut le relier à son annonce par SON N°.
+  useEffect(() => {
+    const d = DEMANDE_OUVRIR_ACHAT;
+    if (!d.id || Date.now() - d.at > 120000) return;
+    const b = liste.find((x) => x && String(x.id) === String(d.id)); d.id = null;
+    if (!b) return;
+    if (!ouvert) onBasculer(true);
+    ouvrirEdition(b);
+    setTimeout(() => { try { const f = document.querySelector('[data-achat-hors-form]'); if (f) f.scrollIntoView({ block: 'center' }); } catch (_) {} }, 120);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const choisirTicket = async (ev) => {
     const f = ev.target.files && ev.target.files[0];
     ev.target.value = '';

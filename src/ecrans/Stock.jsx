@@ -165,7 +165,7 @@ async function lireVcStock() {
   const ventes = Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object' ? rv[0].ventes : null;
   return { lst: { items: r.items && typeof r.items === 'object' ? r.items : null, liens: r.liens && typeof r.liens === 'object' ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true }, ventes };
 }
-async function lireAnnoncesStock(accounts) {
+export async function lireAnnoncesStock(accounts) {
   const horsCompte = comptesStockEcartes();
   const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
   const [vinted, ebay, lbc, vc] = await Promise.all([
