@@ -19386,9 +19386,9 @@ function ApercuSansAbonnement({ tab, setTab }) {
   };
   return createPortal(
     <div className="vrm-apercu-carte" role="region" aria-labelledby="vrm-apercu-titre" data-carte-apercu="" data-signe={signe || undefined} key={signe}>
-      <div className="vrm-apercu-titre" id="vrm-apercu-titre">{e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
-      <div className="vrm-apercu-phrase">Tes données sont là, rien n'est supprimé. {e.impaye ? 'Mets ta carte à jour' : "Reprends l'abonnement"} pour tout retrouver.</div>
-      <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
+      <div className="vrm-apercu-titre" id="vrm-apercu-titre" data-apercu-nouveau={e.nouveau ? '' : undefined}>{e.nouveau ? 'Bienvenue sur VRM' : e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
+      <div className="vrm-apercu-phrase">{e.nouveau ? 'Abonne-toi pour tout voir et agir.' : <>Tes données sont là, rien n'est supprimé. {e.impaye ? 'Mets ta carte à jour' : "Reprends l'abonnement"} pour tout retrouver.</>}</div>
+      <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.nouveau ? "Voir l'offre" : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
     </div>, document.body);
 }
 // ── (9 nov.) UN INCIDENT OUVERT PAR LES SONDES DE /statut ─────────────────────

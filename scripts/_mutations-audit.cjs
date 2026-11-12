@@ -10,12 +10,12 @@
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 
-function prouver(fichierAudit, R, MUTATIONS) {
+function prouver(fichierAudit, R, MUTATIONS, extras = []) {
   let ok = 0;
   const noms = Object.keys(MUTATIONS);
   for (const nom of noms) {
     const t = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-v2-'));
-    for (const x of ['api', 'src', 'package.json']) fs.cpSync(path.join(R, x), path.join(t, x), { recursive: true });
+    for (const x of ['api', 'src', 'package.json', ...extras]) fs.cpSync(path.join(R, x), path.join(t, x), { recursive: true });
     fs.symlinkSync(fs.realpathSync(path.join(R, 'node_modules')), path.join(t, 'node_modules'));
     let ancre = true;
     for (const [f, de, vers] of MUTATIONS[nom]) {

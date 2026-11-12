@@ -65,7 +65,7 @@ export const FICHES_AIDE = [
   { id: 'ventes-facture', ecran: 'ventes', niveau: 'complet', q: 'Faire une facture à un acheteur', etapes: ['Argent → Factures.', 'Complète « Ma facture » une fois.', 'Touche la vente, puis « Facture ».'], aller: { lien: '?tab=invoices' }, mots: ['facture', 'facturer', 'pro', 'siret', 'recu'] },
 
   // Colis
-  { id: 'colis-bordereau', ecran: 'colis', q: 'Imprimer un bordereau', etapes: ['Ouvre Colis → À envoyer.', 'Touche le colis prêt, puis « Imprimer ».', 'Le N° est tamponné sur le bordereau.'], aller: { lien: '?tab=cat_bord' }, mots: ['imprimer', 'bordereau', 'etiquette', 'impression', 'expedition', 'envoi'] },
+  { id: 'colis-bordereau', faq: 5, ecran: 'colis', q: 'Imprimer un bordereau', etapes: ['Ouvre Colis → À envoyer.', 'Touche le colis prêt, puis « Imprimer ».', 'Le N° est tamponné sur le bordereau.'], aller: { lien: '?tab=cat_bord' }, mots: ['imprimer', 'bordereau', 'etiquette', 'impression', 'expedition', 'envoi'] },
   { id: 'colis-tout-imprimer', ecran: 'colis', q: 'Imprimer tous les bordereaux du jour', etapes: ['Colis → « Tout imprimer ».', 'Choisis les colis, puis imprime.'], aller: { lien: '?tab=cat_bord&print=bord' }, mots: ['tout', 'imprimer', 'bordereaux', 'lot', 'jour', 'plusieurs'] },
   { id: 'colis-deposer', ecran: 'colis', q: 'Déposer mes colis au point relais', etapes: ['Au relais, ouvre Colis.', 'Touche « Je dépose ».', 'Scanne chaque bordereau.'], aller: { lien: '?tab=cat_bord' }, mots: ['deposer', 'depot', 'relais', 'poster', 'scanner', 'envoyer'] },
   { id: 'colis-retirer', ecran: 'colis', q: 'Retirer un colis au point relais', etapes: ['Ouvre Colis → À retirer.', 'Montre le code ou son QR.', 'Il reste lisible sans réseau.'], aller: { lien: '?tab=retraits' }, mots: ['retirer', 'retrait', 'code', 'qr', 'recuperer', 'relais'] },
@@ -104,8 +104,8 @@ export const FICHES_AIDE = [
   { id: 'stats-prix-marche', ecran: 'dashboard', niveau: 'complet', q: 'Voir le prix du marché d’un modèle', etapes: ['Statistiques → Prix.', 'Cherche le modèle.'], aller: { lien: '?tab=prixmarche' }, mots: ['prix', 'marche', 'cote', 'modele', 'combien', 'vaut'] },
 
   // Paramètres
-  { id: 'reglages-extension', ecran: 'settings', q: 'Installer l’extension', etapes: ['Réglages → Vérifier mon installation.', 'Télécharge l’extension, dézippe, charge le dossier.', 'Ouvre Vinted dans ce navigateur.'], aller: { lien: '?tab=settings&reglage=verifier' }, mots: ['extension', 'installer', 'chrome', 'module', 'plugin', 'navigateur'] },
-  { id: 'reglages-email', ecran: 'emails', q: 'Relier ma boîte e-mail', etapes: ['Ouvre E-mails.', 'Prends ton adresse VRM.', 'Fais suivre les e-mails de tes plateformes.'], aller: { lien: '?tab=emails' }, mots: ['email', 'mail', 'gmail', 'icloud', 'outlook', 'boite', 'relier', 'transfert'] },
+  { id: 'reglages-extension', faq: 2, ecran: 'settings', q: 'Installer l’extension', etapes: ['Réglages → Vérifier mon installation.', 'Télécharge l’extension, dézippe, charge le dossier.', 'Ouvre Vinted dans ce navigateur.'], aller: { lien: '?tab=settings&reglage=verifier' }, mots: ['extension', 'installer', 'chrome', 'module', 'plugin', 'navigateur'] },
+  { id: 'reglages-email', faq: 4, ecran: 'emails', q: 'Relier ma boîte e-mail', etapes: ['Ouvre E-mails.', 'Prends ton adresse VRM.', 'Fais suivre les e-mails de tes plateformes.'], aller: { lien: '?tab=emails' }, mots: ['email', 'mail', 'gmail', 'icloud', 'outlook', 'boite', 'relier', 'transfert'] },
   { id: 'reglages-compte-lu', ecran: 'settings', q: 'Savoir si un compte est bien lu', etapes: ['Réglages → Tout va bien ?', 'Chaque compte dit sa dernière lecture.'], aller: { lien: '?tab=settings&reglage=toutvabien' }, mots: ['compte', 'lu', 'jour', 'marche', 'probleme', 'verifier', 'tout', 'va', 'bien'] },
   { id: 'reglages-vacances', ecran: 'settings', q: 'Mettre mes comptes en vacances', etapes: ['Réglages → Mode vacances.', 'Un compte par toucher, celui de l’onglet Vinted.'], aller: { lien: '?tab=settings&reglage=vacances' }, mots: ['vacances', 'pause', 'absent', 'conge', 'fermer'] },
   { id: 'reglages-config', ecran: 'settings', q: 'Passer en Simple ou en Complet', etapes: ['Ouvre « Ma configuration ».', 'Choisis Simple ou Complet, et ce que tu vends.'], aller: { lien: '?tab=settings', feuille: 'vrm:configuration' }, mots: ['simple', 'complet', 'configuration', 'vends', 'quoi', 'mode', 'niveau'] },
@@ -116,7 +116,7 @@ export const FICHES_AIDE = [
   { id: 'reglages-stream', ecran: 'settings', niveau: 'complet', q: 'Cacher mes chiffres en direct (stream)', etapes: ['Réglages → Ce que le stream cache.', 'Choisis ce qui se floute.'], aller: { lien: '?tab=settings&reglage=stream' }, mots: ['stream', 'live', 'cacher', 'flouter', 'direct', 'twitch'] },
   { id: 'reglages-double', ecran: 'settings', niveau: 'complet', q: 'Protéger mon compte par un code', etapes: ['Réglages → Double vérification.', 'Scanne le QR avec ton app d’authentification.'], aller: { lien: '?tab=settings&reglage=double' }, mots: ['securite', 'double', 'verification', 'code', 'authentification', 'proteger', '2fa'] },
   { id: 'reglages-equipe', ecran: 'settings', niveau: 'complet', q: 'Inviter un aide pour les colis', etapes: ['Réglages → Équipe.', 'Ton aide voit les colis, jamais l’argent.'], aller: { lien: '?tab=settings&reglage=equipe' }, mots: ['equipe', 'aide', 'inviter', 'employe', 'collaborateur'] },
-  { id: 'reglages-abonnement', ecran: 'settings', q: 'Gérer ou résilier mon abonnement', etapes: ['Réglages → Mon abonnement.', 'Touche « Résilier » : tes données restent.'], aller: { lien: '?tab=settings&reglage=abonnement' }, mots: ['abonnement', 'resilier', 'payer', 'prix', 'stripe', 'arreter'] },
+  { id: 'reglages-abonnement', faq: 7, ecran: 'settings', q: 'Gérer ou résilier mon abonnement', etapes: ['Réglages → Mon abonnement.', 'Touche « Résilier » : tes données restent.'], aller: { lien: '?tab=settings&reglage=abonnement' }, mots: ['abonnement', 'resilier', 'payer', 'prix', 'stripe', 'arreter'] },
   { id: 'reglages-visite', ecran: 'settings', q: 'Revoir la visite de VRM', etapes: ['Lance la visite.', 'Les onglets se présentent un par un.'], aller: { lien: '?tab=settings', feuille: 'vrm:visite' }, mots: ['visite', 'tutoriel', 'tuto', 'decouvrir', 'presentation', 'guide'] },
   { id: 'reglages-depannage', ecran: 'settings', q: 'Résoudre un problème', etapes: ['Réglages → Résoudre un problème.', 'Suis le geste proposé.', 'Sinon : « Signaler un problème ».'], aller: { lien: '?tab=settings&reglage=depannage' }, mots: ['probleme', 'bug', 'marche', 'panne', 'erreur', 'depanner', 'aide'] },
 
@@ -128,6 +128,16 @@ export const FICHES_AIDE = [
   { id: 'communaute-groupe', ecran: 'communaute', q: 'Rejoindre un groupe de revendeurs', etapes: ['Ouvre Communauté.', 'Entre le code que t’a donné son créateur.'], aller: { lien: '?tab=communaute' }, mots: ['groupe', 'rejoindre', 'code', 'communaute', 'revendeur'] },
   { id: 'communaute-classement', ecran: 'communaute', q: 'Apparaître au classement', etapes: ['Ouvre Communauté.', 'Inscris-toi au classement : rien n’est public sans ça.'], aller: { lien: '?tab=communaute' }, mots: ['classement', 'rang', 'top', 'public', 'inscrire'] },
   { id: 'communaute-carte', ecran: 'communaute', q: 'Apparaître sur la carte, ou la quitter', etapes: ['Ouvre Communauté.', 'Rejoins ou quitte la carte.', 'Ta position est arrondie, jamais ton adresse.'], aller: { lien: '?tab=communaute' }, mots: ['carte', 'position', 'quitter', 'apparaitre', 'map'] },
+
+  // (12 nov., ouverture aux clients) LES 10 QUESTIONS LES PLUS PROBABLES d'un nouveau
+  // client (`faq: rang`) : 4 fiches ci-dessus + celles-ci. Affichées dans chaque « ? »
+  // (« Les questions les plus posées », `faqAide`), et trouvées par la recherche.
+  { id: 'faq-prix', faq: 1, ecran: 'settings', q: 'Combien coûte VRM ?', etapes: ['Solo : 16,99 € par mois, un compte vendeur par site.', 'Pro : 19,99 € par mois, comptes vendeurs illimités.', 'Sept jours gratuits au début, sans engagement.'], aller: { lien: '?tab=settings&reglage=abonnement' }, mots: ['prix', 'cout', 'tarif', 'payer', 'abonnement', 'solo', 'pro', 'essai', 'gratuit'] },
+  { id: 'faq-vinted', faq: 3, ecran: 'settings', q: 'Relier mon compte Vinted', etapes: ['Installe l’extension VRM dans Chrome.', 'Ouvre vinted.fr, connecté à ton compte.', 'L’extension le relie toute seule.'], aller: { lien: '?tab=vintedaccounts' }, mots: ['relier', 'lier', 'compte', 'vinted', 'connecter', 'ajouter'] },
+  { id: 'faq-factures', faq: 6, ecran: 'settings', q: 'Trouver les factures de mon abonnement', etapes: ['Réglages → Mon abonnement.', 'Tes factures sont en bas, en PDF.'], aller: { lien: '?tab=settings&reglage=abonnement' }, mots: ['facture', 'abonnement', 'recu', 'pdf', 'paiement', 'stripe'] },
+  { id: 'faq-donnees', faq: 8, ecran: 'settings', q: 'Télécharger toutes mes données', etapes: ['Réglages → Mon compte → Tes données.', 'Touche « Exporter mes données ».', 'Un fichier zip arrive, même sans abonnement.'], aller: { lien: '?tab=settings' }, mots: ['donnees', 'exporter', 'telecharger', 'rgpd', 'fichier', 'zip', 'portabilite'] },
+  { id: 'faq-supprimer', faq: 9, ecran: 'settings', q: 'Supprimer mon compte', etapes: ['Réglages → Mon compte, tout en bas.', 'Tape SUPPRIMER, puis ton mot de passe.', 'Tout est effacé, sauf tes factures légales.'], aller: { lien: '?tab=settings' }, mots: ['supprimer', 'effacer', 'compte', 'fermer', 'rgpd', 'quitter'] },
+  { id: 'faq-probleme', faq: 10, ecran: 'settings', q: 'J’ai un problème : prévenir VRM', etapes: ['Réglages → Signaler un problème.', 'Écris ce qui ne va pas.', 'Coche « Réponds-moi par e-mail » pour une réponse.'], aller: { lien: '?tab=settings' }, mots: ['probleme', 'bug', 'contact', 'aide', 'support', 'signaler', 'joindre', 'email'] },
 ];
 
 // ── LES MOTS DU VENDEUR ──────────────────────────────────────────────────────
@@ -162,6 +172,8 @@ export function fichesPour({ vend = null, mode = 'complet' } = {}) {
     avance: f.niveau === 'complet', cachee: mode === 'simple' && f.niveau === 'complet',
   }));
 }
+// (12 nov.) Les questions les plus posées, dans l'ordre de leur rang (`faq`).
+export const faqAide = (fiches) => (fiches || []).filter((f) => Number.isInteger(f.faq)).sort((a, b) => a.faq - b.faq);
 // Les 3 à 5 fiches d'un écran (en Simple, les avancées se taisent).
 export const fichesEcran = (fiches, ecran, max = 5) => (fiches || []).filter((f) => f.ecran === ecran && !f.cachee).slice(0, max);
 
