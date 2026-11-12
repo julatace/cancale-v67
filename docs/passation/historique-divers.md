@@ -1718,6 +1718,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · Sécurité des comptes (second agent)** : mots qui font bannir (`src/messageSur.js`) — message à la main ⇒ ambre + « Envoyer quand même », automatique (favoris, refus auto) ⇒ jamais envoyé, annonce ⇒ ligne de « vérifier avant » ; « Copie de mes annonces » (zip par compte, dans le navigateur) ; carte « Protège ton compte VRM » ; aucun jeton Vinted vers la page (proxy, connect, liste projetée). `docs/passation/2026-11-12-securite-comptes.md`. Geste : aucun.
 - **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
 
+## Déplacé tel quel de CLAUDE.md §9 (12 nov., intégration 12nov-b)
+
+- **12 nov. · Ouverture aux clients (second agent, `agent2-ouverture-clients`)** : Réglages → « Ouvrir les paiements » (propriétaire seul, 10 prérequis LUS : clé, webhook relu chez Stripe + 5 événements, prix Solo/Pro, mentions, contact, CGV, accueil Pro, mode réel) ; banc paiement de bout en bout (Stripe simulé, vraie route) ; compte neuf + abonnement obligatoire = « Bienvenue », plus « a pris fin » ; export RGPD complet côté serveur (`mode=mes-donnees`) ; « Réponds-moi par e-mail » + FAQ 10 questions. Guide `2026-11-12-guide-paiement-julien.md`, récit `2026-11-12-ouverture-clients.md`. Geste : les 9 champs d’`editeur.js`, prix Stripe + `STRIPE_SECRET_KEY`/`STRIPE_PRIX_PRO`, puis mode réel.
+- **12 nov. · Fiabilité prod (agent2)** : export chiffré par vendeur chaque soir (seau Storage privé `sauvegardes`, 14 j, restauration prouvée sur Postgres jetable) ; `/api/sante` ne dit la configuration qu'au propriétaire ; base d'essai `vrm-essai` (31 migrations, Preview via `VITE_SUPABASE_URL`) ; surveillance 5 min (issue = e-mail) ; « Revenir à la version d'avant ». Mesuré : la copie GitHub n'a jamais tourné. `docs/passation/2026-11-12-fiabilite-prod.md`. Geste : `docs/passation/2026-11-12-guide-fiabilite-julien.md` (secrets de sauvegarde, UptimeRobot, vrm-essai).
+- **12 nov. · Facture au téléphone (second agent)** : l'aperçu de « Envoyer la facture » est une miniature (facture à 520 px, réduite pour tenir, toucher ⇒ PDF en grand) ; tableau à largeurs fixes (plus de « Désignation » à une lettre par ligne) ; boîte choisie mais pas connectée ⇒ « Envoyer avec VRM » (`via:'vrm'`, son clic, réglage inchangé). `docs/passation/2026-11-12-facture-mobile.md`. Geste : aucun.
 ## Déplacé tel quel de CLAUDE.md §9 (12 nov., intégration 12nov-a — fichier sous 59 000 octets)
 ## Déplacé tel quel de CLAUDE.md §9 (12 nov., finitions 2e passe — fichier sous 59 000 octets)
 
@@ -1725,3 +1730,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · Finitions (2 passes)** : défauts écran par écran, ligne unique d'« À retirer » (logo et nom du transporteur), cartes « À expédier », couleurs §7. `docs/passation/2026-11-12-finitions.md`. Geste : aucun.
 
 - **12 nov. · Paquets G2 (ext. 5.368) et 12nov-a (ext. 5.369), mis en ligne par le second agent** : `2026-11-12-integration-11nov-g2.md`, `2026-11-12-integration-12nov-a.md`. Geste : installer 5.369.0 ; migration 042 (facultative).
+
+- **12 nov. · Paquets G2 (ext. 5.368), 12nov-a (ext. 5.369) et 12nov-b, mis en ligne par le second agent** : `2026-11-12-integration-11nov-g2.md`, `-12nov-a.md`, `-12nov-b.md`. Geste : installer 5.369.0 ; migration 042 (facultative).

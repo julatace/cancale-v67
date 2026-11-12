@@ -550,7 +550,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · Vert et vitesse** : CI de main au vert ; « Tout imprimer (N) » = « Imprimer (N) » ; une vente ne relit que son compte (1 350 → 268 Ko). Reste : 20 000 ventes. `docs/passation/2026-11-12-vert-vitesse.md`. Geste : aucun.
+- **12 nov. · Vert et vitesse** : CI au vert ; « Tout imprimer (N) » juste ; une vente relit son compte ; 20 000 ventes : −20 %, chiffres inchangés. `2026-11-12-vert-vitesse.md`, `-vitesse-volume.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

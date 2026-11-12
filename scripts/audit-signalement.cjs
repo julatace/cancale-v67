@@ -343,8 +343,10 @@ const lignesSignalements = () => rows.filter((r) => /^signalement_/.test(r.id));
     ETAT.oublierEtat(); journal = [];
     const s1 = await route(null, { methode: 'GET', mode: 'sante' });
     const c = s1.corps || {};
-    const oui = ['ok', 'serviceKey', 'owner', 'ia', 'detourage', 'stripe', 'stripeWebhook', 'relancesEssai'];
-    dit(s1.code === 200 && oui.every((k) => typeof c[k] === 'boolean'), 'ses oui/non sont intacts', c);
+    // (12 nov., agent2-fiabilite-prod) Publics : ok, serviceKey, owner. Les oui/non de configuration
+    // (ia, détourage, Stripe…) ne partent qu'au propriétaire connecté (scripts/audit-sante-publique.cjs).
+    const oui = ['ok', 'serviceKey', 'owner'];
+    dit(s1.code === 200 && oui.every((k) => typeof c[k] === 'boolean') && c.config === undefined && !('stripe' in c), 'ses oui/non publics sont intacts, la configuration n’est pas publique', c);
     dit(c.etat && c.etat.base === 'ok' && c.etat.emails === 'ok' && c.etat.notifications === 'panne' && c.etat.verifieA === new Date(Date.now()).toISOString(), 'etat : base ok, e-mails ok (collecteur passé il y a 2 min), notifications en panne (clé VAPID absente)', c.etat);
     dit(/s-maxage=30/.test(s1.entetes['Cache-Control'] || ''), 'Cache-Control : s-maxage=30', s1.entetes);
     // (11 nov.) Depuis le 9 nov. (fda8cdb1, /statut) /api/sante lit AUSSI la ligne bornée des sondes

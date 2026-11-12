@@ -80,7 +80,7 @@ dit(evals.length === 0, "aucun eval / new Function (script-src n'a pas 'unsafe-e
 
 // Les hôtes CONTACTÉS : fetch('https://…'), un <script> injecté, un cadre.
 const app = require("./_source-app.cjs").sourceApp();
-const supa = (/const SUPABASE_URL = "([^"]+)"/.exec(app) || [])[1];
+const supa = (/const SUPABASE_URL = [^"\n]*"([^"]+)"/.exec(app) || [])[1];   // (12 nov.) « (VITE_SUPABASE_URL) || "…" » : la valeur de production
 const cs = dir(complete, 'connect-src') || [];
 const permis = (liste, origine) => liste.some((t) => t === origine || (t.includes('*') && new RegExp('^' + t.replace(/[.]/g, '\\.').replace('\\.*', '.*').replace('*', '[^.]+') + '$').test(origine)) || (t === 'https:' && origine.startsWith('https:')));
 dit(!!supa && permis(cs, supa), 'connect-src permet la base (SUPABASE_URL lue dans App.jsx)', supa);

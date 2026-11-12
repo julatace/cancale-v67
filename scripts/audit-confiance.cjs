@@ -121,7 +121,8 @@ async function verifier(R, { silencieux = false } = {}) {
   const paires = corpsSante ? corpsSante.split('\n').map((l) => l.trim()).filter(Boolean) : [];
   // (9 nov.) `statut` : la projection publique des sondes (api/_lib/statut-sondes.js `statutPublic`,
   // mots fixes et dates seulement — jugée par scripts/audit-statut-auto.cjs).
-  const valeurOk = (l) => /^ok: true,$/.test(l) || /^etat,$/.test(l) || /^statut,$/.test(l) || /^\w+: !!process\.env\.[A-Z_]+,$/.test(l) || /^stripe: stripePret\(\),$/.test(l) || /^relancesEssai: configurationRelances\(\)\.pret,$/.test(l);
+  // (12 nov., agent2-fiabilite-prod) `config` : les oui/non de configuration, au SEUL propriétaire connecté (absent sinon).
+  const valeurOk = (l) => /^ok: true,$/.test(l) || /^etat,$/.test(l) || /^statut,$/.test(l) || /^config,$/.test(l) || /^\w+: !!process\.env\.[A-Z_]+,$/.test(l) || /^stripe: stripePret\(\),$/.test(l) || /^relancesEssai: configurationRelances\(\)\.pret,$/.test(l);
   dit(paires.length >= 3 && paires.every(valeurOk), 'A12 /api/sante ne rend que des oui/non et `etat` (aucune valeur de variable, aucune donnée)', paires.filter((l) => !valeurOk(l)));
   const ETAT = await imp('api/_lib/etat-public.js');
   if (ETAT.__erreur || typeof ETAT.sonderEtat !== 'function') dit(false, 'A13 etat-public exécutable', ETAT.__erreur);

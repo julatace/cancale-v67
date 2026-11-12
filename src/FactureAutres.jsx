@@ -14,7 +14,7 @@
 import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
 import React from 'react';
 import { SheetShell } from './composants/SheetShell.jsx';
-import { ApercuFacture, useFicheFacturation, FicheFacturation, relireFactures, ecrireChampsFiche } from './FacturePro.jsx';
+import { ApercuFacture, MiniatureFacture, apercuEnGrand, useFicheFacturation, FicheFacturation, relireFactures, ecrireChampsFiche } from './FacturePro.jsx';
 import { compteFacturable, avecCompte, compteDeVente } from './facturePro/comptes.js';
 import { verifierSiret, manquantsVendeur, manquantsVente, contenuFacture, euros, jourParis, nomFichier } from './facturePro/regle.js';
 import { PLATEFORMES, venteAutre, idFactureAutre, manquantsAcheteurSaisi, venteFacture, ID_FACTURE_AUTRE_RE } from './facturePro/sources.js';
@@ -175,7 +175,7 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer, deja = null }) {
             <label className="vrm-fp-champ is-large"><span>Désignation</span><input value={designation} onChange={(e) => setDesignation(e.target.value)}/></label>
             <p className="vrm-fp-muet" data-fa-prix={v.centimes}>Prix : <b className="vrm-fp-chiffre">{euros(v.centimes)}</b> — celui de la vente {L} n° {v.ref}, du {jourParis(v.venteLe)}.</p>
           </section>
-          {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle="N° donné à l'émission"/></section> : null}
+          {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><MiniatureFacture ouvrir={() => ouvrirPdf(apercuEnGrand(apercu), deps)}><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle="N° donné à l'émission"/></MiniatureFacture></section> : null}
           {!mv.length && (ma.length || mvt.length) ? <p className="vrm-fp-muet" data-fa-manque="">Il manque {[...ma, ...mvt].map((m) => m.l).filter((x, i, t) => t.indexOf(x) === i).join(', ')}.</p> : null}
           <div className="vrm-fp-gestes is-bas">
             <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fa-emettre="" disabled={occupe || !cfg || !!mv.length || !!ma.length || !!mvt.length} onClick={emettre}>{occupe ? 'Un instant…' : 'Émettre la facture'}</button>
