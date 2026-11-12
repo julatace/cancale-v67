@@ -1407,8 +1407,9 @@ const INIT_SAL = [];
 
 // ============ SYNCHRO SUPABASE (Mac <-> iPhone) ============
 // Base de donnees en ligne : les donnees sont partagees entre tous les appareils
-const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
+// (12 nov., agent2-fiabilite-prod) La base d’ESSAI (« vrm-essai ») : les variables Vercel « Preview » VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY ; absentes (Production) ⇒ la vraie base, comme avant.
+const SUPABASE_URL = (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || "https://lgonxzrzjcqthjtbdpzo.supabase.co";
+const SUPABASE_KEY = (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 // Une lecture identique de notre base ne part qu'une fois (16 oct., mesuré :
 // 16 à 45 lectures en double par écran ouvert) — règle et garde-fous dans
@@ -19393,9 +19394,9 @@ function ApercuSansAbonnement({ tab, setTab }) {
   };
   return createPortal(
     <div className="vrm-apercu-carte" role="region" aria-labelledby="vrm-apercu-titre" data-carte-apercu="" data-signe={signe || undefined} key={signe}>
-      <div className="vrm-apercu-titre" id="vrm-apercu-titre">{e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
-      <div className="vrm-apercu-phrase">Tes données sont là, rien n'est supprimé. {e.impaye ? 'Mets ta carte à jour' : "Reprends l'abonnement"} pour tout retrouver.</div>
-      <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
+      <div className="vrm-apercu-titre" id="vrm-apercu-titre" data-apercu-nouveau={e.nouveau ? '' : undefined}>{e.nouveau ? 'Bienvenue sur VRM' : e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
+      <div className="vrm-apercu-phrase">{e.nouveau ? 'Abonne-toi pour tout voir et agir.' : <>Tes données sont là, rien n'est supprimé. {e.impaye ? 'Mets ta carte à jour' : "Reprends l'abonnement"} pour tout retrouver.</>}</div>
+      <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.nouveau ? "Voir l'offre" : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
     </div>, document.body);
 }
 // ── (9 nov.) UN INCIDENT OUVERT PAR LES SONDES DE /statut ─────────────────────

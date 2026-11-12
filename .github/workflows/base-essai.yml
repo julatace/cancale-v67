@@ -1,0 +1,44 @@
+name: Préparer la base d'essai (vrm-essai)
+# (12 nov., agent2-fiabilite-prod) À LA MAIN seulement. Applique, dans l'ordre,
+# toutes les migrations de supabase/migrations/ à la base d'ESSAI (un second
+# projet Supabase gratuit, « vrm-essai ») — scripts/essai/appliquer-migrations.mjs.
+# Aucune donnée n'est copiée. L'adresse de la vraie base est refusée.
+# Secret à poser par Julien (Settings → Secrets and variables → Actions) :
+#   ESSAI_DB_URL   l'adresse « Session pooler » du projet vrm-essai (port 5432)
+# Pas-à-pas : docs/passation/2026-11-12-guide-fiabilite-julien.md
+# Relancer après chaque nouvelle migration : seules les nouvelles passent.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: base-essai
+  cancel-in-progress: false
+jobs:
+  migrations:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Le secret est-il posé ?
+        env:
+          ESSAI_DB_URL: ${{ secrets.ESSAI_DB_URL }}
+        run: |
+          if [ -z "$ESSAI_DB_URL" ]; then
+            echo "::error::Secret ESSAI_DB_URL absent. Geste : GitHub → Settings → Secrets and variables → Actions → New repository secret (pas-à-pas : docs/passation/2026-11-12-guide-fiabilite-julien.md)."
+            exit 1
+          fi
+      - name: Installer psql
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq postgresql-client-17 > /dev/null
+      - name: Appliquer les migrations à la base d'essai
+        env:
+          ESSAI_DB_URL: ${{ secrets.ESSAI_DB_URL }}
+          PSQL: /usr/lib/postgresql/17/bin/psql
+        run: node scripts/essai/appliquer-migrations.mjs

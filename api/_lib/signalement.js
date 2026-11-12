@@ -284,7 +284,13 @@ const resumeValide = (r) => {
   return { plantages: n(o.plantages), lectures: n(o.lectures), echecs: n(o.echecs), plan: n(o.plan), gardeFou: o.gardeFou === true };
 };
 // Ce que la liste projette : des scalaires et le résumé, jamais `data` entier.
-const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume'].join(',');
+const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume', 'repondre:data->>repondre'].join(',');
+// (12 nov., « J'ai un problème ») « Réponds-moi par e-mail » : SEULEMENT si la personne
+// l'a coché (`repondreA: true`), et l'adresse vient de SA SESSION (jamais du corps).
+// Sans la case, rien ne change : ni e-mail, ni pseudo (audit-aide-client).
+const FORME_EMAIL = /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/;
+export const adresseReponse = (corps, utilisateur) => (corps && corps.repondreA === true && utilisateur && FORME_EMAIL.test(String(utilisateur.email || '').trim()) ? String(utilisateur.email).trim().toLowerCase() : null);
+const reponseLue = (x) => (FORME_EMAIL.test(String(x || '')) ? String(x) : null);
 
 // POST (session) : envoyer. `utilisateur` = SA session (api/_lib/session.js).
 export async function envoyerSignalement({ utilisateur, corps, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
@@ -297,6 +303,8 @@ export async function envoyerSignalement({ utilisateur, corps, env = process.env
   // `resume` : les nombres que la LISTE lit (projetée, §4.4) — les champs lourds
   // (capture, erreurs, lectures) ne se lisent qu'à l'ouverture d'UN signalement.
   const data = { ...s, de: String(utilisateur.id), at, traite: false, resume: resumeDe(s) };
+  const reponse = adresseReponse(corps, utilisateur);
+  if (reponse) data.repondre = reponse;
   const id = await reserver({ env, fetcher, proprio, uid: utilisateur.id, t: maintenant, data });
   if (id === null) return { code: 503, corps: { ok: false, raison: 'base' } };
   if (id === 'plein') return { code: 429, corps: { ok: false, raison: 'trop', max: SIGNALEMENTS_PAR_HEURE, reessayerDans: 60 - new Date(maintenant).getUTCMinutes() } };
@@ -329,7 +337,7 @@ export async function listerSignalements({ utilisateur, unId = null, env = proce
     if (!r1[0]) return { code: 404, corps: { ok: false, raison: 'absent' } };
     const d = r1[0].data || {};
     const s = normaliserSignalement({ ...d, texte: d.texte || '…' });
-    return { code: 200, corps: { ok: true, signalement: { id: r1[0].id, ...s, de: UUID.test(String(d.de)) ? String(d.de) : null, at: dateIso(d.at), traite: d.traite === true, traiteLe: dateIso(d.traiteLe) } } };
+    return { code: 200, corps: { ok: true, signalement: { id: r1[0].id, ...s, de: UUID.test(String(d.de)) ? String(d.de) : null, repondre: reponseLue(d.repondre), at: dateIso(d.at), traite: d.traite === true, traiteLe: dateIso(d.traiteLe) } } };
   }
   // La LISTE : projetée (§4.4) — 200 signalements à 30 Ko chacun ne se lisent pas d'un coup.
   const rows = await lire(env, fetcher, `app_data?owner=eq.${proprio}&id=like.${PREFIXE}*&select=${SELECT_LISTE}&order=data->>at.desc&limit=200`);
@@ -338,7 +346,7 @@ export async function listerSignalements({ utilisateur, unId = null, env = proce
     const s = normaliserSignalement({ texte: x.texte, ecran: x.ecran, ecranAvant: x.ecranAvant, version: x.version, extension: x.extension, navigateur: x.navigateur, appareil: x.appareil, systeme: x.systeme, ecranTaille: { largeur: x.largeur, hauteur: x.hauteur } })
       || { texte: '', ecran: '', ecranAvant: '', version: '', extension: null, navigateur: 'inconnu', ecranTaille: null, appareil: null, systeme: null };
     const { plantages, lectures, plan, etatEcran, enLigne, theme, ...leger } = s;   // eslint-disable-line no-unused-vars
-    return { id: x.id, ...leger, resume: resumeValide(x.resume), de: UUID.test(String(x.de)) ? String(x.de) : null, at: dateIso(x.at), traite: String(x.traite) === 'true', traiteLe: dateIso(x.traiteLe) };
+    return { id: x.id, ...leger, resume: resumeValide(x.resume), de: UUID.test(String(x.de)) ? String(x.de) : null, repondre: reponseLue(x.repondre), at: dateIso(x.at), traite: String(x.traite) === 'true', traiteLe: dateIso(x.traiteLe) };
   });
   return { code: 200, corps: { ok: true, signalements, nonTraites: signalements.filter((x) => !x.traite).length } };
 }
@@ -374,9 +382,9 @@ export async function marquerTraite({ utilisateur, corps, env = process.env, fet
 // ── CÔTÉ APP : l'envoi, et ce qu'il dit ─────────────────────────────────────
 // `envoye: true` SEULEMENT sur une réponse `ok:true` du serveur qui porte l'id
 // rangé ; tout le reste (réseau, 5xx, réponse illisible) est « pas envoyé ».
-export async function posterSignalement(signalement, { entetes = {}, fetcher = (typeof fetchAvecDelai === 'function' ? fetchAvecDelai : null) } = {}) {
+export async function posterSignalement(signalement, { entetes = {}, fetcher = (typeof fetchAvecDelai === 'function' ? fetchAvecDelai : null), repondreA = false } = {}) {
   try {
-    const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...entetes }, body: JSON.stringify(signalement) });
+    const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...entetes }, body: JSON.stringify(repondreA === true ? { ...signalement, repondreA: true } : signalement) });
     const j = await r.json().catch(() => null);
     if (r.ok && j && j.ok === true && typeof j.id === 'string' && j.id.startsWith(PREFIXE)) return { envoye: true, id: j.id, notifie: j.notifie === true };
     return { envoye: false, raison: (j && j.raison) || (r.status === 401 ? 'session' : 'serveur'), reessayerDans: j && j.reessayerDans };

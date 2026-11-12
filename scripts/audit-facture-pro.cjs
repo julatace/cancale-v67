@@ -469,6 +469,21 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   const erf = await appel(A, { action: 'envoyer', tx: '23000000707', confirme: true });
   smtp.mode = 'ok';
   dit(erf.corps.issue === 'refuse' && base.get(cle(A, 'email_invoice_tx23000000707')).status !== 'sent' && base.get(cle(A, 'email_invoice_tx23000000707')).envois.slice(-1)[0].etat === 'refusee', 'V13 refus du serveur d’envoi : « pas envoyée », écrit au journal', JSON.stringify(erf.corps.envoi));
+  // (12 nov., Julien : « laisse VRM envoyer » sans bouton) « Envoyer avec VRM » : SA boîte est
+  // choisie mais pas connectée ; son clic pour CETTE facture (`via: 'vrm'`) part par VRM avec
+  // les mêmes garde-fous ; sans `via`, le réglage « ma boîte » est respecté ; l'envoi
+  // AUTOMATIQUE suit toujours le réglage (un `via` ne vient que d'un clic).
+  base.set(cle(A, 'vrm_pro_facture'), { ...CFG, envoiPar: 'boite' }); base.delete(cle(A, R.ID_BOITE));
+  await appel(A, vente('23000000708'));
+  const nV = smtp.recus.length;
+  const eSans = await appel(A, { action: 'envoyer', tx: '23000000708', confirme: true });
+  dit(eSans.code === 409 && eSans.corps.erreur === 'boite' && smtp.recus.length === nV, 'V14 « ma boîte » choisie, pas connectée, sans `via` : le réglage est respecté, rien ne part', JSON.stringify(eSans.corps.erreur));
+  const rAuto = faireRes(); await R.envoyer(A, { action: 'envoyer', tx: '23000000708', confirme: true, via: 'vrm' }, rAuto, process.env, { auto: true });
+  dit(rAuto.code === 409 && rAuto.corps.erreur === 'boite' && smtp.recus.length === nV, 'V14 l’envoi AUTOMATIQUE ignore `via` : il suit le réglage', `HTTP ${rAuto.code}`);
+  const eVrm = await appel(A, { action: 'envoyer', tx: '23000000708', confirme: true, via: 'vrm' });
+  const mVrm = smtp.recus[nV] || { rcpt: [], data: '', from: '' };
+  dit(eVrm.corps.issue === 'envoye' && eVrm.corps.envoi.via === 'vrm' && /factures@vrm-banc\.test/.test(mVrm.from) && /^Reply-To: <boutique@banc\.test>$/mi.test(mVrm.data.split('\r\n\r\n')[0]) && base.get(cle(A, 'vrm_pro_facture')).envoiPar === 'boite', 'V14 « Envoyer avec VRM » : la facture part par VRM (Reply-To au vendeur), le réglage « ma boîte » ne change pas', JSON.stringify(eVrm.corps.envoi));
+  base.set(cle(A, 'vrm_pro_facture'), CFG);
   poserEnv(false);
 
   // ══ M10-M13 : L'APERÇU DE « MA FACTURE » ═════════════════════════════════
