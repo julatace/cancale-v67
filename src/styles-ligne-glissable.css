@@ -46,3 +46,10 @@
 @media (prefers-reduced-motion: reduce) {
   .vrm-lg-action { transition: none; }
 }
+
+/* (11 nov., intégration colis) Au repos, le tiroir ne se montre PAS : là où la ligne est en retrait de son parent
+   (À retirer : la ligne s'arrête 16 px avant le bord de la carte), le parent ne le coupait qu'à son propre bord et
+   un liseré bleu de l'action principale dépassait à droite de chaque ligne (capture du banc colis-retirer-propre).
+   Il redevient visible dès que la ligne bouge (glisser, indice, ouverte) ; il se cache APRÈS le retour (0,35 s). */
+[data-lg] > .vrm-lg-tiroir { visibility: hidden; transition: visibility 0s linear .35s; }
+[data-lg]:is([data-lg-actif], [data-lg-ouvert], [data-lg-indice]) > .vrm-lg-tiroir { visibility: visible; transition-delay: 0s; }

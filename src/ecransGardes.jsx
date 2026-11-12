@@ -40,7 +40,9 @@ import { createPortal } from 'react-dom';
 // ⚠️ Pas Annonces (mesuré le 8 nov., CPU ×4) : sa grille rattachée d'un bloc (style et mise
 // en page de toutes les fiches) s'affichait ~0,6 s PLUS TARD qu'un écran remonté, qui dessine
 // d'abord le haut ; elle reste remontée à chaque visite, comme avant.
-export const ECRANS_GARDABLES = ['journee', 'cat_bord', 'ventes'];
+// (11 nov., lot DJ3) Colis n'est plus un écran (« À expédier » en tête de Ventes, « À retirer » en tête d'Achats) :
+// Achats, qui prend sa place dans la barre, est gardé à sa place.
+export const ECRANS_GARDABLES = ['journee', 'achats', 'ventes'];
 export const MAX_GARDES = 4;
 export const AGE_MAX_CACHE_MS = 10 * 60 * 1000;
 // Clés dont la sauvegarde ne rend aucun écran périmé : des préférences d'affichage

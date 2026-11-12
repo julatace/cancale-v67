@@ -252,8 +252,8 @@ async function main() {
       const T = '1512px';
       const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 });
       await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 25000 });
-      await pg.click('[data-colis-onglet-choix="retirer"]');
+      await pg.locator('[data-colis-section]').first().waitFor({ timeout: 25000 });
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
       await pg.waitForSelector('[data-relais-fond="pret"]', { timeout: 30000 });
       await pg.waitForFunction(() => document.querySelectorAll('[data-relais-epingle]').length >= 3 && !!window.__vrmCarteMesuree(), null, { timeout: 15000 });
       await pg.evaluate(() => { const f = document.querySelector('[data-relais-fond]'); f.scrollIntoView({ block: 'center' }); });

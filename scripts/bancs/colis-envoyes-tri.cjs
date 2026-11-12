@@ -265,8 +265,10 @@ async function regle() {
         const src = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-colis-envoye]')].map((x) => [x.getAttribute('data-colis-envoye'), x.getAttribute('data-envoye-transp-source')])));
         dit(src['v:7107'] === 'pdf' && src['v:7108'] === 'pdf', 'P. l’étiquette (PDF du bordereau, puis celle relue au cron) nomme le transporteur — source « pdf »', JSON.stringify(src));
         dit(['v:7104', 'v:7105', 'v:7106'].every((k) => !src[k] || src[k] === 'aucune' || src[k] === 'null' || src[k] === ''), 'P. 8 ventes au même titre : aucune autre ne prend le transporteur d’une étiquette', JSON.stringify(src));
-        const S = await pg.evaluate(() => { const e = document.querySelector('[data-colis-envoye-suivre="v:7101"]'); return e ? (e.getAttribute('href') || '') + ' ' + e.innerText : ''; });
-        dit(/chronopost/i.test(S) && /Suivre/.test(S), 'S. 7101 : « Suivre » chez Chronopost', S.slice(0, 120));
+        // (11 nov., intégration colis — lot suivi-commandes) Un colis en cours porte la ligne de suivi : son « ↗ » (« Suivre chez le
+        // transporteur ») remplace le bouton « Suivre » ; un colis fini garde le bouton. L'un ou l'autre, vers Chronopost.
+        const S = await pg.evaluate(() => { const e = document.querySelector('[data-colis-envoye-suivre="v:7101"]') || document.querySelector('[data-suivi-commande="v:7101"] a[data-suivi-lien]'); return e ? (e.getAttribute('href') || '') + ' ' + (e.innerText || '') + ' ' + (e.getAttribute('aria-label') || '') : ''; });
+        dit(/chronopost/i.test(S) && /Suivre/.test(S), 'S. 7101 : « Suivre » chez Chronopost (bouton, ou « ↗ » de la ligne de suivi)', S.slice(0, 160));
         await shot(pg, `envoyes-${k}`);
         await sain(pg, 'Colis → Envoyés');
         await pg.click('[data-envoyes-filtre-choix="Mondial Relay"]').catch(() => {});

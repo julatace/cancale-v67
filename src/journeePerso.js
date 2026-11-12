@@ -47,6 +47,8 @@ export const CARTES_JOURNEE = [
   { id: 'messages', zone: 'afaire', nom: 'Messages', desc: 'Tes messages pas lus.' },
   { id: 'prix', zone: 'afaire', nom: 'Prix à baisser', desc: 'Un conseil, rien ne part seul.' },
   { id: 'a-relier', zone: 'afaire', nom: 'E-mails à relier', desc: 'Les comptes dont rien n’arrive.' },
+  // (11 nov., lot suivi-commandes) Une incohérence PROUVÉE entre Vinted, les e-mails et le transporteur.
+  { id: 'suivi', zone: 'afaire', nom: 'Commandes à vérifier', desc: 'Vinted, e-mail et transporteur ne disent pas la même chose.' },
   { id: 'stock-sortie', zone: 'afaire', nom: 'Vendus encore rangés', desc: 'À sortir de tes meubles.' },
   // (11 nov., lot sante-comptes) Seulement quand un compte Vinted GLISSE (un indicateur lu passe son seuil).
   { id: 'sante-comptes', zone: 'afaire', nom: 'Comptes à surveiller', desc: 'Un compte Vinted qui glisse : la raison, le geste.' },

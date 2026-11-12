@@ -124,7 +124,8 @@ async function principal() {
   const idsNav = [...app.matchAll(/entreeNav\(\{(?:\.\.\.\w+,\s*)?id:'(\w+)'/g)].map((m) => m[1]);
   const groupes = [...app.matchAll(/groupeNav\(\{ cle:'(\w+)'/g)].map((m) => m[1]);
   const navKo = [...idsNav.map((i) => `nav.${i}`), 'nav.journee.court', ...groupes.map((g) => `nav.groupe.${g}`)].filter((k) => !(k in fr));
-  dit(idsNav.length >= 10 && groupes.length >= 3 && !navKo.length, `C2 chaque entrée de navigation a sa clé (${idsNav.length} entrées, ${groupes.length} groupes)`, navKo);
+  // (11 nov., lot DJ3 intégré) l'entrée Colis a quitté la navigation (Ventes · À expédier, Achats · À retirer) : 9 entrées.
+  dit(idsNav.length >= 9 && groupes.length >= 3 && !navKo.length, `C2 chaque entrée de navigation a sa clé (${idsNav.length} entrées, ${groupes.length} groupes)`, navKo);
   const acc = lire('src/Accueil.jsx');
   const moments = [...acc.matchAll(/\{ id: '(\w+)', capture: '\w+' \}/g)].map((m) => m[1]);
   const momKo = moments.flatMap((id) => ['titre', 'texte', 'alt', 'point1', 'point2'].map((c) => `accueil.moment.${id}.${c}`)).filter((k) => !(k in fr));

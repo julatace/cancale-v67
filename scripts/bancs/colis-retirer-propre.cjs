@@ -160,12 +160,11 @@ const ouvrir = async (b, vp, sombre) => {
       console.log(`\n— Colis → À retirer · ${nom} · jeu ${JEU}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       await essaie('retirer', async () => {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
-        // (11 nov., webkit-fiable) Plus de délai fixe (§6.5) : on attend l'ÉTAT — autant de lignes
-        // comptées que le nombre publié, et l'onglet qui le dit (25 s au plus ; sinon les contrôles le disent).
-        await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); const o = document.querySelector('[data-colis-onglet-choix="retirer"]'); return !!p && Number.isFinite(p.total) && document.querySelectorAll('.vrm-rpf [data-cc-carte]:not([data-hors-compte])').length === p.total && !!o && o.getAttribute('data-colis-onglet-n') === String(p.total) && !!document.querySelector('[data-rp-section]'); } catch (_) { return false; } }, null, { timeout: 25000 }).catch(() => {});
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
+        // (11 nov., webkit-fiable + lot DJ3) Plus de délai fixe (§6.5) : on attend l'ÉTAT — autant de lignes comptées que le nombre publié.
+        await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); return !!p && Number.isFinite(p.total) && document.querySelectorAll('.vrm-rpf [data-cc-carte]:not([data-hors-compte])').length === p.total && !!document.querySelector('[data-rp-section]'); } catch (_) { return false; } }, null, { timeout: 25000 }).catch(() => {});
         if (process.env.JR_DBG) console.log(await pg.evaluate(() => [document.querySelector('[data-colis-retraits="outils"]'), document.querySelector('[data-colis-retraits="outils"] .vrm-achats'), ...document.querySelectorAll('[data-colis-retraits="outils"] .vrm-achats > *'), document.querySelector('.vrm-rpf-verifier'), document.querySelector('.vrm-rpf')].filter((e) => e && e.getBoundingClientRect().height > 0).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mt${getComputedStyle(e).marginTop} pt${getComputedStyle(e).paddingTop} ${e.tagName}.${String(e.className).slice(0, 30)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')} :: ${e.innerText.slice(0, 90).replace(/\n/g, ' ')}`).join('\n')));
         if (process.env.JR_DBG) console.log('GAP2', await pg.evaluate(() => { const q = (x) => { const e = document.querySelector(x); if (!e) return x + ' —'; const c = getComputedStyle(e), r = e.getBoundingClientRect(); return `${x} top${Math.round(r.top)} h${Math.round(r.height)} mt${c.marginTop} mb${c.marginBottom} pt${c.paddingTop} pb${c.paddingBottom}`; }; return ['.vrm-rpf', '.vrm-colis-retirer', '[data-colis-retraits]', '[data-colis-retraits] > *', '.vrm-achats', '.vrm-achats > *', '.vrm-colis-fraicheur', '.vrm-rpf-verifier'].map(q).join('\n'); }));
         if (process.env.JR_DBG) console.log('GAP', await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); const y0 = d ? d.getBoundingClientRect().bottom : 0; return [...document.querySelectorAll('.vrm-main *')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.top >= y0 - 1 && r.top < y0 + 90 && !e.closest('[data-colis-retraits]'); }).slice(0, 12).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mb${getComputedStyle(e).marginBottom} ${e.tagName}.${String(e.className).slice(0, 40)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')}`).join('\n'); }));
@@ -177,8 +176,10 @@ const ouvrir = async (b, vp, sombre) => {
           const lignes = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')];
           const pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null');
           return {
-            pub, onglet: (document.querySelector('[data-colis-onglet-choix="retirer"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'),
-            carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'),
+            // (11 nov., lot DJ3) « À retirer » est la section de tête d'Achats : plus d'onglet ni de grande carte ;
+            // le nombre est celui de SA liste (`data-cc-n`) et de la pastille d'Achats.
+            pub, onglet: (document.querySelector('[data-cc-colonne="retirer"]') || { getAttribute: () => null }).getAttribute('data-cc-n'),
+            carte: ((document.querySelector('[data-nav-entree="achats"] .vrm-nav-badge-n') || {}).textContent || '').replace(/\D/g, '') || null,
             idents: lignes.map((l) => l.getAttribute('data-cc-carte')),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).length,
             points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); if (!d) return 0; const ra = a.getBoundingClientRect(), rd = d.getBoundingClientRect(); return rd.top >= ra.bottom - 2 && a.scrollWidth <= a.clientWidth + 1 && rd.height <= 24 ? 0 : 99; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
@@ -198,7 +199,7 @@ const ouvrir = async (b, vp, sombre) => {
         const N = m.pub && Number.isFinite(m.pub.total) ? m.pub.total : null;
         dit(N === NB_ATTENDU, `le nombre publié (vrm_colis_retirer) = ${NB_ATTENDU} colis du jeu`, JSON.stringify(m.pub));
         dit(m.onglet === String(N), '« À retirer · N » = vrm_colis_retirer', `${m.onglet} / ${N}`);
-        if (N) dit(m.carte === String(N), 'la carte sombre dit le même N', `${m.carte} / ${N}`);
+        if (N) dit(m.carte === String(N), 'la pastille d’Achats dit le même N', `${m.carte} / ${N}`);
         dit(m.comptes === N, 'autant de lignes comptées que N (chaque colis une fois)', `${m.comptes} / ${N}`);
         dit(new Set(m.idents).size === m.idents.length, 'chaque colis UNE fois à l’écran', m.idents.join(','));
         // (6 nov., v36-visuel-2) LA RÈGLE A CHANGÉ (demande du 6 nov. : « l'adresse passe dessous ») : le NOM garde sa ligne,
@@ -213,13 +214,17 @@ const ouvrir = async (b, vp, sombre) => {
         dit(m.deb <= 1 && !m.hors.length, 'rien ne déborde', `${m.deb}px ${m.hors.join(' | ')}`);
         if (JEU === 'base') {
           const by = (s) => m.rangs.find((r) => r.id && r.id.includes(s)) || {};
-          dit(by('9301').code && !by('9301').avenir, 'code connu ⇒ bouton « Code »', JSON.stringify(by('9301')));
+          // (11 nov., Julien : « des QR codes, des infos dans tous les sens ») Le code est ÉCRIT sur la ligne (plus de bouton « Code »).
+          const vis9301 = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte*="9301"]'); const c = l && l.querySelector('[data-rp-code-visible]'); return c ? c.getAttribute('data-rp-code-visible') : null; });
+          dit(vis9301 === '012345' && !by('9301').avenir, 'code connu ⇒ écrit sur la ligne', JSON.stringify({ vis9301, l: by('9301') }));
           dit(by('90000021').avenir && !by('90000021').code, 'code pas encore lu ⇒ puce « Code à venir »', JSON.stringify(by('90000021')));
-          dit(by('90000022').code, 'QR ⇒ bouton « Code »', JSON.stringify(by('90000022')));
+          const vis22 = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte="r:e:90000022"]'); const c = l && l.querySelector('[data-rp-code-visible]'); return c ? c.getAttribute('data-rp-code-visible') : null; });
+          dit(!!vis22, 'QR ⇒ dit sur la ligne', JSON.stringify({ vis22, l: by('90000022') }));
           const cmd = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].find((x) => /Sac seau toile/.test(x.innerText)); return l ? { avenir: !!l.querySelector('[data-rp-code-a-venir]'), code: !!l.querySelector('[data-rp-code]'), point: (l.closest('[data-relais-point]') || { getAttribute: () => '' }).getAttribute('data-relais-point') } : null; });
           dit(!!cmd && cmd.avenir && !cmd.code && /tabacduquai/i.test(cmd.point || ''), '« Ton achat t’attend » : titre de l’e-mail, « Code à venir », dans le relais lu', JSON.stringify(cmd));
-          const titres = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf [data-rp-titre]')].filter((t) => t.getBoundingClientRect().height > 0).map((t) => ({ t: t.textContent, h: Math.round(t.getBoundingClientRect().height) })));
-          dit(titres.every((x) => x.h <= 22) && !titres.some((x) => /^Colis Mondial Relay$/.test(x.t)), 'titres sur UNE ligne, jamais « Colis Mondial Relay » (n° court ou achat relié)', JSON.stringify(titres.slice(0, 5)));
+          const titres = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf [data-rp-titre]')].filter((t) => t.getBoundingClientRect().height > 0).map((t) => { const cs = getComputedStyle(t); return { t: t.textContent, h: Math.round(t.getBoundingClientRect().height), coupe: t.scrollWidth > t.clientWidth + 1 || t.scrollHeight > t.clientHeight + 2 || (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap') }; }));
+          // (11 nov., lot DJ3 — Julien : « on ne voit pas tout le titre ») La règle « une ligne » devient « en entier » : jamais coupé.
+          dit(titres.every((x) => !x.coupe) && !titres.some((x) => /^Colis Mondial Relay$/.test(x.t)), 'titres en entier (jamais coupés), jamais « Colis Mondial Relay » (n° court ou achat relié)', JSON.stringify(titres.filter((x) => x.coupe).slice(0, 5)));
           const trou = await pg.evaluate(() => { const d = document.querySelector('[data-rp-section="route"]'); const r = document.querySelector('[data-rp-section="argent"]'); return d && r ? Math.round(r.getBoundingClientRect().top - d.getBoundingClientRect().bottom) : null; });
           dit(trou != null && trou <= 60, 'pas de grand vide entre « En route » replié et « Argent à vérifier »', String(trou));
           dit(by('90000003').ech === 'dernier', 'locker au dernier jour ⇒ puce ambre « dernier jour »', JSON.stringify(by('90000003')));
@@ -232,14 +237,15 @@ const ouvrir = async (b, vp, sombre) => {
           dit(pp.length === 2, 'même nom de relais dans deux villes : deux cartes', JSON.stringify(pp));
           // (3 nov., 13 h 02) Des SECTIONS, dans l'ordre : aujourd'hui · prêts · code à venir · lieu à confirmer ·
           // à vérifier · en route · argent à vérifier ; chaque colis UNE fois, dans SA section.
-          dit(m.sections.join(',') === 'aujourdhui,prets,avenir,lieu,verifier,route,argent', 'sections dans l’ordre (aujourd’hui > prêts > code à venir > lieu > à vérifier > en route > argent)', m.sections.join(','));
+          // (11 nov., Julien : « organise mieux les retraits ») « Prêts » et « Code à venir » ne font plus qu'UNE section « À retirer ».
+          dit(m.sections.join(',') === 'aujourdhui,prets,lieu,verifier,route,argent', 'sections dans l’ordre (aujourd’hui > à retirer > lieu > à vérifier > en route > argent)', m.sections.join(','));
           const sec = (s) => Object.entries(m.dansSection).filter(([, v]) => v === s).map(([k]) => k);
           dit(sec('aujourdhui').length === 1 && /90000003/.test(sec('aujourdhui')[0]), '« À retirer aujourd’hui » : le seul colis au dernier jour', sec('aujourdhui').join());
           // (5 nov., Julien : « 2 points de retrait alors que c'est le même ») UN POINT, UNE CARTE : Phone Cash
           // (code connu, QR, code pas lu) va TOUT ENTIER dans « Prêts à retirer », la ligne sans code garde sa
           // puce « Code à venir » ; « Code à venir » ne garde que les points dont AUCUN colis n'a de code.
-          dit(sec('prets').every((k) => !/cmd01|90000008/.test(k)) && sec('prets').some((k) => /9301/.test(k)) && sec('prets').some((k) => /90000022/.test(k)) && sec('prets').some((k) => /90000021/.test(k)), '« Prêts à retirer » : les points qui ont un colis avec code ou QR, tous leurs colis dedans', sec('prets').join());
-          dit(sec('avenir').some((k) => /cmd01|conv|commande/.test(k) || k === 'r:e:email_track_vinted_commande_cmd01') && sec('avenir').every((k) => !/9301|90000022|90000021/.test(k)), '« Code à venir » : les points sans aucun code', sec('avenir').join());
+          // (11 nov.) Une section « À retirer » : les colis avec code ET ceux au code à venir (dit sur leur ligne), chacun une fois.
+          dit(sec('prets').some((k) => /9301/.test(k)) && sec('prets').some((k) => /90000022/.test(k)) && sec('prets').some((k) => /90000021/.test(k)) && sec('prets').some((k) => /cmd01|conv|commande/.test(k)) && !m.sections.includes('avenir'), '« À retirer » : les colis avec code et ceux au code à venir, dans la même section', sec('prets').join(','));
           dit(!(await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-section:not(.is-repli) [data-relais-point-suite]').length)), 'chaque point UNE fois (aucune carte « suite » dans une autre section)');
           dit(sec('lieu').length === 1 && /90000008/.test(sec('lieu')[0]), '« Lieu à confirmer » : le colis sans lieu', sec('lieu').join());
           dit(m.air.every((a) => a >= 20 && a <= 40), 'de l’air entre les sections (20–40 px)', m.air.join(','));
@@ -254,7 +260,7 @@ const ouvrir = async (b, vp, sombre) => {
           await pg.locator('[data-retirer-villes] [data-ville="cancale"]').first().click();
           await pg.waitForFunction(() => { const a = [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point:not(.is-inconnu) [data-relais-adresse]')].map((x) => x.textContent); return a.length > 0 && a.every((t) => /Cancale/i.test(t)); }, null, { timeout: 15000 }).catch(() => {});
           const f = await pg.evaluate(() => ({ lignes: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point:not(.is-inconnu) [data-cc-carte]:not([data-hors-compte])')].length, nInconnu: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point.is-inconnu [data-cc-carte]')].length, inconnu: !!document.querySelector('.vrm-rpf-point.is-inconnu'), carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'), memo: localStorage.getItem('vrm_retirer_ville'), pts: [...document.querySelectorAll('.vrm-rpf-point:not(.vrm-rpf-verifier) [data-relais-adresse]')].map((x) => x.textContent) }));
-          dit(vC && f.lignes === Number(vC.n) && f.carte === vC.n && f.pts.every((a) => /Cancale/i.test(a)) && f.inconnu && f.nInconnu === 1, 'Cancale choisie : ses points seuls, la carte sombre dit son nombre, « Lieu à confirmer » (1) reste visible', JSON.stringify(f));
+          dit(vC && f.lignes === Number(vC.n) && f.pts.every((a) => /Cancale/i.test(a)) && f.inconnu && f.nInconnu === 1, 'Cancale choisie : ses points seuls (le nombre de la ville), « Lieu à confirmer » (1) reste visible', JSON.stringify(f));
           dit(f.memo === 'cancale', 'le choix de ville est retenu', f.memo);
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-ville-cancale-${nom}.png`) });
           await pg.locator('[data-retirer-villes] [data-ville=""]').first().click();
@@ -274,12 +280,14 @@ const ouvrir = async (b, vp, sombre) => {
           const det = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte*="9301"]'); const d = l && l.querySelector('[data-rp-detail]'); return d ? { code: !!d.querySelector('[data-code-retrait="012345"], .vrm-rp-gestes'), txt: d.innerText.slice(0, 200) } : null; });
           dit(!!det && det.code, 'toucher la ligne ouvre son détail (code, gestes)', JSON.stringify(det));
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>{window.__codeCopie=t;}}}));
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-code').first().click();
+          // (11 nov.) Copier se fait sur le code du détail (« Code de retrait · Copier ») : le texte exact, zéro initial compris.
+          await pg.locator('[data-cc-carte*="9301"] [data-rp-detail] .vrm-pickup-code').first().click();
+          await pg.waitForTimeout(150);
           dit(await pg.evaluate(()=>window.__codeCopie)==='012345','Code copie le texte exact en conservant le zéro initial');
           const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang button').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
-          dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir, code et retrait restent côte à côte');
+          dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir et retrait restent côte à côte');
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('refus');}}}));
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-code').first().click();
+          await pg.locator('[data-cc-carte*="9301"] [data-rp-detail] .vrm-pickup-code').first().click();
           dit(await pg.locator('[data-cc-carte*="9301"] [data-rp-detail]').count()===1,'un presse-papiers refusé garde le détail disponible');
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-en-route-liste] [data-en-route-achat]')].some((x) => x.getBoundingClientRect().height > 0), null, { timeout: 15000 }).catch(() => {});

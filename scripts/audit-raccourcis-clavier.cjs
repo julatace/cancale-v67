@@ -59,7 +59,8 @@ async function audit(srcRegle, srcComposant, srcBouton, bavard) {
     const r1 = M.lireTouche({ g: 0 }, 'g', 1000); const r2 = M.lireTouche(r1.etat, a.touche, 1600);
     dit(r2.action && r2.action.sorte === 'aller' && r2.action.lien === '?tab=' + a.tab, `« g » puis « ${a.touche} » ⇒ ${a.nom}`, JSON.stringify(r2.action));
   }
-  for (const n of ['journee', 'annonces', 'ventes', 'cat_bord', 'messages']) dit(M.ALLER.some((a) => a.tab === n), `l'écran ${n} a son raccourci`);
+  // (11 nov., lot DJ3) Colis n'est plus un écran : ses deux moitiés sont en tête de Ventes et d'Achats.
+  for (const n of ['journee', 'annonces', 'ventes', 'achats', 'messages']) dit(M.ALLER.some((a) => a.tab === n), `l'écran ${n} a son raccourci`);
   { const r1 = M.lireTouche({ g: 0 }, 'g', 1000); const r2 = M.lireTouche(r1.etat, 'a', 1000 + M.DELAI_SEQUENCE + 1);
     dit(!(r2.action && r2.action.sorte === 'aller' && /annonces/.test(r2.action.lien)), '« g » puis « a » après le délai : plus une séquence'); }
   { const r1 = M.lireTouche({ g: 0 }, 'g', 1000); const r2 = M.lireTouche(r1.etat, 'q', 1100); const r3 = M.lireTouche(r2.etat, 'a', 1200);
@@ -99,7 +100,7 @@ async function audit(srcRegle, srcComposant, srcBouton, bavard) {
       ['⌘ accepté', regle.replace('|| ev.metaKey ', '')],
       ['délai de séquence infini', regle.replace('maintenant - e.g <= DELAI_SEQUENCE', 'true')],
       ['« n » pré-rempli', regle.replace("'?tab=achats&achat=1'", "'?tab=achats&achat=1&prix=10'")],
-      ['écran hors liste blanche', regle.replace("tab: 'cat_bord'", "tab: 'colis'")],
+      ['écran hors liste blanche', regle.replace("tab: 'messages'", "tab: 'colis'")],
       ['une sorte « ecrire »', regle.replace("{ touche: 'n', sorte: 'aller'", "{ touche: 'n', sorte: 'ecrire'")],
     ];
     const mutC = [

@@ -290,12 +290,14 @@ const mesureJournee = (pg) => pg.evaluate(() => {
           const o = await pg.evaluate(() => ({
             choix: [...document.querySelectorAll('[data-colis-onglet-choix]')].map((e) => ({ v: e.getAttribute('data-colis-onglet-choix'), n: e.getAttribute('data-colis-onglet-n'), txt: e.innerText.replace(/\s+/g, ' ').trim() })),
             pubEnv: JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'), pubRet: JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'),
+            // (11 nov., intégration colis) « À retirer » vit en tête d'Achats : son nombre est l'entrée « Achats » de la navigation.
+            achats: (document.querySelector('[data-badge-nav="achats"]') || { getAttribute: () => null }).getAttribute('data-badge-n'),
           }));
-          dit(o.choix.map((c) => c.v).join(',') === 'envoyer,envoyes,retirer', 'C1 · trois onglets : À envoyer · Envoyés · À retirer', o.choix.map((c) => c.txt).join(' / '));
-          const cE = o.choix.find((c) => c.v === 'envoyer'), cR = o.choix.find((c) => c.v === 'retirer');
+          dit(o.choix.map((c) => c.v).join(',') === 'envoyer,envoyes', 'C1 · Ventes « À expédier » : deux onglets, À envoyer · Envoyés (« À retirer » est en tête d’Achats, lot DJ3)', o.choix.map((c) => c.txt).join(' / '));
+          const cE = o.choix.find((c) => c.v === 'envoyer'), cR = { n: o.achats };
           dit(cE && o.pubEnv && cE.n === String(o.pubEnv.total), 'C1 · « À envoyer · N » = vrm_colis_aposter', `${cE && cE.n} / ${o.pubEnv && o.pubEnv.total}`);
           if (nJourneeEnv != null) dit(cE && cE.n === nJourneeEnv, 'C1 · le même N que la carte de Ma journée', `${cE && cE.n} / ${nJourneeEnv}`);
-          dit(cR && o.pubRet && cR.n === String(o.pubRet.total), 'C1 · « À retirer · N » = vrm_colis_retirer', `${cR && cR.n} / ${o.pubRet && o.pubRet.total}`);
+          dit(cR && o.pubRet && cR.n === String(o.pubRet.total), 'C1 · « Achats · N » (navigation) = vrm_colis_retirer', `${cR && cR.n} / ${o.pubRet && o.pubRet.total}`);
           const env = await pg.evaluate(() => {
             const cartes = [...document.querySelectorAll('[data-colis-lignes] [data-colis-ident]')];
             return { cartes: cartes.map((c) => ({ id: c.getAttribute('data-colis-ident'), site: c.getAttribute('data-plateforme-colis') || 'vinted', groupe: (() => { let p = c.previousElementSibling; while (p && !p.hasAttribute('data-groupe-transp')) p = p.previousElementSibling; return p ? p.getAttribute('data-groupe-transp') : ''; })() })),
@@ -338,7 +340,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
           if (SHOTS) { const suf = `${nom}${JEU === 'base' ? '' : '-' + JEU}`; await pg.screenshot({ path: path.join(SHOTS, `colis-envoyes-${suf}.png`) }); }
           const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
           dit(deb <= 1, 'Colis : aucun débordement horizontal', `${deb}px`);
-          await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+          await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
           await pg.waitForTimeout(700);
           if (SHOTS) { const suf = `${nom}${JEU === 'base' ? '' : '-' + JEU}`; await pg.screenshot({ path: path.join(SHOTS, `colis-retirer-${suf}.png`) }); }
         });

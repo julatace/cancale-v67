@@ -212,7 +212,7 @@ const sain = async (pg, ecran) => {
         await carte.screenshot({ path: path.join(SHOTS, `transporteurs-carte-${vp.width}.png`) }).catch(() => {});
       });
       await essaie(T + ' Colis → À retirer', async () => {
-        await pg.click('[data-colis-onglet-choix="retirer"]');
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForSelector('[data-cc-carte]', { timeout: 15000 });
         await pg.waitForTimeout(1500);
         const r = await pg.evaluate(() => {
