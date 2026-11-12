@@ -461,6 +461,7 @@ import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDes
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
+import VoirEmailColis from "./VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
@@ -47963,6 +47964,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return est ? <span className="vrm-rp-sous" data-colis-limite="estimee" data-colis-limite-estimee={est.jour}>{`Vers le ${est.jour.slice(8, 10)}/${est.jour.slice(5, 7)} (estimé : ${nomTransporteur(carrierKey(t ? t.carrier : ev.carrier))} garde un colis ${est.garde} jours)`}</span>
                       : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>; })())}
               {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
+              {/* (12 nov.) « Voir l'e-mail » : l'e-mail source gardé par la ligne (`emailRecu`) ; pas su ⇒ rien. */}
+              {t && t.emailRecu ? <VoirEmailColis id={t.emailRecu} headers={sbAuth}/> : null}
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
                   quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
               {x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">Transporteur pas encore connu : le suivi Vinted ne le nomme pas</span> : null}
