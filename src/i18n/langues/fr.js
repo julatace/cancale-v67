@@ -382,6 +382,8 @@ export default {
   "reglages.toutvabien.lib": "Tout va bien ?",
   "reglages.vacances.desc": "Mettre tes comptes en pause pendant ton absence, puis rouvrir.",
   "reglages.vacances.lib": "Mode vacances",
+  "reglages.copieannonces.desc": "Télécharger un zip par compte : titres, prix, N°, photos.",
+  "reglages.copieannonces.lib": "Copie de mes annonces",
   "reglages.verifier.desc": "Extension, comptes, boîte e-mail : ce qui manque, et le geste.",
   "reglages.verifier.lib": "Vérifier mon installation",
   "reglages.visite.desc": "Les onglets de VRM présentés un par un.",

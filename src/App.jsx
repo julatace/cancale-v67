@@ -4997,12 +4997,12 @@ const sondeLectureSansCompte = async () => {
   } catch (_) { return null; }
 };
 
-// Les colonnes de `vinted_accounts` que la page lit (mesuré le 12 nov. : id, vinted_user_id,
-// login, domain, updated_at, created_at, owner — plus les jetons, jamais lus ici).
-const SELECT_COMPTES_VINTED = 'id,owner,vinted_user_id,login,domain,created_at,updated_at';
-// Une copie locale d'avant (jetons compris) est nettoyée au chargement.
-const sansJetonsVinted = (a) => { if (!a || typeof a !== 'object') return a; const { access_token, refresh_token, csrf_token, anon_id, ...reste } = a; return reste; };
 const fetchVintedAccounts = async () => {
+  // (12 nov., sécurité des comptes) Les colonnes de `vinted_accounts` que la page lit (mesuré
+  // le 12 nov. : id, vinted_user_id, login, domain, updated_at, created_at, owner — plus les
+  // jetons, jamais lus ici) ; une ligne qui en porterait quand même est nettoyée.
+  const SELECT_COMPTES_VINTED = 'id,owner,vinted_user_id,login,domain,created_at,updated_at';
+  const sansJetonsVinted = (a) => { if (!a || typeof a !== 'object') return a; const { access_token, refresh_token, csrf_token, anon_id, ...reste } = a; return reste; };
   const owner = AUTH.user?.id;
   if (!owner || !AUTH.session?.access_token) return null;
   const filtre = `&owner=eq.${encodeURIComponent(owner)}`;

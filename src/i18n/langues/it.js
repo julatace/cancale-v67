@@ -377,6 +377,8 @@ export default {
   "reglages.toutvabien.lib": "Tutto bene?",
   "reglages.vacances.desc": "Metti in pausa i tuoi account mentre sei via, poi riaprili.",
   "reglages.vacances.lib": "Modalità vacanze",
+  "reglages.copieannonces.desc": "Scarica uno zip per account: titoli, prezzi, numeri, foto.",
+  "reglages.copieannonces.lib": "Copia dei miei annunci",
   "reglages.verifier.desc": "Estensione, account, casella e-mail: cosa manca, e il gesto da fare.",
   "reglages.verifier.lib": "Verifica la mia installazione",
   "reglages.visite.desc": "Le schede di VRM presentate una per una.",

@@ -68,6 +68,8 @@ import { SanteDonnees } from '../SanteDonnees.jsx';
 import HistoriqueVinted from '../ImportDepart.jsx';
 import HistoriqueSites from '../HistoriqueSites.jsx';   // (11 nov., lot import-historique-sites) Leboncoin, Vestiaire, eBay : la même carte (ext. 5.365)   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
+import CopieAnnonces from '../CopieAnnonces.jsx';   // (12 nov., sécurité des comptes) un zip d'annonces par compte
+import CarteDoubleVerif from '../CarteDoubleVerif.jsx';   // (12 nov.) « Protège ton compte VRM »
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
@@ -1931,6 +1933,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<><HistoriqueVinted comptes={comptes||[]} variante="reglages"/><HistoriqueSites/></> },
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
+      // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
+      { id:'copieannonces', type:'panneau', ic:'box', lib:tr('reglages.copieannonces.lib'), desc:tr('reglages.copieannonces.desc'), data:{ 'data-reglage-copieannonces':'' }, el:<CopieAnnonces comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
     ]},
@@ -2220,6 +2224,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {!ouvert && <>
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
+        {/* (12 nov., sécurité des comptes) Double vérification pas activée : UNE carte discrète, jamais forcée. */}
+        {voirReglages && AUTH.user && !rechercheReglage.trim() && <CarteDoubleVerif/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
         {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
