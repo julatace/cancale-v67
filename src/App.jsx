@@ -49316,7 +49316,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const vue = colonnesColis(cartes, siteColis);
           // (6 nov.) « À imprimer » = les bordereaux reçus PAS ENCORE imprimés (src/prochainGesteColis.js) :
           // mesuré sur sa base, la case disait 9 quand 6 avaient été imprimés la veille.
-          const lignesImpr = lignesLot();
+          // (12 nov., finitions) `lignesLot` = les bordereaux VINTED : sur un autre site choisi, aucun (« 15 à imprimer » sur eBay).
+          const lignesImpr = voitSite('vinted') ? lignesLot() : [];
           const nPrets = bordereauxAImprimer(lignesImpr).length, nDejaImpr = lignesImpr.length - nPrets;
           const nLot = lignesLotTous().length;
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
@@ -49375,8 +49376,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // écran, §5 « une seule règle par notion »). Aucune règle ne change.
           const pubEnv = load('vrm_colis_aposter', null);
           const pubRet = load('vrm_colis_retirer', null);
-          const nEnv = pubEnv && Number.isFinite(pubEnv.total) ? pubEnv.total : null;
-          const envPartiel = !!pubEnv && (pubEnv.ebay === null || pubEnv.leboncoin === null || pubEnv.vestiaire === null);
+          // (12 nov., finitions) Un site choisi (Ventes · eBay…) : le nombre de CE site, de la même publication
+          // (`vrm_colis_aposter.<site>`) — « À envoyer · 30 » (les colis Vinted) s'affichait sur eBay. Pas lu ⇒ rien.
+          const nEnv = !pubEnv ? null : siteColis === 'toutes' ? (Number.isFinite(pubEnv.total) ? pubEnv.total : null) : (Number.isFinite(pubEnv[siteColis]) ? pubEnv[siteColis] : null);
+          const envPartiel = siteColis === 'toutes' && !!pubEnv && (pubEnv.ebay === null || pubEnv.leboncoin === null || pubEnv.vestiaire === null);
           const nRet = pubRet && Number.isFinite(pubRet.total) ? pubRet.total : null;
           // E-mails de suivi pas lus : le nombre est un plancher (« au moins », §5).
           const retPartiel = tracking === null;
@@ -50723,7 +50726,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             peut demander un geste (vérifier que la paire revient). */}
         {/* Historique : les bordereaux déjà partis restent consultables, mais ils
             n'encombrent plus la liste de travail. */}
-        {Array.isArray(emailBords) && (()=>{
+        {/* (12 nov., finitions) Les bordereaux des e-mails sont ceux de Vinted : rien à en dire sur Ventes · eBay. */}
+        {Array.isArray(emailBords) && voitSite('vinted') && (()=>{
           const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
           if (!faits.length) return null;
           return (
