@@ -91,6 +91,14 @@ function fond({ enLigne = true, servie = '9.0.0', manifeste = {}, ...o } = {}) {
 }
 
 (async () => {
+  // ── 0. LA VERSION SERVIE = le manifeste = EXT_ATTENDUE (une version publiée se lit là) ──
+  if (!mut) {
+    const R = path.join(__dirname, '..');
+    let vs = null; try { vs = JSON.parse(fs.readFileSync(path.join(R, 'public', 'extension-version.json'), 'utf8')).version; } catch (_) {}
+    const vm = JSON.parse(fs.readFileSync(path.join(R, 'vinted-sync-extension', 'manifest.json'), 'utf8')).version;
+    const ea = (/const EXT_ATTENDUE\s*=\s*'([^']+)'/.exec(fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8')) || [])[1];
+    dit(vs && vs === vm && vs === ea, '0 public/extension-version.json = manifeste = EXT_ATTENDUE (à monter avec chaque version)', `${vs} / ${vm} / ${ea}`);
+  }
   // ── A. NOUVELLE VERSION ──────────────────────────────────────────────────
   await essai('A', async () => {
     const f = fond({ servie: '5.372.0' });

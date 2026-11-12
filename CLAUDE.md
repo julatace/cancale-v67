@@ -541,11 +541,12 @@ sans la fonction.
 | `ecriturehumaine` | `attendreEcriture` | **5.369.0** (12 nov.) | avant chaque message automatique (favoris, refus auto) le temps de le taper (≈ 4,5 c/s ±25 %, 5–45 s), 2–6 s sur son clic, puis envoi d'un coup ; dans la file une-à-la-fois ; pause ou autre compte pendant ⇒ rien ne part ; aucune touche simulée |
 | `variantes` | `choisirVariante` | **5.369.0** (12 nov.) | ses versions 2 à 5 (favoris : `variantes` ; refus : `vinted_offre_refus_variantes`) : une au hasard, jamais celle du message précédent ; n° de version au journal |
 | `discretion` | `porteDiscretion` | **5.370.0** (12 nov.) | plafond du JOUR (200, réglable, tous Chrome), rythme actif/calme, 2–6 min après l'ouverture, un compte à la fois, séries décalées 20–60 min, compte neuf 10→50/h, offres la nuit 30–120 min, baisses programmées, arrêt sur captcha/modération/401 jusqu'à « Reprendre », « Tout arrêter », 15/h favoris et offres, relecture « seulement le nouveau », carnet 7 j (`actions_compte_…` : `jour`, `maxJour`, `captcha`, `arret`, `ev`, `so`, `ta`) ; l'icône ouvre VRM dans un onglet (clic droit : connexion / état) |
+| `majdispo` `carte4` `reparer` `rapportext` `fileReseau` `barresfixes` | `etatMiseAJour` · `quatreLignes` · `reparerExtension` · `envoyerRapport` · `mettreEnFileReseau` · `eviterBarres` | **5.371.0** (12 nov.) | nouvelle version, carte en 4 lignes, Réparer, rapport, file réseau, barres fixes |
 
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · Discrétion (ext. 5.370, second agent, `claude/agent2-discretion`, CONTIENT `agent2-ecriture-humaine`, PAS fusionnée)** : plafond du jour, rythme, attente après l'ouverture, un compte à la fois, compte neuf en douceur, arrêt sur captcha / modération / déconnexion + « Reprendre », « Tout arrêter », 15/h favoris et offres, Republier par groupes, baisses variées et étalées, relecture « seulement le nouveau », freins 7 j dans la Santé des comptes ; l'icône ouvre VRM dans un onglet. `docs/passation/2026-11-12-discretion.md`. Geste : installer 5.370.0.
+- **12 nov. · Boutique + carte du logo (ext. 5.371, `claude/agent2-ext-boutique`, CONTIENT `agent2-discretion`)** : « Nouvelle version disponible » (zip ⇒ Télécharger + 3 étapes ; boutique ⇒ rien), carte en 4 lignes, Réparer, rapport sans donnée (`mode=rapport-extension`), gestes hors ligne en file 24 h, logo jamais sur une barre fixe. `docs/passation/2026-11-12-ext-boutique.md`. Geste : publier (`2026-11-12-chrome-web-store.md`).
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
