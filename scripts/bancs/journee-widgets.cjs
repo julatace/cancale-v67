@@ -169,7 +169,7 @@ async function page(b, T, port, opts = {}) {
   // direct sans compte. La porte de confidentialité répond « vérifié ».
   await pg.addInitScript(([sombre, s]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {} }, [!!T.sombre, SESSION]);
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? SESSION.user : { access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const etat = opts.etat || { main: {} };
   await pg.route('**/rest/v1/**', (route) => {
     // La vraie forme d'une base injoignable : 522 de Cloudflare, en HTML.

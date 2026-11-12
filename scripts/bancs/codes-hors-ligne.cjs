@@ -73,7 +73,7 @@ async function main() {
         let baseDown = false;
         await pg.addInitScript(({ sess, uid }) => { try { if (!localStorage.getItem('vrm_session')) { localStorage.setItem('vrm_session', JSON.stringify(sess)); localStorage.setItem('vrm_local_owner', uid); } localStorage.setItem('schema_cloisonne', '1'); } catch (_) {} }, { sess: SESSION, uid: UID });
         await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? SESSION.user : { access_token: JETON, refresh_token: SESSION.refresh_token, expires_in: 86400, user: SESSION.user }) }));
-        await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+        await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
         await pg.route('**/rest/v1/**', (route) => {
           if (baseDown) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>error</html>' });
           const u = decodeURIComponent(metaVersData(route.request().url()));

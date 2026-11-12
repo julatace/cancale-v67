@@ -143,7 +143,7 @@ async function allerTache(pg, tache, site) {
       // Un push « non abouti » est une panne (503) : le nuage ne garde rien.
       const base = { get main() { return rows[0].data; }, set main(v) { rows[0].data = v; }, maj: auj.toISOString(), ecritures: [], panne: () => bloquerPush };
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
       await pg.route('**/rest/v1/**', (route) => {
         const u = decodeURIComponent(metaVersData(route.request().url()));
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

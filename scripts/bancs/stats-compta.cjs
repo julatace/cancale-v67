@@ -117,7 +117,7 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
   // (2 nov.) Le détail des Statistiques vit dans deux volets repliés (RepliStats) : le banc les
   // ouvre comme Julien le ferait (état gardé sur l'appareil), puis juge les mêmes chiffres.
   await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_freq', JSON.stringify('mensuel')); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['333'])); } catch (_) {} }, { publie });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const L = lignes(!!opts.pack);
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

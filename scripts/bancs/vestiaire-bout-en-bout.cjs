@@ -123,7 +123,7 @@ async function ouvrir(b, vp, lignes, vrm) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); } catch (_) {} }, SESSION);
   await pg.addInitScript(PONT, { version: VERSION, vrm });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => {
     const chemin = new URL(r.request().url()).pathname.replace(/^.*\/auth\/v1\//, '');
     const corps = chemin === 'user' ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated' } : { ...SESSION, expires_in: 3600 };

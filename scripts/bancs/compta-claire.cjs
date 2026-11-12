@@ -88,7 +88,7 @@ async function page(b, vp, sombre, complets, errs) {
   pg.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR_/i.test(m.text())) errs.push('console : ' + m.text()); });
   await pg.clock.setFixedTime(new Date(MAINTENANT));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, sombre);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   let m = main(sombre, complets);
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

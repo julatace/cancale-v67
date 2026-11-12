@@ -80,7 +80,7 @@ async function ouvrir(b, vp, tab) {
     localStorage.setItem('vinted_annonce_numeros', JSON.stringify(f)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(pr));
     localStorage.setItem('vinted_sale_overrides', JSON.stringify({ 9301: { numero: '402' } }));
   } catch (_) {} }, [FICHES, PRESENTS]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

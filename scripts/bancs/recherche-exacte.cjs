@@ -92,7 +92,7 @@ async function preparer(b, vp, { sombre = false, mode = 'normal' } = {}) {
   const tenir = { actif: false };
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ s }) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { s: sombre });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', async (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));

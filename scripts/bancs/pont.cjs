@@ -250,7 +250,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   // L'appareil a-t-il déjà séparé la session de l'extension (une fois par compte) ?
   if (separee) await pg.addInitScript((uid) => { try { localStorage.setItem('vrm_ext_separee_' + uid, '1'); } catch (_) {} }, SESSION.user.id);
   const fourches = [];
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Le faux GoTrue, APRÈS le fourre-tout des hôtes externes (qui laisse passer
   // vers le vrai réseau) : Playwright prend la DERNIÈRE route en premier (§6.6).
   // Posé avant, il n'était jamais atteint — rouge depuis la double vérification
