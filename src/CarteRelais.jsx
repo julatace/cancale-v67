@@ -418,7 +418,10 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const titreSansArticle = !titreLigne || /^n°/i.test(titreLigne) || /^colis\b/i.test(titreLigne);
   const nomTransp = x.transp && !x.trInconnu ? String(x.transp.nom || '') : '';
   // Au point relais, un colis Chronopost est un colis « Chronopost Pickup » (le nom du réseau de points).
-  const titreAffiche = titreSansArticle ? (nomTransp ? `Colis ${x.transp.cle === 'chronopost' ? 'Chronopost Pickup' : nomTransp}` : 'Colis') : titreLigne;
+  const nomAffiche = nomTransp ? (x.transp.cle === 'chronopost' ? 'Chronopost Pickup' : nomTransp) : '';
+  const titreAffiche = titreSansArticle ? (nomAffiche ? `Colis ${nomAffiche}` : 'Colis') : titreLigne;
+  // Ligne 3 : le nom du transporteur EN CLAIR quand le titre est l'article (sinon le titre le dit déjà), puis le n°.
+  const ligne3 = [titreSansArticle ? '' : nomAffiche, suLigne ? `n° ${suLigne}` : ''].filter(Boolean).join(' · ');
   const ouvrirQr = qrDe ? qrDe(x) : null;
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
@@ -453,7 +456,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
               : <span className="vrm-rpf-code-venir" data-rp-code-a-venir="">{x.horsCompte ? 'Code pas lu' : 'Code à venir'}</span>)}
           </span>
-          {suLigne ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={suLigne}>n° {suLigne}</span> : <span className="vrm-rpf-suivi-ligne is-vide" data-rp-sans-suivi="" aria-hidden="true">{'\u00a0'}</span>}
+          {ligne3 ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={suLigne || undefined} data-rp-sans-suivi={suLigne ? undefined : ''} data-rp-transp-nom={titreSansArticle ? undefined : nomAffiche || undefined}>{ligne3}</span> : <span className="vrm-rpf-suivi-ligne is-vide" data-rp-sans-suivi="" aria-hidden="true">{'\u00a0'}</span>}
           <span className="vrm-rpf-ligne-delai" data-rp-l4=""><BarreDelai d={dl}/></span>
           {(st || e || x.lieuDeplace || ancien) ? <span className="vrm-rpf-puces">
             {st ? <span className="vrm-rpf-puce is-ambre" data-rp-statut="">{st}</span> : null}
