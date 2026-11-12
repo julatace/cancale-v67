@@ -388,6 +388,8 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
     };
     c.self = c; c.globalThis = c; c.window = undefined;
     vm.createContext(c); vm.runInContext(BG, c, { filename: 'background.js' });
+    // 5.362 (moyenne 78) : la liste noire est celle d'UN compte VRM — une session (inventée).
+    c.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); c.loadSession = c.authToken;
     // Il est bien dans la liste noire — on le VÉRIFIE, on ne le suppose pas.
     const noirs = await c.blockedAccounts();
     dit(!!(noirs && noirs.has(UID)), 'le compte est bien dans la liste des supprimés définitivement',

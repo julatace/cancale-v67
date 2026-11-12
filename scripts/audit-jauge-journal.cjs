@@ -140,7 +140,7 @@ async function controles({ bgSrc, regleSrc, serveurSrc }) {
       if (typeof f.ctx.noterJournal === 'function') await f.ctx.noterJournal(UID, 'reponse', { a: '42', x: 'Camille', texte: 'Bonjour Camille', login: 'acheteuse_camille', auto: 'oui', p: 'beaucoup' });
       const pub = [...lignesDe(f, 'actions_compte_'), ...lignesDe(f, 'journal_vrm_')];
       dit(pub.length >= 2 && !pub.some((r) => PERSO.test(JSON.stringify(r))), 'D1 aucune ligne publiée ne porte un texte de message, un pseudo ou un login', pub.filter((r) => PERSO.test(JSON.stringify(r))).map((r) => r.id).join(',') || pub.length);
-      const CLES_LIGNE_J = ['uid', 'nav', 'v', 'at', 'e'], CLES_LIGNE_A = ['uid', 'nav', 'ts', 'at', 'max', 'reserve', 'v'], CLES_E = ['t', 's', 'a', 'b', 'x', 'p', 'de', 'vers', 'auto'];
+      const CLES_LIGNE_J = ['uid', 'nav', 'v', 'at', 'e'], CLES_LIGNE_A = ['uid', 'nav', 'ts', 'lec', 'at', 'max', 'reserve', 'maxLectures', 'v']   /* 5.362 (moyenne 33) : les lectures de l'heure, des horodatages */, CLES_E = ['t', 's', 'a', 'b', 'x', 'p', 'de', 'vers', 'auto'];
       const lj = lignesDe(f, 'journal_vrm_'), la = lignesDe(f, 'actions_compte_');
       dit(lj.length === 1 && lj.every((r) => Object.keys(r).every((k) => k === 'id' || CLES_LIGNE_J.includes(k))) && la.every((r) => Object.keys(r).every((k) => k === 'id' || CLES_LIGNE_A.includes(k))), 'D2 les lignes publiées n’ont que des clés de la liste blanche', JSON.stringify(lj.map((r) => Object.keys(r))) + JSON.stringify(la.map((r) => Object.keys(r))));
       const e = journal(f);

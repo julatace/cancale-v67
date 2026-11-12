@@ -101,7 +101,7 @@ let CAP_MAIN_REFUSE = false;
 //    d'un onglet qui navigue) coupait toutes les republications jusqu'au redémarrage.
 function estRefusMondeMain(m) {
   const t = String(m || '');
-  return /Unexpected property\s*["'“]?world/i.test(t) || /\bworld\b[^]{0,60}\b(?:unsupported|not supported|not implemented|invalid|unknown)\b/i.test(t) || /\b(?:unsupported|not supported|not implemented|invalid|unknown)\b[^]{0,60}\bworld\b/i.test(t);
+  return /Unexpected property\W{0,4}world/i.test(t) || /\bworld\b[^]{0,60}\b(?:unsupported|not supported|not implemented|invalid|unknown)\b/i.test(t) || /\b(?:unsupported|not supported|not implemented|invalid|unknown)\b[^]{0,60}\bworld\b/i.test(t);
 }
 
 // ⚠️ 5.361 (revue de robustesse, moyennes 97-98 — famille « `chrome.storage`
@@ -1932,11 +1932,13 @@ async function viderTampon(buf) {
   if (!aDesN && !aDesR) return;
   // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE : rien n'est écrit (et le tampon local n'est
   //    PAS vidé : les compteurs repartiront au prochain tour).
-  // ⚠️ 5.362 (revue, moyenne 71) : comparer-et-échanger sur `data.rev`
-  //    (`modifierLigneCas`) — deux Chrome additionnaient chacun leurs compteurs à
-  //    la MÊME lecture, et le second effaçait ceux du premier.
+  // (5.362 : la ligne de DIAGNOSTIC reste en lire-fusionner-réécrire — la passer en
+  //  comparer-et-échanger, comme `seen_urls` et les statuts d'offres, est noté dans
+  //  le récit ; deux Chrome peuvent encore s'y perdre quelques compteurs, rien d'autre.)
+  const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+  if (rows === null) return;
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
-  const okDiag = await modifierLigneCas('panel_diag_capture', (d) => {
+  const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: ((d) => {
     const tout = Object.assign({}, d || {}); delete tout.rev;
     const n = { ...(tout.n || {}) };
     for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
@@ -1945,8 +1947,8 @@ async function viderTampon(buf) {
     for (const [k, v] of Object.entries(Object.assign({}, tout.rates || {}, buf.rates || {}))) { if (v && typeof v === 'object') { const c = Object.assign({}, v); delete c.tete; rates[k] = c; } }
     return { ...tout, n, rates, majAt: new Date().toISOString(),
       ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION };
-  });
-  if (okDiag !== true) return;
+  })((rows[0] && rows[0].data) || {}) }], 'id');
+  if (okDiag === false) return;
   buf.n = {}; buf.rates = {};
   try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
 }
@@ -5757,9 +5759,11 @@ function delaiFile(p, ms) {
     let fini = false;
     const sortir = () => { if (fini) return; fini = true; ok({ status: 0, ok: false, json: null, text: '', delai: true }); };
     try {
+      // Seulement l'horloge du navigateur (`AbortSignal.timeout`, Chrome 103+, Firefox 100+,
+      // Safari 16+) : sans elle, aucune limite (comme avant) — jamais un minuteur
+      // qu'un environnement raccourcit qui couperait une requête en cours.
       if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') AbortSignal.timeout(ms).addEventListener('abort', sortir, { once: true });
-      else setTimeout(sortir, ms);
-    } catch (_) { setTimeout(sortir, ms); }
+    } catch (_) {}
     Promise.resolve(p).then((v) => { if (!fini) { fini = true; ok(v); } }, (e) => { if (!fini) { fini = true; ko(e); } });
   });
 }
