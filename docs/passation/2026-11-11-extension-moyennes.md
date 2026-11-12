@@ -78,9 +78,12 @@ Remis à la règle : `audit-fusion` (PATCH conditionnel), `audit-jauge-journal` 
 `maxLectures`), `audit-endpoints-vus` (une session pour la liste noire), `audit-diagnostic`
 (échantillon gardé sans `tete`), `audit-lbc-plus-vue-pause`, `audit-lbc-supprimer` (port de banc pour le canal
 privé, le compte attendu dans l'ordre, un ordre posté par la page ne part plus), `audit-lbc-repondre`
-(le banc prend le port du canal, 31 verts). ⚠️ Bancs non relancés : `scripts/bancs/lbc-repondre.cjs`
-(ordres par `window`) et `scripts/bancs/carte-orion-sans-onglet.cjs` (la carte dessinée ne propose
-plus le mot de passe) — à remettre à la règle.
+(le banc prend le port du canal, 31 verts). Bancs remis à la règle (12 nov.) :
+`scripts/bancs/carte-orion-sans-onglet.cjs` juge que la carte DESSINÉE (Orion, repli du cadre muet) ne
+propose aucun mot de passe et connecte par code (70 verts ; 3 rouges sur la branche de départ et par
+mutation `MDP_PERMIS = true`) ; `scripts/bancs/lbc-repondre.cjs` est vert tel quel (31) : il juge l'app ⇄
+le pont `__vmr` de vrm.center, que 5.362 ne change pas — le canal privé de leboncoin.fr est jugé par
+`audit-lbc-repondre` (en-tête du banc l'explique).
 
 ## Geste de Julien
 
