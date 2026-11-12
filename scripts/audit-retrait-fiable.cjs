@@ -242,6 +242,12 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     dit(LL('TABAC A | 35000 RENNES | TABAC B | 56000 VANNES') === null, 'repli : deux codes postaux ⇒ rien (on ne choisit pas)');
     const SCx = await importer('api/_lib/suivi-colis.js');
     const r = SCx.relireLigneSuivi({ status: 'available', code: '123456', extraitLieu: 'CHEZ TEST 12 RUE BASSE 35000 RENNES | Prière de ne pas répondre à ce message.' });
+    // (12 nov., mesuré en production) Chronopost Pickup : l'extrait propre suivi du pied d'e-mail (siège, Pickup Services).
+    const pk = SCx.relireLigneSuivi({ status: 'available', code: '111222', subject: 'Votre colis VINTED est arrivé en relais Pickup', extraitLieu: 'EPICERIE TEST ACCUEIL | RUE DE LA FENETRE | 35000 RENNES | Prière de ne pas répondre à ce message. | Chronopost SAS capital de 1 €, 3 Boulevard Test 75014 Paris - RCS Paris 1 | PICKUP SERVICES, société par actions simplifiée, dont le siège social est situé 1 rue Test – 93400 Saint-Ouen' });
+    dit(pk.lieu === 'EPICERIE TEST ACCUEIL, RUE DE LA FENETRE, 35000 RENNES' && pk.status === 'available' && pk.code === '111222', 'Chronopost Pickup déjà rangé (lieu vide) : le point relu À L’AFFICHAGE, sans migration ; code gardé', JSON.stringify({ l: pk.lieu, s: pk.status }));
+    // « Où vous livrer en cas de point indisponible ? » (Mondial Relay) : envoyé AVANT l'arrivée ⇒ en route, jamais « à retirer ».
+    const ou = SCx.relireLigneSuivi({ status: 'available', subject: 'Où vous livrer en cas de point indisponible ?', suivi: '80000099', extraitLieu: "vos données | <https://exemple.test> | MONDIAL RELAY, 1 avenue de l'horizon, 59650 VILLENEUVE D'ASCQ" });
+    dit(ou.status === 'transit' && !ou.lieu, '« Où vous livrer en cas de point indisponible ? » ⇒ en route (plus dans « Lieu à confirmer »), jamais le siège comme point', JSON.stringify({ s: ou.status, l: ou.lieu }));
     dit(r.lieu === 'CHEZ TEST 12 RUE BASSE 35000 RENNES' && r.lieuBrut === true, 'relecture partagée (app, widget, rappel) : le repli devient le lieu, marqué `lieuBrut`', JSON.stringify({ lieu: r.lieu, brut: r.lieuBrut }));
   });
 
