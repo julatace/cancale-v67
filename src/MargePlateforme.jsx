@@ -10,13 +10,14 @@
 import React, { useMemo } from 'react';
 import { margeParPlateforme, texteMarge, sitesMontres, sitesLusDeLignes } from './margePlateforme.js';
 import './styles-marge-plateforme.css';
+import { motsVendeur } from './profilVendeur.js';
 
 const NOM = { Vinted: 'Vinted', Leboncoin: 'Leboncoin', eBay: 'eBay', Vestiaire: 'Vestiaire Co' };
 
 // liveStats : la coque (vendu) ; releve : les lignes du relevé DÉJÀ bornées à la
 // période (null = pas publié) ; de, a : la période ; onSaisirPrix : la porte de saisie.
 // (11 nov., C11) `lireLignesSites()` → Promise des lignes (id + premier élément), ou null (pas lu).
-export default function MargePlateforme({ liveStats, releve = null, de, a, onSaisirPrix = null, lireLignesSites = null }) {
+export default function MargePlateforme({ sansCompte = false, liveStats, releve = null, de, a, onSaisirPrix = null, lireLignesSites = null }) {
   const [lus, setLus] = React.useState(undefined);   // undefined en cours · null pas su · { plat: bool }
   React.useEffect(() => {
     if (typeof lireLignesSites !== 'function') { setLus(null); return undefined; }
@@ -34,7 +35,7 @@ export default function MargePlateforme({ liveStats, releve = null, de, a, onSai
   const sansAchat = R.plateformes.reduce((s, p) => s + (p.etat === 'lu' ? p.nSansAchat : 0), 0);
   return (
     <section className="vrm-sv-carte vrm-mp-carte" data-stats-carte="marge-plateforme" data-mp-etat={R.etat} data-mp-releve={R.releveLu ? '1' : '0'} data-mp-caches={R.plateformes.filter((p) => !montres.has(p.plat)).map((p) => p.plat).join(',')}>
-      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">Marge par plateforme</h2><span className="vrm-sv-note">bénéfice par paire</span></div>
+      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">Marge par plateforme</h2><span className="vrm-sv-note">bénéfice par {motsVendeur().nom}</span></div>
       <ol className="vrm-mp-liste">
         {lignes.map((p) => {
           const t = texteMarge(p);
@@ -53,7 +54,7 @@ export default function MargePlateforme({ liveStats, releve = null, de, a, onSai
                 {p.etat === 'lu' ? (
                   <span className="vrm-mp-chiffres">{t.ventes} · {t.vendu} vendu{p.total != null ? <> · {t.total} en tout</> : null}</span>
                 ) : null}
-                <span className="vrm-mp-sur" data-mp-raison={p.etat !== 'lu' ? (p.raison || p.etat) : undefined}>{t.sur}</span>
+                <span className="vrm-mp-sur" data-mp-raison={p.etat !== 'lu' ? (p.raison || p.etat) : undefined}>{sansCompte && p.etat === 'encours' ? 'aucun compte relié' : t.sur}</span>
               </>)}
               {t.manques && t.manques.length ? <span className="vrm-mp-manque">{t.manques.join(' · ')}</span> : null}
             </li>

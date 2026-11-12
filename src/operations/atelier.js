@@ -19,6 +19,7 @@
 // exécutent les MÊMES fonctions (§11).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { motsVendeur } from '../profilVendeur.js';
 export const ETAPES_DEFAUT = Object.freeze([
   { id: 'recue', nom: 'Reçue' },
   { id: 'nettoyee', nom: 'Nettoyée' },
@@ -89,8 +90,8 @@ export function ligneAtelierJournee(resume) {
   if (!resume || !(resume.enRetard > 0)) return null;
   const n = resume.enRetard, lourdes = resume.etapes.filter((e) => e.enRetard > 0);
   const court = lourdes.length === 1
-    ? `${n} paire${n > 1 ? 's' : ''} à « ${lourdes[0].nom} » depuis plus de ${ATTENTE_JOURS} j`
-    : `${n} paires bloquées à l’atelier depuis plus de ${ATTENTE_JOURS} j`;
+    ? `${n} ${n > 1 ? motsVendeur().noms : motsVendeur().nom} à « ${lourdes[0].nom} » depuis plus de ${ATTENTE_JOURS} j`
+    : `${n} ${motsVendeur().noms} bloqué${motsVendeur().e}s à l’atelier depuis plus de ${ATTENTE_JOURS} j`;
   const detail = lourdes.length > 1 ? lourdes.map((e) => `${e.nom} ${e.enRetard}`).join(' · ') : ''; // une seule étape : la phrase la dit déjà
   return { n, court, detail };
 }

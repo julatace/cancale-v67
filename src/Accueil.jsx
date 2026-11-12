@@ -39,6 +39,9 @@ import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, PRI
 // (9 nov.) Deux offres : Solo (un compte vendeur par plateforme + comptes d'achat) et Pro (les ventes de tous les comptes).
 import { OFFRES } from '../api/_lib/plan-regle.js';
 import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
+// (11 nov., lot temps-gagne) Le calculateur « le temps que VRM te fait gagner » : un morceau à
+// part, demandé à l'approche de sa section (le fichier d'entrée a un budget de poids).
+const TempsGagne = React.lazy(() => import('./accueil/TempsGagne.jsx'));
 // (5 nov.) Les navigateurs où l'extension SERVIE s'installe : une source, la même
 // que l'app — jamais « Chrome obligatoire ». Module léger.
 import { navigateursServis, NAVS_ORDINATEUR_TEXTE as NAVS_ORDI } from './navigateursServis.js';
@@ -175,6 +178,8 @@ const CSS = `
 .av-moment li{position:relative;padding-left:20px;font-size:16px;color:var(--gris);line-height:1.45}
 .av-moment li:before{content:"";position:absolute;left:2px;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--gris)}
 .av-moment .av-tel-seul{display:none}
+.av-temps{padding:120px 0 0}
+.av-temps-attente{min-height:560px}
 .av-bande{background:var(--fond2);padding:128px 0;margin-top:120px}
 .av-deux{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:96px;align-items:start}
 .av-bande p{font-size:17px;line-height:1.55;margin-top:16px;max-width:34em}
@@ -254,7 +259,7 @@ const CSS = `
   .av-journee{padding-top:104px}
   .av-moment p{font-size:17px}
   .av-bande{padding:88px 0;margin-top:96px}
-  .av-prix,.av-faq{padding-top:104px}
+  .av-prix,.av-faq,.av-temps{padding-top:104px}
   .av-offres{grid-template-columns:1fr;gap:16px;margin-top:40px}
   .av-offre{padding:32px 24px;border-radius:24px}
   .av-faq-texte{columns:1}
@@ -318,6 +323,17 @@ export default function Accueil({ onEntrer }) {
       document.querySelectorAll('[data-moment]').forEach((m) => io.observe(m));
     } catch (_) {}
     return () => { try { io && io.disconnect(); } catch (_) {} try { io2 && io2.disconnect(); } catch (_) {} };
+  }, []);
+
+  // Le calculateur ne se télécharge qu'à l'approche de sa section (sans observateur : tout de suite).
+  const [tempsPret, setTempsPret] = React.useState(false);
+  React.useEffect(() => {
+    let io = null;
+    try {
+      io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setTempsPret(true); io.disconnect(); } }, { rootMargin: '0px 0px 60% 0px' });
+      const t = document.getElementById('temps'); if (t) io.observe(t);
+    } catch (_) { setTempsPret(true); }
+    return () => { try { io && io.disconnect(); } catch (_) {} };
   }, []);
 
   // Apparition au défilement — seulement si le mouvement est permis ET qu'un
@@ -434,6 +450,20 @@ export default function Accueil({ onEntrer }) {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* (11 nov., lot temps-gagne) Une ESTIMATION à partir des chiffres du visiteur, geste
+            par geste — jamais un résultat de client (src/accueil/tempsGagne.js). */}
+        <section className="av-temps" id="temps" data-section="temps">
+          <div className="av-in">
+            <div className="av-journee-tete" data-reveil="">
+              <h2 className="av-h2">{tr('accueil.temps.titre')}</h2>
+              <p className="av-chapo">{tr('accueil.temps.chapo')}</p>
+            </div>
+            <React.Suspense fallback={<div className="av-temps-attente" />}>
+              {tempsPret ? <TempsGagne /> : <div className="av-temps-attente" />}
+            </React.Suspense>
           </div>
         </section>
 

@@ -93,3 +93,7 @@ Le vrai levier est `capterDatesVersement` (background.js), pas le relevé :
 
 Geste de Julien : **ouvrir vinted.fr connecté sur le grand compte** (l'onglet ouvert suffit : les
 dates arrivent quelques-unes à chaque visite) ; rien d'autre.
+
+
+## Ligne de CLAUDE.md §9 (déplacée telle quelle le 11 nov., lot vocabulaire-article, pour rester sous 59 000 octets)
+- **11 nov. · Ventes sans date de versement (lot DJ7)** : mesuré, 1 751 sur UN compte, détail de transaction jamais relu ; relevé : 0 vente datable. « Déclarer » : « N datées ✓ · M sans date », une raison par ligne + geste (« Ouvrir Vinted » par compte, Leboncoin à la main) ; jamais devinée (`src/versementRaisons.js`). `docs/passation/2026-11-11-dates-versement.md`. Geste : ouvrir vinted.fr sur ce compte.

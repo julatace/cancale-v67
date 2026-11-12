@@ -114,7 +114,7 @@ async function rendre(b, { chrome = '111', etroit = false, tel = false, extTel =
   // Un iPhone n'a pas d'extension (aucun pont) ; un téléphone Firefox Android
   // en a une depuis la 5.188 (`extTel`) : il agit alors ICI, comme un ordinateur.
   if (!tel || extTel) await pg.addInitScript(PONT, { chrome, fils: { 301: FIL_A, 402: FIL_B } });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

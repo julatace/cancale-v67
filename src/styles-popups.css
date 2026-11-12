@@ -48,3 +48,6 @@
 /* (10 nov., lot AI) « 1 nouveau N° » seul sur sa ligne : la pastille seule, sans le cadre blanc pleine largeur
    de la ligne d'avis (le cadre ne sert qu'à réunir « Prix d'achat N/M » et « N nouveaux N° »). */
 :root:root body .vrm-ann-avis:has(> .vrm-ann-avis-neufs:only-child) { background: transparent !important; box-shadow: none !important; min-height: 0; }
+/* (11 nov., lot accessibilité) L'initiale de l'avatar est DESSINÉE (data-initiale) : le nom de la
+   pastille contient ainsi tout son texte écrit (WCAG 2.5.3). */
+:root:root body .vrm-etat-pastille .vrm-etat-initiale[data-initiale]::before { content: attr(data-initiale); }

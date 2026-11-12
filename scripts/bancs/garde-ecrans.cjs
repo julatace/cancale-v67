@@ -86,7 +86,7 @@ const aller = async (pg, tel, id) => {
   let b = pg.locator(sel).first();
   if (!(await b.count()) && tel) {
     // Au téléphone, l'écran peut être sous « Plus » (les tuiles au-dessus de la barre).
-    const plus = pg.locator('.vrm-tabbar button[aria-label="Plus"]').first();
+    const plus = pg.locator('.vrm-tabbar button[aria-label^="Plus"]').first();
     if (await plus.count()) { await plus.click(); await pg.waitForTimeout(400); b = pg.locator(`[data-nav-entree="${id}"]:visible`).first(); }
   }
   if (!(await b.count())) return false;

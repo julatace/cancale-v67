@@ -371,12 +371,63 @@
   // y a vues datées ; quand un détail « je suis le vendeur » arrive pour une
   // vente jamais vue datée, on relit ces listes — LECTURE de ses données (§3),
   // 3 au plus, une par une, pas avant 6 h.
+  // ── L'HISTORIQUE LEBONCOIN (11 nov., 5.365) ─────────────────────────────
+  // Le MODÈLE : l'adresse EXACTE d'une liste « Mes transactions » que le site a
+  // lui-même demandée, et qui porte un paramètre de pagination que LEBONCOIN a
+  // mis (`page`, ou `offset` + `limit`). Jamais une adresse devinée, jamais un
+  // paramètre ajouté. L'ORDRE `importpage` (du fond seulement, par lbc-relay.js)
+  // relit UNE page de ce modèle, ou UN détail `v2/pages/transactions/{id}` (la
+  // même adresse que `lireDetails`), au nom du compte privé de CETTE page, par
+  // `origFetch` : la réponse (allégée, bornée) repart au fond, qui la range et
+  // sait si la base l'a prise. Des GET seulement.
+  const LISTE_TX = /^\/api\/consumergoods\/proxy\/v\d+\/pages\/transactions\/?$/i;
+  const DETAIL_TX = /^\/api\/consumergoods\/proxy\/v2\/pages\/transactions\/\d{1,15}$/;
+  const pagineLbc = (u) => { const p = u.searchParams; const n = (k) => p.has(k) && /^\d{1,6}$/.test(p.get(k)); return n('page') || (n('offset') && (n('limit') || n('size') || n('per_page'))); };
+  const modelesLbcVus = new Set();
+  const noterModeleImportLbc = (url) => {
+    try {
+      const u = new URL(url, location.origin);
+      if (u.origin !== 'https://api.leboncoin.fr' || !LISTE_TX.test(u.pathname) || !pagineLbc(u)) return;
+      const moi = moiLbc(); if (!moi) return;
+      const cle = moi + '|' + u.href; if (modelesLbcVus.has(cle)) return; modelesLbcVus.add(cle);
+      post({ kind: 'lbcimportmodele', url: u.href.slice(0, 600), moi });
+    } catch (_) {}
+  };
+  let importLbcEnCours = false;
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'importpage') return;
+    const jeton = String(d.jeton || '');
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'lbcimportresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-leboncoin' });
+    let u; try { u = new URL(String(d.url || '')); } catch (_) { return fin({ statut: 0, erreur: 'adresse' }); }
+    if (u.origin !== 'https://api.leboncoin.fr' || u.username || u.password || !((LISTE_TX.test(u.pathname) && pagineLbc(u)) || (DETAIL_TX.test(u.pathname) && !u.search))) return fin({ statut: 0, erreur: 'adresse' });
+    const moi = moiLbc();
+    if (!moi || String(d.compte || '') !== moi) return fin({ statut: 0, erreur: moi ? 'autre-compte' : 'compte-pas-su' });
+    if (importLbcEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    importLbcEnCours = true;
+    try {
+      let statut = 0, texte = '';
+      try {
+        const res = await origFetch.call(window, u.href, { method: 'GET', credentials: 'include', headers: entetesLbc || { Accept: 'application/json' } });
+        statut = Number(res.status) || 0;
+        if (statut >= 200 && statut < 300) texte = String(await res.text());
+      } catch (_) { return fin({ statut: 0, erreur: 'reseau' }); }
+      if (!(statut >= 200 && statut < 300)) return fin({ statut });
+      const c = allegeVente(texte);
+      if (!c) return fin({ statut, erreur: 'format' });
+      if (new TextEncoder().encode(c).length > VENTE_MAX) return fin({ statut, erreur: 'taille' });
+      fin({ statut, url: u.href, corps: c, session: sessDoc, moi });
+    } finally { importLbcEnCours = false; }
+  }); } catch (_) {}
   const LISTES_CLE = 'vrm_lbc_listes', DATEES_CLE = 'vrm_lbc_datees', RELU_CLE = 'vrm_lbc_listes_relues';
   const lireLS = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (_) { return d; } };
   const ecrireLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
   const noterListe = (url, text) => {
     let arr; try { arr = JSON.parse(text); } catch (_) { return; }
     if (!Array.isArray(arr)) return;
+    noterModeleImportLbc(url);
     const l = lireLS(LISTES_CLE, []).filter((u) => u !== url); l.push(url); ecrireLS(LISTES_CLE, l.slice(-3));
     const d = lireLS(DATEES_CLE, {});
     for (const t of arr) { const id = String((t && ((t.id && t.id.purchase_id) || t.purchase_id)) || ''); if (id && t && typeof t.created_at === 'string' && !isNaN(Date.parse(t.created_at))) d[id] = 1; }

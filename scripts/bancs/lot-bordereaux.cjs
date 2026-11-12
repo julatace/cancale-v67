@@ -75,7 +75,7 @@ const projette = (row, sel) => {
     const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
     await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-    await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+    await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
     if(process.env.VRM_PDFJS_DIR) await pg.route('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/*',route=>{
       const name=route.request().url().split('/').pop();
       return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(process.env.VRM_PDFJS_DIR,name))});

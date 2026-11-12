@@ -237,6 +237,9 @@
     if (!resaDemandee) { resaDemandee = true; resa = await demander({ action: 'numeroPourPublier' }); }
     const b = boutonPublier();
     const deja = document.querySelector('[data-vrm-num-depot]');
+    // (11 nov., 5.353) « Je numérote moi-même » (`raison: 'ecrit'`, 5.324) : VRM ne réserve
+    // rien et n'affiche RIEN à côté du bouton — la pastille « n'a pas pu réserver » mentait.
+    if (resa && resa.raison === 'ecrit') { if (deja) deja.remove(); return; }
     if (deja && b && deja.previousElementSibling === b) return;
     if (deja) deja.remove();
     const texte = resa && resa.ok && resa.numero ? `N°${resa.numero} — écris-le sur le carton` : 'VRM n’a pas pu réserver de numéro : il sera donné dans VRM';
@@ -246,6 +249,81 @@
     if (!(resa && resa.ok)) e.style.borderColor = '#B45309';
     if (b && b.parentElement) { e.style.marginLeft = '10px'; b.insertAdjacentElement('afterend', e); }
     else { e.style.position = 'fixed'; e.style.left = '16px'; e.style.bottom = '16px'; e.style.zIndex = '2147483000'; document.body.appendChild(e); }
+  }
+  // ── AVANT DE PUBLIER : L'ENCART « À VÉRIFIER » (11 nov., lot verif-publication, 5.353) ──
+  // Sur le formulaire de dépôt seulement. La page LIT ce qui est tapé (description,
+  // prix) et le fond rend les alertes (`alertesDepotVinted`, la base VRM seulement —
+  // aucune requête Vinted). Discret, jamais une garde : rien n'est cliqué, le bouton
+  // de Vinted n'est pas touché. « Ne plus me le dire » coupe l'alerte dans CE
+  // navigateur (l'app la coupe partout : Paramètres la rallume).
+  const COUPEES_LOCAL = 'vrmVerifCoupees';
+  const champDescription = () => {
+    const c = document.querySelector('textarea[name="description"], #description, textarea[data-testid*="description"]');
+    if (c) return c;
+    const t = [...document.querySelectorAll('form textarea')];
+    return t.length === 1 ? t[0] : null;   // deux zones de texte : on ne devine pas laquelle
+  };
+  const champPrix = () => document.querySelector('input[name="price"], #price, input[data-testid*="price"]');
+  let verifCle = '', verifVol = false, verifAlertes = [], coupeesLocales = null;
+  async function lireCoupeesLocales() {
+    if (coupeesLocales) return coupeesLocales;
+    try { const v = (await chrome.storage.local.get(COUPEES_LOCAL))[COUPEES_LOCAL]; coupeesLocales = new Set(Array.isArray(v) ? v : []); } catch (_) { coupeesLocales = new Set(); }
+    return coupeesLocales;
+  }
+  async function couperLocale(code) {
+    const c = await lireCoupeesLocales(); c.add(code);
+    try { await chrome.storage.local.set({ [COUPEES_LOCAL]: [...c] }); } catch (_) {}
+    verifAlertes = verifAlertes.filter((a) => a.code !== code); dessinerVerif();
+  }
+  function dessinerVerif() {
+    let h = document.querySelector('[data-vrm-verif-depot]');
+    const vues = verifAlertes.filter((a) => !(coupeesLocales && coupeesLocales.has(a.code)));
+    if (!estDepot() || !vues.length) { if (h) h.remove(); return; }
+    const cle = vues.map((a) => a.code + ':' + a.texte).join('|');
+    if (h && h.getAttribute('data-vrm-verif-cle') === cle) return;
+    if (h) h.remove();
+    h = document.createElement('div');
+    h.setAttribute('data-vrm-verif-depot', String(vues.length));
+    h.setAttribute('data-vrm-verif-cle', cle);
+    h.setAttribute('data-vrm-verif-codes', vues.map((a) => a.code).join(','));
+    h.style.cssText = 'display:block;max-width:360px;margin:10px 0;';
+    const sr = h.attachShadow({ mode: 'closed' });
+    const st = document.createElement('style');
+    st.textContent = ':host{all:initial;display:block}*{box-sizing:border-box;margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}'
+      + '.b{border-radius:14px;background:#F2F2F7;color:#1D1D1F;padding:10px 12px}.t{font-weight:700;font-size:13px;line-height:1.3;margin-bottom:4px}'
+      + '.l{padding:6px 0;border-top:1px solid rgba(60,60,67,.12)}.l:first-of-type{border-top:0}.x{font-weight:600;font-size:13px;line-height:1.35}.p{font-weight:500;font-size:12px;line-height:1.4;color:#6E6E73}'
+      + 'button{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:block;font-weight:600;font-size:12px;line-height:44px;color:#0071E3}button:focus-visible{outline:2px solid #0071E3;border-radius:6px}'
+      + '@media (prefers-color-scheme:dark){.b{background:#1C1C1E;color:#F5F5F7}.p{color:#98989D}button{color:#0A84FF}.l{border-color:rgba(84,84,88,.6)}}';
+    sr.appendChild(st);
+    const b = document.createElement('div'); b.className = 'b';
+    const t = document.createElement('div'); t.className = 't'; t.textContent = `VRM · ${vues.length} point${vues.length > 1 ? 's' : ''} à vérifier (tu peux publier)`; b.appendChild(t);
+    for (const a of vues) {
+      const l = document.createElement('div'); l.className = 'l';
+      const x = document.createElement('div'); x.className = 'x'; x.textContent = a.texte; l.appendChild(x);
+      if (a.pourquoi) { const p = document.createElement('div'); p.className = 'p'; p.textContent = a.pourquoi; l.appendChild(p); }
+      const c = document.createElement('button'); c.type = 'button'; c.textContent = 'Ne plus me le dire'; c.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); couperLocale(a.code); }); l.appendChild(c);
+      b.appendChild(l);
+    }
+    sr.appendChild(b);
+    const bouton = boutonPublier();
+    const ancre = bouton && bouton.parentElement;
+    if (ancre && ancre.parentElement) ancre.insertAdjacentElement('afterend', h);
+    else { h.style.position = 'fixed'; h.style.left = '16px'; h.style.bottom = '56px'; h.style.zIndex = '2147483000'; document.body.appendChild(h); }
+  }
+  async function verifierDepot() {
+    if (!estDepot()) { verifAlertes = []; verifCle = ''; dessinerVerif(); return; }
+    const d = champDescription(), p = champPrix();
+    const description = d ? String(d.value || '') : undefined, prix = p ? String(p.value || '') : undefined;
+    const cle = (description == null ? '∅' : description) + '\u0001' + (prix == null ? '∅' : prix);
+    if (cle === verifCle || verifVol) { dessinerVerif(); return; }
+    verifVol = true;
+    await lireCoupeesLocales();
+    const r = await demander({ action: 'verifDepot', description, prix });
+    verifVol = false;
+    verifCle = cle;
+    // Pas su (fond muet, base injoignable) ⇒ rien : jamais une alerte inventée.
+    verifAlertes = r && r.ok && Array.isArray(r.alertes) ? r.alertes.filter((a) => a && typeof a.code === 'string' && typeof a.texte === 'string') : [];
+    dessinerVerif();
   }
   // Annonces, ventes : les numéros connus pour les liens de la page.
   const connus = { items: {}, convs: {}, txs: {} }, demandes = { items: new Set(), convs: new Set(), txs: new Set() };
@@ -296,11 +374,11 @@
       if (a.querySelector('img') || pa === 'absolute' || pa === 'fixed' || a.getBoundingClientRect().height > 80) {
         const c = carteDe(a);
         if (c !== a && c.querySelector('[data-vrm-num-pour="' + cle + '"]')) continue;   // déjà posée sur la carte
-        const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+        const e = pilule(`N°${n}`, `Numéro VRM de ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'}`);
         e.setAttribute('data-vrm-num-pour', cle);
         epingler(e, a); c.appendChild(e);
       } else {
-        const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+        const e = pilule(`N°${n}`, `Numéro VRM de ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'}`);
         e.style.setProperty('margin-left', '6px', 'important'); e.style.setProperty('vertical-align', 'middle', 'important');
         a.appendChild(e);
       }
@@ -315,7 +393,7 @@
     if (!n) { if (deja) deja.remove(); return; }
     if (deja && deja.getAttribute('data-vrm-num-page') === String(n)) return;
     if (deja) deja.remove();
-    const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+    const e = pilule(`N°${n}`, `Numéro VRM de ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'}`);
     e.setAttribute('data-vrm-num-page', String(n));
     const h1 = document.querySelector('h1');
     if (h1 && !conv) { e.style.marginLeft = '8px'; e.style.verticalAlign = 'middle'; h1.appendChild(e); }
@@ -328,5 +406,6 @@
     if (!vivant()) return;
     if (location.pathname !== dernierChemin) { dernierChemin = location.pathname; resaDemandee = estDepot() ? resaDemandee : false; }
     try { await poserNumeroDepot(); await completer(); poserSurLiens(); poserSurPage(); } catch (_) {}
+    try { await verifierDepot(); } catch (_) {}
   }, 1200);
 })();

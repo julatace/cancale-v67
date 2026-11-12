@@ -109,7 +109,14 @@ async function verifier(racine, { muet = false } = {}) {
   dit(G.affichageRecommande({ proprietaire: false, nComptesVinted: 1, nVentes30j: 12 }) === 'simple' && G.affichageRecommande({ proprietaire: false, nComptesVinted: 1, nVentes30j: 30 }) === 'complet' && G.affichageRecommande({ proprietaire: false, nComptesVinted: 2, nVentes30j: 3 }) === 'complet' && G.affichageRecommande({ proprietaire: false, nComptesVinted: 1, nVentes30j: null }) === null, 'A2 « recommandé pour toi » = la règle existante (1 compte et < 30 ventes / 30 j ⇒ Simple) ; pas su ⇒ aucune recommandation');
   const reg = fs.readFileSync(path.join(racine, 'src', 'ecrans', 'Reglages.jsx'), 'utf8');
   // (11 nov., lot DJ2) « Tu pourras changer dans Paramètres » : l'écran s'appelle Paramètres (barre du bas).
-  dit(G.CHEMIN_REGLAGE_AFFICHAGE === 'Paramètres → Affichage' && /\{ id:'affichage', titre:'Affichage'/.test(reg) && /id:'affichage-mode'[^\n]*lib:'Affichage'/.test(reg), 'A3 le chemin dit existe (Paramètres, groupe « Affichage »)');
+  // (11 nov., traduction) Les libellés de Paramètres passent par tr() : le texte se juge dans le
+  // français (src/i18n/langues/fr.js, la source), par la clé que Reglages.jsx pose.
+  const frTxt = fs.readFileSync(path.join(racine, 'src', 'i18n', 'langues', 'fr.js'), 'utf8');
+  const frDe = (cle) => { const m = new RegExp('"' + cle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '":\\s*"([^"]*)"').exec(frTxt); return m ? m[1] : null; };
+  const libDe = (re) => { const m = re.exec(reg); if (!m) return null; return m[1] != null ? m[1] : frDe(m[2]); };
+  const titreGroupe = libDe(/\{ id:'affichage', titre:(?:'([^']*)'|tr\('([^']+)'\))/);
+  const libMode = libDe(/id:'affichage-mode'[^\n]*?lib:(?:'([^']*)'|tr\('([^']+)'\))/);
+  dit(G.CHEMIN_REGLAGE_AFFICHAGE === 'Paramètres → ' + titreGroupe && titreGroupe === 'Affichage' && libMode === 'Affichage', 'A3 le chemin dit existe (Paramètres, groupe « Affichage »)');
 
   // ── T : les textes ──
   const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*\/\//.test(l)).map((l) => l.replace(/\s\/\/\s.*$/, '')).join('\n');

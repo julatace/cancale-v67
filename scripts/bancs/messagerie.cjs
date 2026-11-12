@@ -216,7 +216,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
   await pg.exposeFunction('__exec', (s) => execs.push(JSON.parse(s)));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '444': { numero: '7', min: '40' }, '555': { numero: '12' } })); } catch (_) {} });
   await pg.addInitScript(PONT, { version, filExt: FIL_EXT, fils: { 301: FIL_OFFRE, 303: FIL_VENTE, 402: FIL_EXT, ...filsEnPlus } });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -605,7 +605,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const point = () => r.pg.evaluate(() => document.querySelectorAll('.vrm-mobile-nav [data-badge-nav="plus"][data-badge-n="point"]').length);
       await r.pg.click('.vrm-mobile-nav [data-nav-entree="ventes"]'); await r.pg.waitForTimeout(1500);
       const avant = await point();
-      await r.pg.click('.vrm-mobile-nav button[aria-label="Plus"]'); await r.pg.waitForTimeout(500);
+      await r.pg.click('.vrm-mobile-nav button[aria-label^="Plus"]'); await r.pg.waitForTimeout(500);
       await r.pg.click('.vrm-sheet [data-nav-entree="messages"]'); await r.pg.waitForTimeout(900);
       for (const id of ['301', '402']) {
         if (!(await r.pg.$(`[data-conv="${id}"]`))) continue;

@@ -30,6 +30,7 @@
 //  scripts/audit-meilleures-sources.cjs.
 // ════════════════════════════════════════════════════════════════════════════
 import { sourceSaisie, horsParNumero } from './sourceAchats.js';
+import { motsVendeur } from './profilVendeur.js';
 
 const J = 86400000;
 const str = (v) => String(v == null ? '' : v).trim();
@@ -119,7 +120,7 @@ export function bilanSources({ achatsVinted = null, estAnnule = null, montantVin
   }
   for (const [id, a] of Object.entries(reg.achats)) {
     const p = reg.personnes[a.fournisseur]; if (!p) continue;
-    ajouterAchat({ genre: 'gros', id: str(id), titre: `Achat en gros · ${a.paires} paire${a.paires > 1 ? 's' : ''}`, ts: msDate(a.date),
+    ajouterAchat({ genre: 'gros', id: str(id), titre: `Achat en gros · ${a.paires} ${a.paires > 1 ? motsVendeur().noms : motsVendeur().nom}`, ts: msDate(a.date),
       investi: Number.isSafeInteger(a.total) ? a.total + (a.frais || 0) : null, articles: a.paires, ventes: [] },
     { cle: 'fournisseur:' + a.fournisseur, libelle: p.nom, genre: 'Fournisseur' });
   }

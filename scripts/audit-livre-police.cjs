@@ -81,6 +81,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX);
     fs.writeFileSync(path.join(dir, 'registres.js'), REG);
+    fs.copyFileSync(path.join(__dirname, '..', 'src', 'profilVendeur.js'), path.join(dir, 'profilVendeur.js'));   // (lot vocabulaire-article) le mot du vendeur, importé par la règle
     fs.writeFileSync(path.join(dir, 'livrePolice.js'), MOD.replace("await import('pdf-lib')", `await import('${'file://' + path.join(R0, 'node_modules', 'pdf-lib', 'cjs', 'index.js').replace(/\\/g, '/')}')`));
     RG = await import('file://' + path.join(dir, 'registres.js'));
     P = await import('file://' + path.join(dir, 'livrePolice.js'));

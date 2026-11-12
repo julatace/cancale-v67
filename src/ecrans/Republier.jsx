@@ -1,12 +1,17 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { problemesLot } from '../verifAnnonce.js';
+import { motsVendeur } from '../profilVendeur.js';
+const CLES_VERIF_NEUVES = ['numeroLu', 'numeroEcrit', 'ou', 'dejaEnLigne', 'dejaEnLigneOu'];
+const pickVerif = (v) => { const o = {}; if (v && typeof v === 'object') for (const k of CLES_VERIF_NEUVES) if (v[k] !== undefined) o[k] = v[k]; return o; };
 import { centimes } from '../beneficePaire.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
 import { PhotoVide } from '../composants/PhotoVide.jsx';
 import JaugeActions from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h du compte
+import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la file
+import { EncartPhotosAutresComptes } from '../PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
@@ -502,7 +507,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
               <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.muted }}>{q.esp.type === 'variable' ? 'de' : ''}<input data-file-esp-min value={q.esp.min} onChange={ev => setQ(p => ({ ...p, esp: { ...p.esp, min: fileClamp(ev.target.value) } }))} inputMode="numeric" style={{ ...champ, width: 70 }} />s</label>
               {q.esp.type === 'variable' && <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.muted }}>à<input data-file-esp-max value={q.esp.max} onChange={ev => setQ(p => ({ ...p, esp: { ...p.esp, max: fileClamp(ev.target.value) } }))} inputMode="numeric" style={{ ...champ, width: 70 }} />s</label>}
             </div>
-            <div style={{ fontSize: 11, color: C.muted }}>{FILE_ESP_MAX / 60} min au plus. Une paire vendue ou incomplète entre-temps est sautée.</div>
+            <div style={{ fontSize: 11, color: C.muted }}>{FILE_ESP_MAX / 60} min au plus. {motsVendeur().Un} vendu{motsVendeur().e} ou incomplet{motsVendeur().e} entre-temps est sauté{motsVendeur().e}.</div>
           </div>
           {/* ── mode RÉEL : publier pour de vrai (baisser le prix sur Vinted) ── */}
           {typeof publier === 'function' && q.mode === 'idle' && (
@@ -734,13 +739,28 @@ function texteSecoursPhotos(p) {
 }
 function texteSecoursTaille(p) {
   if (p && p.envoye) return `Vinted a refusé la taille : VRM a retrouvé la taille « ${p.taille || '?'} » dans la grille de Vinted — nouvel essai`;
-  return 'Vinted a refusé la taille : VRM cherche la taille de la paire dans la grille de Vinted';
+  return `Vinted a refusé la taille : VRM cherche la taille ${motsVendeur().de} dans la grille de Vinted`;
 }
 // (29 oct.) Le résultat d'une mise en ligne planifiée, lu comme celui d'une paire faite d'un trait.
 function etatDeFinRepub(fin) {
   const f = fin || {};
   const etat = f.accepte && ['fait', 'double', 'incertain'].includes(f.etape) ? f.etape : (f.accepte && f.refaire) ? 'a-refaire' : 'echec';
   return { etat, raison: f.raison || (etat === 'echec' ? "la mise en ligne planifiée n'a pas abouti" : ''), nouveau: f.nouveau };
+}
+// (11 nov., lot suivi-travail) Le résultat d'une paire (rendu par l'extension) dit dans la feuille,
+// avec le geste à faire. « Double » et « incertain » ne sont jamais « réussie » : à regarder.
+function issueSuivi(s0) {
+  const r = s0 && s0.raison ? String(s0.raison) : '';
+  switch (s0 && s0.etat) {
+    case 'fait': return { etat: 'ok' };
+    case 'double': return { etat: 'main', raison: r || 'peut-être en double sur Vinted', geste: 'Regarde ton dressing Vinted et supprime le doublon s’il y en a un' };
+    case 'incertain': return { etat: 'main', raison: r || 'Vinted n’a pas répondu clairement', geste: 'Regarde ton dressing Vinted avant de relancer' };
+    case 'a-refaire': return { etat: 'refus', raison: r || 'brouillon pas créé', geste: 'Refais le brouillon depuis sa ligne dans Republier' };
+    default:
+      if (s0 && s0.code === 'plus-dans-la-liste') return { etat: 'saute', raison: r };
+      if (s0 && s0.question) return { etat: 'refus', raison: r || 'il manque une information', geste: 'Réponds à la question sur sa ligne dans Republier' };
+      return { etat: 'refus', raison: r || 'pas faite', geste: s0 && (s0.code === 'vinted-pause' || s0.code === 'frein-refus') ? 'Attends la fin de la pause de Vinted, puis relance' : s0 && s0.code === 'plafond' ? 'Attends que la jauge des 50 actions/heure redescende' : '' };
+  }
 }
 function majProgRepub(p, d) {
   const id = String(d.id); const cur = p[id] || {};
@@ -953,7 +973,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
   const section = (k, enfants) => { const i = ETAPES_MAIN.findIndex((x) => x.k === k); return <section className="vrm-rm-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-rm-t-${k}`}><h3 className="vrm-rm-titre" id={`vrm-rm-t-${k}`}>{i + 1}. {ETAPES_MAIN[i].t}</h3>{enfants}</section>; };
   return (
     <SheetShell onClose={onClose} maxWidth={600} className="vrm-rm-feuille" titre={paire.annulee ? 'Remettre en vente' : 'Republier à la main'}
-      sousTitre={rang ? `Paire ${rang.i + 1}/${rang.n}` : undefined}
+      sousTitre={rang ? `${motsVendeur().Nom} ${rang.i + 1}/${rang.n}` : undefined}
       data-repub-main={paire.id} data-repub-main-etat={etatSuivi} data-main-etape={etape} data-main-rang={rang ? `${rang.i + 1}/${rang.n}` : undefined}>
       {/* La paire : son N°, son titre, son compte — une fois, en tête. */}
       <div className="vrm-rm-paire">
@@ -979,7 +999,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
 
       {section('reglages', <>
         <div className="vrm-rm-memes" data-main-memes-reglages={resumeGardes(regs).join(' · ')}>
-          <b>Mêmes réglages que Republier.</b> Prix et titre repartent de « Garder ». <Pourquoi>La retouche des photos et la lettre valent aussi quand VRM republie pour toi, et l’inverse, sur tous tes appareils. Le prix et le titre repartent de « Garder » à chaque ouverture{rang ? ' (ils valent pour toutes les paires de cette série)' : ''}.</Pourquoi>
+          <b>Mêmes réglages que Republier.</b> Prix et titre repartent de « Garder ». <Pourquoi>La retouche des photos et la lettre valent aussi quand VRM republie pour toi, et l’inverse, sur tous tes appareils. Le prix et le titre repartent de « Garder » à chaque ouverture{rang ? ` (ils valent pour ${motsVendeur().toutes} les ${motsVendeur().noms} de cette série)` : ''}.</Pourquoi>
         </div>
         <div className="vrm-rm-bloc" data-main-bloc="photos">
           <div className="vrm-rm-bloc-tete"><b>Photos</b><span>{regNeutre ? 'telles quelles' : 'retouchées'} · vaut pour toutes</span></div>
@@ -1036,7 +1056,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
           <div className="vrm-rm-muet" data-main-etiquette={ann.etiquette.pose ? ann.etiquette.place : (ann.etiquette.refus ? 'refus' : 'aucune')}>
             {etq.place === 'aucune' ? 'Le N° n’est pas écrit dans l’annonce (Paramètres → Numéros).'
               : ann.etiquette.pose ? <>Le N° « {ann.etiquette.texte} » est posé {placeN.ou} (Paramètres → Numéros).</>
-              : ann.etiquette.refus === 'pas de numéro' ? 'Cette paire n’a pas de N° à écrire dans l’annonce.'
+              : ann.etiquette.refus === 'pas de numéro' ? `${motsVendeur().Ce} n’a pas de N° à écrire dans l’annonce.`
               : <span className="vrm-rm-ambre">N° pas posé : {ann.etiquette.refus}.</span>}
           </div>
         </div>
@@ -1099,7 +1119,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
 
       {section('relier', <>
         {paire.numero && etatSuivi !== 'fait' ? <p className="vrm-rm-muet" data-main-but="">Le N°{paire.numero} passera sur la nouvelle annonce : le même rangement.</p> : null}
-        {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire là où l’article est rangé.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
+        {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire là où l’article est rangé.` : `${motsVendeur().Nom} pas relié${motsVendeur().e} : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.`}</div> : null}
         {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
           : !paire.numero && !paire.annulee ? <div className="vrm-rm-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
           : etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> La nouvelle annonce porte le N°{paire.numero}.</div>
@@ -1124,7 +1144,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
       <div className="vrm-rm-pied">
         {iE > 0 ? <Bouton variante="discret" data-main-retour="" onClick={() => aller(ETAPES_MAIN[iE - 1].k)}>Retour</Bouton> : <span/>}
         {suivante ? <Bouton variante={suivante.k === 'relier' ? 'secondaire' : 'primaire'} data-main-suivant={suivante.k} onClick={() => aller(suivante.k)}>{`Suivant : ${suivante.l}`}</Bouton>
-          : !derniere && onSuivante ? <Bouton variante="primaire" data-main-suivante={`${rang.i + 2}/${rang.n}`} onClick={() => onSuivante({ prix: regs.prix, titre: regs.titre })}>{`Paire suivante · ${rang.i + 2}/${rang.n}`}</Bouton>
+          : !derniere && onSuivante ? <Bouton variante="primaire" data-main-suivante={`${rang.i + 2}/${rang.n}`} onClick={() => onSuivante({ prix: regs.prix, titre: regs.titre })}>{`${motsVendeur().Nom} suivant${motsVendeur().e} · ${rang.i + 2}/${rang.n}`}</Bouton>
           : <Bouton variante={fait.relier ? 'primaire' : 'secondaire'} data-main-terminer="" onClick={onClose}>{fait.relier ? 'Terminer' : 'Fermer'}</Bouton>}
       </div>
     </SheetShell>
@@ -1446,14 +1466,37 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // seule une paire pas commencée qui a quitté la liste vivante (vendue, retirée)
   // est sautée, et c'est dit sur sa ligne.
   const [figee, setFigee] = useState(null);
+  // (11 nov., lot suivi-travail) Le pilote de la feuille « VRM travaille » (src/suiviTravail.js).
+  const suiviRef = React.useRef(null);
+  const arretJusquaRef = React.useRef(0);
+  arretJusquaRef.current = arretJusqua;
   const aFaire = mode !== 'idle' && figee ? figee : aFaireCalc;
   // (3 nov.) Vérifier avant de republier (`src/verifAnnonce.js`) : le titre et le
   // prix qui PARTIRONT (l'aperçu), les photos, la taille et la marque lues.
   const lancerFile = async () => {
     const lot = aFaireCalc.map((a) => { const x = action === 'enLigne' ? {} : apercu(a); return { numero: a.numero, titre: x.titre || a.titre, prix: x.prix != null ? x.prix : a.prix, achat: a.floor,
-      ...(a.nPhotos != null ? { nPhotos: a.nPhotos } : {}), ...(a.taille !== undefined ? { taille: a.taille, famille: a.famille || '' } : {}), ...(a.marque !== undefined ? { marque: a.marque } : {}) }; });
+      ...(a.nPhotos != null ? { nPhotos: a.nPhotos } : {}), ...(a.taille !== undefined ? { taille: a.taille, famille: a.famille || '' } : {}), ...(a.marque !== undefined ? { marque: a.marque } : {}),
+      // (11 nov., lot verif-publication) Le N° écrit (la lecture de la description qui
+      // repart, la lettre du bas sautée) et « déjà en ligne sur ce compte » (une AUTRE
+      // annonce, même N°), tels que l'écran Annonces les a lus ; absents ⇒ rien jugé.
+      ...pickVerif(a.verif) }; });
     if (!(await verifierAvantPublication(problemesLot(lot, 'vinted'), { site: 'vinted' }))) return;
     setFigee(aFaireCalc.map((a) => ({ ...a }))); setMode('run');
+    // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL de tout ce que VRM fait et une BARRE ») La
+    // feuille « VRM travaille » suit la file : ses deux gestes reviennent ici (pause, arrêt, reprise).
+    // La dernière étape n'est cochée que sur le « fait » rendu par l'extension (Vinted a accepté) — jamais supposée.
+    const etapesSuivi = [...listeEtapesSuivi(), ['accepte', 'Acceptée par Vinted ✓']];
+    suiviRef.current = suivi.demarrer({ sorte: `republier-${action}`, titre: A.titre, etapes: etapesSuivi, uid: compteUid,
+      articles: aFaireCalc.map((a) => ({ id: a.id, num: a.numero || '', titre: a.titre || '' })),
+      surGeste: (quoi) => {
+        if (quoi === 'pause') setMode((m) => (m === 'run' ? 'pause' : m));
+        else if (quoi === 'arret') setMode('fini');
+        else if (quoi === 'reprendre') {
+          const t = suiviRef.current; const reste = arretJusquaRef.current - Date.now();
+          if (reste > 0) { if (t) { t.noter(`Vinted demande d’attendre : reprise possible dans ${Math.ceil(reste / 60000)} min`, null, 'pause'); t.pause({ jusqua: arretJusquaRef.current, raison: 'Vinted demande d’attendre' }); t.terminer('', 'pause'); } return; }
+          setMode('run');
+        }
+      } });
   };
   // La paire suivante, dont le bloc d'avancée dit le temps : sa ligne ne le redit pas (§7).
   const idAnnoncee = mode === 'run' ? ((aFaire.find((a) => !st[a.id]) || {}).id || null) : null;
@@ -1515,6 +1558,32 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     }, delai * 1000);
     return () => { annule = true; clearTimeout(t); setProchaine(null); };
   }, [mode, st, esp, espMode, espMin, espMax, plan]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // (11 nov., lot suivi-travail) La feuille suit ce que l'ÉCRAN sait (st : résultat rendu par
+  // l'extension ; prog : ses étapes annoncées ; prochaine : l'attente tirée avant de lancer).
+  // Rien n'y est déduit : une annonce n'est « réussie » que si l'extension l'a dit.
+  React.useEffect(() => {
+    const t = suiviRef.current; if (!t || !t.etat()) return;
+    for (const a of (figee || [])) {
+      const s0 = st[a.id]; if (!s0) continue;
+      const p0 = prog[String(a.id)] || {};
+      if (s0.etat === 'encours') {
+        t.debut(a.id);
+        if (p0.etape) t.etape(a.id, p0.etape, p0.etape === 'photos' && p0.total > 0 ? `photo ${Math.min(p0.fait + 1, p0.total)} sur ${p0.total}` : '');
+        if (p0.pause && p0.pause.jusqua > Date.now()) t.pause({ jusqua: p0.pause.jusqua, raison: `Pause au hasard ${PAUSE_NOM[p0.pause.quoi] || ''}`.trim() });
+      } else if (s0.etat === 'planifiee') {
+        t.debut(a.id);
+        t.etape(a.id, 'attente', s0.jusqua ? `mise en ligne programmée vers ${new Date(s0.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'mise en ligne programmée');
+      } else {
+        if (s0.etat === 'fait') t.etape(a.id, 'accepte');
+        t.fin(a.id, issueSuivi(s0));
+      }
+    }
+    if (prochaine && prochaine.at > Date.now()) t.pause({ jusqua: prochaine.at, raison: 'Pause entre deux annonces' });
+    if (arretJusqua > Date.now()) t.pause({ jusqua: arretJusqua, raison: 'Vinted demande d’attendre' });
+    // La boucle s'est arrêtée (pause, arrêt, fin) et plus rien n'est en route chez l'extension.
+    const enRoute = Object.values(st).some((x) => x.etat === 'encours');
+    if (mode !== 'run' && mode !== 'idle' && !enRoute && t.etat().statut === 'cours') t.terminer(arret || '', mode === 'pause' ? 'pause' : undefined);
+  }, [st, prog, prochaine, mode, arret, arretJusqua]);   // eslint-disable-line react-hooks/exhaustive-deps
   const nFait = Object.values(st).filter((s) => s.etat === 'fait').length;
   const nEchec = Object.values(st).filter((s) => s.etat === 'echec').length;
   const nDouble = Object.values(st).filter((s) => s.etat === 'double' || s.etat === 'incertain').length;
@@ -1567,6 +1636,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
   const summ = { display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: C.text };
   const pageOk = extSait('republierpage') === 'ok';
+  // (11 nov., lot suivi-travail) Les étapes d'UNE annonce, celles que l'extension annonce pour ce geste.
+  function listeEtapesSuivi() { return action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : action === 'enLigne' ? ETAPES_REPUB.publier : action === 'modifier' ? ETAPES_MODIF : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); }
   const ETAPES = A.etapes;
   const iEtape = Math.max(0, ETAPES.findIndex((x) => x[0] === etape));
   const s2 = (n, mot, pl) => `${n} ${n > 1 ? (pl || mot + 's') : mot}`;
@@ -1593,7 +1664,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               const pl = (n, s1, s2x) => `${n} ${n > 1 ? (s2x || s1 + 's') : s1}`;
               const motF = (n) => (n > 1 ? A.faits.replace(/^(\S+)/, '$1s') : A.faits);
               const bilan = `${nFait} sur ${total} ${motF(nFait)}`;
-              const titre = mode === 'fini' ? (arret ? 'Arrêté' : (nPasFaites || nDouble) ? 'Fini' : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${total}` : `Paire ${prochN} sur ${total}`;
+              const titre = mode === 'fini' ? (arret ? 'Arrêté' : (nPasFaites || nDouble) ? 'Fini' : 'Terminé') : mode === 'pause' ? (arret ? 'Arrêté' : 'En pause') : enCours ? `${motsVendeur().Nom} ${aFaire.indexOf(enCours) + 1} sur ${total}` : `${motsVendeur().Nom} ${prochN} sur ${total}`;
               const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
               const phrase = mode === 'run'
                 ? (enCours ? <><b data-republier-en-cours={enCours.id} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{enCours.numero ? `N°${enCours.numero} · ` : ''}{enCours.titre || 'sans titre'}</b>{suivante && tSuiv != null ? <span data-republier-suivante={tSuiv} style={{ display: 'block', color: C.muted, fontSize: 13 }}>{tSuiv > 0 ? `Puis la suivante, ${duree(tSuiv)} après celle-ci.` : 'Puis la suivante, tout de suite après.'}</span> : null}</> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochain article dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Préparation de la suite…')
@@ -1608,7 +1679,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '' }}
                 compte={<span>{compte}</span>}>
                 {peEnCours && <div data-republier-progression={enCours.id} data-republier-etape={peEnCours.etape || 'attente'}>
-                  <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`Paire ${aFaire.indexOf(enCours) + 1}`} barre={false} />
+                  <BarreGeste p={prog[String(enCours.id)]} liste={lstEnCours} label={`${motsVendeur().Nom} ${aFaire.indexOf(enCours) + 1}`} barre={false} />
                 </div>}
               </Avancement>;
   })() : null;
@@ -1733,7 +1804,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               <div style={{ fontSize: 13, color: pageOk ? C.text : C.muted, lineHeight: 1.45 }}>{brouillonOk
                 ? (viaBrouillon
                   ? (pageOk
-                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert {NAV.dans}, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente l’article suivant est déjà préparé (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
+                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert {NAV.dans}, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente l’article suivant est déjà préparé (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 {motsVendeur().noms} par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
                     : <>Mets l’extension VRM à jour en {EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr. <Pourquoi label="Pourquoi ?">L’extension installée ici fait encore l’ancienne republication, depuis son fond, avec des renvois automatiques.</Pourquoi></>)
                   : 'L’annonce est créée directement en ligne.')
                 : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
@@ -1792,6 +1863,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {!aFaire.length && <div data-republier-vide style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{mode === 'idle' ? "Aucune des annonces choisies n'est encore en ligne (déjà republiées ou retirées) : reviens à « Choisir »." : 'Aucun article dans cette file.'}</div>}
             {/* (30 oct.) Avant de lancer : UNE phrase par fait, le détail derrière ⓘ. */}
             {action === 'recreer' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à recréer sur Vinted, une par une. Le N° VRM passe sur la nouvelle. <Pourquoi label="Comment ça marche">Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? "l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu." : 'la nouvelle annonce est créée, et seulement si elle est bien en ligne l’ancienne est supprimée.'}</Pourquoi></div>}
+            {/* (11 nov., lot photos-comptes) AVANT de republier : une de ces photos déjà EN LIGNE sur un AUTRE
+                compte Vinted ⇒ l'encart ambre (miniature, compte). Republier reste possible (son choix). */}
+            {action !== 'enLigne' && !!aFaire.length && mode === 'idle' && <EncartPhotosAutresComptes sources={aFaire.map((a) => ({ id: a.id, compte: String(a.uid || compteUid) }))} compteCible={compteUid ? `vinted:${compteUid}` : null} PhotoVinted={PhotoVinted}/>}
             {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à repasser en brouillon, une par une. <Pourquoi label="Comment ça marche">Pour chacune : elle est enregistrée dans VRM, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est retirée, puis le brouillon est créé sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</Pourquoi></div>}
             {action === 'enLigne' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'brouillon')}</b> à mettre en ligne, un par un, tels que tu les as enregistrés.</div>}
@@ -1805,7 +1879,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux articles</span>
                 <Segmente plein label="Temps entre deux articles" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
-                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const sec = Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} paires : environ {txt} en tout.</div>; })()}
+                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const sec = Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} {motsVendeur().noms} : environ {txt} en tout.</div>; })()}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, flexWrap: 'wrap' }}>
@@ -1859,7 +1933,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   {(s.etat === 'double' || s.etat === 'incertain') && urlAncienne && <div style={{ padding: '0 0 4px 26px' }}><Bouton variante="discret" href={urlAncienne} target="_blank" rel="noopener noreferrer" data-republier-voir-ancienne={a.id}>{s.etat === 'double' ? "Supprimer l'ancienne sur Vinted ↗" : 'Vérifier sur Vinted ↗'}</Bouton></div>}
                   {recree && pb && prog[String(a.id)] && prog[String(a.id)].etape && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
                     <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 0 4px 26px' }}>
-                      <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} issue="echec" barre={false} />
+                      <BarreGeste p={prog[String(a.id)]} liste={lst} label={`${motsVendeur().Nom} ${i + 1}`} issue="echec" barre={false} />
                     </div>
                   ); })()}
                 </div>); })}

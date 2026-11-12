@@ -148,7 +148,8 @@ const lire = (pg) => pg.evaluate(() => {
     modes: window.__modes || [],
     racinePage: h ? h.shadowRoot : 'pas de carte',
     carteVisible: !!(carte && cs(carte).display !== 'none'),
-    carte: carte ? carte.innerText : '',
+    // 5.351 : le détail est replié quand tout va bien — ouvert le temps de lire, puis remis.
+    carte: carte ? (() => { const ds = Array.from(carte.querySelectorAll('details[data-detail]')); const av = ds.map((d) => d.open); ds.forEach((d) => { d.open = true; }); const t = carte.innerText; ds.forEach((d, i) => { d.open = av[i]; }); return t; })() : '',
     form: !!form, mode: form ? form.getAttribute('data-mode') : '',
     iframes: (r ? r.querySelectorAll('iframe').length : 0) + document.querySelectorAll('iframe:not([aria-hidden])').length,
     champsPage: document.querySelectorAll('input').length,
@@ -265,7 +266,8 @@ const lireCadre = (pg) => pg.evaluate(() => {
     iframeH: f ? Math.round(f.getBoundingClientRect().height) : 0,
     formTop: !!(r && r.querySelector('form[data-connexion-carte]')),
     champsPage: document.querySelectorAll('input').length,
-    carte: carte ? carte.innerText : '',
+    // 5.351 : le détail est replié quand tout va bien — ouvert le temps de lire, puis remis.
+    carte: carte ? (() => { const ds = Array.from(carte.querySelectorAll('details[data-detail]')); const av = ds.map((d) => d.open); ds.forEach((d) => { d.open = true; }); const t = carte.innerText; ds.forEach((d, i) => { d.open = av[i]; }); return t; })() : '',
     ouverts: (window.__ouverts || []).slice(),
     deborde: document.documentElement.scrollWidth > window.innerWidth,
   };

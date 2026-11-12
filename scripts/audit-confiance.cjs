@@ -238,7 +238,7 @@ async function verifier(R, { silencieux = false } = {}) {
       'C9 « Exporter » = l’export existant ; « Supprimer mon compte » ouvre la suppression (export proposé d’abord) ; « Ce que l’extension a fait » ouvre le journal');
     dit(/href="\/statut"/.test(td) && /window\.open\('\/statut'/.test(regl) && /data-aide-statut/.test(regl), 'C10 /statut joignable depuis « Tes données », l’Aide et « Résoudre un problème »');
     const fermer = (/function FermerCompte\(\{ onExporter \}\) \{[\s\S]*?\n\}\n/.exec(regl) || [''])[0];
-    dit(/const pareil = tape\.trim\(\) === MOT_SUPPRIMER/.test(fermer) && /disabled=\{!pareil \|\| occupe\}/.test(fermer) && /info\.proprietaire/.test(fermer) && /type="password"/.test(fermer), 'C11 supprimer le compte : taper « SUPPRIMER » (+ mot de passe, jugé par le serveur), bouton éteint sinon ; jamais pour le propriétaire de l’installation');
+    dit(/const pareil = tape\.trim\(\) === MOT_SUPPRIMER/.test(fermer) && (/disabled=\{!pareil \|\| occupe\}/.test(fermer) || (/const peutEnvoyer = pareil &&/.test(fermer) && /disabled=\{!peutEnvoyer \|\| occupe\}/.test(fermer))) && /info\.proprietaire/.test(fermer) && /type="password"/.test(fermer), 'C11 supprimer le compte : taper « SUPPRIMER » (+ mot de passe, jugé par le serveur), bouton éteint sinon ; jamais pour le propriétaire de l’installation');
   }
   return res;
 }

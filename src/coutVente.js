@@ -25,6 +25,7 @@
 //    Publiée par l'écran Annonces sous `vrm_valeur_stock` (`publierValeurStock`),
 //    lue par le Stock et Statistiques (`lireValeurStock`) — jamais recalculée.
 // ════════════════════════════════════════════════════════════════════════════
+import { motsVendeur } from './profilVendeur.js';
 import { beneficePaire, centimes } from './beneficePaire.js';
 
 const vide = (v) => v == null || String(v).trim() === '';
@@ -83,7 +84,7 @@ export const eurosStock = (cents) => {
 
 // Ce que l'écran écrit. `partiel` : une lecture des annonces manque.
 // (11 nov., lot DJ2) `mot` / `mots` : « paire » pour un vendeur de sneakers, « article » sinon.
-export function texteValeurStock(v, { partiel = false, mot = 'paire', mots = 'paires' } = {}) {
+export function texteValeurStock(v, { partiel = false, mot = motsVendeur().nom, mots = motsVendeur().noms } = {}) {
   if (!v || v.centimes == null) return { montant: '—', auMoins: false, sur: v && v.n ? `sur ${v.n} ${v.n > 1 ? mots : mot}` : '', sans: v && v.nSans ? `${v.nSans} sans prix` : '' };
   const auMoins = v.nSans > 0 || !!partiel;
   return { montant: eurosStock(v.centimes), auMoins, sur: `sur ${v.n} ${v.n > 1 ? mots : mot}`, sans: v.nSans ? `${v.nSans} sans prix` : '' };

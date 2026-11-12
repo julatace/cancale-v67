@@ -143,7 +143,7 @@ async function allerTache(pg, tache, site) {
       // Un push « non abouti » est une panne (503) : le nuage ne garde rien.
       const base = { get main() { return rows[0].data; }, set main(v) { rows[0].data = v; }, maj: auj.toISOString(), ecritures: [], panne: () => bloquerPush };
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
       await pg.route('**/rest/v1/**', (route) => {
         const u = decodeURIComponent(metaVersData(route.request().url()));
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -297,8 +297,8 @@ async function allerTache(pg, tache, site) {
       // (`aria-label`) et son nombre est `data-n`. On juge le NOMBRE et la phrase de
       // la règle, pas le libellé affiché (§6.4) — l'ancien contrôle lisait
       // `innerText` et rougissait sur un texte raccourci exprès.
-      const taches = () => pg.evaluate(() => [...document.querySelectorAll('.vrm-day-task')].map((e) => ({ plein: e.getAttribute('aria-label') || '', n: e.getAttribute('data-n') })));
-      await pg.waitForFunction(() => [...document.querySelectorAll('.vrm-day-task')].some((e) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(e.getAttribute('aria-label') || '')), null, { timeout: 15000 }).catch(() => {});
+      const taches = () => pg.evaluate(() => [...document.querySelectorAll('.vrm-day-task')].map((e) => ({ plein: (e.getAttribute('data-plein') || e.getAttribute('aria-label') || ''), n: e.getAttribute('data-n') })));
+      await pg.waitForFunction(() => [...document.querySelectorAll('.vrm-day-task')].some((e) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test((e.getAttribute('data-plein') || e.getAttribute('aria-label') || ''))), null, { timeout: 15000 }).catch(() => {});
       const txt = await pg.evaluate(() => document.body.innerText);
       const tj = await taches();
       const tLbc = tj.find((t) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(t.plein));

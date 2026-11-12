@@ -141,7 +141,7 @@ async function preparer(b, vp, sombre, police) {
   // Une police imposée (métriques d'Arial) pour la vue étroite.
   if (police) await pg.addInitScript((f) => { const poser = () => { const st = document.createElement('style'); st.textContent = `*{font-family:${f},sans-serif!important}`; document.head.appendChild(st); }; if (document.head) poser(); else document.addEventListener('DOMContentLoaded', poser); }, police);
   if (mobile) await pg.addInitScript(() => { const poser = () => { const st = document.createElement('style'); st.textContent = '.vrm-main{isolation:isolate}'; document.head.appendChild(st); }; if (document.head) poser(); else document.addEventListener('DOMContentLoaded', poser); });
-  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await ctx.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

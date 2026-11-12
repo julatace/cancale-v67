@@ -129,7 +129,7 @@ async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligne
   if (!sansPont) await pg.addInitScript(PONT, { version: VERSION_A_JOUR, connecte: pontConnecte, perime: pontPerime, codeDansEtat: CODE_DANS_ETAT });
   // Un réglage PROPRE À L'APPAREIL (ex. « refusé par Vinted »), posé une seule fois.
   if (ls) await pg.addInitScript((o) => { try { for (const k in o) if (!localStorage.getItem('__fait_' + k)) { localStorage.setItem(k, JSON.stringify(o[k])); localStorage.setItem('__fait_' + k, '1'); } } catch (_) {} }, ls);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
