@@ -6256,6 +6256,10 @@ const cachedRow = (cle, chercher) => {
   return promesse;
 };
 const viderCacheLignes = () => { _rowCache.clear(); try { viderLecturesMemo(); } catch (_) {} };   // bouton « Synchroniser »
+// (12 nov.) Oublier les commandes d'UN compte (une vente vient d'arriver) — une fois par signal : un
+// second écran monté qui reçoit le même signal dans les 4 s reprend la lecture déjà partie.
+const _oubliCommandes = new Map();
+const oublierCommandesCompte = (uid) => { const k = String(uid), t = _oubliCommandes.get(k); if (t && Date.now() - t < 4000) return; _oubliCommandes.set(k, Date.now()); _rowCache.delete(`o:${k}`); };
 
 // ── (7 nov., vitesse) LES PETITES LIGNES RELUES À CHAQUE ÉCRAN ─────────────
 // Mesuré au téléphone : chaque changement d'onglet relisait 26 à 44 lignes, presque
@@ -32870,6 +32874,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov.) Revenir sur l'écran : la liste en cache (la même entrée que `loadOrders` servirait
   // une milliseconde plus tard) est là DÈS le premier rendu — plus de squelette d'une image.
   const [sales, setSales] = useState(() => etatOrdersDuCache('sold', accounts));
+  const salesCourant = useRef(sales); salesCourant.current = sales;   // (12 nov.) la liste montrée, pour relire UN compte (`relire`)
   const [buys, setBuys] = useState(() => etatOrdersDuCache('purchased', accounts));
   // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
   // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
@@ -37395,6 +37400,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (Number.isFinite(t) && !Number.isFinite(_harvestSeen[k])) _harvestSeen[k] = t;
     }
     if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
+    // (12 nov., vitesse) UNE VENTE ARRIVE SUR UN COMPTE : on ne relit QUE lui. Avant, `relire(uid)`
+    // relançait la lecture de CHAQUE compte : passé la minute de mémoire des lignes, ~1,2 Mo repartaient
+    // (banc ventes-relecture-compte). Les autres comptes gardent EXACTEMENT ce que l'écran montre (leurs
+    // ventes, leur « pas su ») ; une relecture ratée ne change rien. Ventes seulement (les achats ont
+    // leurs filtres croisés avec les ventes : relus en entier, comme avant).
+    const seul = type === 'sold' && opts && Array.isArray(opts.seulement) ? new Set(opts.seulement.map(String)) : null;
+    const prec = opts && opts.prec;
+    if (seul && !force && prec && Array.isArray(prec.items) && prec.comptes === demandes) {
+      const cibles = accounts.filter(a => seul.has(String(a.vinted_user_id)));
+      if (cibles.length) {
+        const results = await Promise.all(cibles.map(async acc => { const res = await fetchVintedOrders(acc, type, 1, 'all', { force }); noteAcctLive(acc.vinted_user_id, res, force); return { acc, res }; }));
+        if (n !== lectureOrders.current[type]) return;
+        const lus = results.filter(r => r.res && r.res.ok);
+        if (!lus.length) return;                                 // lecture ratée : rien n'est changé
+        const okUids = new Set(lus.map(r => String(r.acc.vinted_user_id)));
+        const garde = prec.items.filter(o => !okUids.has(String(o && o._acc && o._acc.vinted_user_id)));
+        const seen = new Set(garde.map(o => String(o.transaction_id))); const neufs = [];
+        for (const { acc, res } of lus) for (const o of res.items) { const id = String(o.transaction_id); if (seen.has(id)) continue; seen.add(id); neufs.push({ ...o, _acc: acc }); }
+        const items = [...neufs, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+        const failedUids = (Array.isArray(prec.failedUids) ? prec.failedUids : []).map(String).filter(u => !okUids.has(u));
+        const failed = accounts.filter(a => failedUids.includes(String(a.vinted_user_id))).map(accNameOf);
+        const caps = {};
+        for (const acc of accounts) { const t = _harvestSeen[`${acc.vinted_user_id}_orders_${type}`]; if (Number.isFinite(t)) caps[String(acc.vinted_user_id)] = t; }
+        putCache(type, items, { failed, failedUids }, demandes, { caps });
+        setter({ ...prec, loading:false, items, error:false, failed, failedUids, comptes: demandes });
+        return;
+      }
+    }
     if (!silencieux) setter({ loading:true, items:null, error:false });
     // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
     // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
@@ -38155,7 +38188,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ecrans = ['ventes', 'journee', 'bordereaux', 'messages'];
     let derniere = 0;
     const relire = (uid) => {
-      if (uid) _rowCache.delete(`o:${uid}`); else viderCacheLignes();
+      // (12 nov.) Ventes monte DEUX moteurs (la liste et « À expédier ») : le second ne réoublie pas la ligne
+      // que le premier vient de relire (`oublierCommandesCompte`, 4 s) — une seule relecture du compte.
+      if (uid) oublierCommandesCompte(uid); else viderCacheLignes();
       try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
       // ⚠️ Hors de ces écrans, le signal était JETÉ : revenir sur Colis montrait
       //    l'ancien état jusqu'au cycle suivant. On le retient, et l'entrée sur
@@ -38164,7 +38199,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (Date.now() - derniere < 4000) return;      // deux signaux rapprochés = une relecture
       derniere = Date.now();
       ventesPerimees.current = false;
-      loadOrders('sold', setSales, false, { silencieux: true });
+      loadOrders('sold', setSales, false, uid ? { silencieux: true, seulement: [uid], prec: salesCourant.current } : { silencieux: true });
     };
     const ecoute = (e) => {
       if (cache()) return;
