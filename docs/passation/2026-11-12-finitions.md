@@ -23,7 +23,11 @@ Propriétaire unique (données + affichage) : cette branche, depuis la fin de `c
    4 · la barre du délai toujours (« encore N j », « · estimée », « Date limite inconnue »). En-tête du point :
    « N colis · K codes à venir » dès K > 0. Le dépli est une fiche étiquetée (Arrivé · À retirer avant · Code ·
    Compte · Vérifié) et des gestes d'une seule forme (44 px). Aucune couleur si rien à faire. Chronopost Pickup sur
-   le jaune Pickup (le cube noir sur blanc était pris pour un logo générique).
+   le jaune Pickup (le cube noir sur blanc était pris pour un logo générique). UN logo par vignette (badge sur une
+   photo, sinon la vignette est le logo) ; le QR = une petite icône à côté du code. Fiche : rien de technique
+   (« pas encore lu — VRM le lit… » retiré), « Vérifié · e-mail, hier 11:19 », gestes « Copier le code » · « QR en
+   grand » · « Suivre » (le code n'est pas redit, plus d'« En grand » en double). Le nom des enseignes connues
+   s'écrit à leur orthographe officielle (Intermarché, E.Leclerc, Super U… — tableau fixe dans src/CarteRelais.jsx).
 
 Bancs : `retirer-scene-julien.cjs` (la scène de production rejouée sur une base synthétique de même forme : Super U
 Accueil, Intermarché « changé de plan », « Où vous livrer… », Maison de la Presse, un retiré), `retirer-ligne-unique.cjs`,
@@ -110,7 +114,7 @@ Geste de Julien : aucun.
 | cases Vinted sur Ventes · eBay | Ventes · eBay | **corrigé** : « À envoyer · N » et « N à imprimer » du site choisi ; bordereaux des e-mails Vinted seulement sur Vinted |
 | « Tout imprimer (15) » ⇒ « Imprimer (6) » | Ventes → Tout imprimer | **à vérifier** : la feuille travaille par transporteur ; pas modifié (même source `lignesLotTous`) |
 | À retirer « rien n'est cohérent » | Achats · À retirer | **refait** (la règle ci-dessus) |
-| `colis-qr` (16 rouges) | Achats · À retirer | **rouge avant comme après** : il exige « QR dans l'app Mondial Relay / QR pas reçu » (`data-colis-qr-absent`), retirés le 11 nov. (« un QR qu'on n'a pas ne se commente plus ») — à remettre à la règle actuelle |
+| `colis-qr` (16 rouges avant comme après) | Achats · À retirer | **remis à la règle du 11 nov.** (« un QR qu'on n'a pas ne se commente plus » : aucun QR montré ni commenté), le reste intact — 100/0 |
 
 Preuves de la 2e passe : `retirer-scene-julien` 48/0, `retirer-ligne-unique` 88/0 (32 rouges sur l'avant),
 `colis-retirer-propre` 132/0 (11 rouges sur l'avant), `retirer-carte-delai` 0 rouge (15 sur l'avant),
