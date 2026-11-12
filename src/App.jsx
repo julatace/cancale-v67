@@ -22671,6 +22671,38 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
     </div>
   );
 }
+// (12 nov., finitions — Julien, iPhone 17:44 : le QR Chronopost « rond gris VIDE », affiché à 14:46) LE QR D'UN COLIS
+// S'AFFICHE À CHAQUE FOIS, OU LE DIT. Une image distante (`qrUrl`) peut ne pas répondre (hors ligne, lien expiré,
+// réseau lent) : avant, l'image restait un rond vide (chargement sans fin, ou réponse sans image). Maintenant :
+//  · une copie LOCALE est gardée dès qu'elle a été lue une fois (localStorage, par adresse, ≤ 60 Ko — la même image,
+//    rien de fabriqué) ; elle sert d'abord ;
+//  · une image qui échoue, n'a pas de pixels, ou ne répond pas en 8 s ⇒ « QR pas chargé — Réessayer » (jamais un rond
+//    vide) ; le code reste écrit en gros à côté.
+const CLE_QR_LOCAL = 'vrm_qr_local_';
+const lireQrLocal = (u) => { try { return u && !/^data:/.test(u) ? localStorage.getItem(CLE_QR_LOCAL + u) : null; } catch (_) { return null; } };
+const garderQrLocal = async (u) => {
+  if (!u || /^data:/.test(u) || lireQrLocal(u)) return;
+  try {
+    const r = await fetch(u, { mode: 'cors', credentials: 'omit' }); if (!r.ok) return;
+    const b = await r.blob(); if (!/^image\//.test(b.type) || b.size > 60000) return;
+    const d = await new Promise((ok, ko) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = ko; f.readAsDataURL(b); });
+    try { localStorage.setItem(CLE_QR_LOCAL + u, String(d)); } catch (_) {}
+  } catch (_) {}   // le site du transporteur refuse la copie (CORS) : le service worker garde l'image, rien d'autre
+};
+function QrRetraitImage({ src, onOuvrir, attrs = {} }) {
+  const [essai, setEssai] = useState(0);
+  const local = lireQrLocal(src);
+  const [etat, setEtat] = useState(local || /^data:/.test(String(src || '')) ? 'ok' : 'charge');
+  useEffect(() => { if (etat !== 'charge') return undefined; const t = setTimeout(() => setEtat((e) => (e === 'charge' ? 'ko' : e)), 8000); return () => clearTimeout(t); }, [etat, essai]);
+  if (!src) return null;
+  if (etat === 'ko') return <button type="button" className="vrm-rp-qr-ko" data-colis-qr-pas-charge="" onClick={() => { setEtat('charge'); setEssai((n) => n + 1); }}>QR pas chargé — Réessayer</button>;
+  return (
+    <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={onOuvrir} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr-etat={etat} {...attrs}>
+      <img key={essai} src={local || src} alt="QR de retrait"
+        onLoad={(e) => { const i = e.currentTarget; if (!i.naturalWidth || i.naturalWidth < 16) { setEtat('ko'); return; } setEtat('ok'); garderQrLocal(src); }}
+        onError={() => setEtat('ko')}/>
+    </button>);
+}
 function CodeRetraitCopiable({label,code}) {
   const [etat,setEtat]=useState('');
   React.useEffect(()=>setEtat(''),[code]);
@@ -49416,8 +49448,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (<>
               {x.code2 ? <CodeRetraitCopiable label="Identifiant" code={x.code2}/> : null}
               {x.code ? <CodeRetraitCopiable label={x.code2 ? 'Code d’ouverture' : 'Code de retrait'} code={x.code}/> : null}
-              {qi ? <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={() => openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr="" data-colis-qr-source={t && t.qrSource === 'capture' && t.qrB64 ? 'capture' : 'email'}>
-                <img src={qi} alt="QR de retrait" onError={() => noterImgMorte(qrImage(t))}/></button> : null}
+              {qi ? <QrRetraitImage src={qi} onOuvrir={() => openQrView(t)} attrs={{ 'data-colis-qr': '', 'data-colis-qr-source': t && t.qrSource === 'capture' && t.qrB64 ? 'capture' : 'email' }}/> : null}
               {/* (5 nov.) LE CODE ET LE QR EN GRAND, au doigt, pour le comptoir ou le casier — un geste pour
                   tout colis qui a un code ou un QR (e-mail, capture de l’app Mondial Relay, conversation Vinted). */}
               {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : openQrView(ligneRetraitVinted(o)))}
@@ -49459,17 +49490,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const lim = t ? t.limite : (ev && ev.limite), limAt = t ? t.limiteAt : (ev && ev.limiteAt), vers = t ? t.limiteVers : (ev && ev.limiteVers);
             const jl = lim ? joursAvant(lim) : null;
             const cpt = t ? (compteDuColisEmail(t) || '') : (o && o._acc ? accName(o._acc) : '');
+            // (12 nov., finitions — Julien, iPhone : « c'est moche l'affichage ») LE DÉPLI EST UNE FICHE : des lignes
+            // ÉTIQUETÉES, alignées (Arrivé · À retirer avant · Compte ; « Vérifié » est posé par la ligne elle-même,
+            // src/CarteRelais.jsx), les mêmes valeurs qu'avant et les mêmes `data-*`. Ambre seulement pour un retrait
+            // à faire aujourd'hui ou demain (§7). Les autres constats suivent, une phrase chacun, neutres.
+            const fl = (k, v, attrs = {}) => <div className="vrm-rpf-fiche-l" {...attrs}><span className="vrm-rpf-fiche-k">{k}</span><span className="vrm-rpf-fiche-v">{v}</span></div>;
+            const jjFr = (d) => new Date(String(d).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+            const limCourt = jl == null ? '' : jl < 0 ? `${jjFr(lim)} · délai dépassé` : jl === 0 ? `${limAt ? `${heureParis(limAt)} · ` : ''}aujourd’hui (${jjFr(lim)})` : jl === 1 ? `demain${limAt ? ` ${heureParis(limAt)}` : ''} (${jjFr(lim)})` : `${jjFr(lim)}${limAt ? ` à ${heureParis(limAt)}` : ''}`;
             return (<>
-              <LigneArrivee arr={arr || null} style={{marginTop:0}}/>
-              {!x.horsCompte && (jl != null
-                ? <span className={'vrm-rp-sous' + (jl <= 1 ? ' is-ambre' : '')} data-colis-limite={String(lim).slice(0,10)} data-colis-limite-transp={t ? undefined : ''}>{texteLimiteRetrait(jl, lim, limAt)}</span>
-                : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
+              <div className="vrm-rpf-fiche" data-rp-fiche="">
+              <div className="vrm-arrive vrm-rpf-fiche-l" data-arrive-le={arr ? jourLocal(arr.ms) : 'inconnue'} data-arrive-sur={arr ? arr.sur : ''} title={arr && arr.sur==='borne' ? 'Le colis était déjà au point relais ce jour-là ; la date exacte de son arrivée n’est pas connue.' : undefined}>
+                <span className="vrm-rpf-fiche-k">Arrivé</span><span className="vrm-rpf-fiche-v">{arr ? texteArrivee(arr).replace(/^Arrivé\s+/, '') : 'pas encore lu'}</span></div>
+              {(jl != null
+                ? fl('À retirer avant', <span className={jl <= 1 && !x.horsCompte ? 'is-ambre' : ''}>{limCourt}</span>, { 'data-colis-limite': String(lim).slice(0,10), 'data-colis-limite-transp': t ? undefined : '' })
+                : vers ? fl('À retirer avant', `vers le ${jjFr(vers)} · estimée`, { 'data-colis-limite': 'vers', 'data-colis-limite-vers': String(vers) })
                 : (() => { // (6 nov.) Aucune date LUE : la garde de SON transporteur (lu), dite « estimée » (api/_lib/retrait-colis.js).
                     const est = limiteEstimee({ arriveeMs: arr && arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' });
-                    return est ? <span className="vrm-rp-sous" data-colis-limite="estimee" data-colis-limite-estimee={est.jour}>{`Vers le ${est.jour.slice(8, 10)}/${est.jour.slice(5, 7)} (estimé : ${nomTransporteur(carrierKey(t ? t.carrier : ev.carrier))} garde un colis ${est.garde} jours)`}</span>
-                      : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>; })())}
-              {/* (11 nov.) Le n° de suivi est sur la ligne (une fois, §7) : ici le compte seul. */}
-              {(plusieursComptesRet && cpt) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{`compte ${cpt}`}</span> : (su || cpt !== undefined ? <span hidden data-rp-suivi={su} data-colis-compte={cpt}/> : null)}
+                    return est ? fl('À retirer avant', `vers le ${est.jour.slice(8, 10)}/${est.jour.slice(5, 7)} · estimée (${nomTransporteur(carrierKey(t ? t.carrier : ev.carrier))} garde ${est.garde} j)`, { 'data-colis-limite': 'estimee', 'data-colis-limite-estimee': est.jour })
+                      : fl('À retirer avant', 'date inconnue', { 'data-colis-limite': 'inconnue' }); })())}
+              {/* (12 nov., règle 3) Pas de code : où il est, en entier (la ligne n'en dit que le début). */}
+              {!(x.code || x.qr || x.code2) && !x.horsCompte ? fl('Code', (!t || t.source === 'vinted-commande') ? 'sur Vinted — l’extension le lira à ta prochaine visite' : `dans l’e-mail de ${nomTransporteur(carrierKey(t.carrier)) || 'du transporteur'} — pas encore reçu`, { 'data-colis-code-ou': (!t || t.source === 'vinted-commande') ? 'vinted' : 'email' }) : null}
+              {/* (11 nov.) Le n° de suivi est sur la ligne (une fois, §7) : ici le compte. */}
+              {cpt ? fl('Compte', cpt, { className: 'vrm-rpf-fiche-l vrm-rp-suivi', 'data-rp-suivi': su, 'data-colis-compte': cpt }) : (su || cpt !== undefined ? <span hidden data-rp-suivi={su} data-colis-compte={cpt}/> : null)}
+              </div>
               {/* (12 nov.) « Voir l'e-mail » : l'e-mail source gardé par la ligne (`emailRecu`) ; pas su ⇒ rien. */}
               {t && t.emailRecu ? <VoirEmailColis id={t.emailRecu} headers={sbAuth}/> : null}
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
@@ -49487,7 +49530,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {t && (t.source === 'sms' || t.aussiSms) ? (() => { const cmdT = pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(colisKey(t)) : null;
                 const sansAchat = !cmdT && !x.achatAutre && !achatDuColis(t, buysBase, indexSuivisAchats);
                 return <span className="vrm-rp-sous" data-colis-sms={t.source === 'sms' ? 'sms' : 'aussi'} data-colis-sans-achat={sansAchat ? '1' : undefined}>{[t.source === 'sms' ? 'Reçu par SMS Mondial Relay' : 'Aussi annoncé par SMS', sansAchat ? 'achat pas encore relu' : ''].filter(Boolean).join(' · ')}</span>; })() : null}
-              {t && t.codeSms && codeRetrait(t.codeSms) && codeRetrait(t.codeSms) !== codeRetrait(t.code) ? <span className="vrm-rp-sous is-ambre" data-colis-code-sms={codeRetrait(t.codeSms)}>{`Le SMS donne un autre code : ${codeRetrait(t.codeSms)} (l’e-mail fait foi)`}</span> : null}
+              {t && t.codeSms && codeRetrait(t.codeSms) && codeRetrait(t.codeSms) !== codeRetrait(t.code) ? <span className="vrm-rp-sous" data-colis-code-sms={codeRetrait(t.codeSms)}>{`Le SMS donne un autre code : ${codeRetrait(t.codeSms)} (l’e-mail fait foi)`}</span> : null}
               {t ? (() => { const cr = compteDuRetrait(t, mrColis); if (!cr) return null;
                 return <span className="vrm-rp-sous" data-colis-compte-source={cr.source} data-colis-compte-mr={cr.source === 'mondialrelay' ? cr.libelle : undefined} data-colis-hors-comptes-mr={cr.horsComptes ? '1' : undefined}>
                   {cr.source === 'mondialrelay' ? `Compte Mondial Relay · ${cr.libelle}${cr.aussiEmail ? ' · aussi par e-mail' : ''}` : [cr.libelle ? `Arrivé par e-mail sur ${cr.libelle}` : 'Arrivé par e-mail', cr.horsComptes ? 'dans aucun de tes comptes Mondial Relay relus' : ''].filter(Boolean).join(' · ')}</span>; })() : null}

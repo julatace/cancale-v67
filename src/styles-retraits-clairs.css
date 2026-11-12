@@ -66,3 +66,35 @@
 /* « Argent à vérifier » sous la liste : la liste garde 12 px de marge basse, la section n'ajoute que le reste (28 px
    d'air entre deux sections, comme partout ; il en mesurait 41 — banc colis-retirer-propre, 20–40 px). */
 :root:root body .vrm-app-shell .vrm-main .vrm-colis-section[data-colis-hote="achats"]:has(.vrm-rpf) [data-colis-retraits] [data-rp-section="argent"] { margin-top: 15px !important; }
+
+/* ── (12 nov., finitions — Julien, iPhone : « c'est moche l'affichage ») LE DÉPLI D'UN COLIS EST UNE FICHE ──────
+   Lignes étiquetées alignées (Arrivé · À retirer avant · Compte · Vérifié) : l'étiquette dans une colonne fixe, la
+   valeur à côté ; les constats suivants une phrase chacun, neutres ; les GESTES sur une rangée de boutons de la même
+   forme (44 px, même fond, même rayon) — « J'ai retiré » n'est pas redit (il est sur la ligne). */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail { display: flex !important; flex-direction: column !important; gap: 10px !important; padding: 4px 0 14px calc(44px + 12px) !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-detail-txt { display: flex !important; flex-direction: column !important; gap: 4px !important; font-size: 13px !important; line-height: 18px !important; color: var(--p-gris, #6E6E73) !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche { display: flex; flex-direction: column; gap: 4px; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-l { display: grid !important; grid-template-columns: 112px minmax(0, 1fr) !important; column-gap: 10px !important; align-items: baseline !important; margin: 0 !important; font-size: 13px !important; line-height: 18px !important; white-space: normal !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-k { color: var(--p-gris, #6E6E73); font-weight: 500; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v { color: var(--p-encre, #1D1D1F); font-weight: 500; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+:root[data-theme="dark"]:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v { color: #F5F5F7; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v .is-ambre { color: var(--p-ambre-texte, #B25000); font-weight: 600; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v .vrm-rpf-source:has(+ *)::after { content: ' · '; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-detail-txt .vrm-rp-sous { display: block !important; margin: 0 !important; font-size: 13px !important; line-height: 18px !important; color: var(--p-gris, #6E6E73) !important; font-weight: 400 !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-detail-txt .vrm-rp-sous.is-ambre { color: var(--p-ambre-texte, #B25000) !important; }
+/* Les gestes : UNE rangée, une forme. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 8px !important; margin: 2px 0 0 !important; }
+:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) {
+  all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
+  height: 44px !important; min-height: 44px !important; min-width: 44px !important; padding: 0 14px !important; border-radius: 12px !important;
+  background: var(--d-remplir, rgba(118, 118, 128, .12)) !important; color: var(--p-encre, #1D1D1F) !important; border: 0 !important; box-shadow: none !important;
+  font: 600 14px/1 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important; white-space: nowrap !important; cursor: pointer !important; text-decoration: none !important;
+}
+:root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { background: rgba(118, 118, 128, .24) !important; color: #F5F5F7 !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes img { width: 28px !important; height: 28px !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes > [data-colis-retire] { display: none !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #0071e3) !important; outline-offset: 2px !important; }
+@media (max-width: 599px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-l { grid-template-columns: 104px minmax(0, 1fr) !important; }
+}

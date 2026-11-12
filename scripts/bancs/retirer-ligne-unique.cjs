@@ -13,7 +13,8 @@
 //  3 n° de suivi ou ligne vide · 4 barre du délai, aux mêmes écarts ; « J'ai retiré » à la même place ;
 //  un titre n'est jamais un n° de suivi (« Colis Mondial Relay », « Colis Chronopost Pickup ») ; aucune
 //  ligne « sans n° de suivi » ; l'en-tête « N colis · K codes à venir » dès K > 0 ; le QR se touche depuis
-//  sa ligne (44 px). 390 tactile clair/sombre, 1512 clair/sombre. `BANC_PORT`, `BANC_DIST`, `SHOTS=dossier`.
+//  sa ligne (44 px) ; le DÉPLI est une fiche étiquetée (valeurs alignées), ses gestes d'une seule forme (44 px), sans
+//  phrase ambre quand rien n'est urgent. 390 tactile clair/sombre, 1512 clair/sombre. `BANC_PORT`, `BANC_DIST`, `SHOTS=dossier`.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path');
 let chromium, PW;
@@ -181,6 +182,27 @@ const ouvrir = async (b, vp, sombre) => {
           return { lignes, tete: tete ? tete.innerText : '', sansCode: tete && tete.querySelector('[data-relais-sans-code]') ? tete.querySelector('[data-relais-sans-code]').getAttribute('data-relais-sans-code') : null };
         });
         if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `retirer-ligne-${nom}.png`) }); }
+        // ── LE DÉPLI (12 nov., Julien : « c'est moche l'affichage ») : une fiche étiquetée, des gestes d'une forme ──
+        const ouvert = await pg.evaluate(async () => {
+          const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="313131"]'));
+          if (!l) return null; l.querySelector('.vrm-rpf-ouvrir').click(); await new Promise((r) => setTimeout(r, 400)); l.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); await new Promise((r) => setTimeout(r, 300));
+          const d = l.querySelector('[data-rp-detail]'); if (!d) return { ouvert: false };
+          const R = (e) => e.getBoundingClientRect();
+          const ks = [...d.querySelectorAll('.vrm-rpf-fiche-k')].filter((e) => R(e).height > 0);
+          const vs = [...d.querySelectorAll('.vrm-rpf-fiche-v')].filter((e) => R(e).height > 0);
+          const g = [...d.querySelectorAll('.vrm-rp-gestes :is(button, a)')].filter((e) => R(e).height > 0);
+          const ambre = [...d.querySelectorAll('*')].filter((e) => R(e).height > 0 && e.childNodes.length && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).filter((e) => { const c = getComputedStyle(e).color.match(/\d+/g).map(Number); return c[0] > 150 && c[1] > 60 && c[1] < 140 && c[2] < 60; }).map((e) => e.textContent.trim().slice(0, 60));
+          return { ouvert: true, etiquettes: ks.map((e) => e.textContent.trim()), kLeft: [...new Set(ks.map((e) => Math.round(R(e).left)))], vLeft: [...new Set(vs.map((e) => Math.round(R(e).left)))],
+            gestes: g.map((e) => ({ t: (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 30), h: Math.round(R(e).height), r: getComputedStyle(e).borderRadius, bg: getComputedStyle(e).backgroundColor })), ambre };
+        });
+        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `retirer-depli-${nom}.png`) }); }
+        dit(!!ouvert && ouvert.ouvert && ['Arrivé', 'À retirer avant'].every((k) => ouvert.etiquettes.includes(k)) && ouvert.kLeft.length === 1 && ouvert.vLeft.length === 1, `${nom} : le dépli est une fiche (« Arrivé », « À retirer avant »… étiquetés, valeurs alignées)`, JSON.stringify(ouvert && { e: ouvert.etiquettes, k: ouvert.kLeft, v: ouvert.vLeft }));
+        dit(!!ouvert && ouvert.gestes.length >= 1 && new Set(ouvert.gestes.map((x) => `${x.h}|${x.r}|${x.bg}`)).size === 1 && ouvert.gestes.every((x) => x.h >= 44) && !ouvert.gestes.some((x) => /J.ai retiré/.test(x.t)), `${nom} : les gestes du dépli ont UNE forme (44 px, même fond, même rayon), « J'ai retiré » pas redit`, JSON.stringify(ouvert && ouvert.gestes));
+        dit(!!ouvert && !ouvert.ambre.length, `${nom} : aucune phrase ambre dans le dépli d'un colis sans geste urgent (§7)`, JSON.stringify(ouvert && ouvert.ambre));
+        await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="313131"]')); if (l && l.querySelector('[data-rp-detail]')) l.querySelector('.vrm-rpf-ouvrir').click(); });
+        await pg.waitForTimeout(300);
+        await pg.evaluate(() => { const p = document.querySelector('.vrm-rpf-point'); if (p) p.scrollIntoView({ block: 'start' }); });
+        await pg.waitForTimeout(300);
         if (m && m.dbg) console.log('DBG', m.dbg);
         dit(!!m && !!m.lignes && m.lignes.length >= 6, `${nom} : les colis du point mélangé, une ligne chacun`, m && m.lignes.map((l) => l.titre).join(' | '));
         if (!m || !m.lignes) return;

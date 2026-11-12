@@ -423,6 +423,12 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // Ligne 3 : le nom du transporteur EN CLAIR quand le titre est l'article (sinon le titre le dit déjà), puis le n°.
   const ligne3 = [titreSansArticle ? '' : nomAffiche, suLigne ? `n° ${suLigne}` : ''].filter(Boolean).join(' · ');
   const ouvrirQr = qrDe ? qrDe(x) : null;
+  // (12 nov., finitions — règle 3 de Julien) Arrivé SANS code : on dit OÙ il est, jamais « à venir » comme si c'était
+  // normal. Un achat Vinted (sa page, ou l'e-mail « Ton achat t'attend ») : le code est sur Vinted ; un colis du
+  // transporteur : son code arrive dans l'e-mail du transporteur. La phrase entière est dans le dépli.
+  const tSrc = (x.src && x.src.t) || null;
+  const codeSurVinted = !tSrc || tSrc.source === 'vinted-commande';
+  const sansCodeCourt = x.horsCompte ? 'Code pas lu' : codeSurVinted ? 'Code sur Vinted' : 'Code pas encore reçu';
   // (12 nov., finitions) Le serveur vérifie CE colis chez son transporteur (« retiré » puis « changé de plan »,
   // `aVerifierTransporteur`, api/_lib/suivi-colis.js) : rien à faire pour le vendeur ⇒ une mention NEUTRE à la
   // place du délai (jamais une question, jamais ambre), même place, même hauteur.
@@ -459,7 +465,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
             {desaccord ? <span className="vrm-rpf-code-gros is-ambre" data-rp-code-visible="desaccord" data-rp-code-desaccord="">2 codes</span>
               : x.code ? <span className="vrm-rpf-code-gros" data-rp-code-visible={x.code}>{x.code}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
-              : <span className="vrm-rpf-code-venir" data-rp-code-a-venir="">{x.horsCompte ? 'Code pas lu' : 'Code à venir'}</span>)}
+              : <span className="vrm-rpf-code-venir" data-rp-code-a-venir="" data-rp-code-ou={codeSurVinted ? 'vinted' : 'email'}>{sansCodeCourt}</span>)}
           </span>
           {ligne3 ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={suLigne || undefined} data-rp-sans-suivi={suLigne ? undefined : ''} data-rp-transp-nom={titreSansArticle ? undefined : nomAffiche || undefined}>{ligne3}</span> : <span className="vrm-rpf-suivi-ligne is-vide" data-rp-sans-suivi="" aria-hidden="true">{'\u00a0'}</span>}
           <span className="vrm-rpf-ligne-delai" data-rp-l4="" data-rp-verif-transporteur={verifT ? '' : undefined}><BarreDelai d={dl4}/></span>
@@ -488,7 +494,8 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
         {/* (11 nov.) D'où vient ce que la ligne dit (les sources qui ont vu CE colis, l'heure de la dernière vérification) :
             dans le détail ouvert, plus sur la ligne (Julien : « des infos dans tous les sens »). */}
-        {marquesVues.length || verifie ? <span className="vrm-rpf-sources is-detail" data-rp-sources-ligne="">{marquesVues.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="">{verifie}</span> : null}</span> : null}
+        {/* (12 nov., finitions) La dernière ligne de la fiche : « Vérifié · e-mail · par Mondial Relay à 14:26 », étiquetée comme les autres. */}
+        {marquesVues.length || verifie ? <div className="vrm-rpf-fiche-l vrm-rpf-sources is-detail" data-rp-sources-ligne=""><span className="vrm-rpf-fiche-k">Vérifié</span><span className="vrm-rpf-fiche-v">{marquesVues.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="">{verifie}</span> : null}</span></div> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
       </div> : null}
       {tiroirG}
