@@ -4,7 +4,9 @@ import { STYLE_FLOU, lbcFloute } from '../flouCompte.js';
 import React, { useState, useEffect } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
-import { trierRecents } from '../ordreConversations.js';
+import { trierRecents, sansDoublons } from '../ordreConversations.js';
+import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   // (12 nov.) l'envoi vu dans le fil
+import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 
 
@@ -24,11 +26,13 @@ const etiquetteResultatLbc = (r) => {
   if (r.accepte === true && r.etape === 'refuse') return { ton: 'ko', texte: r.raison || "Leboncoin a refusé : le message n'est pas parti." };
   return { ton: 'ko', texte: (r.raison ? r.raison.charAt(0).toUpperCase() + r.raison.slice(1) : "Rien n'est parti.") + (/[.!]$/.test(r.raison || '') ? '' : '.') };
 };
-function FilLeboncoin({ conv, nom, envoi, onFerme }) {
+function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
   const [fil, setFil] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const [texte, setTexte] = React.useState('');
   const [enCours, setEnCours] = React.useState(false);
   const [res, setRes] = React.useState(null);
+  // (12 nov.) L'envoi se voit DANS le fil (src/envoiFil.js) : { etat, texte, depuis }.
+  const [envoiFil, setEnvoiFil] = React.useState(null);
   const relire = React.useCallback(async () => {
     const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page`);
     if (!Array.isArray(j)) { setFil(null); return; }
@@ -45,14 +49,21 @@ function FilLeboncoin({ conv, nom, envoi, onFerme }) {
     const t = texte.trim();
     if (!t || enCours || !peut) return;
     setEnCours(true); setRes(null);
+    const depuis = Date.now(); setEnvoiFil({ etat: 'envoi', texte: t, depuis });
     let r = null; try { r = await vmrCmd({ cmd: 'lbcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
-    setEnCours(false); setRes(etiquetteResultatLbc(r));
-    if (r && r.accepte === true && r.etape === 'fait') { setTexte(''); relire(); }
+    const etat = etatEnvoiExtension(r);
+    setEnCours(false); setEnvoiFil({ etat, texte: t, depuis });
+    // « Envoyé ✓ » est dit sous la bulle ; au-dessus du champ, seulement ce qui demande un geste.
+    setRes(etat === 'ok' ? null : etiquetteResultatLbc(r));
+    if (etat === 'ok') { setTexte((v) => (v.trim() === t ? '' : v)); relire(); }
   };
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-lbc-fil-etat="charge" style={style}>…</div>;
-  else if (fil === null) corps = <div data-lbc-fil-etat="pas-su" style={style}>Conversation illisible pour l'instant.</div>;
+  // (12 nov.) Lecture ratée ≠ vide : la raison et « Réessayer ».
+  else if (fil === null) corps = <FilIllisible attrs={{ 'data-lbc-fil-etat': 'pas-su' }} texte="Conversation illisible pour l'instant." onRelire={() => { setFil(undefined); relire(); }}/>;
+  // (12 nov.) Un fil vide que la liste annonce : « pas encore lu · Relire », jamais « aucun message ».
+  else if (filPasLu(fil.messages, annonce)) corps = <FilPasLu attrs={{ 'data-lbc-fil-etat': 'vide' }} onRelire={relire}/>;
   else if (!fil.messages || !fil.messages.length) corps = <div data-lbc-fil-etat="vide" style={style}>—</div>;
   else corps = (
     <div data-lbc-fil-etat="lu" data-lbc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -62,6 +73,8 @@ function FilLeboncoin({ conv, nom, envoi, onFerme }) {
       ))}
     </div>
   );
+  const envoiVu = <EnvoiDansFil envoi={envoiFil} Bulle={BulleConv} site="Leboncoin" onReessayer={envoyer} reessayerDesactive={enCours || !texte.trim()}
+    dejaLu={!!(envoiFil && fil && dejaDansFil(fil.messages, envoiFil.texte, envoiFil.depuis))}/>;
   // La page où le fil a été VU (sur leboncoin.fr), sinon la messagerie — jamais une adresse devinée.
   const page = fil && /^\/messages[\w/.-]*$/.test(fil.page || '') ? fil.page : '/messages';
   const lien = `https://www.leboncoin.fr${page}`;
@@ -80,7 +93,7 @@ function FilLeboncoin({ conv, nom, envoi, onFerme }) {
   return (
     <CadreFil etiquette="Conversation Leboncoin" onFermer={onFerme} attrs={{ 'data-lbc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={nom || 'Leboncoin'} titre="" compte="Leboncoin"/>
-      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}</div>
+      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}{envoiVu}</div>
       {pied}
     </CadreFil>
   );
@@ -159,7 +172,8 @@ function ConversationsLeboncoin() {
   const releves = lignes.filter((l) => l.c);
   const pasLus = lignes.filter((l) => !l.c);
   // (11 nov.) Le plus récent en haut par HORODATAGE (avant : comparaison de textes) ; sans date, en bas.
-  const fils = Array.isArray(d.fils) ? trierRecents(d.fils, (f) => f && f.da) : [];
+  // (12 nov.) La même conversation deux fois : une ligne, la copie la plus fraîche (`sansDoublons`).
+  const fils = Array.isArray(d.fils) ? trierRecents(sansDoublons(d.fils, (f) => f && f.conv, (f) => f && f.da), (f) => f && f.da) : [];
   if (!releves.length && !fils.length) {
     return (
       <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
@@ -229,7 +243,7 @@ function ConversationsLeboncoin() {
           <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc" style={{ marginTop: 6 }}>Ouvrir sur Leboncoin ↗</a>
         </div>
         <div className="vrm-chat-column">{filChoisi ? (
-          <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} envoi={d.envoi} onFerme={() => setOuvertConv('')}/>
+          <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} envoi={d.envoi} annonce={!!filChoisi.ap || Number(filChoisi.n) > 0} onFerme={() => setOuvertConv('')}/>
         ) : choisi ? (
           <CadreFil etiquette="Messages Leboncoin" onFermer={() => setOuvert('')} attrs={{ 'data-lbc-fil': choisi.id }}>
             <TeteFil onFermer={() => setOuvert('')} nom={choisi.nom} titre={choisi.type ? 'compte ' + choisi.type : ''} compte="Leboncoin"/>
