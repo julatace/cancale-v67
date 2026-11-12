@@ -815,7 +815,7 @@ export default {
   "favoris.recap.depasse": "{n} gestes · {libres} libres cette heure : {m} messages attendront l’heure suivante, puis partiront seuls",
   "favoris.recap.passu": "{n} gestes · limite de l’heure pas lue (l’extension la tient quand même)",
   "favoris.recap.enCours": "Un envoi est en cours.",
-  "favoris.recap.rien": "Choisis une annonce au-dessus.",
+  "favoris.recap.rien": "Coche un favori au-dessus.",
   "favoris.recap.verifier": "Vérifier et envoyer",
   "favoris.recap.offreA": "offre à {prix}",
   "favoris.recap.espace": "Espacés comme tu l’as choisi ; le premier part tout de suite.",

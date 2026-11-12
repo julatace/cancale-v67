@@ -810,7 +810,7 @@ export default {
   "favoris.recap.depasse": "{n} actions · {libres} free this hour: {m} messages will wait for the next hour, then go on their own",
   "favoris.recap.passu": "{n} actions · hourly limit not read (the extension still enforces it)",
   "favoris.recap.enCours": "A send is in progress.",
-  "favoris.recap.rien": "Choose a listing above.",
+  "favoris.recap.rien": "Tick a favourite above.",
   "favoris.recap.verifier": "Review and send",
   "favoris.recap.offreA": "offer at {prix}",
   "favoris.recap.espace": "Spaced as you chose; the first goes right away.",

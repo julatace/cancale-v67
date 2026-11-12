@@ -810,7 +810,7 @@ export default {
   "favoris.recap.depasse": "{n} azioni · {libres} libere quest’ora: {m} messaggi aspetteranno l’ora dopo, poi partiranno da soli",
   "favoris.recap.passu": "{n} azioni · limite orario non letto (l’estensione lo applica comunque)",
   "favoris.recap.enCours": "Un invio è in corso.",
-  "favoris.recap.rien": "Scegli un annuncio qui sopra.",
+  "favoris.recap.rien": "Spunta un preferito sopra.",
   "favoris.recap.verifier": "Controlla e invia",
   "favoris.recap.offreA": "offerta a {prix}",
   "favoris.recap.espace": "Distanziati come hai scelto; il primo parte subito.",

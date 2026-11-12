@@ -35,7 +35,7 @@ export function ListeFavoris({ uid, rows, infos, choisis, basculer, selectionnab
         <span className="vrm-fc-annonce-texte">
           <span className="vrm-fc-titre">{i.titre || tr('favoris.qui.sansTitre')}</span>
           <span className="vrm-fc-meta">{i.pseudo ? <span data-fav-qui="">{i.pseudo}</span> : null}<span data-fav-quand="">{r.date == null ? tr('favoris.liste.sansDateLigne') : i.age}</span></span>
-          {etat ? <span className={'vrm-fc-compte' + (r.article !== 'en-ligne' && r.envoi === 'a_envoyer' ? ' is-geste' : '')}><span>{etat}</span></span> : null}
+          {etat ? <span className="vrm-fc-compte"><span className={r.article !== 'en-ligne' && r.envoi === 'a_envoyer' ? 'is-geste' : ''}>{etat}</span></span> : null}
         </span>
       </>;
       return <li key={r.id} className={'vrm-fpc-ligne' + (coche ? ' is-choisie' : '')} {...attrs}>

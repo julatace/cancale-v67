@@ -810,7 +810,7 @@ export default {
   "favoris.recap.depasse": "{n} acciones · {libres} libres esta hora: {m} mensajes esperarán a la hora siguiente y saldrán solos",
   "favoris.recap.passu": "{n} acciones · límite por hora no leído (la extensión lo aplica igual)",
   "favoris.recap.enCours": "Hay un envío en curso.",
-  "favoris.recap.rien": "Elige un anuncio arriba.",
+  "favoris.recap.rien": "Marca un favorito arriba.",
   "favoris.recap.verifier": "Revisar y enviar",
   "favoris.recap.offreA": "oferta a {prix}",
   "favoris.recap.espace": "Espaciados como elegiste; el primero sale enseguida.",

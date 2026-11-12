@@ -810,7 +810,7 @@ export default {
   "favoris.recap.depasse": "{n} Aktionen · {libres} frei in dieser Stunde: {m} Nachrichten warten auf die nächste Stunde und gehen dann von selbst",
   "favoris.recap.passu": "{n} Aktionen · Stundenlimit nicht gelesen (die Erweiterung hält es trotzdem ein)",
   "favoris.recap.enCours": "Ein Versand läuft.",
-  "favoris.recap.rien": "Wähle oben eine Anzeige.",
+  "favoris.recap.rien": "Hake oben einen Favoriten an.",
   "favoris.recap.verifier": "Prüfen und senden",
   "favoris.recap.offreA": "Angebot {prix}",
   "favoris.recap.espace": "Mit deinem Abstand; die erste sofort.",
