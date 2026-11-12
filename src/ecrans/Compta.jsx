@@ -35,6 +35,7 @@ import { gesteCorbeille, lireVentesImportees } from '../App.jsx';   // (10 nov.,
 import { LiveStatsCarte, REGLES_CARTE, useSourcesCarte } from '../App.jsx';
 // (11 nov., lot rapport-mois) « Rapport du mois » : le PDF (src/rapportMois.js), les lectures de catégories partagées.
 import { AUTH, lireExtrasRepartition } from '../App.jsx';
+import { oublierReglageMontage } from '../App.jsx';   // (11 nov., intégration) l'écriture directe de la fiche oublie la lecture gardée
 import { moisRapportParDefaut, moisRapportChoix, donneesRapportMois, pdfRapportMois, nomFichierRapport, bornesMois, libelleMoisRapport } from '../rapportMois.js';
 import { margeParPlateforme } from '../margePlateforme.js';
 import { statsParCategorie, afficherCategories, cleVente as cleVenteCat, CLE_CATEGORIES_MAIN } from '../statsCategories.js';
@@ -1692,6 +1693,7 @@ function ProfilFiscalCarte({ onNav }) {
     try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: next })); } catch (_) {}
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
+      oublierReglageMontage('vrm_pro_facture');
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
           method: 'POST',

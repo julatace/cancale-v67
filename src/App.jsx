@@ -6096,9 +6096,20 @@ const lireReglage = async (id) => {
 // seulement tant qu'elle est EN COURS (rien n'est gardé après : la suivante relit). Jamais pour un
 // lire-fusionner-réécrire (qui relit lui-même, `lireReglage`, juste avant d'écrire).
 const _reglagesEnVol = new Map();
+// (11 nov., intégration 11nov-f) Une réponse LUE sert encore 20 s aux cartes qui montent juste après
+// (Ma journée, Argent, TVA sur marge, l'en-tête lisaient `vrm_pro_facture` deux fois à quelques
+// secondes d'écart — budget-vitesse). Un « pas su » (null) n'est jamais gardé ; toute écriture du
+// réglage l'oublie (`oublierReglageMontage`, appelée par `ecrireReglage` et les écritures directes).
+const _reglagesLusMontage = new Map();
+const GARDE_REGLAGE_MS = 20000;
+const oublierReglageMontage = (id) => { _reglagesLusMontage.delete(id); };
+if (typeof window !== 'undefined') { try { window.addEventListener('vrm:fiche-facturation', () => oublierReglageMontage('vrm_pro_facture')); } catch (_) {} }
 const lireReglageMontage = (id) => {
   const deja = _reglagesEnVol.get(id); if (deja) return deja;
-  const p = lireReglage(id).finally(() => { if (_reglagesEnVol.get(id) === p) _reglagesEnVol.delete(id); });
+  const lu = _reglagesLusMontage.get(id);
+  if (lu && Date.now() - lu.at < GARDE_REGLAGE_MS) return Promise.resolve(lu.v);
+  const p = lireReglage(id).then((v) => { if (v !== null && v !== undefined) _reglagesLusMontage.set(id, { v, at: Date.now() }); return v; })
+    .finally(() => { if (_reglagesEnVol.get(id) === p) _reglagesEnVol.delete(id); });
   _reglagesEnVol.set(id, p); return p;
 };
 // ⚠️⚠️ ET LA PHRASE NE S'ÉCRIT QU'UNE FOIS (§7). Vu au rendu le 15 septembre,
@@ -52589,6 +52600,7 @@ const applyZoom = (z) => {
 const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {});
 // ── LA FACTURE PRO (2 nov.) : les outils de l'app que src/FacturePro.jsx emprunte.
 const ecrireReglage = async (id, data) => {
+  oublierReglageMontage(id);
   try {
     // (11 nov., réseau instable) Bornée : « enregistrement… » ne reste jamais affiché
     // sur une réponse qui ne vient pas. L'écriture est une fusion idempotente : la
