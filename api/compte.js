@@ -101,6 +101,7 @@ import { etatPublic } from './_lib/etat-public.js';
 import { statutPourSante } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
+import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
 import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
 import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
@@ -1140,26 +1141,10 @@ async function resilier(req, res, reprendre) {
 //    invalide un lien de réinitialisation de mot de passe encore en attente pour
 //    ce compte (`otp_expired` : Supabase n'en garde qu'un). Sans conséquence pour
 //    quelqu'un déjà connecté — il n'a qu'à redemander le sien.
-const FORK_MAX = 6;                 // sessions fabriquées par vendeur…
-const FORK_FENETRE = 3600 * 1000;   // …par heure glissante
 const FORK_DELAI = 5000;            // chaque appel à Supabase, au plus 5 s
-// Frein PAR INSTANCE, en mémoire du module : Vercel peut en faire tourner
-// plusieurs, et une instance froide repart de zéro. C'est voulu — c'est un frein
-// doux contre une boucle de l'extension (qui ferait sinon tourner des sessions
-// à la chaîne), pas un état qui doit survivre ; il n'y a donc rien à ranger en
-// base. Le vrai verrou est la session de l'appelant.
-const forksRecents = new Map();     // id vendeur → horodatages des essais
-function freinFork(uid) {
-  const maintenant = Date.now();
-  if (forksRecents.size > 5000) {
-    for (const [k, v] of forksRecents) if (!v.some((t) => maintenant - t < FORK_FENETRE)) forksRecents.delete(k);
-  }
-  const recents = (forksRecents.get(uid) || []).filter((t) => maintenant - t < FORK_FENETRE);
-  if (recents.length >= FORK_MAX) { forksRecents.set(uid, recents); return Math.ceil((recents[0] + FORK_FENETRE - maintenant) / 1000); }
-  recents.push(maintenant);
-  forksRecents.set(uid, recents);
-  return 0;
-}
+// (12 nov., M54) Le frein (6 sessions par vendeur et par heure) vit EN BASE
+// (`ext_fork_frein`, comparer-et-échanger) : plusieurs instances Vercel ne le
+// multiplient plus. Base muette ⇒ le frein en mémoire d'avant (api/_lib/frein-fork.js).
 
 // Un appel à l'authentification de Supabase. Rend l'objet JSON, ou `null` si
 // Supabase a refusé, n'a pas répondu à temps ou a rendu autre chose que du JSON.
@@ -1253,7 +1238,7 @@ async function sessionExtension(req, res) {
   const email = String(u.email || '').trim();
   if (!email) return repondre(res, 409, { erreur: 'sans-email', message: "Ton compte VRM n'a pas d'adresse email : connecte l'extension depuis sa fenêtre." });
   if (!u.emailConfirme) return repondre(res, 409, { erreur: 'email-non-confirme', message: "Ton adresse email n'est pas encore confirmée : clique le lien reçu par email, puis réessaie." });
-  const attente = freinFork(u.id);
+  const attente = await freinFork({ uid: u.id, url: SUPABASE_URL, entetes: sbCle(SERVICE) });
   if (attente) {
     res.setHeader('Retry-After', String(attente));
     return repondre(res, 429, { erreur: 'trop-souvent', message: "L'extension a demandé sa connexion trop souvent. Réessaie dans un moment." });

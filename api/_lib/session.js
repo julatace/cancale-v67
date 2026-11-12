@@ -37,15 +37,20 @@ export async function utilisateurDe(req) {
 // La base sait-elle séparer les vendeurs ? 200 → oui · 400 (colonne absente) →
 // non · le reste (522, délai) → on le suppose (filtrer sur le vendeur au pire
 // fait échouer la lecture ; ne PAS filtrer mélangerait les boutiques).
+// (12 nov., B137) Pendant une panne, la sonde n'est refaite qu'au bout de 10 s
+// (avant : à CHAQUE requête). La réponse pendant la panne reste « cloisonnée ».
 let _cloisonnee = null;
+let _sondeEnPanneJusqua = 0;
+export const SONDE_PANNE_MS = 10000;
 export async function baseCloisonnee() {
   if (_cloisonnee !== null) return _cloisonnee;
+  if (Date.now() < _sondeEnPanneJusqua) return true;
   try {
     const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
     if (r.ok) _cloisonnee = true;
     else if (r.status === 400) _cloisonnee = false;
-    else return true;
-  } catch (_) { return true; }
+    else { _sondeEnPanneJusqua = Date.now() + SONDE_PANNE_MS; return true; }
+  } catch (_) { _sondeEnPanneJusqua = Date.now() + SONDE_PANNE_MS; return true; }
   return _cloisonnee;
 }
 

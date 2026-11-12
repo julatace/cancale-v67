@@ -236,6 +236,27 @@ const ligneDe = async (owner, id) => {
 };
 export const lireEnvois = (owner) => ligneDe(owner, ID_ENVOIS);
 export const lireChoix = (owner) => ligneDe(owner, ID_CHOIX);
+// (12 nov., M92) Les deux lignes de TOUS les essais du passage, en lots de 100
+// vendeurs (une lecture par lot, au lieu de deux par essai). Rend Map owner →
+// { choix, envois } (lignes absentes ⇒ {}), ou null (pas su : on relit vendeur par
+// vendeur, comme avant). La liste est entière : `limit` = lignes possibles.
+export async function lireLignesEnLot(owners) {
+  const out = new Map();
+  const liste = [...new Set(owners.filter((o) => UUID.test(String(o))))];
+  for (let i = 0; i < liste.length; i += 100) {
+    const lot = liste.slice(i, i + 100);
+    const r = await lire(`app_data?owner=in.(${lot.map(encodeURIComponent).join(',')})&id=in.(${ID_ENVOIS},${ID_CHOIX})&select=owner,id,data&order=owner.asc,id.asc&limit=${lot.length * 2}`);
+    if (!r) return null;
+    for (const o of lot) out.set(o, { choix: {}, envois: {} });
+    for (const l of r) {
+      const o = String((l && l.owner) || '').toLowerCase(); const x = out.get(o);
+      if (!x) continue;
+      const d = l.data && typeof l.data === 'object' ? l.data : {};
+      if (l.id === ID_ENVOIS) x.envois = d; else if (l.id === ID_CHOIX) x.choix = d;
+    }
+  }
+  return out;
+}
 async function ecrire(owner, id, data) {
   if (!SERVICE()) return false;
   try {
@@ -284,6 +305,7 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
   if (!essais) return { pret: true, envoyes: 0, arret: 'essais illisibles' };
   const ignores = {}; const ign = (r) => { ignores[r] = (ignores[r] || 0) + 1; };
   let envoyes = 0;
+  const enLot = await lireLignesEnLot(essais.filter((a) => a && a.statut === 'trialing').map((a) => String(a.owner || '').toLowerCase()));
   for (const a of essais) {
     if (envoyes >= MAX_PAR_PASSAGE) { ign('plafond du passage'); continue; }
     if (horloge() >= jusqua) { ign('temps du passage'); continue; }
@@ -292,7 +314,8 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     if (a.statut !== 'trialing') { ign('pas en essai'); continue; }
     if (proprio.has(owner)) { ign('proprietaire'); continue; }
     if (a.mode_test !== false && !cfg.modeTest) { ign('mode test'); continue; }
-    const [choix, envois] = await Promise.all([lireChoix(owner), lireEnvois(owner)]);
+    const lu = enLot && enLot.get(owner);
+    const [choix, envois] = lu ? [lu.choix, lu.envois] : await Promise.all([lireChoix(owner), lireEnvois(owner)]);
     if (!choix || !envois) { ign('pas su'); continue; }
     if (choix.desinscrit === true) { ign('desinscrit'); continue; }
     const etape = etapeDuJour({ fin: a.fin_periode, maintenant, envois: envois.envois || {} });

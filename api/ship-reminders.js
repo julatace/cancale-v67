@@ -781,14 +781,19 @@ async function lireTransporteursDuVendeur({ max = MAX_CRON, maxDeparts = MAX_DEP
 // (`bilan_mois_choix`, écrit par le serveur seul). Les lectures sont celles du
 // bilan de la semaine (projetées, paginées) + la publication du bénéfice. Le
 // canal : le serveur SMTP des e-mails de l'essai (RELANCES_SMTP_*). La part du
-// jour (`COMPTEUR_BILAN_MOIS`) est posée par le handler, partagée par les lots.
-let COMPTEUR_BILAN_MOIS = { reste: 0 };
+// jour est posée par le handler, partagée par les lots DE CE PASSAGE.
+// (12 nov., M79) Elle voyage dans le contexte du vendeur (`contexteVendeur`,
+// `compteurBilan`), plus dans une variable de module : deux passages simultanés
+// sur la même instance ne se volent plus le plafond. Sans compteur : rien.
 async function bilanDuMoisVendeur(maintenant = Date.now()) {
   const owner = proprietaireCourant();
   if (!owner) return null;
+  const store = contexteVendeur.getStore && contexteVendeur.getStore();
+  const compteur = store && store.compteurBilan;
+  if (!compteur) return null;
   const cfg = configurationRelances();
   return bilanMoisVendeur({
-    owner, maintenant, compteur: COMPTEUR_BILAN_MOIS, config: cfg, service: process.env.SUPABASE_SERVICE_KEY || '',
+    owner, maintenant, compteur, config: cfg, service: process.env.SUPABASE_SERVICE_KEY || '',
     lireChoix: () => getRow(ID_CHOIX_BILAN_MOIS), lireEnvois: () => getRow(ID_ENVOIS_BILAN_MOIS),
     ecrireEnvois: (data) => ecrireDedup(ID_ENVOIS_BILAN_MOIS, data),
     lireDonnees: lireDonneesBilan,
@@ -1585,9 +1590,9 @@ async function passageDuCron(req, res, moment, bailEtat) {
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
     // pour tout VRM (Brevo gratuit, `VRM_EMAILS_PAR_JOUR`), moins les e-mails de
     // l'essai déjà partis, 150 au plus (api/_lib/bilan-mois.js `partBilan`).
-    COMPTEUR_BILAN_MOIS = { reste: !soir && !reveil ? partBilan({ dejaEnvoyes: relances && relances.envoyes }) : 0 };
+    const compteurBilan = { reste: !soir && !reveil ? partBilan({ dejaEnvoyes: relances && relances.envoyes }) : 0 };
     // (8 nov.) L'identité de l'éditeur au pied du bilan (public/legal/editeur.js), lue une fois.
-    if (COMPTEUR_BILAN_MOIS.reste > 0) { try { await lireMentions(); } catch (_) {} }
+    if (compteurBilan.reste > 0) { try { await lireMentions(); } catch (_) {} }
     // (6 nov., filet 4) La veille des plantages.
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
@@ -1641,7 +1646,7 @@ async function passageDuCron(req, res, moment, bailEtat) {
     const budget = Number(process.env.VRM_CRON_BUDGET_MS) > 0 ? Number(process.env.VRM_CRON_BUDGET_MS) : BUDGET_VENDEURS_MS;
     const lot = await passerVendeurs({
       owners, moment: momentCurseur, jour: parisDate(0), debut: debutCron, budgetMs: budget, parallele: VENDEURS_EN_PARALLELE,
-      traiter: (o) => contexteVendeur.run({ owner: o }, () => traiter()),
+      traiter: (o) => contexteVendeur.run({ owner: o, compteurBilan }, () => traiter()),
       lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre, retirerCurseur: retirerNeutre,
     });
     const { bilans, echecs } = lot;
@@ -1658,4 +1663,4 @@ async function passageDuCron(req, res, moment, bailEtat) {
 
 // (8 nov., « à envoyer » prouvé) Pour le banc seulement (scripts/audit-a-envoyer-preuves.cjs) : la
 // composition « à expédier » du soir, du bilan et du matin, exécutée sur une fausse base.
-export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan };
+export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan, bilanDuMoisVendeur };   // (12 nov.) + le bilan du mois (M79, audit-revue-fin)

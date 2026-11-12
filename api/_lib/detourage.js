@@ -177,7 +177,8 @@ export async function handleDetourage(req, res) {
   if (req.method === 'GET') {
     if (!q.usage) { res.status(200).json({ ok: true, ready: !!cle }); return; }
     const u = await utilisateurDe(req);
-    if (!u) { res.status(401).json({ ok: false, reason: 'session' }); return; }
+    if (u === undefined) { res.status(503).json({ ok: false, reason: 'auth-pas-su' }); return; }   // (12 nov., B113) panne ≠ pas de session
+  if (!u) { res.status(401).json({ ok: false, reason: 'session' }); return; }
     const cleUser = await lireCleVendeur(u.id);
     if (cleUser === undefined) { res.status(503).json({ ok: false, reason: 'cle-pas-su', ready: !!cle }); return; }
     // Avec SA clé : prête, sans plafond serveur ni verrou propriétaire — c'est
@@ -191,6 +192,7 @@ export async function handleDetourage(req, res) {
   }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST' }); return; }
   const u = await utilisateurDe(req);
+  if (u === undefined) { res.status(503).json({ ok: false, reason: 'auth-pas-su' }); return; }   // (12 nov., B113)
   if (!u) { res.status(401).json({ ok: false, reason: 'session' }); return; }
   if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement' }); return; }
   // La clé du vendeur d'abord (SON compte Photoroom paie) ; la clé serveur en
@@ -258,8 +260,9 @@ export async function handleDetourage(req, res) {
         const status = (s === 402 || s === 403 || s === 429) ? s : (s >= 500 ? 502 : 502);
         return { status, corps: { ok: false, reason: 'photoroom', status: s } };
       }
-      await ecrireCache(u.id, sha, r.buf);              // au mieux : un cache raté se paiera une fois de plus
-      return { status: 200, corps: { ok: true, hit: false, b64: r.buf.toString('base64'), type: 'image/jpeg', bytes: r.buf.length, ...(propre ? { clePropre: true } : { n }) } };
+      // (12 nov., B114) un cache raté se paiera une fois de plus : c'est DIT dans la réponse.
+      const cacheOk = await ecrireCache(u.id, sha, r.buf);
+      return { status: 200, corps: { ok: true, hit: false, ...(cacheOk ? {} : { cache: false }), b64: r.buf.toString('base64'), type: 'image/jpeg', bytes: r.buf.length, ...(propre ? { clePropre: true } : { n }) } };
     })().finally(() => enVol.delete(cleVol));
     enVol.set(cleVol, p);
   }

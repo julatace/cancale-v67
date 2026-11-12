@@ -254,7 +254,7 @@ async function colisAutresSites(fait, m, departs = null) {
 async function bordRows() {
   const [b, relus] = await Promise.all([
     fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`)),
-    fetchPaginated(scoped(REQ_RELUS)).catch(() => null),
+    fetchPaginated(scoped(REQ_RELUS)),   // (12 nov., B138) ne lève jamais : null = pas su, traité par avecRelus
   ]);
   return avecRelus(b, relus);
 }

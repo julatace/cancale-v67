@@ -157,7 +157,7 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
   const modeTest = env.VRM_DEPARTS_MODE_TEST === '1';
   const ignores = {}; const ign = (r) => { ignores[r] = (ignores[r] || 0) + 1; };
   let avis = 0, supprimes = 0, incomplets = 0;
-  let mentionsLues = false;
+  let mentionsLues = false, mentionsOk = false;
   for (const a of finis) {
     const owner = String((a && a.owner) || '').toLowerCase();
     if (!UUID.test(owner) || owner === PROPRIETAIRE_NEUTRE) { ign('identifiant'); continue; }
@@ -177,7 +177,10 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
     const etape = etapeDepart({ fin, maintenant, avis: lignes[0] && lignes[0].data });
     if (!etape) { ign('rien aujourd’hui'); continue; }
     if (etape === 'avis-pas-prouve') { ign('avis pas prouve : rien efface'); continue; }
-    if (!mentionsLues) { mentionsLues = true; try { await lireMentions(); } catch (_) {} }
+    // (12 nov., B143) Le pied de l'e-mail (l'éditeur) : fichier illisible ⇒ AUCUN e-mail ne part
+    // (ni avis ni « compte supprimé ») — et sans avis prouvé, rien n'est effacé. Demain.
+    if (!mentionsLues) { mentionsLues = true; try { const m = await lireMentions(); mentionsOk = !!(m && !m.erreur); } catch (_) { mentionsOk = false; } }
+    if (!mentionsOk) { ign('mentions pas lues : rien envoye'); continue; }
 
     if (etape === 'avis') {
       if (avis >= maxAvis) { ign('plafond des avis'); continue; }

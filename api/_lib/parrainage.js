@@ -181,8 +181,9 @@ async function crediterParrain(ligne, centimes, maintenant) {
   const an = recents.filter((x) => x.credit_parrain_le && Date.parse(x.credit_parrain_le) > maintenant - 365 * 86400000).length;
   if (an >= PARRAIN_MAX_AN) return true;                  // plafond : rien de plus, dit dans les CGV
   if (!(await crediter(client, `${ligne.filleul}:parrain`, centimes))) return false;
-  await patch(ligne.filleul, { credit_parrain_le: new Date(maintenant).toISOString() });
-  return true;
+  // (12 nov., B135) Crédit fait mais pas noté ⇒ « à réessayer » : Stripe rejoue, et le
+  // rejeu retrouve le crédit par sa marque (`crediter`) au lieu d'en refaire un.
+  return await patch(ligne.filleul, { credit_parrain_le: new Date(maintenant).toISOString() });
 }
 
 // Facture PAYÉE d'un vendeur (webhook `invoice.paid`). `owner` = le vendeur de
@@ -201,7 +202,7 @@ export async function factureFilleulPayee(owner, client, facture, centimes, main
   if (l && paye) {
     if (!l.paye_le) { l.paye_le = new Date(maintenant).toISOString(); if (!(await patch(owner, { paye_le: l.paye_le }))) return { ok: false }; }
     if (!l.credit_filleul_le) {
-      if (await crediter(client, `${owner}:filleul`, centimes)) await patch(owner, { credit_filleul_le: new Date(maintenant).toISOString() });
+      if (await crediter(client, `${owner}:filleul`, centimes)) { if (!(await patch(owner, { credit_filleul_le: new Date(maintenant).toISOString() }))) ok = false; }   // (12 nov., B135)
       else ok = false;
     }
     if (!(await crediterParrain(l, centimes, maintenant))) ok = false;

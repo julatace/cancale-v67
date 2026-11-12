@@ -17,9 +17,15 @@ export function preparerAgentEbay({orders,messages,offres,journal},now=Date.now(
  ]){const ok=r?.body?.ok===true && Array.isArray(r.body[key]);sources.push({nom,ok,partiel:ok && (r.body.totalPages==null || r.body.totalPages>1)});if(ok)add(section,r.body[key],make);}
  return {status:200,body:{ok:true,tasks:[...new Map(tasks.map(t=>[t.id,t])).values()].sort((a,b)=>(b.urgent===true)-(a.urgent===true) || (date(a.deadline) ?? Infinity)-(date(b.deadline) ?? Infinity)),sources,journal:Array.isArray(journal?.items)?journal.items:[],journalLisible:journal!==undefined,capturedAt:now}};
 }
+export const VERROU_ACTION_MS=10*60*1000;
 export async function executerAvecJournal({action,b,execute,modifier}) {
  const entry={id:randomUUID(),action,entityId:String(b.messageId || b.offerId || b.returnId || b.cancelId || b.orderId || b.itemId || b.listingId || '').slice(0,64),ref:String(b.orderId || b.itemId || b.listingId || '').slice(0,64),at:Date.now(),etat:'en_cours'};
- let saved;try{saved=await modifier(d=>({...d,items:[entry,...(Array.isArray(d?.items)?d.items:[])].slice(0,100)}));}catch(_){saved=false;}
+ // (12 nov., M78) Verrou d'idempotence : la MÊME action sur la MÊME entité encore « en cours »
+ // (moins de 10 min) ⇒ refusée avant eBay (deux clics = un seul appel). Entité inconnue ⇒ pas de verrou.
+ let doublon=false;
+ const enCours=x=>x && x.etat==='en_cours' && x.action===action && entry.entityId && x.entityId===entry.entityId && Number.isFinite(Number(x.at)) && entry.at-Number(x.at)<VERROU_ACTION_MS;
+ let saved;try{saved=await modifier(d=>{const items=Array.isArray(d?.items)?d.items:[];doublon=items.some(enCours);return doublon?undefined:{...d,items:[entry,...items].slice(0,100)};});}catch(_){saved=false;}
+ if(saved===true && doublon)return {status:409,body:{ok:false,reason:'en-cours',error:'Cette action est déjà en cours sur eBay : rien n’a été renvoyé. Attends son résultat.'}};
  if(saved!==true)return {status:503,body:{ok:false,error:'Le suivi de cette action n’a pas pu être préparé. Réessaie plus tard ; rien n’a été envoyé.',reason:'journal'}};
  let r;try{r=await execute();}catch(_){r={status:504,body:{ok:false,reason:'incertain',error:'État incertain : relis les données eBay avant de recommencer.'}};}
  const etat=r.body?.ok?'reussi':r.body?.reason==='incertain'?'incertain':'refuse';

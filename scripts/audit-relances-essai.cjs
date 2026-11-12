@@ -80,6 +80,13 @@ global.fetch = async (url, o = {}) => {
   if (methode === 'GET') {
     if (q.get('select') === 'owner' && q.get('limit') === '1') return rep([{ owner: JULIEN }]);
     if (id === 'main' && !owner) return rep([]);                         // aucun vendeur à rappeler
+    // (12 nov., M92) la lecture EN LOT : owner=in.(…)&id=in.(…), select=owner,id,data — la vraie forme.
+    const dans = (n) => { const m = /^in\.\((.*)\)$/.exec(q.get(n) || ''); return m ? m[1].split(',') : null; };
+    if (dans('owner')) {
+      const out = [];
+      for (const o2 of dans('owner')) for (const i2 of (dans('id') || [id])) { const d2 = base.get(k(o2, i2)); if (d2 !== undefined) out.push({ owner: o2, id: i2, data: d2 }); }
+      return rep(out);
+    }
     const d = base.get(k(owner, id));
     if (d === undefined) return rep([]);
     const sel = q.get('select') || 'data';
