@@ -225,7 +225,9 @@ const EMOJI = /\p{Extended_Pictographic}/u;
       dit(pushes.length === 0, `X1 « ${cat} » (retirée) ne part pas, même allumée avant`);
     }
     const cats = Object.keys(T.FAMILLE_DE).join(' ');
-    dit(!/evaluation|avis|sansreponse|bloque|jamais|retard/i.test(cats), 'X2 aucune famille refusée le 11 oct. (évaluation, messages sans réponse, argent bloqué, achat jamais arrivé)', cats);
+    // (11 nov., lot avis-negatif) `avis` = un avis REÇU de 3★ ou moins (src/avisNegatif.js), pas un rappel
+    // d'évaluation À LAISSER (refusé le 11 oct.) : seul ce mot exact est permis, rien qui « rappelle d'évaluer ».
+    dit(!/evaluation|evaluer|alaisser|alaissr|alaisse|sansreponse|bloque|jamais|retard/i.test(cats) && Object.keys(T.FAMILLE_DE).filter((c) => /avis/i.test(c)).every((c) => c === 'avis'), 'X2 aucune famille refusée le 11 oct. (évaluation à laisser, messages sans réponse, argent bloqué, achat jamais arrivé) ; « avis » = avis reçu seulement', cats);
     const api = fs.readdirSync(path.join(R, 'api', '_lib')).map((f) => path.join(R, 'api', '_lib', f)).concat(fs.readdirSync(path.join(R, 'api')).filter((f) => f.endsWith('.js')).map((f) => path.join(R, 'api', f)));
     const fautif = api.filter((f) => /\.js$/.test(f)).filter((f) => /title:\s*[`'"][^`'"]*(évaluation à laisser|sans réponse depuis|argent bloqué|jamais arrivé)/i.test(fs.readFileSync(f, 'utf8')));
     dit(!fautif.length, 'X3 aucun texte de notification de ces familles dans api/', fautif.join(','));

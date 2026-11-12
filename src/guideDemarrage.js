@@ -29,6 +29,7 @@
 // — chacun lu, avec LE geste qui manque.
 // JS pur, sans React : `scripts/audit-premieres-minutes.cjs` l'exécute.
 
+import { motsVendeur } from './profilVendeur.js';
 export const ETAPES_GUIDE = [
   { cle: 'compte', titre: 'Créer ton compte', pourquoi: 'C’est fait : tout ce que VRM range est à toi, et à personne d’autre.' },
   { cle: 'extension', titre: 'Installer l’extension', pourquoi: 'C’est elle qui lit tes ventes, tes colis et tes bordereaux sur Vinted, depuis ton navigateur.' },
@@ -118,7 +119,7 @@ export function etatGuide(preuves = {}, { plusTard = null, maintenant = Date.now
 
 // ── LE CHOIX DE LA NUMÉROTATION ───────────────────────────────────────────────
 export const CHOIX_NUMEROTATION = [
-  { cle: 'vrm', titre: 'VRM numérote mes paires', texte: 'Chaque nouvelle annonce reçoit un numéro à écrire sur sa boîte.' },
+  { cle: 'vrm', get titre() { return `VRM numérote ${motsVendeur().mes}`; }, texte: 'Chaque nouvelle annonce reçoit un numéro à écrire sur sa boîte.' },
   { cle: 'moi', titre: 'Je numérote moi-même', texte: 'Tu termines ta description par «\u00a0N°\u00a0123\u00a0»\u00a0: VRM lit le tien.' },
 ];
 // (8 nov.) Hors sneakers (src/profilVendeur.js) : « mes articles », « sa boîte ou son étiquette ».

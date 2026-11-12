@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { STYLE_FLOU, lbcFloute } from '../flouCompte.js';
+import { motsVendeur } from '../profilVendeur.js';
 import React, { useState, useEffect } from 'react';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
@@ -241,7 +242,7 @@ function ConversationsLeboncoin() {
             <PiedSansEnvoi raison="Pour lire et répondre, ouvre ta messagerie Leboncoin." lien="https://www.leboncoin.fr/messages" texteLien="Répondre sur Leboncoin ↗"/>
           </CadreFil>
         ) : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{fils.length ? 'Choisis une conversation' : 'Choisis un compte'}</span></div>}</div>
-        <FicheConvVolet site="leboncoin" etat={choisi || filChoisi ? 'non-reliee' : 'aucune'} raison="Leboncoin ne dit pas à VRM de quelle annonce parle un message : VRM ne devine pas la paire."/>
+        <FicheConvVolet site="leboncoin" etat={choisi || filChoisi ? 'non-reliee' : 'aucune'} raison={`Leboncoin ne dit pas à VRM de quelle annonce parle un message : VRM ne devine pas ${motsVendeur().le}.`}/>
       </div>
     </div>
   );

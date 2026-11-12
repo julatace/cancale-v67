@@ -40,12 +40,16 @@ export const CARTES_JOURNEE = [
   { id: 'trancher', zone: 'afaire', nom: 'À trancher', desc: 'Tes doutes à régler, toujours en tête.', fixe: true },
   { id: 'ailleurs', zone: 'afaire', nom: 'Vendus ailleurs', desc: 'Annonces à retirer des autres sites.' },
   { id: 'deux-fois', zone: 'afaire', nom: 'En ligne deux fois', desc: 'La même annonce publiée deux fois.' },
+  { id: 'avis-bas', zone: 'afaire', nom: 'Avis négatif reçu', desc: 'Un avis de 3★ ou moins, à lire.' },   // (11 nov., lot avis-negatif, intégration)
+  { id: 'photos-comptes', zone: 'afaire', nom: 'Photos sur deux comptes', desc: 'La même photo sur deux comptes Vinted.' },
   { id: 'envoyer', zone: 'afaire', nom: 'Colis à envoyer', desc: 'Revient seule si un colis est pressé.', urgent: true },
   { id: 'retirer', zone: 'afaire', nom: 'Colis à retirer', desc: 'Revient seule au dernier jour.', urgent: true },
   { id: 'messages', zone: 'afaire', nom: 'Messages', desc: 'Tes messages pas lus.' },
   { id: 'prix', zone: 'afaire', nom: 'Prix à baisser', desc: 'Un conseil, rien ne part seul.' },
   { id: 'a-relier', zone: 'afaire', nom: 'E-mails à relier', desc: 'Les comptes dont rien n’arrive.' },
   { id: 'stock-sortie', zone: 'afaire', nom: 'Vendus encore rangés', desc: 'À sortir de tes meubles.' },
+  // (11 nov., lot sante-comptes) Seulement quand un compte Vinted GLISSE (un indicateur lu passe son seuil).
+  { id: 'sante-comptes', zone: 'afaire', nom: 'Comptes à surveiller', desc: 'Un compte Vinted qui glisse : la raison, le geste.' },
   // (11 nov.) « Supprimés de Vinted » n'est plus une carte : ces articles vivent dans « À trancher » (lot DJ4).
   { id: 'autres', zone: 'afaire', nom: 'Les autres rappels', desc: 'Litiges, achats à relier, inventaire…' },
   { id: 'urssaf', zone: 'afaire', nom: 'Déclaration URSSAF', desc: 'L’échéance qui approche.' },

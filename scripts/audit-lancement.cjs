@@ -49,6 +49,10 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       captchaActif: () => false, routeProtegee: () => false, jetonCaptcha: () => null, etatCaptcha: () => ({ statut: 'inactif' }),
       consommerCaptcha: () => {}, corpsAvecCaptcha: (p, b) => b, MSG_CAPTCHA_ATTENTE: '', MSG_CAPTCHA_REFUS: '', MSG_CAPTCHA_ERREUR: '',
       window: { location: { origin: 'https://vrm.center', pathname: '/' } },
+      // (11 nov., ci-vert) src/lienEmail.js (lot securite-revue) : « ce navigateur a demandé un e-mail de compte »,
+      // noté sur un stockage inventé (rien n'est écrit ailleurs).
+      noterLienDemande: (st) => { try { st.setItem('vrm_lien_demande', String(Date.now())); } catch (_) {} },
+      oublierLienDemande: () => {}, localStorage: { setItem: () => {}, getItem: () => null, removeItem: () => {} },
       fetch: async (url, o) => { appels.push({ url: String(url), methode: (o && o.method) || 'GET' }); return { ok: true, status: 200, json: async () => ({}) }; },
     });
     for (const n of ast.program.body) {

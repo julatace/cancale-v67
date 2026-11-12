@@ -118,7 +118,7 @@ const ouvrir = async (b, tel, tab, options = {}) => {
   await pg.addInitScript((loc) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vrm_bascule_mineral_v1', '1'); for (const [k, v] of Object.entries(loc || {})) localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch (_) {} }, options.local || {});
   const LIGNES = [...LIGNES_BASE];
   if (!options.sansVestiaire) LIGNES.push({ id: 'vc_ventes', data: { ventes: { 'vc-1': { ref: '80', etat: 'Expédiée', date: il(5).toISOString(), montant: { valeur: 120, devise: 'EUR', cle: 'price' } } }, lectures: {} } }, { id: 'vc_listings', data: { items: {}, liens: {} } });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
@@ -210,7 +210,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           // (9 nov., lot Z) L'icône de VRM porte LE MÊME nombre que le badge de Colis (dernière demande au navigateur).
           const pastille = await pg.evaluate(() => (window.__pastille || []).slice(-1)[0]);
           dit(badge.n !== '' && pastille === Number(badge.n), 'Z. pastille de l\'icône de VRM = le badge de Colis', JSON.stringify({ pastille, badge: badge.n }));
-          await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').tap();
+          await pg.locator('.vrm-mobile-nav button[aria-label^="Plus"]').tap();
           await pg.waitForTimeout(500);
           const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
           await capture(pg, 'plus-telephone');
@@ -219,7 +219,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Moi', JSON.stringify(f && f.groupes));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           // (5 nov.) « E-mails » rejoint « Gérer » (demande du 5 nov., `docs/passation/2026-11-05-onglet-emails.md`).
-          dit(exp.join('|') === 'trancher|garage|achats|emails|compta', 'J. « Gérer » : À trancher (lot AC), Stock, Achats, E-mails, Argent ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
+          dit(exp.join('|') === 'garage|achats|emails|compta', 'J. « Gérer » : Stock, Achats, E-mails, Argent (À trancher vit dans Ma journée, lot DJ4) ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
           const libArgent = await pg.evaluate(() => { const e = document.querySelector('.vrm-sheet [data-nav-entree="compta"]'); return e ? e.innerText.trim() : ''; });
           dit(libArgent === 'Argent', 'J. l’entrée `compta` s’appelle « Argent »', libArgent);
           dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
@@ -238,7 +238,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           // (9 nov., lot AL) « Vendre » n'avait plus que Republier et Favoris & offres dans la colonne : vide, il disparaît.
           dit(col.groupes.join('|') === 'Gérer|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'trancher|garage|achats|emails|compta' && !col.toutes.includes('retraits') && !col.toutes.includes('dashboard'), 'J. colonne, « Gérer » : À trancher (lot AC), Stock, Achats, E-mails, Argent (lot AO) ; aucune entrée « Colis à retirer »', exp.join('|'));
+          dit(exp.join('|') === 'garage|achats|emails|compta' && !col.toutes.includes('retraits') && !col.toutes.includes('dashboard'), 'J. colonne, « Gérer » : Stock, Achats, E-mails, Argent (lot AO ; À trancher dans Ma journée, lot DJ4) ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.length === 0, 'J. colonne sans section « Plateformes », sites dans les tâches', plat.join('|'));
           // (6 nov.) La cloche se calcule après ses lectures (passage asynchrone) : sur une

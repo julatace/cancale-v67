@@ -216,12 +216,12 @@ const attendreCoque = async (pg) => {
 // visitée qu'une fois, sur Ma journée).
 const SCOPE_ECRAN = '.vrm-main, .vrm-barre-haut-droite';
 const ouvrirEntreeNav = async (pg, tel, cle) => {
-  if (tel) { await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').click(); await pg.waitForTimeout(500); }
+  if (tel) { await pg.locator('.vrm-mobile-nav button[aria-label^="Plus"]').click(); await pg.waitForTimeout(500); }
   await pg.locator(`[data-nav-entree="${cle}"]`).first().click(); await pg.waitForTimeout(1200);
 };
 const ECRANS = (tel) => [
   { nom: 'coque', url: '?tab=journee', portee: 'body', exclure: SCOPE_ECRAN },
-  ...(tel ? [{ nom: 'plus', url: '?tab=journee', prep: async (pg) => { await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').click(); await pg.waitForTimeout(500); }, portee: '.vrm-sheet', refaire: true }] : []),
+  ...(tel ? [{ nom: 'plus', url: '?tab=journee', prep: async (pg) => { await pg.locator('.vrm-mobile-nav button[aria-label^="Plus"]').click(); await pg.waitForTimeout(500); }, portee: '.vrm-sheet', refaire: true }] : []),
   { nom: 'journee', url: '?tab=journee' },
   { nom: 'tournee', url: '?tab=journee', prep: async (pg) => { const o = pg.locator('[data-tournee-ouvrir]'); if (await o.count()) { await o.first().click(); await pg.waitForTimeout(700); } }, portee: '[data-tournee-plein]', refaire: true },
   ...['vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'annonces.' + s, url: '?tab=annonces&site=' + s })),

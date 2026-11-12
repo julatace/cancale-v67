@@ -514,17 +514,29 @@
         paiementEstime: d.header && typeof d.header.date === 'string' ? d.header.date.slice(0, 40) : '', moi: moiId });
     } catch (_) {}
   }
+  // 5.365 : la source d'une liste de ventes d'après son CHEMIN ('' = pas une liste de ventes).
+  function sourceVentes(u) {
+    const ch = u.pathname;
+    if (/current|cart|basket|purchase|bought|achat/i.test(ch)) return '';
+    return /\/users\/me\/awaiting-shipping-items\/?$/i.test(ch) ? 'a-expedier'
+      : (/\/users\/me\/[\w-]*(sales|sold|transactions)[\w-]*\/?$/i.test(ch) || /\/sales\/?$/i.test(ch)) ? 'ventes' : '';
+  }
   function noteVentes(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
       if (!DE_VC(url)) return;
-      const ch = u.pathname;
-      if (/current|cart|basket|purchase|bought|achat/i.test(ch)) return;
-      const source = /\/users\/me\/awaiting-shipping-items\/?$/i.test(ch) ? 'a-expedier'
-        : (/\/users\/me\/[\w-]*(sales|sold|transactions)[\w-]*\/?$/i.test(ch) || /\/sales\/?$/i.test(ch)) ? 'ventes' : '';
+      const source = sourceVentes(u);
       if (!source) return;
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       if (!obj || typeof obj !== 'object') return;
+      if (source === 'ventes') noterModeleImport('ventes', u);
+      const pq = paquetVentes(u, obj, source);
+      post(Object.assign({ kind: 'vcventes' }, pq, pq.inconnu ? {} : { complet: lotComplet('ventes-' + source, u, pq.total, pq.ventes.map((x) => x.id)) }));
+    } catch (_) {}
+  }
+  // 5.365 : la lecture d'UNE page de ventes, sans rien envoyer (la visite ET l'import la partagent).
+  function paquetVentes(u, obj, source) {
+    {
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
@@ -539,9 +551,9 @@
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
-      if (!listeConnue(obj, arr)) { post({ kind: 'vcventes', source, ventes: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
-      post({ kind: 'vcventes', source, ventes, offset, total, lus: arr.length, forme, complet: lotComplet('ventes-' + source, u, total, ventes.map((x) => x.id)), moi: moiId });
-    } catch (_) {}
+      if (!listeConnue(obj, arr)) return { source, ventes: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId };
+      return { source, ventes, offset, total, lus: arr.length, forme, moi: moiId };
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -651,15 +663,24 @@
     for (const k of Object.keys(e || {}).slice(0, 80)) if (!PAS_ACHAT.test(k)) propre[k] = e[k];
     return scalairesVente(propre);
   }
+  // 5.365 : une liste d'ACHATS d'après son CHEMIN.
+  function estListeAchats(u) {
+    const ch = u.pathname;
+    if (/current|cart|basket|checkout|sales|sold|awaiting-shipping|selling/i.test(ch)) return false;
+    return /\/users\/me\/[\w-]*(orders|purchases|bought|buyings?)[\w-]*\/?$/i.test(ch) || /\/purchases\/?$/i.test(ch);
+  }
   function noteAchats(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
-      if (!DE_VC(url)) return;
-      const ch = u.pathname;
-      if (/current|cart|basket|checkout|sales|sold|awaiting-shipping|selling/i.test(ch)) return;
-      if (!(/\/users\/me\/[\w-]*(orders|purchases|bought|buyings?)[\w-]*\/?$/i.test(ch) || /\/purchases\/?$/i.test(ch))) return;
+      if (!DE_VC(url) || !estListeAchats(u)) return;
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       if (!obj || typeof obj !== 'object') return;
+      noterModeleImport('achats', u);
+      post(Object.assign({ kind: 'vcachats' }, paquetAchats(u, obj)));
+    } catch (_) {}
+  }
+  function paquetAchats(u, obj) {
+    {
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
@@ -670,10 +691,66 @@
         return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', nom: nomArticle(prod), etat: sc.etat, date: sc.date, montant: sc.montant, suivi: sv.suivi, transporteur: sv.transporteur };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHAT.test(c.split(':')[0])).slice(0, 120) : [];
-      if (!listeConnue(obj, arr)) { post({ kind: 'vcachats', achats: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), page: normChemin(sansId(location.pathname)), moi: moiId }); return; }
-      post({ kind: 'vcachats', achats, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)), moi: moiId });
+      if (!listeConnue(obj, arr)) return { achats: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), page: normChemin(sansId(location.pathname)), moi: moiId };
+      return { achats, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)), moi: moiId };
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // L'HISTORIQUE VESTIAIRE (11 nov., 5.365) — « tout l'historique, comme Vinted »
+  // ══════════════════════════════════════════════════════════════════════════
+  // Le MODÈLE : l'adresse EXACTE d'une page de « Mes ventes » / « Mes achats » que
+  // la page a elle-même demandée, sans filtre (`sansFiltre`), et qui porte un
+  // paramètre de pagination que VESTIAIRE a mis (`offset` + `limit`, ou `page`).
+  // Jamais une adresse devinée, jamais un paramètre ajouté : sans pagination vue,
+  // rien n'est importé (le fond dit « va à la page 2 une fois »).
+  // L'ORDRE `importpage` vient du fond seulement (vc.js) : une page du modèle,
+  // au nom du compte de CETTE page (`moiId`), lue par `origFetch` (pas la
+  // capture : la lecture est rendue au fond, qui la range et SAIT si la base l'a
+  // prise). Des GET seulement.
+  const PAGINE = (u) => { const p = u.searchParams; const n = (k) => p.has(k) && /^\d{1,6}$/.test(p.get(k)); return (n('offset') && (n('limit') || n('per_page') || n('perPage') || n('pageSize'))) || n('page'); };
+  const modelesVus = new Set();
+  function noterModeleImport(quoi, u) {
+    try {
+      if (!sansFiltre(u) || !PAGINE(u) || !/^apiv2\./i.test(u.hostname) && !/(^|\.)vestiairecollective\.com$/i.test(u.hostname)) return;
+      if (!moiId) return;
+      const cle = quoi + '|' + moiId + '|' + u.href;
+      if (modelesVus.has(cle)) return; modelesVus.add(cle);
+      post({ kind: 'vcimportmodele', quoi, url: u.href.slice(0, 600), moi: moiId });
     } catch (_) {}
   }
+  let importEnCours = false;
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'importpage') return;
+    const jeton = String(d.jeton || '');
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'vcimportresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
+    let u; try { u = new URL(String(d.url || '')); } catch (_) { return fin({ statut: 0, erreur: 'adresse' }); }
+    const quoi = d.quoi === 'achats' ? 'achats' : (d.quoi === 'ventes' ? 'ventes' : '');
+    if (u.protocol !== 'https:' || u.username || u.password || !DE_VC(u.href) || !sansFiltre(u) || !PAGINE(u)
+      || !quoi || (quoi === 'ventes' ? sourceVentes(u) !== 'ventes' : !estListeAchats(u))) return fin({ statut: 0, erreur: 'adresse' });
+    if (!moiId || String(d.compte || '') !== moiId) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
+    if (importEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    importEnCours = true;
+    try {
+      const h = {};
+      for (const [k, v] of Object.entries(entetesApi || {})) if (!ENTETES_INTERDITS.test(k)) h[k] = v;
+      h.accept = h.accept || 'application/json';
+      let statut = 0, texte = '';
+      try {
+        const res = await origFetch.call(window, u.href, { method: 'GET', credentials: 'include', headers: h });
+        statut = Number(res.status) || 0;
+        if (statut >= 200 && statut < 300) texte = String(await res.text());
+      } catch (e) { return fin({ statut: 0, erreur: 'reseau' }); }
+      if (!(statut >= 200 && statut < 300)) return fin({ statut });
+      let obj = null; try { obj = JSON.parse(texte); } catch (_) {}
+      if (!obj || typeof obj !== 'object') return fin({ statut, paquet: { inconnu: ['(pas du json)'] }, moi: moiId });
+      const paquet = quoi === 'ventes' ? paquetVentes(u, obj, 'ventes') : paquetAchats(u, obj);
+      fin({ statut, quoi, paquet, moi: moiId });
+    } finally { importEnCours = false; }
+  }); } catch (_) {}
 
   // ══════════════════════════════════════════════════════════════════════════
   // LE COMPTE OUVERT, TES CONVERSATIONS EN CLAIR, ET RÉPONDRE SUR SON CLIC

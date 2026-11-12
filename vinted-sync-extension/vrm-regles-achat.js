@@ -35,6 +35,31 @@ var __vrmReglesAchat = (() => {
     prixAchatDe: () => prixAchatDe
   });
 
+  // src/profilVendeur.js
+  var CATEGORIES_VENDS = [
+    { v: "sneakers", titre: "Sneakers" },
+    { v: "vetements", titre: "Vêtements" },
+    { v: "luxe", titre: "Luxe & créateurs" },
+    { v: "sacs", titre: "Sacs & maroquinerie" },
+    { v: "montres", titre: "Montres & bijoux" },
+    { v: "lunettes", titre: "Lunettes" },
+    // (11 nov., lot DJ2) « il y a des personnes qui vendent des lunettes »
+    { v: "accessoires", titre: "Accessoires" },
+    { v: "vintage", titre: "Vintage" },
+    { v: "enfants", titre: "Enfants & puériculture" },
+    { v: "livres", titre: "Livres & BD" },
+    { v: "jeux", titre: "Jeux vidéo & consoles" },
+    { v: "hightech", titre: "High-tech" },
+    { v: "cartes", titre: "Cartes à collectionner" },
+    { v: "jouets", titre: "Jouets & figurines" },
+    { v: "maison", titre: "Maison & déco" },
+    { v: "sport", titre: "Sport & outdoor" },
+    { v: "beaute", titre: "Beauté" },
+    { v: "musique", titre: "Vinyles & musique" },
+    { v: "autre", titre: "Autre chose" }
+  ];
+  var IDS_CATEGORIES = CATEGORIES_VENDS.map((c2) => c2.v);
+
   // src/beneficePaire.js
   function centimes(v) {
     if (v == null || String(v).trim() === "") return null;

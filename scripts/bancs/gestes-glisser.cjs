@@ -108,7 +108,7 @@ async function preparer(b, vp, { indiceVu = true, reduit = false } = {}) {
   await pg.addInitScript(PONT);
   // L'indice est noté au moment où il se pose (il ne dure que 0,9 s) : un observateur, posé avant l'app.
   await pg.addInitScript(() => { window.__indices = []; const t0 = performance.now(); new MutationObserver((ms) => { for (const m of ms) if (m.target.getAttribute('data-lg-indice') === '1') window.__indices.push([Math.round(performance.now() - t0), m.target.getAttribute('data-lg-id')]); }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-lg-indice'] }); });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });

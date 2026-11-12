@@ -96,7 +96,7 @@ async function page(b, vp, sombre, avecVl, errs, o = {}) {
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.setFixedTime(new Date(MAINTENANT));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, sombre);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // La ligne `main` GARDE ce que l'app y écrit (une relecture du nuage ne doit
   // pas rendre l'ancienne valeur : un banc qui jette les écritures mesure une fiction).
   let m = { ...main(sombre, avecVl, o.ligne), ...(o.extra || {}) };

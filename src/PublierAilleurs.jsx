@@ -14,6 +14,7 @@ import { LogoSite } from './SelecteurSites.jsx';
 import { nomPlateforme } from './plateformes.js';
 import './styles-annonces-outils.css';
 import './styles-publier-ailleurs.css';
+import { EncartPhotosAutresComptes } from './PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)
 
 const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const MAX_TITRE = { leboncoin: TITRE_MAX.lbc, ebay: TITRE_MAX.ebay, vestiaire: null };
@@ -124,6 +125,9 @@ export default function PublierAilleurs({ paire = null, paires, lecture = false,
               </span>
               {onChanger ? <button type="button" className="vrm-ao-second" data-pa-changer="" onClick={onChanger}>Changer</button> : null}
             </div>
+            {/* (11 nov., lot photos-comptes) Une photo de cet article déjà EN LIGNE sur un AUTRE compte Vinted :
+                l'encart ambre le dit (miniature, compte) ; publier reste possible (son choix). */}
+            <EncartPhotosAutresComptes sources={[{ id: paire.id, compte: paire.uid || '' }]} photos={Array.isArray(paire.photos) ? paire.photos : []} Photo={Photo}/>
             {lecture ? <p className="vrm-ao-vide" data-pa-lecture="">Je lis tes annonces sur chaque site…</p> : null}
             {ordre.map((c) => <CarteSite key={c.site + ':' + paire.id} c={c} ouvertDefaut={c.site === siteDemande} onPublier={onPublier} Photo={Photo}/>)}
           </>

@@ -26,6 +26,7 @@
 // du journal (`save`, App.jsx) et `scripts/audit-doublons-historique.cjs` exécutent les
 // MÊMES fonctions (§11).
 
+import { motsVendeur } from './profilVendeur.js';
 export const CLE_JOURNAL_NUMEROS = 'vrm_numeros_journal';
 // Le jour où le journal a commencé : avant, on ne sait que le DERNIER changement de chaque fiche.
 export const JOURNAL_DEBUT = '2026-11-09';
@@ -133,7 +134,7 @@ export function historiqueNumero({ cle: cible, fiches, saleOv = null, journal = 
     const r = estObjet(f.reattribue) && cleNum(f.reattribue.vers) === k ? f.reattribue : null;
     let o = null;
     if (str(f.recreeAt) || str(f.recreeDe)) o = { quoi: 'reprise', at: isoOk(f.recreeAt), texte: TEXTE.reprise, preuve: `l’annonce ${str(f.recreeDe) || '?'} remplacée par celle-ci (republiée par VRM)` };
-    else if (str(f.repriseAt)) o = { quoi: 'reprise', at: isoOk(f.repriseAt), texte: 'Repris d’une ancienne fiche de la même paire', preuve: f.repriseDe ? `ancienne fiche ${str(f.repriseDe)}` : 'ancienne fiche' };
+    else if (str(f.repriseAt)) o = { quoi: 'reprise', at: isoOk(f.repriseAt), texte: `Repris d’une ancienne fiche ${motsVendeur().deMeme}`, preuve: f.repriseDe ? `ancienne fiche ${str(f.repriseDe)}` : 'ancienne fiche' };
     else if (r) o = { quoi: r.main ? 'main' : r.archive ? 'archive' : (str(f.ecritAt) && str(f.ecritAt) === str(r.at) ? 'ecrit' : 'doublon'), at: isoOk(r.at),
       texte: `${r.main ? TEXTE.main : r.archive ? TEXTE.archive : (str(f.ecritAt) && str(f.ecritAt) === str(r.at) ? TEXTE.ecrit : TEXTE.doublon)} (avant : N°${str(r.de)})`, preuve: 'fiche de l’annonce' };
     else if (str(f.ecritAt)) o = { quoi: 'ecrit', at: isoOk(f.ecritAt), texte: TEXTE.ecrit, preuve: f.ecrit ? `lu dans ${str(f.ecrit) === 'titre' ? 'le titre' : 'la description'}` : 'fiche de l’annonce' };

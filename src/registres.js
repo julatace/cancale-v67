@@ -46,6 +46,7 @@
 // « au moins ») — jamais un total partiel présenté comme complet (§5). Jamais
 // « encaissé » (§5).
 // ─────────────────────────────────────────────────────────────────────────────
+import { motsVendeur } from './profilVendeur.js';
 import { montantPropose } from './prixAchatPropose.js';
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -226,7 +227,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const reliees = (parGros.get(gid) || []).map((e) => String(e.numero == null ? '' : e.numero).trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, 'fr', { numeric: true }));
     const l = { id: 'gros:' + gid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Achat en gros', fournisseur: nom,
       montant: (a.total + frais) / 100, source: 'saisi', saisi: (a.total + frais) / 100, raison: '', reglement: '', reference: '', num: reliees.join(' + '), compte: '',
-      titre: `En gros · ${a.paires} paire${a.paires > 1 ? 's' : ''}${reliees.length ? ` · ${reliees.length} reliée${reliees.length > 1 ? 's' : ''}` : ''}`,
+      titre: `En gros · ${a.paires} ${a.paires > 1 ? motsVendeur().noms : motsVendeur().nom}${reliees.length ? ` · ${reliees.length} relié${motsVendeur().e}${reliees.length > 1 ? 's' : ''}` : ''}`,
       paires: String(a.paires), frais: frais ? frais / 100 : null, gros: true };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); nGros += 1; }
@@ -265,7 +266,7 @@ export function resumeRegistre(R) {
 }
 const COLONNES = {
   recettes: [['date', 'Date'], ['montant', 'Montant', 1], ['plateforme', 'Plateforme'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['compte', 'Compte']],
-  achats: [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['paires', 'Paires', 1], ['montant', 'Montant', 1], ['frais', 'Dont frais', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']],
+  get achats() { return [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['paires', motsVendeur().Noms, 1], ['montant', 'Montant', 1], ['frais', 'Dont frais', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']]; },
 };
 const cellule = (l, k, tableur) => {
   if (k === 'montant') return l.montant == null ? (tableur ? '' : '—') : (tableur ? tableurNb(l.montant) : eurosTexte(l.montant));

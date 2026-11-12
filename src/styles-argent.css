@@ -90,3 +90,8 @@
   :root:root body .vrm-fac-actions-tel > button { min-height: 44px !important; }
   :root:root body .vrm-fac-plus { width: 44px; height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; padding: 0; }
 }
+
+/* (11 nov., lot accessibilité, axe « color-contrast ») Sur le remplissage gris du widget
+   (rgba(118,118,128,.12) sur #F2F2F7 ≈ #E3E3E9), le gris #6E6E73 ne donnait que 3,97:1.
+   En CLAIR seulement, un cran plus sombre (#5E5E63 : 5,0:1) ; le sombre passe déjà. */
+:root:not([data-theme="dark"]) body .vrm-argent-w { --w-gris: #5E5E63; }

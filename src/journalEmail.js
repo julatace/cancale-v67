@@ -14,6 +14,7 @@
 // ⚠️ « Pas su » ≠ « rien » : un email classé avant le résumé dit « classé avant
 //    le 31 oct. — détail non gardé », jamais une action inventée.
 
+import { motsVendeur } from './profilVendeur.js';
 export const ETATS_JOURNAL = {
   range: { picto: '✓', mot: 'Rangé' },
   verifier: { picto: '⚠', mot: 'À vérifier' },
@@ -66,6 +67,7 @@ const POURQUOI_PAS_DELIER = {
   suivi: 'Ce colis est relié par son n° de suivi, écrit dans l’e-mail par le transporteur : rien n’a été deviné.',
 };
 
+const SITE_ACHAT = { leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
 const ANCIEN = 'Classé avant le 31 oct. — détail non gardé.';
 const ongletDuType = { suivi: 'cat_bord', bordereau: 'cat_bord', achat: 'achats', vente: 'cat_ventes', 'vente-vestiaire': 'cat_ventes', finalisation: 'cat_ventes', offre: 'cat_msg', message: 'cat_msg', favori: 'cat_annonces', action: 'cat_msg' };
 const TYPES_ANCIENS = { suivi: 'Suivi de colis', bordereau: 'Bordereau', achat: 'Reçu d’achat', vente: 'Vente', 'vente-vestiaire': 'Vente Vestiaire', finalisation: 'Versement', offre: 'Offre', message: 'Message', favori: 'Favori', action: 'Demande Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'E-mail non reconnu' };
@@ -121,7 +123,7 @@ export function lectureEmail(e, delies = {}) {
       o = { quoi: `Bordereau de la vente ${r.a ? r.a : 'n° ' + (r.tx || '?')}`,
         fait: `Ajouté aux colis à expédier · vente n° ${r.tx}${numSur ? ` · N°${r.n}` : ''}${r.tp ? ' · déjà tamponné' : ''}`,
         lien: lien('cat_bord'), num: numSur ? String(r.n) : null, cible: { k: 'tx', v: r.tx } };
-      if (r.av === 'num-titre') Object.assign(o, { raison: `Le N°${r.n} a été retrouvé par le titre de l’annonce, pas lu dans l’e-mail : il peut désigner une autre paire.`, geste: 'Vérifie ce N° là où l’article est rangé (carton, étagère, bac…) avant d’imprimer le bordereau (Colis).' });
+      if (r.av === 'num-titre') Object.assign(o, { raison: `Le N°${r.n} a été retrouvé par le titre de l’annonce, pas lu dans l’e-mail : il peut désigner ${motsVendeur().autre}.`, geste: 'Vérifie ce N° là où l’article est rangé (carton, étagère, bac…) avant d’imprimer le bordereau (Colis).' });
       if (r.av === 'sans-pdf') Object.assign(o, { raison: 'L’e-mail ne portait pas de PDF : il n’y a rien à imprimer depuis VRM.', geste: 'Télécharge le bordereau depuis la vente sur Vinted.' });
       o.delier = { offert: false, pourquoi: POURQUOI_PAS_DELIER.bordereau };
       break;
@@ -139,6 +141,19 @@ export function lectureEmail(e, delies = {}) {
       if (d) o.etat = 'delie';
       break;
     }
+    // (11 nov., lot achats-auto) Achat Leboncoin / eBay / Vestiaire lu dans l'e-mail.
+    case 'achat-site': {
+      const site = SITE_ACHAT[r.si] || 'un autre site';
+      const etatAchat = r.fm === 'annulation' ? ' · annulé' : r.fm === 'remboursement' ? ' · remboursé' : r.fm === 'expedition' ? ' · expédié' : '';
+      o = { quoi: `Achat ${site}${r.a ? ` : ${r.a}` : ''}${r.mt ? ` · ${euros(r.mt)}` : ''}${etatAchat}`,
+        fait: `${r.nv ? 'Ajouté à tes achats' : 'Déjà connu : complété'} · commande n° ${r.tx}`, lien: lien('achats'), cible: r.tx ? { k: 'commande', v: r.tx } : null };
+      break;
+    }
+    case 'achat-a-verifier':
+      o = { quoi: `Achat ${SITE_ACHAT[r.si] || ''} · « ${sujet} »`.replace('Achat  ·', 'Achat ·'), fait: 'Gardé entier, aucun achat créé',
+        raison: 'Je reconnais un achat, mais je n’ai pas su lire son n° de commande sans hésiter (ou l’e-mail est transféré).',
+        geste: 'Regarde-le dans Achats → « À vérifier » : rien n’est relié par le titre.', lien: lien('achats') };
+      break;
     case 'vente': {
       if (r.av === 'analyse') {
         o = { quoi: `Vente · « ${sujet} »`, fait: 'Gardé entier, rien noté',

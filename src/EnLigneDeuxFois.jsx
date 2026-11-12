@@ -8,6 +8,7 @@
 import React from 'react';
 import { PhotoVide } from './composants/PhotoVide.jsx';
 import { Numero } from './composants/Numero.jsx';
+import { motsVendeur } from './profilVendeur.js';
 import { texteCarte, texteEuros, texteDepuis } from './enLigneDeuxFois.js';
 import './en-ligne-deux-fois.css';
 
@@ -18,7 +19,7 @@ export function EnLigneDeuxFoisDetail({ groupes, manque = [], PhotoVinted = null
   const pasSu = (manque || []).filter((m) => m.plateforme === 'vinted');
   return (
     <div className="vrm-deux-fois" data-deux-fois-detail="">
-      <p>La même paire est en vente deux fois : elle pourrait partir chez deux acheteurs. Garde une annonce et supprime l’autre sur Vinted. VRM ne supprime rien tout seul.</p>
+      <p>{motsVendeur().Meme} est en vente deux fois : {motsVendeur().elle} pourrait partir chez deux acheteurs. Garde une annonce et supprime l’autre sur Vinted. VRM ne supprime rien tout seul.</p>
       {groupes.map((g) => (
         <section key={g.annonces.map((a) => a.id).join('+')} className="vrm-deux-fois-groupe" data-deux-fois-groupe={g.annonces.map((a) => a.id).join('+')} data-preuves={g.preuves.join(' ')}>
           <h3>{g.numeros.length ? <>{g.numeros.map((n) => <Numero key={n} n={n} taille="petit"/>)}</> : 'Sans N°'}<small>{g.preuves.map((p) => PREUVE[p] || p).join(' · ')}</small></h3>
@@ -72,7 +73,7 @@ export function EnLigneDeuxFoisAlerte({ groupes, manque = [], PhotoVinted = null
         </ul>
       ))}
       {g.length > vus.length && Feuille ? (
-        <button type="button" className="vrm-lien-action vrm-deux-fois-tout" data-deux-fois-tout="" onClick={() => setOuverte(true)}>Tout voir ({g.length} paires) ›</button>
+        <button type="button" className="vrm-lien-action vrm-deux-fois-tout" data-deux-fois-tout="" onClick={() => setOuverte(true)}>Tout voir ({g.length} {motsVendeur().noms}) ›</button>
       ) : null}
       {ouverte && Feuille ? (
         <Feuille titre="En ligne deux fois" sousTitre="Sur Vinted" onClose={() => setOuverte(false)} maxWidth={560} data-feuille-deux-fois="">

@@ -64,11 +64,16 @@ const tout = (fichiers) => fichiers.map((x) => x.sql).join('\n;\n');
 
 // Une fonction est retirée à PUBLIC si une ligne `revoke … on function <nom>(… from public…`
 // existe, ou si son nom est dans un bloc qui exécute `revoke all on function %s from public`.
+// (11 nov., intégration) Une boucle nomme la fonction par son nom seul (`'vrm_x'`) ou par sa
+// signature complète (`'public.vrm_x(uuid,text)'`, forme de la 038) : les deux la désignent.
+function nommeDansBoucle(nom, b) {
+  return new RegExp(`'(?:public\\.)?${nom}(?:\\([^']*\\))?'`, 'i').test(b);
+}
 function retireePublic(nom, sql) {
   const ligne = new RegExp(`revoke\\s+(?:all|execute)[^;]*on\\s+function\\s+(?:public\\.)?${nom}\\s*\\([^;]*from\\s+public\\b`, 'i');
   if (ligne.test(sql)) return true;
   const blocs = sql.match(/do\s+\$\$[\s\S]*?\$\$/gi) || [];
-  return blocs.some((b) => /revoke\s+all\s+on\s+function\s+%s\s+from\s+public/i.test(b) && new RegExp(`'${nom}'`, 'i').test(b));
+  return blocs.some((b) => /revoke\s+all\s+on\s+function\s+%s\s+from\s+public/i.test(b) && nommeDansBoucle(nom, b));
 }
 // (11 nov., revue de sécurité) Retirer à PUBLIC ne suffit pas chez Supabase : ses
 // droits par défaut donnent EXECUTE directement à `anon` et `authenticated`. Le
@@ -77,7 +82,7 @@ function retireeA(nom, sql, role) {
   const ligne = new RegExp(`revoke\\s+(?:all|execute)[^;]*on\\s+function\\s+(?:public\\.)?${nom}\\s*\\([^;]*from\\s+[^;]*\\b${role}\\b`, 'i');
   if (ligne.test(sql)) return true;
   const blocs = sql.match(/do\s+\$\$[\s\S]*?\$\$/gi) || [];
-  return blocs.some((b) => new RegExp(`revoke\\s+all\\s+on\\s+function\\s+%s\\s+from\\s+[^']*\\b${role}\\b`, 'i').test(b) && new RegExp(`'${nom}'`, 'i').test(b));
+  return blocs.some((b) => new RegExp(`revoke\\s+all\\s+on\\s+function\\s+%s\\s+from\\s+[^']*\\b${role}\\b`, 'i').test(b) && nommeDansBoucle(nom, b));
 }
 function rendueA(nom, sql) {
   const roles = new Set();

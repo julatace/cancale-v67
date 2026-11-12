@@ -96,3 +96,7 @@
 :root body .vrm-remise-q b { font-size: 16px; color: var(--vrm-ink, #1D1D1F); }
 :root body .vrm-remise-boutons { display: flex; gap: 8px; margin-top: 8px; }
 :root body .vrm-remise-boutons > * { flex: 1 1 0; }
+
+/* (11 nov., lot accessibilité) L’ambre sur son fond teinté à 12 % : #B25000 = 4,40:1 ⇒ en
+   clair un ambre un cran plus sombre (#A14800 : 5,2:1). Le sombre passe déjà. */
+:root:not([data-theme="dark"]) body .vrm-pop-chip.is-ambre { color: #A14800; }

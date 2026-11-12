@@ -172,8 +172,8 @@ const onglet = (chemin) => ({ tab: { id: 7, url: 'https://www.vinted.fr' + chemi
     dit(r.status === 0, 'I10 · vrm-regles-achat.js est la copie à jour des règles de l’app', (r.stdout || '').trim());
     const man = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'manifest.json'), 'utf8'));
     const cs = (man.content_scripts || []).find((c) => (c.js || []).includes('vinted-infos.js'));
-    dit(!!cs && cs.js.join() === 'vrm-regles-achat.js,vinted-infos.js' && !cs.world && (cs.matches || []).some((m) => /vinted\.fr/.test(m)) && cs.all_frames === false,
-      'I10 · le manifeste charge les règles puis vinted-infos.js sur Vinted (monde isolé, page principale)', JSON.stringify(cs));
+    dit(!!cs && cs.js.join() === 'vrm-mots.js,vrm-regles-achat.js,vinted-infos.js' && !cs.world && (cs.matches || []).some((m) => /vinted\.fr/.test(m)) && cs.all_frames === false,
+      'I10 · le manifeste charge les mots (5.347), les règles puis vinted-infos.js sur Vinted (monde isolé, page principale)', JSON.stringify(cs));
     const ct = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'vinted-infos.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
     dit(/attachShadow\(\{\s*mode:\s*'closed'\s*\}\)/.test(ct) && !/innerHTML/.test(ct) && !/\bfetch\(|XMLHttpRequest/.test(ct) && !/\.click\(\)|dispatchEvent/.test(ct),
       'I10 · vinted-infos.js : ombre fermée, aucun innerHTML, aucune requête, aucun clic');

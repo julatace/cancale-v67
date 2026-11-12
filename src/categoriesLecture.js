@@ -42,14 +42,15 @@ export const lireTableFamilles = () => {
 // pour les annonces dont le dressing ne la porte pas (mesuré le 5 nov. : un
 // dressing non allégé envoie `catalog_id: null`). Projetée clé par clé, un
 // scalaire par annonce (§4.4) ; un lot raté ⇒ null (« pas su »).
+const cleCategorie = (id, i) => `f${i}:data->${encodeURIComponent('"' + id + '"')}->>catalogId`;
 export const lireCategoriesFiches = async (ids) => {
   const uniq = [...new Set((ids || []).map((x) => String(x == null ? '' : x)).filter((x) => /^\d+$/.test(x)))];
   if (!uniq.length) return {};
   const lots = []; for (let i = 0; i < uniq.length; i += 80) lots.push(uniq.slice(i, i + 80));
   try {
     const res = await Promise.all(lots.map(async (l) => {
-      const sel = l.map((id, i) => `f${i}:data->${encodeURIComponent('"' + id + '"')}->>catalogId`).join(',');
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=${sel}`, { headers: sbAuth() });
+      // La projection (clé par clé, `->>catalogId`, `cleCategorie`) écrite DANS le select= : audit-lectures-lourdes la juge.
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=${l.map(cleCategorie).join(',')}`, { headers: sbAuth() });
       if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null;
     }));
     if (res.some((x) => !x)) return null;

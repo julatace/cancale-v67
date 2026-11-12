@@ -4,12 +4,16 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { prixTape, minisAuDessus, NOM_SITE } from './prixPartout.js';
+import { tr } from './i18n/index.js';
 import './styles-annonces-outils.css';
 
 const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const ETAT = { envoi: 'Envoi…', fait: 'Fait', refuse: 'Refusé', incertain: 'Pas sûr', 'a-faire': 'À faire sur le site', ignore: '' };
+// (11 nov. soir) « Un prix modifié dans VRM change partout » : le prix de CHAQUE site
+// (son ajustement réglé, `prixDe`), eBay RELU après, Vinted PROPOSÉ (« Baisser le prix »).
+const etatTexte = (e) => (e.etat === 'propose' ? tr('prixPartout.propose') : e.etat === 'fait' && e.relu ? tr('prixPartout.relu') : ETAT[e.etat]);
 
-export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour }) {
+export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour, prixDe = null, onProposer = null }) {
   const [prix, setPrix] = React.useState('');
   const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
@@ -62,13 +66,15 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
               <li key={s.cle} className="vrm-ao-site" data-prix-site={s.site} data-prix-cle={s.cle} data-prix-mode={s.mode} data-prix-etat={e ? e.etat : ''}>
                 <label className="vrm-ao-case">
                   <input type="checkbox" checked={coche} onChange={() => basculer(s.cle)} disabled={enCours} data-prix-coche={s.cle}/>
-                  <span className="vrm-ao-site-nom"><b>{NOM_SITE[s.site]}</b><small>{eur(s.prix)}{s.mode === 'site' ? ' · sur le site' : ''}</small></span>
+                  <span className="vrm-ao-site-nom"><b>{NOM_SITE[s.site]}</b><small>{eur(s.prix)}{(() => { const c = p == null ? null : (prixDe ? prixDe(s.site, p) : p); return c != null && s.prix != null && Math.round(c * 100) !== Math.round(s.prix * 100) ? <span data-prix-cible={c}>{' → ' + eur(c)}</span> : null; })()}{s.mode === 'site' ? ' · sur le site' : ''}</small></span>
                 </label>
-                <span className={'vrm-ao-etat is-' + (e ? e.etat : 'attente')} title={e && e.raison ? e.raison : undefined}>
-                  {e ? ETAT[e.etat] : ''}
-                  {e && (e.etat === 'refuse' || e.etat === 'incertain') && e.raison ? <small data-prix-raison="">{e.raison}</small> : null}
+                <span className={'vrm-ao-etat is-' + (e ? e.etat : 'attente')} title={e && e.raison ? e.raison : undefined} data-prix-relu={e && e.relu ? '1' : ''}>
+                  {e ? etatTexte(e) : ''}
+                  {e && (e.etat === 'refuse' || e.etat === 'incertain' || e.etat === 'a-faire') && e.raison ? <small data-prix-raison="">{e.raison}</small> : null}
+                  {e && e.etat === 'a-faire' && e.prix != null ? <small data-prix-a-mettre={e.prix}>{tr('prixPartout.aMettre', { prix: eur(e.prix) })}</small> : null}
                 </span>
-                {(s.mode === 'site' || (e && e.etat !== 'fait' && e.etat !== 'envoi')) && s.lien
+                {e && e.etat === 'propose' && onProposer ? <button type="button" className="vrm-ao-ouvrir" data-prix-proposer={s.cle} onClick={() => onProposer(s, e)}>{tr('prixPartout.baisser')}</button> : null}
+                {(s.mode === 'site' || (e && e.etat !== 'fait' && e.etat !== 'envoi' && e.etat !== 'propose')) && s.lien
                   ? <a className="vrm-ao-ouvrir" href={s.lien} target="_blank" rel="noopener noreferrer" data-prix-lien={s.cle}>Ouvrir</a> : null}
               </li>
             );

@@ -29,6 +29,7 @@ import { aVenirPour } from '../argentAVenir.js';
 import { dateLocale } from '../formatsDate.js';   // (9 nov., vitesse) un format créé une fois
 
 export const CLE_CARTE_STATS = 'vrm_carte_stats';
+import { motsVendeur } from '../profilVendeur.js';
 
 export const SITES = ['toutes', 'vinted', 'vestiaire', 'leboncoin', 'ebay'];
 export const NOM_SITE = { toutes: 'Tous les sites', vinted: 'Vinted', vestiaire: 'Vestiaire', leboncoin: 'Leboncoin', ebay: 'eBay' };
@@ -98,7 +99,7 @@ export const AIDE_CHIFFRES = {
   enligne: 'Tes annonces en ligne, d’après la dernière lecture complète de ton dressing (de moins de 24 h).',
   masquees: CHIFFRES.masquees.titre,
   dorment: 'Tes annonces en ligne depuis plus de 30 jours (l’écran Annonces).',
-  stock: 'Le prix d’achat de tes paires encore chez toi, calculé par l’écran Annonces. Une paire sans prix d’achat n’y est pas : le montant est alors un minimum.',
+  get stock() { const m = motsVendeur(); return `Le prix d’achat de ${m.tes} encore chez toi, calculé par l’écran Annonces. ${m.Un} sans prix d’achat n’y est pas : le montant est alors un minimum.`; },
   objectif: 'Où tu en es de ton objectif du mois (la barre de la carte) : la part atteinte, en pourcentage.',
   urssafapayer: 'Les cotisations de ta prochaine échéance URSSAF, sur l’argent reçu (le rappel de Ma journée). Période pas finie ⇒ « au moins ».',
 };
@@ -326,6 +327,12 @@ export const recuPublieEntre = (publie, { de, a, ym, complet }, maintenant = Dat
 // (6 nov., onglets A) UNE règle de fraîcheur pour `vrm_colis_aposter` : la carte et le badge de Colis.
 export const PUB_COLIS_MAX_MS = 12 * 3600000;
 export const publicationColisFraiche = (pub, maintenant = Date.now()) => !!pub && (!Number.isFinite(Number(pub.at)) || pub.at == null || maintenant - Number(pub.at) < PUB_COLIS_MAX_MS);
+// (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque (`sources.sansCompte`) : un chiffre
+// qu'on attend ou qu'on n'a pas lu ne le sera jamais ⇒ « aucun compte relié », pas « lecture… ».
+// Toujours « — » (jamais 0) ; une valeur connue (saisie à la main) reste telle quelle.
+export const sansCompteSur = (v, sources) => (sources && sources.sansCompte && v && v.valeur == null && !v.hors
+  && (v.raison === 'encours' || v.raison === 'pasSu' || v.raison === 'publication' || v.raison === 'colis')
+  ? { ...v, raison: 'sansCompte' } : v);
 export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date.now()) => {
   const S = sources || {};
   const locaux = S.locaux || null;
@@ -506,6 +513,8 @@ export const RAISON_COURTE = {
   statut: 'statut à choisir', absente: 'ouvre Ventes', ancienne: 'à relire', 'ancienne-app': 'à relire', illisible: 'pas lu',
   // (6 nov., onglets A) des envois sans geste « Colis fait » : le nombre n'est pas su.
   nonNotes: 'envois pas notés',
+  // (11 nov., états vides) aucun compte relié, prouvé : rien ne sera lu tant qu'il n'y en a pas.
+  sansCompte: 'aucun compte relié',
   // (6 nov., onglets A) « À envoyer » pas encore compté sur cet appareil (ou plus de 12 h) : le geste.
   colis: 'ouvre Colis',
   // (11 nov., lot stats-plus) La valeur du stock pas encore publiée : le geste.
@@ -520,6 +529,7 @@ export const raisonCourte = (x) => {
   if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater` : '';
   if (x.hors) return x.hors;
   // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
+  if (x.raison === 'sansCompte') return RAISON_COURTE.sansCompte;
   if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;
   if (x.raison === 'a-dater') return `${nFr(x.aDater)} vente${x.aDater > 1 ? 's' : ''} à dater`;
   if (x.raison === 'partiel') return x.manque && x.manque.length ? `sans ${x.manque[0]}` : 'pas tout lu';
@@ -533,7 +543,7 @@ export const valeursCarte = (page, reglage, sources, sel, regles, maintenant = D
   if (!R) return null;
   const un = (place) => {
     const def = defDe(place.id, locaux);
-    const v = valeurChiffre(place.id, place, sources, sel, regles, maintenant);
+    const v = sansCompteSur(valeurChiffre(place.id, place, sources, sel, regles, maintenant), sources);
     return { place, def, ...v };
   };
   const g = un(R.g);

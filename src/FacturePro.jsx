@@ -22,6 +22,7 @@
 //
 // Les outils de l'app (lecture de la base, confirmation, notifications) sont
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
+import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
 import React from 'react';
 import './facture-pro.css';
 import './facture-tva.css';
@@ -30,12 +31,13 @@ import { SheetShell } from './composants/SheetShell.jsx';
 import {
   REGIMES_TVA, FORMES, COULEURS, TAUX_TVA, estSociete, verifierSiret, manquantsVendeur, manquantsVente,
   contenuFacture, contenuApercu, estTrou, euros, emailValide, LOGO_MAX, MESSAGE_DEFAUT, nomFichier, jourParis,
-  adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes,
+  adresseVintedLisible, numeroFacture, anneeParis, emailFacture, MENTIONS_OBLIGATOIRES, mentionsManquantes, refusMarge,
 } from './facturePro/regle.js';
 import { preuveAcheteur, phraseRefus, FENETRE_APRES_S } from './facturePro/rattachement.js';
 import { listeAEnvoyer, autoAllume, lignesRegistre, periodesRegistre, dansPeriode, trousNumerotation, csvRegistre, totauxRegistre, nomZip, SELECT_FACTURES_PRO } from './facturePro/registre.js';
 import { useRechercheEntreprise, CarteVerifEntreprise, CarteMentionsForme } from './RechercheEntreprise.jsx';
 import { comptesConnus, avecCompte } from './facturePro/comptes.js';
+import { comptesProFacture } from './vintedPro.js';   // (11 nov., lot vinted-pro)
 
 const ID_CFG = 'vrm_pro_facture';
 const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true, envoiAuto: false };
@@ -43,6 +45,15 @@ const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville
 // ── Une seule lecture de la fiche pour tout l'écran (trois états) ────────────
 const _ecoutesCfg = new Set(); let _cfg; // undefined en cours · null pas su · objet
 function poserCfg(v) { _cfg = v; _ecoutesCfg.forEach((f) => { try { f(v); } catch (_) {} }); }
+// (11 nov., intégration) UNE lecture en vol pour toutes les cartes qui montent ensemble (Ma journée,
+// Argent, TVA sur marge : jusqu'à 5 lectures identiques au démarrage — budget-vitesse). Rien n'est
+// gardé après la réponse : un « pas su » (null) relit à la prochaine demande.
+let _cfgEnVol = null;
+function lireCfgPartagee(deps) {
+  if (_cfgEnVol) return _cfgEnVol;
+  const p = Promise.resolve().then(() => (deps.lireReglageMontage || deps.lireReglage)(ID_CFG)).finally(() => { if (_cfgEnVol === p) _cfgEnVol = null; });
+  _cfgEnVol = p; return p;
+}
 // (9 nov., soir) « Ma configuration » écrit aussi cette fiche (SIRET et ce que le registre
 // propose, sur son « C'est bon ») : elle annonce la ligne ENTIÈRE qu'elle vient d'écrire,
 // la lecture partagée la reprend (sinon « Ma facture » montrerait l'ancienne).
@@ -53,11 +64,19 @@ export function useFicheFacturation(deps) {
   const [cfg, setCfg] = React.useState(_cfg);
   React.useEffect(() => {
     _ecoutesCfg.add(setCfg);
-    if (_cfg === undefined || _cfg === null) deps.lireReglage(ID_CFG).then((d) => poserCfg(d === null ? null : { ...VIDE, ...migrerAncienne(d) })).catch(() => poserCfg(null));
+    if (_cfg === undefined || _cfg === null) lireCfgPartagee(deps).then((d) => poserCfg(d === null ? null : { ...VIDE, ...migrerAncienne(d) })).catch(() => poserCfg(null));
     return () => { _ecoutesCfg.delete(setCfg); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return cfg;
+}
+// (11 nov., lot tva-marge) Le régime de TVA de SA fiche, pour qui n'affiche pas l'écran (la
+// Comptabilité ne publie la TVA sur marge que pour « marge ») : '' = pas choisi, null = pas su.
+export async function regimeTvaFiche(deps) {
+  if (_cfg === undefined || _cfg === null) {
+    try { const d = await lireCfgPartagee(deps); if (d === null || d === undefined) return null; if (_cfg === undefined || _cfg === null) poserCfg({ ...VIDE, ...migrerAncienne(d) }); } catch (_) { return null; }
+  }
+  return _cfg ? String(_cfg.tva_regime || '') : null;
 }
 // La fiche d'avant (16 oct.) : `tauxTva` « 0 » = franchise. On ne DEVINE pas
 // le régime à partir de rien : un taux > 0 dit « TVA classique », « 0 » ne dit
@@ -192,13 +211,21 @@ async function ouvrirPdf(contenu, deps, { partager = false } = {}) {
   return true;
 }
 
+// (11 nov., réseau instable) Les champs de « Ma facture » pas encore acceptés par la base.
+const CLE_ATTENTE_FP = 'vrm_fp_attente';
+const lireAttenteFp = () => { try { const o = JSON.parse(localStorage.getItem(CLE_ATTENTE_FP) || 'null'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (_) { return {}; } };
+const poserAttenteFp = (o) => { try { if (Object.keys(o).length) localStorage.setItem(CLE_ATTENTE_FP, JSON.stringify(o)); else localStorage.removeItem(CLE_ATTENTE_FP); return true; } catch (_) { return false; } };
+
 // ── Appeler la route du serveur ─────────────────────────────────────────────
 async function route(deps, corps) {
   try {
-    const r = await fetch('/api/compte?mode=facture-pro', corps ? { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) } : { headers: deps.enTeteSession() });
+    // (11 nov., réseau instable) Bornée : un bouton « Émettre » ne reste jamais
+    // occupé sur une réponse qui ne vient pas (src/reseauBorne.js). Le serveur
+    // rend la MÊME facture au rejeu (`deja`) : réessayer ne fait jamais un double.
+    const r = await fetchBorne(fetch, '/api/compte?mode=facture-pro', corps ? { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) } : { headers: deps.enTeteSession() }, DELAI_ROUTE_MS);
     const j = await r.json().catch(() => null);
     return { code: r.status, j: j || {} };
-  } catch (_) { return { code: 0, j: { message: "Pas de réseau : rien n'a été fait." } }; }
+  } catch (e) { return { code: 0, j: { message: typeof navigator !== 'undefined' && navigator.onLine === false && !(e && e.name === NOM_DELAI) ? "Pas de réseau : rien n'a été fait." : "La réponse n'est pas arrivée (réseau trop faible). Réessaie : si elle était partie, tu retrouveras la même facture, jamais une deuxième." } }; }
 }
 // (6 nov.) L'état de la boîte d'envoi ne vaut que LU : un 200 qui ne porte pas
 // `boite` (page HTML servie à la place de la route, réponse d'une autre version
@@ -219,29 +246,64 @@ function Feuille({ titre, fermer, children, deps, large = false, data }) {
 export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   const lu = useFicheFacturation(deps);
   const etat = useEtatEnvoi(deps);
+  // (11 nov., lot vinted-pro) Combien de comptes Vinted sont Pro — LU (profil ou e-mail Vinted Pro), jamais deviné.
+  const dFact = useFactures(deps);
+  const nVintedPro = dFact && dFact.comptesPro ? [...dFact.comptesPro.values()].filter((v) => v === true).length : null;
   const [cfg, setCfg] = React.useState(null);
   const [statut, setStatut] = React.useState('');
   const minuteur = React.useRef(null);
   React.useEffect(() => { if (lu && !cfg) setCfg(lu); }, [lu, cfg]);
 
-  const champsRef = React.useRef({});
   const apercuRef = React.useRef(null);
 
   // Écrire : on RELIT la ligne juste avant (une autre carte — « Ton entreprise »
   // de Comptabilité — écrit la même), on fusionne nos champs, on écrit ; une
   // lecture ratée n'écrit RIEN.
+  // (11 nov., réseau instable) Les champs pas encore acceptés par la base sont
+  // GARDÉS sur l'appareil (`vrm_fp_attente`, effacé à la déconnexion comme tout
+  // `vrm_*`) et renvoyés tout seuls (5 s, 15 s, 1 min, puis 2 min ; au retour du
+  // réseau ; à la réouverture de la fiche) — jamais un « réessaie » qui perd ce
+  // qu'il a tapé si la fiche se ferme. Un champ retapé pendant l'envoi reste en
+  // attente (il n'est retiré que s'il vaut encore ce qui est parti).
+  const reprise = React.useRef({ n: 0, t: null, enVol: false });
+  const envoyer = React.useCallback(async () => {
+    const rp = reprise.current;
+    if (rp.enVol) return; if (rp.t) { clearTimeout(rp.t); rp.t = null; }
+    const att = lireAttenteFp(); if (!Object.keys(att).length) return;
+    rp.enVol = true;
+    let ok = false;
+    try {
+      const frais = await deps.lireReglage(ID_CFG);
+      if (frais !== null) {
+        const fusion = { ...frais, ...att };
+        ok = await deps.ecrireReglage(ID_CFG, fusion);
+        if (ok) {
+          const reste = lireAttenteFp();
+          for (const k of Object.keys(att)) if (JSON.stringify(reste[k]) === JSON.stringify(att[k])) delete reste[k];
+          poserAttenteFp(reste);
+          poserCfg({ ...VIDE, ...migrerAncienne({ ...fusion, ...reste }) });
+        }
+      }
+    } finally { rp.enVol = false; }
+    if (ok && !Object.keys(lireAttenteFp()).length) { rp.n = 0; setStatut('✓ enregistré'); return; }
+    if (ok) { rp.n = 0; rp.t = setTimeout(envoyer, 300); return; }
+    setStatut('⏳ pas encore enregistré · réessai automatique (gardé sur cet appareil)');
+    const d = [5000, 15000, 60000][rp.n] || 120000; rp.n++;
+    rp.t = setTimeout(envoyer, d);
+  }, [deps]);
+  React.useEffect(() => {
+    const f = () => { reprise.current.n = 0; envoyer(); };
+    window.addEventListener('online', f);
+    return () => { window.removeEventListener('online', f); if (reprise.current.t) clearTimeout(reprise.current.t); };
+  }, [envoyer]);
+  // À l'ouverture : ce qui attendait est remis dans la fiche, puis renvoyé.
+  React.useEffect(() => { if (!lu) return; const att = lireAttenteFp(); if (Object.keys(att).length) { setCfg((c) => ({ ...(c || lu), ...att })); setStatut('⏳ pas encore enregistré · réessai automatique (gardé sur cet appareil)'); envoyer(); } }, [!!lu]);
   const ecrire = (next, champs) => {
     setCfg(next); setStatut('enregistrement…');
+    const att = lireAttenteFp(); for (const k of champs) att[k] = next[k];
+    if (!poserAttenteFp(att)) { setStatut("⚠ pas enregistré — cet appareil refuse de le garder, réessaie"); return; }
     if (minuteur.current) clearTimeout(minuteur.current);
-    const a = { ...(champsRef.current || {}) }; for (const k of champs) a[k] = true; champsRef.current = a;
-    minuteur.current = setTimeout(async () => {
-      const aEcrire = Object.keys(champsRef.current); champsRef.current = {};
-      const frais = await deps.lireReglage(ID_CFG);
-      if (frais === null) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); return; }
-      const fusion = { ...frais }; for (const k of aEcrire) fusion[k] = next[k];
-      const ok = await deps.ecrireReglage(ID_CFG, fusion);
-      if (ok) { poserCfg({ ...VIDE, ...migrerAncienne(fusion) }); setStatut('✓ enregistré'); } else setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie");
-    }, 600);
+    minuteur.current = setTimeout(() => { reprise.current.n = 0; envoyer(); }, 600);
   };
   const upd = (k, v) => ecrire({ ...cfg, [k]: v }, [k]);
   const updPlusieurs = (o) => ecrire({ ...cfg, ...o }, Object.keys(o));
@@ -272,6 +334,9 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
   try { if (deps && typeof deps.vendActuel === 'function' && deps.vendActuel() !== 'sneakers' && typeof deps.exemples === 'function') exemple = { ...EXEMPLE, designation: deps.exemples().annonce.titre + ' (exemple)' }; } catch (_) { exemple = EXEMPLE; }
   try { apercu = contenuApercu(cfg, exemple, { numero: numeroExemple, emiseLe: Date.now() }).contenu; } catch (_) { apercu = null; }
   const mentionsKo = apercu ? new Set(mentionsManquantes(apercu)) : new Set();
+  // (11 nov., lot tva-marge) En TVA sur marge, une facture qui montrerait de la TVA n'est jamais faite : la raison est DITE ici
+  // (sinon l'aperçu disparaîtrait sans un mot) — p. ex. « TTC » écrit dans la note.
+  const refusTva = cfg.tva_regime === 'marge' ? refusMarge(cfg, exemple) : '';
   const societe = estSociete(cfg.forme);
   const champ = ({ k, label, aide, type = 'text', placeholder, mode, auto, large: lg = false, majuscules = false }) => (
     <label key={k} className={`vrm-fp-champ${lg ? ' is-large' : ''}`} data-fp-champ={k} data-fp-manque={champManque.has(k) ? '1' : undefined}>
@@ -288,6 +353,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           {manque.length
             ? <><b>{manque.length === 1 ? 'Il manque une information' : `Il manque ${manque.length} informations`} pour faire une facture conforme</b><span>{manque.map((m) => m.l).join(' · ')}</span></>
             : <><b>Ta fiche est complète</b><span>Chaque vente prouvée d'un compte Pro peut recevoir sa facture.</span></>}
+          {refusTva ? <span data-fp-refus-tva="">{refusTva}</span> : null}
           <div className="vrm-fp-voir-apercu"><button type="button" className="vrm-b vrm-b-secondaire" data-fp-voir-apercu="" onClick={() => { try { apercuRef.current && apercuRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }}>Voir l'aperçu</button></div>
         </div>
 
@@ -346,7 +412,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
         {/* (11 nov., lot DJ1) « que sur compte professionnel, ou alors on demande au vendeur sur quel compte » */}
         <section className="vrm-fp-section" data-fp-comptes="">
           <h3>Sur quels comptes ?</h3>
-          <p className="vrm-fp-muet">Vinted : tes comptes Pro, ceux que Vinted dit professionnels.</p>
+          <p className="vrm-fp-muet" data-fp-vinted-pro={nVintedPro == null ? '' : String(nVintedPro)}>{nVintedPro ? `Vinted : ${nVintedPro} compte${nVintedPro > 1 ? 's' : ''} Pro, lu${nVintedPro > 1 ? 's' : ''} sur Vinted.` : nVintedPro === 0 ? 'Vinted : aucun compte Pro lu sur Vinted.' : 'Vinted : tes comptes Pro, ceux que Vinted dit professionnels.'}</p>
           {comptesConnus(cfg).length ? <div className="vrm-fp-comptes">
             {comptesConnus(cfg).map((c) => (
               <label key={c.cle} className="vrm-fp-compte" data-fp-compte={c.cle} data-fp-compte-oui={c.oui ? '1' : '0'}>
@@ -576,10 +642,12 @@ export function relireFactures(deps) {
         factures: new Map(factures.filter((x) => x && x.transaction && /^email_invoice_tx/.test(x.id)).map((x) => [String(x.transaction), x])),
         // Le profil Vinted du compte : professionnel ? (la MÊME règle que l'app,
         // `typeCompteVinted`) — true · false · absent (pas su).
-        comptesPro: new Map((Array.isArray(profils) ? profils : []).map((r) => {
+        // (11 nov., lot vinted-pro) + les comptes dont Vinted a écrit « membre Vinted Pro » dans
+        // un e-mail de vente, là où le profil n'est pas lu (src/vintedPro.js). Jamais un « false » inventé.
+        comptesPro: comptesProFacture(new Map((Array.isArray(profils) ? profils : []).map((r) => {
           const uid = String(r.uid || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
           return [uid, deps.typeCompteVinted({ user: { business: r.business, business_account_id: r.business_account_id, business_account: r.business_account } })];
-        }).filter(([u, t]) => u && typeof t === 'boolean')),
+        }).filter(([u, t]) => u && typeof t === 'boolean')), ventes.map((x) => x && x.uid)),
         avoirs: new Map(factures.filter((x) => x && x.transaction && /^email_invoice_av/.test(x.id)).map((x) => [String(x.transaction), x])),
         // (10 nov., lot Q) Toutes les lignes (registre, trous de la numérotation).
         toutes: factures.filter(Boolean),

@@ -1,16 +1,16 @@
 /* ── La facture Pro (2 nov.) — style Vitrine/Apple : neutre, une couleur rare ── */
 .vrm-fp-fiche { display: grid; gap: 14px; min-width: 0; }
-.vrm-fp-carte { border: 1px solid var(--vrm-line); background: var(--vrm-card); border-radius: 12px; padding: 14px; font-size: 15px; color: var(--vrm-ink); }
+.vrm-fp-carte { border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 12px; padding: 14px; font-size: 15px; color: var(--vrm-ink); }
 .vrm-fp-muet { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted); }
 .vrm-fp-statut { margin: 0; font-size: 13px; color: var(--vrm-muted); }
 
-.vrm-fp-etat { display: grid; gap: 3px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-card); border: 1px solid var(--vrm-line); color: var(--vrm-ink); }
+.vrm-fp-etat { display: grid; gap: 3px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-surface); border: 1px solid var(--vrm-line); color: var(--vrm-ink); }
 .vrm-fp-etat b { font-size: 15px; font-weight: 600; }
 .vrm-fp-etat span { font-size: 13px; line-height: 1.45; color: var(--vrm-muted); overflow-wrap: anywhere; }
 .vrm-fp-etat.is-manque { border-color: color-mix(in srgb, var(--vrm-warn, #b25000) 45%, var(--vrm-line)); }
 .vrm-fp-etat.is-manque .vrm-b { margin-top: 8px; justify-self: start; }
 
-.vrm-fp-section { display: grid; gap: 10px; padding: 14px; border-radius: 12px; background: var(--vrm-card); border: 1px solid var(--vrm-line); min-width: 0; }
+.vrm-fp-section { display: grid; gap: 10px; padding: 14px; border-radius: 12px; background: var(--vrm-surface); border: 1px solid var(--vrm-line); min-width: 0; }
 .vrm-fp-section > h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .01em; color: var(--vrm-muted); text-transform: none; }
 
 .vrm-fp-champ { display: grid; gap: 5px; min-width: 0; font-size: 13px; color: var(--vrm-ink); }
@@ -37,7 +37,7 @@
 .vrm-fp-logo-vide { font-size: 13px; color: var(--vrm-muted); }
 .vrm-fp-logo label.vrm-b { cursor: pointer; }
 .vrm-fp-couleurs { display: flex; gap: 10px; flex-wrap: wrap; }
-.vrm-fp-couleurs > button { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--vrm-card); box-shadow: 0 0 0 1px var(--vrm-line); cursor: pointer; padding: 0; }
+.vrm-fp-couleurs > button { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--vrm-surface); box-shadow: 0 0 0 1px var(--vrm-line); cursor: pointer; padding: 0; }
 .vrm-fp-couleurs > button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--vrm-ink); }
 
 .vrm-fp-case { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: var(--vrm-ink); cursor: pointer; }
@@ -54,7 +54,7 @@
 
 /* ── La ligne sur une vente ── */
 .vrm-fp-vente { display: grid; gap: 6px; min-width: 0; }
-.vrm-fp-vente-ligne { display: grid; gap: 2px; text-align: left; width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-card); color: var(--vrm-ink); font: inherit; cursor: pointer; }
+.vrm-fp-vente-ligne { display: grid; gap: 2px; text-align: left; width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; cursor: pointer; }
 .vrm-fp-vente-ligne b { font-size: 15px; font-weight: 600; }
 .vrm-fp-vente-ligne span { font-size: 13px; color: var(--vrm-muted); overflow-wrap: anywhere; }
 .vrm-fp-vente-ligne[data-fp-vente="refusee"] span, .vrm-fp-vente-ligne[data-fp-vente="incertaine"] span { color: var(--vrm-warn, #b25000); }
@@ -155,7 +155,7 @@ html body .vrm-fp-apercu .vrm-fp-a-table { table-layout: auto; }
 
 /* ════ (10 nov., lot Q) À envoyer · envoi automatique · registre — DA6 : groupes rayon 24,
    rangées entières qui s'ouvrent (chevron), pilules ; l'ambre seulement pour un geste à faire. ════ */
-.vrm-fp-a-envoyer, .vrm-fp-registre { border-radius: var(--w-r, 24px); border: 0; background: var(--w-carte, var(--vrm-card)); box-shadow: var(--w-ombre, 0 1px 3px rgba(0,0,0,.06)); padding: 16px; }
+.vrm-fp-a-envoyer, .vrm-fp-registre { border-radius: var(--w-r, 24px); border: 0; background: var(--w-carte, var(--vrm-surface)); box-shadow: var(--w-ombre, 0 1px 3px rgba(0,0,0,.06)); padding: 16px; }
 .vrm-fp-tete-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .vrm-fp-tete-ligne > h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); }
 .vrm-fp-muet.is-ambre { color: var(--vrm-warn, #b25000); }

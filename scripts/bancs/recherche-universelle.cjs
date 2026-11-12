@@ -104,7 +104,7 @@ async function preparer(b, vp, { sombre = false, stream = false } = {}) {
   pg.on('pageerror', (e) => errs.push(e.message));
   pg.on('requestfailed', (r) => { if (/email-rattacher\?mode=journal&page=0&cherche=/.test(r.url())) journal.annulees++; });
   await pg.addInitScript(({ s, st }) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (s) localStorage.setItem('vinted_dark', 'true'); if (st) { localStorage.setItem('vrm_stream', '1'); localStorage.setItem('vrm_recherche_recents', JSON.stringify(['poupacho'])); } } catch (_) {} }, { s: sombre, st: stream });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));

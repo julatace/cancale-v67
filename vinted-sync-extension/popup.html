@@ -15,6 +15,12 @@
       :root { --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --texte: #F5F5F7; --doux: #98989D;
         --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); }
     }
+    /* 5.351 : la teinte choisie dans VRM (data-theme, posé par le script de la fenêtre) passe avant le système. */
+    :root[data-theme="clair"] { color-scheme: light; --fond: #F2F2F7; --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --texte: #1D1D1F; --doux: #6E6E73;
+      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); }
+    :root[data-theme="sombre"] { color-scheme: dark; --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --texte: #F5F5F7; --doux: #98989D;
+      --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); }
+    html.carte[data-theme] { color-scheme: normal; }
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; width: 320px; margin: 0; padding: 16px;
       background: var(--fond); color: var(--texte); font-size: 15px; line-height: 1.45; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; font-kerning: normal; }
