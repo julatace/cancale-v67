@@ -97,7 +97,7 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       // L2 porte déjà une date tapée (aujourd'hui) : l'extension (mois dernier) doit gagner.
       await pg.addInitScript((a) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_lbc_dates', JSON.stringify({ L2: a })); } catch (_) {} }, AUJ);
-      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
       await brancher(pg);
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
       const r0 = await attendre(pg, (r) => r.etat === 'lu' && r.n > 0);

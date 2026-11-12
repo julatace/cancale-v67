@@ -33,6 +33,7 @@ const RACINE = path.join(__dirname, '..');
 const PERMIS = [
   ['src/App.jsx', /^'\^\(\?:chaussures|^'\(taille\|pointure/, 'expression de lecture d’un titre (aucun texte affiché)'],
   ['src/App.jsx', /^'Chaussures( enfants)?'$/, 'catégorie Leboncoin (le nom du site), choisie seulement pour un article chaussure'],
+  ['src/publierPartout.js', /^'Chaussures( enfants)?'$/, 'LBC_CATEGORIES : les noms EXACTS des catégories Leboncoin (liste du site), proposés parmi les autres catégories (11 nov., publier-partout)'],
   ['src/Accueil.jsx', /seulement pour les baskets \?/, 'la question de l’accueil, dont la réponse est « Non : tout article »'],
   // (11 nov., lot traduction) La même question, déplacée dans les dictionnaires (clé `accueil.faq.baskets.q`).
   ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}-accueil.js`, /^"accueil\.faq\.baskets\.q"/, 'la question de l’accueil (traduite), dont la réponse est « tout article »', 'ligne']),

@@ -30,6 +30,7 @@
 // `entree` : la fiche telle qu'elle est AVANT le geste ; `patch` : les champs posés.
 // Un champ absent avant vaut `undefined` (l'annulation le RETIRE, elle ne pose pas
 // `null` à sa place) — c'est ce qui rend l'état d'avant EXACT.
+import { motsVendeur } from './profilVendeur.js';
 export function champsAvant(entree, patch) {
   const e = entree && typeof entree === 'object' ? entree : {};
   const out = {};
@@ -57,7 +58,7 @@ export const CONFIRMATIONS = [
   { cle: 'ext-vestiaire', geste: 'Déjà publiée sur Vestiaire, clé Photoroom', ou: 'Vestiaire', decision: 'gardee', pourquoi: 'passe par l’extension (`vcMarque`) ou efface une clé du coffre' },
   { cle: 'ext-facture', geste: 'Envoyer / renvoyer / annuler une facture, déconnecter la boîte', ou: 'Factures Pro', decision: 'gardee', pourquoi: 'un e-mail parti ne revient pas ; numérotation légale continue' },
   { cle: 'ext-compte', geste: 'Résilier, changer d’offre, se déconnecter partout, déconnecter un appareil, retirer Discord, équipe, adresses e-mail', ou: 'Réglages', decision: 'gardee', pourquoi: 'paiement, sessions, ou accès d’un tiers' },
-  { cle: 'ext-impression', geste: 'Vérifier avant impression, tamponner le bordereau téléchargé', ou: 'Colis', decision: 'gardee', pourquoi: 'un bordereau imprimé part sur un carton' },
+  { cle: 'ext-impression', geste: 'Tamponner le bordereau téléchargé', ou: 'Colis', decision: 'gardee', pourquoi: 'un bordereau tamponné part sur un carton (la confirmation « contrôlés » à chaque impression est retirée le 11 nov.)' },
   // Gardées — numéros (§5 : un N° est écrit sur un carton, jamais réattribué).
   { cle: 'num', geste: 'N° déjà servi, nouveau N°, N° porté par un autre, donner un N° libre, reprendre un ancien N°, remise en ligne « même paire », Vestiaire « Un seul N° » / défaire', ou: 'Annonces, Stock, Vestiaire', decision: 'gardee', pourquoi: 'un N° posé ou changé s’écrit là où l’article est rangé : jamais « annulé » en silence' },
   { cle: 'num-perdu', geste: 'Déclarer perdu, « n’est plus chez toi », « je m’en sépare »', ou: 'Ventes, Annonces, Ma journée', decision: 'gardee', pourquoi: 'sort la paire du stock et vide sa case au garage ; Ma journée est le chantier d’un autre agent' },
@@ -86,7 +87,7 @@ export const ACTIONS_RECHERCHE = [
   { id: 'calculette', libelle: 'Calculette d’achat', sous: 'Combien je gagne si je l’achète X € ?', icone: 'euro', mots: ['calculette', 'calculer', 'calcul', 'combien', 'gagner', 'gagne', 'benefice', 'marge', 'rentable', 'acheter'] },
   { id: 'achats', libelle: 'Mes achats', sous: 'Achats', icone: 'bag', mots: ['achats', 'achat', 'acheter'] },
   { id: 'reglages', libelle: 'Réglages', sous: 'Paramètres de VRM', icone: 'gear', mots: ['reglages', 'parametres', 'preferences', 'settings', 'options'] },
-  { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, sous: 'La fiche de la paire', icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire'] },
+  { id: 'ouvrir-num', num: true, libelle: (n) => `Ouvrir N°${n}`, get sous() { return `La fiche ${motsVendeur().de}`; }, icone: 'tag', mots: ['ouvrir', 'fiche', 'voir', 'histoire', 'paire', 'article'] },
   { id: 'baisser-prix', num: true, libelle: (n) => `Baisser le prix de N°${n}`, sous: 'La feuille du prix — rien n’est envoyé avant « Appliquer »', icone: 'euro', mots: ['baisser', 'prix', 'changer', 'modifier', 'promo', 'reduire', 'diminuer'] },
   { id: 'stock-num', num: true, libelle: (n) => `Voir N°${n} au Stock`, sous: 'Où il est rangé', icone: 'grid', mots: ['stock', 'ranger', 'rangement', 'garage', 'case', 'ou'] },
 ];

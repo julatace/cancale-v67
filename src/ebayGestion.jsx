@@ -1,4 +1,5 @@
 import {formaterMontantEbay as montant} from './montantsEbay.js';
+import { motsVendeur } from './profilVendeur.js';
 import {appelerEbay} from './ebayRequetes.js';
 import {useReponseIncertaine} from './ebayEtatIncertain.js';
 import {lireBrouillon,sauverBrouillon,effacerBrouillonSiIdentique} from './brouillonsMessages.js';
@@ -187,7 +188,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
     </div> : selected.itemId ? <PiedSansEnvoi attrs={{'data-ebay-pas-question':selected.type || 'inconnu'}} lien={`https://www.ebay.fr/itm/${encodeURIComponent(selected.itemId)}`} texteLien="Ouvrir sur eBay ↗" raison="Pas une question d’acheteur : la réponse se fait sur eBay."><Erreur message={message}/></PiedSansEnvoi>
     : <PiedSansEnvoi lien="https://www.ebay.fr/" texteLien="Ouvrir eBay ↗" raison="Cet échange n’a pas d’annonce identifiée : VRM ne peut pas y répondre d’ici. Le contact des acheteurs d’une commande reste disponible dans Ventes."><Erreur message={message}/></PiedSansEnvoi>}
    </CadreFil>:<div className="vrm-chat-empty"><span>Choisis un échange</span><small>Lis les réponses et réponds depuis VRM.</small></div>}
-  </div>{!selected ? <FicheConvVolet site="ebay" etat="aucune"/> : <FicheConvVolet site="ebay" etat={paireSel?'reliee':'non-reliee'} fc={paireSel} raison="eBay ne rattache aucune annonce à cet échange : VRM ne devine pas la paire d’après le titre."/>}</div>
+  </div>{!selected ? <FicheConvVolet site="ebay" etat="aucune"/> : <FicheConvVolet site="ebay" etat={paireSel?'reliee':'non-reliee'} fc={paireSel} raison={`eBay ne rattache aucune annonce à cet échange : VRM ne devine pas ${motsVendeur().le} d’après le titre.`}/>}</div>
  </section>;
 }
 
@@ -310,8 +311,8 @@ export function EbayRetours({compte='principal',headers,confirm,theme:C,onComman
     <b style={{fontSize:13}}>Annulation demandée · commande {c.orderId}</b>
     <div style={{fontSize:12,color:C.muted,marginTop:3}}>{c.acheteur?`Acheteur : ${c.acheteur}`:''}{c.montant?` · ${euros(c.montant)} à rembourser`:''}{c.date?` · ${heureCourte(c.date)}`:''}</div>
     {issueTexte(f,C) || <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
-     <button type="button" disabled={busy} data-geste="annulation-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'accepter'},{title:'Accepter l’annulation ?',desc:`Commande ${c.orderId}${c.acheteur?' · '+c.acheteur:''}\n\neBay rembourse l’acheteur${c.montant?' ('+euros(c.montant)+')':''} et la vente est annulée : n’expédie pas la paire. Elle sort de tes colis à faire.`,ok:'Accepter l’annulation',cancel:'Annuler'})}>Accepter l’annulation</button>
-     <button type="button" disabled={busy} data-geste="annulation-refuser" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'refuser'},{title:'Refuser l’annulation ?',desc:`Commande ${c.orderId}\n\nLa vente est maintenue : tu dois expédier la paire.`,ok:'Refuser',cancel:'Annuler'})}>Refuser</button>
+     <button type="button" disabled={busy} data-geste="annulation-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'accepter'},{title:'Accepter l’annulation ?',desc:`Commande ${c.orderId}${c.acheteur?' · '+c.acheteur:''}\n\neBay rembourse l’acheteur${c.montant?' ('+euros(c.montant)+')':''} et la vente est annulée : n’expédie pas ${motsVendeur().le}. Elle sort de tes colis à faire.`,ok:'Accepter l’annulation',cancel:'Annuler'})}>Accepter l’annulation</button>
+     <button type="button" disabled={busy} data-geste="annulation-refuser" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'refuser'},{title:'Refuser l’annulation ?',desc:`Commande ${c.orderId}\n\nLa vente est maintenue : tu dois expédier ${motsVendeur().le}.`,ok:'Refuser',cancel:'Annuler'})}>Refuser</button>
     </div>}
    </article>;})}
    {(ouverts||[]).map(r=>{const k='r:'+r.returnId,f=faits[k],attend=String(r.etat).toUpperCase()==='RETURN_REQUESTED';return <article key={k} data-ebay-retour={r.returnId} style={carte}>
@@ -320,7 +321,7 @@ export function EbayRetours({compte='principal',headers,confirm,theme:C,onComman
     {r.commentaire && <p style={{fontSize:12,margin:'6px 0 0',overflowWrap:'anywhere'}}>« {r.commentaire} »</p>}
     {issueTexte(f,C) || (attend ? <div style={{display:'grid',gap:8,marginTop:8}}>
      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-      <button type="button" disabled={busy} data-geste="retour-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'deciderretour',{returnId:r.returnId,decision:'ACCEPT'},{title:'Accepter le retour ?',desc:`${r.titre || r.itemId}\n\nL’acheteur renvoie la paire. Tu devras le rembourser${r.remboursementPrevu?' ('+euros(r.remboursementPrevu)+')':''} à réception.`,ok:'Accepter le retour',cancel:'Annuler'})}>Accepter le retour</button>
+      <button type="button" disabled={busy} data-geste="retour-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'deciderretour',{returnId:r.returnId,decision:'ACCEPT'},{title:'Accepter le retour ?',desc:`${r.titre || r.itemId}\n\nL’acheteur renvoie ${motsVendeur().le}. Tu devras le rembourser${r.remboursementPrevu?' ('+euros(r.remboursementPrevu)+')':''} à réception.`,ok:'Accepter le retour',cancel:'Annuler'})}>Accepter le retour</button>
       <button type="button" disabled={busy} data-geste="retour-refuser" style={{...S.button,minHeight:44}} onClick={()=>{const t=String(motifs[k]||'').trim();if(!t){setMessage('Écris pourquoi tu refuses : eBay le transmet à l’acheteur.');return;}agir(k,'deciderretour',{returnId:r.returnId,decision:'DECLINE',commentaire:t},{title:'Refuser le retour ?',desc:`${r.titre || r.itemId}\nMotif : « ${t} »\n\nL’acheteur peut demander à eBay d’intervenir.`,ok:'Refuser le retour',cancel:'Annuler'});}}>Refuser</button>
      </div>
      <input aria-label="Motif du refus" maxLength={1000} placeholder="Motif si tu refuses" value={motifs[k]||''} onChange={e=>setMotifs(m=>({...m,[k]:e.target.value}))} style={{...S.input,fontSize:17}}/>
@@ -342,7 +343,7 @@ export function EbayPromotion({compte='principal',headers,confirm,theme:C}){
   catch(x){setMessage(x.reason==='incertain'?'Je ne sais pas si c’est parti : regarde sur eBay avant de recommencer.':x.message);setBusy(false);}}
  const promues=new Map((data?.promues||[]).map(p=>[p.listingId,p]));
  const lignes=data?(Array.isArray(data.annonces)?data.annonces:[...promues.keys()].map(id=>({itemId:id,titre:''}))):[];
- const FRAIS='Des frais prélevés par eBay UNIQUEMENT si la paire se vend par la promotion : ce pourcentage du prix de vente, en plus des frais habituels.';
+ const FRAIS=`Des frais prélevés par eBay UNIQUEMENT si ${motsVendeur().le} se vend par la promotion : ce pourcentage du prix de vente, en plus des frais habituels.`;
  return <section data-ebay-promotion={data===undefined?'en-cours':data===null?'pas-su':promues.size}>
   <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}><h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Promotion des annonces</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
   <p style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.5}}>{FRAIS}</p>

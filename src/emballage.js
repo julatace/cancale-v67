@@ -17,8 +17,9 @@
 // Module PUR (sauf la mémoire des cases, sur l'appareil) : l'écran et le banc
 // `emballage.cjs` lisent les mêmes fonctions.
 
+import { motsVendeur } from './profilVendeur.js';
 export const CASES_EMBALLAGE = [
-  { cle: 'trouvee', libelle: 'Paire trouvée' },
+  { cle: 'trouvee', get libelle() { return `${motsVendeur().Nom} trouvé${motsVendeur().e}`; } },
   { cle: 'emballee', libelle: 'Emballée' },
   { cle: 'colle', libelle: 'Bordereau collé' },
 ];

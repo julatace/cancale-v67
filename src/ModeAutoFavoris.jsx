@@ -7,6 +7,7 @@
 import React from 'react';
 import {createPortal} from 'react-dom';
 import {requeteJsonBornee} from './requeteJsonBornee.js';
+import { motsVendeur } from './profilVendeur.js';
 import {RAISONS_FAVORIS} from './favorisProgression.js';
 import {AUTO_DEFAUT,JOURS_AUTO,validerAutoFavoris,limiteJourAuto,AUTO_JOUR_MS,AUTO_HEURE_MS} from './favorisAuto.js';
 import {phraseModeAuto} from './favorisEcran.js';
@@ -15,7 +16,7 @@ import {phraseModeAuto} from './favorisEcran.js';
 // chaque favori porte son état dans la liste de l'écran (`onVue` la lui passe).
 
 const heure=t=>{try{return new Date(t).toLocaleString('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch{return '';}};
-export const RISQUE_AUTO='VRM écrira tout seul aux personnes qui mettent tes annonces en favori, avec ton message et ton offre enregistrés, depuis l’onglet vinted.fr de ce compte.\n\nGarde-fous : jamais une conversation déjà ouverte avec la personne, jamais quelqu’un contacté ces 30 derniers jours, jamais une paire réservée, vendue (ici ou ailleurs), en pause ou masquée ; attente au hasard après le favori ; tes horaires ; tes limites par heure et par 24 h ; 10 messages par jour la 1re semaine, 20 la 2e ; pause de 24 h au premier signe de Vinted.\n\nAttention : Vinted peut quand même voir ça comme un robot : c’est un risque pour le compte, que tu prends en l’allumant. Aucune garantie contre un blocage.';
+export const risqueAuto=()=>`VRM écrira tout seul aux personnes qui mettent tes annonces en favori, avec ton message et ton offre enregistrés, depuis l’onglet vinted.fr de ce compte.\n\nGarde-fous : jamais une conversation déjà ouverte avec la personne, jamais quelqu’un contacté ces 30 derniers jours, jamais ${motsVendeur().un} réservé${motsVendeur().e}, vendu${motsVendeur().e} (ici ou ailleurs), en pause ou masqué${motsVendeur().e} ; attente au hasard après le favori ; tes horaires ; tes limites par heure et par 24 h ; 10 messages par jour la 1re semaine, 20 la 2e ; pause de 24 h au premier signe de Vinted.\n\nAttention : Vinted peut quand même voir ça comme un robot : c’est un risque pour le compte, que tu prends en l’allumant. Aucune garantie contre un blocage.`;
 
 export default function ModeAutoFavoris({uid,owner,ownerActuel,headers,nomCompte,extensionAuto,onVue,variante='',FermeAuRetour=null}){
   const [feuille,setFeuille]=React.useState(false);
@@ -58,7 +59,7 @@ export default function ModeAutoFavoris({uid,owner,ownerActuel,headers,nomCompte
           :<button type="button" className="is-principal" data-favoris-auto-continuer disabled={occupe||!!erreurForm} onClick={()=>setConfirmer(true)}>Continuer</button>}
       </div>:<div className="vrm-favoris-auto-confirmer" role="alertdialog" aria-label="Allumer le mode automatique ?" data-favoris-auto-confirmer>
         <strong>Allumer le mode automatique ?</strong>
-        {RISQUE_AUTO.split('\n\n').map((t,i)=><p key={i}>{t}</p>)}
+        {risqueAuto().split('\n\n').map((t,i)=><p key={i}>{t}</p>)}
         <div className="vrm-favoris-auto-boutons"><button type="button" onClick={()=>setConfirmer(false)}>Annuler</button><button type="button" className="is-principal" data-favoris-auto-oui disabled={occupe} onClick={()=>enregistrer(true,true)}>{occupe?'Allumage…':'Oui, écrire tout seul'}</button></div>
       </div>}
     </div>:null;

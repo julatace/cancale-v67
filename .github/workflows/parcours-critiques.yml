@@ -12,11 +12,13 @@ jobs:
   comptes-et-reception:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # (11 nov.) La garde réseau : un banc qui joint un vrai serveur (la production, Internet) est ROUGE.
-      NODE_OPTIONS: --require=${{ github.workspace }}/scripts/bancs/_garde-reseau.cjs
     steps:
       - uses: actions/checkout@v4
+      # (11 nov.) La garde réseau : un banc qui joint un vrai serveur (la production, Internet) est ROUGE.
+      # (11 nov., ci-vert) Posée APRÈS le checkout : au niveau du job, NODE_OPTIONS chargeait le fichier
+      # avant qu'il existe et `actions/checkout` lui-même plantait (« Cannot find module »).
+      - name: Poser la garde réseau pour tous les pas suivants
+        run: echo "NODE_OPTIONS=--require=$GITHUB_WORKSPACE/scripts/bancs/_garde-reseau.cjs" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22

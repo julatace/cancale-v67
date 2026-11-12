@@ -44,6 +44,7 @@
 // scripts/audit-fournisseurs.cjs ; rendu par src/AchatsOutils.jsx.
 // ─────────────────────────────────────────────────────────────────────────────
 import { centimesDe, partsEgales } from './achatsSourcing.js';
+import { motsVendeur } from './profilVendeur.js';
 
 export const CLE_FOURNISSEURS = 'vrm_fournisseurs';
 export const SOURCE_FOURNISSEUR = 'Fournisseur';
@@ -123,7 +124,7 @@ export function champsAchatGros({ fournisseur, date, paires, total, frais } = {}
   if (!reg.personnes[fournisseur]) return { erreur: 'fournisseur' };
   if (!jourOk(date)) return { erreur: 'Choisis la date' };
   const n = Number(str(paires));
-  if (!Number.isInteger(n) || n < 1 || n > MAX_PAIRES) return { erreur: 'Écris le nombre de paires' };
+  if (!Number.isInteger(n) || n < 1 || n > MAX_PAIRES) return { erreur: `Écris le nombre ${motsVendeur().deNoms}` };
   const t = centimesDe(total);
   if (t == null || t <= 0) return { erreur: 'Écris le montant total' };
   let f = 0;

@@ -81,6 +81,7 @@ const charger = async (src, nom) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-doublons-historique-'));
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   fs.writeFileSync(path.join(dir, nom), src);
+  fs.copyFileSync(path.join(__dirname, '..', 'src', 'profilVendeur.js'), path.join(dir, 'profilVendeur.js'));   // (lot vocabulaire-article) le mot du vendeur, importé par la règle
   return import(pathToFileURL(path.join(dir, nom)).href);
 };
 

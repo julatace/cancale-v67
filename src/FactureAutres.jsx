@@ -11,6 +11,7 @@
 //     « Émettre la facture » (confirmé) — numéro de la MÊME suite que Vinted.
 // VRM n'envoie pas ces factures par e-mail (aucune adresse prouvée) : PDF.
 // Le serveur (api/_lib/facture-autres.js) relit la vente lui-même et refait la règle.
+import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
 import React from 'react';
 import { SheetShell } from './composants/SheetShell.jsx';
 import { ApercuFacture, useFicheFacturation, FicheFacturation, relireFactures, ecrireChampsFiche } from './FacturePro.jsx';
@@ -56,10 +57,11 @@ async function ouvrirPdf(contenu, deps, partager = false) {
 }
 async function route(deps, corps) {
   try {
-    const r = await fetch('/api/compte?mode=facture-autre', { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) });
+    // (11 nov., réseau instable) Bornée, comme src/FacturePro.jsx (rejeu = même facture).
+    const r = await fetchBorne(fetch, '/api/compte?mode=facture-autre', { method: 'POST', headers: { 'Content-Type': 'application/json', ...deps.enTeteSession() }, body: JSON.stringify(corps) }, DELAI_ROUTE_MS);
     const j = await r.json().catch(() => null);
     return { code: r.status, j: j || {} };
-  } catch (_) { return { code: 0, j: { message: "Pas de réseau : rien n'a été fait." } }; }
+  } catch (e) { return { code: 0, j: { message: typeof navigator !== 'undefined' && navigator.onLine === false && !(e && e.name === NOM_DELAI) ? "Pas de réseau : rien n'a été fait." : "La réponse n'est pas arrivée (réseau trop faible). Réessaie : si elle était partie, tu retrouveras la même facture, jamais une deuxième." } }; }
 }
 // Pro = sa fiche « Ma facture » porte un SIRET valide. `undefined` = pas su encore.
 const estPro = (cfg) => (cfg === undefined ? undefined : !!(cfg && verifierSiret(cfg.siret).etat === 'ok'));

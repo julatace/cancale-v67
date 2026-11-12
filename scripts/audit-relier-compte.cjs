@@ -240,7 +240,9 @@ const iso = (j) => new Date(NOW - j * J).toISOString();
     dit(ancien || marque, 'R7 Colis : seulement un compte à relier qui a des colis (sa carte de colis), rien sur une lecture ratée');
     dit(/\{only === 'bordereaux' && <ComptesARelierColis comptes=\{accounts\}\/>\}/.test(APP) || marque, 'R7 Colis porte la marque (sur la carte du colis)');
     // (11 nov.) Ma journée v2 range ses cartes dans une liste (`[{ el: carteARelier() }]`) ; même règle : UNE carte.
-    dit((/\{comptesARelierJour\.length \? (?:carteARelier\(\)|P\(carteARelier\(\)\)) : null\}/.test(APP) || /\.\.\.\(comptesARelierJour\.length \? \[\{ el: carteARelier\(\) \}\] : \[\]\)/.test(APP)) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
+    dit((/\{comptesARelierJour\.length \? (?:carteARelier\(\)|P\(carteARelier\(\)\)) : null\}/.test(APP) || /\.\.\.\(comptesARelierJour\.length \? \[\{ el: carteARelier\(\) \}\] : \[\]\)/.test(APP)
+      // (11 nov., lot journee-perso) les cartes de Ma journée sont rangées par id dans SON ordre (`blocsAF`)
+      || /'a-relier': comptesARelierJour\.length \? \[carteARelier\(\)\] : \[\],/.test(APP)) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
     // (11 nov.) Depuis le 10 nov. (6f60bc8b) Colis lit aussi la règle (la marque sur les cartes des comptes muets).
     dit(/useComptesARelier\(accounts, only === 'journee'(?: \|\| only === 'bordereaux')?\)/.test(APP), 'R7 Ma journée (et Colis) seulement lisent la règle');
   });

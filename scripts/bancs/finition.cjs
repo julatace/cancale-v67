@@ -417,7 +417,7 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
   if (FEUILLES) {
     const OUVRIR = [
       ['notifications', 'journee', '[data-cloche], button[aria-label*="otification"]'],
-      ['plus', 'journee', '[data-tabbar-plus], .vrm-tabbar [aria-label="Plus"], .vrm-tabbar button:last-child'],
+      ['plus', 'journee', '[data-tabbar-plus], .vrm-tabbar [aria-label^="Plus"], .vrm-tabbar button:last-child'],
       ['chiffres', 'journee', '[data-carte-modifier="journee"]'],
       ['aide-ventes', 'ventes', '[data-carte-stats] [data-carte-aide]'],
       ['conversation', 'messages', '[data-conv="502"]'],

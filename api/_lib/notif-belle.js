@@ -122,6 +122,6 @@ export const imageSure = (photo) => (photo && typeof photo === 'object' && photo
 export { echeancePressante } from './notif-textes.js';
 
 // Le nom court d'une famille (cloche, aperçus) et son icône (noms de ICON_PATHS).
-export const ICONE_FAMILLE = { comptes: 'link', ventes: 'cash', doublevente: 'alert', rappels: 'clock', poster: 'box', arrives: 'pin', offres: 'tag', messages: 'chat', test: 'bell2' };
+export const ICONE_FAMILLE = { avis: 'star', comptes: 'link', ventes: 'cash', doublevente: 'alert', rappels: 'clock', poster: 'box', arrives: 'pin', offres: 'tag', messages: 'chat', test: 'bell2' };
 // Le geste écrit sous une ligne de la cloche (ce que fait le toucher).
-export const GESTE_FAMILLE = { comptes: 'Voir le compte', ventes: 'Voir la vente', doublevente: 'Retirer l’annonce', rappels: 'Ouvrir', poster: 'Voir le colis', arrives: 'Voir le code', offres: 'Répondre', messages: 'Répondre' };
+export const GESTE_FAMILLE = { avis: 'Lire l’avis', comptes: 'Voir le compte', ventes: 'Voir la vente', doublevente: 'Retirer l’annonce', rappels: 'Ouvrir', poster: 'Voir le colis', arrives: 'Voir le code', offres: 'Répondre', messages: 'Répondre' };

@@ -17,6 +17,7 @@
 // La marque, le modèle et les couleurs viennent des règles de l'app
 // (`extractBrand`, `extractModel`, `extractColors`), passées en paramètre : une
 // seule définition (§11). Module PUR : scripts/audit-plancher-stock.cjs l'EXÉCUTE.
+import { motsVendeur } from './profilVendeur.js';
 import { tailleNorm, tailleDuTitre } from './suggestionsAchat.js';
 
 const bas = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -67,5 +68,5 @@ export function pairesDuModele({ cible, stock, sauf = null, marqueDe, modeleDe =
 }
 
 export const phraseDejaEnStock = (n, { autres = false } = {}) => (n > 0
-  ? `Tu as déjà ${n} ${autres ? 'autre' + (n > 1 ? 's' : '') + ' ' : ''}paire${n > 1 ? 's' : ''} de ce modèle en stock`
+  ? `Tu as déjà ${n} ${autres ? 'autre' + (n > 1 ? 's' : '') + ' ' : ''}${n > 1 ? motsVendeur().noms : motsVendeur().nom} de ce modèle en stock`
   : '');

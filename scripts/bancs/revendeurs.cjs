@@ -84,7 +84,7 @@ async function brancher(p){
   //  la rangée de filtres de site dans Ventes / Annonces / Messages, et l'espace eBay
   //  (À traiter, Offres, Compte…) par sa porte « Aussi sur eBay » sous la tâche.
   const ongletBas=async id=>{await p.locator(`.vrm-mobile-nav [data-nav-entree="${id}"]`).click();await p.waitForTimeout(300);};
-  const plusVers=async entree=>{await p.locator('.vrm-mobile-nav button[aria-label="Plus"]').click();await p.locator(`.vrm-sheet [data-nav-entree="${entree}"]`).click();await p.waitForTimeout(300);};
+  const plusVers=async entree=>{await p.locator('.vrm-mobile-nav button[aria-label^="Plus"]').click();await p.locator(`.vrm-sheet [data-nav-entree="${entree}"]`).click();await p.waitForTimeout(300);};
   const filtreSite=async(tache,site)=>{await p.locator(`[data-tache="${tache}"]`).waitFor();const f=p.locator(`[data-filtre-site="${tache}"] button[data-site="${site}"]`);if(await f.count())await f.first().click();await p.locator(`[data-tache="${tache}"][data-tache-site="${site}"]`).waitFor();};
   const ebaySection=async nom=>{
    // Une commande ouverte depuis « À traiter » s'ouvre dans Ventes · eBay, en tiroir : on le referme d'abord, comme lui.

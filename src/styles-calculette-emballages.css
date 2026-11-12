@@ -56,7 +56,7 @@
   box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
 }
 .vrm-emb2-tete { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
-.vrm-emb2-ajout { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 4px; cursor: pointer; font: 600 15px var(--vrm-police, inherit); color: var(--vrm-accent, #0066CC); }
+.vrm-emb2-ajout { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 4px; cursor: pointer; font: 600 15px var(--vrm-police, inherit); color: var(--vrm-accent-texte, #0066CC); } /* (11 nov., a11y) texte bleu = accent-texte : 3,6:1 en sombre avec l’accent plein */
 .vrm-emb2-vide, .vrm-emb2-note { margin: 4px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-emb2-liste { list-style: none; margin: 0; padding: 0; }
 .vrm-emb2-liste > li + li { border-top: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }

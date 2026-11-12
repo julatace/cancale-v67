@@ -9,13 +9,19 @@ const { build } = require("esbuild"),
     s = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8"),
     a = s.indexOf("function AtelierBrouillon("),
     b = s.indexOf("// ══ ATELIER DE REPUBLICATION", a),
-    composant = s.slice(a, b);
+    composant = s.slice(a, b),
+    // (9 nov.) l'atelier se pose dans le VRAI voile (portail sur <body>), déclaré hors de la tranche.
+    sr = fs.readFileSync(path.join(root, "src/ecrans/Republier.jsx"), "utf8"),
+    va = sr.indexOf("const VoileAtelier ="),
+    voile = sr.slice(va, sr.indexOf("\n};\n", va) + 3);
+  assert.ok(va > 0 && voile.includes("createPortal"), "VoileAtelier introuvable");
   const bundle = await build({
     stdin: {
       resolveDir: root,
       loader: "jsx",
-      contents: `import React,{useState,useRef}from'react';import{createRoot}from'react-dom/client';import{centimes}from'./src/beneficePaire.js';
+      contents: `import React,{useState,useRef}from'react';import{createRoot}from'react-dom/client';import{createPortal}from'react-dom';import{centimes}from'./src/beneficePaire.js';
 const AUTH={user:{id:'owner-a'}};window.authTest=AUTH;const C={bg:'#f8faf8',card:'#fff',text:'#203c42',muted:'#617575',border:'#dae4e1',accent:'#42786e',warn:'#a65e20'};const load=(k,f)=>f,save=()=>{},PhotoVinted=()=> <span>Photo</span>,Icon=()=>null,ChipsModeles=()=>null;function FermeAuRetour({fermer}){const f=useRef(fermer);f.current=fermer;React.useEffect(()=>{const cb=e=>{if(e.type==='popstate'||e.key==='Escape')f.current();};document.addEventListener('keydown',cb);window.addEventListener('popstate',cb);return()=>{document.removeEventListener('keydown',cb);window.removeEventListener('popstate',cb);};},[]);return null;}
+${voile}
 ${composant}
 const root=createRoot(document.getElementById('root'));window.sauves=[];window.mode='ok';window.ouvert=true;window.afficher=()=>root.render(window.ouvert?<AtelierBrouillon key={window.sauves.length} it={{id:'100',title:'Ordinateur',price:20,photo:'https://example.invalid/photo.jpg'}} e={{numero:'7'}} k="7" draft={window.sauves.at(-1)} onSave={v=>{if(window.mode==='erreur')throw Error('Stockage indisponible');window.sauves.push(v);}} onClose={()=>{window.ouvert=false;window.afficher();}}/>:<button onClick={()=>{window.ouvert=true;window.afficher();}}>Rouvrir</button>);window.afficher();`,
     },

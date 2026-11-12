@@ -3,8 +3,9 @@
   if(window.__vrmLbcRelayLoaded)return;window.__vrmLbcRelayLoaded=true;
   const vus=new Set();
   const pausesEnAttente=new Map();     // jeton → réponse au fond (22 oct.)
+  const importsEnAttente=new Map();    // 5.365 : jeton → réponse au fond (une page de l'historique)
   const envoisEnAttente=new Map();     // 5.318 : jeton → réponse au fond (répondre dans un fil)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.344.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.365.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
@@ -103,6 +104,9 @@
         deMoi: x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null, at: String((x && x.at) || '').slice(0, 30) })).filter((x) => x.t);
       try { transmettre({ from: 'cancale-lbc', action: 'lbcFil', conv: String(d.conv), messages, lus: Number(d.lus) || 0, moi: /^[0-9a-z_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '', page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)) }); } catch (_) {}
     }
+    // 5.365 : le modèle d'une liste « Mes transactions » (son adresse exacte), et une page lue pour l'historique.
+    else if (d.kind === 'lbcimportmodele' && typeof d.url === 'string') { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcImportModele', url: d.url.slice(0, 600), moi: /^[a-z0-9_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '' }, () => { void chrome.runtime.lastError; }); } catch (_) {} }
+    else if (d.kind === 'lbcimportresultat' && typeof d.jeton === 'string') { const r = importsEnAttente.get(d.jeton); if (r) { importsEnAttente.delete(d.jeton); r({ ok: true, statut: Number(d.statut) || 0, erreur: String(d.erreur || '').slice(0, 40), url: typeof d.url === 'string' ? d.url.slice(0, 600) : '', corps: typeof d.corps === 'string' ? d.corps.slice(0, 200000) : '', session: typeof d.session === 'string' ? d.session.slice(0, 80) : '', moi: /^[a-z0-9_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '' }); } }
     else if (d.kind === 'lbcenvoiappris' && d.recette && typeof d.recette === 'object') { try { transmettre({ from: 'cancale-lbc', action: 'lbcEnvoiAppris', recette: d.recette }); } catch (_) {} }
     else if (d.kind === 'lbcenvoiresultat' && typeof d.jeton === 'string') { const r = envoisEnAttente.get(d.jeton); if (r) { envoisEnAttente.delete(d.jeton); r({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), idMsg: /^[\w-]{1,64}$/.test(String(d.idMsg || '')) ? String(d.idMsg) : '', erreur: String(d.erreur || '').slice(0, 80) }); } }
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
@@ -121,6 +125,18 @@
     const t=setTimeout(()=>{if(pausesEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},15000);
     pausesEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
     window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:msg.action==='lbcSupprimeAnnonce'?'supprime':'pause',id,jeton},'*');
+    return true;
+  });}catch(_){}
+  // 5.365 : UNE page de l'historique (liste ou détail), commandée par le fond seulement ;
+  // pas de réponse en 25 s ⇒ « muet » (rien n'avance).
+  try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
+    if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcImportPage')return;
+    if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
+    if(typeof msg.url!=='string'||!/^[a-z0-9_-]{1,64}$/i.test(String(msg.compte||''))){sendResponse({ok:false,code:'invalide'});return;}
+    const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
+    const t=setTimeout(()=>{if(importsEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},25000);
+    importsEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
+    window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:'importpage',jeton,url:msg.url.slice(0,600),compte:String(msg.compte)},'*');
     return true;
   });}catch(_){}
   // 5.335 : le fond dit qu'une session VRM vient d'arriver ⇒ on rejoue ce qu'on garde.

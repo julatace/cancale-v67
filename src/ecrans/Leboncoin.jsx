@@ -5,6 +5,7 @@ import { bilanEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from '../enLi
 import { suivreReceptionLeboncoin } from '../rafraichissementLeboncoin.js';
 import { lbcFloute } from '../flouCompte.js';
 import React, { useState, useEffect, useRef } from 'react';
+import { suivi, suivreJob, lireAvanceeJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { montant } from '../format.js';
 import { ventesVcDe } from '../../api/_lib/vestiaire-regle.js';
 import { lbcColisAPoster } from '../../api/_lib/colis-sites.js';
@@ -12,8 +13,8 @@ import { photoArticle } from '../photosArticles.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis, cleStatTransporteur } from '../transporteursVisuels.js';
 import { attrCible } from '../cibleNotif.js';
-import { champsFacultatifs } from '../profilVendeur.js';
-import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, vendActuel } from '../App.jsx';
+import { champsFacultatifs, motsVendeur, motArticle } from '../profilVendeur.js';
+import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, vendActuel, dejaEnLigneLbc, optsNumeroVerif } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import AnnoncesLeboncoin from '../AnnoncesLeboncoin.jsx';
@@ -89,6 +90,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
     let confirme = false;
     if (lbc && abandonne) { if (!(await demander())) return; confirme = true; }
     setRefus(null); setEnvoi(true);
+    const t0 = Date.now();
     const envoyer = (c) => vmrCmd(Object.assign({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, c ? { confirme: true } : {}), 30000);
     let r = await envoyer(confirme);
     if (r && !r.accepte && r.code === 'confirmer' && !confirme) {
@@ -103,6 +105,8 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
     if (!r.accepte) { setRefus(r.raison || "Refusé par l'extension."); return; }
     __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
     __vmrNotifier();
+    // (11 nov., lot suivi-travail) La feuille « VRM travaille » (eBay : VRM remplit, il met en vente lui-même).
+    if (!enCours) suivrePublicationSite({ sorte: lbc ? 'publier-lbc' : 'preparer-ebay', titre: lbc ? 'Publier sur Leboncoin' : 'Préparer sur eBay', etapes: lbc ? ETAPES_SUIVI_LBC : ETAPES_SUIVI_EBAY, id: String(id), jobId: r.jobId || jobId, depuis: t0, site: lbc ? 'Leboncoin' : 'eBay', preparer: !lbc });
   };
   const libelle = job && libelleRelais(job.etape) ? libelleRelais(job.etape) : envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
     : enCours ? (lbc ? 'Publication en cours…' : 'Formulaire eBay ouvert')
@@ -213,10 +217,15 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
     // (3 nov.) Vérifier avant de publier : une ligne par problème, « Publier quand même » possible.
     if (!enCours && !confirme) {
       const fam = familleArticle({ titre, description: desc, taille: q.taille, marque: q.marque }).famille;
-      const ok = await verifierAvantPublication(problemesAnnonce({ titre, taille: q.taille || '', famille: fam, marque: q.marque || '', categorie: categorieLbcDe(titre, desc, q.taille, '', q.marque), nPhotos: photos.length, prix, achat: q.achat, facultatifs: champsFacultatifs(vendActuel()) }, 'lbc'), { site: 'lbc' });
+      // (11 nov., lot verif-publication) + le N° dans la description qui partira, et la
+      // même paire (même N°) déjà en ligne sur Leboncoin (lecture complète < 24 h).
+      const dejaLbc = q.numero ? await dejaEnLigneLbc(q.numero) : null;
+      const ok = await verifierAvantPublication(problemesAnnonce({ titre, taille: q.taille || '', famille: fam, marque: q.marque || '', categorie: categorieLbcDe(titre, desc, q.taille, '', q.marque), nPhotos: photos.length, prix, achat: q.achat, facultatifs: champsFacultatifs(vendActuel()),
+        numero: q.numero || '', description: typeof desc === 'string' ? desc : undefined, ...optsNumeroVerif(), ...(dejaLbc === true ? { dejaEnLigne: true, dejaEnLigneOu: 'sur Leboncoin' } : {}) }, 'lbc'), { site: 'lbc' });
       if (!ok) return;
     }
     setRefus(null); setAConfirmer(false); setEnvoi(true);
+    const t0 = Date.now();
     let r = await envoyer(!!confirme);
     setEnvoi(false);
     if (r && !r.accepte && r.code === 'confirmer') {
@@ -227,6 +236,8 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
     if (!r.accepte) { setRefus(r.raison ? (r.raison.charAt(0).toUpperCase() + r.raison.slice(1) + '.') : "Refusé par l'extension."); return; }
     __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() });
     __vmrNotifier();
+    // (11 nov., lot suivi-travail) VRM figé pendant le dépôt, avec son détail (pas pour un « remettre devant »).
+    if (!enCours) suivrePublicationSite({ sorte: 'publier-lbc', titre: 'Publier sur Leboncoin', etapes: ETAPES_SUIVI_LBC, id: String(q.id), num: q.numero, titreArticle: titre, jobId: r.jobId || jobId, depuis: t0, site: 'Leboncoin' });
   };
   const basculerPhoto = (u) => setPhotos((l) => (l.includes(u) ? l.filter((x) => x !== u) : (l.length >= LBC_PHOTOS_MAX ? l : [...l, u])));
   const categorie = categorieLbcDe(titre, desc, q.taille);
@@ -869,6 +880,27 @@ function QuotaLbc({ limit, plan, onFait }) {
 //   3. publier sa fiche, puis ATTENDRE la page de confirmation de Leboncoin
 //      avant la suivante (un dépôt à la fois, aucune attente artificielle).
 // Ce qui ne peut pas être recréé n'est jamais proposé (voir `repub` dans l'écran).
+// (11 nov., lot suivi-travail) Les étapes d'une annonce, telles que l'extension les dit (`progres.etape`).
+const ETAPES_SUIVI_LBC_REPUB = [['suppression', 'Suppression sur Leboncoin'], ['marque', 'Remise dans la file de VRM'], ['depot', 'Dépôt demandé à l’extension'], ['ouverture', 'Ouverture du dépôt'], ['remplissage', 'Remplissage du formulaire'], ['photos', 'Envoi des photos'], ['etapes', 'Étapes du dépôt'], ['publication', 'Publication'], ['accepte', 'Publiée sur Leboncoin ✓']];
+const ETAPES_SUIVI_LBC = ETAPES_SUIVI_LBC_REPUB.slice(2);
+const ETAPES_SUIVI_EBAY = [['depot', 'Demande envoyée à l’extension'], ['formulaire', 'Formulaire eBay ouvert et rempli']];
+// Une publication lancée sur SON clic (Leboncoin, eBay) : la feuille « VRM travaille » la suit
+// jusqu'à ce que l'extension dise « fait », un geste à faire dans l'onglet, l'abandon ou le délai.
+// `preparer` (eBay) : VRM remplit, c'est lui qui met en vente — l'annonce finit « à la main ».
+function suivrePublicationSite({ sorte, titre, etapes, id, num, titreArticle, jobId, depuis, site, preparer = false }) {
+  const t = suivi.demarrer({ sorte, titre, etapes, articles: [{ id, num: num || '', titre: titreArticle || '' }] });
+  if (!t) return;
+  t.etape(id, 'depot');
+  if (preparer) { t.etape(id, 'formulaire'); t.fin(id, { etat: 'main', raison: `formulaire ${site} ouvert et rempli par l’extension`, geste: `Relis et mets en vente sur ${site}` }); t.terminer(''); return; }
+  suivreJob(t, id, { jobId, lireJobs: () => __vmrJobs, depuis, delaiMs: 15 * 60000 }).then(({ fin, raison }) => {
+    if (fin === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
+    else if (fin === 'geste') t.fin(id, { etat: 'main', raison: `le dépôt attend ton geste dans l’onglet ${site}`, geste: `Termine-le dans l’onglet ${site}` });
+    else if (fin === 'abandonne') t.fin(id, { etat: 'main', raison: RAISON_ABANDON[raison] || 'VRM n’a pas vu la fin du dépôt', geste: `Si tu l’as publiée toi-même, clique « Déjà publiée » ; sinon relance` });
+    else if (fin === 'arret') t.fin(id, { etat: 'main', raison: `le dépôt continue dans l’onglet ${site}`, geste: `Regarde l’onglet ${site}` });
+    else t.fin(id, { etat: 'main', raison: 'VRM n’a pas vu la fin du dépôt en 15 min', geste: `Regarde l’onglet ${site} avant de relancer` });
+    t.terminer('');
+  });
+}
 const REPUB_LBC_MAX = 10;   // le plafond de suppressions par heure de l'extension
 const REPUB_LBC_ATTENTE_MS = 10 * 60000;
 const attendreRepubLbc = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -929,53 +961,71 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
     if (mode === 'run' || !fiches.length || bloqueExt || invalides.length || sansFiche) return;
     const ok = await askConfirm({
       title: `Republier ${fiches.length} annonce${fiches.length > 1 ? 's' : ''} sur Leboncoin ?`,
-      desc: `Pour chacune, une à la fois : VRM la SUPPRIME de Leboncoin, puis la republie comme une annonce neuve (titre, description, photos de la paire${pMode !== 'aucun' ? ', nouveau prix' : ''}).\n\nLa suppression est sans retour : les favoris, les messages et les statistiques de l'ancienne annonce sont perdus. Si la republication n'aboutit pas, la paire revient dans « À publier ».\n\nL'extension agit depuis ta session Leboncoin, sans option payante.`,
+      desc: `Pour chacune, une à la fois : VRM la SUPPRIME de Leboncoin, puis la republie comme une annonce neuve (titre, description, photos ${motsVendeur().de}${pMode !== 'aucun' ? ', nouveau prix' : ''}).\n\nLa suppression est sans retour : les favoris, les messages et les statistiques de l'ancienne annonce sont perdus. Si la republication n'aboutit pas, ${motsVendeur().le} revient dans « À publier ».\n\nL'extension agit depuis ta session Leboncoin, sans option payante.`,
       ok: 'Oui, republier', cancel: 'Annuler', danger: true,
     });
     if (!ok) return;
     stop.current = false; setMode('run');
+    // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL de tout ce que VRM fait et une BARRE »)
+    const t = suivi.demarrer({ sorte: 'republier-lbc', titre: 'Republier sur Leboncoin', etapes: ETAPES_SUIVI_LBC_REPUB,
+      articles: fiches.map(({ it }) => ({ id: it.lbc.id, num: it.numero || '', titre: (it.lbc && it.lbc.titre) || it.title || '' })) });
+    const poserS = (id, etat, texte, aLaMain) => {
+      poser(id, etat, texte);
+      if (!t) return;
+      if (aLaMain) t.fin(id, { etat: 'main', raison: texte, geste: aLaMain });
+      else if (etat === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
+      else if (etat === 'incertain') t.fin(id, { etat: 'main', raison: texte, geste: 'Regarde l’annonce sur Leboncoin avant de relancer' });
+      else if (etat === 'refuse' || etat === 'echec') t.fin(id, { etat: 'refus', raison: texte });
+    };
     for (const { it, f } of fiches) {
       const id = it.lbc.id;
+      if (t && !(await t.continuer())) stop.current = true;
       if (stop.current) { poser(id, 'attente', 'pas touchée — tu as arrêté'); continue; }
+      if (t) t.etape(id, 'suppression');
       // 1. Supprimer.
       poser(id, 'encours', 'Suppression sur Leboncoin…');
       let r = null; try { r = await vmrCmd({ cmd: 'lbcSupprime', id, confirme: true }, 70000); } catch (_) { r = null; }
-      if (!r) { poser(id, 'incertain', "je ne sais pas si elle est supprimée — l'extension n'a pas répondu. Regarde l'annonce sur Leboncoin. Arrêt."); break; }
-      if (r.accepte === false) { poser(id, 'refuse', `pas touchée — ${r.raison || 'refusé par l’extension'}. Arrêt.`); break; }
-      if (r.etape !== 'fait') { poser(id, r.etape === 'refuse' ? 'refuse' : 'incertain', r.etape === 'refuse' ? `pas touchée — Leboncoin a répondu ${r.statut}. Arrêt.` : `je ne sais pas si elle est supprimée — ${r.raison || 'pas de réponse de Leboncoin'}. Arrêt.`); break; }
-      if (r.note === false) { poser(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu le noter : elle n'est pas republiée (la file la croirait encore en ligne). Clique « ↻ Actualiser » puis publie-la depuis « À publier ». Arrêt."); break; }
+      if (!r) { poserS(id, 'incertain', "je ne sais pas si elle est supprimée — l'extension n'a pas répondu. Regarde l'annonce sur Leboncoin. Arrêt."); break; }
+      if (r.accepte === false) { poserS(id, 'refuse', `pas touchée — ${r.raison || 'refusé par l’extension'}. Arrêt.`); break; }
+      if (r.etape !== 'fait') { poserS(id, r.etape === 'refuse' ? 'refuse' : 'incertain', r.etape === 'refuse' ? `pas touchée — Leboncoin a répondu ${r.statut}. Arrêt.` : `je ne sais pas si elle est supprimée — ${r.raison || 'pas de réponse de Leboncoin'}. Arrêt.`); break; }
+      if (r.note === false) { poserS(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu le noter : elle n'est pas republiée (la file la croirait encore en ligne). Clique « ↻ Actualiser » puis publie-la depuis « À publier ». Arrêt."); break; }
       // 2. Retirer sa marque « publiée ».
+      if (t) t.etape(id, 'marque');
       let marque = true;
       for (const m of it.marques || []) { let x = null; try { x = await vmrCmd({ cmd: 'lbcMarque', id: String(m), etat: 'unposted' }, 30000); } catch (_) { x = null; } if (!x || !x.accepte) { marque = false; break; } }
-      if (!marque) { poser(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu la remettre dans la file : elle n'est pas republiée. Clique « ↻ Actualiser », « Ce n'est plus publié », puis publie-la. Arrêt."); break; }
+      if (!marque) { poserS(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu la remettre dans la file : elle n'est pas republiée. Clique « ↻ Actualiser », « Ce n'est plus publié », puis publie-la. Arrêt."); break; }
       // 3. Publier sa fiche, puis attendre la page de confirmation de Leboncoin.
       poser(id, 'encours', 'Supprimée · republication en cours…');
+      if (t) t.etape(id, 'depot');
       const jobId = 'lbc:' + it.id;
       const t0 = Date.now();
       let p = null; try { p = await vmrCmd(Object.assign({ cmd: 'lbcPublier', id: String(it.id) }, saitFiche ? { annonce: f.v.annonce } : {}), 30000); } catch (_) { p = null; }
-      if (!p || !p.accepte) { poser(id, 'echec', `supprimée de Leboncoin, pas encore republiée — ${p ? (p.raison || 'refusé par l’extension') : "l'extension n'a pas répondu"}. Elle est dans « À publier ». Arrêt.`); break; }
+      if (!p || !p.accepte) { poserS(id, 'echec', `supprimée de Leboncoin, pas encore republiée — ${p ? (p.raison || 'refusé par l’extension') : "l'extension n'a pas répondu"}. Elle est dans « À publier ». Arrêt.`); break; }
       __vmrJobs[jobId] = { etape: p.etape || 'depot', at: Date.now() }; __vmrNotifier();
       let fin = '';
       while (Date.now() - t0 < REPUB_LBC_ATTENTE_MS) {
         await attendreRepubLbc(1500);
         const j = __vmrJobs[jobId];
+        if (t) { const av = lireAvanceeJob(j, t0); if (av.etape && av.etape !== 'fait' && av.etape !== 'abandonne') t.etape(id, av.etape); }
         if (j && j.etape === 'fait' && Number(j.at || 0) >= t0) { fin = 'fait'; break; }
         if (j && j.etape === 'abandonne') { fin = 'abandonne'; break; }
         if (j && j.progres && /^(champ-manquant|publication-refusee)$/.test(j.progres.etape)) { fin = 'geste'; break; }
       }
-      if (fin === 'fait') { poser(id, 'fait', 'republiée ✓ — une annonce neuve est en ligne sur Leboncoin'); continue; }
-      poser(id, 'echec', fin === 'geste' ? "supprimée, et le dépôt attend ton geste dans l'onglet Leboncoin (un champ à choisir). Termine-le là-bas. Arrêt."
+      if (fin === 'fait') { poserS(id, 'fait', 'republiée ✓ — une annonce neuve est en ligne sur Leboncoin'); continue; }
+      poserS(id, 'echec', fin === 'geste' ? "supprimée, et le dépôt attend ton geste dans l'onglet Leboncoin (un champ à choisir). Termine-le là-bas. Arrêt."
         : fin === 'abandonne' ? "supprimée, mais le dépôt n'a pas abouti. Elle est dans « À publier » : relance-la de là. Arrêt."
-        : "supprimée ; je n'ai pas vu la fin du dépôt en 10 min — regarde l'onglet Leboncoin avant de relancer. Arrêt.");
+        : "supprimée ; je n'ai pas vu la fin du dépôt en 10 min — regarde l'onglet Leboncoin avant de relancer. Arrêt.",
+        fin === 'geste' ? 'Termine le dépôt dans l’onglet Leboncoin' : fin === 'abandonne' ? 'Relance-la depuis « À publier »' : 'Regarde l’onglet Leboncoin avant de relancer');
       break;
     }
+    if (t) t.terminer(stop.current ? 'arrêté par toi' : '');
     setMode('fini'); stop.current = false;
     if (onFini) onFini();
   };
   const bouton = (actif, plein) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, padding: '0 16px', borderRadius: 12, border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? (actif ? C.accent : C.border) : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, fontSize: 13, fontWeight: 600, cursor: actif ? 'pointer' : 'not-allowed', opacity: actif ? 1 : 0.55, fontFamily: 'inherit' });
   const ETAPES = [['choix', '1. Choisir'], ['modif', '2. Modifier'], ['envoi', '3. Republier']];
   const nbExclues = Object.values(exclues || {}).reduce((a, b) => a + b, 0);
-  const LIB_KO = { sansPaire: 'pas reliée à une paire (ni lien, ni référence VRM)', pasEnLigne: 'paire plus en ligne sur Vinted', plusieurs: 'plusieurs annonces Vinted pour ce N°', vendue: 'paire vendue sur Vinted', retiree: 'paire retirée du stock ou décochée pour Leboncoin', deux: 'deux annonces Leboncoin pour la même paire', marque: 'marquée publiée sous un N° que VRM ne sait pas retirer', jumelle: 'même photo qu’une autre paire' };
+  const LIB_KO = { sansPaire: `pas reliée à ${motsVendeur().un} (ni lien, ni référence VRM)`, pasEnLigne: `${motsVendeur().nom} plus en ligne sur Vinted`, plusieurs: 'plusieurs annonces Vinted pour ce N°', vendue: `${motsVendeur().nom} vendu${motsVendeur().e} sur Vinted`, retiree: `${motsVendeur().nom} retiré${motsVendeur().e} du stock ou décoché${motsVendeur().e} pour Leboncoin`, deux: `deux annonces Leboncoin pour ${motsVendeur().meme}`, marque: 'marquée publiée sous un N° que VRM ne sait pas retirer', jumelle: `même photo qu’${motsVendeur().autre}` };
   return (
     <SheetShell onClose={() => { if (mode !== 'run') onClose(); }} maxWidth={620}>
       <div data-repub-lbc={etape} data-repub-lbc-mode={mode}>
@@ -1727,11 +1777,11 @@ function LeboncoinScreen() {
   const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').length : 0;
   const nRetirerLbcEbay = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou === 'eBay').length : 0;
   const conseilsLbc = data ? [
-    nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${nRetirerLbc} paire${plurLbc(nRetirerLbc)} vendue${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
-    nRetirerLbcEbay && { k: 'retirer-ebay', urg: true, sel: '[data-lbc-retirer-ebay]', txt: `${nRetirerLbcEbay} paire${plurLbc(nRetirerLbcEbay)} vendue${plurLbc(nRetirerLbcEbay)} sur eBay, encore en ligne ici — à retirer de Leboncoin` },
-    data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendue${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
+    nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${motArticle(nRetirerLbc)} vendu${motsVendeur().e}${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
+    nRetirerLbcEbay && { k: 'retirer-ebay', urg: true, sel: '[data-lbc-retirer-ebay]', txt: `${motArticle(nRetirerLbcEbay)} vendu${motsVendeur().e}${plurLbc(nRetirerLbcEbay)} sur eBay, encore en ligne ici — à retirer de Leboncoin` },
+    data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendu${motsVendeur().e}${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
     data.aRelierVentes && data.aRelierVentes.length && { k: 'relier-ventes', sel: '[data-lbc-ventes-a-relier]', txt: `${data.aRelierVentes.length} vente${plurLbc(data.aRelierVentes.length)} Leboncoin à relier à un article` },
-    data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
+    data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${motArticle(data.queue.length)} prêt${motsVendeur().e}${plurLbc(data.queue.length)} à publier sur Leboncoin` },
   ].filter(Boolean) : [];
   const allerLbc = (c) => () => { try { const el = document.querySelector(c.sel); if (el) el.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth', block: 'center' }); } catch (_) {} };
   // La cible posée par Ma journée : consommée une fois, dans la minute ; la mémoire
@@ -1858,7 +1908,7 @@ function LeboncoinScreen() {
         if (!rates.length) return null;
         const liste = rates.length === 1 ? rates[0] : rates.slice(0, -1).join(', ') + ' ni ' + rates[rates.length - 1];
         const effets = [
-          data.preuveKO && 'la liste à publier peut contenir des paires déjà vendues sur Vinted',
+          data.preuveKO && `la liste à publier peut contenir des ${motsVendeur().noms} déjà vendu${motsVendeur().e}s sur Vinted`,
           data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucun article vendu ici n'est encore en vente sur Vinted",
           data.lbcKO && 'je ne peux pas te dire lesquelles retirer de Leboncoin',
           data.echecLecture && 'la file à publier est incomplète',
@@ -2004,7 +2054,7 @@ function LeboncoinScreen() {
           const carteDoute = vendues.some((r) => r.sortie) ? 'vendues' : doute.some((r) => r.sortie) ? 'doute' : pause.some((r) => r.sortie) ? 'pause' : null;
           const phraseDoute = nDoute > 0 ? (
             <div data-lbc-retirer-doute={nDoute} style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
-              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, <b>une autre annonce</b> est peut-être en ligne : ouvre ta page profil Leboncoin.
+              {nDoute > 1 ? `Pour ${nDoute} de ces ${motsVendeur().noms}` : `Pour ${motsVendeur().une} de ces ${motsVendeur().noms}`}, <b>une autre annonce</b> est peut-être en ligne : ouvre ta page profil Leboncoin.
             </div>
           ) : null;
           return (<>
@@ -2164,7 +2214,7 @@ function LeboncoinScreen() {
               // ⚠️ « Tout est publié 🎉 » serait faux : rien n'est publié, tout
               //    a été retiré de la file. Deux causes, deux phrases.
               ? <div style={{ fontSize: 13, color: C.muted }}>Rien dans la file</div>
-              : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div>) : (<>
+              : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 ({motsVendeur().toutes} {motsVendeur().tes} numéroté{motsVendeur().e}s en ligne sont sur Leboncoin).</div>) : (<>
             {/* ⚠️⚠️ « EXACTEMENT TEL QU'IL PARTIRA » EST UNE PROMESSE SUR L'EXTENSION.
                 C'est ELLE qui publie, avec SA version de la règle : une extension
                 antérieure à 5.55.4 enverra l'ancien titre, coupé en plein mot.
@@ -2276,7 +2326,7 @@ function LeboncoinScreen() {
           se LIT une fois descend ici ; ce qui se FAIT reste en haut. */}
       {data && Array.isArray(data.liensPoses) && data.liensPoses.length > 0 && (
         <details data-lbc-liens={data.liensPoses.length} className="vrm-repli" style={{ marginTop: 6 }}>
-          <summary>Paires que tu as reliées ({data.liensPoses.length}) — corriger une erreur</summary>
+          <summary>{motsVendeur().Noms} que tu as relié{motsVendeur().e}s ({data.liensPoses.length}) — corriger une erreur</summary>
           <Card>
             {data.liensPoses.map((l, i) => (
               <div key={l.id} data-lien-lbc={l.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: i ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap' }}>
@@ -2384,11 +2434,11 @@ function LeboncoinScreen() {
           était la seule à ne rien déclencher »), et l'écran Annonces, lui,
           traitait déjà les trois. *« Pas su » ne vaut pas « oui ».* */}
       {/* (6 nov., v36-visuel — « des murs de texte ») Une ligne ; le comment, derrière le « ⓘ ». */}
-      <div style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.4 }}>La file : tes annonces en ligne sur Vinted.{' '}<Pourquoi label="Comment se fait la file" titre="La file Leboncoin">La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.4 }}>La file : tes annonces en ligne sur Vinted.{' '}<Pourquoi label="Comment se fait la file" titre="La file Leboncoin">La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, {motsVendeur().noms} retiré{motsVendeur().e}s exclu{motsVendeur().e}s). {(() => {
         // Trois états, jamais deux (§ extSait) — et la phrase suit la version
         // INSTALLÉE : c'est l'extension qui publie, avec SA règle.
         const e = extSait('publication');
-        if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
+        if (e === 'ok') return <>{motsVendeur().chaque} a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
         if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Paramètres → État des connexions</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
         return <>Publie depuis l'ordinateur où est l'extension.</>;
       })()}</Pourquoi></div>

@@ -88,7 +88,7 @@ const appareil = async (b, { largeur = 390, hauteur = 844, mobile = true, ua = U
     if (o.standalone) { try { Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true, configurable: true }); } catch (_) {} }
     if (o.kagi) { try { window.KAGI = {}; } catch (_) {} }
   }, { sombre, standalone, kagi, sansPush });
-  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await ctx.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(route.request().url());
     if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });

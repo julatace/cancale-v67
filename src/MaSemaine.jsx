@@ -10,6 +10,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { montant } from './format.js';
+import { motsVendeur } from './profilVendeur.js';
 import { raisonCourte } from './design/carteChiffres.js';
 import './styles-ma-semaine.css';
 
@@ -121,7 +122,7 @@ export default function MaSemaine({ M, entete = null, onSemaine, onNav, vitesse 
           porte={brutPorte ? 'Saisir les prix d’achat' : ''} onClick={onNav ? () => onNav('cat_ventes') : null}/>
         <Widget cle="recu" l="Reçu" x={c.recu} t="eur" e={e.recu} onClick={onNav ? () => onNav(c.recu && c.recu.valeur != null ? 'compta' : 'cat_ventes') : null}/>
         <Widget cle="colis" l="Colis envoyés" x={c.colis} t="n" e={e.colis} onClick={onNav ? () => onNav('cat_bord') : null}/>
-        <Widget cle="dorment" l="Paires qui dorment" large t="n"
+        <Widget cle="dorment" l={`${motsVendeur().Noms} qui dorment`} large t="n"
           x={d.etat === 'su' ? { valeur: d.n, partiel: d.auMoins, manque: [] } : { valeur: null, hors: 'ouvre Annonces' }}
           sous="en ligne depuis plus de 30 jours"
           onClick={onNav ? () => onNav('annonces') : null}/>

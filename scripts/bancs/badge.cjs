@@ -108,7 +108,9 @@ const lire = (pg) => pg.evaluate(() => {
     imgSrc: img ? img.getAttribute('src') : null,
     point: pt ? getComputedStyle(pt).display !== 'none' : false,
     pointCouleur: pt ? getComputedStyle(pt).backgroundColor : '',
-    carte: (r.querySelector('.carte') || {}).innerText || '',
+    // 5.351 : le détail est REPLIÉ quand tout va bien — le banc l'ouvre le temps de
+    // lire (ce que la carte dit derrière « Détails »), puis le remet comme il était.
+    carte: (() => { const c = r.querySelector('.carte'); if (!c) return ''; const ds = Array.from(c.querySelectorAll('details[data-detail]')); const avant = ds.map((d) => d.open); ds.forEach((d) => { d.open = true; }); const t = c.innerText || ''; ds.forEach((d, i) => { d.open = avant[i]; }); return t; })(),
     carteVisible: r.querySelector('.carte') ? getComputedStyle(r.querySelector('.carte')).display !== 'none' : false,
     iframe: r.querySelector('.connexion iframe') ? r.querySelector('.connexion iframe').getAttribute('src') : null,
     // 5.329 : le formulaire est DESSINÉ dans la carte (shadow root fermée), sans iframe.

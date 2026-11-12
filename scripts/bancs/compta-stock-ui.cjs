@@ -64,7 +64,7 @@ async function ouvrir(b, largeur, tab, init = {}) {
     localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches));
     for (const [k, v] of Object.entries(init)) localStorage.setItem(k, v);
   } catch (_) {} }, [FICHES, init]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));

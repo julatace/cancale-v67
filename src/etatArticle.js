@@ -25,6 +25,7 @@
 //    c'est dit.
 // Module PUR : l'écran (FichePaire.jsx) et `scripts/audit-stock-2d.cjs`.
 
+import { motsVendeur } from './profilVendeur.js';
 const J = 86400000;
 const t = (v) => {
   if (v == null || v === '') return null;
@@ -110,14 +111,14 @@ export function etatArticle(p, x = {}) {
   // ── RÉCEPTION ────────────────────────────────────────────────────────────
   const rec = x.reception;
   const dRec = rec && Number.isFinite(rec.ms) ? rec.ms : null;
-  const raisonRec = rec === undefined ? undefined : (!relie ? (gros ? 'réception d’un achat en gros pas suivie' : 'achat pas relié à cette paire') : (x.receptionRaison || 'réception pas lue (ni « livrée » dans la transaction, ni « Récupéré » touché)'));
+  const raisonRec = rec === undefined ? undefined : (!relie ? (gros ? 'réception d’un achat en gros pas suivie' : `achat pas relié à ${motsVendeur().ce}`) : (x.receptionRaison || 'réception pas lue (ni « livrée » dans la transaction, ni « Récupéré » touché)'));
 
   const lignes = [];
   const pose = (cle, titre, res, raison) => lignes.push(res && res.jours !== undefined ? { cle, titre, ...res, raison: res.raison || '' } : { cle, titre, jours: raison === undefined ? undefined : null, borne: null, raison: raison || '' });
 
   // 1. ACHAT → VENTE
   if (!venteSu) pose('achat-vente', 'Achat → vente', null, (eV && eV.detail) || 'tes ventes pas toutes lues');
-  else if (dAchat == null) pose('achat-vente', 'Achat → vente', null, relie ? 'date de l’achat pas écrite' : gros ? 'date de l’achat en gros dans Achats → Fournisseurs' : 'achat pas relié à cette paire');
+  else if (dAchat == null) pose('achat-vente', 'Achat → vente', null, relie ? 'date de l’achat pas écrite' : gros ? 'date de l’achat en gros dans Achats → Fournisseurs' : `achat pas relié à ${motsVendeur().ce}`);
   else if (vendue) pose('achat-vente', 'Achat → vente', dVente != null ? duree(dAchat, dVente) : null, 'date de vente pas lue');
   else pose('achat-vente', 'Achat → vente', duree(dAchat, now, 'depuis'), '');
 

@@ -79,12 +79,15 @@ async function controles(racine, silencieux) {
     return (n0 === 0 && Object.values(r0.res).every((x) => x.etat === 'ignore') && e.appels.length === 1 && e.appels[0][0] === 'ebay') || { n0, appels: e.appels };
   });
   await essai('P7 · prix illisible ⇒ rien ne part', async () => { const { sites } = sitesDe('27'); const e = espion(); const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '72 €', envoyer: e.envoyer }); return (e.appels.length === 0 && r.erreur === 'prix') || e.appels; });
-  await essai('P8 · capacité Vinted absente ou en retard ⇒ « À faire sur le site » avec le lien, jamais envoyé', async () => {
-    for (const cap of ['absente', 'retard']) {
+  // (11 nov. soir, décision de Julien : « un prix modifié dans VRM change partout » — sur Vinted, VRM PROPOSE
+  // « Baisser le prix » et c'est SON clic là-bas) : Vinted n'est JAMAIS envoyé d'ici, quelle que soit l'extension.
+  await essai('P8 · Vinted : PROPOSÉ (« Baisser le prix », son clic), jamais envoyé d\'ici ; une hausse ⇒ « à faire sur le site »', async () => {
+    for (const cap of ['ok', 'absente', 'retard']) {
       const { sites } = sitesDe('27', cap); const e = espion();
       const v = sites.find((s) => s.site === 'vinted');
       const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '50', envoyer: e.envoyer });
-      if (!v || v.mode !== 'site' || !/vinted\.fr\/items\/9027/.test(v.lien) || r.res[v.cle].etat !== 'a-faire' || e.appels.some((a) => a[0] === 'vinted')) return { cap, v, res: r.res, appels: e.appels };
+      const h = await P.appliquerPrix({ sites, coches: new Set([v && v.cle]), prix: '80', envoyer: e.envoyer });
+      if (!v || v.mode !== 'propose' || !/vinted\.fr\/items\/9027/.test(v.lien) || r.res[v.cle].etat !== 'propose' || r.res[v.cle].prix !== 50 || h.res[v.cle].etat !== 'a-faire' || e.appels.some((a) => a[0] === 'vinted')) return { cap, v, res: r.res, h: h.res, appels: e.appels };
     }
     return true;
   });
@@ -94,7 +97,7 @@ async function controles(racine, silencieux) {
     const l = sites.find((s) => s.site === 'leboncoin');
     return (r.res['leboncoin:5027'].etat === 'a-faire' && r.res['vestiaire:3027'].etat === 'a-faire' && !e.appels.some((a) => a[0] === 'lbc' || a[0] === 'vc') && /leboncoin\.fr\/ad\/chaussures\/5027/.test(l.lien)) || { res: r.res, appels: e.appels };
   });
-  await essai('P10 · eBay part CONFIRMÉ, au prix VU (`revise`, `confirme:true`, `prixVu`) ; Vinted par `republierVinted` confirmé, sur SON compte', async () => {
+  await essai('P10 · eBay part CONFIRMÉ, au prix VU (`revise`, `confirme:true`, `prixVu`) ; Vinted n\'est jamais envoyé d\'ici (proposé)', async () => {
     const corps = [];
     const env = P.envoisPrix({ appelEbay: async (c) => { corps.push(c); return c.confirme === true ? { code: 200, j: { ok: true } } : { code: 400, j: { ok: false, reason: 'confirmation' } }; },
       resultatReviseEbay: ({ j }) => (j && j.ok ? { etat: 'ok' } : { etat: 'ko', msg: 'refus' }), corpsCompteEbay: () => ({}),
@@ -102,8 +105,8 @@ async function controles(racine, silencieux) {
     const { sites } = sitesDe('27');
     const r = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027', 'vinted:9027']), prix: '50', envoyer: env });
     const eb = corps.find((c) => c.action === 'revise'), vi = corps.find((c) => c.cmd === 'republierVinted');
-    return (eb && eb.confirme === true && eb.prixVu === 65 && eb.price === '50' && eb.itemId === '7027' && vi && vi.confirme === true && vi.uid === '111' && vi.id === '9027' && vi.prix === 50
-      && r.res['ebay:7027'].etat === 'fait' && r.res['vinted:9027'].etat === 'fait') || { corps, res: r.res };
+    return (eb && eb.confirme === true && eb.prixVu === 65 && eb.price === '50' && eb.itemId === '7027' && !vi
+      && r.res['ebay:7027'].etat === 'fait' && r.res['vinted:9027'].etat === 'propose') || { corps, res: r.res };
   });
   await essai('P11 · eBay sans confirmation : la route refuse (garde serveur P12 présente dans api/ebay.js)', () => {
     let src = ''; try { src = fs.readFileSync(path.join(racine, 'api', 'ebay.js'), 'utf8'); } catch (_) {}
@@ -114,7 +117,25 @@ async function controles(racine, silencieux) {
       vmrCmdSuivi: async () => ({ accepte: false, code: 'modele-absent', raison: 'je n\'ai pas encore vu le format' }) });
     const { sites } = sitesDe('27');
     const r = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027', 'vinted:9027']), prix: '50', envoyer: env });
-    return (r.res['ebay:7027'].etat === 'incertain' && r.res['vinted:9027'].etat === 'refuse' && /format/.test(r.res['vinted:9027'].raison)) || r.res;
+    return (r.res['ebay:7027'].etat === 'incertain' && r.res['vinted:9027'].etat === 'propose') || r.res;
+  });
+  await essai('P15 · chaque site reçoit SON ajustement réglé (vrm_partout_prix) : eBay +5 € ⇒ 55 €, Vestiaire = le prix tapé', async () => {
+    const { sites } = sitesDe('27'); const e = espion();
+    const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '50', envoyer: e.envoyer, reglage: { ebay: { mode: 'eur', valeur: 5 }, leboncoin: { mode: 'pct', valeur: -10 }, vestiaire: { mode: 'eur', valeur: 30 } } });
+    return (e.appels.length === 1 && e.appels[0][2] === 55 && r.res['ebay:7027'].prix === 55 && r.res['leboncoin:5027'].prix === 45 && r.res['vestiaire:3027'].prix === 50 && r.res['vinted:9027'].prix === 50) || { appels: e.appels, res: r.res };
+  });
+  await essai('P16 · eBay RELU après : relu = demandé ⇒ « fait ✓ relu » ; relu autre ⇒ « pas sûr » (jamais « fait »)', async () => {
+    const mk = (prixLu) => P.envoisPrix({ appelEbay: async () => ({ code: 200, j: { ok: true, regle: { lecture: prixLu == null ? null : { prix: prixLu } } } }), resultatReviseEbay: ({ j }) => (j && j.ok ? { etat: 'ok' } : { etat: 'ko' }), corpsCompteEbay: () => ({}), vmrCmdSuivi: async () => null });
+    const { sites } = sitesDe('27');
+    const a = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027']), prix: '50', envoyer: mk(50) });
+    const b = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027']), prix: '50', envoyer: mk(65) });
+    const c = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027']), prix: '50', envoyer: mk(null) });
+    return (a.res['ebay:7027'].etat === 'fait' && a.res['ebay:7027'].relu === true && b.res['ebay:7027'].etat === 'incertain' && /65/.test(b.res['ebay:7027'].raison) && c.res['ebay:7027'].etat === 'fait' && c.res['ebay:7027'].relu === false) || { a: a.res, b: b.res, c: c.res };
+  });
+  await essai('P17 · un réglage qui donne 0 € ou moins : ce site ne part pas, et le dit', async () => {
+    const { sites } = sitesDe('27'); const e = espion();
+    const r = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027']), prix: '4', envoyer: e.envoyer, reglage: { ebay: { mode: 'eur', valeur: -10 } } });
+    return (e.appels.length === 0 && r.res['ebay:7027'].etat === 'refuse') || { res: r.res, appels: e.appels };
   });
   await essai('P13 · le prix mini des offres est DIT s\'il dépasse le nouveau prix, et jamais changé', async () => {
     const avant = JSON.stringify(fiches);

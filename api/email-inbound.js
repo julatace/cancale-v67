@@ -38,6 +38,8 @@ import { stampBordereau } from './_lib/stamp.js';
 import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
+import { motsServeur } from './_lib/mots-vendeur.js';
+import { motsArticle } from '../src/profilVendeur.js';
 // (9 nov.) Solo : la vente d'un compte hors offre ne sonne pas (api/_lib/plan-regle.js).
 import { venteHorsPlanServeur } from './_lib/plan-vendeur.js';
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres as fusionnerRegistresLib, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
@@ -60,6 +62,7 @@ import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_l
 // (9 nov.) Les autres e-mails Vestiaire (rappel d'envoi, annonce en attente / en ligne, offres, marketing).
 import { lireEmailVcAutre, fusionAnnonceVc, fusionOffreVc } from './_lib/vestiaire-email-autres.js';
 import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
+import { lireEmailAchat, fusionAchatEmail, idAchatEmail, PREFIXE_A_VERIFIER } from './_lib/achats-email.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
@@ -1047,12 +1050,14 @@ export function jugerPrixParTitre(title, map) {
 async function prixAchatParTitre(title) {
   if (!title) return { etat: 'aucune' };
   try {
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros,jv:data->vrm_je_vends`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
     const rows = await res.json();
-    return jugerPrixParTitre(title, (rows[0] && rows[0].vinted_annonce_numeros) || {});
+    const j = jugerPrixParTitre(title, (rows[0] && rows[0].vinted_annonce_numeros) || {});
+    // (11 nov., lot vocabulaire-article) « paire » / « article » selon ce qu'il vend.
+    return j && typeof j === 'object' ? { ...j, mots: motsServeur(rows[0] && rows[0].jv, proprietaireCourant()) } : j;
   } catch (_) { return null; }
 }
 // La phrase du conseil, dans la notification. Sans identité, AUCUN « Accepte :
@@ -1060,9 +1065,10 @@ async function prixAchatParTitre(title) {
 // elle ». Pure, exécutée par `audit-flux-divers.cjs`.
 export function phraseConseilOffre(juge, offre) {
   const o = Number(offre);
+  const m = (juge && juge.mots) || motsArticle('sneakers');
   if (!juge || !juge.etat) return ' — expire en 24h.';
-  if (juge.etat === 'ambigu') return ` — ${juge.n || 'plusieurs'} paires portent ce titre dans VRM : ouvre la conversation pour savoir laquelle avant de répondre.`;
-  if (juge.etat === 'unique' && Number.isFinite(o)) return ` — une paire à ce titre a coûté ${Math.round(juge.prix)} € dans VRM (reconnue au titre seulement) : vérifie que c'est elle avant de répondre.`;
+  if (juge.etat === 'ambigu') return ` — ${juge.n || 'plusieurs'} ${m.noms} portent ce titre dans VRM : ouvre la conversation pour savoir ${m.laquelle} avant de répondre.`;
+  if (juge.etat === 'unique' && Number.isFinite(o)) return ` — ${m.un} à ce titre a coûté ${Math.round(juge.prix)} € dans VRM (reconnu${m.e} au titre seulement) : vérifie que c'est ${m.lui} avant de répondre.`;
   return ' — expire en 24h.';
 }
 
@@ -2201,6 +2207,43 @@ export default async function handler(req, res) {
 // email mis en quarantaine, une fois que le vendeur a prouvé son identité.
 // ⚠️ `req.__ownerForce` est posé côté serveur uniquement : Vercel construit
 // l'objet `req` lui-même, une requête HTTP ne peut pas y ajouter de propriété.
+// (11 nov., lot achats-auto) LES ACHATS LEBONCOIN, EBAY, VESTIAIRE LUS DANS LES
+// E-MAILS (api/_lib/achats-email.js). Le vendeur est déjà décidé par l'ADRESSE DE
+// RÉCEPTION ; l'expéditeur officiel ne choisit que la lecture. Rend `true` quand
+// l'e-mail est traité (réponse envoyée), `false` sinon (le flux continue).
+//   · lu sans ambiguïté ⇒ UNE ligne `achat_email_{site}_{n°}` (comparer-et-échanger :
+//     rejeu, deux e-mails, deux adresses ⇒ la même ligne ; une valeur connue n'est
+//     jamais remplacée) ;
+//   · sinon ⇒ `achat_email_verif_{empreinte}` (la lecture, rien de personnel) +
+//     l'e-mail ENTIER gardé (`garderInconnu`) ; aucun achat créé.
+// Écriture ratée ⇒ 503 (le service de réception rejoue), jamais 200.
+async function traiterAchatEmail(res, corpsBrut, mail, corpsTexte, now) {
+  const emailAt = dateDeLEmail(corpsBrut) || now;
+  const lu = lireEmailAchat(mail, corpsTexte, emailAt);
+  if (!lu) return false;
+  const messageId = String(mail.messageId || '').slice(0, 300);
+  const ko503 = async () => { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cet achat : renvoie l'e-mail." }); };
+  if (!lu.ok) {
+    const id = PREFIXE_A_VERIFIER + lu.site + '_' + shortHash(messageId || (String(mail.subject || '') + '|' + emailAt));
+    const ok = await supabaseUpsert([{ id, data: { site: lu.site, famille: lu.famille, raison: lu.raison, lecture: lu.lecture, emailAt, recuLe: now, messageId, aVerifier: true } }]);
+    if (!ok) { await ko503(); return true; }
+    await garderInconnu(corpsBrut, mail, 'achat ' + lu.site + ' à vérifier : ' + lu.raison, '');
+    if (ecritureRatee()) { await ko503(); return true; }
+    await logEmail({ type: 'achat-a-verifier', subject: mail.subject || '', from: mail.from, site: lu.site, raison: lu.raison });
+    await repondre(res, 200, { ok: true, type: 'achat-a-verifier', garde: true, site: lu.site, famille: lu.famille, raison: lu.raison, ligne: id });
+    return true;
+  }
+  const a = lu.achat;
+  const id = idAchatEmail(a.site, a.cle);
+  let nouvelle = false;
+  const r = await modifierCas(id, (cur) => { nouvelle = !cur; return fusionAchatEmail(cur, a, { famille: lu.famille, messageId, at: emailAt }); });
+  if (r === null) { await ko503(); return true; }
+  { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: a.titre }; }
+  await logEmail({ type: 'achat-site', subject: mail.subject || '', from: mail.from, site: a.site, commande: a.commande, famille: lu.famille, nouvelle });
+  await repondre(res, 200, { ok: true, type: 'achat-site', site: a.site, famille: lu.famille, commande: a.commande, ligne: id, nouvelle, rejeu: r === false, total: a.prix.total });
+  return true;
+}
+
 export async function traiterEmail(req, res) {
   // ⚠️ Appelée directement (rejeu depuis `email-rattacher`), il n'y a pas encore
   // de contexte : sans ça le propriétaire imposé se perdait en silence et les
@@ -2401,6 +2444,9 @@ export async function traiterEmail(req, res) {
       // son chemin (un colis caché est un colis perdu). Le filet générique
       // « autre » (mots de colis sans transporteur nommé) ne vaut pas pour
       // Vestiaire : il fabriquait un suivi sans n° à partir de « livré à nos experts ».
+      // (11 nov.) UN ACHAT VESTIAIRE (après vente et autres formes : les sujets de
+      // VENTE portent « (#n°) » ; un e-mail de vendeur rend `null`).
+      if (await traiterAchatEmail(res, corpsBrut, mail, corpsTexte, now)) return;
       const transpVc = detecterTransporteur(mail);
       if (!transpVc || transpVc === 'autre') {
         await garderInconnu(corpsBrut, mail, 'Vestiaire : forme pas encore apprise', '');
@@ -2409,6 +2455,10 @@ export async function traiterEmail(req, res) {
         return;
       }
     }
+
+    // 00b) (11 nov.) UN ACHAT LEBONCOIN / EBAY (ou un transfert de l'un des trois
+    //      sites, toujours « à vérifier ») : api/_lib/achats-email.js.
+    if (await traiterAchatEmail(res, corpsBrut, mail, corpsTexte, now)) return;
 
     // 0a) (3 nov.) « COMMANDE MISE À JOUR » : UN DE SES ACHATS L'ATTEND.
     // Règle : api/_lib/achat-arrive-relais.js. Une ligne de colis à retirer

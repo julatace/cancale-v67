@@ -221,7 +221,8 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
             ) : null}
           </div>
         ) : null}
-        <div className="vrm-fs-corps">{children}</div>
+        {/* (11 nov., lot accessibilité) Le corps DÉFILE : focalisable, il se fait défiler au clavier même sans contrôle dedans (axe « scrollable-region-focusable »). */}
+        <div className="vrm-fs-corps" tabIndex={0}>{children}</div>
       </div>
     </div>
   );

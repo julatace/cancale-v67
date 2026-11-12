@@ -4,6 +4,7 @@
 // pleine. Pas su : « — » et la raison. Pas (encore) arrivée : grisée — jamais
 // inventée. Aucune couleur (§7) sauf le rouge de deux paires sous ce N° (§5).
 import React from 'react';
+import { motsVendeur } from './profilVendeur.js';
 import {HistoriqueModifications} from './OutilsParcours.jsx';
 import { createPortal } from 'react-dom';
 import './styles-fiche-paire.css';
@@ -117,7 +118,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const I = (n, s = 18) => (Icon ? <Icon name={n} size={s}/> : null);
   const r = p && p.resume;
   const corps = !p ? (
-    <p className="vrm-fp-vide" data-fiche-vide="">{lecture ? 'Je lis l’histoire de cette paire…' : `Le N°${num} n’est pas un numéro.`}</p>
+    <p className="vrm-fp-vide" data-fiche-vide="">{lecture ? `Je lis l’histoire de ${motsVendeur().ce}…` : `Le N°${num} n’est pas un numéro.`}</p>
   ) : (
     <>
       <div className="vrm-fp-entete">
@@ -131,7 +132,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       </div>
       {/* (10 nov., lot BD) La note privée de la paire (l'écran la fournit : NotePaireCoque). */}
       {note ? <div className="vrm-fp-note-privee" data-fiche-note="">{note}</div> : null}
-      {p.double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1">Deux paires présentes portent le N°{p.num} : vérifie là où elles sont rangées avant d’emballer ou d’imprimer.</p> : null}
+      {p.double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1">Deux {motsVendeur().noms} présent{motsVendeur().e}s portent le N°{p.num} : vérifie là où {motsVendeur().elle}s sont rangé{motsVendeur().e}s avant d’emballer ou d’imprimer.</p> : null}
       <div className="vrm-fp-tuiles">
         {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
         <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>

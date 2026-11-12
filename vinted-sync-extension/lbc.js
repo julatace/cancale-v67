@@ -380,7 +380,7 @@
       'photoroom-402': 'les crédits Photoroom sont épuisés',
       'photoroom-403': 'la clé Photoroom est refusée',
       'delai': 'Photoroom a mis trop de temps à répondre',
-      'pas-une-photo': 'la couverture n\'est pas une photo de la paire',
+      'pas-une-photo': `la couverture n'est pas une photo ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).de || 'de la paire'}`,
       'trop-lourde': 'la photo est trop lourde',
       'cache': 'le serveur n\'a pas pu vérifier si elle était déjà détourée',
       'acces': 'le serveur n\'a pas pu vérifier ton abonnement',
@@ -520,7 +520,7 @@
     let e = null;
     try { e = JSON.parse(sessionStorage.getItem(clePrixPage(ad)) || 'null'); } catch (_) { e = null; }
     if (!e || e.ok) return null;
-    if (e.voulu == null) return 'VRM n\'a pas de prix lisible pour cette paire — rien n\'est publié : mets le prix et publie toi-même, sans booster';
+    if (e.voulu == null) return `VRM n'a pas de prix lisible pour ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'} — rien n'est publié : mets le prix et publie toi-même, sans booster`;
     if (e.vu == null) return 'je n\'ai pas pu relire le prix de la page (VRM : ' + fmtEuros(e.voulu) + ') — rien n\'est publié : vérifie le prix et publie toi-même, sans booster';
     return 'le prix sur la page (' + fmtEuros(e.vu) + ') n\'est pas celui de VRM (' + fmtEuros(e.voulu) + ') — rien n\'est publié : vérifie le prix et publie toi-même, sans booster';
   }
@@ -1253,7 +1253,7 @@
     const cleClic = 'vrmPublieClique:' + String(pending && pending.id);
     let dejaClique = true;
     try { dejaClique = !!sessionStorage.getItem(cleClic); } catch (_) { dejaClique = true; }   // pas su ⇒ on ne clique pas
-    if (dejaClique) return { ok: false, raison: 'j\'ai déjà cliqué « Publier » pour cette paire dans cet onglet — vérifie dans Mes annonces ; je ne reclique jamais (une seconde publication est pire)' };
+    if (dejaClique) return { ok: false, raison: `j'ai déjà cliqué « Publier » pour ${(globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : {}).ce || 'cette paire'} dans cet onglet — vérifie dans Mes annonces ; je ne reclique jamais (une seconde publication est pire)` };
     // 1) décocher toute option payante — une à une, en vérifiant.
     const radio = radioGratuit();
     if (radio && !estCoche(radio)) { try { radio.click(); } catch (_) {} }

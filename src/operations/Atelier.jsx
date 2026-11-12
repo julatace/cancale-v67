@@ -3,6 +3,7 @@
 // src/operations/atelier.js ; écritures : la route Organisation (`atelier.*`).
 // Rien n'est envoyé à Vinted.
 import React,{useMemo,useState} from 'react';
+import { motsVendeur } from '../profilVendeur.js';
 import {atelierDe,attendTrop,joursAttente,resumeAtelier,idNumero,lireAchatsAtelier,ETAPES_MAX,NOM_ETAPE_MAX,ATTENTE_JOURS} from './atelier.js';
 
 const jours=j=>j==null?'':j===0?'aujourd’hui':j===1?'depuis 1 j':`depuis ${j} j`;
@@ -41,9 +42,9 @@ export default function Atelier({donnees,envoyer,occupe,maintenant,uid}){
  const deposer=(e,etape)=>{e.preventDefault();setSurvol('');const id=e.dataTransfer.getData('text/x-vrm-atelier');const p=paires.find(x=>x.id===id);if(p&&colonne(p)!==etape&&!occupe)placer(p,etape);};
  const nomCarte=p=>{const n=p.id.startsWith('n:')?p.id.slice(2):numParId[p.id]||'';return {n,titre:p.titre||(n?'':'Achat sans titre')};};
  return <div className="atl" data-atelier="" data-atelier-total={resume.total} data-atelier-retard={resume.enRetard}>
-  <div className="atl-resume" role="list" aria-label="Paires par étape">{resume.etapes.map(e=><a key={e.id} role="listitem" href={'#atl-'+e.id} className={'atl-pastille'+(e.enRetard?' atl-ambre':'')} data-atelier-compte={e.id} data-n={e.n} onClick={ev=>{ev.preventDefault();try{document.getElementById('atl-'+e.id)?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'});}catch(_){}}}><strong>{e.n}</strong><span>{e.nom}</span></a>)}</div>
+  <div className="atl-resume" role="list" aria-label={`${motsVendeur().Noms} par étape`}>{resume.etapes.map(e=><a key={e.id} role="listitem" href={'#atl-'+e.id} className={'atl-pastille'+(e.enRetard?' atl-ambre':'')} data-atelier-compte={e.id} data-n={e.n} onClick={ev=>{ev.preventDefault();try{document.getElementById('atl-'+e.id)?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'});}catch(_){}}}><strong>{e.n}</strong><span>{e.nom}</span></a>)}</div>
   <div className="atl-outils">
-   <button className="ops-primaire" disabled={occupe} aria-expanded={ajout} onClick={()=>{setAjout(!ajout);setEdition(false);}} data-atelier-ajouter="">+ Ajouter une paire</button>
+   <button className="ops-primaire" disabled={occupe} aria-expanded={ajout} onClick={()=>{setAjout(!ajout);setEdition(false);}} data-atelier-ajouter="">+ Ajouter {motsVendeur().un}</button>
    <button disabled={occupe} aria-expanded={edition} onClick={()=>{setEdition(!edition);setAjout(false);}} data-atelier-modifier="">Modifier les étapes</button>
   </div>
   {edition&&<Etapes etapes={etapes} occupe={occupe} onFermer={()=>setEdition(false)} onSauver={l=>envoyer('atelier.etapes',{etapes:l})}/>}
@@ -59,7 +60,7 @@ export default function Atelier({donnees,envoyer,occupe,maintenant,uid}){
    <form className="atl-num" onSubmit={ajouterNum}><label><span>Ou un N°</span><input value={num} onChange={e=>setNum(e.target.value)} inputMode="text" autoCapitalize="characters" placeholder="125" maxLength={12}/></label><button disabled={occupe||!num.trim()}>Ajouter</button></form>
    {erreurNum&&<p role="alert" className="ops-erreur">{erreurNum}</p>}
   </div>}
-  {!paires.length&&!ajout&&<div className="ops-vide"><strong>L’atelier est vide.</strong><p>Ajoute une paire achetée pour suivre ses étapes.</p></div>}
+  {!paires.length&&!ajout&&<div className="ops-vide"><strong>L’atelier est vide.</strong><p>Ajoute {motsVendeur().un} acheté{motsVendeur().e} pour suivre ses étapes.</p></div>}
   <div className="atl-tableau" style={{'--atl-n':etapes.length}}>{etapes.map((e,i)=>{
    const ici=paires.filter(p=>colonne(p)===e.id).sort((a,b)=>String(a.depuis).localeCompare(String(b.depuis)));
    const suivante=etapes[i+1];

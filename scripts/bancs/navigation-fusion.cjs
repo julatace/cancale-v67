@@ -157,7 +157,7 @@ const allerLien = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/${q
         // ── C : la navigation n'a plus ces deux entrées ──
         await ouvrirA(pg);
         if (tel) {
-          await pg.locator('.vrm-mobile-nav button[aria-label="Plus"]').tap().catch(() => {});
+          await pg.locator('.vrm-mobile-nav button[aria-label^="Plus"]').tap().catch(() => {});
           await pg.waitForSelector('.vrm-sheet [data-nav-entree]', { timeout: 5000 }).catch(() => {});
         }
         const nav = await pg.evaluate((tel) => {
