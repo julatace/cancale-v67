@@ -37,6 +37,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     // (7 nov.) Une règle peut être enveloppée d'une mémoire d'un seul rendu (`memoRendu`).
     let d = SRC.indexOf(`const ${nom} = (`);
     if (d < 0) d = SRC.indexOf(`const ${nom} = memoRendu((`);
+    if (d < 0) { const m = new RegExp(`const ${nom} = memoVersion\\('[a-z]+', \\(`).exec(SRC); d = m ? m.index : -1; }   // (12 nov.) mémoire par version des données
     if (d < 0) return null;
     const f = SRC.indexOf('\n  };', d) + 4;
     return SRC.slice(d, f);
@@ -84,6 +85,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     // (7 nov.) Une règle peut être enveloppée d'une mémoire d'un seul rendu (`memoRendu`).
     let d = SRC.indexOf(`const ${nom} = (`);
     if (d < 0) d = SRC.indexOf(`const ${nom} = memoRendu((`);
+    if (d < 0) { const m = new RegExp(`const ${nom} = memoVersion\\('[a-z]+', \\(`).exec(SRC); d = m ? m.index : -1; }   // (12 nov.) mémoire par version des données
     if (d < 0) return '';
     return SRC.slice(d, d + 1400);
   };

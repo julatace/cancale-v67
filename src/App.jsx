@@ -8675,23 +8675,30 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
 // achats annules par l'acheteur/le vendeur restaient affiches comme en
 // attente au lieu d'etre a part - d'ou la confusion remontee par l'utilisateur.
 const classifyOrderStatus = (status) => {
-  const s = status || '';
-  // Retour / remboursement / suspension = PAS une vente aboutie (l'article revient
-  // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
-  // capté redevient « finalisée » et la vente se reclasse automatiquement.
-  if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
-  // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
-  // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
-  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
-  // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
-  // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
-  // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
-  // seul « le paiement a échoué » sortait : une autre « …a échoué » était
-  // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
-  // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
-  if (/[ée]chou/i.test(s)) return 'cancelled';
-  if (/finalis/i.test(s)) return 'completed';
-  return 'pending';
+  // (12 nov., vitesse-volume) Mémoire par chaîne : la même règle, appelée des centaines de milliers de fois par rendu à 20 000 ventes (profil). Pure : même entrée, même sortie.
+  const memo = typeof status === 'string' ? (classifyOrderStatus.memo || (classifyOrderStatus.memo = new Map())) : null;
+  if (memo && memo.has(status)) return memo.get(status);
+  const r = ((status) => {
+    const s = status || '';
+    // Retour / remboursement / suspension = PAS une vente aboutie (l'article revient
+    // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
+    // capté redevient « finalisée » et la vente se reclasse automatiquement.
+    if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
+    // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
+    // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
+    if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
+    // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
+    // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
+    // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
+    // seul « le paiement a échoué » sortait : une autre « …a échoué » était
+    // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
+    // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
+    if (/[ée]chou/i.test(s)) return 'cancelled';
+    if (/finalis/i.test(s)) return 'completed';
+    return 'pending';
+  })(status);
+  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(status, r); }
+  return r;
 };
 // Une vente a besoin d'un BORDEREAU seulement si elle est À EXPÉDIER : ni
 // annulée, ni finalisée, ni déjà expédiée/livrée. On exclut donc les statuts
@@ -29452,14 +29459,21 @@ const fusionLignesMemeSuivi = (m, s) => {
 // garde les parties stables : le sous-dossier unique de la photo + le nom de
 // fichier (l'identifiant de l'image), ce qui est le même quelle que soit la taille.
 const photoKey = (url) => {
-  const raw = String(url || '').split('?')[0].split('#')[0];
-  if (!raw) return null;
-  const path = raw.replace(/^https?:\/\/[^/]+/i, '');            // enlève l'hôte
-  const segs = path.split('/').filter(Boolean)
-    .filter(seg => !/^(f\d{2,4}|\d{2,4}x\d{2,4}|thumbnails?)$/i.test(seg)); // enlève le répertoire de taille
-  if (!segs.length) return null;
-  const key = segs.slice(-2).join('/').replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase();
-  return key || null;
+  // (12 nov., vitesse-volume) Mémoire par chaîne : la même règle, appelée des centaines de milliers de fois par rendu à 20 000 ventes (profil). Pure : même entrée, même sortie.
+  const memo = typeof url === 'string' ? (photoKey.memo || (photoKey.memo = new Map())) : null;
+  if (memo && memo.has(url)) return memo.get(url);
+  const r = ((url) => {
+    const raw = String(url || '').split('?')[0].split('#')[0];
+    if (!raw) return null;
+    const path = raw.replace(/^https?:\/\/[^/]+/i, '');            // enlève l'hôte
+    const segs = path.split('/').filter(Boolean)
+      .filter(seg => !/^(f\d{2,4}|\d{2,4}x\d{2,4}|thumbnails?)$/i.test(seg)); // enlève le répertoire de taille
+    if (!segs.length) return null;
+    const key = segs.slice(-2).join('/').replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase();
+    return key || null;
+  })(url);
+  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(url, r); }
+  return r;
 };
 // DOSSIER de la photo, sans le nom de fichier. Quand une annonce est republiée
 // (supprimer + recréer, §46), Vinted RE-TÉLÉVERSE la même image : le dossier
@@ -32867,9 +32881,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   • `vinted_accounts_hidden`  → « ✕ Masquer » dans l'app (synchronisé)
   //   • `panel_accounts_off`      → « ✕ Masquer » depuis le panneau (§35)
   // ⚠️ Le trois-états du panneau est conservé : `false` = rallumé exprès, ça prime.
+  // (12 nov., vitesse-volume) La réponse par compte, gardée tant que les comptes masqués / écartés ne changent pas.
+  const memoComptes = useRef(null);
+  if (!memoComptes.current || memoComptes.current.a !== hiddenAccts || memoComptes.current.p !== panelAcctOff) memoComptes.current = { a: hiddenAccts, p: panelAcctOff, m: new Map() };
+  const comptesM = memoComptes.current.m;
   const acctOff = (uid) => {
+    const k = String(uid ?? '');
+    if (comptesM.has(k)) return comptesM.get(k);
+    const r = (() => {
     // La règle vit dans `compteEcarte` (partagée avec la coque, §11).
     return compteEcarteChoix(uid, hiddenAccts, panelAcctOff);
+    })();
+    comptesM.set(k, r);
+    return r;
   };
   // ── LES COMPTES QUI EXISTENT VRAIMENT ────────────────────────────────────
   // Un compte existe s'il a des jetons (ligne `vinted_accounts`), pas parce
@@ -32888,7 +32912,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (montrée en aperçu par `VentesHorsPlan`) ; une annonce aussi (`venteOffOf`).
   const horsPlanOf = (o) => venteHorsPlanUid(o?._acc?.vinted_user_id);
   const venteOffOf = (o) => acctOffOf(o) || horsPlanOf(o);
-  const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || venteOffOf(o);
+  const isHiddenCalcul = (o) => hiddenSales.has(String(o.transaction_id)) || venteOffOf(o);
+  // (12 nov., vitesse-volume) LES VENTES VISIBLES, CALCULÉES UNE FOIS PAR VERSION DES DONNÉES : la réponse de
+  // `isHiddenCalcul` est gardée par vente (identité de l'objet) tant que ce qu'elle lit ne change pas — les
+  // ventes masquées, les comptes masqués / écartés, l'offre (`signaturePlan`). Un de ces quatre change ⇒ tout
+  // est recalculé. À 20 000 ventes, `isHidden` coûtait 2,7 s propres au démarrage (téléphone ×4).
+  const cleVisibles = [hiddenSales, hiddenAccts, panelAcctOff, signaturePlan()];
+  const memoVisibles = useRef(null);
+  if (!memoVisibles.current || memoVisibles.current.cle.some((x, i) => x !== cleVisibles[i])) memoVisibles.current = { cle: cleVisibles, m: new WeakMap() };
+  const visiblesM = memoVisibles.current.m;
+  const isHidden = (o) => { if (!o || typeof o !== 'object') return isHiddenCalcul(o); if (visiblesM.has(o)) return visiblesM.get(o); const v = isHiddenCalcul(o); visiblesM.set(o, v); return v; };
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
   // (3 nov.) « Articles qui dorment » : le seuil (30/60/90 j) est un confort de CET
@@ -34836,7 +34869,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Elle se vide aussitôt le calcul synchrone fini (microtâche) : un effet ou un geste
   // lancé plus tard recalcule, même si une valeur lue par la règle a bougé entre-temps.
   const memoRendu = (fn) => { let m = null; return (o) => { if (!o || typeof o !== 'object') return fn(o); if (!m) { m = new WeakMap(); queueMicrotask(() => { m = null; }); } if (m.has(o)) return m.get(o); const r = fn(o); m.set(o, r); return r; }; };
-  const entryKeyByPhoto = memoRendu((o) => {
+  // (12 nov., vitesse-volume) LA MÊME MÉMOIRE, GARDÉE TANT QUE CE QUE LA RÈGLE LIT NE CHANGE PAS : `cle()` rend
+  // TOUT ce que la règle lit (états, mémos, réglages du module) ; elle est relue une fois par calcul synchrone,
+  // et une seule valeur différente (par identité) repart de zéro. Mesuré à 20 000 ventes : Comptabilite se rend
+  // ~19 fois avant « prêt », et ces règles d'identité repartaient de zéro à chaque rendu.
+  const memosVersion = useRef({});
+  const memoVersion = (nom, fn, cle) => (o) => {
+    if (!o || typeof o !== 'object') return fn(o);
+    let e = memosVersion.current[nom];
+    if (!e || !e.lue) { const k = cle(); if (!e || e.k.length !== k.length || e.k.some((x, i) => x !== k[i])) e = memosVersion.current[nom] = { k, m: new WeakMap() }; e.lue = true; queueMicrotask(() => { e.lue = false; }); }
+    if (e.m.has(o)) return e.m.get(o);
+    const r = fn(o); e.m.set(o, r); return r;
+  };
+  const reglesNumeros = () => `${coupureNumerotation()}|${archiveNumeros()}|${numeroEcritActif()}|${JSON.stringify(ouNumeroEcrit())}`;
+
+  const entryKeyByPhoto = memoVersion('photo', (o) => {
     const url = o ? orderPhoto(o) : null;
     const pk = photoKey(url);
     let k = (pk && numerosByPhoto[pk]) || null;                  // même fichier = certain
@@ -34847,7 +34894,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // l'histoire.
     if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;
     return k;
-  });
+  }, () => [numerosByPhoto, numerosByPhotoDir, numeros, reglesNumeros()]);
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
@@ -35018,13 +35065,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   1. l'identifiant d'annonce donné par Vinted (transaction → item_id) ;
   //   2. la photo, qui appartient à une paire et une seule (0 collision mesurée).
   // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
-  const identiteAnnonce = memoRendu((o) => {
+  const identiteAnnonce = memoVersion('identite', (o) => {
     if (!o) return null;
     const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     if (parVinted) return String(parVinted);
     return entryKeyByPhoto(o) || null;
-  });
-  const resolvedEntry = memoRendu((o) => {
+  }, () => [txnItem, numerosByPhoto, numerosByPhotoDir, numeros, reglesNumeros()]);
+  const resolvedEntry = memoVersion('fiche', (o) => {
     // Une paire ENCORE EN LIGNE n'est pas vendue : on refuse de l'associer.
     const usable = (key) => (key && numeros[key] && !onlineAnnonceIds.has(String(key))) ? numeros[key] : null;
     // ⚠️ VERROU HÉRITÉ : `vinted_txn_link` est permanent et a longtemps été posé
@@ -35052,7 +35099,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    annonces différentes). Un titre ne caractérise donc pas une annonce :
     //    on préfère ne rien attribuer plutôt que désigner la mauvaise boîte.
     return null;
-  });
+  }, () => [numeros, onlineAnnonceIds, txnItem, txnLink, numerosByPhoto, numerosByPhotoDir, reglesNumeros()]);
   // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
@@ -35470,14 +35517,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (numeroEcritActif()) { const lec = lireNumeroEcrit({ titre: o.title || '' }); if (lec.etat === 'lu' && numeroReprenable(lec.cle) && (coupureNumerotation() == null || venteApresCoupure(o))) src.push({ source: 'ecrit', numero: lec.cle }); }
     return decisionNumeroVenteEmail(src);
   };
-  const effEntry = memoRendu((o) => {
+  const effEntry = memoVersion('effective', (o) => {
     const r = fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum);
     if (!(o && o._venteEmail)) return r;
     // Une vente vue par e-mail : le N° est la DÉCISION ci-dessus (contredit ⇒ aucun).
     const d = numeroVenteEmail(o);
     if (!d.numero) { if (!r || r.numero == null) return r; const { numero: _n, ...reste } = r; return reste; }
     return { ...(r || {}), numero: d.numero };
-  });
+  }, () => [numeros, onlineAnnonceIds, txnItem, txnLink, numerosByPhoto, numerosByPhotoDir, saleOv, buyByNum, bordsVenteEmailParTx, bordLinks, labelsCaptes, reglesNumeros()]);
 
   // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
   // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à
