@@ -18,6 +18,8 @@ import { prendreDemandeAchat, EVT_ACHAT_LIEN } from '../raccourcisSiri.js';
 import { ReventeModele } from '../ReventeModele.jsx';
 import { ImportAchatsFeuille } from '../composants/ImportAchats.jsx';
 import { prendrePhotoPartagee } from '../partagePhoto.js';
+import ChoixPaiement from '../composants/ChoixPaiement.jsx';   // (11 nov., lot livre-registre) « Payé en », facultatif
+import { modePaiementLu } from '../modePaiement.js';
 import { exemplesActuels, Bouton, C, FermeAuRetour, SheetShell, Icon, NOM_RECU_ACHAT, PhotoVinted, SB_CONFLICT, SUPABASE_URL, askConfirm, b64ToBytes, centimesRecu, clavierNum, compressImage, dateLocaleISO, dateMiseEnLigneMs, ecouterFenetreCsp, estIOS, estOctetsPdf, extractBrand, extractColors, extractModel, libelleSourceAchat, lignesRecu, lireExtrasRepartition, lirePdfLigne, lireReleveVentes, orderPhoto, ouvrirPdfOnglet, prixAchatHorsNombre, prixCourt, sbAuth, texteCentimesRecu, toast, txRecuAchat, ventilationRecuAchat, withOwner } from '../App.jsx';
 
 
@@ -327,7 +329,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   // (10 nov., lot J) « Importer un tableur » (src/importAchats.js) : `importer` = { existants, numeroDe, etatNumero, onImporter }.
   const [importOuvert, setImportOuvert] = useState(false);
   // (10 nov., lot AN) `facture` (src/FactureAchat.jsx) : joindre une facture d'achat (PDF ou photo) à l'achat saisi.
-  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false, facture: null, ticket: null, mode: 'article', lot: LOT0() });
+  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', paiement: '', photo: null, photoAvant: false, facture: null, ticket: null, mode: 'article', lot: LOT0() });
   const factureRef = useRef(null);
   // (11 nov., lot achat-photo) La photo du TICKET : lue DANS la page (src/depensesTicket.js, aucun service
   // payant, §2.9), elle PROPOSE prix, date et lieu dans les champs vides (src/achatTicket.js). Le prix lu
@@ -382,7 +384,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   }, []);
   const ouvrirEdition = (b) => {
     setEditId(b.id); setErreur('');
-    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', photo: null, photoAvant: !!b.photo, facture: null });
+    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', ref: b.ref || '', paiement: modePaiementLu(b.paiement), photo: null, photoAvant: !!b.photo, facture: null });
   };
   const fermer = () => { ticketJeton.current++; setForm(null); setEditId(null); setErreur(''); };
   const choisirTicket = async (ev) => {
@@ -457,7 +459,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
       if (ok) { photoOk = true; const b64 = form.photo; setPhotos(p => ({ ...(p || {}), [idPhotoAchatHors(id)]: b64 })); }
       else photoRatee = true;
     }
-    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: lotEdite ? '' : String(form.numero || '').trim(), ref: String(form.ref || '').trim().slice(0, 40) || undefined, photo: photoOk || undefined };
+    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: lotEdite ? '' : String(form.numero || '').trim(), ref: String(form.ref || '').trim().slice(0, 40) || undefined, paiement: modePaiementLu(form.paiement) || undefined, photo: photoOk || undefined };
     if (!editId && horsLigne && !rec.numero) rec.numeroAuRetour = true;
     if (editId) onModifier(editId, rec); else onAjouter({ id, ...rec });
     // La facture jointe part dans SA ligne, par l'identité de l'achat (jamais son titre).
@@ -588,6 +590,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           </div>
           {/* 5. La date (aujourd'hui par défaut). */}
           {champ(champEncoreLu(form, 'date') ? 'Date · lue sur le ticket' : 'Date', <input data-champ="date" data-champ-lu={champEncoreLu(form, 'date') ? '1' : undefined} type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
+          {/* (11 nov., lot livre-registre) « Payé en » : facultatif, jamais deviné ; le registre des achats l'écrit. */}
+          <ChoixPaiement C={C} value={form.paiement} onChange={(m) => setForm(d => ({ ...d, paiement: m }))} />
           {/* 6. Le N° de rangement : le prochain libre PROPOSÉ, posé par SON toucher seulement. */}
           {!enLot && <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {champ('N° de rangement (facultatif)', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder="—" style={inp} />)}

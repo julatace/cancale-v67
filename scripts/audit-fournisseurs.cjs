@@ -73,7 +73,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'fourn-'));
   fs.mkdirSync(path.join(d, 'src'));
-  for (const f of ['fournisseurs.js', 'achatsSourcing.js', 'prixAchatPropose.js']) fs.copyFileSync(path.join(R, 'src', f), path.join(d, 'src', f));
+  for (const f of ['fournisseurs.js', 'achatsSourcing.js', 'prixAchatPropose.js', 'modePaiement.js']) fs.copyFileSync(path.join(R, 'src', f), path.join(d, 'src', f));
   const f = path.join(d, 'src', 'fournisseurs.js');
   const [de, vers] = MUTS[MUT] || []; const s = fs.readFileSync(f, 'utf8');
   if (!de || !s.includes(de)) { console.log('motif introuvable : ' + MUT); process.exit(2); }

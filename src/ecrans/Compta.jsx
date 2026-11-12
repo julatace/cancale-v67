@@ -18,7 +18,12 @@ import { indexRecusParTransaction } from '../../api/_lib/recu-achat.js';
 import { prendreDemande } from '../rechercheEcran.js';
 import { recuPublieEntre } from '../design/carteChiffres.js';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre } from '../registres.js';
+import { livreDesRecettes, registreDesAchats } from '../registres.js';
+// (11 nov., lot livre-registre) Les registres CONFORMES : mentions obligatoires, sources, exports horodatés.
+import { completerRecettes, completerAchats, facturesParVente, SELECT_FACTURES_REGISTRE, idsTxLignes, lirePseudosTx, csvConforme, pdfConforme, feuillesConformes, nomFichierConforme } from '../registresConformes.js';
+import RegistresVue from '../RegistresVue.jsx';
+import { xlsxClasseur } from '../xlsxSimple.js';
+import { tr } from '../i18n/index.js';
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
@@ -1920,14 +1925,55 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
   const registreAchats = React.useMemo(() => (achats === undefined ? undefined : registreAchatsDe({ achats, recus, periode, panelOff })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [achats, recus, periode, panelOff, ticAchats]);
-  const exporter = async (R, forme) => {
-    if (!R || enCours) return;
-    setEnCours(R.type + forme);
+  // (11 nov., lot livre-registre) Les mentions obligatoires LUES par identité, au besoin
+  // (feuille ouverte ou export) : pseudos des transactions Vinted (projection), factures Pro
+  // de CETTE vente, factures d'achat jointes. Pas lu ⇒ « Particulier » et le manque dit.
+  const [vue, setVue] = React.useState(null);
+  const [extras, setExtras] = React.useState({});
+  const extrasRef = React.useRef(new Map());
+  const cleExtras = `${periode}:${recettes ? recettes.n + '/' + recettes.horsPeriode.length : '-'}:${registreAchats ? registreAchats.n + '/' + registreAchats.horsPeriode.length : '-'}`;
+  const chargerExtras = React.useCallback(() => {
+    const k = cleExtras;
+    if (extrasRef.current.has(k)) return extrasRef.current.get(k);
+    const lignes = [...(recettes ? [...recettes.lignes, ...recettes.horsPeriode] : []), ...(registreAchats ? [...registreAchats.lignes, ...registreAchats.horsPeriode] : [])];
+    const pr = (async () => {
+      const ids = idsTxLignes(lignes);
+      const [pseudos, rowsFac, jointes] = await Promise.all([
+        ids.length ? lirePseudosTx(ids, { lireTout }) : Promise.resolve(new Map()),
+        lireTout(`id=like.email_invoice_*&select=${SELECT_FACTURES_REGISTRE}`, { strict: true }).catch(() => null),
+        lireFactures({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: sbAuth }),
+      ]);
+      const x = { pseudos, factures: facturesParVente(rowsFac), jointes };
+      setExtras((e) => ({ ...e, [k]: x }));
+      return x;
+    })().catch(() => { extrasRef.current.delete(k); return { pseudos: null, factures: null, jointes: null }; });
+    extrasRef.current.set(k, pr);
+    return pr;
+  }, [cleExtras, recettes, registreAchats]);
+  React.useEffect(() => { if (vue && recettes !== undefined && registreAchats !== undefined) chargerExtras(); }, [vue, recettes, registreAchats, chargerExtras]);
+  const recuTx = React.useMemo(() => {
+    if (!Array.isArray(recus)) return null;
+    const delies = load('vrm_recus_delies', {}) || {};
+    return indexRecusParTransaction(recus.filter((r) => !(r && r.id && delies[r.id])), () => false);
+  }, [recus]);
+  const completer = React.useCallback((type, ex) => {
+    if (type === 'recettes') return recettes ? completerRecettes(recettes, { pseudos: ex ? ex.pseudos : null, factures: ex ? ex.factures : null }) : recettes;
+    return registreAchats ? completerAchats(registreAchats, { pseudos: ex ? ex.pseudos : null, recuDe: (tx) => !!(recuTx && recuTx.has(String(tx))), facturesJointes: ex ? ex.jointes : null }) : registreAchats;
+  }, [recettes, registreAchats, recuTx]);
+  const exCourant = extras[cleExtras];
+  const complets = React.useMemo(() => ({ recettes: completer('recettes', exCourant), achats: completer('achats', exCourant) }), [completer, exCourant]);
+  const exporter = async (type, forme) => {
+    if (enCours || !(type === 'recettes' ? recettes : registreAchats)) return;
+    setEnCours(type + forme);
     try {
+      const ex = await chargerExtras();
+      const R = completer(type, ex);
+      const maintenant = Date.now();
       let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
       const entreprise = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } : null;
-      if (forme === 'csv') telechargerFichier(new Blob([csvRegistre(R, { entreprise })], { type: 'text/csv;charset=utf-8' }), nomFichierRegistre(R, 'csv'), 'text/csv;charset=utf-8');
-      else telechargerFichier(new Blob([await pdfRegistre(R, { entreprise })], { type: 'application/pdf' }), nomFichierRegistre(R, 'pdf'), 'application/pdf');
+      if (forme === 'csv') telechargerFichier(new Blob([csvConforme(R, { entreprise, maintenant })], { type: 'text/csv;charset=utf-8' }), nomFichierConforme(R, 'csv', maintenant), 'text/csv;charset=utf-8');
+      else if (forme === 'xlsx') telechargerFichier(new Blob([xlsxClasseur(feuillesConformes(R, { entreprise, maintenant }), { titre: nomFichierConforme(R, 'xlsx', maintenant), quand: new Date(maintenant) })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nomFichierConforme(R, 'xlsx', maintenant), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      else telechargerFichier(new Blob([await pdfConforme(R, { entreprise, maintenant })], { type: 'application/pdf' }), nomFichierConforme(R, 'pdf', maintenant), 'application/pdf');
     } catch (err) { toast('Registre pas créé : ' + ((err && err.message) || err)); }
     setEnCours('');
   };
@@ -1945,8 +1991,9 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
         </span>
       </span>
       <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
-        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} aria-label={`Télécharger « ${nom} » en PDF`} title={`Télécharger « ${nom} » en PDF`} disabled={!R || !!enCours} onClick={() => exporter(R, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
-        <Bouton variante="secondaire" icone="save" data-registre-csv={type} aria-label={`Télécharger « ${nom} » en tableur`} title={`Télécharger « ${nom} » en tableur (Excel, Numbers)`} disabled={!R || !!enCours} onClick={() => exporter(R, 'csv')}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
+        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} aria-label={`Télécharger « ${nom} » en PDF`} title={`Télécharger « ${nom} » en PDF`} disabled={!R || !!enCours} onClick={() => exporter(type, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
+        <Bouton variante="secondaire" icone="save" data-registre-csv={type} aria-label={`Télécharger « ${nom} » en tableur`} title={`Télécharger « ${nom} » en tableur (Excel, Numbers)`} disabled={!R || !!enCours} onClick={() => exporter(type, 'csv')}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
+        <Bouton variante="secondaire" data-registre-voir={type} disabled={R === undefined} onClick={() => setVue(type)}>{tr('registres.voir')}</Bouton>
       </span>
     </div>
   );
@@ -1960,6 +2007,8 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
       </div>
       {ligne('recettes', 'Livre des recettes', recettes)}
       {ligne('achats', 'Registre des achats', registreAchats)}
+      {vue && <RegistresVue type={vue} setType={setVue} periode={periode} setPeriode={setPeriode} periodes={periodes} registres={complets}
+        onClose={() => setVue(null)} exporter={(R, forme) => exporter(R.type, forme)} enCours={enCours} />}
     </div></Card>
   );
 }

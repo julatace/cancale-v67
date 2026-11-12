@@ -45,6 +45,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'toute-app-hors-ligne', date: '2026-11-11', titre: 'Toute l’app marche sans réseau', phrase: 'Tes gestes attendent et partent au retour du réseau.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'gros-lot-achat', date: '2026-11-11', titre: 'Un lot de N articles, une saisie', phrase: 'Le coût réparti au centime, les fiches et N° en série.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'rangement-guide', date: '2026-11-11', titre: 'Un achat retiré, rangé en un geste', phrase: 'N° et case libre proposés, la fiche déjà remplie.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'livre-registre', date: '2026-11-11', titre: 'Livre des recettes et registre des achats complets', phrase: 'Client, règlement, pièce : par mois, en PDF, CSV ou Excel.', tab: 'compta', pour: 'pro', mode: 'tous' },
   { id: 'import-depart', date: '2026-11-11', titre: 'Tout ton historique Vinted, relu', phrase: 'Laisse vinted.fr ouvert : ventes et achats arrivent peu à peu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'stats-categories', date: '2026-11-11', titre: 'Tes statistiques par catégorie', phrase: 'Ventes, vendu et bénéfice, catégorie par catégorie.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'achat-photo-ticket', date: '2026-11-11', titre: 'Un achat en photo du ticket', phrase: 'VRM lit le ticket, tu valides le montant.', tab: 'achats', pour: 'tous', mode: 'tous' },
