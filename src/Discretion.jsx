@@ -81,14 +81,14 @@ export function ToutArreter({ rows, variante = 'panneau' }) {
   );
 }
 
-const MOTS_CARNET = [['n403', 'refus 403'], ['n429', 'refus 429'], ['pauses', 'pauses'], ['captchas', 'vérifications'], ['prudences', 'prudences']];
+const MOTS_CARNET = [['n403', 'refus 403', 'refus 403'], ['n429', 'refus 429', 'refus 429'], ['pauses', 'pause', 'pauses'], ['captchas', 'vérification', 'vérifications'], ['prudences', 'prudence', 'prudences']];
 function LigneCarnet({ c }) {
   if (c === undefined) return <span className="vrm-disc-carnet is-passu">…</span>;
   if (c === null) return <span className="vrm-disc-carnet is-passu" data-carnet="pas-su">— pas encore dit par l’extension</span>;
   if (!c.total) return <span className="vrm-disc-carnet" data-carnet="0">Aucun frein en 7 jours</span>;
   return (
     <span className="vrm-disc-carnet is-geste" data-carnet={c.total}>
-      {MOTS_CARNET.filter(([k]) => c[k]).map(([k, m]) => <span key={k} data-carnet-sorte={k}>{c[k]} {m}</span>)}
+      {MOTS_CARNET.filter(([k]) => c[k]).map(([k, un, plusieurs]) => <span key={k} data-carnet-sorte={k}>{c[k]} {c[k] > 1 ? plusieurs : un}</span>)}
       {c.dernier ? <span className="vrm-disc-dernier">dernier {new Date(c.dernier).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' })} {heureFr(c.dernier)}</span> : null}
     </span>
   );
