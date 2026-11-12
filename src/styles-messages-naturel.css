@@ -79,3 +79,11 @@ html body .vrm-chat-panel .vrm-chat-rapides > .vrm-chat-rapides-modifier { width
   html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 44px !important; }
   html body .vrm-chat-panel .vrm-chat-rapides > .vrm-chat-rapides-modifier { width: 44px; }
 }
+
+/* ── (12 nov.) Leboncoin, Vestiaire, eBay : la même refonte ─────────── */
+/* L'offre Vestiaire de l'article, en tête de SA conversation : une carte compacte. */
+html body .vrm-chat-panel .vrm-vc-fil-offre .vrm-of { margin: 0; padding: 10px 12px 6px; box-shadow: none; border: 1px solid var(--vrm-line); }
+html body .vrm-chat-panel .vrm-vc-fil-offre .vrm-of-titre { font-size: 14px; font-weight: 700; }
+html body .vrm-chat-panel .vrm-vc-fil-offre .vrm-of-carte { padding: 6px 0; }
+/* « Relire » / « Réessayer » d'un fil pas lu : une cible au doigt. */
+html body .vrm-chat-panel [data-fil-pas-lu] .vrm-pied-lien, html body .vrm-chat-panel [data-fil-illisible] .vrm-pied-lien, html body [data-ebay-lecture] .vrm-pied-lien { min-height: 44px; display: inline-flex; align-items: center; }

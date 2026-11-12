@@ -12,6 +12,8 @@ import { suivi, suivreJob } from '../suiviTravail.js';   // (11 nov., lot suivi-
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
 import { trierRecents } from '../ordreConversations.js';
+import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   // (12 nov.) l'envoi vu dans le fil
+import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
 import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut, fraisVc } from '../../api/_lib/vestiaire-regle.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis } from '../transporteursVisuels.js';
@@ -872,11 +874,13 @@ function ficheVestiaireDe(v, items) {
   return { item: v.pid || undefined, num: v.num, photo: f && f.photo, titre: f && f.titre, sous: ['Vestiaire'],
     blocs: [{ cle: 'rangement', lib: 'Rangée', val: rangementDuNum(v.num) }, { cle: 'attention', lib: 'Attention', val: fav != null ? `${fav} favori${fav > 1 ? 's' : ''}` : null }] };
 }
-function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
+function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, onFerme }) {
   const [fil, setFil] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const [texte, setTexte] = React.useState('');
   const [enCours, setEnCours] = React.useState(false);
   const [res, setRes] = React.useState(null);
+  // (12 nov.) L'envoi se voit DANS le fil (src/envoiFil.js) : { etat, texte, depuis }.
+  const [envoiFil, setEnvoiFil] = React.useState(null);
   const relire = React.useCallback(async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page,at:data->>capturedAt`, { headers: sbAuth() });
@@ -896,15 +900,22 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
     const t = texte.trim();
     if (!t || enCours || !peut) return;
     setEnCours(true); setRes(null);
+    const depuis = Date.now(); setEnvoiFil({ etat: 'envoi', texte: t, depuis });
     let r = null; try { r = await vmrCmd({ cmd: 'vcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
-    setEnCours(false); setRes(etiquetteResultatVc(r));
-    if (r && r.accepte === true && r.etape === 'fait') { setTexte(''); relire(); }
+    const etat = etatEnvoiExtension(r);
+    setEnCours(false); setEnvoiFil({ etat, texte: t, depuis });
+    // « Envoyé ✓ » est dit sous la bulle ; au-dessus du champ, seulement ce qui demande un geste.
+    setRes(etat === 'ok' ? null : etiquetteResultatVc(r));
+    if (etat === 'ok') { setTexte((v) => (v.trim() === t ? '' : v)); relire(); }
   };
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
-  else if (fil === null) corps = <div data-vc-fil="pas-su" style={style}>Je n'ai pas pu lire cette conversation — rien n'est perdu, réessaie dans un moment.</div>;
+  // (12 nov.) Lecture ratée ≠ vide : la raison et « Réessayer ».
+  else if (fil === null) corps = <FilIllisible attrs={{ 'data-vc-fil': 'pas-su' }} texte="Je n'ai pas pu lire cette conversation — rien n'est perdu." onRelire={() => { setFil(undefined); relire(); }}/>;
   else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Pas encore lue : ouvre-la une fois sur Vestiaire, avec l'extension{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
+  // (12 nov.) La liste annonce un message mais le fil est vide : « pas encore lu · Relire », jamais « aucun ».
+  else if (filPasLu(fil.messages, annonce)) corps = <FilPasLu attrs={{ 'data-vc-fil': 'vide' }} onRelire={relire}/>;
   else if (!fil.messages.length) corps = <div data-vc-fil="vide" style={style}>Conversation lue, mais Vestiaire n'y a rendu aucun message lisible.</div>;
   else corps = (
     <div data-vc-fil="lu" data-vc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -917,6 +928,8 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   );
   const page = fil && /^\/[\w/.-]*$/.test(fil.page || '') ? fil.page : '';
   const lien = `https://fr.vestiairecollective.com${page || '/'}`;
+  const envoiVu = <EnvoiDansFil envoi={envoiFil} Bulle={BulleConv} site="Vestiaire" onReessayer={envoyer} reessayerDesactive={enCours || !texte.trim()}
+    dejaLu={!!(envoiFil && fil && dejaDansFil(fil.messages, envoiFil.texte, envoiFil.depuis))}/>;
   const resultat = res && <div role="status" data-vc-resultat={res.ton} style={{ fontSize: 13, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
   let pied;
   if (fil && fil.messages && peut) pied = (
@@ -945,9 +958,13 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   return (
     <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à un article VRM'} titre={titre || ''} compte="Vestiaire"/>
+      {/* (12 nov.) L'offre de CET article (même productId, §5), en carte, en tête du fil : ses gestes seulement
+          quand c'est à lui de répondre (`OffresVestiaire`, recettes apprises, inchangé). */}
+      {offre ? <div className="vrm-vc-fil-offre" data-vc-fil-offre="" style={{ padding: '10px 16px 0', flexShrink: 0 }}>{offre}</div> : null}
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {fil && fil.messages ? <AlerteArnaque site="vestiaire" lien={lien} messages={fil.messages}/> : null}
         {corps}
+        {envoiVu}
       </div>
       {pied}
     </CadreFil>
@@ -1024,6 +1041,14 @@ function MessagesVestiaire() {
     const choisie = liste.find((v) => v.id === ouvert) || null;
     const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
     const offresEtat = offresVestiaire(d.offres);
+    // (12 nov.) L'offre d'un article se lit DANS sa conversation (même productId, jamais le titre) ;
+    // en haut ne restent que les offres dont la conversation n'est pas ouverte (le même prix jamais deux fois).
+    const pidOuvert = choisie && choisie.pid ? choisie.pid : '';
+    const offresDu = (garder) => (offresEtat.etat === 'lu' ? { ...offresEtat, aTrancher: offresEtat.aTrancher.filter((o) => garder(o.produit)), enAttente: offresEtat.enAttente.filter((o) => garder(o.produit)) } : offresEtat);
+    const propsOffres = { recettes: d.recettesOffres, cap: extSait('vcoffrerepondre'), numDe: (pid) => cleNum((pid && d.liens[pid]) || ''),
+      envoyer: async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }, Photo: PhotoOffreVc };
+    const offreFil = pidOuvert && offresEtat.etat === 'lu' && (offresEtat.aTrancher.some((o) => o.produit === pidOuvert) || offresEtat.enAttente.some((o) => o.produit === pidOuvert))
+      ? <OffresVestiaire etat={offresDu((p) => p === pidOuvert)} {...propsOffres}/> : null;
     corps = (
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0 12px' }}>
@@ -1031,8 +1056,7 @@ function MessagesVestiaire() {
             : <span><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</span>}
           <a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-pied-lien" data-pied-lien="ouvrir-vc">{page ? 'Ouvrir la messagerie ↗' : 'Ouvrir Vestiaire ↗'}</a>
         </div>
-        <OffresVestiaire etat={offresEtat} recettes={d.recettesOffres} cap={extSait('vcoffrerepondre')} numDe={(pid) => cleNum((pid && d.liens[pid]) || '')}
-          envoyer={async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }} Photo={PhotoOffreVc}/>
+        <OffresVestiaire etat={offreFil ? offresDu((p) => p !== pidOuvert) : offresEtat} {...propsOffres}/>
         <div className="vrm-message-workspace">
           <div className="vrm-inbox-column">
             {liste.length ? <>
@@ -1059,7 +1083,7 @@ function MessagesVestiaire() {
               : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire {NAV.dans}.</div>)}
           </div>
           <div className="vrm-chat-column">{choisie
-            ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || choisie.titreArticle || ''} envoi={d.envoi} onFerme={() => setOuvert('')}/>
+            ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || choisie.titreArticle || ''} envoi={d.envoi} annonce={!!choisie.apercu} offre={offreFil} onFerme={() => setOuvert('')}/>
             : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Lis-la et réponds-y depuis VRM.</small></div>}</div>
           {!choisie ? <FicheConvVolet site="vestiaire" etat="aucune"/>
             : <FicheConvVolet site="vestiaire" etat={fcChoisie ? 'reliee' : 'non-reliee'} fc={fcChoisie} raison={`Cet article Vestiaire ne porte aucune référence VRM : VRM ne devine pas ${motsVendeur().le} d’après le titre.`}/>}
