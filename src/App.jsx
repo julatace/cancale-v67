@@ -39999,7 +39999,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    un détail par étape (livrée = imminent > en transit > à expédier).
   //  • DÉBLOQUÉ = ventes finalisées → Vinted a libéré les fonds sur ton solde.
   // Source = statut Vinted moissonné (fiable, se met à jour tout seul).
+  // (13 nov., moteur-compta) Les trois feuilles « Trésorerie », « Courbes par marque », « Sourcing » ne
+  // s'ouvrent plus (aucun bouton ne pose leur drapeau) : leurs calculs, refaits à chaque rendu sur toutes les
+  // ventes, ne tournent que feuille ouverte. `perf` n'est lu que par l'écran Ventes.
+  const [showTreasury, setShowTreasury] = useState(false);
   const treasury = useMemo(() => {
+    if (!showTreasury) return null;
     // (11 nov., famille « une règle par notion ») « En attente » n'est PLUS calculé ici : c'est l'argent à
     //    venir (src/argentAVenir.js, `liveStats.aVenir`), la règle du 4 nov. qui a remplacé cette somme des
     //    statuts « en cours » (220 € de trop mesurés). « Reçu » : prix illisible compté à part (« au moins »).
@@ -40014,8 +40019,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const spent = spentS.total, nSpent = spentS.n;
     return { recu, recuS, nRecu, spent, spentS, nSpent };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
-  const [showTreasury, setShowTreasury] = useState(false);
+  }, [showTreasury, sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
   const [detailAttente, setDetailAttente] = useState(false); // décompte compte par compte de l'argent en attente
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
   // Le solde réel des porte-monnaie sert AUSSI à la carte « argent en route »
@@ -40071,6 +40075,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la vente), taux d'écoulement (vendues / (vendues + en ligne)), meilleure
   // marque (bénéfice moyen par paire), et CA du mois en cours.
   const perf = useMemo(() => {
+    if (curSub !== 'ventes') return null;
     const items = sales.items || [];
     let daysSum=0, daysNb=0, caMois=0;
     const now = new Date(); const ym = now.getFullYear()*100 + now.getMonth();
@@ -40116,7 +40121,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const bestAccount = comptesVendeurs.length>=2 ? comptesVendeurs[0] : null;
     return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues, bestAccount, comptesVendeurs };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff]);
+  }, [curSub, sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff]);
 
   // ── REPÈRE D'ACHAT PAR MODÈLE (proposition 10, 6 octobre) ────────────────
   // « Combien je gagne en moyenne sur une Samba ? » : le prix moyen de REVENTE
@@ -40204,6 +40209,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showBrandCurves, setShowBrandCurves] = useState(false);
   const [curveBrand, setCurveBrand] = useState('');
   const brandCurves = useMemo(() => {
+    if (!showBrandCurves) return null;
     const now = new Date(); const months = [];
     for (let i=11;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
     const idx = {}; months.forEach((ym,i)=>{ idx[ym]=i; });
@@ -40222,7 +40228,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const brandList = Object.keys(data).filter(b=>b!=='__ALL__').sort((a,b)=>data[b].total-data[a].total);
     return { months, series, brandList, hasData: brandList.length>0 };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [showBrandCurves, sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Wrapped du vendeur : rétrospective annuelle façon Spotify Wrapped ──
   const [showWrapped, setShowWrapped] = useState(false);
@@ -40274,6 +40280,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showSourcing, setShowSourcing] = useState(false);
   const [boostsDetected, setBoostsDetected] = useState(null); // boosts captés (facturation Vinted)
   const sourcing = useMemo(() => {
+    if (!showSourcing) return null;
     const items = sales.items || [];
     const mk = () => ({ nb:0, ca:0, pasLu:0, benef:0, benefNb:0, daysSum:0, daysNb:0 });
     const brands={}, sizes={}; let total=0;
@@ -40303,7 +40310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     })).sort((a,b)=> b.nb-a.nb || (b.benefMoy||-1e9)-(a.benefMoy||-1e9));
     return { brands:finalize(brands), sizes:finalize(sizes), total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [showSourcing, sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Saisonnalité : tes meilleurs mois de vente (pour acheter au bon moment) ─
   const seasonality = useMemo(() => {
