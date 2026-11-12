@@ -220,7 +220,7 @@ export async function purger({ stockage, cle, jour }) {
   if (complets < JOURS_COMPLETS_MINI) return { fait: true, retires: 0, jours: jours.length, garde: `seulement ${complets} jours complets récents : rien retiré` };
   let retires = 0;
   for (const j of anciens) {
-    const fichiers = await stockage.lister(j + '/');
+    const fichiers = await stockage.lister(j);   // un dossier, sans « / » final (comme supabase-js `list(dossier)`)
     if (!Array.isArray(fichiers)) continue;
     if (!fichiers.length) continue;
     if (await stockage.retirer(fichiers.map((f) => `${j}/${f}`))) retires++;
