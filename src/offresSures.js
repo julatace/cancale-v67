@@ -92,7 +92,7 @@ export function decisionMoteur(offre, fiche, garde, maintenant = Date.now(), { v
   return { quoi: 'toi', raison: '', min, refuse };
 }
 export const LIBELLE_DECISION = {
-  accepter: `Acceptée ${DELAI_OFFRE_MIN} à ${DELAI_OFFRE_MAX} min après`,
+  accepter: `Acceptée ${DELAI_OFFRE_MIN} à ${DELAI_OFFRE_MAX} min après (30 à 120 la nuit)`,   // 5.370 : la nuit (0 h-7 h Paris), l'extension allonge le délai
   garde: 'Pas acceptée',
   refuser: 'Refusée',
   toi: 'À toi',
