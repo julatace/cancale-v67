@@ -11,7 +11,7 @@ import {tr} from './i18n/index.js';
 function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,onPreparation,masquerSansSelection=false,onErreur,revisionVerification=0,ecranActif=true,decrireJob=null,raisonSuivi=null},ref){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[controleErreur,setControleErreur]=React.useState(null),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
   const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
-  React.useEffect(()=>{if(onErreur)onErreur(erreur?controleErreur||{code:'non_precise'}:null);},[erreur,controleErreur]);
+  React.useEffect(()=>{if(onErreur)onErreur(erreur?controleErreur||{code:'non_precise'}:null,erreur||'');},[erreur,controleErreur]);   // (12 nov.) + la phrase, que la page dit
   const revisionVue=React.useRef(revisionVerification);
   React.useEffect(()=>{
     if(revisionVue.current===revisionVerification)return;revisionVue.current=revisionVerification;

@@ -75,6 +75,12 @@ function creer(mode = "panne") {
     },
     setOpenConv: (f) => f(oc),
     filAvecOffres: (c) => c,
+    // (12 nov., revue fin) la garde anti double vente recalculée sur son clic : ici rien de vendu ailleurs.
+    chargerRetraitsMulti: async () => ({}),
+    articlesVendusAilleurs: () => [],
+    gardeOffres: () => ({ complet: true }),
+    avisAcceptationManuelle: () => null,
+    paireDeConv: () => null,
     normalizeConversationMessages: () => [],
     setPrixOffre: (v) =>
       (etat.prix = typeof v === "function" ? v(etat.prix) : v),

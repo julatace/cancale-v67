@@ -112,7 +112,7 @@ async function auditer({ module: modSrc, app, serveur }) {
   const nfb = corps('  const numForBord = (b) => {', '\n  };\n');
   const iVe = nfb.indexOf('numeroVenteEmail('), iNum = nfb.indexOf('b.numero');
   dit(iVe > 0 && iNum > iVe && /!soldByTxn\[txB\]/.test(nfb), '§5 `numForBord` : une vente e-mail passe par la décision AVANT tout `b.numero`');
-  const eff = corps('  const effEntry = memoRendu((o) => {', '\n  });\n');
+  const eff = corps("  const effEntry = memoVersion('effective', (o) => {", '\n  }, () => [');   // (12 nov.) mémoire par version des données
   dit(/o\._venteEmail/.test(eff) && /numeroVenteEmail\(o\)/.test(eff), '§5 `effEntry` : le N° d’une vente e-mail est la décision');
   dit(m && !/\bb\.numero\b/.test(m[0]), '§5 `numeroVenteEmail` ne lit jamais `b.numero` directement');
   dit(/o\._venteEmail && vFilter === 'aexpedier'\) return estColisEmail\(o\)/.test(app), '§5 le filtre « À envoyer » de Ventes montre le même colis');

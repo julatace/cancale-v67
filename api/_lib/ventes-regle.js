@@ -25,23 +25,30 @@ import { vcVenteAnnulee, montantRecuVc, dateVersementVc, dateVenteVc, etapeMotVc
 import { venteHorsPlan } from './plan-regle.js';
 
 export const classifyOrderStatus = (status) => {
-  const s = status || '';
-  // Retour / remboursement / suspension = PAS une vente aboutie (l'article revient
-  // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
-  // capté redevient « finalisée » et la vente se reclasse automatiquement.
-  if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
-  // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
-  // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
-  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
-  // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
-  // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
-  // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
-  // seul « le paiement a échoué » sortait : une autre « …a échoué » était
-  // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
-  // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
-  if (/[ée]chou/i.test(s)) return 'cancelled';
-  if (/finalis/i.test(s)) return 'completed';
-  return 'pending';
+  // (12 nov., vitesse-volume) Mémoire par chaîne : la même règle, appelée des centaines de milliers de fois par rendu à 20 000 ventes (profil). Pure : même entrée, même sortie.
+  const memo = typeof status === 'string' ? (classifyOrderStatus.memo || (classifyOrderStatus.memo = new Map())) : null;
+  if (memo && memo.has(status)) return memo.get(status);
+  const r = ((status) => {
+    const s = status || '';
+    // Retour / remboursement / suspension = PAS une vente aboutie (l'article revient
+    // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
+    // capté redevient « finalisée » et la vente se reclasse automatiquement.
+    if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
+    // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
+    // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
+    if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
+    // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
+    // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
+    // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
+    // seul « le paiement a échoué » sortait : une autre « …a échoué » était
+    // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
+    // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
+    if (/[ée]chou/i.test(s)) return 'cancelled';
+    if (/finalis/i.test(s)) return 'completed';
+    return 'pending';
+  })(status);
+  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(status, r); }
+  return r;
 };
 
 export const tsCommande = (o) => Date.parse((o && o.date) || '') || 0;

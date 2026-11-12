@@ -507,7 +507,7 @@ import VoirEmailColis from "./VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
-import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
+import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -6407,9 +6407,11 @@ const lireVeilleTempsReel = (uid) => (x) => {
 // appels simultanés ne provoquent qu'un seul aller-retour.
 const _rowCache = new Map();          // clé -> { at, promesse }
 const ROW_TTL_MS = 60 * 1000;
-const cachedRow = (cle, chercher) => {
+// (12 nov.) `ttl` : un lecteur qui SAIT qu'on oublie la ligne quand elle change (les commandes d'un compte :
+// signal de l'extension, sonde des ventes, « Synchroniser ») peut garder la lecture plus longtemps.
+const cachedRow = (cle, chercher, ttl = ROW_TTL_MS) => {
   const e = _rowCache.get(cle);
-  if (e && (Date.now() - e.at) < ROW_TTL_MS) return e.promesse;
+  if (e && (Date.now() - e.at) < ttl) return e.promesse;
   // ⚠️ Un « pas su » (`null`/`undefined` : la base n'a pas répondu) ne se garde
   //    PAS 60 s en cache comme une vraie réponse : la lecture suivante réessaie.
   //    Seul un rejet était retiré ; un échec qui RÉSOUT en `null` restait figé.
@@ -6420,6 +6422,10 @@ const cachedRow = (cle, chercher) => {
   return promesse;
 };
 const viderCacheLignes = () => { _rowCache.clear(); try { viderLecturesMemo(); } catch (_) {} };   // bouton « Synchroniser »
+// (12 nov.) Oublier les commandes d'UN compte (une vente vient d'arriver) — une fois par signal : un
+// second écran monté qui reçoit le même signal dans les 4 s reprend la lecture déjà partie.
+const _oubliCommandes = new Map();
+const oublierCommandesCompte = (uid) => { const k = String(uid), t = _oubliCommandes.get(k); if (t && Date.now() - t < 4000) return; _oubliCommandes.set(k, Date.now()); _rowCache.delete(`o:${k}`); };
 
 // ── (7 nov., vitesse) LES PETITES LIGNES RELUES À CHAQUE ÉCRAN ─────────────
 // Mesuré au téléphone : chaque changement d'onglet relisait 26 à 44 lignes, presque
@@ -8085,7 +8091,7 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
   // (ventes + achats) de ce compte, donc deux appels différents partagent
   // le même aller-retour au lieu d'en faire deux.
   if (opts.force) _rowCache.delete(`o:${uid}`);
-  const rows = await cachedRow(`o:${uid}`, () => fetchHarvestOrdersBrut(uid));
+  const rows = await cachedRow(`o:${uid}`, () => fetchHarvestOrdersBrut(uid), opts.ttl || ROW_TTL_MS);
   // ⚠️ `undefined` = la base n'a PAS répondu ; `null` (plus bas) = la ligne
   //    n'existe pas. Les confondre envoyait un compte en panne de LECTURE
   //    interroger Vinted par le relais du serveur (jusqu'à 12 pages, jetons
@@ -8669,23 +8675,30 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
 // achats annules par l'acheteur/le vendeur restaient affiches comme en
 // attente au lieu d'etre a part - d'ou la confusion remontee par l'utilisateur.
 const classifyOrderStatus = (status) => {
-  const s = status || '';
-  // Retour / remboursement / suspension = PAS une vente aboutie (l'article revient
-  // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
-  // capté redevient « finalisée » et la vente se reclasse automatiquement.
-  if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
-  // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
-  // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
-  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
-  // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
-  // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
-  // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
-  // seul « le paiement a échoué » sortait : une autre « …a échoué » était
-  // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
-  // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
-  if (/[ée]chou/i.test(s)) return 'cancelled';
-  if (/finalis/i.test(s)) return 'completed';
-  return 'pending';
+  // (12 nov., vitesse-volume) Mémoire par chaîne : la même règle, appelée des centaines de milliers de fois par rendu à 20 000 ventes (profil). Pure : même entrée, même sortie.
+  const memo = typeof status === 'string' ? (classifyOrderStatus.memo || (classifyOrderStatus.memo = new Map())) : null;
+  if (memo && memo.has(status)) return memo.get(status);
+  const r = ((status) => {
+    const s = status || '';
+    // Retour / remboursement / suspension = PAS une vente aboutie (l'article revient
+    // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
+    // capté redevient « finalisée » et la vente se reclasse automatiquement.
+    if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
+    // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
+    // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
+    if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
+    // ⚠️ (1er nov., audit A12) UNE RÈGLE « PAS UNE VENTE » : tout état qui « a
+    // échoué » fait REVENIR la paire pour l'anti double vente (`PAS_UNE_VENTE`,
+    // app ET extension) ; il ne compte donc pas non plus comme vendu ici. Avant,
+    // seul « le paiement a échoué » sortait : une autre « …a échoué » était
+    // revenue d'un côté, vendue de l'autre. `audit-flux-divers.cjs` exige que
+    // `classifyOrderStatus(s) === 'cancelled'` ⇔ `PAS_UNE_VENTE.test(s)`.
+    if (/[ée]chou/i.test(s)) return 'cancelled';
+    if (/finalis/i.test(s)) return 'completed';
+    return 'pending';
+  })(status);
+  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(status, r); }
+  return r;
 };
 // Une vente a besoin d'un BORDEREAU seulement si elle est À EXPÉDIER : ni
 // annulée, ni finalisée, ni déjà expédiée/livrée. On exclut donc les statuts
@@ -29446,14 +29459,21 @@ const fusionLignesMemeSuivi = (m, s) => {
 // garde les parties stables : le sous-dossier unique de la photo + le nom de
 // fichier (l'identifiant de l'image), ce qui est le même quelle que soit la taille.
 const photoKey = (url) => {
-  const raw = String(url || '').split('?')[0].split('#')[0];
-  if (!raw) return null;
-  const path = raw.replace(/^https?:\/\/[^/]+/i, '');            // enlève l'hôte
-  const segs = path.split('/').filter(Boolean)
-    .filter(seg => !/^(f\d{2,4}|\d{2,4}x\d{2,4}|thumbnails?)$/i.test(seg)); // enlève le répertoire de taille
-  if (!segs.length) return null;
-  const key = segs.slice(-2).join('/').replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase();
-  return key || null;
+  // (12 nov., vitesse-volume) Mémoire par chaîne : la même règle, appelée des centaines de milliers de fois par rendu à 20 000 ventes (profil). Pure : même entrée, même sortie.
+  const memo = typeof url === 'string' ? (photoKey.memo || (photoKey.memo = new Map())) : null;
+  if (memo && memo.has(url)) return memo.get(url);
+  const r = ((url) => {
+    const raw = String(url || '').split('?')[0].split('#')[0];
+    if (!raw) return null;
+    const path = raw.replace(/^https?:\/\/[^/]+/i, '');            // enlève l'hôte
+    const segs = path.split('/').filter(Boolean)
+      .filter(seg => !/^(f\d{2,4}|\d{2,4}x\d{2,4}|thumbnails?)$/i.test(seg)); // enlève le répertoire de taille
+    if (!segs.length) return null;
+    const key = segs.slice(-2).join('/').replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase();
+    return key || null;
+  })(url);
+  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(url, r); }
+  return r;
 };
 // DOSSIER de la photo, sans le nom de fichier. Quand une annonce est republiée
 // (supprimer + recréer, §46), Vinted RE-TÉLÉVERSE la même image : le dossier
@@ -32861,9 +32881,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   • `vinted_accounts_hidden`  → « ✕ Masquer » dans l'app (synchronisé)
   //   • `panel_accounts_off`      → « ✕ Masquer » depuis le panneau (§35)
   // ⚠️ Le trois-états du panneau est conservé : `false` = rallumé exprès, ça prime.
+  // (12 nov., vitesse-volume) La réponse par compte, gardée tant que les comptes masqués / écartés ne changent pas.
+  const memoComptes = useRef(null);
+  if (!memoComptes.current || memoComptes.current.a !== hiddenAccts || memoComptes.current.p !== panelAcctOff) memoComptes.current = { a: hiddenAccts, p: panelAcctOff, m: new Map() };
+  const comptesM = memoComptes.current.m;
   const acctOff = (uid) => {
+    const k = String(uid ?? '');
+    if (comptesM.has(k)) return comptesM.get(k);
+    const r = (() => {
     // La règle vit dans `compteEcarte` (partagée avec la coque, §11).
     return compteEcarteChoix(uid, hiddenAccts, panelAcctOff);
+    })();
+    comptesM.set(k, r);
+    return r;
   };
   // ── LES COMPTES QUI EXISTENT VRAIMENT ────────────────────────────────────
   // Un compte existe s'il a des jetons (ligne `vinted_accounts`), pas parce
@@ -32882,7 +32912,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (montrée en aperçu par `VentesHorsPlan`) ; une annonce aussi (`venteOffOf`).
   const horsPlanOf = (o) => venteHorsPlanUid(o?._acc?.vinted_user_id);
   const venteOffOf = (o) => acctOffOf(o) || horsPlanOf(o);
-  const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || venteOffOf(o);
+  const isHiddenCalcul = (o) => hiddenSales.has(String(o.transaction_id)) || venteOffOf(o);
+  // (12 nov., vitesse-volume) LES VENTES VISIBLES, CALCULÉES UNE FOIS PAR VERSION DES DONNÉES : la réponse de
+  // `isHiddenCalcul` est gardée par vente (identité de l'objet) tant que ce qu'elle lit ne change pas — les
+  // ventes masquées, les comptes masqués / écartés, l'offre (`signaturePlan`). Un de ces quatre change ⇒ tout
+  // est recalculé. À 20 000 ventes, `isHidden` coûtait 2,7 s propres au démarrage (téléphone ×4).
+  const cleVisibles = [hiddenSales, hiddenAccts, panelAcctOff, signaturePlan()];
+  const memoVisibles = useRef(null);
+  if (!memoVisibles.current || memoVisibles.current.cle.some((x, i) => x !== cleVisibles[i])) memoVisibles.current = { cle: cleVisibles, m: new WeakMap() };
+  const visiblesM = memoVisibles.current.m;
+  const isHidden = (o) => { if (!o || typeof o !== 'object') return isHiddenCalcul(o); if (visiblesM.has(o)) return visiblesM.get(o); const v = isHiddenCalcul(o); visiblesM.set(o, v); return v; };
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
   // (3 nov.) « Articles qui dorment » : le seuil (30/60/90 j) est un confort de CET
@@ -33222,6 +33261,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov.) Revenir sur l'écran : la liste en cache (la même entrée que `loadOrders` servirait
   // une milliseconde plus tard) est là DÈS le premier rendu — plus de squelette d'une image.
   const [sales, setSales] = useState(() => etatOrdersDuCache('sold', accounts));
+  const salesCourant = useRef(sales); salesCourant.current = sales;   // (12 nov.) la liste montrée, pour relire UN compte (`relire`)
   const [buys, setBuys] = useState(() => etatOrdersDuCache('purchased', accounts));
   // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
   // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
@@ -34829,7 +34869,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Elle se vide aussitôt le calcul synchrone fini (microtâche) : un effet ou un geste
   // lancé plus tard recalcule, même si une valeur lue par la règle a bougé entre-temps.
   const memoRendu = (fn) => { let m = null; return (o) => { if (!o || typeof o !== 'object') return fn(o); if (!m) { m = new WeakMap(); queueMicrotask(() => { m = null; }); } if (m.has(o)) return m.get(o); const r = fn(o); m.set(o, r); return r; }; };
-  const entryKeyByPhoto = memoRendu((o) => {
+  // (12 nov., vitesse-volume) LA MÊME MÉMOIRE, GARDÉE TANT QUE CE QUE LA RÈGLE LIT NE CHANGE PAS : `cle()` rend
+  // TOUT ce que la règle lit (états, mémos, réglages du module) ; elle est relue une fois par calcul synchrone,
+  // et une seule valeur différente (par identité) repart de zéro. Mesuré à 20 000 ventes : Comptabilite se rend
+  // ~19 fois avant « prêt », et ces règles d'identité repartaient de zéro à chaque rendu.
+  const memosVersion = useRef({});
+  const memoVersion = (nom, fn, cle) => (o) => {
+    if (!o || typeof o !== 'object') return fn(o);
+    let e = memosVersion.current[nom];
+    if (!e || !e.lue) { const k = cle(); if (!e || e.k.length !== k.length || e.k.some((x, i) => x !== k[i])) e = memosVersion.current[nom] = { k, m: new WeakMap() }; e.lue = true; queueMicrotask(() => { e.lue = false; }); }
+    if (e.m.has(o)) return e.m.get(o);
+    const r = fn(o); e.m.set(o, r); return r;
+  };
+  const reglesNumeros = () => `${coupureNumerotation()}|${archiveNumeros()}|${numeroEcritActif()}|${JSON.stringify(ouNumeroEcrit())}`;
+
+  const entryKeyByPhoto = memoVersion('photo', (o) => {
     const url = o ? orderPhoto(o) : null;
     const pk = photoKey(url);
     let k = (pk && numerosByPhoto[pk]) || null;                  // même fichier = certain
@@ -34840,7 +34894,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // l'histoire.
     if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;
     return k;
-  });
+  }, () => [numerosByPhoto, numerosByPhotoDir, numeros, reglesNumeros()]);
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
@@ -35011,13 +35065,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   1. l'identifiant d'annonce donné par Vinted (transaction → item_id) ;
   //   2. la photo, qui appartient à une paire et une seule (0 collision mesurée).
   // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
-  const identiteAnnonce = memoRendu((o) => {
+  const identiteAnnonce = memoVersion('identite', (o) => {
     if (!o) return null;
     const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     if (parVinted) return String(parVinted);
     return entryKeyByPhoto(o) || null;
-  });
-  const resolvedEntry = memoRendu((o) => {
+  }, () => [txnItem, numerosByPhoto, numerosByPhotoDir, numeros, reglesNumeros()]);
+  const resolvedEntry = memoVersion('fiche', (o) => {
     // Une paire ENCORE EN LIGNE n'est pas vendue : on refuse de l'associer.
     const usable = (key) => (key && numeros[key] && !onlineAnnonceIds.has(String(key))) ? numeros[key] : null;
     // ⚠️ VERROU HÉRITÉ : `vinted_txn_link` est permanent et a longtemps été posé
@@ -35045,7 +35099,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    annonces différentes). Un titre ne caractérise donc pas une annonce :
     //    on préfère ne rien attribuer plutôt que désigner la mauvaise boîte.
     return null;
-  });
+  }, () => [numeros, onlineAnnonceIds, txnItem, txnLink, numerosByPhoto, numerosByPhotoDir, reglesNumeros()]);
   // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
@@ -35463,14 +35517,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (numeroEcritActif()) { const lec = lireNumeroEcrit({ titre: o.title || '' }); if (lec.etat === 'lu' && numeroReprenable(lec.cle) && (coupureNumerotation() == null || venteApresCoupure(o))) src.push({ source: 'ecrit', numero: lec.cle }); }
     return decisionNumeroVenteEmail(src);
   };
-  const effEntry = memoRendu((o) => {
+  const effEntry = memoVersion('effective', (o) => {
     const r = fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum);
     if (!(o && o._venteEmail)) return r;
     // Une vente vue par e-mail : le N° est la DÉCISION ci-dessus (contredit ⇒ aucun).
     const d = numeroVenteEmail(o);
     if (!d.numero) { if (!r || r.numero == null) return r; const { numero: _n, ...reste } = r; return reste; }
     return { ...(r || {}), numero: d.numero };
-  });
+  }, () => [numeros, onlineAnnonceIds, txnItem, txnLink, numerosByPhoto, numerosByPhotoDir, saleOv, buyByNum, bordsVenteEmailParTx, bordLinks, labelsCaptes, reglesNumeros()]);
 
   // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
   // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à
@@ -37740,6 +37794,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (Number.isFinite(t) && !Number.isFinite(_harvestSeen[k])) _harvestSeen[k] = t;
     }
     if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
+    // (12 nov., vitesse) UNE VENTE ARRIVE SUR UN COMPTE : on ne relit QUE lui. Avant, `relire(uid)`
+    // relançait la lecture de CHAQUE compte : passé la minute de mémoire des lignes, ~1,2 Mo repartaient
+    // (banc ventes-relecture-compte). Les autres comptes gardent EXACTEMENT ce que l'écran montre (leurs
+    // ventes, leur « pas su ») ; une relecture ratée ne change rien. Ventes seulement (les achats ont
+    // leurs filtres croisés avec les ventes : relus en entier, comme avant).
+    const seul = type === 'sold' && opts && Array.isArray(opts.seulement) ? new Set(opts.seulement.map(String)) : null;
+    const prec = opts && opts.prec;
+    if (seul && !force && prec && Array.isArray(prec.items) && prec.comptes === demandes) {
+      const cibles = accounts.filter(a => seul.has(String(a.vinted_user_id)));
+      if (cibles.length) {
+        const results = await Promise.all(cibles.map(async acc => { const res = await fetchVintedOrders(acc, type, 1, 'all', { force }); noteAcctLive(acc.vinted_user_id, res, force); return { acc, res }; }));
+        if (n !== lectureOrders.current[type]) return;
+        const lus = results.filter(r => r.res && r.res.ok);
+        if (!lus.length) return;                                 // lecture ratée : rien n'est changé
+        const okUids = new Set(lus.map(r => String(r.acc.vinted_user_id)));
+        const garde = prec.items.filter(o => !okUids.has(String(o && o._acc && o._acc.vinted_user_id)));
+        const seen = new Set(garde.map(o => String(o.transaction_id))); const neufs = [];
+        for (const { acc, res } of lus) for (const o of res.items) { const id = String(o.transaction_id); if (seen.has(id)) continue; seen.add(id); neufs.push({ ...o, _acc: acc }); }
+        const items = [...neufs, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+        const failedUids = (Array.isArray(prec.failedUids) ? prec.failedUids : []).map(String).filter(u => !okUids.has(u));
+        const failed = accounts.filter(a => failedUids.includes(String(a.vinted_user_id))).map(accNameOf);
+        const caps = {};
+        for (const acc of accounts) { const t = _harvestSeen[`${acc.vinted_user_id}_orders_${type}`]; if (Number.isFinite(t)) caps[String(acc.vinted_user_id)] = t; }
+        putCache(type, items, { failed, failedUids }, demandes, { caps });
+        setter({ ...prec, loading:false, items, error:false, failed, failedUids, comptes: demandes });
+        return;
+      }
+    }
     if (!silencieux) setter({ loading:true, items:null, error:false });
     // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
     // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
@@ -38505,7 +38587,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ecrans = ['ventes', 'journee', 'bordereaux', 'messages'];
     let derniere = 0;
     const relire = (uid) => {
-      if (uid) _rowCache.delete(`o:${uid}`); else viderCacheLignes();
+      // (12 nov.) Ventes monte DEUX moteurs (la liste et « À expédier ») : le second ne réoublie pas la ligne
+      // que le premier vient de relire (`oublierCommandesCompte`, 4 s) — une seule relecture du compte.
+      if (uid) oublierCommandesCompte(uid); else viderCacheLignes();
       try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
       // ⚠️ Hors de ces écrans, le signal était JETÉ : revenir sur Colis montrait
       //    l'ancien état jusqu'au cycle suivant. On le retient, et l'entrée sur
@@ -38514,7 +38598,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (Date.now() - derniere < 4000) return;      // deux signaux rapprochés = une relecture
       derniere = Date.now();
       ventesPerimees.current = false;
-      loadOrders('sold', setSales, false, { silencieux: true });
+      loadOrders('sold', setSales, false, uid ? { silencieux: true, seulement: [uid], prec: salesCourant.current } : { silencieux: true });
     };
     const ecoute = (e) => {
       if (cache()) return;
@@ -44628,7 +44712,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         }
         // (11 nov.) « CLÔTURER L'ANNÉE » : en décembre et janvier, UNE fois (src/clotureAnnee.js) —
         // « Voir » ouvre Argent → Déclarer sur la liste, et note l'année vue (SON clic). Neutre.
-        { const cj = carteJourneeCloture({ maintenant: Date.now(), cloture: load(CLE_CLOTURE, {}), vue: load(CLE_CLOTURE_VUE, {}), regime: isCloudReady() ? regimeFiscal() : undefined });
+        // (12 nov.) Pas à la première visite : un vendeur qui arrive n'a pas d'année à clôturer, et cette
+        // carte cachait son guide de démarrage plein écran en décembre et janvier (navigation-plateformes).
+        if (!premierJour) { const cj = carteJourneeCloture({ maintenant: Date.now(), cloture: load(CLE_CLOTURE, {}), vue: load(CLE_CLOTURE_VUE, {}), regime: isCloudReady() ? regimeFiscal() : undefined });
           if (cj) { const court = `Clôturer ${cj.annee}`;
             jobs.push({ id: 'cloture-annee', icon: 'doc', color: C.text, court, detail: 'Une liste guidée : ventes à dater, inventaire, chiffre d’affaires, URSSAF, impôts, export', title: court, tab: 'argent_declarer', prio: 3.4, action: 'Voir',
               avant: () => { DEMANDE_CLOTURE.at = Date.now(); const v = load(CLE_CLOTURE_VUE, {}); save(CLE_CLOTURE_VUE, { ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}), [String(cj.annee)]: Date.now() }); } }); } }
@@ -49762,7 +49848,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (12 nov., finitions) `lignesLot` = les bordereaux VINTED : sur un autre site choisi, aucun (« 15 à imprimer » sur eBay).
           const lignesImpr = voitSite('vinted') ? lignesLot() : [];
           const nPrets = bordereauxAImprimer(lignesImpr).length, nDejaImpr = lignesImpr.length - nPrets;
-          const nLot = lignesLotTous().length;
+          // (12 nov.) Le bouton compte ce qui PART (cochées d'office), comme « Imprimer (N) » de la feuille : une source
+          // (`resumeLot`). Avant : toutes les lignes du lot ⇒ « Tout imprimer (15) » ouvrait « Imprimer (6) ».
+          const resLot = resumeLot(lignesLotTous()), nLot = resLot.partent;
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
           // Messages et que la rangée de Colis · Leboncoin : un site où il a un
@@ -50038,9 +50126,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-colis-barre" data-colis-barre="">
                   <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label={scanRetraitBarre ? 'Scanner un colis à retirer' : 'Scanner un bordereau'} data-scan-mode-bouton={scanRetraitBarre ? 'retrait' : 'envoi'} title={scanRetraitBarre ? 'Scanner le colis au point relais : VRM montre l’achat attendu' : `Scanner le code-barres d’un bordereau : VRM montre ${motsVendeur().le} qui doit être dedans`} onClick={() => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
                   {colisDans === 'achats' ? null : <>
-                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
-                    title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
-                    onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : nLot > 0 ? `Tout imprimer (${nLot})` : 'Tout imprimer'}</Bouton>
+                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={resLot.total > 0 ? '1' : '0'} data-imprimer-prets={nLot}
+                    title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : resLot.total > 0 ? 'Rien de neuf à imprimer : ouvre pour voir pourquoi' : 'Aucun bordereau prêt à imprimer pour l’instant'}
+                    onClick={ouvrirLot} disabled={batchBusy || resLot.total === 0}>{batchBusy ? 'Préparation…' : nLot > 0 ? `Tout imprimer (${nLot})` : 'Tout imprimer'}</Bouton>
                   {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
                       et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
@@ -50376,7 +50464,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // Imprimer, « Préparer quand même ») + 2 pour trouver « Je dépose » ; après 3 (Tout imprimer,
                   // Imprimer, « Oui ») et « Je dépose » dans la même feuille.
                   const L = lot.lignes || lignesLotTous();
-                  const nb=L.filter(l=>lot.coches.has(l.cle)).length;
+                  // (12 nov.) La même source que le bouton (`resumeLot`) : ce qui part, et POURQUOI les autres n'y sont pas.
+                  const resL = resumeLot(L, lot.coches), nb = resL.partent, nSansBord = resL.sansBordereau + aGenItems.length;
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const aVerif = (l) => l.cochable !== false && (l.ancienne || l.imprime || l.depotAVerifier || l.pdf === false);
                   const partent = L.filter((l) => l.cochable !== false && !aVerif(l));
@@ -50426,6 +50515,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {!fait && <div className="vrm-tip-temps" key="choix">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
                         {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
+                        {(nSansBord || resL.dejaImprimes || resL.anciennes || resL.decoches) ? <div className="vrm-tip-pourquoi" data-lot-pourquoi="">
+                          <b>Pas dans ce lot</b>
+                          {nSansBord > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-sans-bordereau={nSansBord}>{nSansBord} sans bordereau encore{aGenItems.length > 0 ? ' — ' : ''}{aGenItems.length > 0 && <BoutonToutGenerer items={aGenItems}/>}</span>}
+                          {resL.dejaImprimes > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-imprimes={resL.dejaImprimes}>{resL.dejaImprimes} déjà imprimé{resL.dejaImprimes > 1 ? 's' : ''} — coche pour réimprimer</span>}
+                          {resL.anciennes > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-anciennes={resL.anciennes}>{resL.anciennes} vendue{resL.anciennes > 1 ? 's' : ''} il y a plus de {VENTE_LOT_MAX_J} j — à vérifier</span>}
+                          {resL.decoches > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-decoches={resL.decoches}>{resL.decoches} décoché{resL.decoches > 1 ? 's' : ''} par toi</span>}
+                        </div> : null}
                         {batchBusy&&progressionLot&&<div className="vrm-tip-progression" role="status">{progressionLot.etape==='lecture'?`PDF ${progressionLot.fait}/${progressionLot.total}`:'Préparation…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div className="vrm-tip-outils">
                           <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
@@ -58482,7 +58578,9 @@ function AppCoeur() {
   const [preuveTick, setPreuveTick] = useState(0);
   useEffect(() => {
     const signal = regrouperSignaux(() => setPreuveTick(t => t + 1), SIGNAL_MIN_MS, 1500);
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && ['preuves', 'label', 'ventes'].includes(d.quoi)) signal(); };
+    // (12 nov.) Une vente signalée : ses commandes sont oubliées ICI aussi (la cloche les garde 10 min), même
+    // quand aucun écran de ventes n'est monté — une fois par signal (`oublierCommandesCompte`).
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && ['preuves', 'label', 'ventes'].includes(d.quoi)) { if (d.quoi === 'ventes' && d.uid) oublierCommandesCompte(d.uid); signal(); } };
     window.addEventListener('vrm:ext', f);
     // (20 octobre) Et une relecture eBay faite sans geste (nouvelle vente eBay,
     // annonce terminée) : la cloche recompte aussi.
@@ -58574,7 +58672,10 @@ function AppCoeur() {
         .filter(a=>!offAcc.has(String(a.vinted_user_id)))
         .map(async a=>[String(a.vinted_user_id), await Promise.all([
           fetchHarvest(a.vinted_user_id,'inbox'),
-          fetchHarvestOrders(a.vinted_user_id,'sold'),
+          // (12 nov., vitesse) La cloche se recompte à CHAQUE vente signalée : ses commandes sont gardées 10 min
+          // (le compte qui a bougé est oublié par `relire`/la sonde) — avant, passé 60 s, les 7 comptes repartaient
+          // (~1,2 Mo) pour une vente sur un seul (banc ventes-relecture-compte).
+          fetchHarvestOrders(a.vinted_user_id,'sold',{ ttl: 10 * 60 * 1000 }),
           fetchHarvest(a.vinted_user_id,'listings'),
         ])])));
       for(const a of vintedAccounts){

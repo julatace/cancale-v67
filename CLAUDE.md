@@ -550,7 +550,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · Paquets G2 (ext. 5.368), 12nov-a (ext. 5.369) et 12nov-b, mis en ligne par le second agent** : `2026-11-12-integration-11nov-g2.md`, `-12nov-a.md`, `-12nov-b.md`. Geste : installer 5.369.0 ; migration 042 (facultative).
+- **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume en ligne** : 20 000 ventes −20 %. `2026-11-12-*.md`. Geste : migration 042 (facultative).
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
