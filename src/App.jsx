@@ -31581,6 +31581,28 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
   return { r, seuil, setSeuil, relire: () => { setLecture(undefined); setTic((x) => x + 1); } };
 }
 
+// ── (13 nov., moteur-compta) LES PUBLICATIONS LOURDES, REGROUPÉES ──────────────────────────────
+// Au chargement, les données arrivent une à une (ventes, N°, corrections, lots, versements…) : chaque
+// arrivée relançait les effets qui PUBLIENT (bénéfice par jour, relevé des ventes, sources, meilleures,
+// envois/vitesse, URSSAF du mois) — à 20 000 ventes, ~0,3 à 0,6 s (×4) chacun, refait à chaque arrivée.
+// `useEffetPublication` lance LE MÊME corps (la fermeture du rendu où ses dépendances ont changé, rien
+// d'autre) une fois que ses dépendances n'ont plus bougé depuis `PUBLICATION_CALME_MS` : la publication
+// finale est celle d'avant (mêmes entrées, même règle) ; seules les publications intermédiaires, aussitôt
+// remplacées, ne sont plus calculées. Démonté avant l'heure : le corps attendu part tout de suite (rien
+// de perdu). Hors navigateur (rendu serveur, banc node) : comme `useEffect`.
+const PUBLICATION_CALME_MS = 1200;
+function useEffetPublication(corps, deps) {
+  const attente = React.useRef(null);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.setTimeout !== 'function') { corps(); return undefined; }
+    attente.current = corps;
+    const t = window.setTimeout(() => { const f = attente.current; attente.current = null; if (f) f(); }, PUBLICATION_CALME_MS);
+    return () => window.clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  React.useEffect(() => () => { const f = attente.current; attente.current = null; if (f) { try { f(); } catch (_) {} } }, []);
+}
+
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null }) {
   // (11 nov., saisie rapide) Les ventes prouvées sans prix d'achat (publiées par la coque) : Ma journée.
   const prixAFaire = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
@@ -35403,7 +35425,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les 14 derniers jours, VENDU et REÇU côte à côte (`joursVenduRecu`).
   const jours14 = useMemo(() => joursVenduRecu(vendus.lignes, declarables ? declarables.lignes : null, 14), [vendus, declarables]);
   const semaine = useMemo(() => joursSemaine(vendus.lignes, declarables ? declarables.lignes : null), [vendus, declarables]);
-  useEffect(() => {
+  useEffetPublication(() => {
     if (!sales.items) return;                       // rien de sûr à publier
     // On attend de savoir ; et les dates de versement illisibles : on ne publie
     // RIEN plutôt qu'un mois où toutes les ventes Vinted seraient « à dater ».
@@ -39755,7 +39777,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // jour de la VENTE (heure de l'appareil, la borne de `dansPeriode`). Un compte
   // non lu (hors comptes exclus) ⇒ on ne publie RIEN : la dernière publication,
   // complète, reste (un total partiel présenté comme complet est pire, §5).
-  useEffect(() => {
+  useEffetPublication(() => {
     if (!sales.items) return;
     if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some(u => !acctOff(u))) return;
     // Leboncoin ou eBay pas lus (en cours ou raté) ⇒ on ne publie RIEN : la
@@ -41120,7 +41142,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // identité seulement (`sourceDeVente` : achat Vinted relié, achat en gros, N° d'un achat
   // hors plateforme et la source QU'IL y a saisie). Rien n'est publié tant qu'une lecture
   // manque (un compte de ventes raté, Leboncoin/eBay pas lus) : la dernière publication reste.
-  useEffect(() => {
+  useEffetPublication(() => {
     if (!Array.isArray(sales.items)) return;
     if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
     if (!Array.isArray(autresBenefice)) return;
@@ -41156,7 +41178,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // identité seulement (`achatDeVente` : `buyFromId`, `buyGros.id`, N° unique d'un achat hors
   // plateforme). Bénéfice : la règle unique (`beneficeLigneVente` / `ventesAutresBenefice`).
   // Rien n'est publié tant qu'une lecture manque (ventes, achats, Leboncoin/eBay) : la dernière reste.
-  useEffect(() => {
+  useEffetPublication(() => {
     if (!Array.isArray(sales.items) || !Array.isArray(buys.items)) return;
     if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
     if ((Array.isArray(buys.failedUids) ? buys.failedUids : []).some((u) => !acctOff(u))) return;
@@ -41195,7 +41217,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (Colis fait / scan, panneau, e-mail du n° exact, prise en charge) ; une vente partie d'après Vinted
   // sans date prouvée compte « sans date de dépôt prouvée ». Rien n'est publié tant qu'un compte de
   // ventes a raté ou que les e-mails sont en lecture (pas lus : publié « partiel », dit).
-  useEffect(() => {
+  useEffetPublication(() => {
     if (!Array.isArray(sales.items)) return;
     if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some((u) => !acctOff(u))) return;
     if (!Array.isArray(tracking) && !trackingKO) return;
