@@ -45,7 +45,7 @@ export const VC_VENTE_ETAPES = [
   ['versee', /payout|paid.?out|vers[ée]|virement|transferred|credited|cr[ée]dit/i, 'Argent versé'],
   ['terminee', /complet|finali|termin|closed|done|clotur/i, 'Terminée'],
   // (11 nov.) « Paiement reçu » (payée par l'acheteur) n'est PAS « livrée » ; « checkout » n'est pas un contrôle.
-  ['livree', /deliver|livr[ée]|(?<!paiement |payment |paid )\b(?:received|re[cç]u)\b(?!.*paiement)/i, 'Livrée à l’acheteur'],
+  ['livree', /deliver|livr[ée]|^(?!.*(?:paiement |payment |paid )(?:received|re[cç]u)\b)(?=.*\b(?:received|re[cç]u)\b(?!.*paiement))/i, 'Livrée à l’acheteur'],   // (12 nov.) sans lookbehind : Safari < 16.4 refusait tout le fichier (audit-safari)
   ['controle', /authenti|control|inspect|verif|expertis|quality|\bcheck(?!out)/i, 'Contrôle par Vestiaire'],
   ['en-route', /ship|sent|transit|exp[ée]di|envoy|on.?the.?way|in.?delivery|dispatch/i, 'Envoyée'],
 ];
