@@ -26,12 +26,12 @@ Ce qu'elle fait pour toi
 • Elle range dans ton espace VRM ce que ces sites affichent déjà sur ta propre activité quand tu les ouvres : annonces, ventes, achats, messages, offres, soldes, bordereaux.
 • Elle récupère les bordereaux d'expédition de tes ventes, prêts à imprimer avec le numéro de rangement de la paire.
 • Elle relève les codes de retrait de tes colis et leur statut chez le transporteur.
-• Sur ton clic dans VRM : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
-• Seulement si tu les allumes dans VRM (éteintes par défaut) : accepter les offres Vinted au-dessus du prix minimum que tu as fixé, et envoyer ton message aux personnes qui mettent ton annonce en favori.
+• Sur ton clic dans VRM : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, baisser un prix, poser le mode vacances, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
+• Seulement si tu les allumes dans VRM (éteintes par défaut) : accepter les offres Vinted au-dessus du prix minimum que tu as fixé (et refuser avec TON message celles sous ton seuil), et envoyer ton message aux personnes qui mettent ton annonce en favori.
 
 Ses garde-fous
 • Elle n'agit qu'au nom du compte connecté dans l'onglet, jamais d'un autre.
-• Au plus 50 actions par heure et par compte, une requête à la fois ; elle s'arrête quand le site demande une pause.
+• Au plus 50 actions par heure et 200 par jour et par compte, une requête à la fois ; elle s’arrête net quand le site demande une pause ou une vérification.
 • Elle ne lit jamais ton mot de passe ni ton historique de navigation.
 • Ce qu'elle lit part uniquement dans TON compte VRM. Rien n'est vendu, rien ne sert à la publicité.
 
@@ -73,6 +73,7 @@ Relier les propres comptes de revente de l'utilisateur (Vinted, Leboncoin, eBay,
 | `scripting` | Exécuter, dans l'onglet Vinted, Leboncoin ou Vestiaire Collective déjà ouvert par l'utilisateur, les lectures et les actions qu'il commande, depuis la page elle-même (même origine, mêmes cookies). |
 | `tabs` | Retrouver l'onglet du site ou de VRM déjà ouvert et ouvrir la page utile (VRM, dépôt d'annonce) quand l'utilisateur le demande ; l'adresse des onglets n'est ni gardée ni envoyée. |
 | `downloads` | Reconnaître le PDF d'un bordereau d'expédition que l'utilisateur télécharge depuis Vinted, pour le ranger avec la vente ; tout autre téléchargement est ignoré et l'extension n'en déclenche aucun. |
+| `contextMenus` | Deux entrées dans le menu du clic droit sur l’icône de l’extension seulement (« Connexion à VRM », « État de l’extension ») : un clic simple sur l’icône ouvre VRM. Aucun menu n’est ajouté aux pages des sites. |
 
 **Autorisations d'hôte** (le formulaire les regroupe en une case « Host permission » : coller le tableau
 en texte, une ligne par hôte) :
@@ -88,7 +89,7 @@ en texte, une ligne par hôte) :
 | `https://www.mondialrelay.be/*`, `https://www.mondialrelay.fr/*`, `https://ws.chronopost.fr/*`, `https://carrier.vintedgo.com/*` | Lire le statut public des colis que l'utilisateur attend (n° de suivi), quand le serveur de VRM ne peut pas le lire ; 12 lectures par heure et par transporteur au plus. |
 | `https://www.chronopost.fr/tracking-no-cms/*`, `https://vintedgo.com/*` (scripts de contenu) | Sur une page de suivi ouverte par l'utilisateur, lire seulement l'adresse de la page (le n° de suivi), jamais son contenu. |
 | `https://lgonxzrzjcqthjtbdpzo.supabase.co/*` | La base de données de VRM, où l'espace de l'utilisateur est rangé. |
-| `https://vrm.center/*`, `https://cancale-v67-ten.vercel.app/*` | L'app VRM, qui commande l'extension (la seconde est l'ancienne adresse de l'app). |
+| `https://vrm.center/*` | L’app VRM, qui commande l’extension, et le numéro de la dernière version servie (`/extension-version.json`), lu au plus toutes les 6 heures. |
 
 **Code distant** : « Non, je n'utilise pas de code distant ». Tout le code est dans le paquet ; les scripts
 de la page (`inject.js`, `lbc-inject.js`, `vc-inject.js`) sont des fichiers du paquet.
