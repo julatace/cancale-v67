@@ -185,7 +185,8 @@ const MUTATIONS = {
 
   // ── J. Prix conseillé ─────────────────────────────────────────────────────
   dit(!/>Prix conseillé</.test(APP) && !/lister\.reco\b/.test(APP), 'J1 plus de « Prix conseillé » à la mise en ligne (refusé le 11 oct.)');
-  dit(/const sugg0 = [^\n]*Math\.ceil\(achat\)/.test(APP), 'J2 le conseil d\'une paire qui dort ne descend jamais sous le prix d\'achat');
+  // (12 nov.) Le conseil passe par la règle mesurée (src/conseilPrix.js : jamais sous l'achat + 10 %, scripts/audit-conseil-mesure.cjs).
+  dit(/const conseil = soldBord \? null : conseilsPrix\.get\(String\(it\.id\)\)/.test(APP) && /MARGE_PLANCHER_PCT = 10;/.test(fs.readFileSync(path.join(R, 'src', 'conseilPrix.js'), 'utf8')), 'J2 le conseil d\'une paire qui dort ne descend jamais sous le prix d\'achat (+ 10 %)');
 
   // ── K. Pas de rouge sur un bénéfice ───────────────────────────────────────
   {

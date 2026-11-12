@@ -230,8 +230,8 @@ const projette = (row, sel) => {
           btn: (document.querySelector('[data-reprice-ebay="5550001"]') || {}).innerText || '',
           autres: [...document.querySelectorAll('[data-reprice-ebay]')].map((x) => x.getAttribute('data-reprice-ebay')),
         }));
-        dit(/Aussi sur eBay à 60\s€/.test(av.a) && /Baisser sur eBay à 53\s€/.test(av.btn),
-          'la paire qui dort est aussi sur eBay (SKU VRM-41) : même baisse en proportion (49 → 43 ⇒ 60 → 53 €)', `${av.a.slice(0, 120)} | ${av.btn}`);
+        dit(/Aussi sur eBay à 60\s€/.test(av.a) && /Baisser sur eBay à 55\s€/.test(av.btn),
+          'la paire qui dort est aussi sur eBay (SKU VRM-41) : même baisse en proportion, mesurée (49 → 45 ⇒ 60 → 55 €, −10 % au plus)', `${av.a.slice(0, 120)} | ${av.btn}`);
         dit(av.autres.length === 1 && !av.autres.includes('5550002'), 'une annonce eBay sans SKU de paire, même au même titre, ne déclenche rien (§5)', JSON.stringify(av.autres));
         // (27 oct.) La paire qui dort a 2 favoris : on DIT que la baisse les prévient
         // (toucher ses favoris sans robot — Vinted le fait tout seul au prix baissé).
@@ -253,9 +253,9 @@ const projette = (row, sel) => {
         await pg.getByRole('button', { name: 'Baisser sur eBay', exact: true }).click({ timeout: 4000 });
         await pg.waitForTimeout(600);
         const e = envoisEbay[0] || {};
-        dit(envoisEbay.length === 1 && e.itemId === '5550001' && Number(e.price) === 53, 'confirmée, UNE baisse part vers eBay, sur la bonne annonce et au bon prix', JSON.stringify(envoisEbay));
+        dit(envoisEbay.length === 1 && e.itemId === '5550001' && Number(e.price) === 55, 'confirmée, UNE baisse part vers eBay, sur la bonne annonce et au bon prix', JSON.stringify(envoisEbay));
         const fait = await pg.evaluate(() => (document.querySelector('[data-reprice-ebay="fait"]') || {}).innerText || '');
-        dit(/baissé à 53\s€/.test(fait), 'et l’écran le dit (« baissé à 53 € »)', fait);
+        dit(/baissé à 55\s€/.test(fait), 'et l’écran le dit (« baissé à 55 € »)', fait);
       } catch (e) { dit(false, 'la baisse eBay se déroule jusqu’au bout', String(e.message).slice(0, 120)); }
       // ── G22 : suivies, pas encore vendues → remise native ──────────────────
       try {
