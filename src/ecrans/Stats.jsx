@@ -1674,7 +1674,7 @@ function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
           ))}
         </tbody>
       </table>
-      <p className="vrm-sv-note">Sur la période, comptes sélectionnés · seuls les comptes avec au moins une vente · bénéfice : ventes finalisées au prix d’achat connu · temps pour vendre : médiane, Vinted seulement · taux : vendues ÷ (vendues + en ligne aujourd’hui), Vinted seulement · panier : à partir de {MIN_DONNEES} ventes.</p>
+      <p className="vrm-sv-note">Sur la période, comptes sélectionnés&nbsp;· seuls les comptes avec au moins une vente&nbsp;· bénéfice : ventes finalisées au prix d’achat connu&nbsp;· temps pour vendre : médiane, Vinted seulement&nbsp;· taux : vendues ÷ (vendues + en ligne aujourd’hui), Vinted seulement&nbsp;· panier : à partir de {MIN_DONNEES} ventes.</p>
     </div>
   );
 }
