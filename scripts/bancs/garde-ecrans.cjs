@@ -123,8 +123,13 @@ async function tournee(nav, W) {
   dit(e.ecran === 'ventes' && !e.garde.length && e.texteMain > 40, `${T} P4 de retour sur Ventes : l'écran est rendu (garde-fou remis à zéro)`, JSON.stringify(e));
   // P4 bis — « Réessayer » remonte l'écran. (intégration g1) Depuis DJ3 Colis vit DANS Ventes (« À expédier ») :
   // c'est cette section (`ventes:colis`) qui plante ; le reste de Ventes et la coque restent.
-  await plante(o.pg, 'ventes:colis');
-  await aller(o.pg, tel, 'ventes');
+  // La section est montée dans un écran gardé (déjà rendu) : on la plante AU CHARGEMENT (le crochet lu
+  // d'une case de session, effacée ensuite), comme un vrai plantage au premier rendu.
+  await o.pg.addInitScript(() => { try { const n = sessionStorage.getItem('banc_plante'); if (n) window.__VRM_BANC_PLANTE = n; } catch (_) {} });
+  await o.pg.evaluate(() => { try { sessionStorage.setItem('banc_plante', 'ventes:colis'); } catch (_) {} });
+  await o.pg.goto(o.pg.url().replace(/\?.*$/, '') + '?tab=ventes', { waitUntil: 'domcontentloaded' });
+  await o.pg.waitForTimeout(4000);
+  await o.pg.evaluate(() => { try { sessionStorage.removeItem('banc_plante'); } catch (_) {} });
   e = await etat(o.pg);
   dit(e.garde.includes('ventes:colis') && e.ecran === 'ventes' && e.entete && !e.dernierFilet, `${T} P1 Colis (Ventes · À expédier) planté : son garde-fou, Ventes et la coque restent`, JSON.stringify(e));
   await plante(o.pg, null);
