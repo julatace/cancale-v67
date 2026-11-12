@@ -120,6 +120,8 @@ global.fetch = async (url, o = {}) => {
 const OWNER = '11111111-1111-4111-8111-111111111111';
 const AUTRE = '22222222-2222-4222-8222-222222222222';
 
+let fini = false;
+process.on('exit', (c) => { if (!fini) { console.log('❌ audit-revue-fin : arrêté avant la fin (une promesse jamais tenue)'); process.exitCode = 1; } });
 (async () => {
   // ── S-M79 : le plafond du bilan du mois dans le contexte ──────────────────
   await essaie('M79', async () => {
@@ -207,9 +209,10 @@ const AUTRE = '22222222-2222-4222-8222-222222222222';
     const b = { orderId: '12-34567-89012', confirme: true };
     const p1 = executerAvecJournal({ action: 'rembourserretour', b, execute, modifier });
     await new Promise((r) => setTimeout(r, 10));
-    const r2 = await executerAvecJournal({ action: 'rembourserretour', b, execute, modifier });
+    const p2 = executerAvecJournal({ action: 'rembourserretour', b, execute, modifier });
+    await new Promise((r) => setTimeout(r, 10));
     liberer();
-    const r1 = await p1;
+    const [r1, r2] = await Promise.all([p1, p2]);
     dit(envois === 1 && r2.status === 409 && r1.status === 200, 'M78 deux clics « rembourser » sur la même commande : UN appel eBay, le second refusé (409)', { envois, s2: r2.status });
     const r3 = await executerAvecJournal({ action: 'rembourserretour', b, execute: async () => { envois++; return { status: 200, body: { ok: true } }; }, modifier });
     dit(r3.status === 200 && envois === 2, 'M78 l’action terminée, la suivante passe', { s: r3.status, envois });
@@ -277,6 +280,7 @@ const AUTRE = '22222222-2222-4222-8222-222222222222';
     dit(/mentionsOk = !!\(m && !m\.erreur\)/.test(cpa) && /if \(!mentionsOk\) \{ ign\(/.test(cpa), 'B143 mentions légales illisibles ⇒ aucun e-mail de départ');
   }
 
+  fini = true;
   console.log(`\n${ko ? '❌' : '✅'} audit-revue-fin : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })();
