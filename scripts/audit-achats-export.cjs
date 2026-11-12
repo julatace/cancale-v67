@@ -98,6 +98,8 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
   try {
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
     fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX);
+    fs.writeFileSync(path.join(dir, 'dateParis.js'), lire('src/dateParis.js'));
+    fs.writeFileSync(path.join(dir, 'sommeConnue.js'), lire('src/sommeConnue.js'));   // (11 nov.) importé par exportComptable.js   // (11 nov.) jour/mois de Paris, importé par registres.js
     fs.writeFileSync(path.join(dir, 'registres.js'), REG);
     fs.writeFileSync(path.join(dir, 'exportComptable.js'), EXP);
     fs.writeFileSync(path.join(dir, 'factureAchat.js'), lire('src/factureAchat.js'));   // (11 nov.) importé par exportComptable.js (mentionFacture)

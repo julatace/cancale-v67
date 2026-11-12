@@ -202,7 +202,7 @@ function parisVersUtc(date, heure) {
 }
 // Le jour suivant, dans le calendrier (pas « + 24 h » : après le 25 octobre
 // une journée dure 25 h, et « 18:00 tous les jours » deviendrait 17:00).
-const jourSuivant = (date) => { const [y, mo, d] = date.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1, d + 1)); return t.toISOString().slice(0, 10); };
+const jourSuivant = (date) => { const [y, mo, d] = date.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1, d + 1)); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`; };   // calendrier pur (aucun instant)
 const minutesDe = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '')); return m ? (+m[1]) * 60 + (+m[2]) : NaN; };
 const JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const JOURS_LETTRE = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
@@ -1787,7 +1787,8 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 de Vinted. */}
             {(() => {
               const ords = data.orders || [];
-              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
+              // (11 nov., revue robustesse) `null` = pas su ⇒ « — », jamais « 0,00 € ».
+              const eur = (n) => n == null || !Number.isFinite(Number(n)) ? '—' : (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
               const val = (o) => Number((o && o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || 0) || 0;
               const paye = (o) => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID';
               const livre = (o) => String((o && o.orderFulfillmentStatus) || '').toUpperCase() === 'FULFILLED';

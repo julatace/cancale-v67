@@ -22,6 +22,9 @@
 // dite « en vérification » (pas su ≠ oui) — et l'extension revérifie tout au
 // lancement de toute façon.
 import { motsNavigateur } from './navigateurExtension.js';
+// (11 nov., famille « N° par cleNum ») l'identité d'un N° : la règle `cleNum` (api/_lib/numerotation.js),
+// recopiée ici car des audits chargent ce module SEUL ; scripts/audit-numeros-clenum.cjs vérifie qu'elle rend la même chose.
+const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; };
 export const ETATS_ANNONCE = {
   'en-ligne': 'En ligne',
   brouillon: 'Brouillon',
@@ -237,7 +240,7 @@ export function etatSuiviMain(s, { numeros, enLigneIds, cle } = {}) {
   // rappel « choisis la nouvelle annonce » restait au-dessus de la liste à vie.
   if (s && !String(s.num || '').trim()) return 'fait';
   if (!s || !s.nouvelId) return 'attente';
-  const k = cle || ((n) => String(n == null ? '' : n).trim().toUpperCase());
+  const k = cle || (cleNum);
   const e = (numeros || {})[String(s.nouvelId)];
   if (e && s.num && k(e.numero) === k(s.num)) return 'fait';
   return 'lie';

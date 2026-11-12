@@ -1,3 +1,6 @@
+// (11 nov., famille « N° par cleNum ») l'identité d'un N° : la règle `cleNum` (api/_lib/numerotation.js),
+// recopiée ici car des audits chargent ce module SEUL ; scripts/audit-numeros-clenum.cjs vérifie qu'elle rend la même chose.
+const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; };
 // ── UN SEUL FIL PAR ACHETEUR ET PAR PAIRE, TOUTES PLATEFORMES (10 nov., lot AB) ──
 // Julien a validé (propositions du 9 nov., n° 42) : « Messages des quatre
 // plateformes dans un seul fil par acheteur et par paire, avec la plateforme
@@ -154,7 +157,7 @@ export function suggestionsFils(fils, liens, refus) {
     const memeQui = [...quiDe(A)].some((q) => quiDe(B).has(q));
     let sorte = null;
     if (memeQui && (!ia.size || !ib.size)) sorte = 'paire';
-    else if (A.num && A.num === B.num && ![...platDe(A)].some((p) => platDe(B).has(p))) sorte = 'acheteur';
+    else if (A.num && cleNum(A.num) === cleNum(B.num) && ![...platDe(A)].some((p) => platDe(B).has(p))) sorte = 'acheteur';
     if (!sorte) continue;
     deja.add(k);
     out.push({ cle: k, a: A.cle, b: B.cle, sorte });

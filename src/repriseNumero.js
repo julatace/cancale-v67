@@ -1,3 +1,6 @@
+// (11 nov., famille « N° par cleNum ») l'identité d'un N° : la règle `cleNum` (api/_lib/numerotation.js),
+// recopiée ici car des audits chargent ce module SEUL ; scripts/audit-numeros-clenum.cjs vérifie qu'elle rend la même chose.
+const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; };
 // La paire REPUBLIÉE garde son numéro (28 oct., Julien : « quand la paire est
 // republiée elle ne conserve pas son numéro »). Une republication (Republier,
 // En ligne → brouillon puis Brouillons → en ligne, Refaire le brouillon) crée
@@ -18,7 +21,7 @@ export function repriseNumerosRecreation({ enLigneIds, numeros, recrees, numeroV
   const out = {};
   if (!recrees || typeof recrees !== 'object') return out;
   const enLigne = new Set((enLigneIds || []).map(String));
-  const k = cle || ((n) => String(n == null ? '' : n).trim().toUpperCase());
+  const k = cle || cleNum;
   const ok = reprenable || ((n) => !!String(n || '').trim());
   // Pour chaque ancienne, ses remplaçantes en ligne.
   const parAncien = {};
@@ -70,7 +73,7 @@ export function archivesAEcrire({ enLigneIds, recrees, numeros, anciens, reprena
   const out = {};
   if (!recrees || typeof recrees !== 'object' || !anciens || typeof anciens !== 'object') return out;
   const enLigne = new Set((enLigneIds || []).map(String));
-  const k = cle || ((n) => String(n == null ? '' : n).trim().toUpperCase());
+  const k = cle || cleNum;
   const ok = reprenable || ((n) => !!String(n || '').trim());
   const parAncien = {};
   for (const nid of Object.keys(recrees)) {

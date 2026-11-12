@@ -32,6 +32,7 @@
 // les couleurs viennent des règles de l'app (`extractBrand`, `extractColors`),
 // passées en paramètre : une seule définition (§11).
 import { ACHAT_SANS_COUT } from './prixAchatPropose.js';
+import { moisParis } from './dateParis.js';
 
 const txDe = (a) => (a && a.transaction_id != null ? String(a.transaction_id) : '');
 const prixDe = (a) => { const v = Number(a && a.price && typeof a.price === 'object' ? a.price.amount : a && a.price); return Number.isFinite(v) && v > 0 ? v : null; };
@@ -205,7 +206,7 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
     const libre = achatDisponible(a, liens, curTx);
     if (compte && typeof compteDe === 'function' && String(compteDe(a) || '') !== compte) continue;
     const d = dateMs(a.date);
-    if (mois && !(Number.isFinite(d) && new Date(d).toISOString().slice(0, 7) === mois)) continue;
+    if (mois && !(Number.isFinite(d) && moisParis(d) === mois)) continue;
     if (mots.length) {
       const foin = sansAccent([a.title, typeof marqueDe === 'function' ? marqueDe(String(a.title || '')) : '', txDe(a)].join(' '));
       if (!mots.every((m) => foin.includes(m))) continue;
@@ -232,7 +233,7 @@ export const tousAchatsLibres = (o = {}) => tousAchatsLibresDetail(o).liste;
 export function filtresAchats(achats, compteDe, marqueDe = null) {
   const mois = new Set(), comptes = new Set(), marques = new Set(), tailles = new Set();
   for (const a of (Array.isArray(achats) ? achats : [])) {
-    const d = dateMs(a && a.date); if (Number.isFinite(d)) mois.add(new Date(d).toISOString().slice(0, 7));
+    const d = dateMs(a && a.date); if (Number.isFinite(d)) mois.add(moisParis(d));
     const c = typeof compteDe === 'function' ? String(compteDe(a) || '') : ''; if (c) comptes.add(c);
     const m = typeof marqueDe === 'function' ? String(marqueDe(String((a && a.title) || '')) || '').trim() : ''; if (m) marques.add(m);
     const t = tailleDuTitre(String((a && a.title) || '')); if (t) tailles.add(t);

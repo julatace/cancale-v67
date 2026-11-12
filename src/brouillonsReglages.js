@@ -14,5 +14,5 @@ export function creerBrouillonsReglages(){
 export function dateImportValide(valeur){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(valeur||'')))return false;
  const t=Date.parse(valeur+'T00:00:00Z');
- return Number.isFinite(t)&&new Date(t).toISOString().slice(0,10)===valeur;
+ if(!Number.isFinite(t))return false;const d=new Date(t);return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`===valeur;
 }

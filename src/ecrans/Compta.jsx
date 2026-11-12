@@ -28,6 +28,8 @@ import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepense
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
+import { prochainNumeroFacture, noterNumeroPris } from '../factureNumero.js';   // (11 nov.) numérotation continue, jamais réutilisée
+import { achatVenteManuelle, beneficeVenteManuelle, totauxVentesManuelles } from '../venteManuelle.js';   // (11 nov.) achat inconnu = pas su, jamais 0
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille, lireVentesImportees } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
@@ -68,6 +70,8 @@ const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
 import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'année »
 import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
+import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
+import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -382,7 +386,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           const url=URL.createObjectURL(blob);
           const a=document.createElement('a');
           a.href=url;
-          a.download=`catalogue-${new Date().toISOString().slice(0,10)}.csv`;
+          a.download=`catalogue-${jourParis()}.csv`;
           document.body.appendChild(a);a.click();document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }} color={C.blue} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>}/>
@@ -431,7 +435,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
                   <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
-                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:days>60?C.danger:C.warn,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
+                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:C.warn,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
@@ -546,10 +550,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
     const u=sales.map(s=>{
       if(s.id!==id) return s;
       const ns={...s,[field]:val};
-      const sell=+(field==='sellPrice'?val:ns.sellPrice);
-      const buy=+(field==='buyPrice'?val:ns.buyPrice);
-      ns.profit=+(sell-buy).toFixed(2);
-      ns.multi=buy>0?+(sell/buy).toFixed(2):0;
+      // (11 nov.) Un achat vide ou illisible = « pas su » (null), jamais 0 € (§5).
+      const b=beneficeVenteManuelle(ns), buy=achatVenteManuelle([],[],ns.buyPrice);
+      ns.profit=b==null?null:+b.toFixed(2);
+      ns.multi=b!=null&&buy>0?+((+String(ns.sellPrice).replace(',','.'))/buy).toFixed(2):null;
       return ns;
     });
     setSales(u); save('vinted_sales',u);
@@ -571,10 +575,12 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
     const foundItems=pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
     const alreadySold=pids.find(id=>{const cp=catalog.find(x=>x.id===id);return cp&&cp.status==='vendu';});
     if(alreadySold){setErr(`#${alreadySold} déjà vendue`);return;}
-    const buy=foundItems.length>0?foundItems.reduce((s,cp)=>s+(+cp.buyPrice),0):(+newRow.buyPrice||0);
+    // (11 nov., revue robustesse) Un N° du lot introuvable, ou l'achat vide : `null`
+    // (« pas su »), jamais 0 € — sinon bénéfice = prix de vente (src/venteManuelle.js).
+    const buy=achatVenteManuelle(pids,catalog,newRow.buyPrice);
     const sell=+newRow.sellPrice;
-    const sale={id:uid(),productId:pid,buyPrice:+buy.toFixed(2),sellPrice:sell,
-      profit:+(sell-buy).toFixed(2),multi:buy>0?+(sell/buy).toFixed(2):0,
+    const sale={id:uid(),productId:pid,buyPrice:buy==null?null:+buy.toFixed(2),sellPrice:sell,
+      profit:buy==null?null:+(sell-buy).toFixed(2),multi:buy!=null&&buy>0?+(sell/buy).toFixed(2):null,
       saleDate:newRow.saleDate,receiveDate:newRow.receiveDate,createdAt:new Date().toISOString(),
       ...(pids.length>1?{isLot:true}:{})};
     const ns=[sale,...sales]; setSales(ns); save('vinted_sales',ns);
@@ -589,13 +595,13 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const filtered=showAll?fullFiltered:fullFiltered.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
 
-  const totalCA=useMemo(()=>fullFiltered.reduce((s,v)=>s+ +v.sellPrice,0),[fullFiltered]);
-  const totalProfit=useMemo(()=>fullFiltered.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0),[fullFiltered]);
+  const totauxF=useMemo(()=>totauxVentesManuelles(fullFiltered),[fullFiltered]);
+  const totalCA=totauxF.ca, totalProfit=totauxF.benefice;
 
   const _pids=newRow.productId.trim().split(/[+,;]+/).map(v=>v.trim()).filter(Boolean);
   const p=_pids.length===1?catalog.find(x=>x.id===_pids[0]):null;
   const _foundItems=_pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
-  const previewBuy=_foundItems.length>0?_foundItems.reduce((s,x)=>s+(+x.buyPrice),0):(+newRow.buyPrice||null);
+  const previewBuy=achatVenteManuelle(_pids,catalog,newRow.buyPrice);
   const previewSell=newRow.sellPrice?+newRow.sellPrice:null;
 
   // CA + bénéfice du mois en cours (basé sur la date de réception JJ/MM/AAAA = argent encaissé)
@@ -603,16 +609,13 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
     const now=new Date();
     const mm=String(now.getMonth()+1).padStart(2,'0');
     const yyyy=String(now.getFullYear());
-    let caM=0, profitM=0, countM=0;
-    sales.forEach(v=>{
-      const dt=(v.receiveDate||'').trim();
-      const parts=dt.split('/');
-      if(parts.length===3 && parts[1]===mm && parts[2]===yyyy){
-        caM+=+v.sellPrice; profitM+=(+v.sellPrice-+v.buyPrice); countM++;
-      }
+    const duMois=sales.filter(v=>{
+      const parts=(v.receiveDate||'').trim().split('/');
+      return parts.length===3 && parts[1]===mm && parts[2]===yyyy;
     });
+    const t=totauxVentesManuelles(duMois);
     const labels=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    return {ca:caM, profit:profitM, count:countM, nom:labels[now.getMonth()]};
+    return {ca:t.ca, profit:t.benefice, connus:t.nConnus, count:t.n, nom:labels[now.getMonth()]};
   },[sales]);
 
   return (
@@ -624,7 +627,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           📅 {moisVentes.nom} — mois en cours
         </div>
         <div><span style={{fontSize:11,color:C.muted}}>CA finalisé</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
-        <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div style={{fontSize:20,fontWeight:600,color:moisVentes.profit>=0?C.accent:C.danger}}>{fmt(moisVentes.profit)}</div></div>
+        <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div data-ventes-man-benef={moisVentes.profit==null?'':moisVentes.profit} style={{fontSize:20,fontWeight:600,color:C.text}}>{moisVentes.profit==null?'—':fmt(moisVentes.profit)}</div>{moisVentes.connus<moisVentes.count?<div style={{fontSize:11,color:C.muted}}>sur {moisVentes.connus} vente{moisVentes.connus>1?'s':''} sur {moisVentes.count}</div>:null}</div>
         <div><span style={{fontSize:11,color:C.muted}}>Ventes</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
       </div>
 
@@ -632,21 +635,21 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <h2 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>Ventes ({sales.length})</h2>
         <div style={{display:'flex',gap:12,fontSize:13,flexWrap:'wrap',alignItems:'center'}}>
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
-          <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
+          <span style={{color:C.muted}}>Bénéf. : <b data-ventes-man-total={totalProfit==null?'':totalProfit} style={{color:C.text}}>{totalProfit==null?'—':fmt(totalProfit)}</b>{totauxF.nConnus<totauxF.n?` sur ${totauxF.nConnus} vente${totauxF.nConnus>1?'s':''} sur ${totauxF.n}`:''}</span>
           <Btn small onClick={()=>{
             if(fullFiltered.length===0){toast('Aucune vente à exporter');return;}
             const headers=['ID','N° Article','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
             const rows=fullFiltered.map(s=>[
               s.id||'',s.productId||'',s.saleDate||'',s.receiveDate||'',
-              String(s.buyPrice||'').replace('.',','),String(s.sellPrice||'').replace('.',','),
-              String(s.profit||'').replace('.',','),String(s.multi||'').replace('.',','),
+              String(s.buyPrice??'').replace('.',','),String(s.sellPrice??'').replace('.',','),
+              String(s.profit??'').replace('.',','),String(s.multi??'').replace('.',','),
             ]);
             const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
             const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
             const url=URL.createObjectURL(blob);
             const a=document.createElement('a');
             a.href=url;
-            a.download=`ventes-${new Date().toISOString().slice(0,10)}.csv`;
+            a.download=`ventes-${jourParis()}.csv`;
             document.body.appendChild(a);a.click();document.body.removeChild(a);
             URL.revokeObjectURL(url);
           }} color={C.blue}>📤 Exporter Excel</Btn>
@@ -677,7 +680,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             <tbody>
               {filtered.length===0&&<tr><td colSpan={9} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune vente</td></tr>}
               {filtered.map(v=>{
-                const b=+(+v.sellPrice-+v.buyPrice);
+                const b=beneficeVenteManuelle(v);
                 const isSelected=selectedIds.has(v.id);
                 return (
                   <tr key={v.id}
@@ -710,13 +713,13 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                       <Cell value={v.receiveDate||''} onChange={val=>updateSale(v.id,'receiveDate',val)}/>
                     </td>
                     <td style={{padding:'2px 10px',minWidth:65}}>
-                      <Cell value={String(v.buyPrice)} onChange={val=>updateSale(v.id,'buyPrice',val)} align="right"/>
+                      <Cell value={v.buyPrice==null?'':String(v.buyPrice)} onChange={val=>updateSale(v.id,'buyPrice',val)} align="right"/>
                     </td>
                     <td style={{padding:'2px 10px',minWidth:65}}>
                       <Cell value={String(v.sellPrice)} onChange={val=>updateSale(v.id,'sellPrice',val)} align="right"/>
                     </td>
-                    <td style={{padding:'2px 10px',color:b>=0?C.accent:C.danger,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(b)}</td>
-                    <td style={{padding:'2px 10px',color:C.warn,whiteSpace:'nowrap'}}>×{fmtN(v.multi)}</td>
+                    <td data-ventes-man-ligne={b==null?'':b} style={{padding:'2px 10px',color:b==null?C.muted:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{b==null?'—':fmt(b)}</td>
+                    <td style={{padding:'2px 10px',color:C.muted,whiteSpace:'nowrap'}}>{v.multi==null||b==null?'—':`×${fmtN(v.multi)}`}</td>
                     <td style={{padding:'2px 10px',whiteSpace:'nowrap'}}>
                       {(() => {
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
@@ -767,7 +770,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
+                  {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{previewBuy==null?'—':fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
                   <input value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
                     type="number" placeholder="Achat&nbsp;€"
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
@@ -781,7 +784,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
-                <td style={{padding:'6px 6px',color:previewBuy!==null&&previewSell!==null?(previewSell-previewBuy>=0?C.accent:C.danger):C.muted,fontWeight:600,fontSize:12,whiteSpace:'nowrap'}}>
+                <td style={{padding:'6px 6px',color:previewBuy!==null&&previewSell!==null?C.text:C.muted,fontWeight:600,fontSize:12,whiteSpace:'nowrap'}}>
                   {previewBuy!==null&&previewSell!==null?fmt(previewSell-previewBuy):''}
                 </td>
                 <td style={{padding:'6px 6px',color:C.warn,fontSize:12}}>
@@ -823,12 +826,12 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             {selectedIds.size>0&&(()=>{
               const sel=fullFiltered.filter(v=>selectedIds.has(v.id));
               const sumCA=sel.reduce((s,v)=>s+ +v.sellPrice,0);
-              const sumProfit=sel.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0);
+              const totSel=totauxVentesManuelles(sel), sumProfit=totSel.benefice;
               const sumRecu=sel.filter(v=>v.receiveDate&&v.receiveDate.trim()!=='').reduce((s,v)=>s+ +v.sellPrice,0);
               return (<>
                 <span style={{fontSize:13,color:C.muted,marginLeft:'auto'}}>Σ : <b style={{color:C.text}}>{fmt(sumCA)}</b></span>
                 <span style={{fontSize:13,color:C.muted}}>💰 Reçu : <b style={{color:C.accentTexte}}>{fmt(sumRecu)}</b></span>
-                <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:sumProfit>=0?C.accent:C.danger}}>{fmt(sumProfit)}</b></span>
+                <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:C.text}}>{sumProfit==null?'—':fmt(sumProfit)}</b>{totSel.nConnus<totSel.n?` sur ${totSel.nConnus} sur ${totSel.n}`:''}</span>
               </>);
             })()}
           </>}
@@ -889,15 +892,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // Chaque micro-entreprise garde ainsi sa propre numérotation continue (légal).
   const firstEntId=(Array.isArray(entreprises)&&entreprises[0]&&entreprises[0].id)||'ent_1';
   const invBelongsToActive=(i)=>{ const eid=i.entrepriseId||firstEntId; return eid===(activeEnt||firstEntId); };
-  const nextInvoiceNumber=useMemo(()=>{
-    const year=new Date().getFullYear();
-    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`)&&invBelongsToActive(i));
-    const maxNum=yearInvoices.reduce((mx,i)=>{
-      const n=parseInt(i.number.split('-')[1],10);
-      return isNaN(n)?mx:Math.max(mx,n);
-    },0);
-    return `${year}-${String(maxNum+1).padStart(6,'0')}`;
-  },[invoices,activeEnt,firstEntId]);
+  // (11 nov., revue robustesse) Continu et JAMAIS réutilisé : le compteur
+  // `vrm_factures_pris` ne fait que monter ; une facture supprimée garde son numéro
+  // pris (src/factureNumero.js). L'année est relue au moment d'ajouter.
+  const numeroSuivant=()=>prochainNumeroFacture({ factures: invoices, pris: load('vrm_factures_pris', {}), ent: activeEnt||firstEntId, annee: new Date().getFullYear(), appartient: invBelongsToActive });
+  const nextInvoiceNumber=useMemo(()=>numeroSuivant(),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [invoices,activeEnt,firstEntId]);
   
   // Set des productIds qui sont déjà dans Ventes (= comptabilisés)
   const accountedSet=useMemo(()=>{
@@ -949,6 +950,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       ? `⚠️ L’article #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
       : 'Supprimer cette facture ?';
     if(!await askConfirm(msg)) return;
+    // Son numéro reste PRIS : la suivante ne le reprendra jamais (un avoir corrige une facture).
+    if(inv&&inv.number) save('vrm_factures_pris', noterNumeroPris(load('vrm_factures_pris', {}), inv.number, inv.entrepriseId||firstEntId));
     const u=invoices.filter(i=>i.id!==id);
     setInvoices(u); save('vinted_invoices',u);
   };
@@ -956,11 +959,12 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const addInvoice=(data)=>{
     const newInvoice={
       id:'inv_'+Date.now(),
-      number:nextInvoiceNumber,
       entrepriseId:activeEnt||firstEntId, // à quelle micro-entreprise cette facture appartient
       ...data,
+      number:numeroSuivant(),
       createdAt:new Date().toISOString(),
     };
+    save('vrm_factures_pris', noterNumeroPris(load('vrm_factures_pris', {}), newInvoice.number, newInvoice.entrepriseId));
     const u=[newInvoice,...invoices];
     setInvoices(u); save('vinted_invoices',u);
     setShowForm(false);
@@ -984,7 +988,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;
-    a.download=`factures-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download=`factures-${jourParis()}.csv`;
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
@@ -1117,7 +1121,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',color:C.accentTexte,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
+                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(valeurSue(inv.sellPrice))}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label="Imprimer la facture" title="Imprimer la facture"><Icon name="printer" size={15}/></Btn>
@@ -1427,7 +1431,8 @@ const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length 
 // ⟦← App.jsx #25⟧
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
-const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// (11 nov.) LA lecture d'un montant saisi (`lireMontantSaisi`) : « 1.234,56 » ou « 12.5.3 » sont refusés, jamais lus 1,23 € / 12,5 €.
+const parseMontant = (s) => { const n = lireMontantSaisi(s); return n != null && n > 0 ? n : null; };
 // ⟦← App.jsx #26⟧
 // (3 nov.) Les LIGNES des charges d'un mois — les mêmes que `comptaChargesMois`
 // somme (fixes, dépenses et packs du mois, échéances d'abonnement) : le récap du
@@ -2909,7 +2914,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
   const lignes = ouvert ? suivi.lignes : suivi.lignes.slice(0, 4);
   const a = suivi.annee;
-  const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+  const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${jourParis()}.csv`, 'text/csv;charset=utf-8');
   const ouvrirEdit = (ym) => { const d = (regLu || {})[ym] || {}; setEdit({ ym, montant: d.montant != null ? String(d.montant).replace('.', ',') : '', paye: d.paye != null ? String(d.paye).replace('.', ',') : '' }); };
   const enregistrer = () => {
     const m = lireMontantSaisi(edit.montant), p = lireMontantSaisi(edit.paye);
@@ -3017,7 +3022,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const urssafMois = v ? v.mois : null;
   // `declare` : le registre « J'ai déclaré ce mois » était-il lu quand la ligne
   // a été publiée (`lu`) ou pas encore (`pasSu`) ? (revue du 6 octobre)
-  const urssafInfo = v ? { aDater: v.aDater || null, sources: v.sources || null, declare: v.declare || null } : null;
+  // (11 nov., revue robustesse) `nonComptees` recopié : sans lui, « ce total est un minimum » ne s'affichait jamais.
+  const urssafInfo = v ? { aDater: v.aDater || null, sources: v.sources || null, declare: v.declare || null, nonComptees: v.nonComptees || null } : null;
   const TAUX_URSSAF = tauxUrssaf() / 100;
   const now0 = new Date();
   const moisCourant = { nom: MOIS_NOMS_FR[now0.getMonth()] };
@@ -3270,7 +3276,7 @@ function RecapComptableMensuel() {
       const rows = [['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'CA apres URSSAF']];
       moisRecap.forEach((m) => rows.push([m.label, m.count, m.ca.toFixed(2), m.profit == null ? '' : m.profit.toFixed(2), m.urssaf.toFixed(2), m.net.toFixed(2)]));
       const csv = rows.map((r) => r.join(';')).join('\n');
-      telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+      telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${jourParis()}.csv`, 'text/csv;charset=utf-8');
     } catch (err) { toast('Erreur export : ' + err.message); }
   };
   // ── (3 nov.) « RÉCAP DE [MOIS] » : un PDF et un tableur (src/recapMois.js) ──

@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ── L'HISTORIQUE DE PRIX D'UNE ANNONCE (10 nov. 2026, lot L — validé par Julien) ──
 // Sur la fiche d'une paire : les prix successifs de SES annonces Vinted, avec leurs
 // dates. SEULEMENT CE QUI A ÉTÉ LU (§5, « mieux vaut un blanc qu'un faux ») :
@@ -27,7 +28,7 @@ export const MAX_POINTS = 24;
 export const MAX_ANNONCES = 4000;
 
 const str = (v) => String(v == null ? '' : v).trim();
-const jour = (ms) => new Date(ms).toISOString().slice(0, 10);
+const jour = (ms) => jourParis(ms);   // (11 nov.) jour de PARIS
 
 // Le prix d'une annonce lue, en centimes — ou null (pas su : rien noté).
 // La forme Vinted : un objet { amount, currency_code } ; une ancienne capture : un nombre ou une chaîne.

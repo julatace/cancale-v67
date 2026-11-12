@@ -26,22 +26,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { mentionFacture, cleFactureLigne } from './factureAchat.js';
 import { PERIODE_OK, libellePeriode, moisDePeriode, jourFr, eurosTexte } from './registres.js';
+import { moisParis, moisRecents } from './dateParis.js';
+import { valeurSue } from './sommeConnue.js';
 
 export { libellePeriode };
 export const TYPES_PERIODE = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
 
 // Les périodes proposées, les plus récentes d'abord (13 mois, 5 trimestres, 2 ans).
 export function periodesExport(type, maintenant = Date.now()) {
-  const d = new Date(maintenant), y = d.getFullYear(), m = d.getMonth();
+  const ym0 = moisParis(maintenant), y = Number(ym0.slice(0, 4)), m = Number(ym0.slice(5, 7)) - 1;   // (11 nov.) mois de PARIS
   if (type === 'annee') return [String(y), String(y - 1)];
   if (type === 'trimestre') {
     const out = []; let a = y, t = Math.floor(m / 3) + 1;
     for (let i = 0; i < 5; i++) { out.push(`${a}-T${t}`); t -= 1; if (t < 1) { t = 4; a -= 1; } }
     return out;
   }
-  const out = []; const x = new Date(y, m, 1);
-  for (let i = 0; i < 13; i++) { out.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`); x.setMonth(x.getMonth() - 1); }
-  return out;
+  return moisRecents(13, maintenant);
 }
 
 // Les bornes d'une période, sous la forme que lit `montantPeriodeUrssaf`
@@ -77,14 +77,15 @@ export const raisonUrssaf = (regime) => (regime === 'micro' ? '' : (RAISON_URSSA
 export function donneesExportComptable({ periode, recettes = null, achats = null, ligne = null, regime = null, taux = null, montantPeriode, aPayer, libelleRegime = (r) => String(r || ''), entreprise = null, maintenant = Date.now(), factures = null } = {}) {
   if (!PERIODE_OK.test(String(periode || ''))) return null;
   const bornes = bornesPeriode(periode);
-  const ymNow = (() => { const d = new Date(maintenant); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const ymNow = moisParis(maintenant);   // (11 nov.) mois de PARIS
   const micro = regime === 'micro';
   // Le CA déclaré, mois par mois : la ligne publiée (les mois à venir ne sont pas listés).
   const lu = ligne && Array.isArray(ligne.mois);
   const caParMois = lu ? bornes.yms.filter((ym) => ym <= ymNow).map((ym) => {
     const m = ligne.mois.find((x) => x && x.ym === ym);
-    const ca = m ? Number(m.ca) || 0 : 0;
-    return { ym, mois: libellePeriode(ym), n: m ? Number(m.n != null ? m.n : m.count) || 0 : 0, ca, urssaf: micro && typeof aPayer === 'function' ? aPayer(ca, taux) : null, declare: !!(m && m.declare) };
+    // (11 nov., famille « pas su ≠ 0 ») un mois PUBLIÉ au CA illisible s'écrit « — », jamais 0,00 €.
+    const ca = m ? valeurSue(m.ca) : 0;
+    return { ym, mois: libellePeriode(ym), n: m ? Number(m.n != null ? m.n : m.count) || 0 : 0, ca, urssaf: ca != null && micro && typeof aPayer === 'function' ? aPayer(ca, taux) : null, declare: !!(m && m.declare) };
   }) : null;
   const tot = lu && typeof montantPeriode === 'function' ? montantPeriode(bornes, ligne, taux) : { ca: null, apayer: null, partiel: false };
   const caDeclare = tot && tot.ca != null ? tot.ca : null;

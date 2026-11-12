@@ -1,3 +1,4 @@
+import { valeurSue } from './sommeConnue.js';
 // ── LA MICRO-ENTREPRISE : seuils, calendrier, options (29 octobre) ─────────
 // Julien : « une jauge qui montre où tu en es par rapport au plafond et au seuil
 // de TVA » ; « vois si la personne a choisi le versement libératoire » ; « si
@@ -74,11 +75,11 @@ export const aDaterSurDansAnnee = (ligne, annee) => {
 
 export const caAnnee = (ligne, annee) => {
   if (!ligne || !Array.isArray(ligne.mois)) return null;
-  let ca = 0, mois = 0;
+  let ca = 0, mois = 0, illisibles = 0;
   for (const m of ligne.mois) {
     if (!m || typeof m.ym !== 'string' || m.ym.slice(0, 4) !== String(annee)) continue;
-    const v = Number(m.ca);
-    if (!isFinite(v)) continue;
+    const v = valeurSue(m.ca);
+    if (v == null) { illisibles += 1; continue; }   // (11 nov.) compté et DIT, plus sauté en silence
     ca += v; mois += 1;
   }
   const sur = aDaterSurDansAnnee(ligne, annee);
@@ -87,6 +88,7 @@ export const caAnnee = (ligne, annee) => {
   const src = ligne.sources || {};
   const pasSu = Object.keys(src).filter((k) => src[k] === 'pasSu');
   if (pasSu.length) raisons.push(`${pasSu.join(' et ')} pas lu${pasSu.length > 1 ? 's' : ''}`);
+  if (illisibles) raisons.push(`${illisibles} mois au chiffre illisible`);
   const nAdReste = (ligne.aDater ? Number(ligne.aDater.n) || 0 : 0) - (sur ? sur.n : 0);
   if (nAdReste > 0) raisons.push(`${nAdReste} vente${nAdReste > 1 ? 's' : ''} sans date de versement`);
   // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas (prix

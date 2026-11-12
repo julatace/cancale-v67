@@ -426,8 +426,10 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     // La facture jointe part dans SA ligne, par l'identité de l'achat (jamais son titre).
     if (form.facture && facture) await facture.joindre(cleFacture('hors', id), form.facture);
     if (rec.numero && rec.price && onPrixParNumero) onPrixParNumero(rec.numero, rec.price);
-    // Le N° PROPOSÉ (le prochain libre) qu'il a pris : réservé dans le pool, jamais redonné.
-    if (rec.numero && prochainNumero != null && rec.numero === String(prochainNumero) && onReserverNumero) onReserverNumero(rec.numero);
+    // (11 nov., revue robustesse) TOUT N° posé sur cet achat — le proposé OU un N° tapé
+    // à la main — est réservé dans le pool (append-only) : la numérotation automatique
+    // ne le redonnera jamais à une autre annonce (deux cartons sous un N°, §5).
+    if (rec.numero && onReserverNumero) onReserverNumero(rec.numero);
     setEnvoi(false);
     if (!ouvert) onBasculer(true);
     if (photoRatee) toast("Achat enregistré — mais la photo n'a pas pu être envoyée (la base n'a pas répondu). Modifie l'achat pour la remettre.");
