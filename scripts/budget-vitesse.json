@@ -127,7 +127,7 @@
     "octets": 428393,
     "doublons": 31,
     "entieres": 0,
-    "js": 20,
+    "js": 1688,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
@@ -214,7 +214,7 @@
     "octets": 554378,
     "doublons": 31,
     "entieres": 0,
-    "js": 20,
+    "js": 1883,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -304,7 +304,7 @@
     "octets": 428427,
     "doublons": 35,
     "entieres": 0,
-    "js": 20,
+    "js": 1746,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
@@ -347,40 +347,38 @@
   "garage": {
    "nom": "Stock",
    "neuf": {
-    "lectures": 110,
-    "octets": 3069901,
+    "lectures": 127,
+    "octets": 3071698,
     "doublons": 12,
     "entieres": 0,
-    "js": 1731,
+    "js": 1929,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
-     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
      "app_data?id=eq.panel_num_reserves&select=data|": 3,
      "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
      "app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt|": 2,
      "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
-     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
      "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
-    "lectures": 95,
-    "octets": 2669479,
+    "lectures": 110,
+    "octets": 2671041,
     "doublons": 11,
     "entieres": 0,
-    "js": 1573
+    "js": 1753
    },
    "deuxieme": {
-    "lectures": 105,
-    "octets": 331301,
-    "doublons": 12,
+    "lectures": 121,
+    "octets": 337216,
+    "doublons": 11,
     "entieres": 0,
     "js": 1731,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
-     "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
      "app_data?id=eq.panel_num_reserves&select=data|": 3,
      "app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua|": 2,
@@ -392,11 +390,11 @@
     }
    },
    "deuxieme_mesure": {
-    "lectures": 91,
-    "octets": 288087,
-    "doublons": 11,
+    "lectures": 105,
+    "octets": 293231,
+    "doublons": 10,
     "entieres": 0,
-    "js": 1573
+    "js": 18
    }
   },
   "messages": {
@@ -575,7 +573,7 @@
     "octets": 337212,
     "doublons": 11,
     "entieres": 0,
-    "js": 20,
+    "js": 1735,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
@@ -664,6 +662,13 @@
     "emails"
    ],
    "raison": "intégration g2 (lbc-plus, vestiaire-plus, securite-vinted, annonce-vinted, republier-programme) : Vestiaire lit aussi vc_offres (même lecture partagée, adresse changée), le programme de republication lu par l'atelier, JS des 5 lots"
+  },
+  {
+   "date": "2026-11-12",
+   "ecrans": [
+    "garage"
+   ],
+   "raison": "intégration g2 : Stock lit une ligne de plus (lots g2), JS des 5 lots"
   }
  ]
 }
