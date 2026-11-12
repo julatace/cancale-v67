@@ -46,8 +46,8 @@ const SECOURS=['Bordereau envoyé au vendeur','Paiement validé','Commande expé
  'Commande non réclamée - Retournée à l\'expéditeur.rice'];
 let S=SECOURS.slice();
 const APPSRC=APP;
-const URLB=(/const SUPABASE_URL = "([^"]+)"/.exec(APPSRC)||[])[1];
-const KEYB=(/const SUPABASE_KEY = "([^"]+)"/.exec(APPSRC)||[])[1];
+const URLB=(/const SUPABASE_URL = [^"\n]*"([^"]+)"/.exec(APPSRC)||[])[1];
+const KEYB=(/const SUPABASE_KEY = [^"\n]*"([^"]+)"/.exec(APPSRC)||[])[1];
 async function corpus(){
   if(!URLB||!KEYB) return;
   try{

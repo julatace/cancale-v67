@@ -116,6 +116,20 @@ const on = (/\non:\n([\s\S]*?)\npermissions:/.exec(wf) || [])[1] || '';
 const secrets = [...new Set([...wf.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]))];
 dit(/workflow_dispatch:/.test(on) && !/schedule:|push:|pull_request/.test(on) && JSON.stringify(secrets) === '["ESSAI_DB_URL"]' && /contents: read/.test(wf) && !/contents: write/.test(wf), 'E8 le workflow : à la main, son seul secret ESSAI_DB_URL, lecture seule du dépôt', { on, secrets });
 
+// E9 — un déploiement « Preview » peut viser la base d'essai : l'app ET les routes lisent leur variable,
+// la production (aucune variable) garde la vraie base.
+const app = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+dit(/const SUPABASE_URL = \(import\.meta\.env && import\.meta\.env\.VITE_SUPABASE_URL\) \|\| "https:\/\/lgonxzrzjcqthjtbdpzo\.supabase\.co";/.test(app)
+  && /const SUPABASE_KEY = \(import\.meta\.env && import\.meta\.env\.VITE_SUPABASE_ANON_KEY\) \|\| "eyJ/.test(app), 'E9 l’app lit VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (Preview), sinon la vraie base');
+const figees = [];
+for (const dir of ['api', 'api/_lib']) for (const f of fs.readdirSync(path.join(R, dir)).filter((x) => x.endsWith('.js'))) {
+  const src = fs.readFileSync(path.join(R, dir, f), 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l));
+  for (const l of src) if (/['"]https:\/\/lgonxzrzjcqthjtbdpzo\.supabase\.co/.test(l) && !/SUPABASE_URL\s*\|\|/.test(l)) figees.push(`${dir}/${f}: ${l.trim().slice(0, 80)}`);
+}
+dit(!figees.length, 'E10 aucune route serveur n’a la vraie base en dur sans SUPABASE_URL d’abord', figees);
+const ex = fs.readFileSync(path.join(R, 'src/modeExemple.js'), 'utf8');
+dit(/const HOTE_BASE = [^\n]*VITE_SUPABASE_URL/.test(ex), 'E11 le mode exemple tient aussi la base d’essai à l’écart');
+
 arreter();
 console.log(`\n${ok} OK, ${ko} KO`);
 process.exit(ko ? 1 : 0);
