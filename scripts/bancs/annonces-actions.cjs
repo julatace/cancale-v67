@@ -121,7 +121,8 @@ async function contexte(b, vp, sombre, etat) {
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const t = r.request().resourceType();
     if (t === 'document') return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>vinted (banc)</title>' });
-    if (['image', 'media', 'font'].includes(t)) return r.abort();
+    // (12 nov.) la sonde des photos Vinted (`essaiSonde`, fetch no-cors) est coupée comme l'image : rien ne sort.
+    if (['image', 'media', 'font'].includes(t) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url())) return r.abort();
     return r.continue();
   });
   await pg.route('**/rest/v1/**', (route) => {
