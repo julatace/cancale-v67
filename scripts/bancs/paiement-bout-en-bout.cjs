@@ -316,7 +316,7 @@ const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
       await capture(pg, `e7-apercu-${tab}-${largeur}${sombre ? '-sombre' : ''}`);
       await ctx.close();
     }
-    const { ctx, pg } = await ouvrir({ largeur: 390 });
+    const { ctx, pg } = await ouvrir({ largeur: 390 }); await pg.locator("[data-abonnement-etat]:not([data-abonnement-etat=\"chargement\"])").first().waitFor({ timeout: 15000 }).catch(() => {});
     const p = await lirePage(pg);
     dit(p.fin === 'expire' && /a pris fin/.test(p.texte) && p.boutons.some((b) => /Reprendre l'abonnement/.test(b)), 'E7 (app, 390) · Paramètres → Abonnement reste net : « Reprendre l’abonnement »', p.boutons.join(' · '));
     await capture(pg, 'e7-abonnement-390');

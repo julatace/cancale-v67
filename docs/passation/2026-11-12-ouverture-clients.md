@@ -43,7 +43,7 @@ par Julien (« indispensable ») : lots 5, 6, 7, 8. Pas d'extension. Aucune fonc
   rejeu sans doublon, y compris « crédité chez Stripe mais pas noté en base ») → E6
   résiliation en 2 clics, accès jusqu'à fin de période → E7 fin ⇒ aperçu (3 lignes
   nettes, reste flouté, `inert`, aucune écriture, rien supprimé). 390/1512, clair/sombre.
-  **42 verts**, 1 ⏸ : « même carte refusée » (`memeCarte`) vit sur
+  **40 verts**, 1 ⏸ : « même carte refusée » (`memeCarte`) vit sur
   `claude/agent2-argent-parrainage`, pas encore sur main — le contrôle s'allume seul
   quand elle arrive. `--prouve` (partie route) : 6/6 mutations.
   Les modes non-argent de `/api/compte` (confidentialité…) sont servis `{ok:true}`
