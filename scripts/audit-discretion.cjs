@@ -361,6 +361,32 @@ const sansMain = (f) => { if (f.lignes.main === undefined) f.lignes.main = {}; }
     dit(C.prixRequisFavori('à {prix}') && !C.prixTexteFavori(null), 'variables : {prix} sans prix lu ⇒ le message ne part pas');
   });
 
+  // ── L'IMPORT LEBONCOIN PAR LE CANAL PRIVÉ (comme les ordres de 5.362) ─────
+  await essai('import-lbc', async () => {
+    const vm = require('vm');
+    const REL = fs.readFileSync(path.join(path.dirname(SRC0), 'lbc-relay.js'), 'utf8');
+    const ecoutes = [], onMsg = [], vus = [];
+    const win = {};
+    // « Un script de la page » : il lit chaque ordre posté sur `window` et répond un faux résultat 200.
+    win.postMessage = (m) => { const d = JSON.parse(JSON.stringify(m)); setTimeout(() => {
+      for (const f of ecoutes.slice()) { try { f({ source: win, origin: 'https://www.leboncoin.fr', data: d, ports: [] }); } catch (_) {} }
+      if (d && d.__tag === 'CANCALE_LBC_ORDRE') { vus.push(d.kind); win.postMessage({ __tag: 'CANCALE_LBC', kind: 'lbcimportresultat', jeton: d.jeton, statut: 200, corps: '{"faux":true}' }); }
+    }, 0); };
+    win.addEventListener = (t, f) => { if (t === 'message') ecoutes.push(f); };
+    win.top = win;
+    const modeles = [];
+    const ctx = { window: win, self: win, location: { origin: 'https://www.leboncoin.fr', hostname: 'www.leboncoin.fr', href: 'https://www.leboncoin.fr/' }, console: { log() {}, warn() {}, error() {} },
+      setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms, 60)), clearTimeout, setInterval: () => 0, clearInterval() {}, TextEncoder, URL, crypto: { randomUUID: () => 'jeton-' + Math.random().toString(16).slice(2, 12) },
+      chrome: { runtime: { id: 'ext', lastError: null, sendMessage: (m, cb) => { if (m && m.action === 'lbcImportModele') modeles.push(m); if (typeof cb === 'function') cb({ ok: true }); }, onMessage: { addListener: (f) => onMsg.push(f) } } } };
+    vm.createContext(ctx); vm.runInContext(REL, ctx, { filename: 'lbc-relay.js' });
+    const r = await new Promise((res) => { let g = false; for (const f of onMsg) { if (f({ from: 'vrm-fond', action: 'lbcImportPage', url: 'https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions?page=2', compte: 'abc' }, { id: 'ext' }, res) === true) g = true; } if (!g) setTimeout(() => res(undefined), 30); });
+    await new Promise((x) => setTimeout(x, 80));
+    dit(!(r && r.ok === true) && !vus.includes('importpage'), 'import Leboncoin : l’ordre ne passe plus par `window` et un faux résultat de la page n’est JAMAIS cru', JSON.stringify({ r, vus }));
+    win.postMessage({ __tag: 'CANCALE_LBC', kind: 'lbcimportmodele', url: 'https://api.leboncoin.fr/x?page=1', moi: 'abc' });
+    await new Promise((x) => setTimeout(x, 30));
+    dit(modeles.length === 0, 'import Leboncoin : un « modèle » posté par la page sur `window` n’est pas appris', JSON.stringify(modeles));
+  });
+
   // ── RÈGLES DE L'APP ──────────────────────────────────────────────────────
   await essai('app', async () => {
     const imp = (p) => import(require('url').pathToFileURL(path.join(__dirname, '..', p)).href);

@@ -46,7 +46,7 @@ function monter(src, { offreStatus = 200, actionsDeja = 0, message = 'Bonjour {u
     }
     return ff(url, o);
   };
-  f.ctx.authToken = async () => ({ access_token: 'session' }); f.ctx.notifierApp = async () => {}; f.ctx.__vrmPausesVues = [];
+  f.ctx.authToken = async () => ({ access_token: 'session', user_id: f.store.vrmSession.user_id }); f.ctx.notifierApp = async () => {}; f.ctx.__vrmPausesVues = [];   // 5.370 : une session AVEC son compte VRM — sans lui, la base est « muette » et la 5.362 ne prend que 25 (moyenne 40)
   return f;
 }
 
