@@ -1400,6 +1400,10 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-progression progress { flex: 1; height: 4px; }
 .vrm-tip-pdf { display: flex; align-items: center; justify-content: center; margin: 0 auto; text-decoration: none; }
 .vrm-tip-outils { display: flex; gap: 16px; margin-top: -4px; }
+/* (12 nov.) « Pas dans ce lot » : pourquoi « Imprimer (N) » n'est pas le total — neutre, une ligne par raison. */
+.vrm-tip-pourquoi { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--fu-case); font: 500 14px/1.35 var(--vrm-police); color: var(--fu-gris); }
+.vrm-tip-pourquoi > b { color: var(--fu-encre); font-weight: 600; }
+.vrm-tip-pourquoi-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .vrm-tip-outils .vrm-tip-lien { margin-right: 0; font-size: 13px; }
 html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien { background: none !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; min-height: 44px; color: var(--vrm-accent-texte, #0066CC) !important; font: 600 14px/1 var(--vrm-police) !important; }
 html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien:disabled { color: var(--fu-gris) !important; }

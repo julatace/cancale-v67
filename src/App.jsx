@@ -491,7 +491,7 @@ import VoirEmailColis from "./VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
-import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
+import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -49313,7 +49313,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // mesuré sur sa base, la case disait 9 quand 6 avaient été imprimés la veille.
           const lignesImpr = lignesLot();
           const nPrets = bordereauxAImprimer(lignesImpr).length, nDejaImpr = lignesImpr.length - nPrets;
-          const nLot = lignesLotTous().length;
+          // (12 nov.) Le bouton compte ce qui PART (cochées d'office), comme « Imprimer (N) » de la feuille : une source
+          // (`resumeLot`). Avant : toutes les lignes du lot ⇒ « Tout imprimer (15) » ouvrait « Imprimer (6) ».
+          const resLot = resumeLot(lignesLotTous()), nLot = resLot.partent;
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
           // Messages et que la rangée de Colis · Leboncoin : un site où il a un
@@ -49568,9 +49570,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-colis-barre" data-colis-barre="">
                   <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label={scanRetraitBarre ? 'Scanner un colis à retirer' : 'Scanner un bordereau'} data-scan-mode-bouton={scanRetraitBarre ? 'retrait' : 'envoi'} title={scanRetraitBarre ? 'Scanner le colis au point relais : VRM montre l’achat attendu' : `Scanner le code-barres d’un bordereau : VRM montre ${motsVendeur().le} qui doit être dedans`} onClick={() => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi')}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
                   {colisDans === 'achats' ? null : <>
-                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
-                    title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
-                    onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : nLot > 0 ? `Tout imprimer (${nLot})` : 'Tout imprimer'}</Bouton>
+                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={resLot.total > 0 ? '1' : '0'} data-imprimer-prets={nLot}
+                    title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : resLot.total > 0 ? 'Rien de neuf à imprimer : ouvre pour voir pourquoi' : 'Aucun bordereau prêt à imprimer pour l’instant'}
+                    onClick={ouvrirLot} disabled={batchBusy || resLot.total === 0}>{batchBusy ? 'Préparation…' : nLot > 0 ? `Tout imprimer (${nLot})` : 'Tout imprimer'}</Bouton>
                   {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
                       et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
@@ -49904,7 +49906,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // Imprimer, « Préparer quand même ») + 2 pour trouver « Je dépose » ; après 3 (Tout imprimer,
                   // Imprimer, « Oui ») et « Je dépose » dans la même feuille.
                   const L = lot.lignes || lignesLotTous();
-                  const nb=L.filter(l=>lot.coches.has(l.cle)).length;
+                  // (12 nov.) La même source que le bouton (`resumeLot`) : ce qui part, et POURQUOI les autres n'y sont pas.
+                  const resL = resumeLot(L, lot.coches), nb = resL.partent, nSansBord = resL.sansBordereau + aGenItems.length;
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const aVerif = (l) => l.cochable !== false && (l.ancienne || l.imprime || l.depotAVerifier || l.pdf === false);
                   const partent = L.filter((l) => l.cochable !== false && !aVerif(l));
@@ -49954,6 +49957,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {!fait && <div className="vrm-tip-temps" key="choix">
                         <ol className="vrm-tip-pas" aria-label="Étapes"><li className="is-la">Choisir</li><li>Imprimer</li><li>Déposer</li></ol>
                         {lot.erreur&&<p className="vrm-tip-alerte" role="alert" data-lot-erreur="">{lot.erreur}</p>}
+                        {(nSansBord || resL.dejaImprimes || resL.anciennes || resL.decoches) ? <div className="vrm-tip-pourquoi" data-lot-pourquoi="">
+                          <b>Pas dans ce lot</b>
+                          {nSansBord > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-sans-bordereau={nSansBord}>{nSansBord} sans bordereau encore{aGenItems.length > 0 ? ' — ' : ''}{aGenItems.length > 0 && <BoutonToutGenerer items={aGenItems}/>}</span>}
+                          {resL.dejaImprimes > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-imprimes={resL.dejaImprimes}>{resL.dejaImprimes} déjà imprimé{resL.dejaImprimes > 1 ? 's' : ''} — coche pour réimprimer</span>}
+                          {resL.anciennes > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-anciennes={resL.anciennes}>{resL.anciennes} vendue{resL.anciennes > 1 ? 's' : ''} il y a plus de {VENTE_LOT_MAX_J} j — à vérifier</span>}
+                          {resL.decoches > 0 && <span className="vrm-tip-pourquoi-ligne" data-lot-pourquoi-decoches={resL.decoches}>{resL.decoches} décoché{resL.decoches > 1 ? 's' : ''} par toi</span>}
+                        </div> : null}
                         {batchBusy&&progressionLot&&<div className="vrm-tip-progression" role="status">{progressionLot.etape==='lecture'?`PDF ${progressionLot.fait}/${progressionLot.total}`:'Préparation…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div className="vrm-tip-outils">
                           <button type="button" className="vrm-tip-lien" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
