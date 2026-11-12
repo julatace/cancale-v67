@@ -1677,3 +1677,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé tel quel de CLAUDE.md §9 (12 nov., intégration — fichier sous 59 000 octets)
 
 - **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : sur 11nov-g1, réunis lbc-rouges (+ lbc-plus 5.363), vestiaire-plus (5.364), securite-vinted (5.366), annonce-vinted (5.367), republier-programme (5.368) ; sécurité des comptes branchée sur les gestes neufs (baisse Vestiaire et Leboncoin, republication Leboncoin, présence leboncoin.fr, Créer sur Vinted, départ programmé = mode `programme`) ; « Créer sur Vinted » depuis À publier (fiches rangées, gros lot) et en série depuis « Achetés, pas en ligne » (champs manquants tapés). Les lignes de ces lots : `historique-divers.md`. `docs/passation/2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
+
+- **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
