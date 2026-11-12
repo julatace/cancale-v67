@@ -69,6 +69,7 @@ import { SanteDonnees } from '../SanteDonnees.jsx';
 import HistoriqueVinted from '../ImportDepart.jsx';
 import HistoriqueSites from '../HistoriqueSites.jsx';   // (11 nov., lot import-historique-sites) Leboncoin, Vestiaire, eBay : la même carte (ext. 5.365)   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
+import SecuriteComptes from '../SecuriteComptes.jsx';   // (11 nov., lot securite-vinted) la sécurité des comptes Vinted et Vestiaire (ext. 5.366)
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
@@ -2047,6 +2048,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
       { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<><HistoriqueVinted comptes={comptes||[]} variante="reglages"/><HistoriqueSites/></> },
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
+      // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
+      { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
       { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },

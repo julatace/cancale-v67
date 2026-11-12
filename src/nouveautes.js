@@ -58,6 +58,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'quoi-republier', date: '2026-11-11', titre: 'Quelles annonces republier ?', phrase: 'Anciennes et peu vues, triées : un toucher les coche, tu lances.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'achetes-pas-en-ligne', date: '2026-11-11', titre: 'Achetés, mais pas encore en ligne', phrase: 'Ce qui dort chez toi depuis plus de 14 jours, prouvé.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'alertes-ebay', date: '2026-11-11', titre: 'Alertes d’achat sur tes recherches eBay', phrase: 'Une nouvelle annonce ? VRM te prévient, avec la marge possible.', tab: 'plat_ebay', pour: 'tous', mode: 'tous' },
+  { id: 'securite-comptes', date: '2026-11-11', titre: 'Tes comptes protégés, comme par toi', phrase: 'Pas la nuit, pas en rafale, arrêt au premier refus.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'import-depart', date: '2026-11-11', titre: 'Tout ton historique Vinted, relu', phrase: 'Laisse vinted.fr ouvert : ventes et achats arrivent peu à peu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'stats-categories', date: '2026-11-11', titre: 'Tes statistiques par catégorie', phrase: 'Ventes, vendu et bénéfice, catégorie par catégorie.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'achat-photo-ticket', date: '2026-11-11', titre: 'Un achat en photo du ticket', phrase: 'VRM lit le ticket, tu valides le montant.', tab: 'achats', pour: 'tous', mode: 'tous' },

@@ -121,6 +121,20 @@
     });
   } catch (_) {}
 
+
+  // 5.366 (sécurité des comptes) : « n'agir que si tu es là ». Un VRAI geste de sa part
+  // (isTrusted : souris, doigt, clavier, molette) dans cet onglet est signalé au fond, au
+  // plus une fois par 30 s. Rien d'autre ne sort : ni la touche, ni l'endroit, ni la page.
+  try {
+    let vuPresence = 0;
+    const presence = (e) => {
+      if (!e || e.isTrusted !== true || document.visibilityState !== 'visible') return;
+      const t = Date.now(); if (t - vuPresence < 30000) return; vuPresence = t;
+      try { chrome.runtime.sendMessage({ from: 'vrm-presence', action: 'la' }, () => { void (chrome.runtime && chrome.runtime.lastError); }); } catch (_) {}
+    };
+    for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(ev, presence, { capture: true, passive: true });
+  } catch (_) {}
+
   const enAttente = new Map();
   window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data || event.data.__tag !== 'CANCALE_VINTED_REP') return;

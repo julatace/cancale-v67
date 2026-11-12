@@ -346,6 +346,7 @@
     if (f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v)) return true;            // dernier envoi refusé
     if (e.plateforme === 'leboncoin' && e.aRetirer && Array.isArray(e.aRetirer.liste) && e.aRetirer.liste.length) return true;   // une paire vendue ailleurs, encore en ligne ici
     if (e.plateforme === 'leboncoin' && e.lbc && e.lbc.compte && e.lbc.compte.ok === false) return true;   // 5.335 : le compte Leboncoin attend un geste (recharger, se connecter)
+    if (e.secu && e.secu.niveau === 'robot') return true;                     // 5.366 : le site vérifie le compte (le geste : la vérification, à lui)
     return false;
   };
 
@@ -616,6 +617,11 @@
       const n = e.aRetirer.liste.length;
       aRetirerLbc = `<div class="ligne"><div class="lib">À retirer de Leboncoin</div>${lignes}${plus}<div class="val gris">Supprime-la${n > 1 ? 's' : ''} dans « Mes annonces », ou depuis VRM → Leboncoin → Annonces.</div></div>`;
     }
+    // 5.366 (Julien : « faire comme Vintex, pour ne pas se faire bannir ») : l'état du compte
+    // en UNE phrase (calculée par le fond, la même que dans VRM) et « Tout arrêter ».
+    const ligneSecu = e.secu && e.secu.texte && v && v.connecte
+      ? `<div class="ligne" data-secu="${esc(e.secu.niveau || '')}"><div class="lib">Sécurité du compte</div><div class="val${e.secu.niveau === 'robot' ? ' alerte' : (e.secu.niveau === 'ok' ? '' : ' gris')}">${esc(e.secu.texte)}</div><button class="b sec" data-secu-arret="${e.secu.arrete ? 'relancer' : 'arreter'}">${e.secu.arrete ? 'Relancer' : 'Tout arrêter'}</button></div>`
+      : '';
     let bascule = '';
     if (e.bascule) {
       const b = e.bascule;
@@ -666,6 +672,7 @@
       ${progression}
       ${historique}
       ${lignePerime}
+      ${ligneSecu}
       ${aRetirerLbc}
       ${diagnosticLbc}
       ${bascule}
@@ -715,6 +722,18 @@
     const capter = carte.querySelector('[data-capter]');
     if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
     // 5.344 : « Tout récupérer » — l'historique du compte de l'onglet, depuis la page 1.
+    const secuB = carte.querySelector('[data-secu-arret]');
+    if (secuB) secuB.addEventListener('click', () => {
+      const arreter = secuB.getAttribute('data-secu-arret') === 'arreter';
+      secuB.disabled = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'secuArret', arret: arreter }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.accepte && e.secu) { e.secu.arrete = !!r.arrete; if (r.arrete) { e.secu.niveau = 'arret'; e.secu.texte = 'Tout est arrêté · rien d’automatique ne part'; } else { e.secu.niveau = 'ok'; e.secu.texte = 'Relancé'; } rendre(); return; }
+          secuB.disabled = false;
+        });
+      } catch (_) { secuB.disabled = false; }
+    });
     const impTout = carte.querySelector('[data-import-tout]');
     if (impTout) impTout.addEventListener('click', () => {
       impTout.disabled = true; impTout.textContent = 'C’est parti…';

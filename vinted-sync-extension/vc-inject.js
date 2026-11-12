@@ -1182,19 +1182,30 @@
     const adresse = 'https://' + r.hote + r.modele.replace('{conv}', encodeURIComponent(conv)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
     envoiEnCours = true;
     try {
-      let statut = 0, rep = '', erreur = '';
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
       try {
         const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
         statut = Number(res.status) || 0;
         try { rep = String(await res.text()).slice(0, 4000); } catch (_) {}
+        defi = defiDe(res, rep); ra = raDe(res);
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       let cles = [], idMsg = '';
       try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map(sansId).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); if (dd && (typeof dd.id === 'string' || typeof dd.id === 'number') && /^[\w-]{1,40}$/.test(String(dd.id))) idMsg = String(dd.id); } catch (_) {}
-      fin({ statut, cles, idMsg, erreur });
+      fin({ statut, cles, idMsg, erreur, defi, ra });
     } finally { envoiEnCours = false; }
   }); } catch (_) {}
 
 
+  // (5.366) Un CONTRÔLE ANTI-ROBOT de Vestiaire (DataDome, captcha) se reconnaît à ses
+  // en-têtes ou au début du texte : seul le OUI/NON sort (et le Retry-After), jamais le texte.
+  const defiDe = (res, txt) => {
+    const st = Number(res && res.status) || 0;
+    // `x-datadome: protected` accompagne aussi les réponses normales : seulement sur un refus (≥ 400).
+    try { if (res && res.headers && st >= 400 && (/protected|blocked/i.test(String(res.headers.get('x-datadome') || '')) || /^\d+$/.test(String(res.headers.get('x-dd-b') || '').trim()))) return true; } catch (_) {}
+    try { if (res && res.headers && /^challenge$/i.test(String(res.headers.get('cf-mitigated') || '').trim())) return true; } catch (_) {}
+    return st >= 400 && /captcha-delivery\.com|geo\.captcha|\bdatadome\b|\bcaptcha\b|cf-chl|challenge-platform|hcaptcha|recaptcha|turnstile|just a moment/i.test(String(txt || '').slice(0, 6000));
+  };
+  const raDe = (res) => { try { const v = res && res.headers && res.headers.get('retry-after'); return v ? String(v).slice(0, 40) : ''; } catch (_) { return ''; } };
   // ── 5.319 (4 nov., Julien : « voir les offres reçues sur Vestiaire et y répondre
   //    depuis VRM ») — LES OFFRES (« négociations »). MESURÉ sur sa base (lecture
   //    seule, 4 nov.) : la page charge `GET apiv2…/negotiations?role=seller&withEvents=true`
@@ -1412,11 +1423,12 @@
     const adresse = 'https://' + r.hote + chemin + (/^\?[\w=&.%:-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
     offreEnCours = true;
     try {
-      let statut = 0, rep = '', erreur = '';
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
       try {
         const res = await origFetch.call(window, adresse, Object.assign({ method: r.methode, credentials: 'include', headers: h }, corps ? { body: JSON.stringify(corps) } : {}));
         statut = Number(res.status) || 0;
         try { rep = String(await res.text()).slice(0, 400000); } catch (_) {}
+        defi = defiDe(res, rep); ra = raDe(res);
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       // La réponse dit-elle TON geste en dernier ? (sinon : « fait » n'est pas dit)
       let confirme = null;
@@ -1430,7 +1442,7 @@
           }
         } catch (_) {}
       }
-      fin({ statut, confirme, erreur });
+      fin({ statut, confirme, erreur, defi, ra });
     } finally { offreEnCours = false; }
   }); } catch (_) {}
 
