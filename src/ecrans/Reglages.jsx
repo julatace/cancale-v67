@@ -1699,6 +1699,7 @@ const GROUPES_NOTIF = [
   { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
   { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
+  { id: 'achats', titre: 'Achats', ids: ['alertesebay'] },
 ];
 function groupesFamillesNotif(familles) {
   const vus = new Set();

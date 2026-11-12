@@ -41,6 +41,9 @@ export const FAMILLES = [
   { id: 'moderation', titre: 'Vinted cache ou limite', def: true },
   // (11 nov., lot avis-negatif) Un avis Vinted de 3★ ou moins (seuil réglable) vient d'arriver (src/avisNegatif.js).
   { id: 'avis', titre: 'Avis négatif reçu', def: true },
+  // (11 nov., lot alertes-ebay) Une nouvelle annonce eBay pour une recherche dont IL a
+  // allumé l'alerte (api/_lib/ebay-alertes.js) : une notification par passage, groupée.
+  { id: 'alertesebay', titre: 'Alertes d’achat eBay', def: true },
 ];
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
@@ -73,6 +76,8 @@ export const FAMILLE_DE = {
   moderation: 'moderation',
   // (11 nov.) Un avis ≤ seuil reçu sur Vinted (api/_lib/avis-negatif.js) : une fois par avis.
   avis: 'avis',
+  // (11 nov.) Les alertes d'achat eBay (api/_lib/ebay-alertes.js).
+  alerteebay: 'alertesebay',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
