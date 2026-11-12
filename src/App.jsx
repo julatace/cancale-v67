@@ -59,7 +59,7 @@ import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.
 // ⟦→ ecrans/Reglages.jsx #2⟧
 // (6 nov., vitesse 2) FavorisVinted : chargé à la demande (voir `aLaDemande`).
 import PiloteFavorisAuto from './PiloteFavorisAuto.jsx';
-import { suivi as suiviTravail } from './suiviTravail.js';   // (11 nov., lot suivi-travail) un travail long suivi (Republier, publier ailleurs, baisse, vacances)
+import { suivi as suiviTravail, lancerTravail as lancerTravailCV } from './suiviTravail.js';   // (11 nov., lot suivi-travail) un travail long suivi (Republier, publier ailleurs, baisse, vacances)
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 // ⟦→ ecrans/Leboncoin.jsx #1⟧
 import './bilanSynchronisation.css'; // (8 nov.) style de ./AnnoncesLeboncoin.jsx, gardé à sa place (son écran est chargé à la demande)
@@ -622,6 +622,8 @@ import { ImportStockReglage } from "./composants/ImportStock.jsx";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "./grosLot.js";
+import CreerSurVinted from './CreerSurVinted.jsx';   // (11 nov., lot annonce-vinted) « Créer sur Vinted » depuis une fiche (extension 5.367)
+import { etatFicheVinted } from './annonceVinted.js';
 import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
@@ -1202,7 +1204,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { securite: '5.366.0', vcprix: '5.364.0', lbcprix: '5.363.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.364.0', lbcprix: '5.363.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3919,15 +3921,22 @@ const onCleRelue = (k, fn) => { if (!_clesRelues.has(k)) _clesRelues.set(k, new 
 // (3 nov.) LES FICHES DUPLIQUÉES À PUBLIER (src/dupliquerFiche.js) : N° neuf,
 // photos à prendre. Une fiche sort de la liste dès qu'une annonce porte son N°
 // (fiche Vinted, lien Leboncoin posé) ; « Retirer » la range (le N° reste servi).
-function FichesNeuves() {
+function FichesNeuves({ annonces = null }) {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { const off = onCloudReady(maj); window.addEventListener('vrm:save', maj); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', maj); }; }, []);
+  // (11 nov., lot annonce-vinted) « Créer sur Vinted » : la sélection et la feuille ouverte.
+  const [sel, setSel] = React.useState(() => new Set());
+  const [ouvert, setOuvert] = React.useState(null);
+  const toutes0 = load('vrm_fiches_neuves', {}) || {};
+  // Le brouillon créé DEPUIS une fiche porte le N° de cette fiche (par l'identifiant rendu
+  // par Vinted) : il ne la fait pas sortir de la liste — elle y reste « Brouillon sur Vinted ».
+  const draftsFiches = new Set(Object.values(toutes0).filter((f) => f && f.vinted && f.vinted.draftId).map((f) => String(f.vinted.draftId)));
   const portes = new Set();
-  for (const f of Object.values(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero) portes.add(cleNum(f.numero));
+  for (const [id, f] of Object.entries(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero && !draftsFiches.has(String(id))) portes.add(cleNum(f.numero));
   for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) portes.add(cleNum(n));
   for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
-  const liste = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum);
-  if (!liste.length) return null;
+  const liste = fichesAPublier(toutes0, portes, cleNum).filter((f) => etatFicheVinted(f, annonces) !== 'en-ligne');
+  if (!liste.length && !ouvert) return null;
   // (10 nov., lot Y) « Retirer » range la fiche (le N° reste servi, §5) ET la met à la corbeille 30 jours :
   // pilule « Annuler » 5 s, puis Paramètres → Corbeille la remet « À publier », même N°.
   const retirer = (f) => {
@@ -3935,17 +3944,56 @@ function FichesNeuves() {
     if (!toutes[f.id]) return;
     gesteCorbeille({ type: 'fiche', libelle: f.titre || '', numero: f.numero, morceaux: [{ k: 'vrm_fiches_neuves', type: 'champs', id: f.id, avant: { retireeAt: toutes[f.id].retireeAt }, apres: { retireeAt: new Date().toISOString() } }] }, {}, () => maj());
   };
+  const noterVinted = (id, champs) => {
+    const t = load('vrm_fiches_neuves', {}) || {};
+    if (!t[id]) return;
+    save('vrm_fiches_neuves', { ...t, [id]: { ...t[id], vinted: { ...(t[id].vinted || {}), ...champs } } });
+    emettreClesRelues(['vrm_fiches_neuves']); maj();
+  };
+  const aCreer = liste.filter((f) => etatFicheVinted(f, annonces) === 'a-creer');
+  const coches = aCreer.filter((f) => sel.has(f.id));
+  const basculer = (id) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // Mettre en ligne le brouillon créé depuis la fiche : la voie de « Publier » des brouillons (`publierBrouillon`).
+  const publier = async (f) => {
+    const v = f.vinted || {};
+    const ok = await askConfirm({ title: tr('creerVinted.publier.titre', { num: f.numero }), desc: tr('creerVinted.publier.desc'), ok: tr('creerVinted.publier'), cancel: tr('creerVinted.annuler') });
+    if (!ok) return;
+    await lancerTravailCV({ titre: tr('creerVinted.publier.suivi'), sorte: 'publier-fiche-vinted', uid: String(v.uid || ''), executer: async () => {
+      const r = await avecCouleurBrouillon((couleur, reponses) => vmrCmdSuivi({ cmd: 'publierBrouillon', uid: String(v.uid), draftId: String(v.draftId), confirme: true, couleur, reponses }, 360000), f.titre || '');
+      if (r && r.accepte && r.etape === 'fait') { noterVinted(f.id, { publieAt: new Date().toISOString() }); return { etat: 'ok' }; }
+      return { etat: r && r.sansReponse ? 'main' : 'refus', raison: String((r && r.raison) || 'refusé').slice(0, 300), geste: 'Ouvre le brouillon sur Vinted', lien: `https://www.vinted.fr/items/${encodeURIComponent(String(v.draftId))}/edit` };
+    } });
+  };
   return (
     <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label="À publier">
       <h3>À publier</h3>
-      {liste.map((f) => (
-        <div key={f.id} className="vrm-ao-neuve" data-fiche-neuve-num={f.numero}>
+      {liste.map((f) => {
+        const etatV = etatFicheVinted(f, annonces);
+        return (
+        <div key={f.id} className="vrm-ao-neuve" data-fiche-neuve-num={f.numero} data-fiche-neuve-vinted={etatV}>
+          {etatV === 'a-creer' && aCreer.length > 1 ? <label className="vrm-ao-neuve-coche"><input type="checkbox" checked={sel.has(f.id)} onChange={() => basculer(f.id)} aria-label={tr('creerVinted.cocher', { num: f.numero })} data-fiche-neuve-cocher={f.numero}/></label> : null}
           <span className="vrm-ao-neuve-num">N°{f.numero}</span>
-          <span className="vrm-ao-neuve-txt"><b>{f.titre || 'Sans titre'}</b><small>{[f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')}\u00a0€` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
+          <span className="vrm-ao-neuve-txt"><b>{f.titre || 'Sans titre'}</b><small>{etatV === 'brouillon' ? <span className="vrm-ao-neuve-etat">{tr('creerVinted.etat.brouillon')}</span> : [f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')}\u00a0€` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
+          {etatV === 'brouillon'
+            ? <button type="button" className="vrm-ao-second" data-fiche-neuve-publier={f.numero} onClick={() => publier(f)}>{tr('creerVinted.publier')}</button>
+            : <button type="button" className="vrm-ao-second" data-fiche-neuve-creer={f.numero} onClick={() => setOuvert([f])}>{tr('creerVinted.bouton')}</button>}
           <button type="button" className="vrm-ao-second" data-fiche-neuve-copier={f.numero} onClick={async () => { try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}>Copier</button>
           <button type="button" className="vrm-ao-second" aria-label={`Retirer la fiche N°${f.numero}`} data-fiche-neuve-retirer={f.numero} onClick={() => retirer(f)}>×</button>
         </div>
-      ))}
+        );
+      })}
+      {coches.length > 1 && <div className="vrm-ao-neuve-serie"><button type="button" className="vrm-ao-second" data-fiche-neuve-serie={coches.length} onClick={() => setOuvert(coches)}>{tr('creerVinted.lancer', { n: coches.length })}</button></div>}
+      {ouvert && (() => {
+        // Promis seulement à une extension 5.367+ de CE navigateur, connectée à CE compte VRM
+        // (`raisonExtGlobale`, capacité `creervinted`) ; sinon la feuille dit pourquoi et rien ne part.
+        const vc = vintedDeChrome();
+        const rx = raisonExtGlobale(false, { cap: 'creervinted', role: 'prépare tes annonces sur Vinted' });
+        return <CreerSurVinted fiches={ouvert} compteOnglet={vc === undefined ? undefined : (vc ? { uid: String(vc.uid || ''), login: String(vc.login || '') } : null)}
+          extRaison={rx ? rx.texte : ''} reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }}
+          envoyer={(p) => vmrCmdSuivi(p, 480000)}
+          onCree={(f, r, uid) => noterVinted(f.id, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() })}
+          onFermer={() => { setOuvert(null); setSel(new Set()); }} Retour={FermeAuRetour}/>;
+      })()}
     </section>
   );
 }
@@ -48066,7 +48114,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
-        <FichesNeuves/>
+        <FichesNeuves annonces={listings.items}/>
         {/* (11 nov., lot quoi-republier) « Quelles annonces republier ? » en tête de la vue Republier : un toucher COCHE
             l'annonce dans la liste ci-dessous (la même sélection `selAnn`, par compte + identifiant) ; rien ne part,
             c'est lui qui choisit ensuite « À la main » ou « Par VRM » et qui lance (§3). */}

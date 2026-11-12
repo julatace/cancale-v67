@@ -35,6 +35,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'vestiaire-parcours', date: '2026-11-11', titre: 'Vestiaire : ta vente étape par étape', phrase: 'Envoyé, arrivé, authentifié, payé : chaque étape lue chez Vestiaire.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'vestiaire-baisse-prix', date: '2026-11-11', titre: 'Baisse tes prix Vestiaire en série', phrase: 'Fais-le une fois à la main : VRM apprend ton geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'vestiaire-offres-journee', date: '2026-11-11', titre: 'Tes offres Vestiaire dans Ma journée', phrase: 'Celle qui expire le plus tôt d’abord, avec « Répondre ».', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'creer-vinted', date: '2026-11-11', titre: 'Créer sur Vinted depuis une fiche', phrase: 'Un brouillon prêt sur Vinted ; c’est toi qui publies.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'suivi-travail', date: '2026-11-11', titre: 'Pendant que VRM travaille, tu vois tout', phrase: 'Une barre, chaque étape, pause ou arrêt quand tu veux.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'sante-comptes', date: '2026-11-11', titre: 'La santé de chaque compte Vinted', phrase: 'Note, envois, annulations : « En forme » ou « À surveiller ».', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'photos-comptes', date: '2026-11-11', titre: 'La même photo sur deux comptes', phrase: 'VRM te montre les photos en double entre tes comptes Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
