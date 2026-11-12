@@ -39,3 +39,49 @@ export function sousVerrou(nom, fn, nav = (typeof navigator !== 'undefined' ? na
   } catch (_) {}
   return Promise.resolve().then(fn);
 }
+
+// ── (12 nov.) LA SESSION NEUVE PASSE PAR INDEXEDDB, PAS PAR localStorage ─────
+// Mesuré (banc robustesse-donnees, scène « onglets », 1 fois sur 3) : l'onglet A
+// renouvelle et range la session dans `localStorage`, rend le verrou ; B entre
+// 7 ms plus tard et relit… l'ANCIENNE session. Deux onglets peuvent vivre dans
+// deux processus : `localStorage` y est recopié APRÈS coup (cohérence à terme).
+// B renvoyait donc l'ancien jeton de renouvellement (déjà utilisé ⇒ refus, et
+// révocation possible). IndexedDB, lui, est tenu par UN seul service pour tout
+// le site : une écriture TERMINÉE avant que A rende le verrou est vue par B.
+// Toujours « pas su » ⇒ `null` (jamais d'exception) : l'adoption par
+// `localStorage` reste le premier essai.
+const BASE_ONGLETS = 'vrm-session-onglets', MAGASIN = 's', CLE = 'derniere';
+const ouvrirBase = (idb) => new Promise((ok) => {
+  try {
+    if (!idb || typeof idb.open !== 'function') return ok(null);
+    const r = idb.open(BASE_ONGLETS, 1);
+    r.onupgradeneeded = () => { try { r.result.createObjectStore(MAGASIN); } catch (_) {} };
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => ok(null);
+    r.onblocked = () => ok(null);
+  } catch (_) { ok(null); }
+});
+const avecDelai = (p, ms) => Promise.race([p, new Promise((ok) => setTimeout(() => ok(null), ms))]);
+const idbDefaut = () => (typeof indexedDB !== 'undefined' ? indexedDB : null);
+// Rend `true` quand l'écriture est TERMINÉE (`oncomplete`), sinon `false`. `null` efface.
+export function rangerSessionOnglets(session, idb = idbDefaut()) {
+  return avecDelai(ouvrirBase(idb).then((db) => new Promise((ok) => {
+    if (!db) return ok(false);
+    try {
+      const t = db.transaction(MAGASIN, 'readwrite');
+      if (session) t.objectStore(MAGASIN).put(session, CLE); else t.objectStore(MAGASIN).delete(CLE);
+      t.oncomplete = () => { try { db.close(); } catch (_) {} ok(true); };
+      t.onerror = t.onabort = () => { try { db.close(); } catch (_) {} ok(false); };
+    } catch (_) { try { db.close(); } catch (__) {} ok(false); }
+  })), 1500).then((v) => v === true);
+}
+export function lireSessionOnglets(idb = idbDefaut()) {
+  return avecDelai(ouvrirBase(idb).then((db) => new Promise((ok) => {
+    if (!db) return ok(null);
+    try {
+      const q = db.transaction(MAGASIN, 'readonly').objectStore(MAGASIN).get(CLE);
+      q.onsuccess = () => { try { db.close(); } catch (_) {} const v = q.result; ok(v && typeof v === 'object' ? v : null); };
+      q.onerror = () => { try { db.close(); } catch (_) {} ok(null); };
+    } catch (_) { try { db.close(); } catch (__) {} ok(null); }
+  })), 1500).then((v) => v || null);
+}

@@ -635,7 +635,7 @@ import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRel
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { deconnecterSansPerte, TEXTES_DECONNEXION } from "./deconnexionSure.js";
-import { sessionAAdopter, sousVerrou, VERROU_RENOUVELLEMENT } from "./sessionOnglets.js";
+import { sessionAAdopter, sousVerrou, VERROU_RENOUVELLEMENT, rangerSessionOnglets, lireSessionOnglets } from "./sessionOnglets.js";
 import { modifierLigneCas, ecrireDifference } from "./ligneCas.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
@@ -1379,7 +1379,7 @@ const writeSession = (s) => {
   }
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
   // (9 nov.) Plus de session (refusée, déconnectée) : plus de laissez-passer hors ligne.
-  if (!s) { try { effacerLaissezPasser(localStorage); } catch (_) {} try { effacerCopies(); } catch (_) {} }
+  if (!s) { try { effacerLaissezPasser(localStorage); } catch (_) {} try { effacerCopies(); } catch (_) {} rangerSessionOnglets(null); }
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
   // quoi que ce soit ne soit relu ou repoussé (voir ensureLocalOwner).
@@ -1604,7 +1604,9 @@ const authRefresh = (opt) => {
     try {
       const s = AUTH.session;
       if (!s || !s.refresh_token) return false;
-      const neuve = sessionAAdopter(s, readSession());
+      // (12 nov.) `localStorage` d'un autre onglet arrive APRÈS coup (deux processus) :
+      // la session rangée dans IndexedDB par l'onglet qui vient de rendre le verrou fait foi.
+      const neuve = sessionAAdopter(s, readSession()) || sessionAAdopter(s, await lireSessionOnglets());
       if (neuve) { writeSession(neuve); _authRefreshEchecAt = 0; return true; }
       const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
       // Trois états : true (renouvelé) · false (REFUSÉ par le service : jeton
@@ -1620,7 +1622,10 @@ const authRefresh = (opt) => {
         ||typeof j.user?.id!=='string'||!j.user.id.trim()
         ||(s.user?.id&&j.user.id!==s.user.id)
         ||(j.expires_in!==undefined&&(!Number.isFinite(Number(j.expires_in))||Number(j.expires_in)<=0))){_authRefreshEchecAt=Date.now();return null;}
-      writeSession(sessionFrom(j));
+      const neuveIci=sessionFrom(j);
+      writeSession(neuveIci);
+      // Rangée pour les autres onglets AVANT de rendre le verrou (écriture terminée).
+      await rangerSessionOnglets(neuveIci);
       _authRefreshEchecAt=0;
       return true;
     } catch (_) {_authRefreshEchecAt=Date.now();return null;}
