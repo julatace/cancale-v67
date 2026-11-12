@@ -33,6 +33,7 @@ import { normaliserLot, fusionnerHisto, resumeJour, jourParis, LOTS_MAX_JOUR, to
 import { normaliserEvenements } from '../../src/alertesPlantages.js';
 import { recevoirAlertesPlantages, listerPlantagesTerrain } from './alertes-plantages.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { listerPlantagesComptes } from './plantages-comptes.js';
 
 export const PREFIXE_MESURES = 'mesures_jour_';
 export const JOURS_LUS = 14;
@@ -226,6 +227,13 @@ export async function listerMesures({ utilisateur, quoi = '', env = process.env,
     const jours = await listerPlantagesTerrain({ proprio, env, fetcher });
     if (!jours) return { code: 503, corps: { ok: false, raison: 'base' } };
     return { code: 200, corps: { ok: true, jours } };
+  }
+  // (11 nov., lot agent2-veille) `quoi=plantages-comptes` : les plantages de TOUS les comptes sur
+  // 7 jours, par type, triés par nombre de comptes touchés (api/_lib/plantages-comptes.js).
+  if (quoi === 'plantages-comptes') {
+    const types = await listerPlantagesComptes({ env, fetcher });
+    if (!types) return { code: 503, corps: { ok: false, raison: 'base' } };
+    return { code: 200, corps: { ok: true, types } };
   }
   const rows = await lireDerniersJours({ env, fetcher, proprio });
   if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };

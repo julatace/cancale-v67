@@ -103,6 +103,11 @@ import { passageSondes } from './_lib/statut-sondes.js';
 import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie, purgerErreursAnciennes } from './_lib/alertes-production.js';
 import { pushConfigure } from './_lib/push.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+// (11 nov., lot agent2-veille) Le contrôle de nuit (lecture seule) et la veille des chiffres.
+import { controleVendeur, controleInstallation } from './_lib/controle-nuit.js';
+import { notifierAlertesChiffres } from './_lib/veille-chiffres.js';
+import { CAT_VEILLE } from '../src/veilleChiffres.js';
+import { stripeApi, stripePret } from './_lib/stripe.js';
 // (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
 // ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
 const RELANCES_JUSQUA_MS = 60000;
@@ -836,9 +841,18 @@ async function traiterVendeur() {
   let transporteursPdf = null;
   try { transporteursPdf = await etiquettesCron({ max: MAX_PDF_MATIN, budgetMs: BUDGET_PDF_MATIN_MS }); }
   catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (11 nov., lot agent2-veille) Le contrôle de nuit, en LECTURE SEULE (api/_lib/controle-nuit.js) :
+  // une seule écriture, SA ligne `vrm_controle_nuit` ; un échec n'empêche aucun rappel.
+  let controle = null;
+  try { controle = await controleVendeur({ lireTout: (p) => fetchPaginated(scoped(p)), ecrire: ecrireDedup }); }
+  catch (e) { controle = { ecrit: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // Un chiffre qui a chuté sans raison et n'a pas encore sonné (le filet de `/api/push` action `veille`).
+  let veilleChiffres = null;
+  try { veilleChiffres = await notifierAlertesChiffres({ getRow, ecrire: ecrireDedup, pousser: sendPushToAll, active: () => pushCategorieActive(CAT_VEILLE) }); }
+  catch (e) { veilleChiffres = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf };
+  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1702,6 +1716,18 @@ async function passageDuCron(req, res, moment, bailEtat) {
     // bornés par passage ; une lecture ratée ne fait rien (dit dans la réponse).
     let clientsPartis = null;
     if (!soir && !reveil) { try { clientsPartis = await passageClientsPartis({ maintenant: debutCron }); } catch (e) { clientsPartis = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (11 nov., lot agent2-veille) Le contrôle de nuit de l'INSTALLATION (lecture seule) : e-mails en
+    // quarantaine sans vendeur, abonnements Stripe incohérents — rangé chez le propriétaire seul.
+    let controleInst = null;
+    if (!soir && !reveil) {
+      try {
+        controleInst = await controleInstallation({
+          lire: fetchPaginated, proprio: await proprietaireInstallation(), maintenant: debutCron,
+          stripe: { pret: stripePret, api: stripeApi },
+          ecrire: (owner, id, data) => contexteVendeur.run({ owner }, () => ecrireDedup(id, data)),
+        });
+      } catch (e) { controleInst = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    }
 
     // ── LES VENDEURS, PAR LOTS (api/_lib/cron-lots.js) ─────────────────────────
     //    UNE passe PAR vendeur, chacun dans SON contexte (AsyncLocalStorage : deux
@@ -1730,7 +1756,7 @@ async function passageDuCron(req, res, moment, bailEtat) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(bailEtat === 'pas-su' ? { bail: 'pas-su' } : {}), ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

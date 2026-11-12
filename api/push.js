@@ -16,6 +16,8 @@
 //   POST { action:'avis', uid }              → (11 nov.) l'extension vient de lire les avis de CE
 //                                              compte : la route RELIT la ligne et sonne une fois
 //                                              par avis ≤ seuil (_lib/avis-negatif.js)
+//   POST { action:'veille' }                 → un chiffre a chuté sans raison : la route RELIT
+//                                              `vrm_veille_chiffres` et sonne une fois (_lib/veille-chiffres.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -29,6 +31,7 @@ import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';
+import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -127,6 +130,14 @@ async function traiter(req, res) {
     if (body.action === 'avis') {
       const r = await notifierAvisBas({ uid: body.uid != null ? String(body.uid) : null });
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., lot agent2-veille) UN CHIFFRE QUI A CHUTÉ SANS RAISON : l'app a écrit une alerte
+    // dans `vrm_veille_chiffres`. Le corps ne dit rien : la ligne est relue ici, au nom de CE
+    // vendeur, et l'alerte sonne une fois (api/_lib/veille-chiffres.js).
+    if (body.action === 'veille') {
+      const r = await notifierAlertesDuVendeur();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.n ? { n: r.n } : {}), ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
     if (body.action === 'subscribe') {
