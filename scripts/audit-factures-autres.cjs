@@ -238,7 +238,8 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   const srv = lire('api/_lib/facture-autres.js').replace(/\/\/.*$/gm, '');
   dit(srv && !/smtp|envoyerSmtp|relances-essai/i.test(srv), 'S8 la route des autres sites n’envoie aucun e-mail (aucun SMTP importé)');
   const app = lire('src/App.jsx');
-  dit(/suite=\{o\.isSeller === true \? <FactureAutreVente plateforme="leboncoin"/.test(app), 'S8 Leboncoin : la facture n’apparaît que sur une VENTE prouvée (isSeller === true)');
+  // (intégration 11nov-g2) la remise en main propre (lbc-plus) partage le même bloc, sous la MÊME condition (vente prouvée).
+  dit(/suite=\{o\.isSeller === true \? (?:<>(?:(?!: null\})[\s\S])*?)?<FactureAutreVente plateforme="leboncoin"/.test(app), 'S8 Leboncoin : la facture n’apparaît que sur une VENTE prouvée (isSeller === true)');
   dit(/mode === 'facture-autre'/.test(lire('api/compte.js')), 'S8 la route est servie par api/compte.js (aucune fonction api/ de plus)');
   const nApi = fs.readdirSync(path.join(racine, 'api')).filter((f) => f.endsWith('.js')).length;
   dit(nApi <= 12, `S8 ${nApi} fonctions api/ (12 au plus)`);

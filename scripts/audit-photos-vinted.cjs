@@ -141,6 +141,8 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
       // (intégration g1) sources nées des lots alertes-ebay, gros-lot, pas-en-ligne :
+      // (intégration 11nov-g2) lot annonce-vinted :
+      'CreerSurVinted :: u': 'photos de « Créer sur Vinted » : choisies par le vendeur et réduites dans la page en data:image/jpeg (photoReduite), ou les photos de SA fiche ; aucune photo Vinted lue par l’<img>',
       'LigneAlerte :: x.photo': 'photo d’une annonce eBay renvoyée par l’API Browse d’eBay (alertes d’achat, api/_lib/ebay-alertes.js) : image eBay, jamais Vinted, referrerPolicy posé',
       'BlocGrosLot :: a.photo': 'photo choisie par le vendeur, compressée en data:image/jpeg dans le navigateur (compresser) ; aucune URL distante',
       'Vignette :: src': 'Achetés pas en ligne : une photo VINTED passe par <Photo> (PhotoVinted) ; l’<img> ne reçoit que la photo d’un achat HORS plateforme, data:image lue dans sa ligne (lirePhotosHorsPasEnLigne)',

@@ -94,6 +94,9 @@ const COUPLES = {
   'src/FavorisEtapes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (favoris, la cloche)'],
   'src/RegistresVue.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (registres, geste à faire)'],
   'src/RetoursLitiges.jsx|www.vinted.fr': ['lien', LIEN + ' — la transaction du retour sur vinted.fr'],
+  // (intégration 11nov-g2) lots vestiaire-plus et annonce-vinted : liens de la feuille « VRM travaille ».
+  'src/BaissePrixVestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Regarde l’annonce sur Vestiaire » (baisse de prix pas relue)'],
+  'src/CreerSurVinted.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » le brouillon créé sur vinted.fr'],
   'src/registresConformes.js|www.legifrance.gouv.fr': ['lien', LIEN + ' — les textes cités sous les registres'],
   'src/registresConformes.js|bofip.impots.gouv.fr': ['lien', LIEN + ' — le BOFiP cité sous les registres'],
   'src/registresConformes.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la fiche F36018 citée sous les registres'],

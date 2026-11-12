@@ -338,7 +338,11 @@ async function extension() {
   const { faireFond } = require(path.join(RACINE, 'scripts', '_fond-vm.cjs'));
   const run = async ({ auto = true, messages = [], statut = 200, corpsCreation = null } = {}) => {
     const conv = { id: 301, opposite_user: { id: 201, login: 'camille' }, transaction: { id: 5001, item_id: 101 }, allow_reply: true, messages };
+    // (intégration 11nov-g2) La sécurité des comptes (5.366) pose un repos de nuit (23 h → 8 h, Paris) aux gestes
+    // AUTOMATIQUES : lancé la nuit, l'audit voyait un refus de la couche, pas la règle des favoris. Repos éteint ici
+    // (le repos lui-même est jugé par audit-securite-comptes).
     const f = faireFond({ src: path.join(RACINE, 'vinted-sync-extension', 'background.js'), connecte: '111',
+      lignes: { main: { capturedAt: new Date().toISOString(), vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } } },
       vinted: (e) => {
         if (e.methode === 'POST' && /\/api\/v2\/conversations$/.test(e.chemin)) return { status: statut, body: corpsCreation || { conversation: conv, code: 0 } };
         if (e.methode === 'GET' && /\/api\/v2\/conversations\/301$/.test(e.chemin)) return { status: 200, body: { conversation: conv } };

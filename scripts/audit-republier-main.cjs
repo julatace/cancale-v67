@@ -209,7 +209,8 @@ async function auditer(src) {
   dit(!copies.length, 'B3 aucune copie qui pourrait diverger (une règle par notion, src/republierReglages.js)', copies.join(' ; '));
   dit(/'vrm_republier_reglages',/.test(tranche(app, 'const SYNC_KEYS', '];')), 'B4 les réglages sont synchronisés (SYNC_KEYS) : régler sur un appareil règle l’autre');
   dit(/data-main-memes-reglages/.test(main) && /Mêmes réglages que Republier/.test(main) && /data-republier-memes-reglages/.test(atelier) && /Mêmes réglages que « Republier à la main »/.test(atelier), 'B5 l’interface le dit, des deux côtés');
-  dit(/const partage = action === 'recreer' \|\| action === 'versBrouillon';/.test(atelier) && /const regs = partage \? regsP : regsL;/.test(atelier), 'B6 « Modifier prix ou titre » garde des réglages à lui (neutres à chaque ouverture)');
+  // (intégration 11nov-g2) une programmation rouverte (republier-programme, `PR`) part de SES réglages figés, jamais les communs.
+  dit(/const partage = \(?action === 'recreer' \|\| action === 'versBrouillon'\)?(?: && !PR)?;/.test(atelier) && /const regs = partage \? regsP : regsL;/.test(atelier), 'B6 « Modifier prix ou titre » garde des réglages à lui (neutres à chaque ouverture)');
   dit(!/vmrCmd|executerCommande|method:\s*'(POST|PUT|DELETE)'/.test(main), 'B7 rien ne part chez Vinted depuis « à la main » (c’est lui qui publie)');
   dit(!/data-(main|republier)-(varier|regler)\b/.test(main + atelier) && !/regs\.photo\[\s*paire/.test(main), 'B8 un réglage photo pour toutes : ni « Varier », ni réglage par annonce (retirés, §3)');
   dit(/navigator\.share\(\{ files/.test(main) && /navigator\.canShare\(\{ files \}\)/.test(app), 'B9 iPhone : les photos partent au menu de partage (fichiers), sinon téléchargées');

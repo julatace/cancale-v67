@@ -90,7 +90,7 @@ const ARRET = new Set(['plafond', 'plafond-bordereaux', 'vinted-pause', 'frein-r
 // La réponse de l'extension ⇒ l'issue du suivi (`lancerTravail`).
 export function issueCreation(r) {
   if (!r || r.sansReponse) return { etat: 'main', raison: 'l’extension n’a pas répondu à temps : elle a peut-être fini', geste: 'Regarde tes brouillons Vinted avant de relancer' };
-  if (r.envoye === false) return { etat: 'refus', raison: str(r.raison) || 'l’extension ne répond pas', geste: 'Ouvre VRM dans le Chrome où l’extension est installée', arreterTout: true };
+  if (r.envoye === false) return { etat: 'refus', raison: str(r.raison) || 'l’extension ne répond pas', geste: 'Ouvre VRM dans le navigateur où l’extension est installée', arreterTout: true };
   if (r.accepte === true && r.etape === 'fait') return { etat: 'ok', raison: Array.isArray(r.aFinir) && r.aFinir.length ? `à choisir sur Vinted : ${r.aFinir.join(', ')}` : '' };
   if (r.accepte === true && r.etape === 'incertain') return { etat: 'main', raison: str(r.raison) || 'issue pas claire', geste: 'Regarde tes brouillons Vinted' };
   if (ARRET.has(String(r.code || ''))) return { etat: 'refus', raison: str(r.raison) || 'refusé', geste: 'Attends, puis relance', arreterTout: true };

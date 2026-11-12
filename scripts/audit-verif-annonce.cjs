@@ -95,8 +95,11 @@ function app(ok) {
   const vc = entre('const preparer = async (p) => {', 'const marquer = async (p) => {');
   ok(/verifierAvantPublication\(problemesAnnonce\(\{[^]*?\}, 'vestiaire'\)/.test(vc) && vc.indexOf('verifierAvantPublication') < vc.indexOf("cmd: 'vcPreparer'"), 'B3 « Préparer sur Vestiaire » vérifie AVANT l’envoi');
   // Republier.
-  const rp = entre('const lancerFile = async () => {', 'const idAnnoncee');
-  ok(/verifierAvantPublication\(problemesLot\(lot, 'vinted'\)/.test(rp) && rp.indexOf('verifierAvantPublication') < rp.indexOf("setMode('run')"), 'B4 « Republier » vérifie le lot AVANT de lancer');
+  // (intégration 11nov-g2) republier-programme : le lot se bâtit dans `lotVerif`, la vérification est `verifierLot`
+  // (refaite au départ programmé) ; `lancerFile` l'attend AVANT de lancer.
+  const rp = entre('const lotVerif = () =>', 'const idAnnoncee');
+  const rpL = rp.slice(rp.indexOf('const lancerFile = async () => {'));
+  ok(/const verifierLot = \(\) => verifierAvantPublication\(problemesLot\(lotVerif\(\), 'vinted'\)/.test(rp) && rpL.indexOf('await verifierLot()') > 0 && rpL.indexOf('await verifierLot()') < rpL.indexOf("setMode('run')"), 'B4 « Republier » vérifie le lot AVANT de lancer');
   ok(/titre: x\.titre \|\| a\.titre, prix: x\.prix != null \? x\.prix : a\.prix, achat: a\.floor/.test(rp), 'B4b Republier juge le titre et le prix QUI PARTIRONT (l’aperçu), contre le prix d’achat');
   // La feuille.
   const f = entre("if (q.kind === 'verif') return createPortal(", '</SheetShell>, document.body);');

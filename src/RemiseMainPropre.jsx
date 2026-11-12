@@ -17,6 +17,9 @@ import { useLangue } from './i18n/react.js';
 import { lireRemises, remiseSaisie, remiseDeVente, remiseFaiteDeVente, poserRemise, marquerRemise, annulerRemise, purgerRemises, finRemises,
   instantRemise, jourParisRemise, CLE_REMISES, CLE_REMISE_FIN, LIEU_MAX } from '../api/_lib/remises-main-propre.js';
 import { opsRemis } from './lbcPlus.js';
+import { motsVendeur } from './profilVendeur.js';
+// (intégration 11nov-g2) les phrases qui nomment l'article : « paire » pour Sneakers, sinon la variante `.art`.
+const tv = (k, p) => tr(motsVendeur().nom === 'paire' ? k : k + '.art', p);
 import { C, askConfirm, cleNum, gesteVrm, load, save, toast } from './App.jsx';
 
 const EVT = 'vrm:remises';
@@ -100,7 +103,7 @@ export default function RemiseMainPropre({ o, num = '', eligible = true }) {
   if (faite && !prevue) return <div data-remise-faite={String(o.txId)} style={{ fontSize: 12, color: C.muted, padding: '4px 0' }}>{tr('lbcplus.remise.faite', { quand: dateLoc(new Date(faite.remiseAt || faite.majAt), { day: 'numeric', month: 'short' }) })}</div>;
   if (!prevue && !eligible) return null;
   const remis = async () => {
-    const ok = await askConfirm({ title: tr('lbcplus.remise.remisTitre', { num: num ? 'N°' + num : tr('lbcplus.remise.laPaire') }), desc: tr('lbcplus.remise.remisDesc'), ok: tr('lbcplus.remise.remis'), cancel: tr('lbcplus.annuler') });
+    const ok = await askConfirm({ title: tr('lbcplus.remise.remisTitre', { num: num ? 'N°' + num : tv('lbcplus.remise.laPaire') }), desc: tv('lbcplus.remise.remisDesc'), ok: tr('lbcplus.remise.remis'), cancel: tr('lbcplus.annuler') });
     if (!ok) return;
     const c0 = lireCarte();
     const r = opsRemis({ carte: c0, remise: prevue, vente: o, num, fiches: load('vinted_annonce_numeros', {}) || {}, dates: load('vrm_lbc_dates', {}) || {},
@@ -111,7 +114,7 @@ export default function RemiseMainPropre({ o, num = '', eligible = true }) {
       save(CLE_REMISE_FIN, finRemises(sens === 'avant' ? c0 : r.carteApres));
       try { window.dispatchEvent(new Event(EVT)); } catch (_) {}
     });
-    if (r.stock === 'plusieurs' || r.stock === 'aucune-fiche') toast(tr('lbcplus.remise.stockPasSur'), 'info');
+    if (r.stock === 'plusieurs' || r.stock === 'aucune-fiche') toast(tv('lbcplus.remise.stockPasSur'), 'info');
   };
   const annuler = async () => {
     const ok = await askConfirm({ title: tr('lbcplus.remise.annulerTitre'), desc: tr('lbcplus.remise.annulerDesc'), ok: tr('lbcplus.remise.annulerOk'), cancel: tr('lbcplus.garder') });

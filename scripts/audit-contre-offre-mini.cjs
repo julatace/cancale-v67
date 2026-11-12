@@ -89,6 +89,8 @@ function extension(ok) {
   let comptees = 0;
   const ctx = { ACTIONS_MAX_HEURE: 50, RAISON_STOCKAGE: '',
     pauseVinted: async () => null, compteConnecte: async () => '111', raisonPauseVinted: () => '',
+    // (intégration 11nov-g2) la sécurité des comptes (5.366) passe AVANT le plafond : ici, rien ne l'arrête.
+    secuRobotDit: async () => null, secuGeste: async () => null,
     compterAction: async () => { comptees += 1; return { ok: true }; } };
   vm.createContext(ctx);
   vm.runInContext(bg.slice(i, k + 3) + '\nthis.execPermis = execPermis; this.gardeStricte = gardeStricte;', ctx);
