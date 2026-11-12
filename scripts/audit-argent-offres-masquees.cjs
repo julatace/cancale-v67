@@ -125,7 +125,9 @@ const h = (n) => new Date(NOW - n * 3600e3).toISOString();
   }
   // ── A · le branchement ────────────────────────────────────────────────────
   const APP = require("./_source-app.cjs").sourceAppDe(path.join(DIR, 'App.jsx')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  dit(/<OffresVestiaire etat=\{offresEtat\} recettes=\{d\.recettesOffres\} cap=\{extSait\('vcoffrerepondre'\)\}/.test(APP) && /id=eq\.vc_offres&select=offres:data->offres/.test(APP), 'A1 · Messages · Vestiaire lit `vc_offres` (projeté) et montre les offres, gestes jugés par `vcoffrerepondre`');
+  dit((/<OffresVestiaire etat=\{offresEtat\} recettes=\{d\.recettesOffres\} cap=\{extSait\('vcoffrerepondre'\)\}/.test(APP)
+    // (12 nov., messages-sites) l'offre de CET article en tête du fil, les autres sous la liste : mêmes recettes, même capacité.
+    || (/<OffresVestiaire etat=\{[^}]+\} \{\.\.\.propsOffres\}\/>/.test(APP) && /const propsOffres = \{ recettes: d\.recettesOffres, cap: extSait\('vcoffrerepondre'\)/.test(APP))) && /id=eq\.vc_offres&select=offres:data->offres/.test(APP), 'A1 · Messages · Vestiaire lit `vc_offres` (projeté) et montre les offres, gestes jugés par `vcoffrerepondre`');
   dit(/data-vc-conv-offre=/.test(APP), 'A1 · la conversation d’un article qui a une offre à trancher la montre');
   dit(/<PorteMonnaieCompta accounts=\{accounts\} panelOff=\{panelOff\}\/>/.test(APP) && /id=like\.harvest_\*_billing&select=id,cap:data->>capturedAt,main:/.test(APP) && !/harvest_\*_billing&select=data\b/.test(APP), 'A2 · Compta → Porte-monnaie, lectures projetées (jamais `select=data`)');
   dit(/annSort==='masquees' \? \(\s*<AnnoncesMasquees/.test(APP) && /setAnnSort\('masquees'\)/.test(APP), 'A3 · Annonces → « Masquées » (vue rapide) ouvre la liste par compte');
