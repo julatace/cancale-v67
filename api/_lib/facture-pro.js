@@ -15,7 +15,7 @@
 //                               (6 nov.) l'acheteur, le prix et la date viennent
 //                               de la PREUVE relue par le serveur (lirePreuve),
 //                               jamais du navigateur
-//   POST {action:'envoyer', tx, avoir?, renvoyer?, confirme:true}
+//   POST {action:'envoyer', tx, avoir?, renvoyer?, via?:'vrm', confirme:true}
 //                               l'envoie à l'acheteur depuis SA boîte
 //   POST {action:'avoir', tx, confirme:true}
 //                               annule une facture émise par un avoir numéroté
@@ -429,7 +429,10 @@ export async function envoyer(owner, corps, res, env = process.env, opts = {}) {
   if (e && e.etat === 'en-cours' && Number.isFinite(tEnvoi) && Date.now() - tEnvoi < EN_COURS_MS) return repondre(res, 409, { erreur: 'en-cours', message: "Un envoi de cette facture est déjà en cours. Attends une minute." });
   if (e && (e.etat === 'envoyee' || e.etat === 'incertaine') && corps.renvoyer !== true) return repondre(res, 409, { erreur: 'deja', envoi: e, message: e.etat === 'envoyee' ? 'Cette facture est déjà partie.' : 'Un envoi précédent est incertain.' });
   // Le chemin d'envoi et ce qu'il exige.
-  const via = cfg && cfg.envoiPar === 'boite' ? 'boite' : 'vrm';
+  // (12 nov.) « Envoyer avec VRM » : SON clic, pour CETTE facture, quand sa boîte n'est pas
+  // connectée (`corps.via === 'vrm'`) — le chemin par défaut de VRM, avec tous ses garde-fous
+  // ci-dessous ; le réglage « ma boîte » n'est pas changé. L'envoi automatique suit le réglage.
+  const via = !auto && corps.via === 'vrm' ? 'vrm' : cfg && cfg.envoiPar === 'boite' ? 'boite' : 'vrm';
   const vendeurEmail = String((cfg && cfg.email) || '').trim();
   let transport;
   if (via === 'vrm') {
