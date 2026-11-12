@@ -52,8 +52,9 @@ const ITEMS_222 = [
   ann(9303, { title: 'Brouillon du second compte', is_draft: true }),
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_essai', domain: 'www.vinted.fr', updated_at: auj.toISOString() }, { id: 2, vinted_user_id: '222', login: 'autre_essai', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
-// Deux prix d'achat connus sur six annonces en ligne (9101, 9301).
-const MAIN = { vinted_annonce_numeros: { 9101: { numero: '11', buyPrice: '30' }, 9102: { numero: '12' }, 9103: { numero: '13' }, 9301: { numero: '21', buyPrice: '25' }, 9302: { numero: '22' } } };
+// Deux prix d'achat connus sur six annonces en ligne (9102, 9301). (12 nov.) Celui de la N°11 est passé à la
+// N°12 : la paire qui dort a besoin de son prix d'achat pour qu'un conseil de baisse soit proposé.
+const MAIN = { vinted_annonce_numeros: { 9101: { numero: '11' }, 9102: { numero: '12', buyPrice: '60' }, 9103: { numero: '13' }, 9301: { numero: '21', buyPrice: '25' }, 9302: { numero: '22' } } };
 const ATTENDU_ACHATS = '2/6';
 const lignes = () => [
   { id: 'main', data: MAIN },
@@ -243,7 +244,8 @@ async function vueSelection(pg) {
           if (tel) await pg.evaluate((id) => { const c = document.querySelector(`[data-carte-annonce="${id}"]`); const bt = c && c.querySelector('[data-fiche-plus-bouton][aria-expanded="false"]'); if (bt) bt.click(); }, carteTest);
           await pg.waitForTimeout(250);
           const prixGeste = await pg.evaluate((id) => { const c = document.querySelector(`[data-carte-annonce="${id}"]`); const p = c && c.querySelector('[data-annonce-prix-partout], [data-annonce-prix-vinted]'); return p ? { t: p.innerText.replace(/\s+/g, ' '), conseil: (p.querySelector('[data-prix-conseille]') || {}).textContent || '' } : null; }, carteTest);
-          dit(prixGeste && /Changer le prix/.test(prixGeste.t) && /102\s€ conseillé/.test(prixGeste.conseil), `G ${T} la paire qui dort : « Changer le prix » dit le prix conseillé (102 €), sans bouton à part`, JSON.stringify(prixGeste));
+          // (12 nov., conseil mesuré) 120 €, 45 j, achat 60 € ⇒ « Baisser à 108 € ? » (−10 % au plus) et sa raison.
+          dit(prixGeste && /Changer le prix/.test(prixGeste.t) && /^Baisser à 108\s€\s\?/.test(prixGeste.conseil) && /en ligne depuis 45 j/.test(prixGeste.conseil), `G ${T} la paire qui dort : « Changer le prix » propose « Baisser à 108 € ? · en ligne depuis 45 j », sans bouton à part`, JSON.stringify(prixGeste));
           await clic(pg, `[data-carte-annonce="${carteTest}"] [data-fiche-menu-ouvrir]`);
           await pg.waitForSelector('[data-fiche-menu]', { timeout: 4000 }).catch(() => {});
           const menu = await pg.evaluate(() => { const m = document.querySelector('[data-fiche-menu]'); if (!m) return null; const l = [...m.querySelectorAll('.vrm-fiche-menu > button, .vrm-fiche-menu > a')]; return { n: l.length, t: l.map((x) => x.textContent.trim()), h: l.map((x) => Math.round(x.getBoundingClientRect().height)), num: !!m.querySelector('.vrm-num') }; });

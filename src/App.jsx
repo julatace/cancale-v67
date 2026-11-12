@@ -608,7 +608,8 @@ import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : b
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
-import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";   // (10 nov., lot L) les prix lus dans le dressing
+import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
+import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
 import CalculetteAchat from "./CalculetteAchat.jsx";   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
 import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot L) l'emballage d'un colis (facultatif)
 import { CLE_EMBALLAGES } from "./emballages.js";
@@ -2956,6 +2957,8 @@ const SYNC_KEYS = [
   // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
   // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
   'vrm_cycle_decisions','vrm_vus_en_ligne','vrm_fiches_neuves','vrm_prix_journal','vrm_modeles_desc',
+  // (12 nov.) La dernière proposition de baisse par paire (src/conseilPrix.js : une tous les 14 j).
+  'vrm_conseil_prix',
   // (4 nov.) Les achats qu'il a DÉCLARÉS lots, et ses répartitions d'un lot sur ses N°
   // (l'état d'avant gardé pour « Annuler ») — src/achatsSourcing.js, écrits sur SON clic.
   'vrm_lots_declares','vrm_repartitions_lots',
@@ -37407,35 +37410,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     toast(`✓ ${moves.length} article${moves.length > 1 ? 's' : ''} renuméroté${moves.length > 1 ? 's' : ''}`);
   };
   // ── Assistant de repricing : quoi baisser, de combien, pourquoi ────────────
-  // Règles : plus une paire dort, plus la baisse conseillée est forte ; une paire
-  // très vue sans favori a un prix perçu trop haut. On ne conseille JAMAIS sous
-  // le prix d'achat connu (pas de vente à perte). L'action reste un lien vers
-  // l'annonce (sûr, ton rythme) — aucune écriture automatique côté Vinted.
+  // (12 nov., Julien : « on le garde, mais ça ne doit pas être abusif ») UNE règle,
+  // `conseilBaisse` (src/conseilPrix.js) : en ligne depuis 30 j au moins (âge LU),
+  // −10 % au plus, une proposition par paire tous les 14 j, jamais sous l'achat
+  // + 10 %, prix d'achat inconnu ⇒ rien. La fiche et cette liste lisent la MÊME
+  // carte. L'action reste un lien vers l'annonce — aucune écriture côté Vinted.
+  const [conseilMemo, setConseilMemo] = useStateCle(CLE_CONSEIL_PRIX, () => load(CLE_CONSEIL_PRIX, null));
+  useEffect(() => onCloudReady(() => setConseilMemo((local) => fusionConseils(load(CLE_CONSEIL_PRIX, null), local))), []);
+  const conseilsPrix = useMemo(() => {
+    const m = new Map();
+    const journal = load(CLE_PRIX_LUS, null), histo = load('vinted_prix_historique', []) || [];
+    const memoA = conseilMemo && conseilMemo.v === 1 && conseilMemo.a ? conseilMemo.a : {};
+    for (const it of annBase) {
+      const id = String(it.id);
+      const c = conseilBaisse({ prix: it.price, ageJours: listedAgeDays(it), achat: prixAchatDe(numeros[it.id], buyByNum),
+        favoris: it.favourites ?? null, derniereBaisse: derniereBaisseLue(id, journal, histo), memo: memoA[id] || null });
+      if (c.sugg != null) m.set(id, c);
+    }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, numeros, buyByNum, conseilMemo, listingDates]);
+  // Une proposition NOUVELLE est notée (sa date ouvre les 14 jours) ; rien d'autre n'est écrit.
+  useEffect(() => {
+    if (![...conseilsPrix.values()].some((c) => c.nouveau)) return;
+    setConseilMemo((m) => { const n = noterConseils(m, conseilsPrix); if (n !== m) save(CLE_CONSEIL_PRIX, n); return n; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conseilsPrix]);
   const repriceList = useMemo(() => {
     const out = [];
     for (const it of annBase) {
-      const price = it.price != null ? Number(it.price) : 0;
-      if (!price || price <= 1) continue;
+      const c = conseilsPrix.get(String(it.id)); if (!c) continue;
       const age = listedAgeDays(it);
       const views = it.views ?? null, favs = it.favourites ?? null;
-      let drop = 0; const why = [];
-      if (age != null && age >= SLEEP_DAYS) { drop = Math.max(drop, age >= 90 ? 0.30 : age >= 60 ? 0.20 : 0.12); why.push(`dort ${age} j`); }
-      if (views != null && views >= 30 && (favs ?? 0) <= 1) { drop = Math.max(drop, 0.12); why.push(`${views} vues · ${favs ?? 0} ❤️`); }
-      else if (views != null && views >= 60 && favs != null && favs >= 1 && favs / views < 0.03) { drop = Math.max(drop, 0.10); why.push(`${views} vues pour ${favs} ❤️`); }
-      if (drop <= 0) continue;
-      let sugg = Math.round(price * (1 - drop));
-      // Le prix d'achat comme la carte le lit (fiche, sinon par N°) : §11.
-      const buy = prixAchatDe(numeros[it.id], buyByNum);
-      let atFloor = false;
-      if (buy != null && sugg < buy) { sugg = Math.ceil(buy); atFloor = true; }
-      sugg = Math.max(1, sugg);
-      if (sugg >= price) continue; // déjà au plancher : rien à conseiller
-      out.push({ it, price, sugg, saving: price - sugg, age, views, favs, why, atFloor, score: (views ?? 0) + (age ?? 0) * 2 });
+      out.push({ it, price: c.prix, sugg: c.sugg, saving: c.prix - c.sugg, age, views, favs, why: [c.raison], atFloor: c.auPlancher, conseil: c, score: (views ?? 0) + (age ?? 0) * 2 });
     }
     out.sort((a, b) => b.score - a.score);
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros,buyByNum]);
+  }, [annBase, conseilsPrix]);
   // ── SUIVIES, PAS ENCORE VENDUES → REMISE NATIVE (G22) ─────────────────────
   // Une paire dans les favoris de plusieurs personnes mais non vendue est la
   // candidate idéale à la REMISE NATIVE de Vinted : une baisse de prix prévient
@@ -37523,7 +37535,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { stop = true; };
   }, [tipsOpen, showReprice, repriceList.length, ebayVivantes]);
   // Le prix conseillé sur eBay : la MÊME baisse (en proportion) que celle
-  // conseillée sur Vinted, appliquée au prix eBay, jamais sous le prix d'achat.
+  // conseillée sur Vinted, appliquée au prix eBay, jamais sous l'achat + 10 %.
   const baisseEbayDe = (r) => {
     const num = numeros[r.it.id]?.numero; if (!num || !(ebayVivantes instanceof Map)) return null;
     const cle = cleNum(num);
@@ -37545,10 +37557,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const prixConnu = memoEbay != null && !(Number.isFinite(capL) && Number.isFinite(Number(memo.at)) && capL > Number(memo.at)) ? memoEbay : e.prix;
     const fait = ebayBaisse[e.itemId] || (memoValable ? { etat: 'ok', prix: prixConnu, memo: true } : undefined);
     const prixActuel = fait && fait.etat === 'ok' && !fait.memo ? fait.prix : prixConnu;
-    let sugg = Math.round(prixActuel * (r.sugg / r.price));
-    const buy = prixAchatDe(numeros[r.it.id], buyByNum);
-    if (buy != null && sugg < buy) sugg = Math.ceil(buy);
-    sugg = Math.max(1, sugg);
+    // (12 nov.) La même règle mesurée (src/conseilPrix.js) : −10 % au plus, jamais sous l'achat + 10 %.
+    const sugg = baisseProportion(prixActuel, r.conseil, prixAchatDe(numeros[r.it.id], buyByNum)) ?? prixActuel;
     // (9 octobre) La règle d'offre de l'annonce eBay : la MÊME garde que la
     // carte (`prixCompatibleRegle`, §11) — un prix à ou sous le seuil connu
     // n'est pas proposé (eBay le refuserait).
@@ -48637,9 +48647,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const boost = feesOf(e);
             const marge = (it.price!=null && achat!=null && !isNaN(achat)) ? Math.round(Number(it.price) - achat - boost) : null;
             const ailleurs = lbcAussi.has(String(it.id));
-            // (11 nov., revue robustesse) Jamais sous le prix d'achat (le plancher de `repriceList`) : pas de conseil de vente à perte.
-            const sugg0 = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85), achat!=null && !isNaN(achat) ? Math.ceil(achat) : 0) : null;
-            const sugg = sugg0!=null && sugg0 < Number(it.price) ? sugg0 : null;
+            // (12 nov., Julien : « pas abusif ») Le conseil MESURÉ (src/conseilPrix.js, la même carte que
+            // le repricing) : 30 j en ligne, −10 % au plus, 14 j entre deux, jamais sous l'achat + 10 %.
+            const conseil = soldBord ? null : conseilsPrix.get(String(it.id)) || null;
+            const sugg = conseil ? conseil.sugg : null;
             // (29 oct., Julien : « augmente la taille des photos ; l'état plus
             // original avec à côté la saisie du prix d'achat ; toutes les infos
             // qui sont dans les 3 petits points ») LA FICHE : la photo en grand,
@@ -48793,10 +48804,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-fiche-gestes" data-fiche-gestes="" data-fiche-gestes-n={num ? 2 : 1}>
                     {num
                       ? <button type="button" className="vrm-fiche-geste vrm-fiche-geste-prix" data-annonce-prix-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:prix-partout',{detail:String(num)})); } catch (_) {} }} style={geste}
-                          title={sugg!=null && sugg < Number(it.price) ? `Elle dort : ${sugg}\u00a0€ serait un prix plus juste (−15\u00a0%)` : 'Le prix de ce N° sur tous les sites où il est en ligne'}>
-                          Changer le prix{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</button>
+                          title={conseil ? `Une suggestion : ${conseil.raison}. Rien ne change sans toi.` : 'Le prix de ce N° sur tous les sites où il est en ligne'}>
+                          Changer le prix{conseil ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg} data-conseil-raison={conseil.raison}>{conseil.phrase}<span className="vrm-fiche-geste-raison"> · {conseil.raison}</span></span> : null}</button>
                       : <a className="vrm-fiche-geste vrm-fiche-geste-prix" href={urlFiche ? `${urlFiche.replace(/\/$/,'')}/edit` : undefined} target="_blank" rel="noreferrer" data-annonce-prix-vinted="" style={geste}
-                          title="Sans N°, le prix se change sur Vinted">Changer le prix ↗{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</a>}
+                          title="Sans N°, le prix se change sur Vinted">Changer le prix ↗{conseil ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg} data-conseil-raison={conseil.raison}>{conseil.phrase}<span className="vrm-fiche-geste-raison"> · {conseil.raison}</span></span> : null}</a>}
                     {num && (
                       <button type="button" className="vrm-fiche-geste" data-fiche-stock={atGarage?'range':'a-ranger'} onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={geste}
                         title={atGarage?`La N°${num} est rangée dans ton stock — la voir`:`La N°${num} n'est pas encore rangée dans ton stock — la ranger`}>
@@ -49065,7 +49076,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span style={{fontSize:20}}>🏷️</span>
                 <span style={{flex:1,minWidth:0}}>
                   <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>Repricing — {repriceList.length} article{repriceList.length>1?'s':''} à baisser</span>
-                  <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,fontWeight:500}}>Très vues sans acheteur ou qui dorment · jamais sous ton prix d'achat</span>
+                  <span className="vrm-aide" style={{display:'block',fontSize:11,color:C.muted,fontWeight:500}}>En ligne depuis 30 j · −10 % au plus · jamais sous achat + 10 %</span>
                 </span>
                 <span style={{fontSize:13,color:C.muted}}>{showReprice?'▲':'▼'}</span>
               </button>
@@ -49093,7 +49104,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                         <div style={{flexShrink:0,textAlign:'right'}}>
                           <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
-                          {atFloor && <div style={{fontSize:11,color:C.muted}}>= prix d'achat (plancher)</div>}
+                          {atFloor && <div style={{fontSize:11,color:C.muted}}>= achat + 10 % (plancher)</div>}
                         </div>
                         <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:12,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Baisser</a>
                       </div>
