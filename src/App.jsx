@@ -1406,8 +1406,9 @@ const INIT_SAL = [];
 
 // ============ SYNCHRO SUPABASE (Mac <-> iPhone) ============
 // Base de donnees en ligne : les donnees sont partagees entre tous les appareils
-const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
+// (12 nov., agent2-fiabilite-prod) La base d’ESSAI (« vrm-essai ») : les variables Vercel « Preview » VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY ; absentes (Production) ⇒ la vraie base, comme avant.
+const SUPABASE_URL = (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || "https://lgonxzrzjcqthjtbdpzo.supabase.co";
+const SUPABASE_KEY = (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 // Une lecture identique de notre base ne part qu'une fois (16 oct., mesuré :
 // 16 à 45 lectures en double par écran ouvert) — règle et garde-fous dans

@@ -30,3 +30,12 @@ create or replace function sauvegarde.noter_ecriture() returns trigger language 
   $$ begin return new; end $$;
 create or replace function sauvegarde.noter_ecriture_agent() returns trigger language plpgsql as
   $$ begin return new; end $$;
+-- (12 nov., intégration 12nov-b) Le schéma `realtime` de Supabase, que la migration 040 (temps réel) suppose :
+-- imité au plus juste, comme scripts/audit-temps-reel-sql.cjs (messages, topic(), send). Base jetable seulement.
+create schema if not exists realtime;
+grant usage on schema realtime to anon, authenticated;
+create table if not exists realtime.messages (id bigserial primary key, topic text not null, extension text not null, payload jsonb, event text, private boolean, inserted_at timestamptz default now());
+alter table realtime.messages enable row level security;
+create or replace function realtime.topic() returns text language sql stable as $$ select nullif(current_setting('realtime.topic', true), '') $$;
+create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language plpgsql as $$
+begin insert into realtime.messages(topic, extension, payload, event, private) values (topic, 'broadcast', payload, event, private); end $$;

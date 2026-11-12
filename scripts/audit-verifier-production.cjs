@@ -76,7 +76,7 @@ const lire = (rel) => fs.readFileSync(path.join(R, rel));
 const titre = /<title>([^<]+)<\/title>/.exec(lire('index.html').toString())[1].trim();
 const attendue = /const EXT_ATTENDUE\s*=\s*'([0-9.]+)'/.exec(lire('src/App.jsx').toString())[1];
 const PAGE = `<!doctype html><html><head><title>${titre}</title><script type="module" src="/assets/index-banc.js"></script></head><body><div id="root"></div></body></html>`;
-const santeSaine = () => ({ ok: true, serviceKey: true, owner: true, ia: false, detourage: false, stripe: false, stripeWebhook: false, relancesEssai: false });
+const santeSaine = () => ({ ok: true, serviceKey: true, owner: true });   // (12 nov.) les oui/non de configuration ne sont plus publics (agent2-fiabilite-prod)
 
 let PANNE = {};
 const srv = http.createServer((q, r) => {
@@ -86,7 +86,7 @@ const srv = http.createServer((q, r) => {
   if (p === '/') return page();
   if (p === '/api/sante') {
     if (PANNE.sante500) return envoyer(500, 'application/json', '{"error":"FUNCTION_INVOCATION_FAILED"}');
-    const s = santeSaine(); if (PANNE.santeSansCle) delete s.relancesEssai; if (PANNE.santePasBool) s.ia = 'oui'; if (PANNE.sansServiceKey) s.serviceKey = false;
+    const s = santeSaine(); if (PANNE.santeSansCle) delete s.owner; if (PANNE.santePasBool) s.owner = 'oui'; if (PANNE.sansServiceKey) s.serviceKey = false;
     return envoyer(200, 'application/json', JSON.stringify(s));
   }
   if (p === '/api/compte' && u.searchParams.get('mode') === 'confidentialite') return PANNE.confOuverte ? envoyer(200, 'application/json', '{"ok":true}') : envoyer(401, 'application/json', '{"ok":false}');
@@ -132,8 +132,8 @@ const lancer = (origine, env = {}) => new Promise((ok2) => {
     ['zipDeuxDossiers', /extension servie.*UN dossier/, 'le zip ne se dézippe pas en un seul dossier'],
     ['zipAbsent', /extension servie.*page de l’app est servie à la place du zip/, 'le zip absent (la page de l’app servie à sa place)'],
     ['orionVersion', /Orion.*version 5\.1\.0 servie, le dépôt porte/, 'le paquet Orion n’est pas celui du dépôt'],
-    ['santeSansCle', /\/api\/sante.*clé\(s\) absente\(s\) : relancesEssai/, 'une clé de /api/sante absente'],
-    ['santePasBool', /\/api\/sante.*pas un oui\/non : ia/, 'une clé de /api/sante qui n’est pas un oui/non'],
+    ['santeSansCle', /\/api\/sante.*clé\(s\) absente\(s\) : owner/, 'une clé de /api/sante absente'],
+    ['santePasBool', /\/api\/sante.*pas un oui\/non : owner/, 'une clé de /api/sante qui n’est pas un oui/non'],
     ['sansServiceKey', /\/api\/sante.*SUPABASE_SERVICE_KEY/, 'la clé de service pas posée'],
     ['sante500', /\/api\/sante.*HTTP 500/, '/api/sante en panne (500)'],
     ['titre', /page d’accueil.*titre/, 'la page d’accueil sans son titre'],

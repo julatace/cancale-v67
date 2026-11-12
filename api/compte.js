@@ -1810,21 +1810,31 @@ async function mesures(req, res) {
 // et l'heure de la vérification, pour public/etat.html — aucune donnée d'un
 // vendeur (api/_lib/etat-public.js). LÉGER : une requête de deux scalaires,
 // gardée 30 s en mémoire, et 30 s au cache de Vercel (`s-maxage`).
+// (12 nov., agent2-fiabilite-prod) Ce que la surveillance lit (ok, serviceKey, owner,
+// `etat.base`) reste PUBLIC ; les oui/non de CONFIGURATION (IA, détourage, Stripe,
+// webhook Stripe, e-mails de l'essai) ne disent plus à n'importe qui quelles portes
+// sont posées : ils ne partent (`config`) qu'au PROPRIÉTAIRE de l'installation, avec
+// SA session, et jamais par le cache partagé. Tenu par scripts/audit-sante-publique.cjs.
+async function configPourProprietaire(req) {
+  if (!String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '')) return undefined;
+  const u = await utilisateurDe(req).catch(() => null);
+  const proprio = u && u.id ? await proprioAlertes().catch(() => null) : null;
+  if (!proprio || String(u.id).toLowerCase() !== proprio) return undefined;
+  return { ia: !!process.env.AI_API_KEY, detourage: !!process.env.PHOTOROOM_API_KEY, stripe: stripePret(), stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET, relancesEssai: configurationRelances().pret };
+}
 async function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30');
+  const config = await configPourProprietaire(req);
+  res.setHeader('Cache-Control', config ? 'private, no-store' : 'public, max-age=0, s-maxage=30');
+  if (config) res.setHeader('Vary', 'Authorization');
   const [etat, statut] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
   return repondre(res, 200, {
     ok: true,
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
     owner: !!process.env.VRM_OWNER_UID,
-    ia: !!process.env.AI_API_KEY,
-    detourage: !!process.env.PHOTOROOM_API_KEY,
-    stripe: stripePret(),
-    stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
-    relancesEssai: configurationRelances().pret,
     etat,
     statut,
+    config,
   });
 }
 
