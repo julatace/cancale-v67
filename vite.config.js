@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 // __BUILD__ = horodatage du build, injecté à la compilation. Sert de « version »
 // visible dans l'app pour diagnostiquer les problèmes de cache/mise à jour.
 // ⚠️ ON INJECTE L'ISO COMPLET, PAS UNE CHAÎNE DÉJÀ MISE EN FORME. La version
@@ -44,6 +45,23 @@ const versionEtat = () => ({
 // `modulepreload` / `preload`. Ici on lui donne les VRAIS noms du build (empreintes),
 // dans les attributs de sa balise — index.html n'est jamais mis en cache, il vise
 // donc toujours les fichiers du déploiement en cours.
+// (11 nov., lot hors-ligne) TOUTE L'APP HORS LIGNE : la liste des morceaux de CE build
+// (`/hors-ligne-assets.json`). Le service worker (public/sw.js, `rechaufferMorceaux`) les
+// range en ligne, une fois par déploiement : un écran jamais ouvert s'ouvre ensuite sans
+// réseau. Ni la carte (maplibre : ses tuiles viennent du réseau), ni la 3D, ni le film
+// d'accueil : lourds et inutiles hors ligne (≈ 3,5 Mo gardés au lieu de 6).
+const EXCLU_HORS_LIGNE = /maplibre|three\.module|Room3D|OrbitControls|AccueilFilm/;
+const listeHorsLigne = () => ({
+  name: 'vrm-liste-hors-ligne',
+  apply: 'build',
+  // Après l'écriture : seulement les fichiers VRAIMENT livrés (un morceau qui ne portait que du CSS
+  // est retiré par Vite après `generateBundle` — le nommer ferait un 404 au rangement).
+  writeBundle(o, bundle) {
+    const dir = o.dir || 'dist';
+    const fichiers = Object.keys(bundle).filter((f) => /^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) && !EXCLU_HORS_LIGNE.test(f) && existsSync(join(dir, f))).map((f) => '/' + f).sort();
+    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers }));
+  },
+});
 const prechargerApp = () => ({
   name: 'vrm-precharger-app',
   apply: 'build',
@@ -80,7 +98,7 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [react(), allegerIndex(), versionEtat(), prechargerApp()],
+  plugins: [react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne()],
   define: { __BUILD__: JSON.stringify(BUILD) },
   build: {
     // Cible moderne : moins de transformations/polyfills → bundle plus léger et

@@ -42,6 +42,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'retirer-lisible', date: '2026-11-11', titre: 'À retirer : le code sur chaque ligne', phrase: 'Code, n° de suivi et itinéraire, sans carte.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'ventes-logo-transporteur', date: '2026-11-11', titre: 'Le logo du transporteur sur chaque vente', phrase: 'Au même endroit, dès que son transporteur est connu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'impression-thermique', date: '2026-11-11', titre: 'Bordereaux pour ton imprimante thermique', phrase: '10 × 15, Dymo, Brother ou ta taille : choisis le tampon.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'toute-app-hors-ligne', date: '2026-11-11', titre: 'Toute l’app marche sans réseau', phrase: 'Tes gestes attendent et partent au retour du réseau.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'import-depart', date: '2026-11-11', titre: 'Tout ton historique Vinted, relu', phrase: 'Laisse vinted.fr ouvert : ventes et achats arrivent peu à peu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'stats-categories', date: '2026-11-11', titre: 'Tes statistiques par catégorie', phrase: 'Ventes, vendu et bénéfice, catégorie par catégorie.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'achat-photo-ticket', date: '2026-11-11', titre: 'Un achat en photo du ticket', phrase: 'VRM lit le ticket, tu valides le montant.', tab: 'achats', pour: 'tous', mode: 'tous' },

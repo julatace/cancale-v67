@@ -3,6 +3,7 @@
 import { prixAchatSaisi } from '../prixAuNumerotage.js';
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { tr } from '../i18n/index.js';
 import { createPortal } from 'react-dom';
 import { pairesDuModele } from '../dejaEnStock.js';
 import { cleFacture, verifierFichier } from '../factureAchat.js';
@@ -317,7 +318,7 @@ const lirePhotosAchatsHors = async () => {
 // lieux d'abord, puis la liste courte), la date, le N° de rangement — le prochain N° libre PROPOSÉ en
 // pastille, posé seulement par SON toucher, et réservé dans le pool à l'enregistrement (`onReserverNumero`,
 // append-only : jamais redonné à une annonce). Une colonne, gros boutons. Rien n'est deviné (§2.5).
-function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null, importer = null, onReserverNumero = null }) {
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null, importer = null, onReserverNumero = null, horsLigne = false, garderPhotoHorsLigne = null }) {
   // (10 nov., lot J) « Importer un tableur » (src/importAchats.js) : `importer` = { existants, numeroDe, etatNumero, onImporter }.
   const [importOuvert, setImportOuvert] = useState(false);
   // (10 nov., lot AN) `facture` (src/FactureAchat.jsx) : joindre une facture d'achat (PDF ou photo) à l'achat saisi.
@@ -416,12 +417,17 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     const id = editId || ('ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
     let photoOk = form.photoAvant;
     let photoRatee = false;
-    if (form.photo) {
+    // (11 nov.) Hors ligne : la photo (déjà compressée) attend dans la file des gestes, envoyée au retour du réseau ;
+    // aucun N° neuf proposé (réservé au serveur seul) : l'achat le reçoit au retour.
+    let photoHL = false;
+    if (form.photo && horsLigne && garderPhotoHorsLigne) photoHL = await garderPhotoHorsLigne(id, form.photo);
+    if (form.photo && !photoHL) {
       const ok = await ecrirePhotoAchatHors(id, form.photo);
       if (ok) { photoOk = true; const b64 = form.photo; setPhotos(p => ({ ...(p || {}), [idPhotoAchatHors(id)]: b64 })); }
       else photoRatee = true;
     }
     const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: String(form.numero || '').trim(), ref: String(form.ref || '').trim().slice(0, 40) || undefined, photo: photoOk || undefined };
+    if (!editId && horsLigne && !rec.numero) rec.numeroAuRetour = true;
     if (editId) onModifier(editId, rec); else onAjouter({ id, ...rec });
     // La facture jointe part dans SA ligne, par l'identité de l'achat (jamais son titre).
     if (form.facture && facture) await facture.joindre(cleFacture('hors', id), form.facture);
@@ -430,7 +436,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     if (rec.numero && prochainNumero != null && rec.numero === String(prochainNumero) && onReserverNumero) onReserverNumero(rec.numero);
     setEnvoi(false);
     if (!ouvert) onBasculer(true);
-    if (photoRatee) toast("Achat enregistré — mais la photo n'a pas pu être envoyée (la base n'a pas répondu). Modifie l'achat pour la remettre.");
+    if (horsLigne && !editId) toast(tr('horsligne.achat.note'));
+    else if (photoRatee) toast("Achat enregistré — mais la photo n'a pas pu être envoyée (la base n'a pas répondu). Modifie l'achat pour la remettre.");
     else toast(editId ? 'Achat modifié' : 'Achat ajouté');
     fermer();
   };
@@ -458,6 +465,19 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     return [...recents.map((l) => ({ l, recent: true })), ...SOURCES_ACHAT_HORS.filter((x) => !vus.has(x.toLowerCase())).map((l) => ({ l, recent: false }))];
   }, [liste]);
   const numPropose = !editId && prochainNumero != null && String(prochainNumero).trim() ? String(prochainNumero) : '';
+  // (11 nov.) Au retour du réseau : un achat saisi hors ligne sans N° reçoit le prochain N° libre,
+  // un à la fois (le pool est réservé à chaque fois, `onReserverNumero`), jamais tant que hors ligne.
+  const numDonnes = useRef(new Set());
+  useEffect(() => {
+    if (horsLigne || prochainNumero == null || !onReserverNumero) return;
+    const n = String(prochainNumero);
+    if (numDonnes.current.has(n)) return;
+    const b = liste.find((x) => x && x.numeroAuRetour && !x.numero);
+    if (!b) return;
+    numDonnes.current.add(n);
+    onModifier(b.id, { numero: n, numeroAuRetour: undefined });
+    onReserverNumero(n);
+  }, [horsLigne, prochainNumero, liste]);
   return (
     <div data-achats-hors style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, marginBottom: 12, boxShadow: C.shadow || 'none', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 14px', minHeight: 58 }}>
@@ -596,6 +616,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginTop: 2, minWidth: 0 }}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{meta || '—'}</span>
                     {b.numero && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 6, padding: '1px 6px' }}>N°{b.numero}</span>}
+                    {!b.numero && b.numeroAuRetour ? <span data-achat-num-au-retour="" style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.muted, borderRadius: 6, padding: '1px 6px', border: `1px solid ${C.border}` }}>{tr('horsligne.achat.numeroAuRetour')}</span> : null}
                     {facture && facture.factures && facture.factures[cleFacture('hors', b.id)] ? <span data-achat-hors-a-facture="" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, color: C.text }}><Icon name="doc" size={12} />Facture</span> : null}
                   </span>
                 </span>
