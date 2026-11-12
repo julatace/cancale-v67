@@ -136,7 +136,15 @@ const essaie = async (nom, f) => { try { return await f(); } catch (e) { dit(fal
   await essaie('B', () => {
     const barre = (app.split('<div className="vrm-colis-barre" data-colis-barre="">')[1] || '').split('</div>')[0];
     dit(!!barre && ['scanner', 'imprimer', 'outils'].every((k) => barre.includes(`data-colis-barre-btn="${k}"`)), 'B les trois boutons de la barre');
-    dit(!!barre && !/onglet\s*===|ongletColisVu/.test(barre), 'B la barre ne dépend pas de l\'onglet', barre.match(/onglet\s*===[^?]*/) ? barre.match(/onglet\s*===[^?]*/)[0] : '');
+    // (12 nov.) La règle du 5 nov. (§2.21) : les MÊMES trois boutons, à la même place, sur chaque onglet —
+    // aucun bouton rendu ou retiré selon l'onglet. Depuis le lot V (9 nov., `2026-11-09-scanner.md`),
+    // « Scanner » (même place) ouvre le mode retrait sur « À retirer » : un ATTRIBUT qui suit l'onglet
+    // n'est pas un bouton qui disparaît. On juge donc le RENDU conditionnel (`{… onglet … ? <…` ou
+    // `&& <…`), plus le simple mot `onglet ===` (qui rendait rouge le mode du scanner, voulu).
+    const sansComB = barre.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+    const rendSelonOnglet = sansComB.match(/\{[^{}]*\b(?:onglet|ongletColisVu)\b[^{}]*(?:\?|&&)\s*\(?\s*</);
+    dit(!!barre && !rendSelonOnglet && !/ongletColisVu/.test(sansComB), 'B la barre ne dépend pas de l\'onglet (aucun bouton rendu selon l\'onglet)', rendSelonOnglet ? rendSelonOnglet[0] : '');
+    dit(/data-colis-barre-btn="scanner"[^>]*data-scan-mode-bouton=\{(?:onglet === 'retirer'|[A-Za-z]+) \? 'retrait' : 'envoi'\}/.test(barre), 'B « Scanner » (même place) : mode retrait sur « À retirer », envoi ailleurs (lot V)');
     const sansCom = app.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
     dit(!/<EntreeJournalEmails\b/.test(sansCom), 'B « Tes emails, ce que VRM en a fait » n\'est plus rendu dans Colis');
     dit(!/className="vrm-colis-imprimante"/.test(sansCom), 'B le réglage d\'imprimante n\'est plus en double dans Colis (il est dans Paramètres)');
