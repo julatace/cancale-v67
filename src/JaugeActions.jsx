@@ -12,6 +12,8 @@ import React from 'react';
 import { PREFIXE_ACTIONS, SELECT_ACTIONS, jaugeDuCompte, texteJauge } from './jaugeActions.js';
 import { lireTout } from './App.jsx';
 import './styles-jauge-journal.css';
+// (12 nov., ext. 5.370) « 112/200 aujourd’hui » et l'alerte « Vinted demande une vérification ».
+import { AlerteVerification } from './Discretion.jsx';
 
 export function lireLignesActions(uid) {
   const filtre = uid ? `${PREFIXE_ACTIONS}${uid}_*` : `${PREFIXE_ACTIONS}*`;
@@ -53,15 +55,19 @@ export default function JaugeActions({ uid, nom = '' }) {
   const j = rows === undefined ? undefined : jaugeDuCompte(rows, u, maintenant);
   const t = j === undefined ? { valeur: '…', suite: '', ton: 'passu' } : texteJauge(j);
   return (
+    <>
     <div className="vrm-jauge" data-jauge-actions={u} data-jauge-n={j ? j.n : (j === null ? 'pas-su' : 'lecture')} data-jauge-max={j ? j.max : ''} data-jauge-prudence={j && j.prudence ? String(j.prudence) : undefined} data-ton={t.ton || undefined}
       role="status" aria-label={`Actions de l’heure${nom ? ' sur ' + nom : ''} : ${t.valeur}${t.suite ? ', ' + t.suite : ''}`}>
       <BarreJauge j={j || null} />
       <span className="vrm-jauge-texte">
         <span className="vrm-jauge-mot">Actions{nom ? ` · ${nom}` : ''}</span>
         <b className="vrm-jauge-valeur">{t.valeur}</b>
+        {t.jour ? <span className="vrm-jauge-jour" data-jauge-jour={j ? `${j.nJour}/${j.maxJour}` : ''}>{t.jour}</span> : null}
         {t.suite ? <span className="vrm-jauge-suite">{t.suite}</span> : null}
       </span>
     </div>
+    {j && j.captcha ? <AlerteVerification uid={u} captcha={j.captcha} nom={nom} /> : null}
+    </>
   );
 }
 
@@ -80,7 +86,7 @@ export function JaugesComptes({ uids = [], nomCompte = () => null }) {
           <div key={u} className="vrm-jauge vrm-jauge-rangee" data-jauge-actions={u} data-jauge-n={j ? j.n : (j === null ? 'pas-su' : 'lecture')} data-jauge-prudence={j && j.prudence ? String(j.prudence) : undefined} data-ton={t.ton || undefined}>
             <span className="vrm-jauge-nom">{nomCompte(u) || `compte ${u}`}</span>
             <BarreJauge j={j || null} />
-            <span className="vrm-jauge-texte"><b className="vrm-jauge-valeur">{t.valeur}</b>{t.suite ? <span className="vrm-jauge-suite">{t.suite}</span> : null}</span>
+            <span className="vrm-jauge-texte"><b className="vrm-jauge-valeur">{t.valeur}</b>{t.jour ? <span className="vrm-jauge-jour" data-jauge-jour={j ? `${j.nJour}/${j.maxJour}` : ''}>{t.jour}</span> : null}{t.suite ? <span className="vrm-jauge-suite">{t.suite}</span> : null}</span>
           </div>
         );
       })}

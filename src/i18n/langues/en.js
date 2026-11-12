@@ -340,6 +340,8 @@ export default {
   "reglages.tes-donnees.lib": "What VRM reads and does",
   "reglages.toutvabien.desc": "Each account, its last reread and each device’s extension.",
   "reglages.toutvabien.lib": "All good?",
+  "reglages.discretion.desc": "Daily cap and Vinted slowdowns, account by account.",
+  "reglages.discretion.lib": "Discretion",
   "reglages.vacances.desc": "Pause your accounts while you’re away, then reopen.",
   "reglages.vacances.lib": "Holiday mode",
   "reglages.verifier.desc": "Extension, accounts, inbox: what’s missing, and what to do.",

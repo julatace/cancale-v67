@@ -345,6 +345,8 @@ export default {
   "reglages.tes-donnees.lib": "Ce que VRM lit et fait",
   "reglages.toutvabien.desc": "Chaque compte, sa dernière relecture et l’extension de chaque appareil.",
   "reglages.toutvabien.lib": "Tout va bien ?",
+  "reglages.discretion.desc": "Plafond par jour et freins de Vinted, compte par compte.",
+  "reglages.discretion.lib": "Discrétion",
   "reglages.vacances.desc": "Mettre tes comptes en pause pendant ton absence, puis rouvrir.",
   "reglages.vacances.lib": "Mode vacances",
   "reglages.verifier.desc": "Extension, comptes, boîte e-mail : ce qui manque, et le geste.",

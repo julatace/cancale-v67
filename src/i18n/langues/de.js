@@ -340,6 +340,8 @@ export default {
   "reglages.tes-donnees.lib": "Was VRM liest und tut",
   "reglages.toutvabien.desc": "Jedes Konto, sein letztes Lesen und die Erweiterung jedes Geräts.",
   "reglages.toutvabien.lib": "Alles okay?",
+  "reglages.discretion.desc": "Tageslimit und Vinted-Bremsen, Konto für Konto.",
+  "reglages.discretion.lib": "Zurückhaltung",
   "reglages.vacances.desc": "Konten während deiner Abwesenheit pausieren, dann wieder öffnen.",
   "reglages.vacances.lib": "Urlaubsmodus",
   "reglages.verifier.desc": "Erweiterung, Konten, Postfach: was fehlt und was zu tun ist.",

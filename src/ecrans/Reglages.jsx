@@ -59,7 +59,8 @@ import { ToutVaBien } from '../ToutVaBien.jsx';
 import { SanteDonnees } from '../SanteDonnees.jsx';
 import HistoriqueVinted from '../ImportDepart.jsx';   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
-import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
+import { JaugesComptes } from '../JaugeActions.jsx';
+import { PanneauDiscretion } from '../Discretion.jsx';   // (12 nov., ext. 5.370) plafond du jour, vérification, freins des 7 jours   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
 // ⟦← App.jsx #2⟧
@@ -1889,6 +1890,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<HistoriqueVinted comptes={comptes||[]} variante="reglages"/> },
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
+      // (12 nov., ext. 5.370) La discrétion : plafond par jour, vérification demandée par Vinted, freins des 7 jours (src/Discretion.jsx).
+      { id:'discretion', type:'panneau', ic:'sleep', lib:tr('reglages.discretion.lib'), desc:tr('reglages.discretion.desc'), data:{ 'data-reglage-discretion':'' }, el:<PanneauDiscretion uids={(comptes||[]).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={(u) => { const a = (comptes||[]).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && (a.label || a.login)) || null; }}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
     ]},

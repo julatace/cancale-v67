@@ -340,6 +340,8 @@ export default {
   "reglages.tes-donnees.lib": "Cosa VRM legge e fa",
   "reglages.toutvabien.desc": "Ogni account, la sua ultima lettura e l’estensione di ogni dispositivo.",
   "reglages.toutvabien.lib": "Tutto bene?",
+  "reglages.discretion.desc": "Limite giornaliero e freni di Vinted, account per account.",
+  "reglages.discretion.lib": "Discrezione",
   "reglages.vacances.desc": "Metti in pausa i tuoi account mentre sei via, poi riaprili.",
   "reglages.vacances.lib": "Modalità vacanze",
   "reglages.verifier.desc": "Estensione, account, casella e-mail: cosa manca, e il gesto da fare.",
