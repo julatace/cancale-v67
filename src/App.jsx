@@ -34868,7 +34868,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Elle se vide aussitôt le calcul synchrone fini (microtâche) : un effet ou un geste
   // lancé plus tard recalcule, même si une valeur lue par la règle a bougé entre-temps.
   const memoRendu = (fn) => { let m = null; return (o) => { if (!o || typeof o !== 'object') return fn(o); if (!m) { m = new WeakMap(); queueMicrotask(() => { m = null; }); } if (m.has(o)) return m.get(o); const r = fn(o); m.set(o, r); return r; }; };
-  const entryKeyByPhoto = memoRendu((o) => {
+  // (12 nov., vitesse-volume) LA MÊME MÉMOIRE, GARDÉE TANT QUE CE QUE LA RÈGLE LIT NE CHANGE PAS : `cle()` rend
+  // TOUT ce que la règle lit (états, mémos, réglages du module) ; elle est relue une fois par calcul synchrone,
+  // et une seule valeur différente (par identité) repart de zéro. Mesuré à 20 000 ventes : Comptabilite se rend
+  // ~19 fois avant « prêt », et ces règles d'identité repartaient de zéro à chaque rendu.
+  const memosVersion = useRef({});
+  const memoVersion = (nom, fn, cle) => (o) => {
+    if (!o || typeof o !== 'object') return fn(o);
+    let e = memosVersion.current[nom];
+    if (!e || !e.lue) { const k = cle(); if (!e || e.k.length !== k.length || e.k.some((x, i) => x !== k[i])) e = memosVersion.current[nom] = { k, m: new WeakMap() }; e.lue = true; queueMicrotask(() => { e.lue = false; }); }
+    if (e.m.has(o)) return e.m.get(o);
+    const r = fn(o); e.m.set(o, r); return r;
+  };
+  const reglesNumeros = () => `${coupureNumerotation()}|${archiveNumeros()}|${numeroEcritActif()}|${JSON.stringify(ouNumeroEcrit())}`;
+
+  const entryKeyByPhoto = memoVersion('photo', (o) => {
     const url = o ? orderPhoto(o) : null;
     const pk = photoKey(url);
     let k = (pk && numerosByPhoto[pk]) || null;                  // même fichier = certain
@@ -34879,7 +34893,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // l'histoire.
     if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;
     return k;
-  });
+  }, () => [numerosByPhoto, numerosByPhotoDir, numeros, reglesNumeros()]);
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
@@ -35050,13 +35064,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   1. l'identifiant d'annonce donné par Vinted (transaction → item_id) ;
   //   2. la photo, qui appartient à une paire et une seule (0 collision mesurée).
   // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
-  const identiteAnnonce = memoRendu((o) => {
+  const identiteAnnonce = memoVersion('identite', (o) => {
     if (!o) return null;
     const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     if (parVinted) return String(parVinted);
     return entryKeyByPhoto(o) || null;
-  });
-  const resolvedEntry = memoRendu((o) => {
+  }, () => [txnItem, numerosByPhoto, numerosByPhotoDir, numeros, reglesNumeros()]);
+  const resolvedEntry = memoVersion('fiche', (o) => {
     // Une paire ENCORE EN LIGNE n'est pas vendue : on refuse de l'associer.
     const usable = (key) => (key && numeros[key] && !onlineAnnonceIds.has(String(key))) ? numeros[key] : null;
     // ⚠️ VERROU HÉRITÉ : `vinted_txn_link` est permanent et a longtemps été posé
@@ -35084,7 +35098,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    annonces différentes). Un titre ne caractérise donc pas une annonce :
     //    on préfère ne rien attribuer plutôt que désigner la mauvaise boîte.
     return null;
-  });
+  }, () => [numeros, onlineAnnonceIds, txnItem, txnLink, numerosByPhoto, numerosByPhotoDir, reglesNumeros()]);
   // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
@@ -35502,14 +35516,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (numeroEcritActif()) { const lec = lireNumeroEcrit({ titre: o.title || '' }); if (lec.etat === 'lu' && numeroReprenable(lec.cle) && (coupureNumerotation() == null || venteApresCoupure(o))) src.push({ source: 'ecrit', numero: lec.cle }); }
     return decisionNumeroVenteEmail(src);
   };
-  const effEntry = memoRendu((o) => {
+  const effEntry = memoVersion('effective', (o) => {
     const r = fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum);
     if (!(o && o._venteEmail)) return r;
     // Une vente vue par e-mail : le N° est la DÉCISION ci-dessus (contredit ⇒ aucun).
     const d = numeroVenteEmail(o);
     if (!d.numero) { if (!r || r.numero == null) return r; const { numero: _n, ...reste } = r; return reste; }
     return { ...(r || {}), numero: d.numero };
-  });
+  }, () => [numeros, onlineAnnonceIds, txnItem, txnLink, numerosByPhoto, numerosByPhotoDir, saleOv, buyByNum, bordsVenteEmailParTx, bordLinks, labelsCaptes, reglesNumeros()]);
 
   // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
   // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à

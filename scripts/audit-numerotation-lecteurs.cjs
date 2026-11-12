@@ -385,7 +385,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/for \(const k in numeros\) \{\s*const e = numeros\[k\];[^}]*?\n\s*\/\/[^\n]*\n\s*if \(!numeroReprenable\(e\.numero\)\) continue;/.test(auto), 'sa réutilisation par PHOTO écarte les fiches d\'archive');
     dit(/let num = numeroReprenable\(numVentesParIdentite\.parItem/.test(auto) && /numeroReprenable\(pk && numVentesParIdentite\.parPhoto\[pk\]\)/.test(auto), 'sa réutilisation par VENTE écarte les numéros d\'archive');
     dit(/sort\(\(a, b\) => \(dateMiseEnLigneMs\(a, listingDates\)/.test(auto), 'elle numérote dans l\'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il reposte)');
-    const photo = corps('const entryKeyByPhoto = memoRendu((o) => {', '});');
+    const photo = corps("const entryKeyByPhoto = memoVersion('photo', (o) => {", '}, () => [');   // (12 nov.) mémoire par version des données
     dit(/venteApresCoupure\(o\) && !numeroReprenable/.test(photo), 'la photo ne relie jamais une vente d\'après la coupure à une fiche d\'archive');
     const ban = corps("if (!e || !String(e.numero || '').trim()) continue;", 'pairsLost[String(e.numero)]');
     dit(/if \(!numeroReprenable\(e\.numero\)\) continue;/.test(ban), 'la bannière ♻️ ne propose jamais un numéro d\'archive');
