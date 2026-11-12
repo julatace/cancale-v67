@@ -3794,11 +3794,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-vcapture') {
       (async () => {
         try {
-          if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
+          // 5.362 (revue, moyenne 51) : la date aussi n'est rangée que pour une annonce À LUI
+          // (onglet Vinted, compte de l'onglet, son dressing ou ses fiches) — comme `saveDetail`.
+          if (msg.action === 'saveDate' && msg.id && msg.ts) { if (await detailEstASoi(sender, msg.id)) await saveListingDate(msg.id, msg.ts, msg.text); else noterDiag('date_pas_a_soi'); sendResponse({ ok: true }); return; }
           // 5.357 (revue, haute 18) : seulement une annonce À LUI (son dressing ou ses fiches) — l'annonce
           // d'un autre vendeur qu'il regarde n'entre plus dans `vinted_item_details`.
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { if (await detailEstASoi(sender, msg.id)) await saveItemDetail(msg.id, msg.detail); else noterDiag('detail_pas_a_soi'); sendResponse({ ok: true }); return; }
-          if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
+          // 5.362 (revue, moyenne 52) : le compte est celui de L'ONGLET qui publie (son hôte),
+          // jamais un domaine dicté par le message.
+          if (msg.action === 'numeroPourPublier') { const h = hoteVintedDeLOnglet(sender); sendResponse(h ? await reserverNumeroPourOnglet(sender.tab.id, h) : { ok: false, raison: 'onglet' }); return; }
           if (msg.action === 'numeros') {
             const uidOnglet = await numerosPermisDansPage(sender);
             if (!uidOnglet) { sendResponse({ok:true,items:{},convs:{},txs:{},portee:'hors_compte'}); return; }
@@ -4879,7 +4883,9 @@ async function reserverNumeroPourOnglet(tabId, domain) {
     let loc = {};
     try { loc = (await chrome.storage.local.get(RESA_LOCAL))[RESA_LOCAL] || {}; } catch (_) { return { ok: false, raison: 'stockage' }; }
     const deja = loc[tabId];
-    if (deja && !deja.item && Date.now() - deja.at < RESA_ATTENTE_MS) return { ok: true, numero: deja.numero };
+    // 5.362 (moyenne 53) : une réservation de l'onglet ne sert qu'au MÊME compte.
+    const uidOnglet = await activeAccountId(domain);
+    if (deja && !deja.item && Date.now() - deja.at < RESA_ATTENTE_MS && uidOnglet && String(deja.uid) === String(uidOnglet)) return { ok: true, numero: deja.numero };
     // Une publication vue mais pas encore rangée (base injoignable) : on la garde
     // à part — une nouvelle réservation dans cet onglet ne doit pas l'effacer.
     if (deja && deja.item) { loc['lie_' + tabId + '_' + deja.at] = deja; delete loc[tabId]; }
@@ -4928,6 +4934,34 @@ async function noterPublication(tabId, itemId, status) {
     await lierPublicationsEnAttente();
   });
 }
+// L'hôte Vinted de l'onglet qui parle (jamais celui que dit le message) ; '' sinon.
+function hoteVintedDeLOnglet(sender) {
+  try {
+    if (!sender || !sender.tab || sender.tab.id == null) return '';
+    const u = new URL(String(sender.tab.url || sender.url || ''));
+    return u.protocol === 'https:' && /^(?:www\.)?vinted\.(?:fr|com|it|de)$/.test(u.hostname) ? u.host : '';
+  } catch (_) { return ''; }
+}
+// ⚠️ 5.362 (revue, moyenne 53) — UNE RÉSERVATION D'ONGLET MEURT AVEC L'ONGLET.
+//    `vrmNumResaOnglets` est rangé par n° d'onglet : un onglet fermé sans publier
+//    gardait sa réservation, et Chrome redonne les mêmes n° après un redémarrage —
+//    un nouvel onglet héritait (jusqu'à 3 h) du N° réservé d'un ancien. Purgées à la
+//    fermeture de l'onglet et au démarrage de Chrome (une publication VUE mais pas
+//    encore rangée, elle, est gardée : elle sera liée).
+function purgerResaOnglets(tabId) {
+  return unResaALaFois(async () => {
+    let loc = {};
+    try { loc = (await chrome.storage.local.get(RESA_LOCAL))[RESA_LOCAL] || {}; } catch (_) { return; }
+    let change = false;
+    for (const k of Object.keys(loc)) {
+      if (/^lie_/.test(k) || (loc[k] && loc[k].item)) continue;
+      if (tabId == null || String(k) === String(tabId)) { delete loc[k]; change = true; }
+    }
+    if (change) { try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {} }
+  });
+}
+try { chrome.tabs.onRemoved.addListener((tabId) => { purgerResaOnglets(tabId).catch(() => {}); }); } catch (_) {}
+try { chrome.runtime.onStartup.addListener(() => { purgerResaOnglets(null).catch(() => {}); }); } catch (_) {}
 async function lierPublicationsEnAttente() {
   let loc = {};
   try { loc = (await chrome.storage.local.get(RESA_LOCAL))[RESA_LOCAL] || {}; } catch (_) { return; }
@@ -19489,6 +19523,7 @@ async function repondreLeboncoin(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'message refusé par la page — rien n’est parti' }; }
+      if (rep && rep.code === 'canal') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Leboncoin, puis réessaie — rien n'est parti" }; }   // 5.362 (moyenne 60)
       noterDiag('lbc_repondre_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Leboncoin avant de renvoyer" };
     }
@@ -20302,20 +20337,41 @@ async function pauseLbcDepuisApp(msg) {
       if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
       o = { ok: true, tabId: ouvert.id };
     }
+    // ⚠️ 5.362 (revue, moyennes 56 et 57) : Leboncoin a demandé de ralentir (429/403,
+    //    sur un message, une pause ou une suppression) ⇒ rien ne part ; et l'ordre prend
+    //    sa place dans les 50 actions/heure DU COMPTE Leboncoin (avant : compteurs à part,
+    //    50 messages + 10 suppressions + 10 pauses par heure).
+    const freinLbc = await pauseLbcMsg();
+    if (freinLbc) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir — VRM reprend dans ${Math.max(1, Math.ceil((Number(freinLbc.jusqua) - Date.now()) / 60000))} min (rien n'est parti)` };
+    const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
+    if (!cptLbc.ok && cptLbc.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!cptLbc.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cptLbc.resteMs || 0) / 60000))} min` };
+    const depuisLbc = Number(cptLbc.at) || (Date.now() - 5);
     // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
     try { await chrome.storage.local.set({ vrmLbcPauses: [...journal, Date.now()] }); } catch (_) {}
     let rep = null;
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcPauseAnnonce', id }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    // 5.362 (moyenne 58) : l'ordre porte le compte attendu, revérifié DANS la page.
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcPauseAnnonce', id, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
     const statut = (rep && Number(rep.statut)) || 0;
+    // 5.362 (moyennes 58 et 60) : rien n'est parti (canal privé absent, onglet sur un
+    //    autre compte, une autre action en cours) ⇒ certain, la place est rendue.
+    if (rep && (rep.code === 'canal' || (rep.ok === true && !statut && /^(autre-compte|compte-pas-su|en-cours)$/.test(String(rep.erreur || ''))))) {
+      await rendreActions('lbc:' + compte, depuisLbc, 1);
+      if (rep.code === 'canal') return { accepte: false, code: 'canal', raison: "recharge la page Leboncoin, puis réessaie — rien n'est parti" };
+      if (rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre action est en cours dans cet onglet Leboncoin' };
+      return autreCompte('');
+    }
+
     const reponse = rep && typeof rep.corps === 'string' ? rep.corps.slice(0, 300) : '';
     // La FORME de la réponse (clés et types, jamais une valeur) : la passe suivante saura.
     try { await storeLbcRecon({ envoiOne: { cle: 'VRM PUT api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads', val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: 'PUT', cles: ['list_ids[]:number'], reponse: { statut, cles: (rep && Array.isArray(rep.cles)) ? rep.cles.slice(0, 60) : [], entetes: (rep && Number(rep.entetes)) || 0 } } } }); } catch (_) {}
-    if (rep && rep.ok === true && rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre mise en pause est en cours dans cet onglet' };
     if (!rep || rep.ok !== true || !statut) {
       noterDiag('lbc_pause_incertain');
       return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si la pause est partie : regarde l'annonce sur Leboncoin" };
     }
     noterDiag('lbc_pause_' + statut);
+    // 5.362 (moyenne 57) : 429/403 ⇒ le même frein que la messagerie (30 min).
+    if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, reponse, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur Leboncoin` }; }
     if (statut >= 200 && statut < 300) {
       const note = await noterPauseLbc(id, statut);
       try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
@@ -20398,19 +20454,40 @@ async function supprimeLbcDepuisApp(msg) {
       if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
       o = { ok: true, tabId: ouvert.id };
     }
+    // ⚠️ 5.362 (revue, moyennes 56 et 57) : Leboncoin a demandé de ralentir (429/403,
+    //    sur un message, une pause ou une suppression) ⇒ rien ne part ; et l'ordre prend
+    //    sa place dans les 50 actions/heure DU COMPTE Leboncoin (avant : compteurs à part,
+    //    50 messages + 10 suppressions + 10 pauses par heure).
+    const freinLbc = await pauseLbcMsg();
+    if (freinLbc) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir — VRM reprend dans ${Math.max(1, Math.ceil((Number(freinLbc.jusqua) - Date.now()) / 60000))} min (rien n'est parti)` };
+    const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
+    if (!cptLbc.ok && cptLbc.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!cptLbc.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cptLbc.resteMs || 0) / 60000))} min` };
+    const depuisLbc = Number(cptLbc.at) || (Date.now() - 5);
     // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
     try { await chrome.storage.local.set({ vrmLbcSuppressions: [...journal, Date.now()] }); } catch (_) {}
     let rep = null;
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    // 5.362 (moyenne 58) : l'ordre porte le compte attendu, revérifié DANS la page.
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
     const statut = (rep && Number(rep.statut)) || 0;
+    // 5.362 (moyennes 58 et 60) : rien n'est parti (canal privé absent, onglet sur un
+    //    autre compte, une autre action en cours) ⇒ certain, la place est rendue.
+    if (rep && (rep.code === 'canal' || (rep.ok === true && !statut && /^(autre-compte|compte-pas-su|en-cours)$/.test(String(rep.erreur || ''))))) {
+      await rendreActions('lbc:' + compte, depuisLbc, 1);
+      if (rep.code === 'canal') return { accepte: false, code: 'canal', raison: "recharge la page Leboncoin, puis réessaie — rien n'est parti" };
+      if (rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre action est en cours dans cet onglet Leboncoin' };
+      return autreCompte('');
+    }
+
     const reponse = rep && typeof rep.corps === 'string' ? rep.corps.slice(0, 300) : '';
     try { await storeLbcRecon({ envoiOne: { cle: 'VRM DELETE api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads', val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: 'DELETE', cles: ['list_ids[]:number'], reponse: { statut, cles: (rep && Array.isArray(rep.cles)) ? rep.cles.slice(0, 60) : [], entetes: (rep && Number(rep.entetes)) || 0 } } } }); } catch (_) {}
-    if (rep && rep.ok === true && rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre action est en cours dans cet onglet Leboncoin' };
     if (!rep || rep.ok !== true || !statut) {
       noterDiag('lbc_supprime_incertain');
       return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si l'annonce est supprimée : regarde-la sur Leboncoin avant de recliquer" };
     }
     noterDiag('lbc_supprime_' + statut);
+    // 5.362 (moyenne 57) : 429/403 ⇒ le même frein que la messagerie (30 min).
+    if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, reponse, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur Leboncoin` }; }
     if (statut >= 200 && statut < 300) {
       const note = await noterSuppressionLbc(id, statut);
       try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
@@ -21118,6 +21195,7 @@ async function rangerLbcVentesUneFois(list,owner) {
 //    fois. Et le drapeau `coupe` reste : on saura si ça ne suffit toujours pas.
 const EXT_VERSION = (() => { try { return (chrome.runtime.getManifest() || {}).version || ''; } catch (_) { return ''; } })();
 const LBC_CATALOGUE_MAX = 3000000;
+const LBC_CATALOGUE_CLES_MAX = 40, LBC_CATALOGUE_TOTAL_MAX = 6000000;   // 5.362 (moyenne 55)
 // ⚠️⚠️ 11 octobre (mesuré : 2,6 Mo par écriture, plusieurs fois par minute). Le
 //    catalogue était RELU EN ENTIER (2,6 Mo) à chaque réponse, juste pour savoir
 //    s'il avait changé, puis réécrit en entier — tous les endpoints à la fois —
@@ -21181,6 +21259,17 @@ function viderLbcCatalogue() {
       change = true;
     }
     if (change) {
+      // ⚠️ 5.362 (revue, moyenne 55) : le catalogue est BORNÉ — au plus
+      //    `LBC_CATALOGUE_CLES_MAX` endpoints et `LBC_CATALOGUE_TOTAL_MAX` octets en
+      //    tout, les plus récemment vus gardés (avant : toutes les clés, à jamais).
+      const cles = Object.keys(next).filter((k) => k !== 'index' && k !== 'updatedAt' && next[k] && typeof next[k] === 'object');
+      cles.sort((a, b) => String(next[b].at || '').localeCompare(String(next[a].at || '')));
+      let total = 0, gardees = 0;
+      for (const k of cles) {
+        const t = Number(next[k].taille) || String(next[k].corps || '').length;
+        if (gardees >= LBC_CATALOGUE_CLES_MAX || total + t > LBC_CATALOGUE_TOTAL_MAX) { delete next[k]; noterDiag('lbc_catalogue_borne'); continue; }
+        total += t; gardees++;
+      }
       const index = {};
       for (const k of Object.keys(next)) {
         if (k === 'index' || k === 'updatedAt') continue;

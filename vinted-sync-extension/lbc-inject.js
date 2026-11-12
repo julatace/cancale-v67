@@ -25,6 +25,24 @@
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
   const CAPTEUR_VERSION='5.361.0';
+  // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — UN CANAL PRIVÉ AVEC lbc-relay.js POUR
+  //    LES ORDRES. Les ordres du fond (pause, suppression, réponse — leur jeton, le
+  //    texte du message) et leurs résultats passaient par `window.postMessage(…,'*')` :
+  //    tout script de la page les lisait, et pouvait poster un faux résultat 200
+  //    (« supprimée / envoyé » sans que rien ne soit parti) ou une fausse recette
+  //    « apprise ». Dès le chargement (document_start, monde MAIN, AVANT tout script
+  //    de la page), un `MessageChannel` ; son second port est remis UNE fois au
+  //    relais, qui ne croit que lui pour les ordres, les résultats et les recettes.
+  let canalOrdres = null;
+  const ecoutesOrdres = [];
+  try {
+    const mc = new MessageChannel();
+    canalOrdres = mc.port1;
+    canalOrdres.onmessage = (e) => { const d = e && e.data; if (!d || typeof d !== 'object') return; for (const f of ecoutesOrdres) { try { f(d); } catch (_) {} } };
+    window.postMessage({ __tag: 'CANCALE_LBC_CANAL' }, location.origin, [mc.port2]);
+  } catch (_) { canalOrdres = null; }
+  const surOrdre = (fn) => { ecoutesOrdres.push(fn); };
+  const versRelais = (payload) => { try { if (canalOrdres) canalOrdres.postMessage(Object.assign({ __tag: 'CANCALE_LBC' }, payload)); } catch (_) {} };
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;
@@ -830,7 +848,7 @@
     try {
       if (!(statut >= 200 && statut < 300)) return;
       const r = recetteEnvoiLbc(url, methode, corps, entetes);
-      if (r) post({ kind: 'lbcenvoiappris', recette: r });
+      if (r) versRelais({ kind: 'lbcenvoiappris', recette: r });   // 5.362 : canal privé seulement
     } catch (_) {}
   }
   // Certaines pages contiennent déjà les données : aucun fetch n'aura lieu.
@@ -934,14 +952,17 @@
   const URL_SUPPRIME_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads';
   const ORDRES_LBC = { pause: { url: URL_PAUSE_LBC, methode: 'PUT' }, supprime: { url: URL_SUPPRIME_LBC, methode: 'DELETE' } };
   let pauseEnCours = false;
-  try { window.addEventListener('message', async (event) => {
-    const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || !Object.prototype.hasOwnProperty.call(ORDRES_LBC, d.kind)) return;
+  try { surOrdre(async (d) => {
+    if (!d || d.__tag !== 'CANCALE_LBC_ORDRE' || !Object.prototype.hasOwnProperty.call(ORDRES_LBC, d.kind)) return;
     const ordre = ORDRES_LBC[d.kind];
     const id = String(d.id || ''), jeton = String(d.jeton || '');
     if (!/^\d{6,12}$/.test(id) || !/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
     if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return;
-    if (pauseEnCours) { post({ kind: 'lbcpauseresultat', jeton, id, statut: 0, erreur: 'en-cours' }); return; }
+    if (pauseEnCours) { versRelais({ kind: 'lbcpauseresultat', jeton, id, statut: 0, erreur: 'en-cours' }); return; }
+    // ⚠️ 5.362 (revue, moyenne 58) : l'ordre ne part qu'au nom du compte privé de
+    //    CETTE page, celui que le fond attend (comme `repondre`) — un compte basculé
+    //    entre la vérification du fond et l'ordre ⇒ rien ne part.
+    { const moi = moiLbc(); if (!moi || String(d.compte || '') !== moi) { versRelais({ kind: 'lbcpauseresultat', jeton, id, statut: 0, erreur: moi ? 'autre-compte' : 'compte-pas-su' }); return; } }
     pauseEnCours = true;
     try {
       const h = Object.assign({}, entetesPintad || entetesApi || {}, { 'Content-Type': 'application/json', Accept: 'application/json' });
@@ -953,18 +974,17 @@
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       let cles = [];
       try { cles = cheminsDeCles(JSON.parse(corps)).slice(0, 60); } catch (_) {}
-      post({ kind: 'lbcpauseresultat', jeton, id, quoi: d.kind, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
+      versRelais({ kind: 'lbcpauseresultat', jeton, id, quoi: d.kind, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
     } finally { pauseEnCours = false; }
   }); } catch (_) {}
   // ── 5.318 : RÉPONDRE, SUR SON CLIC (l'ordre vient du fond par lbc-relay.js) ──
   let envoiMsgEnCours = false;
   const poserLbc = (o, ch, v) => { let x = o; for (let i = 0; i < ch.length - 1; i++) { if (!x[ch[i]] || typeof x[ch[i]] !== 'object') x[ch[i]] = {}; x = x[ch[i]]; } x[ch[ch.length - 1]] = v; };
-  try { window.addEventListener('message', async (event) => {
-    const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'repondre') return;
+  try { surOrdre(async (d) => {
+    if (!d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'repondre') return;
     const jeton = String(d.jeton || ''), conv = String(d.conv || ''), texte = typeof d.texte === 'string' ? d.texte : '';
     if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
-    const fin = (o) => post(Object.assign({ kind: 'lbcenvoiresultat', jeton }, o));
+    const fin = (o) => versRelais(Object.assign({ kind: 'lbcenvoiresultat', jeton }, o));
     if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-leboncoin' });
     const r = d.recette;
     if (!/^[\w-]{3,64}$/.test(conv) || !texte.trim() || texte.length > 2000) return fin({ statut: 0, erreur: 'invalide' });
