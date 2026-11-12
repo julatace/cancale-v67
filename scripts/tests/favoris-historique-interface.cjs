@@ -6,7 +6,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  // sans embarquer toute l'app (ses CSS, ses migrations) dans ce banc de l'écran Favoris.
  const sansApp={name:'sans-app',setup(b){b.onResolve({filter:/(^|\/)App\.jsx$/},()=>({path:'App.jsx',namespace:'sans-app'}));b.onLoad({filter:/.*/,namespace:'sans-app'},()=>({contents:'export const lireTout=async()=>null;',loader:'js'}));b.onResolve({filter:/\.css$/},a=>({path:a.path,namespace:'css-vide'}));b.onLoad({filter:/.*/,namespace:'css-vide'},()=>({contents:'',loader:'js'}));}};
  const racine=path.resolve(__dirname,'../..');const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`
- import React from'react';import{createRoot}from'react-dom/client';import Favoris from'./src/FavorisVinted.jsx';
+ import React from'react';import{createRoot}from'react-dom/client';import{ajouterSourceApp}from'./src/i18n/index.js';import frApp from'./src/i18n/langues/fr.js';ajouterSourceApp(frApp);import Favoris from'./src/FavorisVinted.jsx';
  const root=createRoot(document.getElementById('root'));window.pages=0;window.envois=0;window.ouvertures=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async t=>window.controleCopie=t},configurable:true});
  const dateNotification=new Date(Date.now()-7*3600000).toISOString();const note=i=>({id:'n'+i,body:'Camille '+i+' a ajouté ton article à ses favoris.',actor:{login:'Camille '+i},link:'/items/'+(100+i)+'/conversation/new',user_id:200+i,created_at:dateNotification,is_read:true});
  window.fetch=async(url,opts={})=>{const ok=x=>({ok:true,json:async()=>x});
@@ -19,7 +19,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  window.afficherFavoris=()=>root.render(<Favoris articlesVendus={new Set(window.idsVendus||[])} uid="123" owner="owner-test" ownerActuel={()=>'owner-test'} base="https://base.invalid" headers={()=>({})} ouvrirFavori={async x=>{window.ouvertures.push(x.id);return await new Promise(r=>window.accuserOuverture=r);}} executerFavori={async()=>{window.envois++;throw Error('No real sending');}} verifierExtension={async()=>({disponible:true,canal:'Chrome direct'})} recupererPage={async()=>{window.pages++;return{ok:true,data:{pagesLues:window.pages,totalPages:2,complete:window.pages===2}};}}/>);window.afficherFavoris();`},bundle:true,write:false,format:'iife',logLevel:'silent',plugins:[sansApp]});
  const b=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});let n=0;const check=(v,m)=>{assert.ok(v,m);n++;};
  try{for(const width of [320,390,1512]){const p=await b.newPage({viewport:{width,height:950}});await p.setContent('<div id="root"></div>');await p.addStyleTag({content:'body{margin:12px;font-family:Arial}'+fs.readFileSync(path.join(racine,'src/styles-captures.css'),'utf8')});await p.addScriptTag({content:bundle.outputFiles[0].text});
- await p.getByRole('button',{name:'Envoyer un message aux favoris',exact:true}).click();await p.locator('.vrm-favoris-rows article').waitFor();await p.getByText('Message déjà envoyé',{exact:true}).waitFor();
+ await p.getByRole('button',{name:'Plus d’outils',exact:true}).click();await p.locator('.vrm-favoris-rows article').waitFor();await p.getByText('Message déjà envoyé',{exact:true}).waitFor();
  check(await p.getByRole('button',{name:'Dans la file (0)',exact:true}).count()===1,'queue filter with count');
  check(await p.getByRole('button',{name:'Envoi à vérifier (0)',exact:true}).count()===1,'uncertain filter with count');
  check(await p.getByRole('checkbox',{name:'Sélectionner Camille 1',exact:true}).isDisabled(),'confirmed sent favorite cannot be selected');
@@ -108,7 +108,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  check(!assistance.lancement,'le rapport ne recycle pas un refus de lancement effacé');
  check(await p.evaluate(()=>window.envois===0&&window.pages===2),'loading history never dispatches a message');
  await p.evaluate(()=>{window.idsVendus=['103'];window.afficherFavoris();});
- await p.getByRole('button',{name:'Envoyer un message aux favoris',exact:true}).click();
+ await p.getByRole('button',{name:'Plus d’outils',exact:true}).click();
  await p.getByRole('button',{name:'Articles vendus (1)',exact:true}).click();
  check(await p.getByRole('checkbox',{name:'Sélectionner Camille 3',exact:true}).isDisabled(),'a sold article cannot be selected');
  check(await p.getByText('Article vendu',{exact:true}).count()===1,'sold article is labelled on its row');

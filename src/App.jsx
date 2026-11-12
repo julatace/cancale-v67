@@ -24881,7 +24881,7 @@ function CarteColisVc({ v, imprime, fait }) {
             <span style={{ fontWeight: 600 }}>Vestiaire</span>
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
-            <span data-colis-dates="">{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}{v.date && joursAttente(v.date) != null ? <span className="vrm-colis-vendue" data-colis-attente={joursAttente(v.date)} title={`Vendue le ${dateCourteVc(v.date)}`}>{urg ? ' · ' : ''}{texteAttenteVente(joursAttente(v.date))}</span> : null}</span>
+            <span data-colis-dates="">{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}{v.date && joursAttente(v.date) != null ? <span className="vrm-colis-vendue" data-colis-attente={joursAttente(v.date)} title={`Vendue le ${dateCourteVc(v.date)}`}>{urg ? '\u00a0· ' : ''}{texteAttenteVente(joursAttente(v.date))}</span> : null}</span>
             {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · déposé</span> : null}
           </div>
           {/* Le transporteur est écrit UNE fois : la pastille à côté du bouton bordereau. */}
@@ -50523,7 +50523,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             <Icon name="mail" size={13}/></button> : null}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
                             {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(urgTxt)}</span>}
-                            {att != null ? <span data-colis-attente={att}>{urgTxt ? ' · ' : ''}{texteAttenteVente(att)}</span> : null}
+                            {att != null ? <span data-colis-attente={att}>{urgTxt ? '\u00a0· ' : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
