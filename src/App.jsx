@@ -19734,11 +19734,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
       ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions) — ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>).</>
       : voie === 'serveur'
         ? (fenetreAncienne()
-          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>).</>
-          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe}, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton e-mail VRM'}</b>).</>)
+          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : fais un clic droit sur l'icône VRM {NAV.hautDe} (« Connexion à VRM ») et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>).</>
+          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : fais un clic droit sur l'icône VRM {NAV.hautDe} (« Connexion à VRM »), puis « avec mon mot de passe VRM » (<b>{monMail || 'ton e-mail VRM'}</b>).</>)
         : voie === 'page'
-          ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM.</>
-          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM {NAV.hautDe}, puis {boutonLierExt()}.</>}</span>; }
+          ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou fais un clic droit sur l'icône VRM {NAV.hautDe} (« Connexion à VRM ») et connecte-toi avec ton mot de passe VRM.</>
+          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : fais un clic droit sur l'icône VRM {NAV.hautDe} (« Connexion à VRM »), puis {boutonLierExt()}.</>}</span>; }
   // Autre compte : une extension CONNECTÉE ouvre VRM quand on clique son icône
   // (sa fenêtre n'apparaît plus) — « clique l'icône, Se déconnecter » serait
   // impossible à suivre. Avant la 5.171 elle n'entend pas le canal adressé : le
@@ -21409,9 +21409,9 @@ function TeteTransporteurs({ transp, colis, relire }) {
     {mrRefus > 0 && <div data-transp-mr-refus={sansSouris ? 'telephone' : (sait === 'ok' && navTransp ? navTransp : sait)} data-transp-mr-n={String(mrRefus)} style={st}>
       Mondial Relay refuse en ce moment la lecture du serveur VRM ({mrRefus} colis) : {sait === 'ok' && !sansSouris
         ? (navTransp === 'permission'
-          ? <>touche « Autoriser » dans la fenêtre de l'icône VRM.</>
+          ? <>touche « Autoriser » dans la fenêtre de l'icône VRM (clic droit sur l'icône → « État de l’extension »).</>
           : navTransp === 'passu'
-            ? <>ouvre la fenêtre de l'icône VRM pour vérifier la permission.</>
+            ? <>ouvre la fenêtre de l'icône VRM (clic droit sur l'icône → « État de l’extension ») pour vérifier la permission.</>
             : <>l'extension VRM {NAV.de} les lit à la place, depuis ton ordinateur.</>)
         : sansSouris
           ? <>ouvre VRM sur l'ordinateur où elle est installée.</>
