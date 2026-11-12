@@ -12,7 +12,7 @@ const crypto = require('crypto');
 
 const SERVICE = 'sb_secret_monde';
 const SECRET_WEBHOOK = 'whsec_monde_paiement';
-const rep = (corps, status = 200, entetes = {}) => new Response(corps === null ? null : typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json', ...entetes } });
+const rep = (corps, status = 200, entetes = {}) => new Response(corps === null || status === 204 ? null : typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json', ...entetes } });
 const formulaire = (s) => { const o = {}; for (const [k, v] of new URLSearchParams(s || '')) o[k] = v; return o; };
 const uuid = (n) => `${String(n).repeat(8).slice(0, 8)}-${String(n).repeat(4).slice(0, 4)}-4${String(n).repeat(3).slice(0, 3)}-8${String(n).repeat(3).slice(0, 3)}-${String(n).repeat(12).slice(0, 12)}`;
 
@@ -31,7 +31,7 @@ function creerMonde({ proprio = uuid(9), parrainageOuvert = true, obligatoire = 
     },
     // ── Base ──
     base: { abonnements: {}, essais: {}, vinted: [], codes: {}, parrainages: {}, reglages: { parrainage: parrainageOuvert ? '1' : '0', proprietaire: proprio } },
-    appels: [], n: 0,
+    appels: [], n: 0, file: [],
   };
   M.id = (p) => `${p}_${++M.n}`;
   M.ajouterUtilisateur = (n, email, { creeIlYa = 0 } = {}) => {
@@ -84,6 +84,7 @@ function creerMonde({ proprio = uuid(9), parrainageOuvert = true, obligatoire = 
         const f = formulaire(corps);
         if ('cancel_at_period_end' in f) s.cancel_at_period_end = f.cancel_at_period_end === 'true';
         for (const [k, v] of Object.entries(f)) { const mm = /^metadata\[(.+)\]$/.exec(k); if (mm) s.metadata[mm[1]] = v; }
+        M.file.push(['customer.subscription.updated', JSON.parse(JSON.stringify(s))]);   // ce que Stripe enverra
       }
       if (m === 'DELETE') { s.status = 'canceled'; }
       return rep(s);
@@ -180,9 +181,11 @@ function creerMonde({ proprio = uuid(9), parrainageOuvert = true, obligatoire = 
   M.finEssai = (id) => { const s = sub(id); s.status = 'active'; s.trial_end = null; const p = s.items.data[0].price;
     return [['customer.subscription.updated', s], ['invoice.paid', { id: M.id('in'), customer: s.customer, amount_paid: p.unit_amount, subscription: id }]]; };
   // La fin de la période payée d'un abonnement résilié.
+  // Les webhooks que Stripe enverrait après un changement fait par l'API.
+  M.enAttente = () => M.file.splice(0);
   M.finPeriode = (id) => { const s = sub(id); s.status = 'canceled'; return [['customer.subscription.deleted', s]]; };
 
-  let horloge = 1000;
+  let horloge = Math.floor(Date.now() / 1000);
   M.evenement = (type, objet) => JSON.stringify({ id: M.id('evt'), type, created: ++horloge, livemode: false, data: { object: objet } });
   M.signer = (corps, secret = SECRET_WEBHOOK, t = Math.floor(Date.now() / 1000)) => `t=${t},v1=${crypto.createHmac('sha256', secret).update(`${t}.${corps}`).digest('hex')}`;
   return M;

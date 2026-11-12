@@ -90,6 +90,7 @@ import { traiterAgenda } from './_lib/agenda-ics.js';                 // (10 nov
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
 import { effacerCompte } from './_lib/effacer-compte.js';
+import { pageExport } from './_lib/export-rgpd.js';   // (12 nov.) RGPD : toutes ses données
 import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov., lot DJ6)
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
@@ -1413,6 +1414,21 @@ async function apercuSuppression(req, res) {
     fenetreMinutes: FENETRE_RECENTE_MS / 60000, mot: MOT_CONFIRMATION });
 }
 
+// ── (12 nov.) « TÉLÉCHARGER TOUTES MES DONNÉES » (RGPD art. 15 et 20) ────────
+// Une page à la fois (`suite`), pour le compte de SA session seulement : la règle
+// et ce qui part sont dans api/_lib/export-rgpd.js. Ouvert avec ou sans
+// abonnement (ce n'est pas utiliser VRM, c'est repartir avec ses données).
+async function mesDonnees(req, res) {
+  const u = await utilisateurDe(req);
+  if (u === undefined) return repondre(res, 503, { ok: false, erreur: 'pas-su', message: 'Connexion pas vérifiée. Réessaie dans un instant.' });
+  if (!u) return repondre(res, 401, { ok: false, erreur: 'session' });
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  const proprio = SERVICE ? await lireProprietaire({ url: SUPABASE_URL, service: SERVICE }) : '';
+  if (proprio === undefined) return repondre(res, 503, { ok: false, erreur: 'pas-su', message: "Je n'ai pas pu tout lire. Relance l'export dans un instant." });
+  const r = await pageExport({ utilisateur: u, curseur: String((req.query && req.query.suite) || ''), url: SUPABASE_URL, service: SERVICE, proprio: proprio === u.id ? '' : proprio });
+  return repondre(res, r.code, r.corps);
+}
+
 async function supprimerCompte(req, res) {
   const g = await gardesSuppression(req, res);
   if (!g) return;
@@ -1846,6 +1862,7 @@ export default async function handler(req, res) {
   if (mode === 'oauth-sans-compte') return m === 'POST' ? annulerCompteOAuthNeuf(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'supprimer' || mode === 'fermer') return m === 'POST' ? supprimerCompte(req, res) : (m === 'GET' && mode === 'supprimer') ? apercuSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
+  if (mode === 'mes-donnees') return m === 'GET' ? mesDonnees(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
   // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :

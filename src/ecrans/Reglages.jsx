@@ -105,6 +105,7 @@ import {conflitAdresseCompte} from '../receptionEmail.js';
 import EspaceEmails from '../EspaceEmails.jsx';
 // ⟦← App.jsx #9⟧
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportDonnees.js";
+import { toutesMesDonnees } from "../exportRgpd.js";   // (12 nov.) RGPD : toutes ses données
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
@@ -1264,7 +1265,13 @@ async function exporterMesDonnees() {
   // « Sauvegarde complète » (restaurer VRM) reste, elle, fermée sans abonnement.
   try {
     const src = await sourcesExportDonnees();
-    const zip = zipStocke(fichiersExport(feuillesExport(src)));
+    // (12 nov., RGPD) + TOUTES ses données, générées par le serveur pour SA session
+    // (src/exportRgpd.js) ; une page ratée ⇒ le zip le DIT (INCOMPLET.txt).
+    toast('Export en préparation…');
+    const tout = await toutesMesDonnees({ entetes: enTeteSession });
+    const complet = tout.ok ? tout.fichiers : [{ nom: 'INCOMPLET.txt', texte: "Tes tableaux sont là, mais le reste de tes données n'a pas pu être lu.\r\nRelance « Exporter mes données » dans un instant.\r\n" }];
+    if (!tout.ok) toast('Export incomplet : relance-le dans un instant.');
+    const zip = zipStocke([...fichiersExport(feuillesExport(src)), ...complet]);
     telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
   } catch (e) { toast('Export pas créé : ' + (e && e.message || e)); }
 }
