@@ -16,6 +16,7 @@
 //      (§5 : une proposition peut utiliser la ressemblance, c'est toujours SON
 //      clic qui relie).
 import React, { useEffect, useRef, useState } from 'react';
+import { motsVendeur } from './profilVendeur.js';
 import { classer, NIVEAUX } from './empreintePhoto.js';
 import { mettreAJourIndex, empreinteDeFichier } from './indexPhotos.js';
 import { Numero } from './composants/Numero.jsx';
@@ -60,7 +61,7 @@ export default function RecherchePhoto({ C, Feuille, Bouton, PhotoVinted, lireCa
   const choix = (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
       <Bouton variante={etat === 'attente' ? 'primaire' : 'secondaire'} icone="camera" data-rp-prendre="" onClick={() => photoRef.current && photoRef.current.click()} style={{ minHeight: 44 }}>
-        {etat === 'attente' ? 'Prendre la paire en photo' : 'Autre photo'}
+        {etat === 'attente' ? `Prendre ${motsVendeur().le} en photo` : 'Autre photo'}
       </Bouton>
       <Bouton variante="secondaire" icone="image" data-rp-choisir="" onClick={() => imageRef.current && imageRef.current.click()} style={{ minHeight: 44 }}>Choisir une image</Bouton>
       <input ref={photoRef} type="file" accept="image/*" capture="environment" data-rp-fichier="camera" onChange={choisi} style={{ display: 'none' }} />
@@ -72,7 +73,7 @@ export default function RecherchePhoto({ C, Feuille, Bouton, PhotoVinted, lireCa
     <Feuille onClose={onClose} titre="Chercher par photo" data-recherche-photo="" data-rp-etat={etat}>
       <div style={{ padding: '0 16px 16px' }}>
         <p style={{ ...texte, marginTop: 0 }}>
-          Prends la paire en photo : VRM te montre les annonces dont la photo lui ressemble le plus. C'est toi qui choisis — rien n'est relié, et ta photo ne quitte pas cet appareil. Le mieux : la paire de profil, sur un fond uni.
+          Prends {motsVendeur().le} en photo : VRM te montre les annonces dont la photo lui ressemble le plus. C'est toi qui choisis — rien n'est relié, et ta photo ne quitte pas cet appareil. Le mieux : {motsVendeur().le} de profil, sur un fond uni.
         </p>
         {choix}
         {apercu && (
@@ -82,7 +83,7 @@ export default function RecherchePhoto({ C, Feuille, Bouton, PhotoVinted, lireCa
               {etat === 'calcul' && (progres && progres.total
                 ? <span data-rp-progres={`${progres.faits}/${progres.total}`}>Je prépare tes photos d'annonces : {progres.faits} sur {progres.total}. La première fois prend un moment, ensuite elles sont gardées sur cet appareil.</span>
                 : <span data-rp-progres="">Je compare…</span>)}
-              {etat === 'resultats' && <span>Les {res.top.length} plus ressemblantes, la plus proche d'abord. Vérifie la paire avant de t'en servir.</span>}
+              {etat === 'resultats' && <span>Les {res.top.length} plus ressemblantes, la plus proche d'abord. Vérifie {motsVendeur().le} avant de t'en servir.</span>}
               {etat === 'illisible' && <span data-rp-raison="illisible">Je n'arrive pas à lire cette image. Essaie une autre photo (JPEG ou PNG).</span>}
               {etat === 'pas-su' && <span data-rp-raison="lecture">Je n'ai pas pu lire tes annonces (la base n'a pas répondu). Rien n'est perdu : réessaie dans un instant.</span>}
               {etat === 'vide' && <span data-rp-raison="vide">Aucune photo d'annonce à comparer{res && res.illisibles ? ' : aucune n’a pu être lue ici' : ''}.</span>}
@@ -118,7 +119,7 @@ export default function RecherchePhoto({ C, Feuille, Bouton, PhotoVinted, lireCa
             {res.illisibles ? ` ${res.illisibles} n'${res.illisibles > 1 ? 'ont' : 'a'} pas pu être lue${res.illisibles > 1 ? 's' : ''} ici (ouvre VRM dans le navigateur où l'extension est installée, ou réessaie plus tard) : ${res.illisibles > 1 ? 'elles ne sont' : 'elle n’est'} pas dans la recherche.` : ''}
             {res.sansPhoto ? ` ${res.sansPhoto} fiche${res.sansPhoto > 1 ? 's' : ''} sans photo.` : ''}
             {(res.raisons || []).map((x) => ` ${x}`).join('')}
-            {' '}« Très proche » veut dire « ça y ressemble beaucoup », pas « c'est elle » : deux paires du même modèle et de la même couleur se ressemblent autant.
+            {' '}« Très proche » veut dire « ça y ressemble beaucoup », pas « c'est {motsVendeur().lui} » : deux {motsVendeur().noms} du même modèle et de la même couleur se ressemblent autant.
           </p>
         )}
       </div>

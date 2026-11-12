@@ -38,7 +38,7 @@ import { sbCle } from './cle.js';
 import { coffrePret, chiffrerCoffre, dechiffrerCoffre } from './coffre.js';
 import { envoyerSmtp, FOURNISSEURS, fournisseurDe, hoteValide, emailSur } from './smtp.js';
 import { gabaritMail } from './mail-gabarit.js';
-import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, nomFichier, MESSAGE_DEFAUT, emailFacture, adresseVintedLisible, emailValide } from '../../src/facturePro/regle.js';
+import { refusMarge, manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, nomFichier, MESSAGE_DEFAUT, emailFacture, adresseVintedLisible, emailValide } from '../../src/facturePro/regle.js';
 import { preuveAcheteur } from '../../src/facturePro/rattachement.js';
 import { pdfFacture } from '../../src/facturePro/pdf.js';
 import { configurationRelances } from './relances-essai.js';
@@ -316,6 +316,9 @@ export async function emettre(owner, corps, res) {
   };
   const mvt = manquantsVente(vente);
   if (mv.length || mvt.length) return repondre(res, 409, { erreur: 'incomplet', manquants: [...mv, ...mvt] });
+  // (11 nov., lot tva-marge) TVA sur marge : aucune TVA apparente (art. 297 E) — refusé AVANT le numéro.
+  const rm = refusMarge(cfg, vente);
+  if (rm) return repondre(res, 409, { erreur: 'tva-apparente', message: `Pas de facture : ${rm}` });
   // Le numéro : celui du brouillon d'avant (jamais envoyé) s'il en a un, sinon un neuf.
   let numero = ligne && ligne.number ? String(ligne.number) : '';
   if (!numero) {

@@ -101,7 +101,7 @@ async function ouvrir(b, vp, { sombre = false, url = '/?tab=messages&site=toutes
     if (relies) localStorage.setItem('vrm_fils_relies', JSON.stringify(relies));
   } catch (_) {} }, { s: sombre, relies });
   await pg.addInitScript(PONT, { version: '5.335.0' });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

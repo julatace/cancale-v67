@@ -216,6 +216,9 @@
 .vrm-s2d-aussi { position: absolute; right: 4px; bottom: 22px; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 5px; border-radius: 6px; }
 @media (min-width: 760px) { .vrm-s2d-gestes .vrm-b { flex: 0 1 220px; } }
 
+/* (11 nov., lot accessibilité) La pastille du N° d'une vignette MINI : 2 px du bord et 3 px de marge
+   intérieure — « N°123 » tient dans 44 px (il était coupé en « N°1… »). */
+.vrm-s2d-num[data-mini] { left: 2px; bottom: 2px; max-width: calc(100% - 4px); padding: 0 3px; }
 /* (11 nov., lot DJ4) Une paire en ligne sur plusieurs sites = UNE ligne, une pastille par site.
    Neutres (aucune couleur d'accent : §7). Le « à part » (à confirmer, masquées, gardées) : replis. */
 .vrm-s2d-sites { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0 1px; }

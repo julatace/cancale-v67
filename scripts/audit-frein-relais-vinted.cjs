@@ -64,6 +64,7 @@ const stockage = () => { const m = new Map(); return { getItem: (k) => (m.has(k)
       extSait: () => (opts.extension ? 'ok' : 'absente'),
       vmrExec: async () => { appels.exec++; return { ok: true, data: { conversations: [{ id: 10 }] } }; },
       classifyOrderStatus: () => 'pending',
+      appliquerPrixProCompte: async (uid, items) => items,   // (11 nov., intégration) lot vinted-pro : prix Pro appliqué aux ventes lues (sans effet ici)
     };
     vm.createContext(ctx);
     vm.runInContext([fonction('vintedApiCall'), fonction('fetchVintedOrders'), fonction('fetchVintedConversations')].join('\n')

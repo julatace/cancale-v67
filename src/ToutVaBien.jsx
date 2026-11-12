@@ -23,6 +23,7 @@ import { nomPlateforme } from './plateformes.js';
 import { ageLecture } from './comptesLies.js';
 import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
 import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS, useEstProprietaire, enTeteSession } from './App.jsx';
+import { lireEtatsComptes } from './etatsComptesLecture.js';
 import { AlertesProduction } from './composants/AlertesProduction.jsx';
 import { aVoirCapture } from './santeDonnees.js';
 import { LigneSante } from './SanteDonnees.jsx';
@@ -41,14 +42,8 @@ async function lireDerniereVersion() {
     return { ver: d.ver ? String(d.ver) : '', code: d.code ? String(d.code) : '', at: Date.parse(d.at || '') || 0 };
   } catch (_) { return null; }
 }
-async function lireEtatsVinted() {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_comptes_etat&select=c:data->comptes`, { headers: sbAuth() });
-    if (!r.ok) return null;
-    const rows = await r.json();
-    return Array.isArray(rows) ? ((rows[0] && rows[0].c && typeof rows[0].c === 'object') ? rows[0].c : {}) : null;
-  } catch (_) { return null; }
-}
+// (11 nov., intégration) La lecture partagée avec « Santé des comptes » (une seule requête en vol).
+const lireEtatsVinted = () => lireEtatsComptes();
 // Un appareil actif qui porte une preuve (un refus courant, un compte vu) : seul
 // cas où la ligne ambre a besoin de lire les comptes.
 const aUnePreuve = (apps, maintenant) => (apps || []).some((a) => maintenant - a.at <= ACTIF_MS && Object.values(a.flux).some((f) => f && f.koAt && !(f.okAt > f.koAt))

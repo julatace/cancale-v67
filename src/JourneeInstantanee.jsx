@@ -11,6 +11,7 @@
 import React from 'react';
 import { instantaneMontrable } from './journeeInstantanee.js';
 import { PileVignettes } from './design/PileVignettes.jsx';
+import { GrandChiffre } from './design/CarteMois.jsx';
 import { BarreObjectif } from './design/CarteStats.jsx';
 import { SqLignes } from './Squelette.jsx';
 // (9 nov., soir) Le rendu commun des instantanés (Ma journée, Colis, Ventes).
@@ -97,7 +98,7 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
                       ? <div className="vrm-fu-grand vrm-jv2-grand is-vide" data-ji-vendu="">—</div>
                       : P.vendu === '0'
                         ? <div className="vrm-jv2-grand is-zero" data-ji-vendu="0">Rien vendu</div>
-                        : <div className="vrm-fu-grand vrm-jv2-grand" data-ji-vendu={P.vendu}>{P.grand}</div>}
+                        : <GrandChiffre className="vrm-fu-grand vrm-jv2-grand" data-ji-vendu={P.vendu}>{P.grand}</GrandChiffre>}
                     <p className="vrm-jv2-faits">{(P.faits || []).map((f, i) => <React.Fragment key={i}>{i ? ' ' : ''}<span>{f}</span></React.Fragment>)}</p>
                   </div>
                 </div>

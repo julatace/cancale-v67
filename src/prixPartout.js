@@ -17,7 +17,20 @@
 //    prouvée pour changer un prix ⇒ « À faire sur le site », avec le lien.
 // ⚠️ Le prix mini des offres automatiques (fiche Vinted `min`) n'est JAMAIS
 //    changé ici : s'il dépasse le nouveau prix, la feuille le dit.
-// Module PUR : la feuille (src/PrixPartout.jsx) et `audit-prix-partout.cjs`.
+// Module PUR : la feuille (src/PrixPartout.jsx) et `audit-publier-partout.cjs` (section P).
+//
+// (11 nov. soir, validé par Julien : « un prix modifié dans VRM change partout »)
+//   · le prix TAPÉ est celui de l'annonce Vinted ; chaque autre site reçoit SON
+//     ajustement réglé dans « Publier partout » (`vrm_partout_prix`, src/publierPartout.js :
+//     ± € / ± % ; Vestiaire = le prix tapé) — `prixParSite` ;
+//   · eBay : la route `revise`, puis le prix RELU chez eBay (`regle.lecture.prix`) :
+//     relu = demandé ⇒ « fait ✓ relu » ; relu autre ⇒ « pas sûr » avec le prix vu ;
+//     pas relu ⇒ « fait » sans « relu » (jamais supposé) ;
+//   · Vinted : VRM PROPOSE (mode 'propose') — la feuille « Baisser le prix » existante
+//     s'ouvre sur CETTE annonce au nouveau prix, et c'est SON clic là-bas qui envoie ;
+//     une hausse ne se propose pas (« à faire sur le site ») ;
+//   · Leboncoin, Vestiaire : toujours « à faire sur le site », avec le prix À METTRE.
+import { prixPourSite, reglagePrix } from './publierPartout.js';
 
 const str = (v) => String(v == null ? '' : v).trim();
 const arr = (a) => (Array.isArray(a) ? a : []);
@@ -60,10 +73,11 @@ export function sitesDuNumero(cle, { rn, fiches, lbcItems, vcItems } = {}, o = {
     const f = fiches && fiches[String(a.id)];
     if (f && f.numero != null && !meme(f.numero)) continue;            // la fiche dit autre chose : on ne touche pas
     const mini = f ? montant(f.min) : null;
-    const auto = o.capVinted === 'ok' && a.accountId != null && /^\d+$/.test(String(a.accountId));
+    // (11 nov. soir) Vinted : VRM PROPOSE (« Baisser le prix », son clic) — jamais envoyé d'ici.
+    const compteOk = a.accountId != null && /^\d+$/.test(String(a.accountId));
     sites.push({ cle: 'vinted:' + a.id, site: 'vinted', id: String(a.id), compte: a.accountId != null ? String(a.accountId) : null,
-      titre: a.title || '', prix: montant(a.price), mini, mode: auto ? 'app' : 'site',
-      raison: auto ? null : o.capVinted === 'retard' ? 'extension à mettre à jour' : 'extension absente de ce navigateur',
+      titre: a.title || '', prix: montant(a.price), mini, mode: compteOk ? 'propose' : 'site',
+      raison: compteOk ? null : 'compte introuvable',
       lien: `https://www.vinted.fr/items/${encodeURIComponent(String(a.id))}` });
   }
   // eBay : les annonces dont le SKU désigne ce N° (`numEbayAnnonce`, déjà appliqué par `toutSurLeNumero`).
@@ -105,20 +119,45 @@ export const minisAuDessus = (sites, prix) => arr(sites).filter((s) => s.site ==
 // `envoyer` : { vinted(site, prix), ebay(site, prix) } → { etat: 'fait'|'refuse'|'incertain', raison }.
 // Rend { [cle]: { etat: 'fait'|'refuse'|'incertain'|'a-faire'|'ignore', raison } }.
 // Un site en mode 'site' n'est jamais envoyé : « À faire sur le site ».
-export async function appliquerPrix({ sites, coches, prix, envoyer = {}, surEtat } = {}) {
+// Le prix de CHAQUE site pour un prix tapé (celui de Vinted) : l'ajustement réglé
+// (`vrm_partout_prix`) ; null ⇒ le réglage donne 0 € ou moins (rien ne part).
+export function prixParSite(site, p, reglage) {
+  const n = prixTape(p);
+  if (n == null) return null;
+  if (site === 'vinted') return n;
+  const r = reglagePrix(reglage)[site];
+  return r ? prixPourSite(n, r) : n;
+}
+// `reglage` : `vrm_partout_prix` (absent ⇒ le même prix partout).
+// États : envoi · fait (relu: true quand le site l'a RELU au prix demandé) ·
+// refuse · incertain · a-faire (le prix à mettre sur le site) · propose (Vinted :
+// la feuille « Baisser le prix » s'ouvre, son clic) · ignore.
+export async function appliquerPrix({ sites, coches, prix, envoyer = {}, surEtat, reglage = null } = {}) {
   const p = prixTape(prix);
   const res = {};
   if (p == null) return { erreur: 'prix', res };
+  const dire = (cle, e) => { res[cle] = e; if (surEtat) surEtat(cle, e); };
   for (const s of arr(sites)) {
     if (!coches || !coches.has(s.cle)) { res[s.cle] = { etat: 'ignore', raison: null }; continue; }
-    if (s.mode !== 'app' || typeof envoyer[s.site] !== 'function') { res[s.cle] = { etat: 'a-faire', raison: s.raison || null }; if (surEtat) surEtat(s.cle, res[s.cle]); continue; }
-    if (s.prix != null && Math.round(s.prix * 100) === Math.round(p * 100)) { res[s.cle] = { etat: 'fait', raison: 'déjà à ce prix', inchange: true }; if (surEtat) surEtat(s.cle, res[s.cle]); continue; }
-    if (surEtat) surEtat(s.cle, { etat: 'envoi' });
+    const cible = prixParSite(s.site, p, reglage);
+    if (cible == null) { dire(s.cle, { etat: 'refuse', raison: 'ton réglage de prix pour ce site donne 0 € ou moins', prix: null }); continue; }
+    const meme = s.prix != null && Math.round(s.prix * 100) === Math.round(cible * 100);
+    if (s.mode === 'propose') {
+      if (meme) { dire(s.cle, { etat: 'fait', raison: 'déjà à ce prix', inchange: true, prix: cible }); continue; }
+      if (s.prix != null && cible > s.prix) { dire(s.cle, { etat: 'a-faire', raison: 'une hausse se fait sur Vinted', prix: cible }); continue; }
+      dire(s.cle, { etat: 'propose', raison: null, prix: cible, avant: s.prix }); continue;
+    }
+    if (s.mode !== 'app' || typeof envoyer[s.site] !== 'function') { dire(s.cle, { etat: 'a-faire', raison: s.raison || null, prix: cible }); continue; }
+    if (meme) { dire(s.cle, { etat: 'fait', raison: 'déjà à ce prix', inchange: true, prix: cible }); continue; }
+    if (surEtat) surEtat(s.cle, { etat: 'envoi', prix: cible });
     let r;
-    try { r = await envoyer[s.site](s, p); } catch (_) { r = { etat: 'incertain', raison: 'pas de réponse' }; }
-    const etat = r && (r.etat === 'fait' || r.etat === 'refuse' || r.etat === 'incertain') ? r.etat : 'incertain';
-    res[s.cle] = { etat, raison: (r && r.raison) || null };
-    if (surEtat) surEtat(s.cle, res[s.cle]);
+    try { r = await envoyer[s.site](s, cible); } catch (_) { r = { etat: 'incertain', raison: 'pas de réponse' }; }
+    let etat = r && (r.etat === 'fait' || r.etat === 'refuse' || r.etat === 'incertain') ? r.etat : 'incertain';
+    let raison = (r && r.raison) || null;
+    // Relu après : le prix que le site MONTRE. Autre que demandé ⇒ « pas sûr », dit.
+    const relu = r && r.prixRelu != null && Number.isFinite(Number(r.prixRelu)) ? Math.round(Number(r.prixRelu) * 100) / 100 : null;
+    if (etat === 'fait' && relu != null && Math.round(relu * 100) !== Math.round(cible * 100)) { etat = 'incertain'; raison = `le site montre ${String(relu).replace('.', ',')} €`; }
+    dire(s.cle, { etat, raison, prix: cible, relu: etat === 'fait' && relu != null });
   }
   return { prix: p, res };
 }
@@ -143,8 +182,11 @@ export function noterJournalPrix(journal, cle, prix, sites, res, maintenant = ne
 export function envoisPrix(dep) {
   return {
     ebay: async (s, p) => {
-      const r = dep.resultatReviseEbay(await dep.appelEbay({ action: 'revise', itemId: s.id, price: String(p), prixVu: s.prix, confirme: true, ...dep.corpsCompteEbay(s.compte) }));
-      return { etat: r.etat === 'ok' ? 'fait' : r.etat === 'ko' ? 'refuse' : 'incertain', raison: r.msg || null };
+      const brut = await dep.appelEbay({ action: 'revise', itemId: s.id, price: String(p), prixVu: s.prix, confirme: true, ...dep.corpsCompteEbay(s.compte) });
+      const r = dep.resultatReviseEbay(brut);
+      // La route relit l'annonce après l'écriture (GetItem) : son prix, s'il est lu.
+      const lu = brut && brut.j && brut.j.regle && brut.j.regle.lecture ? brut.j.regle.lecture.prix : null;
+      return { etat: r.etat === 'ok' ? 'fait' : r.etat === 'ko' ? 'refuse' : 'incertain', raison: r.msg || null, prixRelu: lu == null ? null : lu };
     },
     vinted: async (s, p) => {
       if (!s.compte) return { etat: 'refuse', raison: 'compte introuvable' };

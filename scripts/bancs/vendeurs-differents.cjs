@@ -44,6 +44,10 @@ function navAvec(nav, { proprio, orion = false }) {
       const np = ctx.newPage.bind(ctx);
       ctx.newPage = async () => {
         const pg = await np();
+        // (11 nov., ci-vert) Un vendeur déjà configuré : « Ma configuration » (parcours d'arrivée plein
+        // écran, lot accompagnement-nouveau-vendeur) couvrait l'app et prenait le clic sur « Plus ». Ce
+        // banc juge le menu et les chiffres ; le parcours a son banc (configuration-depart).
+        await pg.addInitScript(() => { try { if (!localStorage.getItem('vrm_configuration')) localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); } catch (_) {} });
         pg.__routeApi = true;
         const orig = pg.route.bind(pg);
         pg.route = async (motif, f) => {
@@ -113,17 +117,22 @@ async function capture(pg, nom) {
         // (9 nov., lot AL) « Republier » n'est plus une entrée du menu (une vue d'Annonces) : jamais dans le menu, en Simple comme en Complet.
         dit(!eS.includes('garage') && !eS.includes('republier'), `A3 ${cle} Simple : ni Stock ni Republier dans le menu`, eS.join(','));
         dit(!eS.some((x) => /^plat_(ebay|leboncoin|vestiaire)$/.test(x)), `A4 ${cle} Simple : aucun site jamais relié dans le menu`, eS.join(','));
-        dit(eS.includes('compta') && eS.includes('settings'), `A5 ${cle} Simple : Compta et Paramètres restent`, eS.join(','));
+        // (11 nov., ci-vert) Paramètres vit derrière la photo du profil (lot DJ6) : plus une entrée du menu ;
+        // « Argent » (`compta`) reste, et le profil qui mène à Paramètres est là.
+        const profilLa = await pg.evaluate(() => !!document.querySelector('[data-profil-tete], [data-nav-compte-ouvre="profil"]'));
+        dit(eS.includes('compta') && !eS.includes('settings') && profilLa, `A5 ${cle} Simple : Argent reste, Paramètres derrière le profil`, eS.join(',') + ' · profil ' + profilLa);
         const cS = await compteurs(pg);
         await capture(pg, `A-journee-simple-${cle}`);
         // « Complet » d'un geste (le réglage), puis les mêmes compteurs.
         await pg.evaluate(() => { localStorage.setItem('vrm_affichage', JSON.stringify({ choix: 'complet', at: new Date().toISOString() })); });
-        await pg.reload({ waitUntil: 'domcontentloaded' });
+        // (11 nov., ci-vert) Rouvrir Ma journée PAR SON LIEN : un rechargement de « / » reprend le dernier
+        // écran TOUCHÉ (lot reprise-ecrans : un écran ouvert par `?tab=` n'est pas un geste), ici Paramètres.
+        await pg.goto(new URL('/?tab=journee', pg.url()).href, { waitUntil: 'domcontentloaded' });
         await attendre(4500);
         const eC = await entreesVues(pg, tel);
         dit(eC.includes('garage') && !eC.includes('republier'), `A6 ${cle} Complet : Stock revient (Republier vit dans Annonces, lot AL)`, eC.join(','));
         const cC = await compteurs(pg);
-        dit(Object.keys(cS).length > 0 && JSON.stringify(cS) === JSON.stringify(cC), `A7 ${cle} aucun compteur ni chiffre de Ma journée ne change entre Simple et Complet`, JSON.stringify(cS) + ' ≠ ' + JSON.stringify(cC));
+        dit(Object.keys(cS).length > 0 && JSON.stringify(cS) === JSON.stringify(cC), `A7 ${cle} aucun compteur ni chiffre de Ma journée ne change entre Simple et Complet`, Object.keys({ ...cS, ...cC }).filter((k) => cS[k] !== cC[k]).map((k) => `${k}: ${JSON.stringify(cS[k])} ≠ ${JSON.stringify(cC[k])}`).join(" ¦ "));
         await pg.goto(new URL('/?tab=garage', pg.url()).href, { waitUntil: 'domcontentloaded' });
         await attendre(3500);
         const st = await pg.evaluate(() => { const e = document.querySelector('[data-stock-resume]'); return e ? e.textContent : ''; });

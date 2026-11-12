@@ -1,0 +1,28 @@
+/* (11 nov., lot sante-comptes) La santé de chaque compte Vinted (src/SanteComptes.jsx).
+   Neutre (§7) : l'AMBRE seulement pour « À surveiller » et sa raison (un geste à faire) ;
+   jamais de rouge, jamais de vert ; « En forme » reste en encre. */
+.vrm-sc { display: flex; flex-direction: column; gap: 0; }
+.vrm-sc-vide { margin: 4px 0 0; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-sc-compte { padding: 12px 0; border-top: 0.5px solid var(--vrm-line, rgba(60, 60, 67, .18)); min-width: 0; }
+.vrm-sc-carte .vrm-sc-compte:first-of-type, .vrm-sc-reglages .vrm-sc-compte:first-child { border-top: 0; padding-top: 4px; }
+.vrm-sc-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.vrm-sc-nom { font-size: 16px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-sc-etat { flex-shrink: 0; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--vrm-card2, #F2F2F7); color: var(--vrm-ink, #1D1D1F); white-space: nowrap; }
+.vrm-sc-etat[data-ton="surveiller"] { background: var(--vrm-warn-soft, #FFF4E5); color: var(--vrm-warn, #B25000); }
+.vrm-sc-etat[data-ton="passu"] { color: var(--vrm-muted, #6E6E73); }
+.vrm-sc-raison { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-top: 4px; font-size: 14px; line-height: 1.4; color: var(--vrm-warn, #B25000); font-variant-numeric: tabular-nums; }
+.vrm-sc-raison > span { min-width: 0; overflow-wrap: anywhere; }
+.vrm-sc button.vrm-sc-geste { appearance: none; min-height: 44px; padding: 0 4px; border: 0 !important; background: none !important; box-shadow: none !important; font: 600 15px/1.2 var(--vrm-police, -apple-system, system-ui, sans-serif); color: var(--vrm-b-lien, var(--vrm-accent-texte, #0066CC)); cursor: pointer; flex-shrink: 0; }
+.vrm-sc-sous { margin: 4px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-sc-pourquoi { appearance: none; border: 0; background: none; padding: 0; min-height: 44px; font: inherit; font-size: 14px; font-weight: 500; color: var(--vrm-muted, #6E6E73); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 0.5px; }
+.vrm-sc-pourquoi[aria-expanded="true"] { color: var(--vrm-ink, #1D1D1F); }
+.vrm-sc-inds { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.vrm-sc-ind { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-sc-ind-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
+.vrm-sc-ind-nom { font-size: 14px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-sc-ind-val { font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.vrm-sc-ind[data-sc-alerte="1"] .vrm-sc-ind-val { color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-sc-ind[data-sc-lu="0"] .vrm-sc-ind-val { color: var(--vrm-muted, #6E6E73); }
+.vrm-sc-ind-tend { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-sc-ind-ps { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-sc-ind-src { font-size: 12px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }

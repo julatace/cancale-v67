@@ -30,6 +30,9 @@ const ACCS = [
   { id: 3, vinted_user_id: '333', login: 'troisieme', domain: 'www.vinted.fr', updated_at: iso(auj), created_at: iso(auj - 2 * 86400e3), owner: null },
 ];
 // L'état publié par l'extension (la forme EXACTE de `publierImport`, background.js 5.344).
+// (11 nov., lot extension-visuel) La version demandée est celle de l'app (`EXT_ATTENDUE`),
+// lue dans src/App.jsx — elle monte à chaque version d'extension, le banc ne la recopie pas.
+const EXT_ATTENDUE_APP = (/const EXT_ATTENDUE = '([\d.]+)'/.exec(require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '?';
 const ligne = (uid, o) => ({ id: `import_vinted_${uid}`, data: Object.assign({ v: 1, type: 'import', uid, code: '5.344.0', capturedAt: iso(auj), at: auj, debut: auj - 3600e3, demande: false, repriseA: null, cause: null, fin: null }, o) });
 let ROWS = [];
 const ROWS_DEFAUT = () => [
@@ -86,7 +89,7 @@ async function page(b, T, { sombre = false, version = '5.344.0', onglet = '222' 
   const errs = [], ecrits = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(({ sombre }) => { try { if (sessionStorage.getItem('__banc')) return; sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { sombre });
   await pg.addInitScript(PONT, { version, onglet });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
@@ -180,7 +183,7 @@ const capture = async (pg, nom, sel) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           const { ctx, pg } = await page(b, T, { sombre, version: '5.341.0' });
           await ouvrirReglages(pg);
           const s = await lireR(pg);
-          dit(s && /Mets l'extension à jour \(5\.344\.0\)/.test(s.ext) && !Object.values(s.L).some((x) => x.bouton), 'B1 extension 5.341 : « Mets l’extension à jour (5.344.0) », aucun bouton', s && s.ext);
+          dit(s && new RegExp("Mets l'extension à jour \\(" + EXT_ATTENDUE_APP.replace(/\./g, '\\.') + "\\)").test(s.ext) && !Object.values(s.L).some((x) => x.bouton), 'B1 extension 5.341 : « Mets l’extension à jour (5.344.0) », aucun bouton', s && s.ext);
           await ctx.close();
         });
         await essaie('C' + suf, async () => {

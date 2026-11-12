@@ -93,7 +93,7 @@ const ouvrir = async (b, vp, sombre) => {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: maintenant });
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!sombre);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const main = { ...MAIN, ...(sombre ? { vinted_dark: true } : {}) };
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

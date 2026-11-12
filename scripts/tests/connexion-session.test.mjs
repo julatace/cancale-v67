@@ -5,6 +5,9 @@ import vm from "node:vm";
 // (11 nov., lot DJ6) Le retour OAuth lit l'intention du clic (src/auth/compteNeuf.js) : la vraie règle, pas une copie.
 import { lireIntention as lireIntentionOAuth } from "../../src/auth/compteNeuf.js";
 import * as lienEmail from "../../src/lienEmail.js";
+import { messageErreurOAuth } from "../../src/auth/erreursOAuth.js";
+import { prendreEssais, oterEssai, candidatsVerificateur, ESSAIS_MAX } from "../../src/auth/essaisPkce.js";
+import { lireReconnexion, reconnexionPermise } from "../../src/auth/reconnexion.js";
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source = fs.readFileSync(
@@ -172,6 +175,17 @@ function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
     RECOVERY_PENDING: false,
     lireLiaisonOAuth: () => null,
     lireIntentionOAuth,
+    // (11 nov., lot connexions-oauth) les vraies règles importées par App.jsx.
+    messageErreurOAuth,
+    prendreEssais,
+    oterEssai,
+    candidatsVerificateur,
+    ESSAIS_MAX,
+    toast() {},
+    setTimeout,
+    // (relecture du 11 nov., lot suppression-oauth) les vraies règles de la reconnexion.
+    lireReconnexion,
+    reconnexionPermise,
     cleanAuthUrl: () => {
       nettoyee = true;
     },
@@ -205,7 +219,9 @@ test("retour OAuth : erreur déjà décodée avec % ne fait pas disparaître le 
   const b = retourAvec({
     search: "?error_description=Action%20100%25%20refus%C3%A9e",
   });
-  assert.equal((await b.retour()).error, "Action 100% refusée");
+  // (11 nov.) Le message ne disparaît pas — mais jamais le texte brut du fournisseur :
+  // la phrase française de src/auth/erreursOAuth.js.
+  assert.match((await b.retour()).error, /n’a pas pu aboutir/);
   assert.equal(b.nettoyee, true);
   assert.equal(b.session, null);
 });

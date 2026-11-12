@@ -16,6 +16,7 @@ import { useInventaireAnnuel } from './InventaireAnnuel.jsx';
 import { AUTH, askConfirm, beneficeDesJours, cleNum, lireBeneficeJours, lireDeclarations, load, montantPeriodeUrssaf, moisDeclare, save, tauxUrssaf, useLigneSynchro, useLigneUrssaf, useRegimeFiscal } from './App.jsx';
 import './styles-mois-boucle.css';
 import './styles-cloture-annee.css';
+import { motsVendeur } from './profilVendeur.js';
 
 export const REGLES_CLOTURE = { caAnnee, declarationRevenus, jaugeSeuils, dac7ParPlateforme, montantPeriodeUrssaf, moisDeclare, beneficeDesJours, moisCouvert: moisCouvertParPublication };
 
@@ -63,10 +64,10 @@ function sousTexte(e, K) {
     case 'adater': return e.n > 0 ? `${nb(e.n)} vente${pl(e.n)} sans date de versement : dans aucun mois` : 'toutes les ventes ont leur date';
     case 'prix': return e.n > 0 ? `${nb(e.n)} vente${pl(e.n)} de ${K.annee} sur ${nb(e.sur)} sans prix d’achat` : `${nb(e.sur)} vente${pl(e.sur)} de ${K.annee}, toutes avec un prix`;
     case 'inventaire': {
-      const val = e.v && e.v.centimes != null ? `${e.v.nSans > 0 || e.partiel ? 'au moins ' : ''}${eur(e.v.centimes / 100)} sur ${nb(e.v.n)} paire${pl(e.v.n)}` : '';
+      const val = e.v && e.v.centimes != null ? `${e.v.nSans > 0 || e.partiel ? 'au moins ' : ''}${eur(e.v.centimes / 100)} sur ${nb(e.v.n)} ${e.v.n > 1 ? motsVendeur().noms : motsVendeur().nom}` : '';
       if (e.etat === 'attente') return `à faire le 31 décembre${val ? ' · aujourd’hui ' + val : ''}`;
       if (e.etat === 'passu') return e.raison === 'pas-ce-jour' && e.lue ? `liste lue le ${e.lue.split('-').reverse().join('/')}, pas le 31/12 : VRM ne reconstitue pas un jour passé` : (RAISONS['inventaire-' + e.raison] || RAISONS[e.raison] || 'pas su');
-      if (e.etat === 'manque') return `${nb(e.n)} paire${pl(e.n)} sans prix · ${val}`;
+      if (e.etat === 'manque') return `${nb(e.n)} ${e.n > 1 ? motsVendeur().noms : motsVendeur().nom} sans prix · ${val}`;
       return val || 'liste lue le 31 décembre';
     }
     case 'ca': return `${e.partiel ? 'au moins ' : ''}${eur(e.ca)} reçus en ${K.annee}${e.raisons && e.raisons.length ? ' · ' + e.raisons.join(' · ') : ''}`;

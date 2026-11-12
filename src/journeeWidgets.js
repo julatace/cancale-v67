@@ -21,6 +21,7 @@
 // petit fait la largeur entière : le bouton de taille n'y est pas montré
 // (styles-widgets.css).
 
+import { motsVendeur } from './profilVendeur.js';
 export const CLE_WIDGETS_JOURNEE = 'vrm_journee_widgets';
 export const TAILLES_WIDGET = ['petit', 'moyen', 'grand', 'pleine'];
 export const NOM_TAILLE = { petit: 'Petit', moyen: 'Un tiers', grand: 'Deux tiers', pleine: 'Pleine largeur' };
@@ -46,12 +47,12 @@ export const WIDGETS_JOURNEE = {
   envoyer:  { nom: 'À envoyer', desc: 'Petite case : le nombre de colis à poster', tailles: ['petit'] },
   retirer:  { nom: 'À retirer', desc: 'Petite case : le nombre de colis à aller chercher', tailles: ['petit'] },
   messages: { nom: 'Messages', desc: 'Petite case : les messages récents sans réponse', tailles: ['petit'] },
-  prix:     { nom: 'Prix à baisser', desc: 'Petite case : les paires vues qui ne partent pas', tailles: ['petit'] },
+  prix:     { nom: 'Prix à baisser', get desc() { return `Petite case : les ${motsVendeur().noms} vu${motsVendeur().e}s qui ne partent pas`; }, tailles: ['petit'] },
   // (31 oct.) Quatre tendances compactes qui ouvrent Statistiques : aujourd'hui
   // contre ta moyenne, 7 jours contre les 7 d'avant, les paires qui dorment, et
   // l'argent en attente (ou le panier moyen quand « Argent en attente » est déjà
   // sur l'écran : le même nombre ne s'écrit pas deux fois, §7).
-  tendances: { nom: 'Tendances', desc: 'Aujourd’hui contre ta moyenne, la semaine contre la précédente, les paires qui dorment', tailles: ['pleine', 'grand', 'moyen'] },
+  tendances: { nom: 'Tendances', get desc() { return `Aujourd’hui contre ta moyenne, la semaine contre la précédente, les ${motsVendeur().noms} qui dorment`; }, tailles: ['pleine', 'grand', 'moyen'] },
 };
 
 // ⚠️ UNE CARTE NOUVELLE ARRIVE D'ELLE-MÊME, UNE CARTE RETIRÉE NE REVIENT PAS

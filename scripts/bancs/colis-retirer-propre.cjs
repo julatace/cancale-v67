@@ -126,6 +126,8 @@ const ouvrir = async (b, vp, sombre) => {
     const m = /images1\.vinted\.net\/t\/b(\d+)\//.exec(u);
     if (m) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(Number(m[1])) });
     if (/api-adresse\.data\.gouv\.fr/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: [] }) });
+    // (12 nov.) le géocodage de l'app retombe sur Nominatim quand l'API Adresse ne trouve rien : servi vide aussi (garde réseau).
+    if (/nominatim\.openstreetmap\.org/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     if (/\/favicon\.ico$/i.test(u)) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect x="4" y="4" width="24" height="24" rx="5" fill="#8e8e93"/></svg>' });
     return ['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue();
   });

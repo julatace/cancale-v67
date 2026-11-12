@@ -32,14 +32,16 @@ export const FRAIS_MS = 12 * 3600e3;
 export const FRAIS_URSSAF_MS = 3 * 86400e3;
 
 const pl = (n, s, p) => (n > 1 ? p : s);
+// (11 nov., lot vocabulaire-article) « paire » pour Sneakers, « article » sinon : une source (src/profilVendeur.js).
+import { motsVendeur } from './profilVendeur.js';
 
 // L'ordre = la priorité : ce qui coûte un colis ou de l'argent d'abord.
 // `ecran` : où se publie le nombre (la raison d'un « — ») ; `geste` : ce que
 // le bouton ouvre (`tab`, `onglet` de Colis, `vue` d'Annonces, `cible` = le bloc
 // de l'écran propriétaire où il tranche, rejoint par défilement).
 export const SOURCES = [
-  { cle: 'numeros-double', ecran: 'Colis', quoi: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux paires`,
-    pourquoi: 'au moment d’expédier, la mauvaise paire part', geste: { libelle: 'Corriger', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-numeros-double]' } },
+  { cle: 'numeros-double', ecran: 'Colis', quoi: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux ${motsVendeur().noms}`,
+    get pourquoi() { return `au moment d’expédier, ${motsVendeur().la} mauvais${motsVendeur().e} ${motsVendeur().nom} part`; }, geste: { libelle: 'Corriger', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-numeros-double]' } },
   { cle: 'colis-postes', ecran: 'Colis', quoi: (n) => `${n} colis ${pl(n, 'coché', 'cochés')} « posté » que Vinted n’a pas vu${pl(n, '', 's')} partir`,
     pourquoi: 'vérifie le dépôt avant la date limite', geste: { libelle: 'Vérifier', tab: 'cat_bord', onglet: 'envoyes' } },
   { cle: 'colis-retirer', ecran: 'Colis', quoi: (n) => `${n} colis à retirer à vérifier`,
@@ -58,7 +60,7 @@ export const SOURCES = [
     pourquoi: 'peut-être plusieurs fois le même colis', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'retirer', cible: '[data-infos-sms="pickup"]' } },
   { cle: 'supprimes-vinted', ecran: 'Ma journée', quoi: (n) => `${n} ${pl(n, 'article supprimé', 'articles supprimés')} de Vinted : encore chez toi ?`,
     pourquoi: 'vendu ailleurs, remis en ligne ou toujours là', geste: { libelle: 'Répondre', tab: 'journee', cible: '[data-job="a-trancher"]' } },
-  { cle: 'remise-en-ligne', ecran: 'Annonces', quoi: (n) => `${n} ${pl(n, 'annonce remise', 'annonces remises')} en ligne : même paire ?`,
+  { cle: 'remise-en-ligne', ecran: 'Annonces', quoi: (n) => `${n} ${pl(n, 'annonce remise', 'annonces remises')} en ligne : même ${motsVendeur().nom} ?`,
     pourquoi: 'si oui, elle garde son N° ; ton clic relie', geste: { libelle: 'Répondre', tab: 'cat_annonces', cible: '[data-remise-bloc]' } },
   // (10 nov., lot BH) Un même achat enregistré deux fois (même n° de transaction / de
   // commande / de facture — jamais par ressemblance) : publié par l'écran Achats,
@@ -66,7 +68,7 @@ export const SOURCES = [
   { cle: 'achats-doubles', ecran: 'Achats', quoi: (n) => `${n} ${pl(n, 'achat saisi', 'achats saisis')} deux fois`,
     pourquoi: 'il compterait deux fois dans tes dépenses', geste: { libelle: 'Choisir', tab: 'achats', cible: '[data-achats-doubles]' } },
   { cle: 'achats-sans-prix', ecran: 'Annonces', quoi: (n) => `${n} ${pl(n, 'annonce numérotée', 'annonces numérotées')} sans prix d’achat`,
-    pourquoi: 'le bénéfice ne compte pas ces paires', geste: { libelle: 'Saisir', tab: 'cat_annonces', vue: 'sansachat' } },
+    get pourquoi() { return `le bénéfice ne compte pas ces ${motsVendeur().noms}`; }, geste: { libelle: 'Saisir', tab: 'cat_annonces', vue: 'sansachat' } },
   { cle: 'adresses-sans-compte', ecran: 'E-mails', quoi: (n) => `${n} ${pl(n, 'adresse e-mail', 'adresses e-mail')} sans compte relié`,
     pourquoi: 'leurs ventes et bordereaux n’ont pas de compte', geste: { libelle: 'Relier', tab: 'emails', clic: '[data-boite-vue="relier"]', cible: '[data-adresses-sans-compte]' } },
   { cle: 'comptes-a-relire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'compte', 'comptes')} à relire`,
@@ -76,7 +78,7 @@ export const SOURCES = [
 ];
 // Le nom d'une source quand son nombre n'est pas su (sans nombre dans la phrase).
 export const NOMS = {
-  'numeros-double': 'N° portés par deux paires',
+  get 'numeros-double'() { return `N° portés par deux ${motsVendeur().noms}`; },
   'colis-postes': 'Colis cochés « posté » pas vus partir',
   'colis-retirer': 'Colis à retirer à vérifier',
   'litiges-en-cours': 'Litiges et retours en cours',
@@ -217,16 +219,16 @@ export const TYPES = [
 ];
 // La question : `n` (carte d'une source, le nombre est dans la vignette) ou `x` (une chose).
 export const QUESTIONS = {
-  'numeros-double': { n: () => 'N° portés par deux paires', x: () => 'Deux paires sous ce N°' },
+  'numeros-double': { n: () => `N° portés par deux ${motsVendeur().noms}`, x: () => `Deux ${motsVendeur().noms} sous ce N°` },
   'colis-postes': { n: (n) => (n > 1 ? 'Colis cochés « posté », pas vus partir' : 'Colis coché « posté », pas vu partir') },
   'colis-retirer': { n: () => 'Colis à retirer : à vérifier' },
   'litiges-en-cours': { n: (n) => (n > 1 ? 'Litiges ou retours en cours' : 'Litige ou retour en cours'), x: () => 'Litige en cours : réponds à temps' },
-  'numeros-a-ecrire': { n: () => 'Nouveaux N° à écrire à leur place', x: () => 'Écris ce N° là où est la paire' },
-  'numeros-a-verifier': { n: () => 'N° à vérifier sur place', x: () => 'Vérifie ce N° là où est la paire' },
+  'numeros-a-ecrire': { n: () => 'Nouveaux N° à écrire à leur place', x: () => `Écris ce N° là où est ${motsVendeur().le}` },
+  'numeros-a-verifier': { n: () => 'N° à vérifier sur place', x: () => `Vérifie ce N° là où est ${motsVendeur().le}` },
   'sms-vestiaire': { n: (n) => (n > 1 ? 'Ventes Vestiaire reçues par SMS, à relier' : 'Vente Vestiaire reçue par SMS, à relier') },
   'sms-pickup': { n: () => 'Colis Pickup reçus par SMS, sans code' },
   'supprimes-vinted': { n: () => 'Supprimés de Vinted : les enlever du stock ?', x: () => 'Supprimée de Vinted. L’enlever du stock ?' },
-  'remise-en-ligne': { n: () => 'Remises en ligne : même paire ?', x: (x) => (x.de ? `Remise en ligne : même paire que N°${x.de} ?` : 'Remise en ligne : même paire qu’une ancienne ?') },
+  'remise-en-ligne': { n: () => `Remises en ligne : même ${motsVendeur().nom} ?`, x: (x) => (x.de ? `Remise en ligne : même ${motsVendeur().nom} que N°${x.de} ?` : `Remise en ligne : même ${motsVendeur().nom} qu’une ancienne ?`) },
   'achats-doubles': { n: (n) => (n > 1 ? 'Achats saisis deux fois : garde le bon' : 'Achat saisi deux fois : garde le bon') },
   'achats-sans-prix': { n: () => 'Annonces sans prix d’achat', x: () => 'Prix d’achat pas saisi' },
   'adresses-sans-compte': { n: (n) => (n > 1 ? 'Adresses e-mail sans compte relié' : 'Adresse e-mail sans compte relié') },

@@ -196,7 +196,8 @@ const charger = async (texte, nom) => {
     console.log('── La carte des chiffres lit la même règle');
     const carteTxt = CARTE.replace("from '../argentAVenir.js'", `from 'file://${tmpM}'`)
       // (11 nov.) la carte importe aussi src/formatsDate.js (un format créé une fois) : le vrai fichier
-      .replace("from '../formatsDate.js'", `from 'file://${path.join(R, 'src', 'formatsDate.js')}'`);
+      .replace("from '../formatsDate.js'", `from 'file://${path.join(R, 'src', 'formatsDate.js')}'`)
+      .replace("from '../profilVendeur.js'", `from 'file://${path.join(R, 'src', 'profilVendeur.js')}'`);   // (11 nov., 5.355) vocabulaire
     let K = null; try { K = (await charger(carteTxt, 'carte')).mod; } catch (e) { K = null; }
     dit(!!K, 'src/design/carteChiffres.js se charge');
     if (K) {

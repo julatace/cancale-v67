@@ -233,6 +233,8 @@ function plateformeDe(url) {
 // `lier-extension=<identifiant de CETTE extension>` — l'app, connectée, lui
 // adresse sa propre session (voir `demanderLiaison`). Plus de mot de passe VRM
 // tapé dans l'extension quand l'app peut la connecter.
+// 5.351 : les écrans que la carte du logo peut ouvrir (liste blanche, adresse de l'app).
+const ECRANS_CARTE = Object.freeze({ colis: 'tab=cat_bord', messages: 'tab=messages', offres: 'tab=messages&vue=favoris', journee: 'tab=journee' });
 function ouvrirVRMDepuis(urlActive, opts) {
   const p = plateformeDe(urlActive);
   let idExt = ''; try { idExt = String(chrome.runtime.id || ''); } catch (_) {}
@@ -240,13 +242,15 @@ function ouvrirVRMDepuis(urlActive, opts) {
   // 5.325 : « Continuer avec Google / Discord » — un nom de la liste, jamais
   // un texte reçu tel quel ; seulement avec une liaison.
   const connexion = lier && FOURNISSEURS_CONNEXION.includes(String((opts && opts.connexion) || '')) ? String(opts.connexion) : '';
-  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
+  // 5.351 : « Colis · Messages · Offres · Ma journée » depuis la carte du logo.
+  const ecran = !lier && opts && Object.prototype.hasOwnProperty.call(ECRANS_CARTE, String(opts.ecran || '')) ? ECRANS_CARTE[String(opts.ecran)] : '';
+  const cible = ecran ? APP_URL_VRM + '/?' + ecran : APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
   try {
     chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
       const t = (ouverts || [])[0];
       // Déjà sur VRM : on ne recharge pas la page (on garde l'écran où l'on est)
       // — sauf pour une liaison, que l'app lit dans l'adresse.
-      if (t && !lier && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
+      if (t && !lier && !ecran && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
       if (t) { chrome.tabs.update(t.id, { url: cible, active: true }); try { chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} }
       else chrome.tabs.create({ url: cible });
     });
@@ -863,6 +867,49 @@ function b64url(octets) {
 }
 async function noterEtatOAuth(v) { try { await chrome.storage.local.set({ [OAUTH_ETAT]: Object.assign({ at: Date.now() }, v) }); } catch (_) {} }
 const NOM_FOURN = { google: 'Google', discord: 'Discord' };
+// (5.346, lot connexions-oauth) Les refus de Supabase / Google / Discord en français :
+// MÊME règle que l'app, recopiée de src/auth/erreursOAuth.js par
+// `node scripts/audit-connexions-oauth.cjs --recopie` (ne pas modifier ici).
+// <regle-erreurs-oauth>
+const NOMS_FOURNISSEURS_OAUTH = { google: 'Google', discord: 'Discord' };
+// `e` : { error, code, description } · `fournisseur` : 'google' | 'discord' | '' (pas su) ·
+// `contexte` : 'connexion' (app) · 'liaison' (Relier, connecté) · 'extension'.
+function messageErreurOAuth(e, fournisseur, contexte) {
+  const x = e || {};
+  const code = String(x.code || '').toLowerCase().replace(/[^a-z_]/g, '');
+  const err = String(x.error || '').toLowerCase();
+  const desc = String(x.description || '');
+  const nomConnu = NOMS_FOURNISSEURS_OAUTH[fournisseur] || '';
+  const nom = nomConnu || 'ce compte';
+  const ctx = contexte === 'liaison' || contexte === 'extension' ? contexte : 'connexion';
+  const recommencer = ctx === 'liaison' ? (nomConnu ? `Reclique « Relier ${nomConnu} ».` : 'Recommence depuis Mon compte.')
+    : ctx === 'extension' ? 'Recommence depuis le logo VRM.'
+    : (nomConnu ? `Reclique « Continuer avec ${nomConnu} ».` : 'Recommence depuis la connexion.');
+  const parEmail = ctx === 'liaison' ? '' : ' Ou connecte-toi avec ton e-mail VRM.';
+  const a = (c) => code === c;
+  // Liens reçus par e-mail (confirmation, mot de passe) : aucun fournisseur en jeu.
+  if (a('otp_expired') || (!code && /email link is invalid|has expired/i.test(desc) && !nomConnu)) return 'Ce lien e-mail a expiré ou a déjà servi. Redemande un e-mail depuis la connexion.';
+  if (a('provider_email_needs_verification') || a('email_not_confirmed') || /unverified email/i.test(desc)) {
+    if (/confirmation email has been sent/i.test(desc) || a('email_not_confirmed')) return `Un e-mail de confirmation est parti vers ton adresse ${nom}. Ouvre-le, puis reviens te connecter.`;
+    return `Ton adresse e-mail ${nom} n’est pas vérifiée. Vérifie-la chez ${nom}, puis réessaie.${parEmail}`;
+  }
+  if (/error getting user email/i.test(desc)) return `${nomConnu || 'Ce compte'} n’a pas donné d’adresse e-mail. Ajoute une adresse vérifiée chez ${nom}, puis réessaie.${parEmail}`;
+  if (a('identity_already_exists') || /identity is already linked/i.test(desc)) {
+    // « Identity is already linked » (à CE compte) ≠ « … to another user » (un autre compte VRM).
+    if (/already linked\s*\.?$/i.test(desc.trim()) && !/another/i.test(desc)) return `${nomConnu || 'Ce compte'} est déjà relié à ton compte VRM. Rien à faire.`;
+    // Le chemin en 3 gestes, le MÊME que l'écran de suppression (lot suppression-oauth).
+    return `Ce ${nom} a déjà son propre compte VRM. 1. Déconnecte-toi, puis « Continuer avec ${nom} ». 2. Paramètres → Supprimer mon compte : tape SUPPRIMER. 3. Reconnecte-toi ici, puis relie ${nom}.`;
+  }
+  if (a('manual_linking_disabled') || /manual.?linking/i.test(desc)) return 'La liaison n’est pas encore activée sur VRM. Ton compte reste inchangé.';
+  if (a('email_exists') || /already been registered/i.test(desc)) return `Cette adresse a déjà un compte VRM. Connecte-toi avec elle, puis relie ${nom} dans ton profil.`;
+  if (a('signup_disabled') || /signups not allowed/i.test(desc)) return 'Les inscriptions sont fermées sur VRM pour le moment. Aucun compte n’a été créé.';
+  if (a('user_banned') || /user is banned/i.test(desc)) return 'Ce compte VRM est suspendu. Écris au support de VRM.';
+  if (['bad_oauth_state', 'bad_oauth_callback', 'flow_state_not_found', 'flow_state_expired', 'flow_state_already_used', 'bad_code_verifier'].includes(code)
+    || /flow state|oauth state|code verifier|code challenge/i.test(desc)) return `Cette connexion a expiré ou a déjà servi. ${recommencer}`;
+  if (!code && (err === 'access_denied' || /denied|cancel/i.test(desc))) return nomConnu ? `Connexion avec ${nomConnu} annulée. Rien n’a changé.` : 'Connexion annulée. Rien n’a changé.';
+  return `La connexion${nomConnu ? ' avec ' + nomConnu : ''} n’a pas pu aboutir. Réessaie dans un instant. ${recommencer}`;
+}
+// </regle-erreurs-oauth>
 // 5.329 (Julien, 8 nov. : « que ça n'ouvre AUCUN autre onglet ») : depuis la
 // carte du logo, Google / Discord ne s'ouvrent QUE dans une petite fenêtre
 // (`chrome.windows.create`, type popup) que `oauthRetour` referme. Un navigateur
@@ -939,6 +986,17 @@ async function oauthDepart(fournisseur, ongletDepart, opts) {
 }
 // Le code rendu par Supabase, remis par `oauth-retour.js`. `fixe` : la page de
 // retour de l'extension (sinon : la page d'accueil de VRM, repli de Supabase).
+// `true` seulement si vrm.center a ANNULÉ le compte (réponse `annule: true`). Tout
+// le reste (refus 409, panne, réseau) ⇒ false : on ne devine rien.
+const SANS_COMPTE_API = 'https://vrm.center/api/compte?mode=oauth-sans-compte';
+async function annulerCompteNeufOAuth(jeton) {
+  if (typeof jeton !== 'string' || !jeton) return false;
+  try {
+    const r = await fetch(SANS_COMPTE_API, { method: 'POST', headers: { Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(12000) });
+    const j = await r.json().catch(() => null);
+    return !!(r.ok && j && j.annule === true);
+  } catch (_) { return false; }
+}
 async function oauthRetour(msg, sender) {
   const src = (sender && sender.tab && sender.tab.url) || (sender && (sender.origin || sender.url)) || '';
   if (!ORIGINE_APP.test(src)) return { ok: false, code: 'origine' };
@@ -962,8 +1020,9 @@ async function oauthRetour(msg, sender) {
     try { if (typeof d.tab === 'number') chrome.tabs.update(d.tab, { active: true }, () => { void chrome.runtime.lastError; }); } catch (_) {}
   };
   if (msg && msg.error) {
-    const t = String(msg.error_description || msg.error || '').slice(0, 160);
-    const message = /access_denied|denied|cancel/i.test(t) ? `Connexion avec ${nom} annulée : rien n’a changé.` : `${nom} a refusé la connexion (${t || 'sans raison'}). Réessaie, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    // 5.346 : le CODE de Supabase d'abord (`error_code`) — `access_denied` vaut AUSSI pour
+    // une adresse non vérifiée ou une inscription fermée : jamais « annulée » à tort.
+    const message = messageErreurOAuth({ error: String(msg.error || '').slice(0, 60), code: String(msg.error_code || '').slice(0, 60), description: String(msg.error_description || '').slice(0, 200) }, d.f, 'extension');
     await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
     return rendre({ ok: false, code: 'refus', message });
   }
@@ -975,7 +1034,7 @@ async function oauthRetour(msg, sender) {
     j = await r.json().catch(() => null);
   } catch (_) { r = null; }
   if (!r || !r.ok || !j || typeof j.access_token !== 'string' || typeof j.refresh_token !== 'string' || !j.user || typeof j.user.id !== 'string') {
-    const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
+    const message = !r ? 'Réseau coupé pendant la connexion : recommence.' : (j && (j.error_code || j.msg)) ? messageErreurOAuth({ code: String(j.error_code || ''), description: String(j.msg || j.error_description || '') }, d.f, 'extension') : `VRM n’a pas validé la connexion avec ${nom} (code ${r.status}). Recommence, ou connecte-toi avec ton email et ton mot de passe VRM.`;
     await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message }, enPlus));
     return rendre({ ok: false, code: 'echange', message });
   }
@@ -987,6 +1046,17 @@ async function oauthRetour(msg, sender) {
     const ids = Array.isArray(j.user.identities) ? j.user.identities : [];
     neuf = isFinite(cree) && Date.now() - cree < 10 * 60000 && !ids.some((x) => x && x.provider === 'email');
   } catch (_) { neuf = false; }
+  // 5.346 (lot connexions-oauth) : même règle que l'app (lot DJ6). Ce bouton est
+  // « Continuer avec … » — une CONNEXION. Un compte que ce clic vient de faire créer
+  // n'a été voulu par personne : le serveur l'annule (il refait toutes les preuves,
+  // `?mode=oauth-sans-compte`) et la session n'est PAS rangée. Refusé ou pas su ⇒
+  // comme avant (session rangée, « compte neuf » dit).
+  if (neuf && (await annulerCompteNeufOAuth(j.access_token)) === true) {
+    const message = `Aucun compte VRM n’est relié à ce ${nom}. Rien n’a été créé. Connecte-toi sur vrm.center avec ton e-mail. Puis relie ${nom} dans ton profil.`;
+    await noterEtatOAuth(Object.assign({ etat: 'erreur', f: d.f, message, sansCompte: true }, enPlus));
+    // Comme tout refus : la page de retour reste ouverte et DIT la phrase (rien fermé).
+    return rendre({ ok: false, code: 'sans-compte', message });
+  }
   const email = String(j.user.email || emailDuJwt(j.access_token) || '');
   await saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((Number(j.expires_in) || 3600) * 1000), user_id: j.user.id, email, depuis: Date.now() });
   Promise.resolve().then(() => noterDiag('session_oauth_' + d.f)).catch(() => {});
@@ -3652,6 +3722,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // pour le compte du COOKIE de l'onglet qui demande (jamais un autre compte
     // nommé par le message) — c'est la règle « garde » de l'extension.
     // 5.344 : « Tout récupérer » depuis la carte du logo — le compte de l'onglet seulement.
+    // 5.354 : « Masquer / Afficher le résumé du mois » — un réglage de CE navigateur.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'resumeMasque') {
+      poserMoisMasque(msg.masque === true).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'importTout') {
       (async () => {
         let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
@@ -3682,7 +3757,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'ouvrirVRM') {
       // La carte de connexion vit dans un iframe de l'onglet : sender.tab est
       // l'onglet du site, c'est lui qui décide l'onglet de VRM.
-      ouvrirVRMDepuis((sender && sender.tab && sender.tab.url) || '');
+      // 5.351 (lot extension-visuel) : la carte ouvre VRM sur un ÉCRAN de la liste
+      // (`ECRANS_CARTE`) — un nom connu, jamais une adresse reçue telle quelle.
+      ouvrirVRMDepuis((sender && sender.tab && sender.tab.url) || '', { ecran: msg.ecran });
       sendResponse({ ok: true });
       return true;
     }
@@ -4016,6 +4093,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // 5.365 : le MODÈLE d'une page « Mes ventes / Mes achats » (l'historique), pour le compte de l'onglet ET de la page.
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcImportModele') {
+      (async () => {
+        let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+        if (!/(^|\.)vestiairecollective\.com$/i.test(hote) || (sender && sender.frameId > 0)) return { ok: false };
+        const compte = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+        if (!compte) return { ok: false, code: 'compte-pas-su' };
+        let u; try { u = new URL(String(msg.url || '')); } catch (_) { return { ok: false }; }
+        if (!/(^|\.)vestiairecollective\.com$/i.test(u.hostname)) return { ok: false };
+        return { ok: await noterModeleSite('vestiaire', compte, msg.quoi === 'achats' ? 'achats' : 'ventes', u.href) };
+      })().then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     // 5.239 : tes ACHATS Vestiaire (vc-inject.js, réponses que la page charge déjà).
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAchats') {
       (async () => {
@@ -4254,6 +4344,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // encore. C'est une lecture de SES ventes (§3), rangée dans lbc_recon.
           // On garde une place par famille (pas par id) : la 100e vente n'écrase
           // pas la carte, elle la rafraîchit. Jamais dans une fixture (§6).
+          // 5.365 : le MODÈLE d'une liste « Mes transactions » (l'historique), pour le compte privé de CET onglet.
+          if (msg.action === 'lbcImportModele') {
+            const tabUrl = (sender && sender.tab && sender.tab.url) || '';
+            if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl)) { sendResponse({ ok: false }); return; }
+            let carte = null; try { carte = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[sender.tab.id]; } catch (_) { carte = null; }
+            const moi = String(msg.moi || '');
+            if (!carte || carte.source !== 'prive' || carte.ambigue || carte.compte !== 'lbc-account:' + moi) { sendResponse({ ok: false, code: 'compte-pas-su' }); return; }
+            let u; try { u = new URL(String(msg.url || '')); } catch (_) { sendResponse({ ok: false }); return; }
+            if (u.origin !== 'https://api.leboncoin.fr') { sendResponse({ ok: false }); return; }
+            sendResponse({ ok: await noterModeleSite('leboncoin', moi, 'transactions', u.href) }); return;
+          }
           if (msg.action === 'lbcVente' && msg.body) {
             const ownerReception=(await loadSession())?.user_id;
             if(!ownerReception||await lbcSansSessionVrm()){_lbcRejeuAttendu=true;sendResponse({ok:false,etat:'ecriture-refusee',sansSession:true});return;}
@@ -5058,13 +5159,81 @@ function numerosDuCompte(m, uid, msg) {
 // Un autre compte (le sien ou pas) ⇒ rien. Pas su ⇒ le champ manque (jamais 0).
 // Le prix d'achat part BRUT (la fiche et `vinted_buyprice_by_num` du N°) : la page
 // le lit par `prixAchatDe`, la règle de l'app recopiée (vrm-regles-achat.js).
+// ── « PAIRE » OU « ARTICLE » (11 nov., lot vocabulaire-article, 5.347.0) ─────
+// Le vocabulaire de l'app (src/profilVendeur.js) recopié TEL QUEL entre les marques
+// (`node scripts/audit-vocabulaire-article.cjs --recopie`). Ce qu'il vend : `vrm_je_vends`
+// de SA ligne main ; « automatique » ⇒ Sneakers pour le propriétaire de l'installation
+// (lu chez vrm.center, une fois par 24 h), « article » sinon — la règle `jeVendsEffectif`.
+// Rangé dans chrome.storage.local.vrm_vend_ext pour les pages (vrm-mots.js). Rien de
+// su ⇒ les textes d'avant (« paire »). Aucune écriture en base.
+const MOTS_ARTICLE = (() => {
+// <mots-article> (copie, ne pas modifier ici)
+const MOTS = {
+  sneakers: { nom: 'paire', noms: 'paires', un: 'une paire', Un: 'Une paire', le: 'la paire', Le: 'La paire', ce: 'cette paire', tes: 'tes paires', e: 'e', es: 'es', chaque: 'Chaque paire', elle: 'elle', Elle: 'Elle', une: 'une',
+    // (11 nov., lot vocabulaire-article) les formes des écrans secondaires, des notifications et de l'extension.
+    Nom: 'Paire', Noms: 'Paires', sa: 'sa paire', la: 'la', La: 'La', de: 'de la paire', a: 'à la paire', Ce: 'Cette paire', aucune: 'aucune paire', Aucune: 'Aucune paire',
+    celle: 'celle', celles: 'celles', toutes: 'toutes', Toutes: 'Toutes', laquelle: 'laquelle', autre: 'une autre paire', meme: 'la même paire', Meme: 'La même paire', lui: 'elle', eux: 'elles', deNom: 'de paire', deNoms: 'de paires', Tes: 'Tes paires', quelle: 'quelle paire', bonne: 'la bonne paire', AucuneDe: 'Aucune de ces paires', mes: 'mes paires', deMeme: 'de la même paire', quelles: 'quelles paires', ancienne: 'ANCIENNE paire', nouvelle: 'la nouvelle', ta: 'ta paire', deCe: 'de cette paire', deLa: 'de la' },
+  autre:    { nom: 'article', noms: 'articles', un: 'un article', Un: 'Un article', le: 'l’article', Le: 'L’article', ce: 'cet article', tes: 'tes articles', e: '', es: 's', chaque: 'Chaque article', elle: 'il', Elle: 'Il', une: 'un',
+    Nom: 'Article', Noms: 'Articles', sa: 'son article', la: 'le', La: 'Le', de: 'de l’article', a: 'à l’article', Ce: 'Cet article', aucune: 'aucun article', Aucune: 'Aucun article',
+    celle: 'celui', celles: 'ceux', toutes: 'tous', Toutes: 'Tous', laquelle: 'lequel', autre: 'un autre article', meme: 'le même article', Meme: 'Le même article', lui: 'lui', eux: 'eux', deNom: 'd’article', deNoms: 'd’articles', Tes: 'Tes articles', quelle: 'quel article', bonne: 'le bon article', AucuneDe: 'Aucun de ces articles', mes: 'mes articles', deMeme: 'du même article', quelles: 'quels articles', ancienne: 'ANCIEN article', nouvelle: 'le nouvel article', ta: 'ton article', deCe: 'de cet article', deLa: 'du' },
+};
+// </mots-article>
+  return MOTS;
+})();
+let _vendExt = 'sneakers';
+try { chrome.storage.local.get('vrm_vend_ext').then((o) => { const v = o && o.vrm_vend_ext; _vendExt = v && v.vend === 'autre' ? 'autre' : 'sneakers'; }).catch(() => {}); } catch (_) {}
+function motsExt() { return MOTS_ARTICLE[_vendExt === 'autre' ? 'autre' : 'sneakers']; }
+function vendDeReglage(r, proprietaire) {
+  const c = r && typeof r === 'object' ? r.choix : r;
+  if (c === 'sneakers' || c === 'autre') return c;
+  return proprietaire === true ? 'sneakers' : 'autre';
+}
+const ABONNEMENT_API = 'https://vrm.center/api/compte?mode=abonnement';
+async function proprietaireExt(owner) {
+  try {
+    const o = await chrome.storage.local.get('vrm_proprio_ext');
+    const m = o && o.vrm_proprio_ext;
+    const connu = m && m.owner === owner && typeof m.v === 'boolean';
+    if (connu && Date.now() - Number(m.at || 0) < 24 * 3600000) return m.v;
+    const s = await loadSession();
+    if (!s || !s.access_token || String(s.user_id || '') !== owner) return connu ? m.v : null;
+    const r = await fetch(ABONNEMENT_API, { headers: { Authorization: `Bearer ${s.access_token}` }, cache: 'no-store' });
+    if (!r.ok) return connu ? m.v : null;
+    const j = await r.json().catch(() => null);
+    if (!j || typeof j.proprietaire !== 'boolean') return connu ? m.v : null;
+    await chrome.storage.local.set({ vrm_proprio_ext: { owner, v: j.proprietaire, at: Date.now() } });
+    return j.proprietaire;
+  } catch (_) { return null; }
+}
+async function rafraichirVendExt(reglage, owner) {
+  if (!owner) return _vendExt;
+  const c = reglage && typeof reglage === 'object' ? reglage.choix : null;
+  const vend = vendDeReglage(reglage, (c === 'sneakers' || c === 'autre') ? null : await proprietaireExt(owner));
+  _vendExt = vend;
+  try { await chrome.storage.local.set({ vrm_vend_ext: { vend, owner, at: Date.now() } }); } catch (_) {}
+  return vend;
+}
+// Relu au plus toutes les 6 h (au démarrage, à chaque synchronisation) : UNE petite projection.
+async function vendExtAJour() {
+  try {
+    const owner = String((await loadSession())?.user_id || '');
+    if (!owner) return;
+    const o = await chrome.storage.local.get('vrm_vend_ext');
+    const v = o && o.vrm_vend_ext;
+    if (v && v.owner === owner && Date.now() - Number(v.at || 0) < 6 * 3600000) { _vendExt = v.vend === 'autre' ? 'autre' : 'sneakers'; return; }
+    const main = await lireMain(['vrm_je_vends']);
+    if (main === null) return;
+    await rafraichirVendExt(main.vrm_je_vends, owner);
+  } catch (_) {}
+}
 let _infosPage = null;
 async function donneesInfosPage(uid) {
   const owner = String((await loadSession())?.user_id || '');
   if (!owner || !uid) return null;
   if (_infosPage && _infosPage.owner === owner && _infosPage.uid === uid && Date.now() - _infosPage.at < 120000) return _infosPage;
-  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit']);
+  const main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_numero_ecrit', 'vrm_je_vends']);
   if (main === null) return null;
+  await rafraichirVendExt(main.vrm_je_vends, owner);   // (5.347) « paire » / « article »
   const dates = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
   if (dates === null) return null;
   const dr = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
@@ -5514,11 +5683,270 @@ function noterEtatCompte(uid, json) {
       const ok = await supabaseUpsert('app_data', [{ id: ETAT_COMPTE_ROW, data: { comptes, majAt: new Date(maintenant).toISOString() } }], 'id');
       noterDiag(ok === false ? 'etat_compte_ecriture_ratee' : `etat_compte_${etat}`);
       if (ok !== false && (!avant || avant.etat !== etat || proChange)) { try { notifierApp({ type: 'maj', quoi: 'etatcompte', uid: k }); } catch (_) {} }
+      // 5.350 : l'alerte « Vinted a fermé le compte » (une fois par fermeture) ; rouvert ⇒ elle se ferme.
+      if (ok !== false && etat === 'banni' && !etatGarde && (!avant || avant.etat !== 'banni')) noterCompteModeration(k, 'banni', {});
+      if (ok !== false && etat === 'actif' && avant && avant.etat === 'banni') noterCompteModeration(k, 'actif', {});
       return ok !== false;
     } catch (_) { return false; }
   });
   chaineEtatCompte = fait.catch(() => false);
   return fait;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QUAND VINTED CACHE, SUPPRIME OU RESTREINT (11 nov., 5.350)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien veut être prévenu TOUT DE SUITE. Aucune requête Vinted de plus : on
+// compare ce que l'extension lit DÉJÀ —
+//   · deux lectures COMPLÈTES du dressing de SON compte (moisson active, toutes
+//     les pages : `dressingCompletFaitFoi`) — jamais une capture passive, qui
+//     peut être une page filtrée ;
+//   · son profil (`noterEtatCompte` : banni) ;
+//   · un refus « restricted / suspended » de Vinted (`poserFreinRepub`).
+// La règle (masquée, disparue, compte) est recopiée de src/moderationVinted.js
+// (`node scripts/audit-alerte-moderation.cjs --recopie`), jamais réécrite ici.
+// La dernière lecture complète de chaque compte (états seulement : o/r/h/s/c/d)
+// reste dans CE Chrome (`vrmModerationVu`) ; elle n'avance QUE si ce qu'elle a
+// trouvé est rangé (sinon la lecture suivante le retrouve). Une lecture ratée
+// de la ligne n'écrit rien (§5).
+// La notification part du serveur (`/api/push`, action `moderation`) : il relit
+// les lignes lui-même, regroupe, respecte les heures calmes et ne notifie
+// jamais deux fois le même événement (sa mémoire `vrm_moderation_notifie`).
+// Banni ou restreint ⇒ le frein de 24 h du compte (republication, baisses de
+// prix, offres automatiques — tout ce qui lit `lireFreinRepub`).
+// Exécuté par scripts/audit-alerte-moderation.cjs (le vrai fichier, dans un vm).
+// <moderation-regle>
+const MODERATION_LIGNE = 'moderation_vinted_';
+const MODERATION_MAX = 200;
+const MODERATION_JOURS = 90;
+const MODERATION_RESTREINT_MS = 24 * 3600 * 1000;
+const MODERATION_SORTES = ['masquee', 'disparue', 'banni', 'restreint'];
+const RE_ID_MODERATION = /^\d{4,15}$/;
+// L'état d'une annonce dans un dressing : o en ligne · r réservée · h masquée ·
+// s vendue · c fermée · d brouillon. `null` = pas une annonce.
+function etatArticleModeration(it) {
+  if (!it || typeof it !== 'object' || it.id == null || !RE_ID_MODERATION.test(String(it.id))) return null;
+  if (it.is_draft === true) return 'd';
+  if (it.is_closed === true) return /sold/i.test(String(it.item_closing_action || '')) ? 's' : 'c';
+  if (it.is_hidden === true) return 'h';
+  if (it.is_reserved === true) return 'r';
+  return 'o';
+}
+function etatsDressingModeration(items) {
+  const out = {};
+  for (const it of Array.isArray(items) ? items : []) {
+    const e = etatArticleModeration(it);
+    if (e) out[String(it.id)] = e;
+  }
+  return out;
+}
+// `avant` / `apres` : { at (ms), etats } — deux lectures COMPLÈTES du même compte.
+// `supprimees` : { [id]: date } de SES suppressions (`null` = pas su).
+// `vacances` : true · false · null (son profil).
+function evenementsDressingModeration({ avant, apres, supprimees, vacances } = {}) {
+  const rien = (raison) => ({ evenements: [], raison });
+  if (!apres || !apres.etats || typeof apres.etats !== 'object' || !Number.isFinite(Number(apres.at))) return rien('lecture');
+  if (!avant || !avant.etats || typeof avant.etats !== 'object' || !Number.isFinite(Number(avant.at))) return rien('premiere-lecture');
+  const at = Number(apres.at), av = Number(avant.at);
+  if (!(at > av)) return rien('ordre');
+  const A = avant.etats, B = apres.etats;
+  const ouverts = Object.keys(A).filter((id) => A[id] === 'o' || A[id] === 'r');
+  let masquees = ouverts.filter((id) => B[id] === 'h');
+  const raisons = [];
+  if (vacances === true && masquees.length) { masquees = []; raisons.push('vacances'); }
+  if (masquees.length >= 3 && masquees.length === ouverts.length) { masquees = []; raisons.push('tout-masque'); }
+  let disparues = Object.keys(A).filter((id) => (A[id] === 'o' || A[id] === 'h') && !Object.prototype.hasOwnProperty.call(B, id));
+  if (disparues.length && (supprimees === null || supprimees === undefined || typeof supprimees !== 'object')) { disparues = []; raisons.push('suppressions-pas-sues'); }
+  else disparues = disparues.filter((id) => !(supprimees[id] != null && supprimees[id] !== ''));
+  const restants = Object.keys(B).filter((id) => B[id] === 'o' || B[id] === 'h' || B[id] === 'r');
+  if (disparues.length >= 3 && !restants.length) { disparues = []; raisons.push('tout-disparu'); }
+  const evenements = [];
+  for (const id of masquees.sort()) evenements.push({ k: `masquee:${id}:${at}`, s: 'masquee', t: at, a: id, av });
+  for (const id of disparues.sort()) evenements.push({ k: `disparue:${id}:${at}`, s: 'disparue', t: at, a: id, av });
+  return { evenements, raison: raisons.join(',') };
+}
+// Un événement du COMPTE (banni, restreint) — `null` si la sorte est inconnue.
+function evenementCompteModeration(sorte, at, { raison = '', jusqua = null } = {}) {
+  const t = Number(at);
+  if ((sorte !== 'banni' && sorte !== 'restreint') || !Number.isFinite(t)) return null;
+  const e = { k: `${sorte}:${t}`, s: sorte, t };
+  const j = Number(jusqua);
+  if (jusqua != null && Number.isFinite(j) && j > t) e.j = j;
+  const r = String(raison || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  if (r) e.r = r;
+  return e;
+}
+// Rebâtit une entrée (jamais un champ inconnu) — `null` si elle ne tient pas.
+function nettoyerModeration(e) {
+  if (!e || typeof e !== 'object' || !MODERATION_SORTES.includes(e.s)) return null;
+  const t = Number(e.t);
+  if (!Number.isFinite(t) || t <= 0 || typeof e.k !== 'string' || !e.k || e.k.length > 80) return null;
+  const o = { k: e.k, s: e.s, t };
+  if (e.s === 'masquee' || e.s === 'disparue') { if (!RE_ID_MODERATION.test(String(e.a || ''))) return null; o.a = String(e.a); }
+  const av = Number(e.av); if (e.av != null && Number.isFinite(av) && av > 0 && av < t) o.av = av;
+  const j = Number(e.j); if (e.j != null && Number.isFinite(j) && j > t) o.j = j;
+  const f = Number(e.f); if (e.f != null && Number.isFinite(f) && f >= t) o.f = f;
+  const r = typeof e.r === 'string' ? e.r.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+  if (r) o.r = r;
+  return o;
+}
+// Ajoute les nouveaux événements à la liste rangée (jamais deux fois) et ferme
+// ceux que la lecture contredit. `etats` : les états de la lecture complète qui
+// vient d'arriver (ou null) ; `compte` : 'actif' quand le profil vient de le dire.
+// Rend { liste, ajoutes, change }.
+function fusionnerModeration(liste, nouveaux, { etats = null, compte = null, at = Date.now(), maintenant = Date.now() } = {}) {
+  let change = false;
+  const l = [];
+  for (const x of Array.isArray(liste) ? liste : []) { const e = nettoyerModeration(x); if (e) l.push(e); else change = true; }
+  const fin = Number(at);
+  if (etats && typeof etats === 'object') {
+    for (const e of l) {
+      if (e.f || !e.a || !(e.t < fin)) continue;
+      const st = etats[e.a];
+      if (e.s === 'masquee' && st && st !== 'h') { e.f = fin; change = true; }
+      else if (e.s === 'disparue' && st) { e.f = fin; change = true; }
+    }
+  }
+  if (compte === 'actif') for (const e of l) if (e.s === 'banni' && !e.f && e.t < fin) { e.f = fin; change = true; }
+  const ajoutes = [];
+  for (const x of Array.isArray(nouveaux) ? nouveaux : []) {
+    const n = nettoyerModeration(x);
+    if (!n || n.f) continue;
+    const meme = (e) => e.s === n.s && (n.a ? e.a === n.a : !e.a);
+    // Un « limité » n'est ouvert que jusqu'à sa fin (`j`, sinon 24 h) : une nouvelle
+    // limite des semaines plus tard est un nouvel événement.
+    const ouvert = (e) => !e.f && !(e.s === 'restreint' && Number(e.j || (e.t + MODERATION_RESTREINT_MS)) <= n.t);
+    if (l.some((e) => e.k === n.k)) continue;
+    if (l.some((e) => meme(e) && ouvert(e))) continue;                               // déjà ouvert
+    if (n.s === 'restreint' && l.some((e) => meme(e) && Math.abs(n.t - e.t) < MODERATION_RESTREINT_MS)) continue;
+    l.push(n); ajoutes.push(n); change = true;
+  }
+  const lim = Number(maintenant) - MODERATION_JOURS * 864e5;
+  const gardes = l.filter((e) => e.t > lim).sort((p, q) => p.t - q.t).slice(-MODERATION_MAX);
+  if (gardes.length !== l.length) change = true;
+  return { liste: gardes, ajoutes, change };
+}
+// </moderation-regle>
+const MODERATION_VU = 'vrmModerationVu';
+const MODERATION_A_SIGNALER = 'vrmModerationASignaler';
+const VACANCES_VUES = 'vrmVacancesVues';
+let _chaineModeration = Promise.resolve();
+function unModerationALaFois(fn) {
+  const suite = _chaineModeration.then(() => fn(), () => fn());
+  _chaineModeration = suite.then(() => {}, () => {});
+  return suite;
+}
+// Le mode vacances lu dans SON profil (aucune lecture de plus) : true · false · null.
+async function noterVacancesVues(uid, v) {
+  if (typeof v !== 'boolean' || !/^\d{1,20}$/.test(String(uid || ''))) return;
+  try { const m = (await chrome.storage.local.get(VACANCES_VUES))[VACANCES_VUES] || {}; if (!m[uid] || m[uid].v !== v) { m[uid] = { v, at: Date.now() }; await chrome.storage.local.set({ [VACANCES_VUES]: m }); } } catch (_) {}
+}
+async function vacancesVues(uid) {
+  try { const m = (await chrome.storage.local.get(VACANCES_VUES))[VACANCES_VUES] || {}; const e = m[String(uid)]; return e && typeof e.v === 'boolean' ? e.v : null; } catch (_) { return null; }
+}
+// SES suppressions (rangées + encore en file dans ce Chrome). `null` = pas su.
+async function suppressionsModeration(uid) {
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_supprimees&select=ids:data->ids`);
+  if (rows === null || !Array.isArray(rows)) return null;
+  const ids = Object.assign({}, (rows[0] && rows[0].ids && typeof rows[0].ids === 'object') ? rows[0].ids : {});
+  try {
+    const file = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || [];
+    for (const e of file) if (e && String(e.uid) === String(uid) && e.id && !ids[e.id]) ids[e.id] = e.at || true;
+  } catch (_) { return null; }
+  return ids;
+}
+// Lire-fusionner-réécrire la ligne du compte. Rend { ajoutes, ouverts } ou null (pas su / pas écrit).
+async function rangerModeration(uid, nouveaux, opts) {
+  const id = `${MODERATION_LIGNE}${uid}`;
+  const rows = await sbGet(`app_data?id=eq.${id}&select=e:data->e`);
+  if (rows === null || !Array.isArray(rows)) { noterDiag('moderation_lecture_ratee'); return null; }
+  const f = fusionnerModeration((rows[0] && rows[0].e) || [], nouveaux, { ...(opts || {}), maintenant: Date.now() });
+  if (f.change) {
+    const ok = await supabaseUpsert('app_data', [{ id, data: { uid: String(uid), v: CODE_VERSION, majAt: new Date().toISOString(), e: f.liste } }], 'id');
+    if (ok === false) { noterDiag('moderation_ecriture_ratee'); return null; }
+    noterDiag(f.ajoutes.length ? 'moderation_alerte_rangee' : 'moderation_fermee');
+    try { notifierApp({ type: 'maj', quoi: 'moderation', uid: String(uid) }); } catch (_) {}
+  }
+  if (f.ajoutes.length) await signalerModeration(true);
+  return { ajoutes: f.ajoutes, ouverts: f.liste.filter((e) => !e.f && e.a).map((e) => e.a) };
+}
+// Le frein de 24 h posé sans refus (compte fermé par Vinted) : mêmes gestes arrêtés.
+async function poserFreinCompte(uid) {
+  try {
+    const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {};
+    const f = { jusqua: Date.now() + FREIN_RESTREINT_MS, restreint: true, status: 0, at: Date.now(), banni: true };
+    const cur = m[String(uid)];
+    if (!(cur && Number(cur.jusqua) > f.jusqua)) { m[String(uid)] = f; await chrome.storage.local.set({ [FREIN_REPUB]: m }); }
+  } catch (_) {}
+}
+// Une lecture COMPLÈTE du dressing de `uid` vient d'être rangée.
+function guetterDressing(uid, items, at) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  return unModerationALaFois(async () => {
+    try {
+      const etats = etatsDressingModeration(items);
+      const memo = (await chrome.storage.local.get(MODERATION_VU))[MODERATION_VU] || {};
+      const avant = memo[u] && memo[u].etats ? memo[u] : null;
+      // Les lectures passent une à une (la chaîne) : celle-ci est APRÈS la précédente, même à la même milliseconde.
+      const t = Math.max(Number(at) || Date.now(), avant && Number.isFinite(Number(avant.at)) ? Number(avant.at) + 1 : 0);
+      const vacances = await vacancesVues(u);
+      let r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: {}, vacances });
+      // Les suppressions ne se lisent QUE s'il y a une disparue à juger (égress).
+      if (r.evenements.some((e) => e.s === 'disparue')) r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: await suppressionsModeration(u), vacances });
+      if (r.raison) noterDiag(`moderation_rien_${r.raison.split(',')[0]}`);
+      const ouverts = (avant && Array.isArray(avant.ouverts)) ? avant.ouverts : [];
+      const aFermer = ouverts.some((a) => etats[a] && etats[a] !== 'h');
+      let ouvertsApres = ouverts;
+      if (r.evenements.length || aFermer) {
+        const rg = await rangerModeration(u, r.evenements, { etats, at: t });
+        if (rg === null) return null;            // pas rangé : le point de départ n'avance pas
+        ouvertsApres = rg.ouverts;
+      }
+      const m2 = (await chrome.storage.local.get(MODERATION_VU))[MODERATION_VU] || {};
+      m2[u] = { at: t, etats, ouverts: ouvertsApres.slice(-MODERATION_MAX) };
+      await chrome.storage.local.set({ [MODERATION_VU]: m2 });
+      return r.evenements.length;
+    } catch (_) { return null; }
+  });
+}
+// Un événement du COMPTE (banni, restreint, ou le compte redevenu actif).
+function noterCompteModeration(uid, sorte, { raison = '', jusqua = null } = {}) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  return unModerationALaFois(async () => {
+    try {
+      if (sorte === 'actif') return await rangerModeration(u, [], { compte: 'actif', at: Date.now() });
+      const e = evenementCompteModeration(sorte, Date.now(), { raison, jusqua });
+      if (!e) return null;
+      if (sorte === 'banni') await poserFreinCompte(u);
+      return await rangerModeration(u, [e], { at: e.t });
+    } catch (_) { return null; }
+  });
+}
+// La notification : le serveur relit tout (le corps ne dit rien). Une marque
+// locale tient l'envoi tant qu'il n'a pas abouti (réessayé au prochain passage).
+async function signalerModeration(neuf) {
+  try {
+    if (neuf) await chrome.storage.local.set({ [MODERATION_A_SIGNALER]: Date.now() });
+    const en = Number((await chrome.storage.local.get(MODERATION_A_SIGNALER))[MODERATION_A_SIGNALER] || 0);
+    if (!en) return false;
+    if (Date.now() - en > 3 * 864e5) { await chrome.storage.local.remove(MODERATION_A_SIGNALER); return false; }   // le cron du serveur l'a fait depuis
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('moderation_push_sans_session'); return false; }
+    let status = 0;
+    try {
+      const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(COMPTE_PUSH_URL, { method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+        body: JSON.stringify({ action: 'moderation' }) });
+      clearTimeout(tm); status = r.status;
+    } catch (_) { status = 0; }
+    const fini = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 429);
+    if (fini) await chrome.storage.local.remove(MODERATION_A_SIGNALER);
+    noterDiag(status >= 200 && status < 300 ? 'moderation_push_envoye' : `moderation_push_${fini ? 'refus' : 'ko'}_${status || 'reseau'}`);
+    return fini && status < 300;
+  } catch (_) { return false; }
 }
 
 async function noterUrlLabel(url, ok) {
@@ -5949,6 +6377,13 @@ function photoUtile(it) {
       || (Array.isArray(p.thumbnails) && p.thumbnails.find(t => t && t.url)?.url);
     if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) continue;
     const out = { url };
+    // 5.358 — la MINIATURE (photos en double entre comptes : l'empreinte se calcule sur une
+    // petite image). La plus petite d'au moins 100 px de large, de vinted.net seulement.
+    if (typeof p === 'object' && Array.isArray(p.thumbnails)) {
+      const m = p.thumbnails.filter((t) => t && typeof t.url === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(t.url) && Number(t.width || 0) >= 100)
+        .sort((a, b) => Number(a.width || 0) - Number(b.width || 0))[0];
+      if (m) out.mini = m.url;
+    }
     const ts = p.high_resolution && p.high_resolution.timestamp;
     if (ts) out.high_resolution = { timestamp: ts };
     return out;
@@ -6070,6 +6505,82 @@ return { lireNumeroTexte, compacterLecture };
 function lectureNumeroDescription(texte) {
   if (typeof texte !== 'string' || !texte.trim()) return null;
   try { return VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(texte.slice(0, 20000), 'description')); } catch (_) { return null; }
+}
+
+// ── AVANT DE PUBLIER SUR VINTED : L'ENCART DU FORMULAIRE (11 nov., lot verif-publication, 5.353) ──
+// Sur vinted.fr/items/new, une courte liste discrète, JAMAIS une garde : rien n'est
+// cliqué, rien n'est envoyé à Vinted, aucune requête Vinted de plus (la base VRM
+// seulement, comme `donneesInfosPage`). La page envoie ce qu'elle VOIT (description,
+// prix tapés), le fond rend les alertes ; le texte n'est ni gardé ni écrit.
+//   · numero  : il numérote lui-même (réglage `vrm_numero_ecrit` allumé, ou
+//               l'habitude PROUVÉE : 5 descriptions lues, 4 sur 5 avec un N° à la
+//               fin — la règle `habitudeNumeroEcrit` de src/verifAnnonce.js) et la
+//               fin de la description n'a pas de N° (ou deux) ;
+//   · enligne : le N° écrit est celui d'une annonce EN LIGNE de CE compte (la règle
+//               `<enligne-regle>`, lecture complète < 24 h) — par identité ;
+//   · prix    : le prix tapé est sous SON prix d'achat saisi pour ce N°
+//               (`vinted_buyprice_by_num`), jamais deviné, aucun prix proposé.
+// Pas su (base muette, compte pas relu, champ introuvable) ⇒ rien. Les photos ne
+// sont pas jugées ici : le formulaire de Vinted n'a pas été mesuré (pas su ⇒ rien).
+const HABITUDE_MIN_EXT = 5;
+function habitudeNumeroEcritExt(lectures) {
+  const ls = (Array.isArray(lectures) ? lectures : []).map((l) => VRM_NUMERO_ECRIT.compacterLecture(l)).filter(Boolean);
+  if (ls.length < HABITUDE_MIN_EXT) return null;
+  const lus = ls.filter((l) => l.etat === 'lu').length;
+  return lus * 5 >= ls.length * 4 ? true : null;
+}
+const CODES_VERIF_EXT = ['numero', 'enligne', 'prix'];
+const nombreVerif = (v) => { if (v == null || v === '') return null; const n = Number(String(v).replace(/\s|€/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+const eurosVerif = (v) => (Number.isInteger(v) ? `${v} €` : `${v.toFixed(2).replace('.', ',')} €`);
+function alertesDepotVinted(page, d) {
+  const out = [];
+  if (!d || !page) return out;
+  const coupees = new Set(Array.isArray(d.coupees) ? d.coupees : []);
+  const desc = typeof page.description === 'string' ? page.description : null;
+  const ouDesc = !Array.isArray(d.ou) || d.ou.includes('description');
+  const lu = desc != null && desc.trim().length >= 5 ? VRM_NUMERO_ECRIT.compacterLecture(VRM_NUMERO_ECRIT.lireNumeroTexte(desc.slice(0, 20000), 'description')) : null;
+  if (d.ecrit === true && ouDesc && lu) {
+    if (lu.etat === 'rien') out.push({ code: 'numero', texte: 'Aucun N° à la fin de la description', pourquoi: `Tu numérotes toi-même : sans N°, VRM ne retrouve pas ${motsExt().le}.` });
+    else if (lu.etat === 'ambigu') out.push({ code: 'numero', texte: 'Deux N° différents dans la description', pourquoi: 'VRM ne saura pas lequel est le bon.' });
+  }
+  const cle = lu && lu.etat === 'lu' ? lu.cle : '';
+  if (cle && d.enLigne && typeof d.enLigne.has === 'function' && d.enLigne.has(cle)) out.push({ code: 'enligne', texte: `N°${cle} déjà en ligne sur ce compte`, pourquoi: `Deux annonces pour ${motsExt().un} : risque de ${motsExt().la} vendre deux fois.` });
+  const p = nombreVerif(page.prix), ac = cle && d.buyByNum ? nombreVerif(d.buyByNum[cle]) : null;
+  if (p != null && p > 0 && ac != null && ac > 0 && p < ac) out.push({ code: 'prix', texte: `Prix ${eurosVerif(p)} sous ton prix d’achat ${eurosVerif(ac)}`, pourquoi: 'Tu vendrais moins cher que ce que tu l’as payée.' });
+  return out.filter((a) => !coupees.has(a.code));
+}
+let _verifDepot = null;
+async function donneesVerifDepot(uid) {
+  const owner = String((await loadSession())?.user_id || '');
+  const u = String(uid || '');
+  if (!owner || !u) return null;
+  if (_verifDepot && _verifDepot.owner === owner && _verifDepot.uid === u && Date.now() - _verifDepot.at < 120000) return _verifDepot;
+  const main = await lireMain(['vrm_numero_ecrit', 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_verif_coupees']);
+  if (main === null) return null;
+  const rowL = await sbGet(`app_data?id=eq.harvest_${u}_listings&select=id,data`);
+  if (rowL === null) return null;
+  const rowP = await sbGet(`app_data?id=eq.harvest_${u}_enligne&select=${SELECT_ENLIGNE}`);
+  const supp = await lireSupprimeesTous();
+  const r = enLigneDesLignes(rowL, rowP === null ? null : rowP, supp, Date.now()).parCompte.get(u);
+  const fiches = main.vinted_annonce_numeros || {};
+  const cleDe = (it) => { const f = fiches[String(it && it.id)]; const n = f && f.numero != null ? cleNum(f.numero) : ''; if (n) return n; const l = it && VRM_NUMERO_ECRIT.compacterLecture(it.numEcrit); return l && l.etat === 'lu' ? l.cle : ''; };
+  // En ligne : seulement une lecture qui fait foi (`enLigne`, < 24 h) ; sinon pas su.
+  let enLigne = null;
+  if (r && Array.isArray(r.enLigne) && !(r.aConfirmer && r.aConfirmer.length) && supp !== null) { enLigne = new Set(); for (const it of r.enLigne) { const k = cleDe(it); if (k) enLigne.add(k); } }
+  const items = (rowL && rowL[0] && rowL[0].data && rowL[0].data.payload && Array.isArray(rowL[0].data.payload.items)) ? rowL[0].data.payload.items : [];
+  const reglage = main.vrm_numero_ecrit && typeof main.vrm_numero_ecrit === 'object' ? main.vrm_numero_ecrit : null;
+  const ecrit = numeroEcritAllume(main) ? true : habitudeNumeroEcritExt(items.map((it) => it && it.numEcrit).filter(Boolean));
+  const coupees = (main.vrm_verif_coupees && Array.isArray(main.vrm_verif_coupees.codes) ? main.vrm_verif_coupees.codes : []).filter((c) => CODES_VERIF_EXT.includes(c));
+  if (String((await loadSession())?.user_id || '') !== owner) return null;
+  _verifDepot = { owner, uid: u, at: Date.now(), ecrit, ou: reglage && reglage.actif === true && Array.isArray(reglage.ou) ? reglage.ou : null, enLigne, buyByNum: main.vinted_buyprice_by_num || {}, coupees };
+  return _verifDepot;
+}
+async function verifDepotPage(sender, msg) {
+  const uid = await numerosPermisDansPage(sender);
+  if (!uid) return { ok: true, alertes: [], portee: 'hors_compte' };
+  const d = await donneesVerifDepot(uid);
+  if (!d) return { ok: false };
+  return { ok: true, alertes: alertesDepotVinted({ description: msg && msg.description, prix: msg && msg.prix }, d) };
 }
 
 function articleMaigre(it) {
@@ -6434,7 +6945,30 @@ function avisPropre(f) {
   if (typeof f.created_at === 'string' && /^\d{4}-\d{2}-\d{2}/.test(f.created_at)) o.created_at = f.created_at.slice(0, 40);
   if (Number.isFinite(Number(f.created_at_ts)) && f.created_at_ts !== null && f.created_at_ts !== '') o.created_at_ts = Number(f.created_at_ts);
   if (typeof f.feedback === 'string') o.feedback = f.feedback.slice(0, 600);
+  // 5.352 (11 nov., lot avis-negatif) — LE N° DE TRANSACTION, S'IL EST DANS LA RÉPONSE (jamais vu
+  // à ce jour) : la seule identité qui relie un avis à SA vente (§5). Chiffres seulement ; absent ⇒ rien.
+  const tx = f.transaction_id != null ? String(f.transaction_id) : '';
+  if (/^\d{1,20}$/.test(tx)) o.transaction_id = tx;
   return o;
+}
+// 5.352 (11 nov., lot avis-negatif) — APRÈS une écriture RÉUSSIE des avis : « l'extension vient de
+// lire les avis de CE compte » (`/api/push { action:'avis', uid }`). Le serveur relit la ligne au nom
+// du vendeur, compare à SA mémoire et sonne une fois par avis ≤ seuil (api/_lib/avis-negatif.js).
+// Aucune requête Vinted ; sans session, ou réseau KO, rien n'est retenté : le cron du matin et du
+// soir est le filet (la mémoire est côté serveur, rien ne se perd).
+async function signalerAvisLus(uid) {
+  try {
+    if (!/^\d{1,20}$/.test(String(uid || ''))) return false;
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('avis_signal_sans_session'); return false; }
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+      body: JSON.stringify({ action: 'avis', uid: String(uid) }) });
+    clearTimeout(t);
+    noterDiag(r.ok ? 'avis_signal_envoye' : `avis_signal_ko_${r.status}`);
+    return r.ok;
+  } catch (_) { noterDiag('avis_signal_ko_reseau'); return false; }
 }
 // 5.340 (11 nov.) — UN POINT PAR CAPTURE : { at, total (Vinted, ou null), n (avis lus),
 // c: [nombre de 1★, 2★, 3★, 4★, 5★] }. Jamais un texte, un pseudo ni un identifiant
@@ -6504,6 +7038,7 @@ async function capterAvis(uid) {
     const historique = historiqueAvis(hr && hr[0] && hr[0].h, pointAvis(maintenant, user_feedbacks, pag));
     const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_feedbacks`, data: { type: 'feedbacks', uid: String(uid), domain: acc.domain || 'www.vinted.fr', capturedAt: maintenant, nItems: user_feedbacks.length, payload: { user_feedbacks, ...(pag ? { pagination: pag } : {}), historique } } }], 'id');
     noterDiag(ok === false ? 'avis_ecriture_ratee' : 'avis_ecrits');
+    if (ok !== false) await signalerAvisLus(uid);   // 5.352 : seulement une écriture réussie
     return ok !== false;
   } catch (_) { return false; }
 }
@@ -7111,6 +7646,302 @@ async function tickPhotosUn() {
     // Plus rien à faire (ou garde qui refuse) → on met en pause ce compte.
     if (!n) { cd[uid] = Date.now(); await chrome.storage.local.set({ vrmPhotosCooldown: cd }); }
   } catch (_) { /* une capture ratée n'a pas à réveiller d'erreur */ }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.358 (11 nov.) — L'EMPREINTE DES PHOTOS : « une même photo sur deux de tes comptes »
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « Vinted relie les comptes entre eux et peut les bannir ; une même photo
+// publiée sur deux de mes comptes est un risque ». La page VRM ne peut pas lire les
+// pixels d'une image de vinted.net (CORS) : l'extension, qui a les droits d'hôte, la
+// télécharge (sans cookie : `credentials: 'omit'`), la dessine en 64 × 64 et en calcule
+// l'empreinte PERCEPTUELLE (src/photoEmpreinte.js, recopiée ci-dessous) — SANS IA (§2.9).
+// Rangée dans `photo_emprunte_{uid}` : { annonces: { [id]: { [clé de photo]: empreinte } } }.
+// JAMAIS l'image, jamais un pixel : l'empreinte seule.
+// Bornes (§3) : un onglet vinted.fr ouvert, un compte connecté, rien pendant qu'il
+// navigue (`PHOTOS_CALME_MS`) ni pendant une pause Vinted ; UNE image par tour au plus,
+// `EMPREINTES_ECART_MS` entre deux ; chaque image compte sur le budget de LECTURE du compte
+// connecté (20/h), classe « photos » — la plus basse : jamais la place de l'argent, des
+// codes ni des colis (`gardeLecture`) ; dans la file Vinted (une requête à la fois) ;
+// la MINIATURE quand Vinted la donne (`photo.mini`), une image de plus de
+// `EMPREINTES_MAX_OCTETS` n'est pas lue. Un refus (429/403) du site des images ⇒ 24 h
+// sans empreinte. Une écriture ne part qu'après une lecture RÉUSSIE de la ligne
+// (lire-fusionner-réécrire : une lecture ratée n'écrit rien).
+// ⚠️ §5 : un doublon de photo est un RISQUE à montrer, jamais une identité.
+// <empreinte-photo-regle> — COPIE de src/photoEmpreinte.js (scripts/audit-photos-comptes.cjs --recopie). Ne pas modifier ici.
+// La taille à laquelle l'image est dessinée avant le calcul (étirée, sans garder les
+// proportions : la même règle pour toutes les photos, page et extension).
+const COTE_EMPREINTE = 64;
+// L'empreinte d'une photo = 6 empreintes de 64 bits : dHash (gradient horizontal, 9 × 8)
+// et pHash (transformée en cosinus 32 × 32, bloc 8 × 8 comparé à sa médiane), chacune
+// sur l'image entière et recadrée de 4 % et 8 % tout autour (un recadrage léger d'un
+// côté retombe sur l'un des trois). 96 caractères hexadécimaux.
+// Distance de deux photos = (meilleure distance dHash) + (meilleure distance pHash) / 2.
+// MESURÉ (banc photos-comptes-seuil, 11 nov., 48 photos inventées × 11 transformations) :
+// même photo recompressée / réduite / agrandie / éclaircie / recadrée ⇒ ≤ 13 ;
+// photo différente (même paire autrement cadrée, ou autre paire) ⇒ ≥ 19. Seuil entre les deux.
+const SEUIL_PHOTO = 16;
+const RECADRAGES = [0, 0.04, 0.08];
+const N_DCT = 32;
+let _cos = null;
+function tableCos() {
+  if (_cos) return _cos;
+  _cos = new Float64Array(8 * N_DCT);
+  for (let u = 0; u < 8; u++) for (let x = 0; x < N_DCT; x++) _cos[u * N_DCT + x] = Math.cos(((2 * x + 1) * u * Math.PI) / (2 * N_DCT));
+  return _cos;
+}
+// Niveaux de gris de la zone [c, 1 − c] réduits à nx × ny par moyenne de surface.
+function grisReduit(gris, w, h, c, nx, ny) {
+  const ax = w * c, ay = h * c, lw = w * (1 - 2 * c), lh = h * (1 - 2 * c);
+  const out = new Float64Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    const y0 = ay + (j * lh) / ny, y1 = ay + ((j + 1) * lh) / ny;
+    for (let i = 0; i < nx; i++) {
+      const x0 = ax + (i * lw) / nx, x1 = ax + ((i + 1) * lw) / nx;
+      let s = 0, a = 0;
+      for (let y = Math.floor(y0); y < Math.min(h, Math.ceil(y1)); y++) {
+        const fy = Math.min(y + 1, y1) - Math.max(y, y0);
+        if (fy <= 0) continue;
+        for (let x = Math.floor(x0); x < Math.min(w, Math.ceil(x1)); x++) {
+          const fx = Math.min(x + 1, x1) - Math.max(x, x0);
+          if (fx <= 0) continue;
+          s += fx * fy * gris[y * w + x]; a += fx * fy;
+        }
+      }
+      out[j * nx + i] = a > 0 ? s / a : 0;
+    }
+  }
+  return out;
+}
+const versHex = (bits) => { let h = ''; for (let q = 0; q < 16; q++) { let n = 0; for (let b = 0; b < 4; b++) n = (n << 1) | (bits[q * 4 + b] ? 1 : 0); h += n.toString(16); } return h; };
+function dHash(g) {                                    // g : 9 × 8
+  const bits = [];
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits.push(g[y * 9 + x] < g[y * 9 + x + 1]);
+  return versHex(bits);
+}
+function pHash(g) {                                    // g : 32 × 32
+  const c = tableCos();
+  const lignes = new Float64Array(8 * N_DCT);
+  for (let y = 0; y < N_DCT; y++) for (let u = 0; u < 8; u++) { let s = 0; for (let x = 0; x < N_DCT; x++) s += g[y * N_DCT + x] * c[u * N_DCT + x]; lignes[u * N_DCT + y] = s; }
+  const bloc = new Float64Array(64);
+  for (let v = 0; v < 8; v++) for (let u = 0; u < 8; u++) { let s = 0; for (let y = 0; y < N_DCT; y++) s += lignes[u * N_DCT + y] * c[v * N_DCT + y]; bloc[v * 8 + u] = s; }
+  const ac = Array.from(bloc).slice(1).sort((x, y) => x - y);
+  const med = (ac[31] + ac[32]) / 2;
+  return versHex(Array.from(bloc, (v, i) => i > 0 && v > med));
+}
+// `rgba` : les octets R, G, B, A ligne par ligne (ImageData.data), `w` × `h`.
+// Rend 96 caractères hexadécimaux, ou null si l'image n'est pas lisible (vide, ou
+// uniforme : une photo sans aucun détail ne dit rien — « pas su », jamais un faux).
+function empreinteDepuisPixels(rgba, w, h) {
+  w = Math.floor(Number(w)); h = Math.floor(Number(h));
+  if (!rgba || !(w > 0) || !(h > 0) || rgba.length < w * h * 4) return null;
+  const gris = new Float64Array(w * h);
+  let mn = 255, mx = 0;
+  for (let i = 0; i < w * h; i++) { const v = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]; gris[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
+  if (!(mx - mn > 2)) return null;                     // image uniforme : rien à dire
+  let d = '', p = '';
+  for (const c of RECADRAGES) { d += dHash(grisReduit(gris, w, h, c, 9, 8)); p += pHash(grisReduit(gris, w, h, c, N_DCT, N_DCT)); }
+  return d + p;
+}
+function empreinteValide(h) { return typeof h === 'string' && /^[0-9a-f]{96}$/.test(h); }
+const BITS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+function hamming16(a, i, b, j) { let n = 0; for (let k = 0; k < 16; k++) n += BITS[parseInt(a[i + k], 16) ^ parseInt(b[j + k], 16)]; return n; }
+// Distance de deux photos (0…96) ; null si l'une n'est pas lisible.
+function distanceEmpreintes(a, b) {
+  if (!empreinteValide(a) || !empreinteValide(b)) return null;
+  let dd = 64, dp = 64;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    dd = Math.min(dd, hamming16(a, i * 16, b, j * 16));
+    dp = Math.min(dp, hamming16(a, 48 + i * 16, b, 48 + j * 16));
+  }
+  return dd + dp / 2;
+}
+function memePhoto(a, b, seuil = SEUIL_PHOTO) {
+  const d = distanceEmpreintes(a, b);
+  return d != null && d <= seuil;
+}
+// La clé d'une photo (son adresse sans la signature `?s=`) : ce qui dit « cette photo
+// est déjà calculée ». Jamais une identité de paire.
+function clePhotoEmpreinte(url) {
+  const s = String(url || '').trim();
+  if (!/^https:\/\/[\w.-]+\//i.test(s)) return '';
+  return s.split('#')[0].split('?')[0].slice(0, 240);
+}
+// </empreinte-photo-regle>
+const EMPREINTES_ECART_MS = 45 * 1000;
+const EMPREINTES_MAX_OCTETS = 600 * 1024;
+const EMPREINTES_PLAN = 'vrmEmpreintesPlan';          // { at, photos: [{ uid, id, k, url }], ids: { [uid]: [id] } }
+const EMPREINTES_PLAN_MS = 3 * 60 * 60 * 1000;        // la liste se relit toutes les 3 h (égress, §4.4)
+const EMPREINTES_PLAN_VIDE_MS = 30 * 60 * 1000;
+const EMPREINTES_MEMO = 'vrmEmpreintesMemo';          // { [clé]: ms du dernier essai }
+const EMPREINTES_RETRY_MS = 24 * 60 * 60 * 1000;
+const EMPREINTES_FILE = 'vrmEmpreintesFile';          // [{ uid, id, k, h, at }] — calculées, pas encore rangées
+const EMPREINTES_LOT = 10;
+const EMPREINTES_LOT_MS = 10 * 60 * 1000;
+const EMPREINTES_DERNIERE = 'vrmEmpreintesDerniere';
+const EMPREINTES_FREIN = 'vrmEmpreintesFrein';
+const EMPREINTES_TOUR = 'vrmEmpreintesTour';
+const EMPREINTES_PAR_ANNONCE = 8;
+const urlImageVinted = (u) => typeof u === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(u);
+// La liste des photos à calculer : les annonces EN LIGNE de ses comptes liés (dressing
+// lu), la photo de couverture d'abord (sa miniature), puis les autres photos de la fiche
+// (`vinted_item_details`) ; moins ce qui est déjà rangé. `null` = pas su (rien ne part).
+async function planEmpreintes() {
+  let st = {};
+  try { st = await chrome.storage.local.get(EMPREINTES_PLAN); } catch (_) { return null; }
+  const p = st[EMPREINTES_PLAN];
+  const age = Date.now() - Number(p && p.at || 0);
+  if (p && Array.isArray(p.photos) && age >= 0 && age < (p.photos.length ? EMPREINTES_PLAN_MS : EMPREINTES_PLAN_VIDE_MS)) return p;
+  const comptes = (await getStoredAccounts()).map((a) => String(a && a.vinted_user_id || '')).filter((u) => /^\d{1,15}$/.test(u));
+  if (!comptes.length) return null;
+  const dressings = await sbGet('app_data?id=like.harvest_*_listings&select=id,items:data->payload->items');
+  if (dressings === null) return null;
+  const faites = await sbGet('app_data?id=like.photo_emprunte_*&select=id,a:data->payload->annonces');
+  if (faites === null) return null;
+  let details = {};
+  const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  if (dr !== null) details = (dr[0] && dr[0].data) || {};
+  const deja = new Set();
+  for (const r of faites || []) {
+    const m = /^photo_emprunte_(\d+)$/.exec(String(r && r.id || '')); if (!m) continue;
+    for (const [id, ph] of Object.entries((r && r.a) || {})) for (const k of Object.keys(ph || {})) deja.add(`${m[1]}|${id}|${k}`);
+  }
+  const couvertures = [], autres = [], ids = {};
+  for (const r of dressings || []) {
+    const m = /^harvest_(\d+)_listings$/.exec(String(r && r.id || ''));
+    if (!m || !comptes.includes(m[1])) continue;
+    const uid = m[1]; ids[uid] = [];
+    for (const it of Array.isArray(r.items) ? r.items : []) {
+      if (!it || !it.id || it.is_closed || it.is_hidden || it.is_draft) continue;
+      const id = String(it.id); ids[uid].push(id);
+      const vues = new Set();
+      const ajoute = (liste, cle, url) => { const k = clePhotoEmpreinte(cle); if (!k || !urlImageVinted(url) || vues.has(k) || vues.size >= EMPREINTES_PAR_ANNONCE) return; vues.add(k); if (!deja.has(`${uid}|${id}|${k}`)) liste.push({ uid, id, k, url }); };
+      const ph = it.photo && typeof it.photo === 'object' ? it.photo : null;
+      if (ph && ph.url) ajoute(couvertures, ph.url, ph.mini || ph.url);
+      const d = details[id];
+      for (const u of (d && Array.isArray(d.photos) ? d.photos : []).slice(0, EMPREINTES_PAR_ANNONCE)) { const url = typeof u === 'string' ? u : (u && u.url); ajoute(autres, url, url); }
+    }
+  }
+  const plan = { at: Date.now(), photos: couvertures.concat(autres), ids };
+  try { await chrome.storage.local.set({ [EMPREINTES_PLAN]: plan }); } catch (_) {}
+  return plan;
+}
+// Une image ⇒ son empreinte (ou null). `createImageBitmap` + `OffscreenCanvas` : dans le
+// service worker, sans page, sans IA. Dessinée en 64 × 64 comme dans la page VRM.
+async function empreinteDeBlob(blob) {
+  try {
+    if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return null;
+    const bmp = await createImageBitmap(blob);
+    const n = COTE_EMPREINTE;
+    const c = new OffscreenCanvas(n, n);
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(bmp, 0, 0, n, n);
+    try { bmp.close && bmp.close(); } catch (_) {}
+    return empreinteDepuisPixels(x.getImageData(0, 0, n, n).data, n, n);
+  } catch (_) { return null; }
+}
+// La file des empreintes calculées part dans `photo_emprunte_{uid}` (une écriture par
+// compte), fusionnée sur la ligne RELUE ; une lecture ratée n'écrit rien (la file reste).
+async function rangerEmpreintes(force = false) {
+  let file = [];
+  try { file = (await chrome.storage.local.get(EMPREINTES_FILE))[EMPREINTES_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const plusVieille = Math.min(...file.map((e) => Number(e.at) || Date.now()));
+  if (!force && file.length < EMPREINTES_LOT && Date.now() - plusVieille < EMPREINTES_LOT_MS) return true;
+  let plan = null;
+  try { plan = (await chrome.storage.local.get(EMPREINTES_PLAN))[EMPREINTES_PLAN] || null; } catch (_) {}
+  const restent = [];
+  const parUid = {};
+  for (const e of file) (parUid[e.uid] = parUid[e.uid] || []).push(e);
+  for (const [uid, liste] of Object.entries(parUid)) {
+    const r = await sbGet(`app_data?id=eq.photo_emprunte_${uid}&select=a:data->payload->annonces`);
+    if (r === null) { restent.push(...liste); noterDiag('empreintes_lecture_ratee'); continue; }
+    const annonces = Object.assign({}, (r[0] && r[0].a && typeof r[0].a === 'object') ? r[0].a : {});
+    for (const e of liste) { annonces[e.id] = Object.assign({}, annonces[e.id] || {}, { [e.k]: e.h }); }
+    // Une annonce qui n'est plus dans le dressing lu de ce compte sort (la ligne reste bornée).
+    const enLigne = plan && plan.ids && Array.isArray(plan.ids[uid]) ? new Set(plan.ids[uid]) : null;
+    if (enLigne && enLigne.size) for (const id of Object.keys(annonces)) if (!enLigne.has(id)) delete annonces[id];
+    const n = Object.values(annonces).reduce((t, a) => t + Object.keys(a || {}).length, 0);
+    const ok = await supabaseUpsert('app_data', [{ id: `photo_emprunte_${uid}`, data: { type: 'photo_empreintes', uid: String(uid), capturedAt: new Date().toISOString(), nItems: n, payload: { version: 1, seuil: SEUIL_PHOTO, annonces } } }], 'id');
+    if (ok === false) { restent.push(...liste); noterDiag('empreintes_ecriture_ratee'); } else noterDiag('empreintes_ecrites');
+  }
+  try { await chrome.storage.local.set({ [EMPREINTES_FILE]: restent }); } catch (_) {}
+  return !restent.length;
+}
+// UN tour : une image au plus. Rend 1 (une image lue), 0 (rien à faire / refus).
+async function empreintesUnTour() {
+  const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
+  if (!tabs || !tabs.length) return 0;                // pas d'onglet Vinted : on ne touche à rien
+  const uid = await activeUidForDomain('www.vinted.fr');
+  if (!uid) return 0;
+  if (await pauseVinted()) return 0;
+  const st = await chrome.storage.local.get([ACTIVITE_VINTED, EMPREINTES_DERNIERE, EMPREINTES_FREIN, EMPREINTES_MEMO]);
+  const t = Date.now();
+  const frein = Number(st[EMPREINTES_FREIN] || 0);
+  if (frein && t - frein >= 0 && t - frein < EMPREINTES_RETRY_MS) return 0;
+  const depuisNav = t - Number(st[ACTIVITE_VINTED] || 0);
+  if (depuisNav >= 0 && depuisNav < PHOTOS_CALME_MS) { noterDiag('empreintes_attend_navigation'); return 0; }
+  const depuis = t - Number(st[EMPREINTES_DERNIERE] || 0);
+  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;
+  const plan = await planEmpreintes();
+  if (!plan) return 0;
+  const memo = st[EMPREINTES_MEMO] || {};
+  let file = [];
+  try { file = (await chrome.storage.local.get(EMPREINTES_FILE))[EMPREINTES_FILE] || []; } catch (_) { return 0; }
+  const enFile = new Set(file.map((e) => `${e.uid}|${e.id}|${e.k}`));
+  const cible = plan.photos.find((p) => !enFile.has(`${p.uid}|${p.id}|${p.k}`) && !(memo[`${p.uid}|${p.id}|${p.k}`] && t - Number(memo[`${p.uid}|${p.id}|${p.k}`]) < EMPREINTES_RETRY_MS));
+  if (!cible) { await rangerEmpreintes(true); return 0; }
+  const acc = (await getStoredAccounts()).find((a) => String(a.vinted_user_id) === String(uid));
+  if (!acc) return 0;
+  const refus = await gardeLecture(uid, acc, 'photos');   // la classe la plus basse
+  if (refus) { noterDiag('empreintes_' + refus.code); return 0; }
+  const cle = `${cible.uid}|${cible.id}|${cible.k}`;
+  memo[cle] = Date.now();
+  try { await chrome.storage.local.set({ [EMPREINTES_MEMO]: memo, [EMPREINTES_DERNIERE]: Date.now() }); } catch (_) {}
+  const rep = await requeteVinted('image', async () => {
+    try {
+      const res = await fetch(cible.url, { credentials: 'omit', cache: 'no-store' });
+      const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');
+      const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);
+      // `status` reste 0 : un refus du site des IMAGES (une adresse signée périmée répond 403)
+      // ne doit pas poser la pause de TOUT Vinted (`requeteVinted`) — son frein est le sien.
+      if (!res.ok || !/^image\//i.test(type) || taille > EMPREINTES_MAX_OCTETS) return { ok: false, status: 0, http: res.status || 0 };
+      const blob = await res.blob();
+      if (!blob || blob.size > EMPREINTES_MAX_OCTETS) return { ok: false, status: 0, http: 413 };
+      return { ok: true, status: 0, http: res.status, blob };
+    } catch (_) { return { ok: false, status: 0, http: 0 }; }
+  });
+  try { await chrome.storage.local.set({ [EMPREINTES_DERNIERE]: Date.now() }); } catch (_) {}
+  if (!rep || !rep.ok || !rep.blob) {
+    noterDiag(`empreintes_image_refusee_${rep ? (rep.http || 0) : 0}`);
+    // « Trop de demandes » du site des images ⇒ 24 h sans empreinte (rien d'autre n'est freiné).
+    if (rep && Number(rep.http) === 429) { try { await chrome.storage.local.set({ [EMPREINTES_FREIN]: Date.now() }); } catch (_) {} }
+    return 0;
+  }
+  const h = await empreinteDeBlob(rep.blob);
+  if (!h) { noterDiag('empreintes_image_illisible'); return 0; }
+  file.push({ uid: cible.uid, id: cible.id, k: cible.k, h, at: Date.now() });
+  try { await chrome.storage.local.set({ [EMPREINTES_FILE]: file }); } catch (_) { return 0; }
+  noterDiag('empreintes_calculee');
+  await rangerEmpreintes(false);
+  return 1;
+}
+// Un tour à la fois (même verrou que les photos : promesse en vol + verrou daté).
+let _tourEmpreintes = null;
+function tickEmpreintes() {
+  if (_tourEmpreintes) return _tourEmpreintes;
+  _tourEmpreintes = (async () => {
+    try {
+      const v = (await chrome.storage.local.get(EMPREINTES_TOUR))[EMPREINTES_TOUR];
+      const age = Date.now() - Number(v && v.at || 0);
+      if (v && age >= 0 && age < PHOTOS_TOUR_MS) return 0;
+      await chrome.storage.local.set({ [EMPREINTES_TOUR]: { at: Date.now() } });
+    } catch (_) { return 0; }
+    try { return await empreintesUnTour(); } catch (_) { return 0; }
+    finally { try { await chrome.storage.local.remove(EMPREINTES_TOUR); } catch (_) {} }
+  })().finally(() => { _tourEmpreintes = null; });
+  return _tourEmpreintes;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -8803,7 +9634,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
   verifFormeObjet(type, brut, '');
-  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); }   // 5.181 : actif / banni ; 5.191 : login
+  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); try { await noterVacancesVues(String(uid), vacancesDuProfil(brut)); } catch (_) {} }   // 5.181 : actif / banni ; 5.191 : login ; 5.350 : vacances (alerte modération)
   payload = alleger(type, payload);
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
@@ -8880,6 +9711,8 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // 5.294 : la date de la dernière lecture COMPLÈTE du dressing de ce compte,
   // RANGÉE (le rattrapage au retour sur Vinted la lit : `retourSurVinted`).
   if (capturePrevue && ecritRow !== false) await noterCaptureComplete(uid);
+  // 5.350 : deux lectures COMPLÈTES comparées (masquée / disparue) — aucune requête Vinted de plus.
+  if (capturePrevue && ecritRow !== false && type === 'listings') { try { await guetterDressing(uid, (brut && brut.items) || [], Date.parse(maintenant)); } catch (_) {} }
   if (fenetreCmd && ecritRow !== false) await noterFenetreRangee(`harvest_${uid}_${type}`, fenetreCmd);
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
@@ -9520,7 +10353,7 @@ function effacerReculBase() {
   }).catch(() => {});
   return _reculChaine;
 }
-function fullSync() { sansRejet(captureAllAccounts().then(() => runActive()), 'fullsync'); }
+function fullSync() { vendExtAJour(); sansRejet(captureAllAccounts().then(() => runActive()), 'fullsync'); }
 
 // ⚠️ APRÈS UNE MISE À JOUR, Chrome n'injecte PAS le nouveau bridge.js dans les
 //    onglets de l'app déjà ouverts : l'app parlerait à l'ancien (orphelin,
@@ -9599,7 +10432,8 @@ function alarmeSiAbsente(nom, opts) {
 // ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
 // 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
 // Rien ne part sans session VRM (voir `relaisTick`).
-const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1, 'vrm-transp': 30, 'vrm-versement': 20, 'vrm-import': 5 };
+// 5.358 : l'empreinte des photos (`vrm-empreintes`, 1 min, une image au plus par tour — `tickEmpreintes`).
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30, 'vrm-offres': 1, 'vrm-transp': 30, 'vrm-versement': 20, 'vrm-import': 5, 'vrm-empreintes': 1 };
 // ⚠️ 5.361 (revue de robustesse, moyennes 87-88 — famille « promesses non
 //    attrapées ») : chaque tâche lancée par un réveil part par `sansRejet` — un
 //    rejet est NOTÉ (`promesse_<tâche>`), jamais une erreur non attrapée qui
@@ -9622,7 +10456,9 @@ function surAlarme(a) {
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
   else if (a.name === 'vrm-versement') lance('versement', () => tickVersements());
   // 5.344 : l'historique de départ, onglet Vinted ouvert (voir `tickImport`).
-  else if (a.name === 'vrm-import') lance('import', () => tickImport());
+  else if (a.name === 'vrm-import') { lance('import', () => tickImport()); lance('importsites', () => tickImportSites()); }   // 5.365 : et Leboncoin / Vestiaire
+  // 5.358 : l'empreinte des photos de ses annonces (voir `tickEmpreintes`).
+  else if (a.name === 'vrm-empreintes') lance('empreintes', () => tickEmpreintes());
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
   // une longue période calme attendrait la prochaine capture pour être écrit.
@@ -10755,7 +11591,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
             await chrome.storage.local.set({ vrmOffresGardeDit: dits });
             noterDiag('offre_auto_garde_' + raison);
             logActivity(raison === 'vendue-ailleurs'
-              ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : cette paire est vendue ailleurs (retire l'annonce Vinted)`
+              ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : ${motsExt().ce} est vendu${motsExt().e} ailleurs (retire l'annonce Vinted)`
               : `⏸ Offre de ${o.prix.toFixed(2)} € pas acceptée : ouvre VRM pour qu'il vérifie qu'elle n'est vendue nulle part ailleurs`);
           }
           continue;
@@ -10926,6 +11762,7 @@ async function visiteVintedUnPassage() {
     await envoyerNotifsRetrait();
     // 5.331 : un « compte relié » resté en attente (réseau, session absente) repart ici.
     await envoyerComptesSignales();
+    await signalerModeration(false);   // 5.350 : une alerte de modération dont l'envoi a échoué repart
     await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -11299,18 +12136,18 @@ function tailleRefusee(rc) {
   const errs = j && Array.isArray(j.errors) ? j.errors : [];
   return errs.some((e) => e && (/^(size|size_id)\b/i.test(String(e.field || e.name || '')) || /champ taille/i.test(String(e.value || e.message || ''))));
 }
-const TEXTE_TAILLE_REFUSEE = " Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne pose une taille que si Vinted en propose une au libellé exact de ta paire.";
+const texteTailleRefusee = () => ` Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne pose une taille que si Vinted en propose une au libellé exact de ${motsExt().ta}.`;
 const TEXTE_PHOTOS_REFUSEES = " Vinted refuse les photos de ce brouillon : ouvre-le sur Vinted (Mes brouillons → Modifier), rajoute les photos, puis « Publier ». VRM ne les renvoie pas tout seul (jamais d'essais en rafale).";
 function gesteRefus(rc, corps) {
   if (!tailleRefusee(rc)) return (typeof photosRefusees === 'function' && photosRefusees(rc)) ? TEXTE_PHOTOS_REFUSEES : '';
   const pourquoi = rc && rc.tailleRaison ? ` VRM a cherché la bonne taille : ${rc.tailleRaison}.` : '';
-  if (pourquoi) return pourquoi + TEXTE_TAILLE_REFUSEE;
+  if (pourquoi) return pourquoi + texteTailleRefusee();
   try {
     const d = (corps && (corps.draft || corps.item)) || {};
     const t = (Array.isArray(d.item_attributes) ? d.item_attributes : []).filter((a) => a && a.code === 'size').map((a) => (a.ids || []).join('+')).join(',');
     echantillonRate('vinted_refus_taille', String(d.id || ''), JSON.stringify({ catalog_id: d.catalog_id || null, size: t || null }));
   } catch (_) {}
-  return TEXTE_TAILLE_REFUSEE;
+  return texteTailleRefusee();
 }
 // ── LA TAILLE RETROUVÉE (29 oct., sa décision : « VRM doit pouvoir regarder la
 // taille, garder toutes les infos de l'article ») ─────────────────────────────
@@ -11359,7 +12196,7 @@ function formeJson(j, prof = 0) {
 }
 function choisirTaille(options, libelle) {
   const cible = libelleTaille(libelle);
-  if (!cible) return { raison: "VRM ne connaît pas la taille de cette paire" };
+  if (!cible) return { raison: `VRM ne connaît pas la taille ${motsExt().deCe}` };
   const ids = [...new Set((options || []).filter((o) => libelleTaille(o.t) === cible).map((o) => o.id))];
   if (ids.length === 1) return { id: ids[0] };
   if (ids.length > 1) return { raison: `Vinted propose plusieurs tailles « ${String(libelle).slice(0, 12)} » pour cette catégorie — VRM ne choisit pas entre elles` };
@@ -11459,7 +12296,7 @@ async function champsManquantsAvant(uid, acc, it, idsPaire, opts = {}) {
       const sz = a('size'); const ids = sz ? sz.ids.map(Number) : [];
       if (!ids.length || !ids.some((x) => g.options.some((o) => o.id === x))) {
         const libelle = await libelleTaillePaire(uid, idsPaire || []);
-        const t = libelle ? choisirTaille(g.options, libelle) : { raison: "VRM ne connaît pas la taille de cette paire" };
+        const t = libelle ? choisirTaille(g.options, libelle) : { raison: `VRM ne connaît pas la taille ${motsExt().deCe}` };
         if (t.id) { it.item_attributes = [...attrs.filter((x) => x && x.code !== 'size'), { code: 'size', ids: [t.id] }]; noterDiag('avant_taille_corrigee'); }
         else { manque.push(`la taille (${t.raison})`); noter('size'); }
       }
@@ -11577,6 +12414,8 @@ async function poserFreinRepub(uid, rc) {
   const f = { jusqua: Date.now() + (restreint ? FREIN_RESTREINT_MS : FREIN_REPUB_MS), restreint, status: st, at: Date.now() };
   try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const cur = m[String(uid)]; if (!(cur && Number(cur.jusqua) > f.jusqua)) m[String(uid)] = f; await chrome.storage.local.set({ [FREIN_REPUB]: m }); } catch (_) {}
   noterDiag(restreint ? 'frein_repub_restreint' : 'frein_repub_refus');
+  // 5.350 : « Vinted limite le compte » — une alerte (pas deux dans les 24 h), la raison si Vinted la donne.
+  if (restreint) { try { await noterCompteModeration(uid, 'restreint', { raison: raisonRefusVinted(rc), jusqua: f.jusqua }); } catch (_) {} }
   return f;
 }
 function phraseFreinRepub(f) {
@@ -11743,7 +12582,7 @@ async function reglerAvant(uid, acc, it, ids, reponses, ctx = {}) {
 }
 function phraseQuestion(q, avant) {
   if (!q) return '';
-  const qui = q.num ? `de la N°${q.num}` : 'de cette paire';
+  const qui = q.num ? `${motsExt().deLa} N°${q.num}` : motsExt().deCe;
   const base = q.options ? `Il manque ${q.nom} ${qui} : choisis dans VRM, la republication reprend sur ta réponse.` : `Il manque ${q.nom} ${qui}. ${q.geste}`;
   return `${base}${q.autres && q.autres.length ? ` (Il manque aussi : ${q.autres.join(', ')}.)` : ''}${avant ? ' Rien n’a été touché.' : ''}`;
 }
@@ -12686,7 +13525,7 @@ async function gardeJourRepub(uid) {
   const l = base.length > loc.length ? base : loc;
   if (l.length < REPUB_PAR_JOUR) return null;
   const h = Math.max(1, Math.ceil((Math.min(...l) + 86400000 - Date.now()) / 3600000));
-  return { code: 'quota-jour', raison: `${REPUB_PAR_JOUR} paires republiées sur ce compte ces dernières 24 h — c'est la limite de VRM pour ne pas te faire repérer. La prochaine dans environ ${h} h. Rien n'a été touché.` };
+  return { code: 'quota-jour', raison: `${REPUB_PAR_JOUR} ${motsExt().noms} republié${motsExt().e}s sur ce compte ces dernières 24 h — c'est la limite de VRM pour ne pas te faire repérer. La prochaine dans environ ${h} h. Rien n'a été touché.` };
 }
 function idPhotoReponse(j) {
   const n = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : ((typeof v === 'string' && /^\d{1,15}$/.test(v)) ? Number(v) : null);
@@ -12911,12 +13750,12 @@ async function publierBrouillon(msg) {
   }
   { const gL = await gardeLecture(uid, acc, 'clic');
     if (!ancienneOk) {
-      if (gL) return { accepte: false, code: 'ancienne-pas-sure', raison: "VRM n'est pas sûr que l'ancienne annonce de cette paire a été supprimée, et ne peut pas la relire maintenant — réessaie dans un moment. Rien n'a été touché." };
+      if (gL) return { accepte: false, code: 'ancienne-pas-sure', raison: `VRM n'est pas sûr que l'ancienne annonce ${motsExt().deCe} a été supprimée, et ne peut pas la relire maintenant — réessaie dans un moment. Rien n'a été touché.` };
       const ra = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${b.ancienId}`, null, { timeoutMs: 30000 });
       if (ra && ra.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(ra) };
       if (!(ra && (ra.status === 404 || ra.status === 410))) {
         noterDiag('brouillon_publier_ancienne_en_ligne');
-        return { accepte: false, code: 'ancienne-en-ligne', raison: ra && ra.ok ? "l'ancienne annonce de cette paire est TOUJOURS sur Vinted : la mettre en ligne la vendrait deux fois. Supprime l'ancienne sur Vinted, puis réessaie. Rien n'a été touché." : "VRM n'a pas pu vérifier que l'ancienne annonce de cette paire a été supprimée — réessaie dans un moment. Rien n'a été touché." };
+        return { accepte: false, code: 'ancienne-en-ligne', raison: ra && ra.ok ? `l'ancienne annonce ${motsExt().deCe} est TOUJOURS sur Vinted : la mettre en ligne la vendrait deux fois. Supprime l'ancienne sur Vinted, puis réessaie. Rien n'a été touché.` : `VRM n'a pas pu vérifier que l'ancienne annonce ${motsExt().deCe} a été supprimée — réessaie dans un moment. Rien n'a été touché.` };
       }
     }
     if (!gL) {
@@ -13576,7 +14415,7 @@ async function recreerVinted(msg) {
       // nouvelle recréation de CETTE annonce (sinon un second brouillon, puis une seconde
       // suppression). « Brouillons → en ligne » reste ouvert pour le brouillon rangé.
       await poserVerrouRecreer(id);
-      return { refaire: true, accepte: true, etape: 'incertain', draftId, raison: "le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois la même paire en ligne) — regarde ton dressing ; si elle n'y est plus, « Brouillons → en ligne » met le brouillon en ligne." };
+      return { refaire: true, accepte: true, etape: 'incertain', draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois ${motsExt().meme} en ligne) — regarde ton dressing ; si elle n'y est plus, « Brouillons → en ligne » met le brouillon en ligne.` };
     }
     if (!suppIncertaine && !rdV.ok) {
       noterDiag(`versbrouillon_suppression_refusee_${rdV.status}`);
@@ -14745,7 +15584,7 @@ async function executerPourApp(msg, sender) {
   //    confirmation… et le pont le jetait : le fond ne l'exigeait que par le
   //    relais du téléphone. N'importe quel message `exec` de l'app acceptait
   //    donc une offre sans elle. Exigé ici, pour toutes les voies.
-  if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti' };
+  if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti` };
   const accts = await getStoredAccounts({ ouNull: true });
   if (accts === null) return { ok: false, code: 'pas-su', error: 'tes comptes n’ont pas pu être relus — rien n’est parti, réessaie' };
   const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
@@ -15432,6 +16271,121 @@ async function lbcARetirerPourCarte() {
   }
   return c && c.data ? c.data : null;
 }
+// ── LE MINI-RÉSUMÉ DU MOIS DANS LA CARTE (5.354, lot extension-resume) ───────
+// « Ce mois : 1 340 € vendus · 42 ventes · 3 à expédier », replié sous une ligne
+// discrète. L'extension ne recalcule RIEN (§5) : elle LIT ce que l'app publie déjà
+// pour le widget de l'iPhone (`widget_stats` : caMois, ventesMois,
+// caMoisNonComptees, updatedAt, et `aExpedier` recopié du badge de Colis —
+// src/resumeCarte.js). Une lecture PROJETÉE (§4.4, aucun `select=data`), au plus
+// une TENTATIVE toutes les 15 min (réussie ou non), jamais plus d'1,2 s d'attente
+// pour la carte ; aucune requête vers Vinted. « Pas su » ⇒ null (la carte dit
+// « — », jamais 0). La copie est celle d'UN compte VRM (`u`).
+// Rien n'est montré si le compte de l'ONGLET n'est pas PROUVÉ à ce compte VRM
+// (`ongletDuVendeur`) : Vinted = un compte de SA liste (`vrmLogins` de cette
+// session, jamais « ignoré ») ; Leboncoin = un compte de SON `lbc_accounts` vu sur
+// une page « moi » ; Vestiaire = un compte de SON `vc_session` ; eBay = pas su.
+// Masqué (son choix, ce navigateur : `vrmResumeMasque`) ⇒ aucune lecture du tout.
+const MOIS_CARTE_RELU_MS = 15 * 60e3;
+const MOIS_CARTE_CACHE = 'vrmResumeCarte';
+const MOIS_CARTE_MASQUE = 'vrmResumeMasque';
+const MOIS_COLIS_MAX_MS = 12 * 3600e3;   // la fraîcheur du badge de Colis (publicationColisFraiche)
+const MOIS_CARTE_REQUETE = 'app_data?id=in.(widget_stats,lbc_accounts,vc_session)&select=id,ca:data->caMois,nv:data->ventesMois,nc:data->caMoisNonComptees,ae:data->aExpedier,maj:data->>updatedAt,la:data->accounts,vcc:data->comptes';
+function moisParis(ms) {
+  try {
+    const p = {}; for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).formatToParts(new Date(ms))) p[x.type] = x.value;
+    return p.year && p.month ? `${p.year}-${p.month}` : null;
+  } catch (_) { return null; }
+}
+const nombreOuNull = (x) => (typeof x === 'number' && Number.isFinite(x) ? x : (typeof x === 'string' && x.trim() !== '' && Number.isFinite(Number(x)) ? Number(x) : null));
+// Les lignes lues ⇒ ce que la carte peut dire. Rien n'est calculé : chaque chiffre
+// est celui de l'app, ou null (pas su) — mois d'avant, champ absent, colis trop vieux.
+function resumeMoisCarte(rows, maintenant) {
+  const now = Number(maintenant) || Date.now();
+  const w = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'widget_stats') || null;
+  const lbc = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'lbc_accounts') || null;
+  const vc = (Array.isArray(rows) ? rows : []).find((r) => r && r.id === 'vc_session') || null;
+  const lbcIds = [];
+  if (lbc && lbc.la && typeof lbc.la === 'object') for (const [k, a] of Object.entries(lbc.la)) {
+    if (a && typeof a === 'object' && (a.session === true || a.sessionAt || (a.source && !LBC_URL_AUTRUI.test(String(a.source))))) lbcIds.push(idCompteLbc(k));
+  }
+  const vcIds = vc && vc.vcc && typeof vc.vcc === 'object' ? Object.keys(vc.vcc).map(String).slice(0, 20) : [];
+  const majMs = w && w.maj ? Date.parse(String(w.maj)) : NaN;
+  const ceMois = Number.isFinite(majMs) && moisParis(majMs) != null && moisParis(majMs) === moisParis(now);
+  const ca = ceMois ? nombreOuNull(w.ca) : null;
+  const ventes = ceMois ? nombreOuNull(w.nv) : null;
+  const nc = ceMois ? nombreOuNull(w.nc) : null;
+  const ae = w && w.ae && typeof w.ae === 'object' ? w.ae : null;
+  const aeAt = ae ? nombreOuNull(ae.at) : null;
+  const aeFrais = aeAt != null && now - aeAt >= 0 && now - aeAt < MOIS_COLIS_MAX_MS;
+  const aExpedier = ae && aeFrais && nombreOuNull(ae.n) != null ? Math.max(0, Math.round(nombreOuNull(ae.n))) : null;
+  return {
+    ca: ca == null ? null : Math.round(ca), caAuMoins: ca != null && nc != null && nc > 0,
+    ventes: ventes == null ? null : Math.round(ventes),
+    aExpedier, aExpedierAuMoins: aExpedier != null && ae.auMoins === true,
+    maj: Number.isFinite(majMs) ? majMs : null,
+    raison: !w ? 'jamais' : !ceMois ? 'mois' : null,
+    lbcIds: [...new Set(lbcIds)].slice(0, 20), vcIds,
+  };
+}
+// Le compte de l'onglet appartient-il à CE compte VRM ? true · false · null (pas su).
+function ongletDuVendeur({ plateforme, site, logins, u, resume, vcOnglet }) {
+  if (plateforme === 'vinted') {
+    if (!site || !site.id) return null;
+    if (site.choix === 'non') return false;
+    if (!logins || logins.owner !== u || !logins.map) return null;
+    if (Object.prototype.hasOwnProperty.call(logins.map, String(site.id))) return true;
+    return Date.now() - Number(logins.at || 0) < 300000 ? false : null;
+  }
+  if (plateforme === 'leboncoin') {
+    if (!site || !site.id || !resume) return null;
+    return resume.lbcIds.includes(idCompteLbc(site.id)) ? true : null;
+  }
+  if (plateforme === 'vestiaire') {
+    if (!vcOnglet || !resume) return null;
+    return resume.vcIds.includes(String(vcOnglet)) ? true : null;
+  }
+  return null;
+}
+async function moisPourCarte(plateforme, site, tabId) {
+  let local = {};
+  try { local = await chrome.storage.local.get([MOIS_CARTE_MASQUE, MOIS_CARTE_CACHE, 'vrmLogins', VC_ONGLETS]); } catch (_) { return null; }
+  if (local[MOIS_CARTE_MASQUE] === true) return { masque: true };
+  if (plateforme !== 'vinted' && plateforme !== 'leboncoin' && plateforme !== 'vestiaire') return null;
+  let u = '';
+  try { const s = await loadSession(); u = String((s && (s.user_id || subDuJwt(s.access_token))) || ''); } catch (_) { u = ''; }
+  if (!u) return null;
+  // Vinted : la preuve se lit SANS réseau ; un compte d'un autre ne déclenche aucune lecture.
+  if (plateforme === 'vinted' && ongletDuVendeur({ plateforme, site, logins: local.vrmLogins, u }) !== true) return null;
+  let c = local[MOIS_CARTE_CACHE] || null;
+  if (c && c.u !== u) c = null;
+  if (!c || !(Date.now() - Number(c.tente || 0) < MOIS_CARTE_RELU_MS) || Date.now() < Number(c.tente || 0)) {
+    const avant = c;
+    const lire = (async () => {
+      const marque = { u, tente: Date.now(), rows: avant ? avant.rows : null, lu: avant ? avant.lu : 0 };
+      try { await chrome.storage.local.set({ [MOIS_CARTE_CACHE]: marque }); } catch (_) {}
+      const rows = await sbGet(MOIS_CARTE_REQUETE);
+      if (rows === null || !Array.isArray(rows)) return marque;        // lecture ratée : la dernière connue reste
+      const v = { u, tente: marque.tente, lu: Date.now(), rows: rows.slice(0, 3).map((r) => ({ id: r.id, ca: r.ca, nv: r.nv, nc: r.nc, ae: r.ae, maj: r.maj, la: r.la, vcc: r.vcc })) };
+      try { await chrome.storage.local.set({ [MOIS_CARTE_CACHE]: v }); } catch (_) {}
+      return v;
+    })();
+    const r = await avecDelai(lire, 1200, null).catch(() => null);
+    if (r) c = r;
+  }
+  if (!c || !c.rows) return null;
+  const resume = resumeMoisCarte(c.rows, Date.now());
+  const vcOnglet = plateforme === 'vestiaire' && tabId != null ? ((local[VC_ONGLETS] || {})[String(tabId)] || {}).compte : null;
+  if (ongletDuVendeur({ plateforme, site, logins: local.vrmLogins, u, resume, vcOnglet }) !== true) return null;
+  const { lbcIds, vcIds, ...dire } = resume;
+  return Object.assign(dire, { lu: Number(c.lu) || null });
+}
+async function poserMoisMasque(masque) {
+  try {
+    if (masque) await chrome.storage.local.set({ [MOIS_CARTE_MASQUE]: true });
+    else await chrome.storage.local.remove(MOIS_CARTE_MASQUE);
+    return { ok: true, masque: !!masque };
+  } catch (_) { return { ok: false }; }
+}
 async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
@@ -15453,6 +16407,11 @@ async function etatSite(url,tabId) {
     site = uid ? { id: String(uid), nom: (await loginDe(String(uid))) || (await loginVu(String(uid))), choix: await choixCompte(String(uid)) } : { id: null, nom: '' };
     // 5.341 : les dates de versement encore à lire sur CE compte (pas su ⇒ null).
     if (uid) site.dates = await datesPourCarte(String(uid));
+    // 5.351 : « en pause car Vinted freine » — lu dans CE Chrome (stockage local,
+    // aucune requête) : la pause 429/403 et le frein des mises en ligne du compte.
+    if (uid) { const fr = await lireFreinRepub(String(uid)).catch(() => null); site.frein = fr ? { jusqua: Number(fr.jusqua) || 0, restreint: !!fr.restreint } : null; }
+    const pz = await pauseVinted().catch(() => null);
+    site.pause = pz ? { jusqua: Number(pz.jusqua) || 0 } : null;
     // 5.344 : l'historique de départ de CE compte (pas su ⇒ null).
     if (uid) site.import = await importPourCarte(String(uid));
   } else if (plateforme === 'leboncoin') {
@@ -15483,7 +16442,9 @@ async function etatSite(url,tabId) {
   const aRetirer = aRetirerBrut ? { at: aRetirerBrut.at, liste: aRetirerProuveCarte(aRetirerBrut.liste, lectureLbc, Date.now()) } : null;
   const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now() }) : null;
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
+  // 5.354 : le mini-résumé du mois (connecté seulement ; compte de l'onglet prouvé).
+  const mois = vrm && vrm.connecte === true ? await moisPourCarte(plateforme, site, tabId).catch(() => null) : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -15879,6 +16840,11 @@ async function executerCommande(msg) {
     const r = await demanderImportTout(uid);
     return r.ok ? { accepte: true, etape: 'file', etat: r.etat } : { accepte: false, code: r.code || 'refus', raison: r.raison };
   }
+  // 5.365 : « Tout récupérer » Leboncoin / Vestiaire — le compte ouvert dans un onglet de ce site.
+  if (msg && msg.cmd === 'importSiteTout') {
+    const r = await demanderImportSiteTout(String(msg.site || ''), String(msg.compte || ''));
+    return r.ok ? { accepte: true, etape: 'file', etat: r.etat } : { accepte: false, code: r.code || 'refus', raison: r.raison };
+  }
   if (msg && msg.cmd === 'republierVinted') { const r = await republierVinted(msg); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted({ ...msg, programme: false }); await journalCommande(msg, r); return r; }
@@ -16129,7 +17095,7 @@ function relaisCommande(d) {
 const RAISON_REFUS_RELAIS = {
   'arguments': 'commande incomplète — rien n\'est parti',
   'non-autorise': 'action non autorisée depuis le téléphone — rien n\'est parti',
-  'confirmation': 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti',
+  'confirmation': `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti`,
   'expiree': 'commande trop ancienne (plus de 10 min) — rien n\'est parti, relance-la si tu le veux encore',
 };
 // `null` = le stockage n'a pas répondu (on ne décide rien sur « pas su »).
@@ -17517,6 +18483,346 @@ async function demanderImportTout(uid) {
   await publierImport(String(uid), st);
   if (!p) importerHistorique(String(uid)).catch(() => {});
   return { ok: true, etat: resumeImport(st) };
+}
+
+// ═══ L'HISTORIQUE LEBONCOIN ET VESTIAIRE (5.365, 11 novembre) ════════════════
+// Julien : « récupérer TOUT l'historique de ventes et d'achats sur Leboncoin,
+// eBay et Vestiaire, comme pour Vinted, pour avoir stats et compta complètes dès
+// le premier jour ». (eBay : côté serveur, `api/_lib/ebay-historique.js`.)
+// · LE MODÈLE : l'adresse EXACTE d'une page « Mes transactions » (Leboncoin) ou
+//   « Mes ventes / Mes achats » (Vestiaire) que le SITE a lui-même demandée, avec
+//   un paramètre de pagination que le site a mis (`page`, ou `offset`+`limit`) —
+//   noté par la page (`lbcimportmodele`, `vcimportmodele`), rangé ici PAR COMPTE.
+//   Jamais une adresse devinée, jamais un paramètre ajouté : sans modèle, rien ne
+//   part et la carte dit le geste (« va à la page 2, une fois »).
+// · COMPTE DE L'ONGLET SEULEMENT : Leboncoin = l'identité privée lue par la page
+//   (`vrmLbcTransport`, source « prive ») ; Vestiaire = le compte que l'onglet ET
+//   la page disent (`compteVcCapture`). La page refuse un ordre pour un autre compte.
+// · BUDGET DE LECTURE (20/h, `compterLecture` sous la clé `{site}:{compte}`) :
+//   l'import en prend au plus `IMPSITE_MAX_HEURE` (12) ⇒ 8 restent TOUJOURS aux
+//   lectures de l'argent et des colis (les détails des ventes en cours que la page
+//   relit, `lireDetails`) — jamais leur place. Une requête à la fois (un passage
+//   à la fois), pause aléatoire de 3 à 8 s, des GET seulement ; un 401/403/429
+//   ⇒ pause de 30 min, la série s'arrête.
+// · REPRISE là où on s'est arrêté (`vrmImportSites`, chrome.storage.local, §4.9).
+// · FUSION par identité : Leboncoin par n° de transaction (`rangerLbcVentes`),
+//   Vestiaire par identifiant de vente / d'achat (`rangerVcVentes`,
+//   `rangerVcAchats`) — jamais par titre. Une page que la base n'a pas prise
+//   n'avance PAS ; une réponse d'une forme inconnue n'écrit rien et arrête.
+// · Leboncoin : la liste ne dit ni vendeur/acheteur ni le prix final : chaque
+//   transaction lue est ensuite relue en DÉTAIL (`v2/pages/transactions/{id}`, la
+//   même adresse que `lireDetails`), dans le même budget, sauf celles que la base
+//   a déjà en détail (`isSeller` posé).
+// · Une liste déjà lue jusqu'au bout (état noté ici) n'est plus relue (« fini »,
+//   aucune lecture) ; « Tout récupérer » repart de la première page.
+// · PROGRESSION dans SA ligne `import_{site}_{compte}` (jamais `main`), ≈ 500 o.
+const IMPSITE_STORE = 'vrmImportSites';
+const IMPSITE_MODELES = 'vrmImportModeles';
+const IMPSITE_LUS = 'vrmImportSitesLus';
+const IMPSITE_MAX_HEURE = 12;
+const IMPSITE_PAR_PASSAGE = 3;
+const IMPSITE_PAUSE_MS = [3000, 8000];
+const IMPSITE_PAUSE_REFUS_MS = 30 * 60000;
+const IMPSITE_PAGES_MAX = 300;
+const IMPSITE_DETAILS_MAX = 3000;
+const IMPSITE_TYPES = { leboncoin: ['transactions', 'details'], vestiaire: ['ventes', 'achats'] };
+const cleImpSite = (site, compte) => `${site}:${compte}`;
+const compteImpOk = (c) => /^[\w-]{1,64}$/.test(String(c || ''));
+// La pagination qu'un modèle porte, ou null (« pas su » : rien n'est deviné).
+function paginationModele(url) {
+  let u; try { u = new URL(String(url || '')); } catch (_) { return null; }
+  const p = u.searchParams, n = (k) => (p.has(k) && /^\d{1,6}$/.test(p.get(k)) ? Number(p.get(k)) : null);
+  if (n('page') !== null) return { mode: 'page', base: n('page') === 0 ? 0 : 1 };
+  const off = n('offset'), lim = ['limit', 'size', 'per_page', 'perPage', 'pageSize'].map((k) => [k, n(k)]).find(([, v]) => v !== null && v > 0);
+  if (off !== null && lim) return { mode: 'offset', cleLimite: lim[0], limite: lim[1] };
+  return null;
+}
+// L'adresse de la page `i` (0 = la première) du modèle : seul le paramètre de
+// pagination que le site a mis change ; tout le reste est recopié tel quel.
+function urlPageModele(url, i) {
+  const pg = paginationModele(url);
+  if (!pg || !Number.isInteger(i) || i < 0) return null;
+  const u = new URL(url);
+  if (pg.mode === 'page') u.searchParams.set('page', String(pg.base + i));
+  else u.searchParams.set('offset', String(i * pg.limite));
+  return u.href;
+}
+// La clé d'une liste : son adresse sans pagination (deux onglets d'une même page = deux listes).
+function cleListeModele(url) {
+  try { const u = new URL(url); for (const k of ['page', 'offset', 'limit', 'size', 'per_page', 'perPage', 'pageSize']) u.searchParams.delete(k); u.searchParams.sort(); return u.origin + u.pathname + '?' + u.searchParams.toString(); } catch (_) { return ''; }
+}
+async function lireStoreImp(cle, nom) {
+  try { return ((await chrome.storage.local.get(nom))[nom] || {})[cle] || null; } catch (_) { return undefined; }
+}
+async function poserStoreImp(cle, nom, val) {
+  try { const cur = (await chrome.storage.local.get(nom))[nom] || {}; cur[cle] = val; await chrome.storage.local.set({ [nom]: cur }); return true; } catch (_) { return false; }
+}
+// Un modèle vu par la page : rangé pour CE compte (au plus 4 listes par type).
+async function noterModeleSite(site, compte, quoi, url) {
+  if (!IMPSITE_TYPES[site] || !compteImpOk(compte) || !paginationModele(url)) return false;
+  const cle = cleImpSite(site, compte);
+  const cur = await lireStoreImp(cle, IMPSITE_MODELES);
+  if (cur === undefined) return false;
+  const m = Object.assign({}, cur || {});
+  const l = Object.assign({}, m[quoi] || {});
+  const k = cleListeModele(url);
+  if (!k) return false;
+  if (l[k] && l[k].url === url) return true;
+  if (!l[k] && Object.keys(l).length >= 4) return false;
+  l[k] = { url, at: Date.now() };
+  m[quoi] = l;
+  const ok = await poserStoreImp(cle, IMPSITE_MODELES, m);
+  if (ok) planifierImportSites();
+  return ok;
+}
+async function impLusHeure(cle) {
+  try { const cur = (await chrome.storage.local.get(IMPSITE_LUS))[IMPSITE_LUS] || {}; return (cur[cle] || []).filter((x) => x > Date.now() - 3600000); } catch (_) { return null; }
+}
+async function noterImpLu(cle) {
+  try { const cur = (await chrome.storage.local.get(IMPSITE_LUS))[IMPSITE_LUS] || {}; const t = Date.now(); const l = (cur[cle] || []).filter((x) => x > t - 3600000); l.push(t); cur[cle] = l; await chrome.storage.local.set({ [IMPSITE_LUS]: cur }); } catch (_) {}
+}
+// Une liste neuve (l'index de la prochaine page, ce qui a été lu).
+const listeImpNeuve = (url) => ({ url, i: 0, lus: 0, total: null, pages: 0, fini: false, dernier: '' });
+// Les listes connues d'un type, l'état existant gardé (une liste déjà finie reste finie).
+function fusionListesImp(st, quoi, modeles) {
+  const t = Object.assign({ listes: {}, fini: false }, st[quoi] || {});
+  const listes = Object.assign({}, t.listes || {});
+  for (const [k, m] of Object.entries(modeles || {})) if (!listes[k]) listes[k] = listeImpNeuve(m.url); else if (m.url && !listes[k].fini) listes[k] = Object.assign({}, listes[k], { url: m.url });
+  t.listes = listes;
+  return t;
+}
+const typeImpFini = (t) => !!(t && t.listes && Object.keys(t.listes).length && Object.values(t.listes).every((l) => l.fini));
+// L'état SIMPLE publié (par type : lus, total, pages, fini ; et ce qu'il attend).
+function resumeImpSite(site, st, maintenant = Date.now()) {
+  if (!st) return null;
+  const types = {};
+  let attend = null;
+  for (const nom of IMPSITE_TYPES[site]) {
+    const t = st[nom] || {};
+    if (site === 'leboncoin' && nom === 'details') {
+      const file = Array.isArray(t.file) ? t.file.length : 0, faits = Math.max(0, Number(t.faits) || 0);
+      const listeFinie = typeImpFini(st.transactions);
+      types.details = { lus: faits, total: listeFinie ? faits + file : null, pages: faits, fini: listeFinie && !file };
+      continue;
+    }
+    const ls = Object.values(t.listes || {});
+    if (!ls.length) { types[nom] = { lus: 0, total: null, pages: 0, fini: !!t.deja, sansModele: !t.deja }; if (!t.deja && !attend) attend = 'modele'; continue; }
+    const tot = ls.every((l) => Number.isFinite(Number(l.total)) && l.total !== null) ? ls.reduce((s, l) => s + Number(l.total), 0) : null;
+    const lus = ls.reduce((s, l) => s + (Number(l.lus) || 0), 0);
+    types[nom] = { lus: tot !== null ? Math.min(lus, tot) : lus, total: tot, pages: ls.reduce((s, l) => s + (Number(l.pages) || 0), 0), fini: ls.every((l) => l.fini) };
+  }
+  const fini = Object.values(types).every((x) => x.fini);
+  const pause = st.pause && Number(st.pause.jusqua) > maintenant ? st.pause : null;
+  const etat = fini ? 'fini' : pause ? 'pause' : (Object.values(types).some((x) => x.lus > 0 || x.pages > 0) ? 'encours' : 'attente');
+  // Le reste à lire, au mieux connu : pages de liste + détails ⇒ minutes à 12 lectures/h.
+  let reste = 0;
+  for (const nom of IMPSITE_TYPES[site]) {
+    const x = types[nom]; if (x.fini) continue;
+    if (site === 'leboncoin' && nom === 'details') reste += Array.isArray((st.details || {}).file) ? st.details.file.length : 0;
+    else for (const l of Object.values(((st[nom] || {}).listes) || {})) { if (l.fini) continue; const pg = paginationModele(l.url); const parPage = pg && pg.mode === 'offset' ? pg.limite : Math.max(1, Math.round((Number(l.lus) || 0) / Math.max(1, Number(l.pages) || 1)) || 20); reste += l.total !== null && Number(l.total) > 0 ? Math.max(1, Math.ceil((Number(l.total) - (Number(l.lus) || 0)) / parPage)) : 1; }
+  }
+  return { v: 1, type: 'import', plateforme: site, etat, types, attend: fini ? null : attend, debut: Number(st.debut) || null, fin: fini ? (Number(st.fin) || Date.now()) : null,
+    repriseA: pause ? Number(pause.jusqua) : null, cause: pause ? String(pause.cause || '') : null, resteMin: fini ? 0 : Math.max(5, Math.ceil(reste / IMPSITE_MAX_HEURE * 60)), at: Number(st.at) || null, demande: !!st.demande };
+}
+async function publierImpSite(site, compte, st) {
+  const r = resumeImpSite(site, st);
+  if (!r) return false;
+  try {
+    const data = Object.assign({}, r, { compte: String(compte), code: CODE_VERSION, capturedAt: new Date().toISOString() });
+    const ok = await supabaseUpsert('app_data', [{ id: `import_${site}_${compte}`, data }], 'id');
+    if (ok !== false) notifierApp({ type: 'maj', quoi: 'import', site, compte: String(compte) });
+    return ok !== false;
+  } catch (_) { return false; }
+}
+// L'état de ce compte, créé à la 1re fois (ou sur `force`) ; les modèles neufs s'y ajoutent.
+async function departImpSite(site, compte, opts = {}) {
+  const cle = cleImpSite(site, compte);
+  const [st0, modeles] = [await lireStoreImp(cle, IMPSITE_STORE), await lireStoreImp(cle, IMPSITE_MODELES)];
+  if (st0 === undefined || modeles === undefined) return null;
+  const t = Date.now();
+  let st = st0 && !opts.force ? Object.assign({}, st0) : { v: 1, debut: t, at: t, demande: !!opts.force };
+  for (const nom of IMPSITE_TYPES[site]) if (!(site === 'leboncoin' && nom === 'details')) st[nom] = fusionListesImp(st, nom, (modeles || {})[nom]);
+  if (site === 'leboncoin') st.details = Object.assign({ file: [], faits: 0 }, st.details || {});
+  // ⚠️ Vestiaire : `vc_ventes.lectures.ventes.complet` ne dit pas DE QUEL compte la
+  //    liste entière a été lue (la ligne est commune à tous les comptes) : « pas su »
+  //    ne vaut pas « complet » ⇒ on lit (la fusion par identifiant ne perd rien).
+  if (!(await poserStoreImp(cle, IMPSITE_STORE, st))) return null;
+  return st;
+}
+function pauseImpSite() {
+  const p = IMPSITE_PAUSE_MS, ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['impsite', ms]); } catch (_) {}
+  return new Promise((ok) => setTimeout(ok, ms));
+}
+// L'onglet de CE compte sur CE site (le cadre principal), ou null.
+async function ongletImpSite(site, compte) {
+  if (site === 'leboncoin') { const o = await ongletLbcDuCompte(compte); return o && o.ok ? o.tabId : null; }
+  let m = {};
+  try { m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {}; } catch (_) { return null; }
+  for (const [tid, e] of Object.entries(m)) {
+    if (!e || String(e.compte || '') !== String(compte)) continue;
+    let tab = null; try { tab = await chrome.tabs.get(Number(tid)); } catch (_) { tab = null; }
+    if (tab && /^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(tab.url || '')) return Number(tid);
+  }
+  return null;
+}
+// Les détails Leboncoin que la base n'a pas encore (`isSeller` absent) parmi `ids`.
+// `null` = base muette (on les garde tous à lire : « pas su »).
+async function detailsLbcManquants(ids) {
+  const l = ids.filter((x) => /^\d{1,15}$/.test(x)).slice(0, 40);
+  if (!l.length) return [];
+  const sel = l.map((id, i) => `s${i}:data->ventes->"${id}"->>isSeller`).join(',');
+  const rows = await sbGetLbc(`app_data?id=eq.lbc_ventes&select=${sel}`);
+  if (rows === null || !Array.isArray(rows)) return null;
+  const r = rows[0] || {};
+  return l.filter((id, i) => !(r['s' + i] === 'true' || r['s' + i] === 'false'));
+}
+// UNE lecture d'import : l'ordre à la page, la réponse rangée. Rend
+// { ok, n, ids, total, fin, refus } — `ok:false` ⇒ rien n'avance.
+async function lireUneImpSite(site, compte, tabId, quoi, url) {
+  let rep = null;
+  const action = site === 'leboncoin' ? 'lbcImportPage' : 'vcImportPage';
+  try { rep = await avecDelai(chrome.tabs.sendMessage(tabId, { from: 'vrm-fond', action, url, quoi, compte }, { frameId: 0 }), 30000, null); } catch (_) { rep = null; }
+  if (!rep || rep.ok !== true) return { ok: false, cause: 'muet' };
+  if ([401, 403, 429].includes(Number(rep.statut))) return { ok: false, refus: true, cause: site };
+  if (rep.erreur) return { ok: false, cause: rep.erreur };
+  if (!(rep.statut >= 200 && rep.statut < 300)) return { ok: false, cause: 'statut' };
+  const owner = (await loadSession())?.user_id;
+  if (!owner) return { ok: false, cause: 'session' };
+  if (site === 'leboncoin') {
+    if (String(rep.moi || '') !== String(compte)) return { ok: false, cause: 'autre-compte' };
+    const c = await sessionDeListe(rep.session);
+    if (!c || c.id !== 'lbc-account:' + compte) return { ok: false, cause: 'compte-pas-su' };
+    let j = null; try { j = JSON.parse(rep.corps); } catch (_) {}
+    const ventes = extraireVentesLbc(url, rep.corps);
+    if (Array.isArray(j) && !j.length) return { ok: true, n: 0, ids: [] };
+    if (!ventes.length) return { ok: false, cause: 'forme' };
+    for (const v of ventes) { v.account = c.id; v.accountName = c.name || ''; }
+    const ok = await rangerLbcVentes(ventes, owner);
+    if (ok !== true) return { ok: false, cause: 'base' };
+    return { ok: true, n: ventes.length, ids: ventes.map((v) => v.txId), etats: ventes.map((v) => v.stepStatus || '') };
+  }
+  const moi = await compteVcCapture(tabId, rep.moi);
+  if (!moi || moi !== String(compte)) return { ok: false, cause: 'autre-compte' };
+  const p = rep.paquet;
+  if (!p || Array.isArray(p.inconnu) || !rep.quoi) return { ok: false, cause: 'forme' };
+  const lot = quoi === 'ventes' ? p.ventes : p.achats;
+  if (!Array.isArray(lot)) return { ok: false, cause: 'forme' };
+  if (!lot.length) return { ok: true, n: 0, ids: [], total: p.total };
+  const ok = quoi === 'ventes' ? await rangerVcVentes(Object.assign({}, p, { source: 'ventes', compte: moi })) : await rangerVcAchats(Object.assign({}, p, { compte: moi }));
+  if (ok !== true) return { ok: false, cause: 'base' };
+  return { ok: true, n: lot.length, ids: lot.map((x) => x.id), total: typeof p.total === 'number' ? p.total : null };
+}
+let _impSiteEnCours = null;
+function importerSite(site, compte, opts = {}) {
+  if (_impSiteEnCours) { try { noterDiag('impsite_deja_en_cours'); } catch (_) {} return _impSiteEnCours.then(() => 0, () => 0); }
+  _impSiteEnCours = importerSiteUn(site, compte, opts).catch(() => 0).finally(() => { _impSiteEnCours = null; });
+  return _impSiteEnCours;
+}
+async function importerSiteUn(site, compte, opts) {
+  if (!IMPSITE_TYPES[site] || !compteImpOk(compte)) return 0;
+  const tabId = await ongletImpSite(site, compte);
+  if (tabId == null) return 0;
+  const st = await departImpSite(site, compte, { force: !!opts.force });
+  if (!st) return 0;
+  const cle = cleImpSite(site, compte);
+  if (st.pause && Number(st.pause.jusqua) > Date.now()) { if (!st.publie) { st.publie = await publierImpSite(site, compte, st); await poserStoreImp(cle, IMPSITE_STORE, st); } return 0; }
+  delete st.pause;
+  let n = 0;
+  while (n < IMPSITE_PAR_PASSAGE) {
+    // Le prochain travail : une page d'une liste pas finie, sinon un détail (Leboncoin).
+    let quoi = null, k = null, l = null, url = null;
+    for (const nom of IMPSITE_TYPES[site]) {
+      if (site === 'leboncoin' && nom === 'details') continue;
+      for (const [kk, ll] of Object.entries(((st[nom] || {}).listes) || {})) if (!ll.fini) { quoi = nom; k = kk; l = ll; break; }
+      if (l) break;
+    }
+    if (l) {
+      if (l.i >= IMPSITE_PAGES_MAX) { l.fini = true; noterDiag(`impsite_garde_fou_${site}`); continue; }
+      url = urlPageModele(l.url, l.i);
+      if (!url) { l.fini = true; continue; }
+    } else if (site === 'leboncoin' && st.details.file.length) {
+      quoi = 'details'; url = `https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/${st.details.file[0]}`;
+    } else break;
+    const lus = await impLusHeure(cle);
+    if (lus === null) { noterDiag('impsite_compteur_muet'); break; }
+    if (lus.length >= IMPSITE_MAX_HEURE) { st.pause = { jusqua: Math.min(...lus) + 3600000, cause: 'rythme' }; break; }
+    if (n > 0) await pauseImpSite();
+    // DANS le budget de lecture de CE compte (20/h) : l'import s'arrête à 12, le reste est gardé.
+    const c = await compterLecture(cle, IMPSITE_MAX_HEURE);
+    if (!c.ok) { st.pause = c.code === 'stockage' ? null : { jusqua: Date.now() + 15 * 60000, cause: 'budget' }; if (!st.pause) delete st.pause; break; }
+    await noterImpLu(cle);
+    n++;
+    const r = await lireUneImpSite(site, compte, tabId, quoi === 'details' ? 'details' : quoi, url);
+    if (!r.ok) {
+      noterDiag(`impsite_${site}_${r.cause || 'refus'}`);
+      if (r.refus) st.pause = { jusqua: Date.now() + IMPSITE_PAUSE_REFUS_MS, cause: site };
+      // Un détail introuvable (forme inconnue) ne bloque pas toute la file : il passe en fin, une fois.
+      if (quoi === 'details' && r.cause === 'forme') { const id = st.details.file.shift(); st.details.rates = (st.details.rates || []).concat(id).slice(-200); }
+      break;
+    }
+    if (quoi === 'details') { st.details.file.shift(); st.details.faits = (Number(st.details.faits) || 0) + 1; continue; }
+    const empreinte = (r.ids || []).join(',');
+    l.pages += 1; l.i += 1;
+    if (Number.isFinite(Number(r.total)) && r.total !== null && Number(r.total) >= 0) l.total = Number(r.total);
+    // La DERNIÈRE page : vide, la même que la précédente (le site ignore la pagination), ou le total atteint.
+    if (!r.n || (empreinte && empreinte === l.dernier)) l.fini = true;
+    else { l.lus += r.n; if (l.total !== null && l.lus >= l.total) { l.lus = l.total; l.fini = true; } }
+    l.dernier = empreinte;
+    if (site === 'leboncoin' && r.n) {
+      const neufs = (r.ids || []).filter((id, i) => !/cancel/i.test((r.etats || [])[i] || ''));
+      const manq = await detailsLbcManquants(neufs);
+      const aLire = manq === null ? neufs : manq;
+      const deja = new Set(st.details.file);
+      for (const id of aLire) if (!deja.has(id) && st.details.file.length < IMPSITE_DETAILS_MAX) { st.details.file.push(id); deja.add(id); }
+    }
+    st[quoi].listes[k] = l;
+  }
+  st.at = Date.now();
+  const r = resumeImpSite(site, st);
+  if (r && r.etat === 'fini' && !st.fin) { st.fin = st.at; logActivity(`📥 Historique ${site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'} récupéré`); }
+  const cur = await lireStoreImp(cle, IMPSITE_STORE);
+  if (cur && Number(cur.debut) !== Number(st.debut)) { noterDiag('impsite_relance_pendant'); return n; }
+  st.publie = await publierImpSite(site, compte, st);
+  await poserStoreImp(cle, IMPSITE_STORE, st);
+  return n;
+}
+let _impSiteMinuteur = null;
+function planifierImportSites() {
+  try { if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000); } catch (_) {}
+}
+// Le passage de fond (alarme `vrm-import`) : chaque compte ouvert dans un onglet
+// Leboncoin / Vestiaire qui a un modèle et quelque chose à lire — un à la fois.
+async function tickImportSites() {
+  try {
+    if (await sansSessionPourEcrire()) return 0;
+    if (await reculBase()) return 0;
+    let modeles = {};
+    try { modeles = (await chrome.storage.local.get(IMPSITE_MODELES))[IMPSITE_MODELES] || {}; } catch (_) { return 0; }
+    for (const cle of Object.keys(modeles)) {
+      const [site, compte] = cle.split(':');
+      if (!IMPSITE_TYPES[site] || !compteImpOk(compte)) continue;
+      const st = await lireStoreImp(cle, IMPSITE_STORE);
+      if (st === undefined) continue;
+      const r = st ? resumeImpSite(site, st) : null;
+      if (r && r.etat === 'fini' && st.publie) continue;
+      if (r && r.etat === 'pause') continue;
+      if ((await ongletImpSite(site, compte)) == null) continue;
+      const n = await importerSite(site, compte);
+      if (n) return n;
+    }
+    return 0;
+  } catch (_) { return 0; }
+}
+// « Tout récupérer » (l'app) : le compte ouvert dans un onglet de CE site seulement.
+async function demanderImportSiteTout(site, compte) {
+  if (!IMPSITE_TYPES[site] || !compteImpOk(compte)) return { ok: false, code: 'invalide', raison: 'Compte inconnu.' };
+  if ((await ongletImpSite(site, compte)) == null) return { ok: false, code: 'onglet-absent', raison: site === 'leboncoin' ? 'Ouvre leboncoin.fr sur ce compte dans ce Chrome.' : 'Ouvre Vestiaire sur ce compte dans ce Chrome.' };
+  const st = await departImpSite(site, String(compte), { force: true });
+  if (!st) return { ok: false, code: 'stockage', raison: 'L’extension ne peut pas noter la reprise. Recharge-la.' };
+  await publierImpSite(site, String(compte), st);
+  importerSite(site, String(compte)).catch(() => {});
+  return { ok: true, etat: resumeImpSite(site, st) };
 }
 
 // ═══ LA PREUVE DE VENTE, RANGÉE (5.169, 11 octobre) ════════════════════════
@@ -21881,6 +23187,7 @@ function extraireVentesLbc(url, body) {
 //    qu'elle venait de poser. Prouvé (audit-lbc-restes.cjs) : la liste et un
 //    détail envoyés ensemble ⇒ plus aucune `dateVente`. Les rangements passent
 //    maintenant à la file : chacun relit ce que le précédent a écrit.
+const LBC_VENTES_MAX = 3000;
 let _lbcVentesChaine = Promise.resolve();
 async function rangerLbcVentes(list,ownerAttendu=null) {
   const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return false;
@@ -21914,7 +23221,8 @@ async function rangerLbcVentesUneFois(list,owner) {
     ventes[k] = m;
   }
   const noms = Object.keys(ventes);
-  if (noms.length > 500) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 500); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
+  // 5.365 : l'historique (« Mon historique ») range TOUTES les transactions — 3 000 au plus (≈ 1,5 Mo) ; au-delà, les moins récemment vues sortent.
+  if (noms.length > LBC_VENTES_MAX) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, LBC_VENTES_MAX); const garde = new Set(g); for (const n of noms) if (!garde.has(n)) delete ventes[n]; }
   const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id',owner);
   await noterFlux('leboncoin', _okFlux === true);
   if(_okFlux===true)notifierApp({type:'maj',quoi:'lbc'});

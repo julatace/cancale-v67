@@ -113,8 +113,14 @@ function brancher(page, base, { faute = null, nom = '' } = {}) {
   return page.route('**/rest/v1/**', async (route) => {
     const req = route.request(); const urlBrute = req.url(); const meth = req.method();
     const u = decodeURIComponent(urlBrute);
-    const f = faute ? faute(u, meth, req) : null;
+    let f = faute ? faute(u, meth, req) : null;
     if (f && f.delai) await new Promise((r) => setTimeout(r, f.delai));
+    // (11 nov., réseau instable) `tenir` : une promesse — la requête reste SANS
+    // réponse jusqu'à ce qu'elle se résolve (CLAUDE.md §6.5 : jamais un délai fixe),
+    // puis la faute qu'elle rend (ou rien) s'applique. `perdre` : la base FAIT
+    // l'écriture, puis la réponse se perd (connexion coupée au retour).
+    if (f && f.tenir) { if (f.surTenue) { try { f.surTenue(u, meth); } catch (_) {} } const ensuite = await f.tenir; f = ensuite || null; }
+    if (f && f.perdre) { const vraie = route; route = { request: () => vraie.request(), fulfill: () => vraie.abort('connectionreset').catch(() => {}), abort: (...a) => vraie.abort(...a), fallback: (...a) => vraie.fallback(...a) }; }
     if (f && f.coupe) return route.abort('internetdisconnected').catch(() => {});
     if (f && f.status) return route.fulfill({ status: f.status, contentType: f.html ? 'text/html' : 'application/json', body: f.body || (f.html ? '<html><body>error code: ' + f.status + '</body></html>' : '{"message":"panne de banc"}') }).catch(() => {});
     const uu = metaVersData(urlBrute);

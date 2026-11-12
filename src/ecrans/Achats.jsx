@@ -506,7 +506,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             );
           })()}
           {/* 1. La photo d'abord : une grande tuile, un toucher (appareil photo ou galerie). */}
-          <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? 'Changer la photo' : 'Ajouter une photo'} style={{ borderColor: C.border, background: C.card, color: C.text }}>
+          <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? 'Changer la photo de l’article' : 'Photo de l’article : ajouter une photo'} style={{ borderColor: C.border, background: C.card, color: C.text }}>
             {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" /> : <span className="vrm-ahp-photo-vide"><Icon name="camera" size={28} /><span>Photo de l’article</span></span>}
             {photoForm ? <span className="vrm-ahp-photo-changer">Changer</span> : null}
           </button>

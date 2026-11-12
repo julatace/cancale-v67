@@ -5,6 +5,7 @@ import { ordreRecent, quandVestiaire } from '../ordreRecent.js';
 import { STYLE_FLOU, vcFloute } from '../flouCompte.js';
 import { lienDe, vcReliable } from '../lienVestiaire.js';
 import React, { useState, useEffect } from 'react';
+import { suivi, suivreJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
 import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut } from '../../api/_lib/vestiaire-regle.js';
@@ -16,8 +17,8 @@ import Frise from '../design/Frise.jsx';
 import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { nomCompteVente } from '../plateformes.js';
-import { champsFacultatifs } from '../profilVendeur.js';
-import { InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel } from '../App.jsx';
+import { champsFacultatifs, motsVendeur } from '../profilVendeur.js';
+import { InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel, optsNumeroVerif } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { preuvesFriseVc, preuvesFriseEbay } from "../friseSites.js";
@@ -459,13 +460,28 @@ function PublierVestiaire({ comptes }) {
     // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) ; la catégorie se choisit sur Vestiaire.
     let achatV = null;
     try { achatV = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[String(p.id)], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatV = null; }
-    if (!(await verifierAvantPublication(problemesAnnonce({ titre: p.title || '', taille: p.taille || '', famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, marque: p.marque || '', nPhotos: (p.photos || []).length, prix: p.prix, achat: achatV , facultatifs: champsFacultatifs(vendActuel()) }, 'vestiaire'), { site: 'vestiaire' }))) return;
+    if (!(await verifierAvantPublication(problemesAnnonce({ titre: p.title || '', taille: p.taille || '', famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, marque: p.marque || '', nPhotos: (p.photos || []).length, prix: p.prix, achat: achatV , facultatifs: champsFacultatifs(vendActuel()),
+      // (11 nov.) Le N° écrit : jugé seulement si la description qui partira est sue.
+      numero: p.num || '', ...(typeof p.description === 'string' ? { description: p.description } : {}), ...optsNumeroVerif() }, 'vestiaire'), { site: 'vestiaire' }))) return;
     setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
+    const t0 = Date.now();
     const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id), publier: auto }, 30000);
     setEnvoi('');
     if (!r) { setMsg((m) => ({ ...m, [p.id]: "L'extension n'a pas répondu — recharge cette page et réessaie." })); return; }
     if (!r.accepte) { setMsg((m) => ({ ...m, [p.id]: r.raison || "Refusé par l'extension." })); return; }
     __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier();
+    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : « publiée » seulement si l'extension le dit.
+    const id = String(p.id);
+    const t = suivi.demarrer({ sorte: auto ? 'publier-vc' : 'preparer-vc', titre: auto ? 'Publier sur Vestiaire' : 'Préparer sur Vestiaire', articles: [{ id, num: p.num || '', titre: p.title || '' }],
+      etapes: auto ? [['depot', 'Formulaire Vestiaire ouvert'], ['accepte', 'Publiée sur Vestiaire ✓']] : [['depot', 'Formulaire Vestiaire ouvert et rempli']] });
+    if (!t) return;
+    t.etape(id, 'depot');
+    if (!auto) { t.fin(id, { etat: 'main', raison: 'formulaire ouvert et rempli par l’extension', geste: 'Relis et publie sur Vestiaire' }); t.terminer(''); return; }
+    suivreJob(t, id, { jobId: r.jobId || 'vc:' + id, lireJobs: () => __vmrJobs, depuis: t0, delaiMs: 15 * 60000 }).then(({ fin }) => {
+      if (fin === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
+      else t.fin(id, { etat: 'main', raison: fin === 'abandonne' ? 'VRM n’a pas vu la fin de la publication' : fin === 'arret' ? 'la publication continue dans l’onglet Vestiaire' : 'VRM n’a pas vu la fin en 15 min', geste: 'Regarde l’onglet Vestiaire ; si elle est en ligne, clique « Déjà publiée »' });
+      t.terminer('');
+    });
   };
   const marquer = async (p) => {
     if (envoi) return;
@@ -673,7 +689,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
         {v.prixVente && !vcVenteAnnulee(v) ? <FactureVcVente plateforme="vestiaire" vente={v} deps={DEPS_FACTURE}/> : null}
         <div className="vrm-recap-grille">
           {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => gesteVrm(fait ? 'Colis remis à envoyer' : 'Colis fait', [{ k: 'vrm_vc_colis_done', type: 'cle', id: String(v.id), apres: fait ? undefined : Date.now(), avant: vcCarte('vrm_vc_colis_done')[String(v.id)] }], { vrm_vc_colis_done: vcSetter('vrm_vc_colis_done') })}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
-          {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(v.num) })); }}>Fiche de l’article</Bouton> : null}
+          {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche de l’article N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(v.num) })); }}>Fiche de l’article</Bouton> : null}
         </div>
       </section>
     </>;
@@ -990,7 +1006,7 @@ function MessagesVestiaire() {
             ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || choisie.titreArticle || ''} envoi={d.envoi} onFerme={() => setOuvert('')}/>
             : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Lis-la et réponds-y depuis VRM.</small></div>}</div>
           {!choisie ? <FicheConvVolet site="vestiaire" etat="aucune"/>
-            : <FicheConvVolet site="vestiaire" etat={fcChoisie ? 'reliee' : 'non-reliee'} fc={fcChoisie} raison="Cet article Vestiaire ne porte aucune référence VRM : VRM ne devine pas la paire d’après le titre."/>}
+            : <FicheConvVolet site="vestiaire" etat={fcChoisie ? 'reliee' : 'non-reliee'} fc={fcChoisie} raison={`Cet article Vestiaire ne porte aucune référence VRM : VRM ne devine pas ${motsVendeur().le} d’après le titre.`}/>}
         </div>
       </div>
     );

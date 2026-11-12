@@ -14,11 +14,13 @@
 // Deux conversations sans identité commune ne sont JAMAIS fusionnées : VRM
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
-import { C, Icon, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc } from '../App.jsx';
+import { motsVendeur } from '../profilVendeur.js';
+import { C, Icon, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm } from '../App.jsx';
+import { tr } from '../i18n/index.js';
 import { LogoSite } from '../SelecteurSites.jsx';
 import { FilLeboncoin } from './MessagesLeboncoin.jsx';
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
-import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
+import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
 
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
 const lireRelies = () => { try { const v = load(CLE_FILS_RELIES, {}); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; } };
@@ -79,7 +81,8 @@ function useAutresSites() {
 }
 
 // Les messages d'une conversation pour le fil fusionné : `null` pas su, [] lue vide.
-async function lireMessages(e, vintedDe, lireVinted) {
+async function lireMessages(e, vintedDe, lireVinted, ebayDe) {
+  if (e.plateforme === 'ebay') { const x = ebayDe ? ebayDe(e) : null; if (!x) return null; const m = x.m; return [{ t: m.body || m.subject, at: m.date, deMoi: false }, ...(m.responses || []).filter(Boolean).map((t) => ({ t, at: null, deMoi: true }))]; }
   if (e.plateforme === 'vinted') { const c = vintedDe(e); if (!c) return null; try { return await lireVinted(c); } catch (_) { return null; } }
   const id = (e.plateforme === 'leboncoin' ? 'lbc_fil_' : 'vc_fil_') + e.conv;
   const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=messages:data->messages`);
@@ -87,10 +90,10 @@ async function lireMessages(e, vintedDe, lireVinted) {
   return j[0] && Array.isArray(j[0].messages) ? j[0].messages : [];
 }
 
-function FilFusionne({ fil, vintedDe, lireVinted, onRepondre, onDelier, onFermer, nomDe }) {
+function FilFusionne({ fil, vintedDe, lireVinted, ebayDe, onRepondre, onDelier, onFermer, nomDe }) {
   const [parConv, setParConv] = React.useState(undefined);
   React.useEffect(() => { let stop = false; (async () => {
-    const l = await Promise.all(fil.convs.map(async (e) => ({ entree: e, messages: await lireMessages(e, vintedDe, lireVinted) })));
+    const l = await Promise.all(fil.convs.map(async (e) => ({ entree: e, messages: await lireMessages(e, vintedDe, lireVinted, ebayDe) })));
     if (!stop) setParConv(l);
   })(); return () => { stop = true; }; }, [fil.cle, fil.convs.length]);
   const messages = parConv ? messagesDuFil(parConv) : [];
@@ -122,8 +125,66 @@ function FilFusionne({ fil, vintedDe, lireVinted, onRepondre, onDelier, onFermer
   );
 }
 
+
+// (11 nov., ebay-complet — ajout validé par Julien) eBay DANS « Tous » : ses échanges
+// lus EN DIRECT (action `messages`, page 1, chaque compte eBay actif) — VRM ne les
+// range pas. Trois états : undefined en cours · null pas su · { items, messages }.
+function useEbayTous() {
+  const [d, setD] = React.useState(undefined);
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => { let stop = false; (async () => {
+    const comptes = await lireComptesEbay(false).catch(() => null);
+    if (stop) return;
+    if (!Array.isArray(comptes)) { setD(null); return; }
+    if (!comptes.length) { setD({ items: [], messages: new Map(), aucun: true }); return; }
+    const res = await Promise.all(comptes.map(async (c) => { const ref = c.ref || 'principal'; const { j } = await appelEbay({ action: 'messages', page: 1, ...corpsCompteEbay(ref) }); return { ref, j }; }));
+    if (stop) return;
+    if (res.some((r) => !(r.j && r.j.ok && Array.isArray(r.j.messages)))) { setD(null); return; }
+    const messages = new Map(), items = [];
+    for (const { ref, j } of res) for (const m of j.messages) { items.push({ m, compte: ref }); messages.set(ref + ':' + m.id, { m, compte: ref }); }
+    setD({ items, messages });
+  })(); return () => { stop = true; }; }, [tick]);
+  return [d, () => setTick((t) => t + 1)];
+}
+// Le fil d'un échange eBay : la question, ses réponses, et « Envoyer » sur SON clic
+// (confirmé) seulement pour une question d'acheteur sur une annonce — la route relit
+// la question chez eBay juste avant (`repondre`, AddMemberMessageRTQ).
+function FilEbay({ x, onFerme, onEnvoye }) {
+  const [t, setT] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const [occupe, setOccupe] = React.useState(false);
+  if (!x) return <div className="vrm-chat-empty" data-fil-etat="passu"><span>{tr('ebay.fil.passu')}</span></div>;
+  const m = x.m, rep = Array.isArray(m.responses) ? m.responses.filter(Boolean) : [];
+  const question = /^AskSellerQuestion$/i.test(String(m.type || '')) && /^\d{6,19}$/.test(String(m.itemId || ''));
+  const envoyer = async () => {
+    const body = t.trim(); if (!body) return;
+    const ok = await askConfirm({ title: tr('ebay.fil.conf.titre'), desc: body, ok: tr('ebay.fil.conf.ok'), cancel: tr('ebay.conf.annuler') });
+    if (!ok) return;
+    setOccupe(true);
+    const { j } = await appelEbay({ action: 'repondre', confirme: true, itemId: String(m.itemId), messageId: String(m.id), body, ...corpsCompteEbay(x.compte) });
+    setOccupe(false);
+    if (j && j.ok) { setT(''); setMsg(tr('ebay.fil.envoye')); if (onEnvoye) onEnvoye(); } else setMsg((j && j.error) || tr('ebay.err.autre'));
+  };
+  return (
+    <div data-fil-ebay={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button type="button" onClick={onFerme} aria-label={tr('ebay.fil.fermer')} style={{ minHeight: 44, minWidth: 44, border: 'none', background: 'transparent', color: C.muted, fontSize: 22, cursor: 'pointer' }}>‹</button>
+        <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.titre || m.subject || 'eBay'}</div><div style={{ fontSize: 12, color: C.muted }}>eBay</div></div>
+      </div>
+      <div data-fil-ebay-question style={{ alignSelf: 'flex-start', maxWidth: '85%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{m.body || m.subject}</div>
+      {rep.map((r, i) => <div key={i} data-fil-ebay-reponse style={{ alignSelf: 'flex-end', maxWidth: '85%', background: `${C.accent}14`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{r}</div>)}
+      {question ? (<>
+        <textarea data-fil-ebay-saisie value={t} onChange={(e) => setT(e.target.value.slice(0, 2000))} rows={3} aria-label={tr('ebay.fil.repondre')} placeholder={tr('ebay.fil.repondre')} style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, fontSize: 17, fontFamily: 'inherit', background: C.card, color: C.text }}/>
+        <div><Bouton variante="primaire" occupe={occupe} disabled={!t.trim()} data-fil-ebay-envoyer="" onClick={envoyer}>{tr('ebay.fil.envoyer')}</Bouton></div>
+      </>) : <p data-fil-ebay-sans-reponse style={{ fontSize: 13, color: C.muted }}>{tr('ebay.fil.surEbay')}</p>}
+      {msg && <p role="status" style={{ fontSize: 13, color: C.text }}>{msg}</p>}
+    </div>
+  );
+}
+
 export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted }) {
   const autres = useAutresSites();
+  const [ebayTous, relireEbay] = useEbayTous();
   const [relies, setRelies] = React.useState(lireRelies);
   React.useEffect(() => { const stop = onCloudReady(() => setRelies(lireRelies())); return typeof stop === 'function' ? stop : undefined; }, []);
   const ecrire = (n) => { setRelies(n); save(CLE_FILS_RELIES, n); };
@@ -135,6 +196,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire); if (e) { e.compteNom = x.compte || ''; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
   for (const f of ((autres.lbc && autres.lbc.fils) || [])) { const e = convLeboncoin(f); if (e) { e.compteNom = f.nom || ''; parCle.set(e.cle, { e }); entrees.push(e); } }
   for (const v of ((autres.vc && autres.vc.fils) || [])) { const e = convVestiaire(v); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
+  for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
   const fils = regrouperFils(entrees, relies.liens);
   const propositions = suggestionsFils(fils, relies.liens, relies.refus);
   const filDe = (cle) => fils.find((f) => f.cle === cle) || null;
@@ -143,7 +205,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     const v = f.convs.find((c) => c.plateforme === 'vinted' && c.nom);
     if (v) return v.nom;
     const t = f.convs.find((c) => c.titre);
-    return t ? t.titre : f.convs[0].plateforme === 'leboncoin' ? 'Acheteur Leboncoin' : 'Acheteur Vestiaire';
+    return t ? t.titre : f.convs[0].plateforme === 'leboncoin' ? 'Acheteur Leboncoin' : f.convs[0].plateforme === 'ebay' ? 'Acheteur eBay' : 'Acheteur Vestiaire';
   };
   const ouvrir = (f) => {
     setVia('');
@@ -166,16 +228,17 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   }, [vintedOuvert, cleVinted]);
   const panneau = () => {
     if (!choisi) return <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis un fil</span></div>;
-    if (!conv) return <FilFusionne key={choisi.cle} fil={choisi} vintedDe={vintedDe} lireVinted={lireVinted} onRepondre={repondre} onFermer={fermer} nomDe={nomDe}
+    if (!conv) return <FilFusionne key={choisi.cle} fil={choisi} vintedDe={vintedDe} lireVinted={lireVinted} ebayDe={(e) => (ebayTous && ebayTous.messages ? ebayTous.messages.get(e.compte + ':' + e.conv) : null)} onRepondre={repondre} onFermer={fermer} nomDe={nomDe}
       onDelier={choisi.convs.some((c) => Object.values(relies.liens || {}).some((l) => l && (l.a === c.cle || l.b === c.cle))) ? () => { ecrire(delierFil(relies, choisi.convs.map((c) => c.cle))); setOuvert(''); } : null}/>;
     const fermerConv = () => (via ? (setVia(''), fermerVinted()) : fermer());
     if (conv.plateforme === 'vinted') return vintedOuvert === conv.compte + ':' + conv.conv ? rendreVinted() : <div className="vrm-chat-empty" data-fil-etat="charge"><span>Lecture…</span></div>;
+    if (conv.plateforme === 'ebay') return <FilEbay key={conv.cle} x={ebayTous && ebayTous.messages ? ebayTous.messages.get(conv.compte + ':' + conv.conv) : null} onFerme={fermerConv} onEnvoye={relireEbay}/>;
     if (conv.plateforme === 'leboncoin') return <FilLeboncoin key={conv.cle} conv={conv.conv} nom={conv.compteNom || 'Leboncoin'} envoi={autres.lbc && autres.lbc.envoi} onFerme={fermerConv}/>;
     return <FilVestiaire key={conv.cle} conv={conv.conv} num={conv.num || ''} titre={conv.titre || ''} envoi={autres.vc && autres.vc.envoi} onFerme={fermerConv}/>;
   };
 
   const chargement = vinted === undefined || autres.lbc === undefined || autres.vc === undefined;
-  const sources = [['vinted', vinted === null ? 'passu' : 'lu'], ['leboncoin', autres.lbc === null ? 'passu' : 'lu'], ['vestiaire', autres.vc === null ? 'passu' : 'lu']];
+  const sources = [['vinted', vinted === null ? 'passu' : 'lu'], ['leboncoin', autres.lbc === null ? 'passu' : 'lu'], ['vestiaire', autres.vc === null ? 'passu' : 'lu'], ['ebay', ebayTous === undefined ? 'charge' : ebayTous === null ? 'passu' : 'lu']];
   const pasLus = sources.filter(([, s]) => s === 'passu').map(([p]) => p);
   const muted = { fontSize: 13, color: C.muted, lineHeight: 1.5 };
   return (
@@ -189,7 +252,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: C.text }}>
                   <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: C.warn, flexShrink: 0 }}/>
-                  {p.sorte === 'paire' ? 'Peut-être la même paire ?' : 'Peut-être le même acheteur ?'}
+                  {p.sorte === 'paire' ? `Peut-être ${motsVendeur().meme} ?` : 'Peut-être le même acheteur ?'}
                 </div>
                 <div style={{ ...muted, marginTop: 4 }}>
                   {[A, B].map((f, i) => <div key={f.cle} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><Marques plateformes={f.plateformes}/><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nomDe(f)}{f.num ? ` · N°${f.num}` : ''}</span></div>)}
@@ -222,7 +285,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                 })}
               </div>}
           {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{pasLus.map((p) => NOM_SITE[p]).join(', ')} : pas pu lire. Rien n'est perdu.</p> : null}
-          <p data-fils-ebay="" style={{ ...muted, marginTop: 8 }}>eBay : ses messages se lisent dans le filtre eBay.</p>
+          {ebayTous === undefined ? <p data-fils-ebay="charge" style={{ ...muted, marginTop: 8 }}>{tr('ebay.fil.lecture')}</p> : null}
         </div>
         <div className="vrm-chat-column">{panneau()}</div>
       </div>

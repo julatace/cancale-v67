@@ -40,7 +40,8 @@ function extraire(src, nom) {
 }
 const charger = async (texte, nom) => {
   const tmp = path.join(os.tmpdir(), `${nom}-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
-  fs.writeFileSync(tmp, texte.replace(/from '\.\/([^']+)'/g, (m, f) => `from 'file://${path.join(R, 'api/_lib', f)}'`));
+  // (11 nov., intégration 5.355) bilan-semaine.js importe aussi ../../src/profilVendeur.js (vocabulaire) : chemin rendu absolu.
+  fs.writeFileSync(tmp, texte.replace(/from '\.\/([^']+)'/g, (m, f) => `from 'file://${path.join(R, 'api/_lib', f)}'`).replace(/from '\.\.\/\.\.\/([^']+)'/g, (m, f) => `from 'file://${path.join(R, f)}'`));
   try { return await import('file://' + tmp); } finally { try { fs.unlinkSync(tmp); } catch (_) {} }
 };
 

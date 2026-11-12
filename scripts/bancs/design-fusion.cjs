@@ -130,7 +130,7 @@ const ouvrir = async (b, vp, sombre, tab) => {
     localStorage.setItem('vinted_sale_overrides', JSON.stringify({ '8004': { buyPrice: '45', numero: '23' }, '8005': { buyPrice: '30', numero: '61' }, '8003': { numero: '124' }, '8001': { numero: '99', buyPrice: '28' } }));
   } catch (_) {} }, !!sombre);
   await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Les logos des transporteurs (leur favicon, sur LEUR domaine) : le réseau du banc est
   // fermé ; on sert une tuile NEUTRE (un carré gris) pour voir la forme — jamais un logo dessiné.
   await pg.route(/\/favicon\.ico$/i, (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect x="4" y="4" width="24" height="24" rx="5" fill="#8e8e93"/></svg>' }));

@@ -8,6 +8,7 @@
 //  identité, il n'a donc pas d'épingle (jamais devinée).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { motsVendeur } from './profilVendeur.js';
 import { createPortal } from 'react-dom';
 import { useReperes, repereDe, FondRelais, raisonPasSurCarte, codePasSurCarte } from './CarteRelais.jsx';
 import { texteJours } from './tournee.js';
@@ -29,7 +30,7 @@ function texteEtapeLong(e) {
     if (e.etat === 'rien') return { t: 'Emballer', s: 'Aucun colis à emballer' };
     if (e.etat === 'fait') return { t: 'Emballer', s: "Tout est parti aujourd'hui" };
     // Le total n'est pas réécrit : c'est le nombre de la case « À envoyer » (§7).
-    return { t: 'Emballer', s: e.numeros.length ? [e.numeros.map((n) => `N°${n}`).join(' · '), e.sansNumero ? `${e.sansNumero} sans N°` : ''].filter(Boolean).join(' · ') : 'Aucune de ces paires n’a encore de N°' };
+    return { t: 'Emballer', s: e.numeros.length ? [e.numeros.map((n) => `N°${n}`).join(' · '), e.sansNumero ? `${e.sansNumero} sans N°` : ''].filter(Boolean).join(' · ') : `${motsVendeur().AucuneDe} n’a encore de N°` };
   }
   if (e.id === 'deposer') {
     if (e.etat === 'passu') return { t: 'Déposer', s: 'Je lis encore tes ventes…' };

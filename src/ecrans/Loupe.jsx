@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { motsVendeur } from '../profilVendeur.js';
 import { C, commandeEbayEngagee, etapeVente, lbcAnnulee, lbcEuro, lbcFinalisee, prixCourt, rechercheParNumero } from '../App.jsx';
 
 
@@ -35,7 +36,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
       {rn.ancienNumero && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Un ancien numéro (d'avant la remise à zéro) : il ne désigne que l'histoire.</div>}
       {rn.double && (
         <div data-tout-double="1" role="alert" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, border: `1px solid ${C.doublon}`, color: C.doublon, fontSize: 13, fontWeight: 600 }}>
-          Deux paires présentes portent le N°{k}. Vérifie là où ils sont rangés avant d'imprimer un bordereau.
+          Deux {motsVendeur().noms} présent{motsVendeur().e}s portent le N°{k}. Vérifie là où {motsVendeur().elle}s sont rangé{motsVendeur().e}s avant d'imprimer un bordereau.
           <button type="button" onClick={() => onNav('cat_annonces')} style={{ ...lien, display: 'block', marginTop: 4, color: C.doublon }}>Voir dans Annonces</button>
         </div>
       )}
