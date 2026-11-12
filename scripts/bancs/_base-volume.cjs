@@ -49,7 +49,10 @@ const STATUTS_A = ['Commande finalisée', 'Colis déposé en bureau de Poste ou 
 //    · 5 ANCIENS comptes (plus dans `vinted_accounts`) qui gardent leurs lignes
 //      de commandes (~15 Ko vendues, ~20 Ko achetées).
 //    Sans l'option, la base est EXACTEMENT celle d'avant (les autres bancs).
-function fabriquer({ comptes = 7, volumeReel = false, qr = false } = {}) {
+// `ventes` (12 nov., lot vert-vitesse) : le NOMBRE total de ventes voulu (ex. 20 000, un gros vendeur) — les
+//    ventes en plus sont de vieilles ventes finalisées, dans la ligne `orders_sold` seulement (pas de
+//    transaction ni d'e-mail : c'est le CALCUL des écrans qu'on mesure, pas le réseau). Défaut : la base d'avant.
+function fabriquer({ comptes = 7, volumeReel = false, qr = false, ventes = 0 } = {}) {
   graine = 42;
   const accounts = [], rows = [], detailsReels = [];
   const numeros = {};
@@ -91,6 +94,13 @@ function fabriquer({ comptes = 7, volumeReel = false, qr = false } = {}) {
         pdfB64: 'JVBERi0' + pad(90000), pdfTamponneB64: 'JVBERi0' + pad(90000) } });
     }
     rows.push({ id: `harvest_${uid}_label_latest`, data: { tx: String(tx - 60), item: '1', capturedAt: iso(0), pdfB64: 'JVBERi0' + pad(100000) } });
+    const enPlus = ventes > 0 ? Math.max(0, Math.ceil(ventes / comptes) - sold.length) : 0;
+    for (let i = 0; i < enPlus; i++) {
+      const t = tx++, it = item++;
+      sold.push({ transaction_id: t, title: `${MARQUES[i % 6]} ${MODELES[(i + a) % 8]} taille ${37 + (i % 9)}`, price: { amount: String(25 + (i * 13) % 90) + '.0', currency_code: 'EUR' },
+        status: 'Commande finalisée', date: iso((80 + i * 0.25) * J), item_id: it, transaction_user_status: 'completed',
+        photo: { url: `https://images1.vinted.net/t/${it}/f800/v.jpeg?s=abc` } });
+    }
     rows.push({ id: `harvest_${uid}_orders_sold`, data: { capturedAt: frais(120000), nItems: sold.length, payload: { my_orders: sold } } });
     // Transactions-conversations (status 1, status_title vide) : ~110 de plus.
     for (let i = 0; i < 110; i++) {
