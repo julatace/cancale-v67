@@ -43,20 +43,14 @@
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-vignette-logo { display: grid; place-items: center; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-vignette > .vrm-colis-logo-transp { position: absolute !important; right: -4px !important; bottom: -4px !important; left: auto !important; top: auto !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-rang { align-items: center !important; }
-/* Le QR du colis, touchable depuis la ligne (44 px), à gauche de « J'ai retiré ». */
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: 0 4px 0 0; padding: 0; border: 0; border-radius: 12px; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--p-encre, currentColor); cursor: pointer; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
-/* À l'ordinateur, la rangée est une grille [ligne 1fr] [136 px] [J'ai retiré 136 px] (styles-premium, couche
-   vrm-premium) : le QR prend la colonne du milieu, jamais une rangée à lui. */
-@layer vrm-premium {
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-qr { grid-column: 2 !important; justify-self: end !important; margin: 0 !important; }
-}
-/* Au téléphone, le QR se pose SOUS la vignette (place libre de la colonne de gauche) : le texte garde toute sa
-   largeur et « J'ai retiré » reste au même endroit que sur les autres lignes. */
-@media (max-width: 1023px) {
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne > .vrm-rpf-rang { position: relative !important; }
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne > .vrm-rpf-rang > .vrm-rpf-qr { position: absolute !important; left: 0 !important; top: 60px !important; margin: 0 !important; z-index: 1; }
-}
+/* (12 nov., finitions) Le QR : une petite icône à côté du code, sur la ligne ; au doigt une zone de 44 px autour
+   (sans grandir la ligne) ⇒ le QR en grand. Plus de tuile QR sous la vignette. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-comptoir { overflow: visible !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini { position: relative; display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 10px; border-radius: 7px; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--p-encre, currentColor); cursor: pointer; flex: none; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini svg { width: 16px; height: 16px; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini::after { content: ''; position: absolute; inset: -9px; }
+/* « QR en grand » dans la rangée des gestes : une vignette du QR + le mot. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-qr-grand img { width: 22px !important; height: 22px !important; border-radius: 3px; background: #fff; }
 /* Au téléphone, le NOM du point garde toute sa ligne (« Phone C… » était rogné par « 4 colis · 1 code à venir ·
    Masquer ») ; l'adresse dessous, puis le compte du point (banc colis-retirer-propre, « le nom garde sa ligne »). */
 @media (max-width: 599px) {

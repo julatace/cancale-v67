@@ -166,15 +166,15 @@ const ouvrir = async (b, vp, sombre) => {
             const n = (v) => (v == null ? null : Math.round(v));
             return {
               cle: l.getAttribute('data-cc-carte'), titre: t ? t.innerText.trim() : '', lignesTitre: lt, hauteur: n(r0.height),
-              vignette: vg && [n(vg.left - r0.left), n(vg.width), n(vg.height)].join(','), logo: bd && vg ? [n(bd.left - vg.left), n(bd.top - vg.top)].join(',') : null,
+              vignette: vg && [n(vg.left - r0.left), n(vg.width), n(vg.height)].join(','), logo: vg ? (() => { const ms = [...l.querySelectorAll('.vrm-rpf-vignette [data-marque]')].filter((e) => e.getBoundingClientRect().height > 0); const r = ms[0] && ms[0].getBoundingClientRect(); return ms.length === 1 && r.left >= vg.left - 6 && r.right <= vg.right + 6 && r.top >= vg.top - 6 && r.bottom <= vg.bottom + 6 ? 'un' : `${ms.length}`; })() : null,
               z2: c && rt ? n(c.top - rt.bottom) : null, z3: s && c ? n(s.top - c.bottom) : null, z4: d && s ? n(d.top - s.bottom) : null,
               h2: c ? n(c.height) : null, h3: s ? n(s.height) : null,
               bouton: btn && rang ? [n(r0.right - btn.right), n(Math.abs((btn.top + btn.height / 2) - (rang.top + rang.height / 2)))].join(',') : null,
               code: !!l.querySelector('.vrm-rpf-comptoir [data-rp-code-visible], .vrm-rpf-comptoir [data-rp-code-a-venir]'),
-              sansSuiviDit: /sans n° de suivi/.test(visibles), qr: rq ? [n(rq.width), n(rq.height)].join('x') : null,
+              sansSuiviDit: /sans n° de suivi/.test(visibles), qr: rq ? (() => { const af = getComputedStyle(qr, '::after'); const ins = -parseFloat(af.top || '0') || 0; return [n(rq.width + 2 * ins), n(rq.height + 2 * ins)].join('x'); })() : null,
               qrAttendu: !!l.querySelector('[data-code-retrait="454545"]'),
-              marque: (l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp]') || { getAttribute: () => null }).getAttribute('data-colis-logo-transp'),
-              fondMarque: (() => { const e = l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp] [data-marque]'); return e ? getComputedStyle(e).backgroundColor : null; })(),
+              marque: (l.querySelector('.vrm-rpf-vignette [data-marque]') || { getAttribute: () => null }).getAttribute('data-marque'),
+              fondMarque: (() => { const e = l.querySelector('.vrm-rpf-vignette [data-marque]'); return e ? getComputedStyle(e).backgroundColor : null; })(),
               l3: (l.querySelector('.vrm-rpf-suivi-ligne') || {}).textContent || '',
               verif: (() => { const v = l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]'); return v ? { txt: v.textContent.trim(), titre: (v.querySelector('[role="progressbar"]') || { getAttribute: () => '' }).getAttribute('aria-valuetext'), ambre: v.getAttribute('data-rp-delai-ambre'), couleur: getComputedStyle(v.querySelector('.vrm-rpf-delai-txt')).color } : null; })(),
             };
@@ -208,7 +208,7 @@ const ouvrir = async (b, vp, sombre) => {
         if (!m || !m.lignes) return;
         const L = m.lignes, egal = (k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != null;
         dit(egal('vignette'), `${nom} : la vignette au même endroit, de la même taille, sur chaque ligne`, L.map((l) => l.vignette).join(' / '));
-        dit(egal('logo'), `${nom} : le logo du transporteur au MÊME coin de la vignette sur chaque ligne`, L.map((l) => l.logo).join(' / '));
+        dit(egal('logo'), `${nom} : UN logo par vignette, jamais deux (badge sur une photo, sinon la vignette est le logo)`, L.map((l) => l.logo).join(' / '));
         dit(egal('z2') && egal('h2'), `${nom} : la ligne 2 (code ou « Code à venir ») au même écart, même hauteur`, L.map((l) => `${l.z2}/${l.h2}`).join(' · '));
         dit(egal('z3') && egal('h3'), `${nom} : la ligne 3 (n° de suivi ou vide) au même écart, même hauteur`, L.map((l) => `${l.z3}/${l.h3}`).join(' · '));
         dit(egal('z4'), `${nom} : la ligne 4 (barre du délai) sur CHAQUE ligne, au même écart`, L.map((l) => l.z4).join(' · '));
@@ -231,7 +231,7 @@ const ouvrir = async (b, vp, sombre) => {
         dit(L.every((l) => !l.sansSuiviDit), `${nom} : « sans n° de suivi » n'est répété sur aucune ligne`);
         dit(m.sansCode === '1' && /1 code à venir/.test(m.tete) && /^6 colis/.test(m.tete), `${nom} : l'en-tête du point « 6 colis · 1 code à venir »`, m.tete);
         const q = L.find((l) => l.qrAttendu);
-        dit(!!q && !!q.qr && q.qr.split('x').every((v) => Number(v) >= 44), `${nom} : le QR (Pickup Pass) se touche depuis sa ligne, 44 px`, q ? String(q.qr) : 'ligne absente');
+        dit(!!q && !!q.qr && q.qr.split('x').every((v) => Number(v) >= 44), `${nom} : le QR (Pickup Pass) : une icône à côté du code, zone de 44 px au doigt`, q ? String(q.qr) : 'ligne absente');
       });
       dit(!errs.length, `${nom} : aucune erreur`, errs.join(' | ').slice(0, 200));
       await ctx.close();

@@ -22697,21 +22697,24 @@ function QrRetraitImage({ src, onOuvrir, attrs = {} }) {
   if (!src) return null;
   if (etat === 'ko') return <button type="button" className="vrm-rp-qr-ko" data-colis-qr-pas-charge="" onClick={() => { setEtat('charge'); setEssai((n) => n + 1); }}>QR pas chargé — Réessayer</button>;
   return (
-    <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={onOuvrir} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr-etat={etat} {...attrs}>
-      <img key={essai} src={local || src} alt="QR de retrait"
+    <button className="vrm-rp-qr vrm-rp-qr-grand" type="button" onClick={onOuvrir} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr-etat={etat} {...attrs}>
+      <img key={essai} src={local || src} alt=""
         onLoad={(e) => { const i = e.currentTarget; if (!i.naturalWidth || i.naturalWidth < 16) { setEtat('ko'); return; } setEtat('ok'); garderQrLocal(src); }}
-        onError={() => setEtat('ko')}/>
+        onError={() => setEtat('ko')}/><span>QR en grand</span>
     </button>);
 }
-function CodeRetraitCopiable({label,code}) {
+function CodeRetraitCopiable({label,code,court=false}) {
   const [etat,setEtat]=useState('');
   React.useEffect(()=>setEtat(''),[code]);
   return <button type="button" className="vrm-pickup-code" data-code-long={String(code).length > 8 ? "true" : undefined} aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
     try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
     catch { setEtat('Copie indisponible'); }
   }}>
+    {/* (12 nov., finitions) `court` : dans le dépli d'« À retirer », le code est déjà écrit en gros sur la ligne —
+        le geste dit « Copier le code », sans redire le nombre (§7). */}
+    {court ? <><Icon name="copy" size={15}/><span aria-live="polite">{etat || `Copier ${label === 'Identifiant' ? 'l’identifiant' : 'le code'}`}</span></> : <>
     <span>{label}</span><strong className="vrm-sensible" data-stream-type="code" style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
-    <small aria-live="polite"><Icon name="copy" size={14}/><span>{etat || 'Copier'}</span></small>
+    <small aria-live="polite"><Icon name="copy" size={14}/><span>{etat || 'Copier'}</span></small></>}
   </button>;
 }
 
@@ -49446,13 +49449,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (t && t.suivi) suivre = <BoutonSuivreColis transporteur={t.carrier} suivi={t.suivi} codePostal={codePostalLu(t)} enLigne court attrs={{'data-colis-suivre':''}}/>;
             else if (o) { const e = entreeSuiviAchat(o); const su = suivisAchat(o, indexSuivisAchats)[0]; if (su) suivre = <BoutonSuivreColis transporteur={(e && e.transporteur) || transporteurDeForme(su) || ''} suivi={su} codePostal={codePostalLu({ lieu: relV && relV.lieu })} enLigne court/>; }
             return (<>
-              {x.code2 ? <CodeRetraitCopiable label="Identifiant" code={x.code2}/> : null}
-              {x.code ? <CodeRetraitCopiable label={x.code2 ? 'Code d’ouverture' : 'Code de retrait'} code={x.code}/> : null}
+              {x.code2 ? <CodeRetraitCopiable label="Identifiant" code={x.code2} court/> : null}
+              {x.code ? <CodeRetraitCopiable label={x.code2 ? 'Code d’ouverture' : 'Code de retrait'} code={x.code} court/> : null}
               {qi ? <QrRetraitImage src={qi} onOuvrir={() => openQrView(t)} attrs={{ 'data-colis-qr': '', 'data-colis-qr-source': t && t.qrSource === 'capture' && t.qrB64 ? 'capture' : 'email' }}/> : null}
               {/* (5 nov.) LE CODE ET LE QR EN GRAND, au doigt, pour le comptoir ou le casier — un geste pour
                   tout colis qui a un code ou un QR (e-mail, capture de l’app Mondial Relay, conversation Vinted). */}
-              {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : openQrView(ligneRetraitVinted(o)))}
-                aria-label="Afficher le code et le QR en grand">En grand</button> : null}
+              {/* (12 nov., finitions) Un QR ⇒ « QR en grand » (plus haut) suffit ; sans QR, le code en grand. */}
+              {!qi && (x.code || x.code2 || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : openQrView(ligneRetraitVinted(o)))}
+                aria-label="Afficher le code en grand">Code en grand</button> : null}
               {/* (5 nov.) Un QR qu'on n'a pas se DIT, avec où le trouver (src/retraitQr.js) — jamais un QR fabriqué.
                   Mondial Relay : la vérité, courte — « QR dans l'app Mondial Relay » (ni e-mail ni site ne le
                   portent) — et « Ajouter le QR » : SA capture de l'app, posée sur CE colis (src/qrCapture.js). */}
@@ -49550,14 +49554,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (8 nov., retraits) Jamais lu, ou abandonné : POURQUOI et le geste (src/retraitSuivi.js). */}
                   {(() => { if (!(transpMap instanceof Map)) return null; const su = suiviDeLigne(t); const tl = su ? transpMap.get(normaliserSuivi(su)) : null;
                     const r = pourquoiPasLu({ suivi: su, carrier: t.carrier, t: tl });
-                    if (r) return <RaisonPasLu r={r}/>;
+                    // (12 nov., finitions) « pas encore lu — VRM le lit tant que l'app est ouverte » : rien à faire pour lui ⇒ rien.
+                    if (r) return r.code === 'jamais' ? null : <RaisonPasLu r={r}/>;
                     return tl ? <LigneTransporteur transp={transpMap} suivi={su} carrier={t.carrier} court limiteCarte={t.limite || t.limiteVers || ''} preuve={preuveDeLigne(t)}/> : null; })()}
                 </>
                 : o ? (() => { const su2 = suivisAchat(o, indexSuivisAchats)[0] || ''; const e2 = entreeSuiviAchat(o); return <>
                   <LigneNouvelleVinted nv={nvUtile(nouvelleDe(o), x)} transp={transpMap} suivi={su2}/>
                   {(() => { if (!(transpMap instanceof Map) || !su2) return null; const tl = transpMap.get(normaliserSuivi(su2)); const car = (e2 && e2.transporteur) || transporteurDeForme(su2) || '';
                     const r = pourquoiPasLu({ suivi: su2, carrier: car, t: tl });
-                    if (r) return <RaisonPasLu r={r}/>;
+                    // (12 nov., finitions) « pas encore lu — VRM le lit tant que l'app est ouverte » : rien à faire pour lui ⇒ rien.
+                    if (r) return r.code === 'jamais' ? null : <RaisonPasLu r={r}/>;
                     return tl ? <LigneTransporteur transp={transpMap} suivi={su2} carrier={car} court limiteCarte={(ev && (ev.limite || ev.limiteVers)) || ''}/> : null; })()}
                 </>; })() : null}
             </>); };

@@ -171,8 +171,8 @@ const egalTous = (L, k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != 
           const R = (e) => (e ? e.getBoundingClientRect() : null), n = (v) => (v == null ? null : Math.round(v));
           const r0 = R(l), vg = R(l.querySelector('.vrm-rpf-vignette')), bd = R(l.querySelector('.vrm-rpf-vignette .vrm-colis-logo-transp'));
           const t = l.querySelector('.vrm-rpf-titre'), rt = R(t), c = R(l.querySelector('.vrm-rpf-comptoir')), s3 = R(l.querySelector('.vrm-rpf-suivi-ligne')), d = R(l.querySelector('[data-rp-l4] .vrm-rpf-delai'));
-          return { cle: l.getAttribute('data-cc-carte'), titre: t ? t.innerText.trim() : '', marque: (l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp]') || { getAttribute: () => null }).getAttribute('data-colis-logo-transp'),
-            vignette: vg && [n(vg.left - r0.left), n(vg.width)].join(','), logo: bd && vg ? [n(bd.left - vg.left), n(bd.top - vg.top)].join(',') : null,
+          return { cle: l.getAttribute('data-cc-carte'), titre: t ? t.innerText.trim() : '', marque: (l.querySelector('.vrm-rpf-vignette [data-marque]') || { getAttribute: () => null }).getAttribute('data-marque'),
+            vignette: vg && [n(vg.left - r0.left), n(vg.width)].join(','), logo: vg ? (() => { const ms = [...l.querySelectorAll('.vrm-rpf-vignette [data-marque]')].filter((e) => e.getBoundingClientRect().height > 0); const r = ms[0] && ms[0].getBoundingClientRect(); return ms.length === 1 && r.left >= vg.left - 6 && r.right <= vg.right + 6 && r.top >= vg.top - 6 && r.bottom <= vg.bottom + 6 ? 'un' : `${ms.length}`; })() : null,
             z2: c && rt ? n(c.top - rt.bottom) : null, z3: s3 && c ? n(s3.top - c.bottom) : null, z4: d && s3 ? n(d.top - s3.bottom) : null,
             verif: (l.querySelector('[data-rp-verif-transporteur] .vrm-rpf-delai-txt') || {}).textContent || '', verifNom: (l.querySelector('[data-rp-verif-transporteur] [role="progressbar"]') || { getAttribute: () => '' }).getAttribute('aria-valuetext') || '', verifAmbre: (l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]') || { getAttribute: () => null }).getAttribute('data-rp-delai-ambre'),
             l3: (l.querySelector('.vrm-rpf-suivi-ligne') || {}).textContent || '', code: (l.querySelector('[data-code-retrait]') || { getAttribute: () => '' }).getAttribute('data-code-retrait') };
@@ -182,7 +182,7 @@ const egalTous = (L, k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != 
         const tous = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf .vrm-rpf-ligne[data-cc-carte]')].map((l) => ({ titre: (l.querySelector('.vrm-rpf-titre') || {}).textContent || '', ou: (l.querySelector('[data-rp-code-ou]') || { getAttribute: () => null }).getAttribute('data-rp-code-ou'), sansCode: (l.querySelector('[data-rp-code-a-venir]') || {}).textContent || '', vu: l.getBoundingClientRect().height > 0 })));
         dit(L.length === 7 && tous.length === 9, `${nom} : 9 colis, une ligne chacun (7 comptés + 2 achats Vinted « peut-être le même »), ni le roulant ni le retiré`, L.map((l) => l.titre + ':' + l.code).join(' | ') + ' // ' + tous.length);
         dit(!L.some((l) => /777666/.test(l.code)) && !L.some((l) => /81112222/.test(l.cle)), `${nom} : le colis retiré et le « Où vous livrer… » (il roule) ne sont pas à retirer`);
-        dit(['vignette', 'logo', 'z2', 'z3', 'z4'].every((k) => egalTous(L, k)), `${nom} : chaque ligne a la même forme (vignette, logo au coin, code, n°, délai aux mêmes places)`, ['vignette', 'logo', 'z2', 'z3', 'z4'].map((k) => k + '=' + [...new Set(L.map((l) => l[k]))].join('/')).join(' · '));
+        dit(['vignette', 'logo', 'z2', 'z3', 'z4'].every((k) => egalTous(L, k)), `${nom} : chaque ligne a la même forme (vignette, un seul logo par vignette, code, n°, délai aux mêmes places)`, ['vignette', 'logo', 'z2', 'z3', 'z4'].map((k) => k + '=' + [...new Set(L.map((l) => l[k]))].join('/')).join(' · '));
         dit(L.every((l) => !/^(N°\d+ · )?n°/i.test(l.titre)), `${nom} : jamais un n° de suivi en titre`, L.map((l) => l.titre).join(' | '));
         const chrono = L.filter((l) => /620738|723461/.test(l.code)), mr = L.filter((l) => /^5100|088943/.test(l.code));
         dit(chrono.length === 2 && chrono.every((l) => l.marque === 'chronopost' && /Colis Chronopost Pickup/.test(l.titre)) && mr.length === 4 && mr.every((l) => l.marque === 'mondialrelay' && /Colis Mondial Relay/.test(l.titre)), `${nom} : le bon logo et le nom écrit (Chronopost Pickup ≠ Mondial Relay)`, L.map((l) => `${l.titre}=${l.marque}`).join(' | '));
@@ -192,7 +192,7 @@ const egalTous = (L, k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != 
         dit(vinted.length === 3, `${nom} : les 3 achats Vinted sans n° gardent chacun leur ligne, au nom de l'article`, tous.map((l) => l.titre).join(' | '));
         const vSans = vinted.filter((l) => l.sansCode);
         dit(vSans.length === 2 && vSans.every((l) => l.ou === 'vinted' && /^Code sur Vinted$/.test(l.sansCode)), `${nom} : arrivé sans code ⇒ « Code sur Vinted » (où il est), jamais « Code à venir »`, JSON.stringify(vSans));
-        dit(pts.some((p) => /SUPER U|Super U/i.test(p.nom) && p.n === 3 && /^3 colis/.test(p.tete)) && pts.some((p) => /INTERMARCHE|Intermarch/i.test(p.nom) && p.n === 3), `${nom} : Super U 3 colis comptés (2 Chronopost + l'achat au code lu), Intermarché 3`, JSON.stringify(pts));
+        dit(pts.some((p) => /SUPER U|Super U/i.test(p.nom) && p.n === 3 && /^3 colis/.test(p.tete)) && pts.some((p) => /^Intermarché$/.test(p.nom) && p.n === 3) && pts.some((p) => /^Super U\b/.test(p.nom)), `${nom} : Super U 3 colis comptés (2 Chronopost + l'achat au code lu), « Intermarché » (l'orthographe de l'enseigne) 3`, JSON.stringify(pts));
         // Le QR qui ne répond pas : dit, jamais un rond vide.
         const qr = await pg.evaluate(async () => {
           const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="723461"]')); if (!l) return null;
@@ -207,10 +207,13 @@ const egalTous = (L, k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != 
           const l = [...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((x) => x.querySelector('[data-code-retrait="620738"]')); if (!l) return null;
           l.querySelector('.vrm-rpf-ouvrir').click(); l.scrollIntoView({ block: 'start' }); window.scrollBy(0, -60);
           for (let i = 0; i < 40; i++) { const im = l.querySelector('[data-colis-qr] img'); if (im && im.naturalWidth) break; await new Promise((r) => setTimeout(r, 250)); }
-          const im = l.querySelector('[data-colis-qr] img'); return { w: im ? im.naturalWidth : 0, etat: (l.querySelector('[data-colis-qr]') || { getAttribute: () => null }).getAttribute('data-colis-qr-etat') };
+          const im = l.querySelector('[data-colis-qr] img'); const d = l.querySelector('[data-rp-detail]');
+          return { w: im ? im.naturalWidth : 0, etat: (l.querySelector('[data-colis-qr]') || { getAttribute: () => null }).getAttribute('data-colis-qr-etat'), gestes: d ? [...d.querySelectorAll('.vrm-rp-gestes :is(button, a)')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => e.innerText.trim()) : [], detail: d ? d.innerText : '' };
         });
         await shot('qr-ok-depli');
         dit(!!qrOk && qrOk.w > 16 && qrOk.etat === 'ok', `${nom} : le QR qui répond s'affiche (pixels lus)`, JSON.stringify(qrOk));
+        // La fiche : rien de technique, le code pas redit, une rangée de gestes sans doublon.
+        dit(!!qrOk && !/VRM le lit|pas encore lu/.test(qrOk.detail) && qrOk.gestes.includes('Copier le code') && qrOk.gestes.includes('QR en grand') && !qrOk.gestes.some((g) => /620738/.test(g)) && !qrOk.gestes.some((g) => /^(Code )?en grand$/i.test(g)) && /Vérifié\s+e-mail, hier \d\d:\d\d/.test(qrOk.detail), `${nom} : la fiche — « Copier le code » · « QR en grand » · « Suivre », le code pas redit, rien de technique, « Vérifié · e-mail, hier 11:19 »`, JSON.stringify({ g: qrOk && qrOk.gestes, d: qrOk && qrOk.detail.replace(/\n/g, ' | ').slice(0, 300) }));
       });
       dit(!errs.length, `${nom} : aucune erreur`, errs.join(' | ').slice(0, 200));
       await ctx.close();
