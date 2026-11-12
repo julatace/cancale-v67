@@ -1658,3 +1658,4 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Revue adverse + intégration du paquet colis** (`claude/revue-colis`) : 3 défauts corrigés (« Tout imprimer » avalé par Achats caché, Achats · eBay montrait les colis Vinted, écran blanc Leboncoin) ; fusions e2, ventes-achats-visuel, e3, `main`, `journee-perso` (À retirer : plus de carte, code + n° écrits, Itinéraire vers l'adresse LUE seulement) ; Ventes : logo du transporteur connu au même endroit sur chaque ligne, plus de vide sous la frise, envoi prouvé ⇒ plus de bordereau (banc `ventes-achats-visuel` L/V/P). `docs/passation/2026-11-11-revue-colis.md`. Geste : aucun.
 ## Lignes de CLAUDE.md §9 déplacées telles quelles (11 nov., lbc-rouges)
 > Ligne déplacée telle quelle de CLAUDE.md §9 le 11 nov. (lot vestiaire-plus, taille du fichier) :
+## Déplacé de CLAUDE.md §9 (11 nov., lot republier-programme), tel quel

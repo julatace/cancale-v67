@@ -11585,6 +11585,17 @@ const refusRestreint = (rc) => { try { return /restrict|suspend/i.test(JSON.stri
 async function lireFreinRepub(uid) {
   try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const f = m[String(uid)]; return f && Number(f.jusqua) > Date.now() ? f : null; } catch (_) { return null; }
 }
+// (11 nov., 5.368, lot republier-programme) Ce que l'app vérifie AVANT un départ programmé
+// (lecture seule, rien n'est envoyé à Vinted) : un onglet vinted.fr ouvert et prêt, et le
+// frein de republication de CE compte. « Pas su » (stockage muet) ⇒ `frein: undefined`,
+// jamais « aucun frein » — l'app ne part pas sur un « pas su ».
+async function etatDepartRepub(uid) {
+  const [t, fr] = await Promise.all([
+    ongletVinted().catch(() => undefined),
+    (async () => { try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const f = m[String(uid)]; return f && Number(f.jusqua) > Date.now() ? { jusqua: Number(f.jusqua) || 0, restreint: !!f.restreint } : null; } catch (_) { return undefined; } })(),
+  ]);
+  return { onglet: t === undefined ? null : !!t, frein: fr };
+}
 async function poserFreinRepub(uid, rc) {
   const st = Number(rc && rc.status) || 0;
   if (!(st >= 400 && st < 500) || st === 401 || st === 429) return null;
@@ -15770,6 +15781,8 @@ async function etatPourApp() {
     uid && !vintedPasSu ? avecDelai(loginDe(String(uid), { attendreMs: 250 }), 300, '').catch(() => '') : Promise.resolve(''),
     avecDelai(pauseVinted(), 300, PAUSE_PAS_SUE).catch(() => PAUSE_PAS_SUE),
   ]);
+  // 5.368 : l'onglet vinted.fr et le frein de republication du compte de l'onglet (départ programmé).
+  const repub = uid && !vintedPasSu ? await avecDelai(etatDepartRepub(String(uid)), 400, null).catch(() => null) : null;
   const vrm = e ? Object.assign({ ok: true, connecte: e.connecte, expiree: e.expiree, email: e.email || '', user_id: e.user_id || null, cloisonne: e.cloisonne === undefined ? null : e.cloisonne },
     e.mort ? { mort: true } : {}, e.renouvellement ? { renouvellement: e.renouvellement } : {}) : null;
   // Les demandes réellement dans la file portent `vivant` (voir `avecVivant`).
@@ -15796,7 +15809,8 @@ async function etatPourApp() {
   return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, lbcPrix: true, vcPrix: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
-    nav ? { nav } : {});
+    nav ? { nav } : {},
+    repub ? { repub } : {});
 }
 // `remplace` : l'API manque, un autre chemin garde la fonction (rien à faire).
 // `indispo` : rien ne la remplace ICI, aujourd'hui — l'app le dit, une fois.
