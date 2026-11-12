@@ -212,6 +212,39 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     dit(M.lieuDepuisExtrait('CHRONOPOST | RUE DE LA FONTAINE | 35000 RENNES') === null, 'sans numéro non plus, le transporteur n\'est jamais le point');
   });
 
+  // (12 nov., Julien : « elle doit pouvoir voir tous les points relais, peu importe comment c'est écrit »)
+  // Fixtures SYNTHÉTIQUES (aucune vraie adresse), une par transporteur et par écriture : en-tête seul ou suivi
+  // de deux-points, majuscules, lignes vides, tableau aplati (tabulations), numéro de point, CEDEX.
+  await essaie('tous les points relais', async () => {
+    const cas = [
+      ['Mondial Relay « POINT RELAIS® »', 'Votre colis est arrivé.\nPOINT RELAIS®\nTABAC DU TEST\n12 RUE DE LA GARE\n35000 RENNES\nHoraires', 'TABAC DU TEST, 12 RUE DE LA GARE, 35000 RENNES'],
+      ['Mondial Relay LOCKER 24/7 (lignes vides)', 'LOCKER\n\nLOCKER 24/7 MARCHE TEST\n\nRue des Tests\n\n22100 Dinan\n\nCode', 'LOCKER 24/7 MARCHE TEST, Rue des Tests, 22100 Dinan'],
+      ['InPost « Votre casier InPost : »', 'Votre casier InPost :\nInPost Locker Gare Test\n3 place de la Gare\n75010 Paris\nCode d’ouverture', 'InPost Locker Gare Test, 3 place de la Gare, 75010 Paris'],
+      ['Relais Colis', 'Votre Relais Colis\nPRESSE DU TEST\n8 avenue Jean Jaurès\n69007 LYON\nHoraires d’ouverture', 'PRESSE DU TEST, 8 avenue Jean Jaurès, 69007 LYON'],
+      ['Chronopost « Votre Relais Pickup » (rue sans numéro)', 'Votre Relais Pickup\nSUPER TEST ACCUEIL\nRUE DE LA FONTAINE\n35260 CANCALE', 'SUPER TEST ACCUEIL, RUE DE LA FONTAINE, 35260 CANCALE'],
+      ['UPS Access Point™', 'UPS Access Point™\nEPICERIE TEST\n5 rue Victor Hugo\n33000 BORDEAUX', 'EPICERIE TEST, 5 rue Victor Hugo, 33000 BORDEAUX'],
+      ['DPD Pickup + numéro de point', 'DPD Pickup\nPoint relais n° 012345\nCAVE DU TEST\n14 bd de la Liberté\n13001 MARSEILLE', 'CAVE DU TEST, 14 bd de la Liberté, 13001 MARSEILLE'],
+      ['GLS ParcelShop, nom sur la ligne de l’en-tête', 'GLS ParcelShop : TABAC TEST\n2 rue Haute\n67000 STRASBOURG', 'TABAC TEST, 2 rue Haute, 67000 STRASBOURG'],
+      ['La Poste « Bureau de poste » + CEDEX', 'Bureau de poste\nLA POSTE TEST\n1 RUE DU MARCHE\n44000 NANTES CEDEX 1', 'LA POSTE TEST, 1 RUE DU MARCHE, 44000 NANTES CEDEX 1'],
+      ['tableau HTML aplati (tabulations)', 'Point Relais\nFLEURS TEST\t9 Rue des Lilas\t59000 Lille\nHoraires', 'FLEURS TEST, 9 Rue des Lilas, 59000 Lille'],
+      ['tout sur la ligne de l’en-tête', 'Point Relais : BAR TEST, 4 rue du Port, 29200 Brest', 'BAR TEST, 4 rue du Port, 29200 Brest'],
+      ['Vinted Go « Adresse »', 'Adresse\nConsigne Vinted Go Test\n7 rue Neuve\n31000 Toulouse', 'Consigne Vinted Go Test, 7 rue Neuve, 31000 Toulouse'],
+      ['Shop2Shop', 'Point Shop2Shop\nLIBRAIRIE TEST\n10 rue Basse\n21000 Dijon', 'LIBRAIRIE TEST, 10 rue Basse, 21000 Dijon'],
+    ];
+    for (const [nom, txt, attendu] of cas) dit(M.lieuSousEnTete(txt) === attendu, `point lu : ${nom}`, String(M.lieuSousEnTete(txt)));
+    dit(M.lieuDepuisExtrait('BAR TEST, 4 rue du Port, 29200 Brest | Avec 19 000 points de proximité') === 'BAR TEST, 4 rue du Port, 29200 Brest', 'extrait : « NOM, rue, CP Ville » sur UNE ligne est lu');
+    dit(M.lieuDepuisExtrait('TABAC TEST - 3 rue Basse - 56000 Vannes') === 'TABAC TEST, 3 rue Basse, 56000 Vannes', 'extrait : « NOM - rue - CP Ville » est lu');
+    dit(M.lieuDepuisExtrait("MONDIAL RELAY, 1 avenue de l'horizon, 59650 VILLENEUVE D'ASCQ") === null, 'extrait : le siège du transporteur sur une ligne n’est jamais un point');
+    // Le repli : le texte de l'e-mail nettoyé, jamais recomposé ; le pied d'e-mail seul ⇒ rien.
+    const LL = M.lieuLisibleDepuisExtrait || (() => undefined);
+    dit(LL('CHEZ TEST 12 RUE BASSE 35000 RENNES | Prière de ne pas répondre à ce message.') === 'CHEZ TEST 12 RUE BASSE 35000 RENNES', 'repli : une forme non reconnue ⇒ le texte de l’e-mail tel quel (nettoyé)', String(LL('CHEZ TEST 12 RUE BASSE 35000 RENNES | Prière de ne pas répondre à ce message.')));
+    dit(LL("vos données personnelles dans notre politique de confidentialité | <https://exemple.test/c?q=a> | MONDIAL RELAY, 1 avenue de l'horizon, 59650 VILLENEUVE D'ASCQ") === null, 'repli : rien que le pied d’e-mail (siège, liens, mentions) ⇒ rien (« — »), jamais le siège comme point');
+    dit(LL('TABAC A | 35000 RENNES | TABAC B | 56000 VANNES') === null, 'repli : deux codes postaux ⇒ rien (on ne choisit pas)');
+    const SCx = await importer('api/_lib/suivi-colis.js');
+    const r = SCx.relireLigneSuivi({ status: 'available', code: '123456', extraitLieu: 'CHEZ TEST 12 RUE BASSE 35000 RENNES | Prière de ne pas répondre à ce message.' });
+    dit(r.lieu === 'CHEZ TEST 12 RUE BASSE 35000 RENNES' && r.lieuBrut === true, 'relecture partagée (app, widget, rappel) : le repli devient le lieu, marqué `lieuBrut`', JSON.stringify({ lieu: r.lieu, brut: r.lieuBrut }));
+  });
+
   await essaie('parseCarrierEmail', async () => {
     const { parseCarrierEmail } = await importer('api/email-inbound.js');
     const mr = parseCarrierEmail({ from: 'shipping@relay.vinted.com', subject: 'Votre colis 12345678 est disponible 📦', text: MR_TEXTE, html: '' }, 'mondialrelay', RECU_MR);

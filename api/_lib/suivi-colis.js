@@ -27,7 +27,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { normaliserSuivi, etatColisDepuisTexte, changementDeRelais, colisPerdu } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
-import { etatRetrait, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
+import { etatRetrait, lieuDepuisExtrait, lieuLisibleDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
 import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
 import { preuveDeLigne, preuveDeTransp, contredit, lectureEnRetard, etatProuve } from './etat-colis.js';
 // (24 oct.) LE STATUT LU CHEZ LE TRANSPORTEUR (api/_lib/transporteurs.js) : une
@@ -62,6 +62,9 @@ export function relireLigneSuivi(d) {
   if (!d || typeof d !== 'object') return d;
   if (!codeLu(d.code) && d.extraitCode) { const c = codeRetraitTournure(d.extraitCode); if (c) d = { ...d, code: c }; }
   if (!d.lieu && d.extraitLieu) { const l = lieuDepuisExtrait(d.extraitLieu); if (l) d = { ...d, lieu: l, lieuLuDansExtrait: true }; }
+  // (12 nov.) Repli : l'extrait a un point sans la forme « NOM | rue | CP Ville » ⇒ son texte nettoyé, tel
+  // qu'écrit dans l'e-mail (`lieuBrut`), jamais une adresse recomposée ; rien que le siège ⇒ rien (« — »).
+  if (!d.lieu && d.extraitLieu) { const l = lieuLisibleDepuisExtrait(d.extraitLieu); if (l) d = { ...d, lieu: l, lieuLuDansExtrait: true, lieuBrut: true }; }
   // (1er nov., audit des codes de retrait) Une ligne rangée avant la règle peut
   // porter le n° de suivi ou le code postal du lieu comme « code » : il n'est
   // plus montré (« code pas lu », jamais un faux devant le comptoir).
