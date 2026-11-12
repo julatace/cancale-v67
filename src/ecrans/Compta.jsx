@@ -412,8 +412,8 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         ))}
       </div>
       {oldStockCount>0&&(
-        <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:500}}>
-          ⚠️ {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
+        <div style={{background:C.card2||C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.muted,fontWeight:500}}>
+          {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -426,7 +426,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           <tbody>
             {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucun article</td></tr>}
             {list.map(p=>(
-              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
+              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return 'transparent';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:600,color:C.accentTexte,fontSize:15,minWidth:60}}>
                   <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
                 </td>
@@ -435,12 +435,12 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <span onClick={()=>toggleStatus(p.id)} style={{cursor:'pointer'}}>
-                    <Badge color={p.status==='stock'?C.accent:C.danger}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
+                    <Badge color={p.status==='stock'?C.accent:C.muted}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
                   </span>
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
                   <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
-                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:days>60?C.danger:C.warn,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
+                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:C.muted,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
@@ -487,7 +487,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} articles</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} articles</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
     </div>
@@ -633,7 +633,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           📅 {moisVentes.nom} — mois en cours
         </div>
         <div><span style={{fontSize:11,color:C.muted}}>CA finalisé</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
-        <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div style={{fontSize:20,fontWeight:600,color:moisVentes.profit>=0?C.accent:C.danger}}>{fmt(moisVentes.profit)}</div></div>
+        <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.profit)}</div></div>
         <div><span style={{fontSize:11,color:C.muted}}>Ventes</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
       </div>
 
@@ -641,7 +641,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <h2 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>Ventes ({sales.length})</h2>
         <div style={{display:'flex',gap:12,fontSize:13,flexWrap:'wrap',alignItems:'center'}}>
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
-          <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
+          <span style={{color:C.muted}}>Bénéf. : <b style={{color:C.text}}>{fmt(totalProfit)}</b></span>
           <Btn small onClick={()=>{
             if(fullFiltered.length===0){toast('Aucune vente à exporter');return;}
             const headers=['ID','N° Article','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
@@ -725,8 +725,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     <td style={{padding:'2px 10px',minWidth:65}}>
                       <Cell value={String(v.sellPrice)} onChange={val=>updateSale(v.id,'sellPrice',val)} align="right"/>
                     </td>
-                    <td style={{padding:'2px 10px',color:b>=0?C.accent:C.danger,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(b)}</td>
-                    <td style={{padding:'2px 10px',color:C.warn,whiteSpace:'nowrap'}}>×{fmtN(v.multi)}</td>
+                    <td style={{padding:'2px 10px',color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(b)}</td>
+                    <td style={{padding:'2px 10px',color:C.muted,whiteSpace:'nowrap'}}>×{fmtN(v.multi)}</td>
                     <td style={{padding:'2px 10px',whiteSpace:'nowrap'}}>
                       {(() => {
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
@@ -791,10 +791,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
-                <td style={{padding:'6px 6px',color:previewBuy!==null&&previewSell!==null?(previewSell-previewBuy>=0?C.accent:C.danger):C.muted,fontWeight:600,fontSize:12,whiteSpace:'nowrap'}}>
+                <td style={{padding:'6px 6px',color:previewBuy!==null&&previewSell!==null?C.text:C.muted,fontWeight:600,fontSize:12,whiteSpace:'nowrap'}}>
                   {previewBuy!==null&&previewSell!==null?fmt(previewSell-previewBuy):''}
                 </td>
-                <td style={{padding:'6px 6px',color:C.warn,fontSize:12}}>
+                <td style={{padding:'6px 6px',color:C.muted,fontSize:12}}>
                   {previewBuy&&previewBuy>0&&previewSell?`×${(previewSell/previewBuy).toFixed(2)}`:''}
                 </td>
                 <td style={{padding:'6px 6px'}}>
@@ -816,7 +816,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
       
@@ -838,7 +838,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
               return (<>
                 <span style={{fontSize:13,color:C.muted,marginLeft:'auto'}}>Σ : <b style={{color:C.text}}>{fmt(sumCA)}</b></span>
                 <span style={{fontSize:13,color:C.muted}}>💰 Reçu : <b style={{color:C.accentTexte}}>{fmt(sumRecu)}</b></span>
-                <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:sumProfit>=0?C.accent:C.danger}}>{fmt(sumProfit)}</b></span>
+                <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:C.text}}>{fmt(sumProfit)}</b></span>
               </>);
             })()}
           </>}
@@ -1059,7 +1059,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
       </div>
-      {search&&<div style={{fontSize:12,color:C.warn}}>
+      {search&&<div style={{fontSize:12,color:C.muted}}>
         🔍 « {search} » : {fullList.length} résultat{fullList.length>1?'s':''} dans toutes les factures.
       </div>}
       
@@ -1078,7 +1078,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       </div>
       {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
           identique, faisait doublon.) */}
-      {search.trim()&&<div style={{fontSize:11,color:C.warn,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
+      {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
       
       {/* Tableau factures */}
       <Card style={{padding:0,overflowX:'auto'}}>
@@ -1155,7 +1155,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} factures</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} factures</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
       
