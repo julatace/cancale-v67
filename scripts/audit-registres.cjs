@@ -125,6 +125,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   try {
     fs.writeFileSync(path.join(dir, 'prixAchatPropose.js'), PRIX); fs.copyFileSync(path.join(R0, 'src', 'modePaiement.js'), path.join(dir, 'modePaiement.js'));   // (11 nov.) importé par registres.js
     fs.copyFileSync(path.join(__dirname, '..', 'src', 'profilVendeur.js'), path.join(dir, 'profilVendeur.js'));   // (lot vocabulaire-article) le mot du vendeur, importé par la règle
+    fs.writeFileSync(path.join(dir, 'dateParis.js'), lire('src/dateParis.js'));   // (11 nov.) jour/mois de Paris, importé par registres.js
     fs.writeFileSync(path.join(dir, 'vestiaire-regle.mjs'), VC.replace(/from '\.\/([^']+)\.js'/g, (x, n) => `from '${path.join(R0, 'api', '_lib', n + '.js').replace(/\\/g, '/')}'`));
     if (MOD) { fs.writeFileSync(path.join(dir, 'registres.mjs'), MOD.replace("from './prixAchatPropose.js'", "from './prixAchatPropose.js'")); fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}'); fs.renameSync(path.join(dir, 'registres.mjs'), path.join(dir, 'registres.js')); M = await import('file://' + path.join(dir, 'registres.js')); }
     V = await import('file://' + path.join(dir, 'vestiaire-regle.mjs'));

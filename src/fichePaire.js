@@ -173,8 +173,13 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     } else { raisonBenef = r.raison; etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: r.raison }); }
   } else if (venteL) {
     venteC = venteL.price != null && Number.isFinite(Number(venteL.price)) ? Number(venteL.price) : null;
-    if (venteC != null && achatC != null) { benefice = venteC - achatC; benefPartiel = true; } else raisonBenef = achatC == null ? 'prix d’achat pas saisi' : 'prix de vente illisible';
-    etapes.push({ cle: 'argent', etat: o.lbcFinalisee && o.lbcFinalisee(venteL) ? 'fait' : 'absent', titre: 'Argent', detail: 'Leboncoin : daté à la vente · frais pas renseignés' });
+    // (11 nov., famille « une règle par notion ») LA règle du bénéfice (`beneficePaire`) : prix − achat −
+    //    frais SAISIS sur la fiche, « au plus » tant qu'ils ne sont pas tous confirmés — comme Vinted.
+    const bilL = venteC != null ? beneficePaire(venteC / 100, entree || {}) : null;
+    if (bilL && bilL.benefice != null) { benefice = Math.round(bilL.benefice * 100); benefPartiel = !bilL.complet; }
+    else raisonBenef = achatC == null ? 'prix d’achat pas saisi' : venteC == null ? 'prix de vente illisible' : 'frais illisibles';
+    const fraisL = bilL && bilL.cents ? `frais renseignés ${(bilL.cents / 100).toFixed(2).replace('.', ',')}\u00a0€${bilL.complet ? '' : ' (pas tous confirmés)'}` : (bilL && bilL.complet ? 'aucun frais' : 'frais pas renseignés');
+    etapes.push({ cle: 'argent', etat: o.lbcFinalisee && o.lbcFinalisee(venteL) ? 'fait' : 'absent', titre: 'Argent', detail: `Leboncoin : daté à la vente · ${fraisL}` });
   } else if (ventesInconnues) { raisonBenef = 'ventes pas lues'; etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: 'tes ventes pas toutes lues' }); }
   else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: 'rien de vendu' });
 

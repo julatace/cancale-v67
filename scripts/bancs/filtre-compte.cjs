@@ -142,7 +142,11 @@ const lireListe = (pg) => pg.evaluate(() => {
   const note = document.querySelector('[data-sel-compte-note]');
   return s ? { val: s.value, options: [...s.options].map((o) => o.value + '=' + o.textContent.trim()), note: note ? note.getAttribute('data-sel-compte-note') : null } : null;
 });
-const lignesFloues = (pg, re) => pg.evaluate((src) => {
+// (11 nov., agent2-regroupe-comptes) Les lignes d'un autre compte sont regroupées dans un groupe REPLIÉ
+// (« compte_b · 1 vente › ») : on les déplie d'abord — estompées, jamais masquées, à un toucher.
+const deplierGroupes = (pg) => pg.evaluate(() => { const bs = [...document.querySelectorAll('[data-groupe-compte="compte"][aria-expanded="false"]')]; bs.forEach((b) => b.click()); return bs.length; });
+const lignesFloues = async (pg, re) => { await deplierGroupes(pg); await pg.waitForTimeout(250); return lignesFlouesDeplies(pg, re); };
+const lignesFlouesDeplies = (pg, re) => pg.evaluate((src) => {
   const rx = new RegExp(src);
   const floues = [...document.querySelectorAll('*')].filter((x) => /blur/.test(getComputedStyle(x).filter));
   const texte = (x) => (x.innerText || '').replace(/\s+/g, ' ');
@@ -181,6 +185,8 @@ const messagerie = (pg) => pg.evaluate(() => {
       dit(l && l.options.some((o) => /^111=📍/.test(o)), 'il porte le 📍', JSON.stringify(l && l.options));
       dit(l && l.note === 'extension', 'et la liste le dit, avec le geste pour tout voir (une fois)', JSON.stringify(l && l.note));
       dit(l && !l.options.some((o) => /^333=/.test(o)), 'un compte EXCLU n’est jamais proposé', JSON.stringify(l && l.options));
+      const g = await r.pg.evaluate(() => ({ tete: (document.querySelector('[data-groupe-compte="ouvert"]') || {}).innerText || '', autres: [...document.querySelectorAll('[data-groupe-compte="compte"]')].map((x) => x.getAttribute('data-groupe-compte-id') + ':' + x.getAttribute('aria-expanded')) }));
+      dit(/compte_a/.test(g.tete) && g.autres.join() === '222:false', 'regroupées : compte_a en tête, compte_b dans un groupe REPLIÉ (11 nov.)', JSON.stringify(g));
       const f = await lignesFloues(r.pg, /Vente 8\d01/);
       dit(f.floues.includes('Vente 8201') && !f.floues.includes('Vente 8101'), 'la vente de compte_b est estompée, celle de compte_a reste nette', JSON.stringify(f));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));

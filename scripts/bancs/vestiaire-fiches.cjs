@@ -139,6 +139,11 @@ const aller = async (pg, tache, attendre) => {
   await pg.goto(pg.url().split('?')[0] + `?tab=${tache}&site=vestiaire`, { waitUntil: 'domcontentloaded' }).catch(() => {});
   await pg.waitForSelector(attendre, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(900);   // la lecture du compte ouvert (vc_session) arrive à côté
+  // (11 nov., agent2-regroupe-comptes) Les lignes d'un autre compte sont dans un groupe REPLIÉ : on le
+  // déplie (estompées, jamais masquées, à un toucher) ; rend le nombre de groupes dépliés.
+  const n = await pg.evaluate(() => { const bs = [...document.querySelectorAll('[data-groupe-compte="compte"][aria-expanded="false"]')]; bs.forEach((x) => x.click()); return bs.length; });
+  if (n) await pg.waitForTimeout(300);
+  return n;
 };
 const etatLigne = (pg, sel) => pg.evaluate((s) => {
   const e = document.querySelector(s);
@@ -199,7 +204,8 @@ const LIGNES = [
       await o.pg.screenshot({ path: path.join(CAPTURES, `vc-fiches-ventes-${vp.width}.png`), fullPage: true }).catch(() => {});
       // 3. Le flou, sur les quatre écrans.
       for (const [k, nom, att, selA, selB] of LIGNES) {
-        await aller(o.pg, k, att);
+        const replies = await aller(o.pg, k, att);
+        if (k !== 'messages') dit(replies === 1, `${nom} : compteB regroupé à part, replié (11 nov.)`, String(replies));
         const a = await etatLigne(o.pg, selA), bb = await etatLigne(o.pg, selB);
         dit(net(a) && floue(bb), `${nom} : la ligne de compteA est nette, celle de compteB est là mais estompée`, JSON.stringify({ a, b: bb }));
       }

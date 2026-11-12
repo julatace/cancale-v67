@@ -23,6 +23,7 @@ import { nomEcran } from './veille-plantages.js';
 // (11 nov.) L'envoi passe par le journal des alertes de production : même
 // regroupement à l'heure, interrupteur « Un écran plante », 30 jours.
 import { signalerProduction } from './alertes-production.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 async function direPlantages(enAttente, { proprio, env, fetcher, pousser, maintenant }) {
   const notif = texteAlerte(enAttente, nomEcran);
@@ -66,7 +67,7 @@ async function ecrireCas(env, fetcher, proprio, id, avant, data, maintenant) {
 
 // Range les événements d'un lot, puis prévient si l'heure est venue.
 // `pousser(notif)` envoie au propriétaire (le chemin push existant).
-export async function recevoirAlertesPlantages({ evenements, empreinte, proprio, env = process.env, fetcher = fetch, pousser = null, maintenant = Date.now() }) {
+export async function recevoirAlertesPlantages({ evenements, empreinte, proprio, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
   const evts = normaliserEvenements(evenements);
   if (!evts.length) return { fait: false, raison: 'rien' };
   if (!cfg(env).service || !proprio) return { fait: false, raison: 'non-configure' };
@@ -94,7 +95,7 @@ export async function recevoirAlertesPlantages({ evenements, empreinte, proprio,
 
 // La veille du matin : ce qui attend encore (types arrivés pendant l'heure de
 // repos, sans lot après) est dit — même règle, même ligne.
-export async function vidangerAlertesPlantages({ proprio, env = process.env, fetcher = fetch, pousser = null, maintenant = Date.now() }) {
+export async function vidangerAlertesPlantages({ proprio, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
   if (!cfg(env).service || !proprio) return { fait: false, raison: 'non-configure' };
   const out = [];
   for (const jour of [jourParis(maintenant - 864e5), jourParis(maintenant)]) {
@@ -128,7 +129,7 @@ export function terrainPourPanneau(rows) {
   }).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.jour)).sort((a, b) => b.jour.localeCompare(a.jour));
 }
 
-export async function listerPlantagesTerrain({ proprio, env = process.env, fetcher = fetch }) {
+export async function listerPlantagesTerrain({ proprio, env = process.env, fetcher = fetchAvecDelai }) {
   const { url, service } = cfg(env);
   try {
     const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=like.${PREFIXE_TERRAIN}*&select=id,data&order=id.desc&limit=${JOURS_PANNEAU}`, { headers: sbCle(service) });

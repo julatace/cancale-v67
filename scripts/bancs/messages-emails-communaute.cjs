@@ -296,7 +296,8 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
         await pg.evaluate(() => document.querySelectorAll('details.vrm-quick-settings').forEach((d) => { d.open = true; })); await pg.waitForTimeout(200);
         const pieds = await pg.evaluate(() => [...document.querySelectorAll('[data-pied-lien]')].filter((x) => x.offsetParent && x.checkVisibility()).map((x) => { const s = getComputedStyle(x), r = x.getBoundingClientRect(); return { k: x.getAttribute('data-pied-lien'), c: s.color, t: s.fontSize, g: s.fontWeight, fond: s.backgroundColor, h: Math.round(r.height) }; }));
         const sig = (x) => x.c + '|' + x.t + '|' + x.g + '|' + x.fond;
-        dit(pieds.length >= 2 && new Set(pieds.map(sig)).size === 1 && pieds.every((x) => !tel || x.h >= 44), `${suf} : G2 un seul style de lien en pied de Messages (≥ 2 liens, une signature, ≥ 44 px au doigt)`, JSON.stringify(pieds));
+        // (11 nov.) Le « Modifier » des réponses rapides vit dans la feuille ouverte depuis le fil (plus de repli sous la liste) : ≥ 1 lien ici.
+        dit(pieds.length >= 1 && new Set(pieds.map(sig)).size === 1 && pieds.every((x) => !tel || x.h >= 44), `${suf} : G2 un seul style de lien en pied de Messages (≥ 1 lien, une signature, ≥ 44 px au doigt)`, JSON.stringify(pieds));
         // G9 — aucun texte écrit dans l'aplat d'accent (le bleu reste rare : un point, un bouton plein).
         const bleus = await texteAccent(pg, '[data-messagerie]');
         dit(bleus.length === 0, `${suf} : G9 aucun texte de Messages · Vinted dans l'aplat bleu (C.accent)`, bleus.join(' | '));

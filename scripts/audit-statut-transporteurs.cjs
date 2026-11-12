@@ -125,7 +125,17 @@ if (ARG_PROUVE) {
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m + ' — le contrôle a pu s’exécuter', String((e && e.stack) || e).split('\n').slice(0, 2).join(' ').slice(0, 260)); } };
-const importer = (p) => import('file://' + path.join(R, p));
+const importer = async (p) => {
+  const m = await import('file://' + path.join(R, p));
+  // (12 nov., limites-client) le widget borne les appels d'un vendeur (12/min) : ce banc l'appelle
+  // bien plus souvent pour UN vendeur fictif — chaque appel repart d'un compteur vide (la règle de
+  // débit a son propre audit, audit-limites-client).
+  if (p === 'api/widget.js') {
+    let D = null; try { D = await import('file://' + path.join(R, 'api/_lib/debit-vendeur.js')); } catch (_) { D = null; }
+    if (D && D._viderDebits) { const f = m.default; return { ...m, default: (...a) => { D._viderDebits(); return f(...a); } }; }
+  }
+  return m;
+};
 
 // ── L'environnement des routes ──────────────────────────────────────────────
 const A = '11111111-2222-3333-4444-555555555555';

@@ -30,6 +30,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { sbCle } from './cle.js';
 import { nettoyer } from '../../src/plantages.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const ID_ALERTES = 'alertes_production';
 export const TYPES = Object.freeze(['plantage', 'emails', 'colis', 'sante']);
@@ -188,7 +189,7 @@ async function ecrireCas(env, fetcher, proprio, avant, data, maintenant) {
 
 // Applique `operation(data) → { data, dues }` sur la ligne, écrit (si changé),
 // PUIS envoie. `pousser(notif)` → { sent } (le chemin push existant).
-export async function passerAlertes({ proprio, operation, env = process.env, fetcher = fetch, pousser = null, maintenant = Date.now() }) {
+export async function passerAlertes({ proprio, operation, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
   const p = String(proprio || '').trim().toLowerCase();
   if (!cfg(env).service || !RE_UUID.test(p)) return { fait: false, raison: 'non-configure' };
   for (let essai = 0; essai < ESSAIS; essai++) {
@@ -238,7 +239,7 @@ export function alertesPourPanneau(data, maintenant = Date.now()) {
   return { reglages: Object.fromEntries(TYPES.map((t) => [t, typeActif(d.reglages, t)])), alertes };
 }
 
-export async function listerAlertesProduction({ proprio, env = process.env, fetcher = fetch, maintenant = Date.now() }) {
+export async function listerAlertesProduction({ proprio, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   if (!cfg(env).service) return null;
   const d = await lireLigne(env, fetcher, String(proprio || '').toLowerCase());
   if (d === undefined) return null;
@@ -248,7 +249,7 @@ export async function listerAlertesProduction({ proprio, env = process.env, fetc
 // ── LA ROUTE (api/compte.js `?mode=alertes`) — propriétaire seul ────────────
 //   GET  : { ok, reglages, alertes }
 //   POST : { type, actif } ⇒ l'interrupteur (SON clic).
-export async function routeAlertes({ methode, utilisateur, corps, proprio, env = process.env, fetcher = fetch, maintenant = Date.now() }) {
+export async function routeAlertes({ methode, utilisateur, corps, proprio, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
   if (!utilisateur || String(utilisateur.id).toLowerCase() !== String(proprio).toLowerCase()) return { code: 403, corps: { ok: false, raison: 'proprietaire' } };
@@ -281,7 +282,7 @@ export function refusEnSerie(bilans) {
 // `plantages_terrain_<jour>` du propriétaire (le jour est dans l'id) et les
 // `plantage_*` de chaque vendeur (date copiée dans `meta`, migration 004).
 // Une suppression par filtre : ce qui n'a pas de date n'est jamais touché.
-export async function purgerErreursAnciennes({ url, headers, proprio, fetcher = fetch, maintenant = Date.now() }) {
+export async function purgerErreursAnciennes({ url, headers, proprio, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   const seuil = new Date(maintenant - GARDE_MS);
   const jour = seuil.toISOString().slice(0, 10);
   const out = { fait: true, seuil: seuil.toISOString() };

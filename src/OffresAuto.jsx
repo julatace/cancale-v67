@@ -36,6 +36,7 @@ import './offres-auto.css';
 // (intégration g1) prix-mini (textes par tr) × vocabulaire-article (« paire » seulement pour un vendeur
 // Sneakers) : les clés qui nomment l'article ont une variante `.art`, choisie par le vocabulaire du vendeur.
 const tv = (k, p) => tr(motsVendeur().nom === 'paire' ? k : k + '.art', p);
+import { erreurMessageAuto } from './messageSur.js';
 
 const PAR_PAGE = 30;
 const quand = (t) => {
@@ -242,6 +243,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
       <h3 className="vrm-oa-titre">{tr('oa.refus.titre')}</h3>
       <div className="vrm-oa-groupe">
         <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder={tr('oa.refus.vide')} aria-label={tr('oa.refus.label')}/>
+        {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{ margin: '6px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--vrm-warn, #B25000)' }}>{erreurMessageAuto(refusMsg)}</p> : null}
       </div>
     </section>
   );

@@ -67,6 +67,8 @@ function poserFetch({ vintedRefuse }) {
     if (/\/api\/v2\/users\/current$/.test(u)) return J({ user: { login: 'moncompte', id: 7 } });
 
     // ── Supabase ────────────────────────────────────────────────────────────
+    // (11 nov.) La fonction de la migration 042 : absente (404, la forme de PostgREST avant la 042).
+    if (/\/rest\/v1\/rpc\/vrm_vinted_relier/.test(u)) return J({ code: 'PGRST202' }, 404);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) {
       if (method === 'GET') {
         lectures.push(u);

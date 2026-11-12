@@ -45,6 +45,7 @@ import { configurationRelances } from './relances-essai.js';
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles : la règle de l'app (src/venteLot.js),
 // COPIE refabriquée par `node scripts/audit-ventes-lot.cjs --recopie` — jamais modifiée à la main.
 import { resumeVenteLot, lignesFactureLot } from './vente-lot-regle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const sbKey = () => process.env.SUPABASE_SERVICE_KEY || '';
@@ -83,7 +84,7 @@ export const idFacture = (tx, avoir = false) => `email_invoice_${avoir ? 'av' : 
 export async function lireLigne(id, owner, select = 'data') {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${url(id, owner)}&select=${select}`, { headers: enTetes() });
+    const r = await fetchAvecDelai(`${url(id, owner)}&select=${select}`, { headers: enTetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -94,7 +95,7 @@ export async function lireLigne(id, owner, select = 'data') {
 // Créer seulement si absente : 'ok' · 'conflit' · 'ko'.
 export async function creer(id, owner, data) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([{ owner, id, data }]) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify([{ owner, id, data }]) });
     if (r.ok) return 'ok';
     return r.status === 409 ? 'conflit' : 'ko';
   } catch (_) { return 'ko'; }
@@ -103,7 +104,7 @@ export async function creer(id, owner, data) {
 // 'ok' · 'conflit' · 'ko'.
 export async function modifierSi(id, owner, filtre, data) {
   try {
-    const r = await fetch(`${url(id, owner)}&${filtre}&select=id`, { method: 'PATCH', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data }) });
+    const r = await fetchAvecDelai(`${url(id, owner)}&${filtre}&select=id`, { method: 'PATCH', headers: enTetes({ 'content-type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data }) });
     if (!r.ok) return 'ko';
     const out = await r.json().catch(() => null);
     if (!Array.isArray(out)) return 'ko';
@@ -114,7 +115,7 @@ export async function modifierSi(id, owner, filtre, data) {
 export async function lireListe(requete, owner) {
   if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
     if (!r.ok) return undefined;
     const rows = await r.json();
     return Array.isArray(rows) ? rows : undefined;
@@ -173,11 +174,29 @@ export const condRev = (rev) => (rev == null || rev === '' ? 'data->>rev=is.null
 export function lireCompteur(d) {
   if (d == null) return { n: 0, journal: [], ancien: null };
   if (typeof d === 'number' || (typeof d === 'string' && /^\d+$/.test(d))) return { n: Number(d), journal: [], ancien: Number(d) };
-  if (typeof d === 'object' && Number.isInteger(d.n) && d.n >= 0) return { n: d.n, journal: Array.isArray(d.journal) ? d.journal : [], ancien: null };
+  if (typeof d === 'object' && Number.isInteger(d.n) && d.n >= 0) return { n: d.n, journal: Array.isArray(d.journal) ? d.journal : [], ancien: null, ...(Number.isInteger(d.seq) ? { seq: d.seq } : {}) };
   return null;                                           // forme inconnue : on ne devine pas
 }
+// (12 nov., M75) Un numéro pris puis ABANDONNÉ (facture jamais écrite : base
+// tombée, vendeur parti) laissait un trou dans une série qui doit être continue.
+// Le DERNIER numéro donné est repris par la pièce suivante seulement si : c'est
+// bien le dernier (aucun numéro après lui : la chronologie reste juste), il a plus
+// de 10 min (l'émission d'origine ne peut plus écrire), il est de la même année
+// (heure de Paris), et la ligne de SA pièce ne porte AUCUN numéro (lue ; pas su ⇒
+// numéro neuf, jamais une reprise devinée). Sinon, numéro neuf comme avant.
+export const REPRISE_APRES_MS = 10 * 60 * 1000;
+export function numeroAReprendre(c, maintenant = Date.now()) {
+  const der = c && c.journal && c.journal[c.journal.length - 1];
+  if (!der || der.n !== c.n) return null;
+  const at = Date.parse(der.at || '');
+  if (!Number.isFinite(at) || maintenant - at < REPRISE_APRES_MS) return null;
+  if (anneeParis(at) !== anneeParis(maintenant)) return null;
+  return der;
+}
 // Rend { n } · { erreur:'pas-su' }. `cle` = l'identité de la pièce (tx).
-export async function prendreNumero(owner, idCompteur, cle, essais = 12) {
+// `ligneDe(cle)` (facultatif) : l'id de la ligne de la pièce d'une clé du journal
+// (null si inconnue) — sans elle, aucune reprise.
+export async function prendreNumero(owner, idCompteur, cle, essais = 12, ligneDe = null) {
   for (let i = 0; i < essais; i++) {
     if (i) await new Promise((r) => setTimeout(r, 20 + Math.floor(Math.random() * 60 * i)));
     const brut = await lireLigne(idCompteur, owner, 'data');
@@ -186,12 +205,21 @@ export async function prendreNumero(owner, idCompteur, cle, essais = 12) {
     if (!c) return { erreur: 'pas-su' };
     const deja = c.journal.find((x) => x && x.cle === cle);
     if (deja) return { n: deja.n };
-    const n = c.n + 1;
-    const suivant = { n, journal: [...c.journal, { n, cle, at: new Date().toISOString() }].slice(-JOURNAL_MAX) };
+    const der = typeof ligneDe === 'function' ? numeroAReprendre(c) : null;
+    const idDer = der ? ligneDe(der.cle) : null;
+    let repris = false;
+    if (der && idDer) {
+      const l = await lireLigne(idDer, owner, 'number:data->>number');
+      repris = l === null || (l && (l.number == null || l.number === ''));   // undefined (pas su) ⇒ jamais repris
+    }
+    const n = repris ? der.n : c.n + 1;
+    const journal = repris ? [...c.journal.slice(0, -1), { n, cle, at: new Date().toISOString(), reprisDe: der.cle }] : [...c.journal, { n, cle, at: new Date().toISOString() }];
+    // `seq` (posé à la 1re reprise, puis monte à chaque écriture) : une reprise (n inchangé) reste un comparer-et-échanger.
+    const suivant = { n, ...(repris || c.seq != null ? { seq: (c.seq || 0) + 1 } : {}), journal: journal.slice(-JOURNAL_MAX) };
     let w;
     if (brut == null) w = await creer(idCompteur, owner, suivant);
     else if (c.ancien != null) w = await modifierSi(idCompteur, owner, `data=eq.${c.ancien}`, suivant);
-    else w = await modifierSi(idCompteur, owner, `data->>n=eq.${c.n}`, suivant);
+    else w = await modifierSi(idCompteur, owner, `data->>n=eq.${c.n}${repris || c.seq != null ? `&data->>seq=${c.seq == null ? 'is.null' : `eq.${c.seq}`}` : ''}`, suivant);
     if (w === 'ok') return { n };
     if (w === 'ko') return { erreur: 'pas-su' };
     // conflit : quelqu'un a pris un numéro entre-temps — on relit.
@@ -241,7 +269,7 @@ async function boitePoser(owner, corps, res) {
   if (!chiffre) return repondre(res, 503, { erreur: 'coffre', message: "Le coffre n'a pas pu chiffrer : rien n'a été rangé." });
   const data = { v: 1, chiffre, adresse: s.adresse, fournisseur: s.fournisseur, hote: s.hote, port: s.port, at: new Date().toISOString(), rev: nouveauRev() };
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify([{ owner, id: ID_BOITE, data }]) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: enTetes({ 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify([{ owner, id: ID_BOITE, data }]) });
     if (!r.ok) return repondre(res, 503, { erreur: 'base', message: "La base n'a pas pu ranger ta boîte : rien n'a changé. Réessaie." });
   } catch (_) { return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu : rien n'a changé. Réessaie." }); }
   return repondre(res, 200, { ok: true, boite: boitePublique(data) });
@@ -275,7 +303,7 @@ async function boiteEssai(owner, res) {
 async function boiteRetirer(owner, corps, res) {
   if (!corps || corps.confirme !== true) return repondre(res, 400, { erreur: 'confirmation' });
   try {
-    const r = await fetch(url(ID_BOITE, owner), { method: 'DELETE', headers: enTetes({ Prefer: 'return=minimal' }) });
+    const r = await fetchAvecDelai(url(ID_BOITE, owner), { method: 'DELETE', headers: enTetes({ Prefer: 'return=minimal' }) });
     if (!r.ok) return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu : ta boîte est peut-être toujours connectée. Réessaie." });
   } catch (_) { return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu. Réessaie." }); }
   return repondre(res, 200, { ok: true, boite: { etat: 'aucune' } });
@@ -322,7 +350,7 @@ export async function emettre(owner, corps, res) {
   // Le numéro : celui du brouillon d'avant (jamais envoyé) s'il en a un, sinon un neuf.
   let numero = ligne && ligne.number ? String(ligne.number) : '';
   if (!numero) {
-    const p = await prendreNumero(owner, 'vrm_invoice_counter', `tx${tx}`);
+    const p = await prendreNumero(owner, 'vrm_invoice_counter', `tx${tx}`, 12, (k) => (/^tx\d{4,20}$/.test(String(k)) ? idFacture(String(k).slice(2)) : null));   // (12 nov., M75)
     if (p.erreur) return repondre(res, 503, { erreur: 'pas-su', message: "Le compteur de factures n'a pas pu être lu : aucune facture n'a été numérotée. Réessaie." });
     numero = numeroFacture(cfg.prefixe, anneeParis(Date.now()), p.n);
   }
@@ -369,8 +397,17 @@ async function avoir(owner, corps, res) {
   const data = { type: 'avoir_pro', number: contenu.numero, status: 'emise', contenu, emiseLe: contenu.emiseLe, transaction: tx, origine: fc.numero, buyerEmail: fc.acheteur.email, rev: nouveauRev() };
   const w = a ? await modifierSi(idA, owner, condRev(a.rev), data) : await creer(idA, owner, data);
   if (w !== 'ok') { const relu = await lireLigne(idA, owner); if (relu && relu.contenu) return repondre(res, 200, { ok: true, deja: true, avoir: facturePublique(relu, idA) }); return repondre(res, 503, { erreur: 'base', message: "L'avoir n'a pas pu être enregistré. Réessaie : il gardera le même numéro." }); }
-  await modifierSi(idF, owner, condRev(f.rev), { ...f, annuleePar: contenu.numero, rev: nouveauRev() });
-  return repondre(res, 200, { ok: true, avoir: facturePublique(data, idA) });
+  // (11 nov., M74) La facture marquée « annulée par » l'avoir : par comparer-et-échanger,
+  // RELUE et réessayée si un autre l'a touchée entre-temps ; jamais un résultat ignoré.
+  // Pas abouti ⇒ l'avoir EST émis (réponse ok) mais `avertissement` le dit.
+  let marque = false;
+  for (let essai = 0, cible = f; essai < 4 && cible && !marque; essai++) {
+    if (cible.annuleePar === contenu.numero) { marque = true; break; }
+    const w2 = await modifierSi(idF, owner, condRev(cible.rev), { ...cible, annuleePar: contenu.numero, rev: nouveauRev() });
+    if (w2 === 'ok') { marque = true; break; }
+    cible = await lireLigne(idF, owner);
+  }
+  return repondre(res, 200, { ok: true, avoir: facturePublique(data, idA), ...(marque ? {} : { avertissement: "L'avoir est émis, mais la facture n'a pas pu être marquée « annulée ». Rouvre la vente pour réessayer." }) });
 }
 
 // ── ENVOYER ─────────────────────────────────────────────────────────────────

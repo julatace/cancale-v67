@@ -84,7 +84,9 @@ async function monter(nav, { lignesKO = false, patchKO = false } = {}) {
     // (22 oct.) Au démarrage l'app relit la liste COMPLÈTE (select=*, jetons compris)
     // et remplace la copie du navigateur par elle (ba317a6) : le banc la sert, jetons
     // compris — c'est justement ce que la sauvegarde doit retirer.
-    if (/vinted_accounts\?select=\*/.test(u)) return J(LOCAL.vinted_accounts);
+    // (12 nov.) La page relit la liste projetée SANS jetons (`SELECT_COMPTES_VINTED`) ; le banc
+    // sert quand même la ligne jetons compris (une base qui en renverrait) : rien ne doit en sortir.
+    if (/vinted_accounts\?select=(\*|id,owner,vinted_user_id)/.test(u)) return J(LOCAL.vinted_accounts);
     return J([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));

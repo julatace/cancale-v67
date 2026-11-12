@@ -155,8 +155,13 @@ const section = async (pg, k, attendre) => {
   // sur Leboncoin ; Achats reste dans l'espace Leboncoin (« Plateformes »).
   const url = k === 'achats' ? '?tab=plat_leboncoin&section=achats' : `?tab=${k}&site=leboncoin`;
   await pg.goto(pg.url().split('?')[0] + url, { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await pg.waitForSelector(attendre, { timeout: 12000 }).catch(() => {});
+  await pg.waitForSelector(`${attendre}, [data-groupe-compte="compte"]`, { timeout: 12000 }).catch(() => {});
   await pg.waitForTimeout(700);   // la lecture du compte ouvert (lbc_accounts) arrive à côté
+  // (11 nov., agent2-regroupe-comptes) Les lignes d'un autre compte sont dans un groupe REPLIÉ : on le
+  // déplie (estompées, jamais masquées, à un toucher) ; rend le nombre de groupes dépliés.
+  const n = await pg.evaluate(() => { const bs = [...document.querySelectorAll('[data-groupe-compte="compte"][aria-expanded="false"]')]; bs.forEach((x) => x.click()); return bs.length; });
+  if (n) await pg.waitForTimeout(300);
+  return n;
 };
 const SECTIONS = [
   ['annonces', 'Annonces', '[data-lbc-catalog-id="4100000001"]', '[data-lbc-catalog-id="4100000002"]'],
@@ -173,7 +178,8 @@ const SECTIONS = [
       console.log(`── ${vp.width} px · extension connectée, Compte_A ouvert sur leboncoin.fr (il y a 10 min)`);
       const o = await ouvrir(b, vp);
       for (const [k, nom, selA, selB] of SECTIONS) {
-        await section(o.pg, k, selB);
+        const replies = await section(o.pg, k, selB);
+        if (k !== 'messages') dit(replies === 1, `${nom} : Compte_B regroupé à part, replié (11 nov.)`, String(replies));
         const a = await etatLigne(o.pg, selA), bb = await etatLigne(o.pg, selB);
         dit(net(a) && floue(bb), `${nom} : la ligne de Compte_A est nette, celle de Compte_B est là mais estompée`, JSON.stringify({ a, b: bb }));
         if (k === 'ventes' || k === 'annonces') await o.pg.screenshot({ path: path.join(os.tmpdir(), `lbc-flou-${k}-${vp.width}.png`), fullPage: true }).catch(() => {});

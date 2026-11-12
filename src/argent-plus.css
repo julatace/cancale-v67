@@ -1,0 +1,47 @@
+/* Argent, en plus (11 nov., agent2-argent-parrainage, src/ArgentPlus.jsx) : prévision du mois,
+   coût par site et par mois. Neutre ; l'accent seulement sur le trait du centre (§7). */
+.vrm-ap-carte { background: var(--vrm-surface, var(--vrm-bg, #fff)); border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 14px; padding: 16px 16px 12px; min-width: 0; color: var(--vrm-ink, #1D1D1F); }
+.vrm-ap-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.vrm-ap-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; min-width: 0; }
+.vrm-ap-note { font-size: 13px; color: var(--vrm-muted, #6E6E73); white-space: nowrap; }
+.vrm-ap-grand { font-size: 30px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.15; }
+.vrm-ap-grand.is-vide, .vrm-ap-carte .is-vide { color: var(--vrm-muted, #6E6E73); }
+.vrm-ap-sous { font-size: 14px; color: var(--vrm-muted, #6E6E73); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.vrm-ap-manque { font-size: 13px; color: var(--vrm-muted, #6E6E73); margin-top: 6px; }
+.vrm-ap-piste { position: relative; height: 10px; border-radius: 999px; background: var(--vrm-card2, #F2F2F7); margin: 12px 0 4px; overflow: hidden; }
+.vrm-ap-piste > span { position: absolute; top: 0; bottom: 0; }
+.vrm-ap-fait { left: 0; background: var(--vrm-ink, #1D1D1F); opacity: .78; border-radius: 999px; }
+.vrm-ap-bande { background: var(--vrm-ink, #1D1D1F); opacity: .16; }
+.vrm-ap-centre { width: 2px; margin-left: -1px; background: var(--vrm-accent, #0071E3); }
+.vrm-ap-benef { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; border-top: 1px solid var(--vrm-line, #E5E5EA); margin-top: 12px; padding-top: 10px; min-height: 44px; }
+.vrm-ap-benef-nom { font-size: 15px; font-weight: 600; }
+.vrm-ap-benef-v { font-size: 15px; font-variant-numeric: tabular-nums; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
+.vrm-ap-benef-v small { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+html body .vrm-ap-carte button.vrm-ap-saisir { min-height: 44px; padding: 0 4px; border: 0; background: transparent; font: 600 15px/1.2 var(--vrm-police, inherit); color: var(--vrm-accent-texte, var(--vrm-accent, #0066CC)); cursor: pointer; }
+.vrm-ap-pied { font-size: 13px; color: var(--vrm-muted, #6E6E73); margin: 10px 0 0; }
+
+html body button.vrm-ap-ligne { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 4px; margin: 2px 0 6px; border: 0; background: transparent; font: 500 15px/1.3 var(--vrm-police, inherit); color: var(--vrm-ink, #1D1D1F); text-align: left; cursor: pointer; }
+html body button.vrm-ap-ligne:disabled { cursor: default; opacity: 1; }
+.vrm-ap-ligne-t { min-width: 0; font-variant-numeric: tabular-nums; }
+.vrm-ap-ligne-f { color: var(--vrm-muted, #6E6E73); font-size: 18px; }
+
+.vrm-ap-cout { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.vrm-ap-cout > .vrm-ap-vue { align-self: flex-start; max-width: 100%; }
+.vrm-ap-table { display: flex; flex-direction: column; margin-top: 4px; }
+.vrm-ap-tr { display: grid; grid-template-columns: minmax(64px, 1.1fr) repeat(var(--n, 4), minmax(0, 1fr)); align-items: center; column-gap: 4px; border-top: 1px solid var(--vrm-line, #E5E5EA); }
+.vrm-ap-th { border-top: 0; font-size: 12px; color: var(--vrm-muted, #6E6E73); font-weight: 600; min-height: 28px; }
+.vrm-ap-mois { text-align: right; padding-right: 6px; white-space: nowrap; }
+.vrm-ap-site { font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .vrm-ap-carte button.vrm-ap-td { min-height: 44px; min-width: 0; padding: 0 6px; border: 0; border-radius: 8px; background: transparent; font: 500 14px/1.2 var(--vrm-police, inherit); color: var(--vrm-ink, #1D1D1F); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-ap-carte button.vrm-ap-td[aria-expanded="true"] { background: var(--vrm-card2, #F2F2F7); }
+.vrm-ap-td i { font-style: normal; color: var(--vrm-muted, #6E6E73); margin-left: 1px; }
+.vrm-ap-detail { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--vrm-card2, #F2F2F7); }
+.vrm-ap-detail-t { font-size: 15px; font-weight: 600; margin-bottom: 4px; text-transform: none; }
+.vrm-ap-dl { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; min-height: 30px; align-items: center; font-variant-numeric: tabular-nums; }
+.vrm-ap-dl > span:last-child { color: var(--vrm-muted, #6E6E73); text-align: right; }
+.vrm-ap-dl b { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
+@media (max-width: 420px) {
+  .vrm-ap-tr { grid-template-columns: minmax(56px, 1fr) repeat(var(--n, 4), minmax(0, 1fr)); }
+  html body .vrm-ap-carte button.vrm-ap-td { font-size: 13px; padding: 0 3px; }
+  .vrm-ap-site { font-size: 14px; }
+}

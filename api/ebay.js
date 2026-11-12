@@ -44,6 +44,7 @@ import { sbCle } from './_lib/cle.js';
 import { lireEtatJeton, keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 // ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
 // COMPTE eBAY (9 octobre, plusieurs comptes par vendeur). `ctx.compte.suffixe`
@@ -67,7 +68,7 @@ const EBAY_API = 'https://api.ebay.com';
 const DELAI_EBAY_MS = 10000, DELAI_TRADING_MS = 25000;
 async function ebayJson(url, token, extra) {
   try {
-    const r = await fetch(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}), signal: AbortSignal.timeout(DELAI_EBAY_MS) });
+    const r = await fetchAvecDelai(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}), signal: AbortSignal.timeout(DELAI_EBAY_MS) });
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (_) {}
     return { status: r.status, ok: r.ok, data: j, raw: txt.slice(0, 400) };
@@ -169,7 +170,7 @@ async function tradingCall(token, callName, inner) {
   const body = '<?xml version="1.0" encoding="utf-8"?>'
     + `<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">${inner}</${callName}Request>`;
   try {
-    const r = await fetch(`${EBAY_API}/ws/api.dll`, {
+    const r = await fetchAvecDelai(`${EBAY_API}/ws/api.dll`, {
       method: 'POST',
       headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': marcheCourant().siteId, 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
       body, signal: AbortSignal.timeout(DELAI_TRADING_MS),
@@ -1457,7 +1458,7 @@ async function handleOffre(b, ctx) {
   if (message) corps.message = message;
   let r;
   try {
-    r = await fetch(`${NEGO}/send_offer_to_interested_buyers`, {
+    r = await fetchAvecDelai(`${NEGO}/send_offer_to_interested_buyers`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${at.token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Language': marcheCourant().langue, ...enteteMarche() },
       body: JSON.stringify(corps),
@@ -1739,7 +1740,8 @@ async function handleSync(ctx) {
   const lectureCommandesId=crypto.randomUUID();
   const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2,lectureCommandesId):null;
   if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2,lectureCommandesId),status:orders.status}))===true;
-  if (inv.ok && Array.isArray(inv.data?.inventoryItems))stockRange=await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems, status: inv.status, capturedAt: at2 }, ctx.owner)===true;
+  // (11 nov., M77) une seule page lue : `complet`/`total` le disent (jamais un stock partiel présenté entier).
+  if (inv.ok && Array.isArray(inv.data?.inventoryItems))stockRange=await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems, status: inv.status, capturedAt: at2, total: Number.isFinite(Number(inv.data.total)) ? Number(inv.data.total) : null, complet: !inv.data.next && Number.isFinite(Number(inv.data.total)) && Number(inv.data.total) <= inv.data.inventoryItems.length }, ctx.owner)===true;
   // Le principal dont l'identité n'est pas encore apprise : on la demande à
   // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
   // au sélecteur, et ce qui permet d'ajouter un second compte sans mélange.
@@ -2223,12 +2225,11 @@ async function handleApp(req, res) {
     // désigne rien. Ce qui engage (offre, retrait, programmation, annulation,
     // déplacement) exige en plus `confirme:true` — vérifié AVANT eBay aussi.
     const ACTIONS = {
-      agent:async(ctx)=>preparerAgentEbay({
-        orders:await lireDonnee(ligneDe('ebay_orders',ctx),ctx.owner),
-        messages:await gestionEbay.messages({page:1},ctx),
-        offres:await gestionEbay.offres({page:1},ctx),
-        journal:await lireDonnee(ligneDe('ebay_agent_journal',ctx),ctx.owner),
-      }),
+      // (11 nov., familles-serveur, H27/M87) L'AGENT eBAY EST ARRÊTÉ (Julien, 5 nov.) et
+      // l'app ne l'appelle plus : il relisait `ebay_orders` ENTIÈRE (`select=data`,
+      // adresses comprises) puis attendait messages et offres en série. Il répond
+      // 410 sans rien lire. `preparerAgentEbay` reste (bancs) si on le rallume.
+      agent:async()=>({status:410,body:{ok:false,reason:'agent-arrete',error:'L\'agent eBay est arrêté.'}}),
       commande:(ctx)=>gestionEbay.commande(b,ctx),
       transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),
@@ -2329,12 +2330,16 @@ async function handleApp(req, res) {
       : ACTIONS[action](ctx));
     res.status(r.status).json(r.body);
   } catch (e) {
-    res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });
+    // (11 nov., B120) une panne d'eBay (réseau, délai) n'est pas une panne de base ou de code.
+    const reseau = e && (e.name === 'TimeoutError' || e.name === 'AbortError' || e.name === 'TypeError' && String(e.message).toLowerCase().includes('fetch'));
+    if (!reseau) console.warn('ebay : erreur interne', e && e.name);
+    res.status(reseau ? 502 : 500).json({ ok: false, error: reseau ? 'eBay injoignable' : 'Erreur de VRM — réessaie', detail: String((e && e.message) || '').slice(0, 200) });
   }
 }
 
 export default async function handler(req, res) {
   const mode = (req.query && req.query.mode) || '';
+  if (mode !== 'deletion') res.setHeader('Cache-Control', 'no-store');   // (11 nov., B118) un état par vendeur ne se met pas en cache
   if (mode === 'deletion') return handleDeletion(req, res);
   if (mode === 'callback') return handleCallback(req, res);
   return handleApp(req, res);

@@ -26,6 +26,7 @@ import { effacerCommunaute } from './communaute.js';
 import { effacerFavorisDe } from './favoris-confidentialite.js';
 import { lignesPriveesProfil } from './profil-avatar.js';
 import { requetes } from './suppression-compte.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const FACTURES_ANS = 10;
@@ -37,7 +38,7 @@ const nb = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
 // table n'existe pas ici (404), `null` si la base a refusé ou n'a pas répondu.
 export async function effacer(url, service, chemin) {
   try {
-    const r = await fetch(`${url}/rest/v1/${chemin}`, { method: 'DELETE', headers: { ...sbCle(service), Prefer: 'count=exact,return=minimal' } });
+    const r = await fetchAvecDelai(`${url}/rest/v1/${chemin}`, { method: 'DELETE', headers: { ...sbCle(service), Prefer: 'count=exact,return=minimal' } });
     if (r.status === 404) return 0;
     if (!r.ok) return null;
     const m = /\/(\d+)\s*$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');
@@ -50,14 +51,14 @@ export async function viderCacheDetourage(url, service, owner) {
   let n = 0;
   try {
     for (let tour = 0; tour < 50; tour++) {
-      const l = await fetch(`${url}/storage/v1/object/list/detourage`, { method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: owner, limit: 100, offset: 0 }) });
+      const l = await fetchAvecDelai(`${url}/storage/v1/object/list/detourage`, { method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: owner, limit: 100, offset: 0 }) });
       if (l.status === 404 || l.status === 400) return n;
       if (!l.ok) return null;
       const items = await l.json();
       if (!Array.isArray(items)) return null;
       const noms = items.map((x) => x && x.name).filter((x) => typeof x === 'string' && x && !x.includes('/') && x !== '.emptyFolderPlaceholder');
       if (!noms.length) return n;
-      const d = await fetch(`${url}/storage/v1/object/detourage`, { method: 'DELETE', headers: { ...sbCle(service), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: noms.map((x) => `${owner}/${x}`) }) });
+      const d = await fetchAvecDelai(`${url}/storage/v1/object/detourage`, { method: 'DELETE', headers: { ...sbCle(service), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: noms.map((x) => `${owner}/${x}`) }) });
       if (!d.ok) return null;
       n += noms.length;
     }
@@ -69,7 +70,7 @@ async function poserFacturesGardees(url, service, owner, n, maintenant) {
   const at = new Date(maintenant).toISOString();
   const jusque = new Date(maintenant + FACTURES_ANS * 365.25 * 864e5).toISOString();
   try {
-    const r = await fetch(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id: idFacturesGardees(owner), data: { owner: String(owner).toLowerCase(), n, depuis: at, jusque }, updated_at: at }]),
@@ -110,7 +111,7 @@ export async function effacerCompte({ url, service, owner, proprio, inv, mainten
   let connexion = false;
   if (!casse) {
     try {
-      const r = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(owner)}`, { method: 'DELETE', headers: sbCle(service) });
+      const r = await fetchAvecDelai(`${url}/auth/v1/admin/users/${encodeURIComponent(owner)}`, { method: 'DELETE', headers: sbCle(service) });
       connexion = r.ok || r.status === 404;           // déjà parti : rejoué, c'est fait
     } catch (_) { connexion = false; }
   }
@@ -135,7 +136,7 @@ export async function purgerFacturesGardees({ url, service, maintenant = Date.no
   if (!service) return { fait: false, raison: 'non-configure' };
   let rows;
   try {
-    const r = await fetch(`${url}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_FACTURES_GARDEES}*&data->>jusque=lt.${encodeURIComponent(new Date(maintenant).toISOString())}&select=id,o:data->>owner&limit=${max}`, { headers: sbCle(service) });
+    const r = await fetchAvecDelai(`${url}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_FACTURES_GARDEES}*&data->>jusque=lt.${encodeURIComponent(new Date(maintenant).toISOString())}&select=id,o:data->>owner&limit=${max}`, { headers: sbCle(service) });
     if (!r.ok) return { fait: false, raison: 'lecture' };
     rows = await r.json();
     if (!Array.isArray(rows)) return { fait: false, raison: 'lecture' };

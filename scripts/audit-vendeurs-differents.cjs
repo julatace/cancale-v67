@@ -40,7 +40,7 @@ async function importer(dir, nom) { return import(path.join(dir, nom + '.mjs'));
 
 async function controles(T, ok) {
   // ── A ────────────────────────────────────────────────────────────────────
-  const dir = await charger({ 'profilVendeur.js': T.profil, 'verifAnnonce.js': T.verif, 'navigateurExtension.js': T.nav, 'navigateursServis.js': T.servis, 'numeroEcrit.js': lire('src/numeroEcrit.js') });   // (11 nov., 5.355) verifAnnonce.js importe numeroEcrit.js
+  const dir = await charger({ 'profilVendeur.js': T.profil, 'verifAnnonce.js': T.verif, 'navigateurExtension.js': T.nav, 'navigateursServis.js': T.servis, 'numeroEcrit.js': lire('src/numeroEcrit.js'), 'messageSur.js': lire('src/messageSur.js') });   /* (12 nov.) verifAnnonce.js importe messageSur.js */   // (11 nov., 5.355) verifAnnonce.js importe numeroEcrit.js
   let P = null, V = null, N = null;
   try { P = await importer(dir, 'profilVendeur'); } catch (e) { ok(false, 'A0 src/profilVendeur.js se charge', e.message); }
   try { V = await importer(dir, 'verifAnnonce'); } catch (e) { ok(false, 'C0 src/verifAnnonce.js se charge', e.message); }

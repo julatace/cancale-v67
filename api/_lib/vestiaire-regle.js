@@ -44,8 +44,9 @@ export const VC_VENTE_ETAPES = [
   ['annulee', /cancel|annul|refund|rembours|return|retour|litige|dispute/i, 'Annulée ou retournée'],
   ['versee', /payout|paid.?out|vers[ée]|virement|transferred|credited|cr[ée]dit/i, 'Argent versé'],
   ['terminee', /complet|finali|termin|closed|done|clotur/i, 'Terminée'],
-  ['livree', /deliver|livr|received|re[cç]u/i, 'Livrée à l’acheteur'],
-  ['controle', /authenti|control|inspect|verif|expertis|check|quality/i, 'Contrôle par Vestiaire'],
+  // (11 nov.) « Paiement reçu » (payée par l'acheteur) n'est PAS « livrée » ; « checkout » n'est pas un contrôle.
+  ['livree', /deliver|livr[ée]|^(?!.*(?:paiement |payment |paid )(?:received|re[cç]u)\b)(?=.*\b(?:received|re[cç]u)\b(?!.*paiement))/i, 'Livrée à l’acheteur'],   // (12 nov.) sans lookbehind : Safari < 16.4 refusait tout le fichier (audit-safari)
+  ['controle', /authenti|control|inspect|verif|expertis|quality|\bcheck(?!out)/i, 'Contrôle par Vestiaire'],
   ['en-route', /ship|sent|transit|exp[ée]di|envoy|on.?the.?way|in.?delivery|dispatch/i, 'Envoyée'],
 ];
 // L'étape nommée par le mot, ou '' (aucun mot, ou un mot qu'aucune étape ne nomme).
@@ -96,13 +97,33 @@ export const numVcAnnonce = (id, it, liens, auto) => cleNum((id != null && objet
 // net vendeur…). « price », « amount », « total » seuls ne le disent pas.
 // (2 nov.) `vousGagnez` : « Vous gagnez » de l'email de vente Vestiaire
 // (api/_lib/vestiaire-email.js) — la même valeur que `sellerEarning`, mesurée.
-export const CLE_RECU_VC = /payout|earning|vous.?gagnez|net.?(amount|price|seller|vendeur)|seller.?(amount|net|payout|revenue|earning|price)|amount.?to.?(seller|receive|pay)|you.?(get|receive|earn)|to.?receive|versement|vers[ée]|gain/i;
+// (11 nov.) ni `sellerPrice` (le PRIX DE VENTE, avant commission — §8 vcprixvente) ni `sellerAmount` : ils ne disent pas « versé ».
+export const CLE_RECU_VC = /payout|earning|vous.?gagnez|net.?(amount|price|seller|vendeur)|seller.?(net|payout|revenue|earning)|amount.?to.?(seller|receive|pay)|you.?(get|receive|earn)|to.?receive|versement|vers[ée]|gain/i;
 export function montantRecuVc(v) {
   const m = v && objet(v.montant);
   if (!m || typeof m.valeur !== 'number' || !isFinite(m.valeur) || m.valeur < 0) return { eur: null, raison: 'montant pas lu' };
   if (!CLE_RECU_VC.test(String(m.cle || ''))) return { eur: null, raison: 'montant pas sûr' };
   if (String(m.devise || '').toUpperCase() !== 'EUR') return { eur: null, raison: m.devise ? 'autre devise' : 'devise non dite' };
   return { eur: Math.round(m.valeur * 100) / 100, raison: '' };
+}
+// (11 nov. soir, Julien : « sur Vestiaire Collective, je veux voir les frais que la plateforme
+// prend ») LES FRAIS VESTIAIRE D'UNE VENTE, LUS, jamais devinés : prix de vente affiché
+// (`prixVente`, clé `sellerPrice`, extension 5.340/5.364) − ce que Vestiaire te verse
+// (`montant`, clé `sellerEarning`, `montantRecuVc`). Les DEUX lus en euros, sous ces clés-là,
+// et prix ≥ versé ; sinon `{ lu:false, raison }` (« frais pas lus » à l'écran, jamais 0).
+// Centimes entiers : aucun arrondi flottant. Exécuté par scripts/audit-frais-vestiaire.cjs.
+export function fraisVc(v) {
+  const pv = v && objet(v.prixVente);
+  const m = v && objet(v.montant);
+  if (!pv || typeof pv.valeur !== 'number' || !isFinite(pv.valeur) || pv.valeur <= 0) return { lu: false, raison: 'prix de vente pas lu' };
+  if (String(pv.cle || '') !== 'sellerPrice' || String(pv.devise || '').toUpperCase() !== 'EUR') return { lu: false, raison: 'prix de vente pas sûr' };
+  const recu = montantRecuVc(v);
+  if (recu.eur == null) return { lu: false, raison: recu.raison };
+  if (!/earning/i.test(String((m && m.cle) || ''))) return { lu: false, raison: 'montant versé pas sûr' };
+  const cPrix = Math.round(pv.valeur * 100), cVerse = Math.round(recu.eur * 100);
+  if (cVerse > cPrix) return { lu: false, raison: 'versé plus haut que le prix' };
+  const cFrais = cPrix - cVerse;
+  return { lu: true, raison: '', cPrix, cVerse, cFrais, prix: cPrix / 100, verse: cVerse / 100, frais: cFrais / 100, pct: Math.round(cFrais * 1000 / cPrix) / 10 };
 }
 // La date de versement : seulement une clé qui la PORTE (jamais la date de la
 // vente, jamais l'heure de lecture). 0 = pas su.

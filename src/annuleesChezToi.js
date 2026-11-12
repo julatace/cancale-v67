@@ -1,3 +1,6 @@
+// (11 nov., famille « N° par cleNum ») l'identité d'un N° : la règle `cleNum` (api/_lib/numerotation.js),
+// recopiée ici car des audits chargent ce module SEUL ; scripts/audit-numeros-clenum.cjs vérifie qu'elle rend la même chose.
+const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; };
 // ═══════════════════════════════════════════════════════════════════════════
 // REMETTRE EN VENTE UNE VENTE ANNULÉE AVANT L'ENVOI (6 nov., vague 2 · point 1)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -50,7 +53,7 @@ export function etatRemise(suivi, { num = '', reprenable = null, numeros = null,
   if (!suivi.nouvelId) return 'en-cours';
   const ok = typeof reprenable === 'function' ? reprenable : (n) => !!String(n || '').trim();
   if (!String(num || '').trim() || !ok(num)) return 'fait';
-  const k = typeof cle === 'function' ? cle : (n) => String(n == null ? '' : n).trim().toUpperCase();
+  const k = typeof cle === 'function' ? cle : cleNum;
   const e = numeros && numeros[String(suivi.nouvelId)];
   return e && k(e.numero) === k(num) ? 'fait' : 'en-cours';
 }

@@ -2,13 +2,14 @@ import {createHash} from 'node:crypto';
 import {vendeurExige,jetonDe} from './session.js';
 import {sbCle} from './cle.js';
 import {VIDE,appliquer,Refus} from '../../src/operations/metier.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 const URL_SB=process.env.SUPABASE_URL||'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // Same public anonymous key as the existing session verifier; never a service key.
 const ANON=process.env.SUPABASE_KEY||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 export const ID_OPERATIONS='vrm_operations_v1';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function requete(chemin,headers,options={}){
- const r=await fetch(`${URL_SB}/rest/v1/${chemin}`,{...options,headers:{...headers,'Content-Type':'application/json',...(options.headers||{})},signal:AbortSignal.timeout(12000)});
+ const r=await fetchAvecDelai(`${URL_SB}/rest/v1/${chemin}`,{...options,headers:{...headers,'Content-Type':'application/json',...(options.headers||{})},signal:AbortSignal.timeout(12000)});
  const j=await r.json().catch(()=>null);return {r,j};
 }
 function projection(d,membre){return membre?{version:d.version,revision:d.revision,missions:d.missions.filter(x=>x.attribution===membre).map(x=>({id:x.id,titre:x.titre,consigne:x.consigne,categorie:x.categorie,echeance:x.echeance,etat:x.etat,etapes:x.etapes,compteRendu:x.compteRendu,evenements:x.evenements||[]})),journal:[]}:d;}

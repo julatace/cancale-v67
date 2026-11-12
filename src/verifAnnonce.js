@@ -26,6 +26,7 @@
 //   Vestiaire : aucune limite connue ⇒ pas jugé.
 import { lireNumeroTexte, lectureRecue, cleNumero } from './numeroEcrit.js';
 import { motsVendeur } from './profilVendeur.js';
+import { risquesAnnonce, phraseRisqueAnnonce, GESTE_ANNONCE } from './messageSur.js';
 export const TITRE_MAX = { lbc: 50, ebay: 80, vinted: 100 };
 export const PHOTOS_MIN = 3;
 export const SITES_VERIF = { lbc: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire', vinted: 'Vinted' };
@@ -172,6 +173,13 @@ export function problemesAnnonce(a, site) {
     if (x.couleur !== undefined && x.couleur !== null && vide(x.couleur)) pose('couleur', 'Couleur absente');
     if (x.etat !== undefined && x.etat !== null && vide(x.etat)) pose('etat', 'État absent');
   }
+  // (12 nov., sécurité des comptes) LES MOTS QUI FONT SUPPRIMER L'ANNONCE (src/messageSur.js) :
+  // contrefaçon (réplica, 1:1, « type Nike »…), coordonnées, paiement hors plateforme — sur
+  // le titre et la description qui PARTIRONT (seulement ce qui est su). En tête, ambre, jamais
+  // bloquant, jamais coupable (`motsRisque` n'est pas dans NOMS_ALERTES).
+  const aLire = [x.titre, x.description].filter((v) => typeof v === 'string').join('\n');
+  const mots = aLire ? risquesAnnonce(aLire, site) : [];
+  if (mots.length) out.unshift(...mots.map((r) => ({ code: 'motsRisque', sorte: r.code, texte: r.texte, geste: GESTE_ANNONCE, pourquoi: phraseRisqueAnnonce(site === 'lbc' ? 'leboncoin' : site), ambre: true })));
   return out;
 }
 

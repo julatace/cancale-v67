@@ -28,6 +28,13 @@
       "schedule": "0 18 * * *"
     }
   ],
+  "redirects": [
+    {
+      "source": "/r/:code([A-Za-z0-9]{8})",
+      "destination": "/?parrain=:code",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/ebay-callback",

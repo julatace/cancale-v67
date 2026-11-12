@@ -1,5 +1,6 @@
 import {decoderEntitesHtml} from '../api/_lib/entites-html.js';
 import {erreurVariablesFavori} from './favorisMessage.js';
+import {erreurMessageAuto} from './messageSur.js';
 
 const texte = v => typeof v === 'string' ? decoderEntitesHtml(v.replace(/<[^>]*>/g,' ')).replace(/\s+/g,' ').trim().slice(0,2000) : '';
 export function preparerMessageFavori(message,pourcentage='') {
@@ -11,6 +12,10 @@ export function preparerMessageFavori(message,pourcentage='') {
   // ajoutée au texte — la VRAIE offre Vinted apparaît dans la conversation.
   if(base.length>2000)return {message:'',pourcentage:p,erreur:'Raccourcis ton message : il doit tenir en 2 000 caractères.'};
   const ev=erreurVariablesFavori(base);if(ev)return {message:'',pourcentage:p,erreur:ev};
+  // (12 nov., sécurité des comptes) Un message aux favoris part sans relecture, un par
+  // personne : un mot qui fait bannir (numéro, PayPal, « hors Vinted »… src/messageSur.js)
+  // ⇒ jamais envoyé — dit dans l'éditeur à la saisie, refusé au serveur (file et mode auto).
+  const er=erreurMessageAuto(base,'vinted');if(er)return {message:'',pourcentage:p,erreur:er};
   return {message:base,pourcentage:p,erreur:''};
 }
 export function lienFavoriVinted(v,domain='www.vinted.fr') {

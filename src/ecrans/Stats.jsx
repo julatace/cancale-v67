@@ -8,7 +8,7 @@ import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBr
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
-import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc } from '../../api/_lib/vestiaire-regle.js';
+import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc, fraisVc } from '../../api/_lib/vestiaire-regle.js';
 import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
@@ -16,7 +16,7 @@ import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/c
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte } from '../App.jsx';
+import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -26,6 +26,7 @@ import { texteValeurStock } from '../coutVente.js';
 import {comparerDeuxMois,ymEnFace,bornesMois} from '../comparerMois.js';
 import { estLot as estLotAchat, nombreLot } from '../achatsSourcing.js';   // (11 nov., C5) la règle des lots de l'écran Achats
 import '../styles-mois-boucle.css';
+import { PrevisionMoisCarte, CoutPlateformes } from '../ArgentPlus.jsx';
 import {fraisParPlateforme,texteCouverture} from '../fraisPlateformes.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
@@ -47,6 +48,9 @@ import '../stats-categories.css';
 import { resumePeriode, margeConnue, meilleuresVentes, ageDuStock, venduEtRecu, MIN_DONNEES, recordsDe, colonneCompte } from '../statsPlus.js';   // (11 nov., lot stats-plus)
 import '../stats-plus.css';
 import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categoriesLecture.js';   // (11 nov., lot rapport-mois) lectures partagées
+import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
+import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
+import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 
 // ⟦← App.jsx #6⟧
 // « Annonces en ligne » : UNE règle d'écriture pour chaque écran qui la montre
@@ -119,7 +123,10 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
   const n=mois.length;
   if(!n)return null;
   const H=compact?124:Math.max(hauteur,196), left=18,right=18,top=14,bottom=28;
-  const vals=mois.map(m=>Math.max(0,Number(valeur(m))||0));
+  // (11 nov., famille « pas su ≠ 0 ») un mois au chiffre pas su : aucune barre, « — » (jamais 0 €).
+  const brut=mois.map(m=>valeurSue(valeur(m)));
+  const vals=brut.map(v=>v==null?0:Math.max(0,v));
+  const ecrire=i=>brut[i]==null?'—':format(vals[i]);
   const max=Math.max(1,...vals),base=H-bottom;
   const col=(W-left-right)/n;
   const X=i=>left+(i+.5)*col;
@@ -134,11 +141,11 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
   const choisir=(m,i)=>{setLecture(cleDe(m));if(onChoisir)onChoisir(i===externe?null:cleDe(m));};
   return <div ref={ref} className="vrm-chart-months" style={{width:'100%',minWidth:0}}>
     <svg {...{[attr]:''}} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group"
-      aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${format(vals[i])}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
+      aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${ecrire(i)}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
       <defs><linearGradient id={`area${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent} stopOpacity=".20"/><stop offset="1" stopColor={C.accent} stopOpacity=".01"/></linearGradient><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
       {[0,.5,1].map(f=><line key={f} x1={left} x2={W-right} y1={Y(max*f)} y2={Y(max*f)} stroke={C.border} strokeWidth="1" strokeDasharray={f?'3 5':undefined}/>)}
       {presentation==='ligne'&&<g aria-hidden="true" pointerEvents="none"><path d={`M ${X(0)} ${base} L ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')} L ${X(n-1)} ${base} Z`} fill={`url(#area${uid})`}/><path d={`M ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')}`} fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/></g>}
-      {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${format(vals[i])}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
+      {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${ecrire(i)}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={brut[i]==null?'':Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
         <title>{label}</title>
         {actif&&presentation!=='ligne'&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
         <rect x={X(i)-col/2} y="0" width={col} height={H} fill="transparent"/>
@@ -146,8 +153,8 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
         {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
       </g>;})}
     </svg>
-    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{format(vals[lu])}</strong></div>}
-    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{format(vals[lu-1])}</strong></div>}
+    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{ecrire(lu)}</strong></div>}
+    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{ecrire(lu-1)}</strong></div>}
   </div>;
 }
 // ⟦← App.jsx #11⟧
@@ -165,8 +172,9 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
     const db=(type==='encaisse'?b.receiveDate:b.saleDate)||'';
     return db.localeCompare(da);
   });
-  const totalCA=ventes.reduce((s,v)=>s+(+v.sellPrice||0),0);
-  const totalProfit=ventes.reduce((s,v)=>s+((+v.sellPrice||0)-(+v.buyPrice||0)),0);
+  // (11 nov., famille « pas su ≠ 0 ») un achat inconnu ne vaut pas 0 € : bénéfice des ventes au coût connu, « sur N ».
+  const tot=totauxVentesManuelles(ventes);
+  const totalCA=tot.ca, totalProfit=tot.benefice;
   return (
     <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
@@ -175,22 +183,22 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
       </div>
       <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12}}>
         <span style={{color:C.text}}>CA : <b>{fmt(totalCA)}</b></span>
-        <span style={{color:C.accentTexte}}>Bénéfice : <b>{fmt(totalProfit)}</b></span>
+        <span style={{color:C.accentTexte}} data-benefice-mois={totalProfit==null?'':Math.round(totalProfit*100)}>Bénéfice : <b>{totalProfit==null?'—':fmt(totalProfit)}</b>{totalProfit!=null&&tot.nConnus<tot.n?` sur ${tot.nConnus} vente${tot.nConnus>1?'s':''} sur ${tot.n}`:''}</span>
       </div>
       <div style={{maxHeight:260,overflowY:'auto'}}>
         {ventes.map((v,i)=>{
           const nom=catName[v.productId]||(v.productId?(motsVendeur().Nom+' '+v.productId):'—');
           const dateAff=(type==='encaisse'?v.receiveDate:v.saleDate)||'';
-          const benef=(+v.sellPrice||0)-(+v.buyPrice||0);
+          const benef=beneficeVenteManuelle(v);
           return (
-            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+            <div key={v.id||i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{color:C.text,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
                 <div style={{color:C.muted,fontSize:11}}>{dateAff}{v.productId?` · n°${v.productId}`:''}</div>
               </div>
               <div style={{textAlign:'right',marginLeft:10}}>
-                <div style={{color:C.text,fontWeight:500}}>{fmt(+v.sellPrice||0)}</div>
-                <div style={{color:benef>=0?C.accent:C.warn,fontSize:11}}>{benef>=0?'+':''}{fmt(benef)}</div>
+                <div style={{color:C.text,fontWeight:500}}>{fmt(valeurSue(v.sellPrice))}</div>
+                <div style={{color:C.muted,fontSize:11}}>{benef==null?'—':`${benef>=0?'+':''}${fmt(benef)}`}</div>
               </div>
             </div>
           );
@@ -661,13 +669,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
       <div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
+      {/* (11 nov., agent2-argent-parrainage) « Fin de novembre, à ce rythme » : le vendu prouvé du mois prolongé (src/previsionMois.js). */}
+      <PrevisionMoisCarte liveStats={liveStats} onSaisirPrix={versSaisiePrix}/>
       {/* (8 nov., « beauté ») Le vendu par semaine façon Santé : les 12 semaines de `rythmeVendu`
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
       {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine) : un lien, rien de recalculé ici. */}
       {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>Ma semaine <span aria-hidden="true">›</span></button> : null}
       <ComparerMoisCarte liveStats={liveStats} panelOff={panelOff}/>
-      <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
+      {/* (11 nov., agent2-argent-parrainage) « Frais par site » sur la période OU mois par mois, une vue à la fois (src/ArgentPlus.jsx). */}
+      <CoutSitesCarte periode={periodeStats} ebayCommandes={ebayCommandes} parPeriode={<FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -1085,7 +1096,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct}\u00a0%)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
               ); })()}
             </div>
-            <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
+            <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{ecrireLocal('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -1104,7 +1115,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
             </div>
-            <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
+            <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{ecrireLocal('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -2318,13 +2329,24 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
 // (`vrm_stats_ventes`, frais saisis sur les fiches), les commandes eBay
 // (`totalMarketplaceFee`), les packs et options de Comptabilité. La couverture
 // est dite là où le site a une commission à lire.
+// (11 nov., agent2-argent-parrainage) La même carte, ou mois par mois côte à côte (src/coutPlateformes.js) :
+// le relevé de Ventes, les Dépenses (packs, abonnements) et les commandes eBay arrivent en props.
+function CoutSitesCarte({ periode, ebayCommandes, parPeriode }) {
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const excluAutre = useExcluAutre();
+  const R = React.useMemo(() => ({ commandeEbayEngagee }), []);
+  const chargeAbo = React.useCallback((a, ym) => chargeAbonnement(a, (m) => m === ym, ym), []);
+  return <CoutPlateformes parPeriode={parPeriode} releve={releve ? releve.l : null} ebay={Array.isArray(ebayCommandes) ? ebayCommandes : null}
+    compta={compta} excluAutre={excluAutre} R={R} chargeAbo={chargeAbo} Segmente={Segmente}/>;
+}
 const lireReleveFrais = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
-function FraisParSiteCarte({ periode, ebayCommandes }) {
+function FraisParSiteCarte({ periode, ebayCommandes, ventesVc }) {
   const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const excluAutre = useExcluAutre();
   const b = bornesPeriode(periode, Date.now());
-  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee } });
+  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee, fraisVc }, vestiaire: Array.isArray(ventesVc) ? ventesVc : null });   // (11 nov. soir) + les frais Vestiaire LUS
   if (!F.sites.length) return null;
   // (6 nov.) Aucun site lu : une ligne, pas trois rangées de « pas lu — — » (moins de cartes,
   // celles qui servent). Le geste qui la remplit est dit.

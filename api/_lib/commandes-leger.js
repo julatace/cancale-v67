@@ -33,8 +33,9 @@
 //     temps : comparer-et-échanger sur `data.rev` et `data.capturedAt` (une
 //     extension ancienne qui réécrit la ligne fait échouer l'échange ⇒ relu) ;
 //   · AU NOM du vendeur (son jeton, RLS) : jamais la clé de service.
+import { prendreDebit, refuserTropVite } from './debit-vendeur.js';
 import { cleTxCommande, fusionnerCommandes, lectureDuHaut, empreinteCommande } from '../../src/commandesFusion.js';
-import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur, baseCloisonnee } from './session.js';
+import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur, baseCloisonnee, rpcCommeVendeur } from './session.js';
 
 export const FENETRE_MAX = 5000;          // commandes décrites dans un envoi (Vinted : 2 000 lues au plus)
 export const COMMANDES_PAR_ENVOI_MAX = 400; // commandes ENTIÈRES dans un envoi (≈ 180 Ko)
@@ -147,6 +148,53 @@ export function appliquerEnvoi(avant, envoi, maintenant = Date.now()) {
 
 const SEL_AVANT = 'cap:data->>capturedAt,rev:data->>rev,pg:data->payload->pagination,mo:data->payload->my_orders,resume:data->resume';
 
+// ── (11 nov., M72 de la revue serveur, migration 042) LE SQUELETTE ─────────────
+// Avant : chaque envoi léger relisait les 2 000 commandes ENTIÈRES (≈ 0,7 Mo) et
+// les réécrivait toutes. Avec la 042 : la base rend, pour chaque commande rangée,
+// son n° et sa date (`sq`), et ENTIÈRES les seules commandes de la fenêtre que
+// l'extension n'a pas fournies (`mo` : leur empreinte est à comparer). Les autres
+// restent des TENANT-LIEU (`{ transaction_id, date }`) que la fusion déplace sans
+// les ouvrir ; à l'écriture, un tenant-lieu redevient SA POSITION dans la ligne
+// rangée et la base recompose la liste (`vrm_commandes_ecrire`, sous la condition
+// `rev` + `capturedAt`). La règle de fusion est la MÊME fonction qu'avant
+// (`appliquerEnvoi`) : la ligne écrite est identique (scripts/audit-serveur-migrations.cjs
+// la compare au chemin d'avant, dans un vrai Postgres).
+// 404 (042 pas passée) ⇒ le chemin d'avant, inchangé.
+export function avantDepuisSquelette(lu) {
+  if (!lu || typeof lu !== 'object' || !Array.isArray(lu.sq)) return null;
+  const mo = lu.mo && typeof lu.mo === 'object' && !Array.isArray(lu.mo) ? lu.mo : {};
+  const positions = new Map(), pris = new Set();
+  const my_orders = lu.sq.map((s, i) => {
+    const tx = Array.isArray(s) && s[0] != null ? String(s[0]) : null;
+    let o;
+    if (tx != null && !pris.has(tx) && Object.prototype.hasOwnProperty.call(mo, tx) && mo[tx] && typeof mo[tx] === 'object') { o = mo[tx]; pris.add(tx); }
+    else { o = { transaction_id: tx }; if (Array.isArray(s) && typeof s[1] === 'string') o.date = s[1]; }
+    positions.set(o, i);
+    return o;
+  });
+  const avant = { cap: lu.cap == null ? null : String(lu.cap), rev: lu.rev == null ? null : String(lu.rev), pagination: lu.pg || null, my_orders, resume: lu.resume || null };
+  return { avant, positions };
+}
+// La liste fusionnée ⇒ { ordre, commandes } : une POSITION (commande déjà rangée,
+// tenant-lieu compris) ou le n° d'une commande fournie. `null` si une commande
+// neuve n'a pas de n° unique (ne doit pas arriver : on reprend le chemin d'avant).
+export function ordreDEcriture(liste, positions) {
+  const ordre = [], commandes = {};
+  for (const o of liste) {
+    if (positions.has(o)) { ordre.push(positions.get(o)); continue; }
+    const k = cleTxCommande(o);
+    if (!k || Object.prototype.hasOwnProperty.call(commandes, k)) return null;
+    commandes[k] = o; ordre.push(k);
+  }
+  return { ordre, commandes };
+}
+// Les n° de la fenêtre que l'extension n'a pas fournis : leur copie rangée est à comparer.
+export const txAFournir = (envoi) => {
+  const fen = lireFenetre(envoi && envoi.fenetre) || [];
+  const fournies = new Set((Array.isArray(envoi && envoi.commandes) ? envoi.commandes : []).map(cleTxCommande).filter(Boolean));
+  return fen.map(([k]) => k).filter((k) => !fournies.has(k));
+};
+
 // POST /api/compte?mode=commandes — corps : l'envoi (voir `appliquerEnvoi`).
 // Réponses : 200 { ok, ecrit, complet, manquants, n } · 400 envoi illisible ·
 // 401 session · 503 base injoignable (RIEN écrit) · 409 deux écritures en même
@@ -155,23 +203,46 @@ export async function routeCommandes(req, res, { maintenant = () => Date.now() }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, erreur: 'POST seulement' });
   const u = await vendeurExige(req, res);
   if (!u) return;
+  // (11 nov., limites-client) Un débit PAR VENDEUR (l'extension prend un 429 comme « rien rangé, au prochain passage »).
+  { const d = prendreDebit('commandes', u.id); if (!d.ok) return refuserTropVite(res, d); }
   const envoi = req.body;
   if (!envoi || typeof envoi !== 'object' || !TYPES.has(envoi.type) || !/^\d{1,20}$/.test(String(envoi.uid || ''))) return res.status(400).json({ ok: false, erreur: 'envoi' });
   const rowId = `harvest_${envoi.uid}_${envoi.type}`;
   const cloison = await baseCloisonnee();
   const proprio = cloison ? `&owner=eq.${encodeURIComponent(u.id)}` : '';
+  const pOwner = cloison ? u.id : null;
+  let squelette = true;                // faux dès que la base dit « fonction inconnue » (042 pas passée)
   for (let tour = 0; tour < 2; tour++) {
-    const rows = await lireCommeVendeur(req, `app_data?id=eq.${encodeURIComponent(rowId)}${proprio}&select=${SEL_AVANT}`);
-    if (rows === null) return res.status(503).json({ ok: false, erreur: 'base' });   // pas su : rien écrit
-    const r0 = rows[0] || null;
-    const avant = r0 ? { cap: r0.cap || null, rev: r0.rev == null ? null : String(r0.rev), pagination: r0.pg || null, my_orders: Array.isArray(r0.mo) ? r0.mo : [], resume: r0.resume || null } : null;
+    let avant = null, positions = null;
+    if (squelette) {
+      const s = await rpcCommeVendeur(req, 'vrm_commandes_lire', { p_id: rowId, p_owner: pOwner, p_tx: txAFournir(envoi) });
+      if (s === null) return res.status(503).json({ ok: false, erreur: 'base' });   // pas su : rien écrit
+      if (s.absente) squelette = false;
+      else if (s.valeur != null) {
+        const a = avantDepuisSquelette(s.valeur);
+        if (!a) return res.status(503).json({ ok: false, erreur: 'base' });
+        avant = a.avant; positions = a.positions;
+      }
+    }
+    if (!squelette) {
+      const rows = await lireCommeVendeur(req, `app_data?id=eq.${encodeURIComponent(rowId)}${proprio}&select=${SEL_AVANT}`);
+      if (rows === null) return res.status(503).json({ ok: false, erreur: 'base' });   // pas su : rien écrit
+      const r0 = rows[0] || null;
+      avant = r0 ? { cap: r0.cap || null, rev: r0.rev == null ? null : String(r0.rev), pagination: r0.pg || null, my_orders: Array.isArray(r0.mo) ? r0.mo : [], resume: r0.resume || null } : null;
+    }
     const t = maintenant();
     const r = appliquerEnvoi(avant, envoi, t);
     if (r.erreur) return res.status(400).json({ ok: false, erreur: r.erreur });
     if (!r.ecrit) return res.status(200).json({ ok: true, ecrit: false, complet: false, manquants: r.manquants, n: avant ? avant.my_orders.length : 0 });
     const quand = new Date(t).toISOString();
     let n;
-    if (avant) {
+    if (avant && positions) {
+      const o = ordreDEcriture(r.data.payload.my_orders, positions);
+      if (!o) { squelette = false; tour--; continue; }
+      const data = { ...r.data, payload: { ...r.data.payload, my_orders: [] } };
+      const w = await rpcCommeVendeur(req, 'vrm_commandes_ecrire', { p_id: rowId, p_owner: pOwner, p_rev: avant.rev, p_cap: avant.cap, p_ordre: o.ordre, p_commandes: o.commandes, p_data: data });
+      n = w && !w.absente && Number.isInteger(w.valeur) ? w.valeur : null;
+    } else if (avant) {
       const cas = `&${avant.rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(avant.rev)}`}&${avant.cap == null ? 'data->>capturedAt=is.null' : `data->>capturedAt=eq.${encodeURIComponent(avant.cap)}`}`;
       n = await modifierCommeVendeur(req, `app_data?id=eq.${encodeURIComponent(rowId)}${proprio}${cas}&select=id`, { data: r.data, updated_at: quand });
     } else {

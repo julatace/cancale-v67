@@ -136,12 +136,16 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     ? ok('mise en ligne : le numéro est écrit par ID d\'annonce', 'pas par titre')
     : nok('mise en ligne : le numéro est écrit par ID d\'annonce');
 
-  // AUTO-RETRAIT d'une annonce en ligne d'après un email de vente : c'est le
-  // SEUL chemin qui utilise encore titre+taille (un email ne porte pas d'id).
-  // Il DOIT refuser dès que deux paires partagent la clé.
-  /ambiguousKey\.has\(k\)\) continue;/.test(SRC)
-    ? ok('auto-retrait d\'une annonce (email) : refuse titre+taille en double')
-    : nok('auto-retrait d\'une annonce (email) : refuse titre+taille en double');
+  // AUTO-RETRAIT d'une annonce en ligne d'après un email de vente. (11 nov., revue
+  // robustesse) Plus aucun titre+taille : l'e-mail porte sa transaction → l'annonce
+  // que Vinted lui rattache, ou un bordereau relié par identité
+  // (src/venduesParEmail.js, exécuté par audit-robustesse-metier B).
+  {
+    const regle = (() => { try { return fs.readFileSync(path.join(__dirname, '..', 'src', 'venduesParEmail.js'), 'utf8').replace(/\/\/[^\n]*/g, ''); } catch (_) { return ''; } })();
+    /emailSoldIds = useMemo\(\(\) => venduesParEmail\(/.test(SRC) && !/ambiguousKey|normTitle\(t\) \+ '\|'/.test(SRC) && regle && !/title|designation|article/.test(regle)
+      ? ok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)')
+      : nok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)');
+  }
 
   // BORDEREAU ↔ annonce : PAR IDENTITÉ (N°, ou transaction → annonce), jamais
   // par titre (3 octobre : le repli par titre est retiré, §5).
@@ -235,7 +239,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 //        sinon taper « 20 » posait d'abord le N°2 sur la paire (et brûlait ce
 //        numéro au passage).
 {
-  /\(porteursNum\[String\(cur\.numero\)\] \|\| \[\]\)\.some\(x => x\.type === 'garage'\)/.test(SRC)
+  /\(porteursNum\[cleNum\(cur\.numero\)\] \|\| \[\]\)\.some\(x => x\.type === 'garage'\)/.test(SRC)   // (11 nov.) la carte est rangée par cleNum
     ? ok('la reprise auto ne touche jamais une paire rangée au garage')
     : nok('la reprise auto ne touche jamais une paire rangée au garage',
           'une paire déjà dans sa boîte peut encore changer de numéro toute seule');
