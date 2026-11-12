@@ -168,6 +168,8 @@ createRoot(document.getElementById('r')).render(<Banc/>);
 `);
   const mutant = MUTANT && MUTATIONS[MUTANT];
   const plugins = mutant ? [{ name: 'mutant', setup(b) { b.onLoad({ filter: new RegExp(mutant[0].replace('.', '\\.') + '$') }, (a) => { const t = fs.readFileSync(a.path, 'utf8'); if (!t.includes(mutant[1])) throw Error('mutation introuvable : ' + MUTANT); return { contents: t.replace(mutant[1], mutant[2]), loader: 'jsx' }; }); } }] : [];
+  // (12 nov.) JaugeActions.jsx importe App.jsx, qui importe un `.sql?raw` (Vite) : lu en texte.
+  plugins.push({ name: 'brut', setup(b) { b.onResolve({ filter: /\?raw$/ }, (a) => ({ path: path.resolve(a.resolveDir, a.path.replace(/\?raw$/, '')), namespace: 'brut' })); b.onLoad({ filter: /.*/, namespace: 'brut' }, (a) => ({ contents: fs.readFileSync(a.path, 'utf8'), loader: 'text' })); } });
   await esbuild.build({ entryPoints: [path.join(dir, 'entree.jsx')], bundle: true, outdir: path.join(dir, 'out'), format: 'esm', jsx: 'automatic', plugins, loader: { '.js': 'jsx', '.woff2': 'empty', '.woff': 'empty', '.png': 'empty', '.svg': 'empty', '.jpg': 'empty' }, nodePaths: [NM], logLevel: 'error', define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{"MODE":"production","PROD":true,"DEV":false}' }, external: ['/fonts/*', '/images/*', '/textures/*'] });
   fs.writeFileSync(path.join(dir, 'out', 'index.html'), '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/entree.css"></head><body><div id="r"></div><script type="module" src="/entree.js"></script></body></html>');
   return path.join(dir, 'out');
