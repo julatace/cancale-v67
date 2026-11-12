@@ -3876,7 +3876,7 @@ function NumeroEcritSetting({ onAnnonces }) {
         </div>
         {a === undefined && <div role="status" style={{fontSize:13,color:C.muted,marginTop:4}}>Lecture…</div>}
         {a === null && (cle === 'vinted'
-          ? <div data-numero-ecrit-passu="vinted" style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>Pas encore lu : ouvre tes annonces une fois, VRM les lira. {onAnnonces && <button type="button" className="vrm-lien-action" data-numero-ecrit-ouvrir-annonces="" onClick={onAnnonces}>Ouvrir mes annonces</button>}</div>
+          ? <div data-numero-ecrit-passu="vinted" style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>Pas encore lu : ouvre tes annonces une fois, VRM les lira. {onAnnonces && <button type="button" className="vrm-lien-action" data-numero-ecrit-ouvrir-annonces="" onClick={onAnnonces} style={{display:'flex',alignItems:'center',minHeight:44,margin:0,padding:0,border:0,background:'transparent',font:'inherit',fontWeight:600,cursor:'pointer'}}>Ouvrir mes annonces</button>}</div>
           : <div data-numero-ecrit-passu={cle} style={{fontSize:13,color:C.muted,marginTop:4}}>— tes annonces n’ont pas pu être lues.</div>)}
         {z && z.total === 0 && <div style={{fontSize:13,color:C.muted,marginTop:4}}>Aucune annonce en ligne lue.</div>}
         {z && z.total > 0 && (

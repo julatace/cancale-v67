@@ -402,7 +402,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
             placeholder="Numéro... puis Entrée"
             style={{flex:1,minWidth:120}}/>
-          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
         </div>
         {['all','stock','vendu'].map(f=>(
@@ -667,7 +667,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
           placeholder="Article, date... puis Entrée"
           style={{maxWidth:280,flex:1,minWidth:160}}/>
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -1055,7 +1055,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
       </div>
       {search&&<div style={{fontSize:12,color:C.warn}}>
@@ -1081,25 +1081,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       
       {/* Tableau factures */}
       <Card style={{padding:0,overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
-          <thead>
-            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
-                développeur — « Aucune facture en attente » ne se rattrape
-                nulle part). D'où l'origine des lignes, et la porte : le même
-                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
-                constate le vide. */}
-            {list.length===0&&<tr><td colSpan={7} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
+        {/* (12 nov., finitions) Le vide se dit HORS du tableau : dans un tableau de 700 px, sur
+            téléphone, la phrase et « + Nouvelle facture » étaient coupés au bord de la carte. */}
+        {list.length===0 ? <div data-factures-vide={zone} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
               {search.trim()
                 ? <>Aucune facture trouvée pour « {search} ».</>
                 : zone==='attente'
@@ -1118,12 +1102,31 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   : <>Aucune facture comptabilisée.<br/>
                       <span style={{fontSize:12}}>Une facture arrive ici quand tu la marques comptabilisée.</span>
                     </>}
-            </td></tr>}
+
+        </div> :
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
+          <thead>
+            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
+                développeur — « Aucune facture en attente » ne se rattrape
+                nulle part). D'où l'origine des lignes, et la porte : le même
+                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
+                constate le vide. */}
             {list.map(inv=>{
               const isAccounted=accountedSet.has(String(inv.productId).trim());
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:'8px',color:C.warn,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
+                  <td style={{padding:'8px',color:C.text,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
                   <td style={{padding:'8px',color:C.accentTexte,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
@@ -1138,7 +1141,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               );
             })}
           </tbody>
-        </table>
+        </table>}
       </Card>
       
       {/* Pagination */}

@@ -1519,7 +1519,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   },[stockVinted,search]);
 
   return (
-    <div>
+    <div style={{padding:16}}>
       <ScreenHead icon="tag" title={`Stock Vinted (${stockVinted.length})`}
         desc="L'ancienne liste des numéros en ligne."
         right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:12,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
