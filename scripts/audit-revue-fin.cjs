@@ -12,7 +12,8 @@
 //   S-B113 détourage : panne de connexion = 503, pas 401 ;
 //   S-B137 sonde du cloisonnement : une panne n'est pas resondée à chaque requête ;
 //   S-B114/B135/B138/B143 : sur le code.
-//   A-*    les règles de l'app (voir plus bas).
+//   A1-A4  l'app : valeur du stock sans « 0 € », facture sans prix refusée, case de carte partielle
+//          « au moins », App.jsx recollé lisible d'un bloc.
 //  `node scripts/audit-revue-fin.cjs [--prouve]`
 //  `--prouve` : ROUGE sur la branche de départ (git archive DEPART) et sur chaque mutation.
 // ════════════════════════════════════════════════════════════════════════════
@@ -33,12 +34,15 @@ const MUTATIONS = {
   'M92 lecture par vendeur': [['api/_lib/relances-essai.js', "  const enLot = await lireLignesEnLot(essais.filter((a) => a && a.statut === 'trialing').map((a) => String(a.owner || '').toLowerCase()));", '  const enLot = null;']],
   'B113 panne = 401': [['api/_lib/detourage.js', "  if (u === undefined) { res.status(503).json({ ok: false, reason: 'auth-pas-su' }); return; }   // (12 nov., B113)\n", '']],
   'B137 sonde à chaque requête': [['api/_lib/session.js', '  if (Date.now() < _sondeEnPanneJusqua) return true;\n', '']],
+  'A pas su : facture à 0 €': [['src/App.jsx', "  if (v == null || !(v > 0)) throw new Error('prix de vente pas lu — aucune facture');", '  if (v == null) return 0;']],
+  'A pas su : stock affiché à 0 €': [['src/App.jsx', '    if (a != null) { affiche += a; marcheAffiche += m; }', '    affiche += (a || 0); marcheAffiche += m;']],
+  'A case partielle muette': [['src/design/carteChiffres.js', "x.partiel ? 'au moins' : '';", "'';"]],
   'B143 mentions avalées': [['api/_lib/clients-partis.js', "    if (!mentionsOk) { ign('mentions pas lues : rien envoye'); continue; }\n", '']],
 };
 
 if (process.argv.includes('--prouve')) {
   const t = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-revue-fin-'));
-  cp.execSync(`git -C "${ICI}" archive ${DEPART} api src package.json | tar -x -C "${t}"`);
+  cp.execSync(`git -C "${ICI}" archive ${DEPART} api src scripts/_source-app.cjs package.json | tar -x -C "${t}"`);
   let nm = ICI; while (!fs.existsSync(path.join(nm, 'node_modules')) && path.dirname(nm) !== nm) nm = path.dirname(nm);
   fs.symlinkSync(fs.realpathSync(path.join(nm, 'node_modules')), path.join(t, 'node_modules'));
   const r = cp.spawnSync(process.execPath, [__filename], { env: { ...process.env, AUDIT_RACINE: t }, encoding: 'utf8', timeout: 300000 });
@@ -279,6 +283,54 @@ process.on('exit', (c) => { if (!fini) { console.log('❌ audit-revue-fin : arr�
     const cpa = sansCommentaires(lire('api/_lib/clients-partis.js'));
     dit(/mentionsOk = !!\(m && !m\.erreur\)/.test(cpa) && /if \(!mentionsOk\) \{ ign\(/.test(cpa), 'B143 mentions légales illisibles ⇒ aucun e-mail de départ');
   }
+
+  // ── A · L'APP (règles EXÉCUTÉES, extraites d'App.jsx recollé) ──────────
+  await essaie('A', async () => {
+    const vm = require('vm');
+    // Le recollage de l'arbre jugé (la branche de départ a le sien) ; sinon celui d'ici.
+    const { sourceApp } = require(fs.existsSync(path.join(R, 'scripts', '_source-app.cjs')) ? path.join(R, 'scripts', '_source-app.cjs') : './_source-app.cjs');
+    const APP = sourceApp(R);
+    const extraire = (nom) => {
+      const m = new RegExp(`^(?:export )?(?:async )?function ${nom}\\(|^(?:export )?const ${nom}\\s*=\\s*`, 'm').exec(APP);
+      if (!m) return '';
+      const estFn = /function/.test(m[0]); let prof = 0, vuCorps = false;
+      for (let i = m.index; i < APP.length; i++) {
+        const c = APP[i];
+        if (c === '(' || c === '[' || c === '{') { prof++; if (c === '{') vuCorps = true; }
+        else if (c === ')' || c === ']' || c === '}') { prof--; if (estFn && vuCorps && prof === 0 && c === '}') return APP.slice(m.index, i + 1); }
+        else if (!estFn && c === ';' && prof === 0) return APP.slice(m.index, i + 1);
+      }
+      return '';
+    };
+    const SC = await importer('src/sommeConnue.js');
+    const ctx = { Date, Math, Number, String, Object, Array, JSON, Set, Map, isFinite, isNaN, valeurSue: SC.valeurSue,
+      extractModel: () => 'samba', extractSize: () => '42' };
+    vm.createContext(ctx);
+    for (const n of ['montantCommande', 'montantCommandeLu', 'valoriserStock', 'xmlEsc', 'prixFactureLu', 'factureCII']) {
+      const t = extraire(n); if (!t) continue;
+      try { vm.runInContext(t.replace(/^const /, 'var ') + `\n;this.${n} = ${n};`, ctx); } catch (_) {}
+    }
+    // A1 · la valeur du stock : un prix affiché pas lu n'est pas « 0 € » (comparaison sur les mêmes annonces)
+    if (typeof ctx.valoriserStock === 'function') {
+      const v = ctx.valoriserStock([{ modele: 'samba', taille: '42', med: 80 }], [{ title: 'a', price: { amount: '90', currency_code: 'EUR' } }, { title: 'b', price: null }]);
+      dit(v.reconnu === 2 && v.affiche === 90 && v.marcheAffiche === 80, 'A1 valeur du stock : l’annonce au prix pas lu sort de la comparaison (90 € contre 80 €, pas 90 € contre 160 €)', v);
+    } else dit(false, 'A1 valoriserStock se lit dans App.jsx');
+    // A2 · une facture sans prix lu : AUCUNE facture (jamais 0,00 €)
+    if (typeof ctx.factureCII === 'function') {
+      let xml = null, err = null;
+      try { xml = ctx.factureCII({ sellPrice: null, saleDate: '2026-11-10', number: 'FA-1' }, { siret: '1' }); } catch (e) { err = e; }
+      dit(!!err && xml == null, 'A2 facture électronique sans prix lu : refusée (jamais une facture à 0,00 €)', xml ? String(xml).match(/<ram:GrandTotalAmount>[^<]*/) : err);
+      let ok2 = null; try { ok2 = ctx.factureCII({ sellPrice: '12,50', saleDate: '2026-11-10', number: 'FA-2' }, { siret: '1' }); } catch (e) { ok2 = String(e); }
+      dit(typeof ok2 === 'string' && /12\.50/.test(ok2), 'A2 « 12,50 » est lu (12.50 dans le XML)', String(ok2).slice(0, 80));
+    } else dit(false, 'A2 factureCII se lit dans App.jsx');
+    // A3 · une case de carte partielle le dit sous son libellé
+    const CC = await importer('src/design/carteChiffres.js').catch(() => null);
+    dit(!!CC && CC.raisonCourte({ valeur: 30, partiel: true, manque: ['Leboncoin'] }) === 'au moins' && CC.raisonCourte({ valeur: 30, partiel: false }) === '',
+      'A3 case de carte partielle : « au moins » sous le libellé (complète : rien)', CC && CC.raisonCourte({ valeur: 30, partiel: true }));
+    // A4 · audit-benefice relit App.jsx recollé (MeilleuresSources n'est plus « déclaré deux fois »)
+    let lu = true; try { require(path.join(R, 'node_modules', '@babel', 'parser')).parse(APP, { sourceType: 'module', plugins: ['jsx'], errorRecovery: false }); } catch (e) { lu = String(e.message); }
+    dit(lu === true, 'A4 App.jsx recollé se lit d’un bloc (Babel) — aucun nom déclaré deux fois', lu);
+  });
 
   fini = true;
   console.log(`\n${ko ? '❌' : '✅'} audit-revue-fin : ${ok} vert(s), ${ko} rouge(s)`);
