@@ -107,7 +107,14 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
     await f.ctx.autoAccepterOffres(UID);
     const pv = (f.store.vrmOffresPrevues || {})[String(OFFRE.oid)];
     dit(accepts(f.j) === 0, "délai aléatoire : à la première vue de l'offre, RIEN n'est accepté", `accepts=${accepts(f.j)}`);
-    dit(pv && pv.at - t0 >= 3 * 60000 - 50 && pv.at - t0 <= 20 * 60000 + 1000, "l'acceptation est prévue entre 3 et 20 min plus tard (tiré au hasard)", JSON.stringify(pv));
+    // 5.370 (discrétion, validé par Julien) : la nuit (0 h-7 h, heure de Paris), la fourchette est 30-120 min.
+    const nuitA2 = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(t0)).find((x) => x.type === 'hour').value) < 7;
+    const [mnA2, mxA2] = nuitA2 ? [30, 120] : [3, 20];
+    dit(pv && pv.at - t0 >= mnA2 * 60000 - 50 && pv.at - t0 <= mxA2 * 60000 + 1000, `l'acceptation est prévue entre ${mnA2} et ${mxA2} min plus tard (tiré au hasard${nuitA2 ? ', nuit' : ''})`, JSON.stringify(pv));
+    // Les deux fourchettes, quelle que soit l'heure du banc (midi et 3 h du matin à Paris).
+    const midi = Date.UTC(2026, 10, 12, 11, 0), trois = Date.UTC(2026, 10, 12, 2, 0);
+    const jour = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(midi)), nuit = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(trois));
+    dit(jour.every((d) => d >= 3 * 60000 && d <= 20 * 60000) && nuit.every((d) => d >= 30 * 60000 && d <= 120 * 60000), 'délai : 3-20 min le jour, 30-120 min la nuit (heure de Paris)', JSON.stringify({ jour: [Math.min(...jour), Math.max(...jour)], nuit: [Math.min(...nuit), Math.max(...nuit)] }));
     await f.ctx.offresTick();
     dit(accepts(f.j) === 0, "l'alarme d'1 min ne relance rien tant que l'heure prévue n'est pas passée", `accepts=${accepts(f.j)}`);
     const tires = new Set(); for (let i = 0; i < 40; i++) tires.add(f.ctx.delaiOffreMs());
