@@ -57,3 +57,12 @@
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne > .vrm-rpf-rang { position: relative !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne > .vrm-rpf-rang > .vrm-rpf-qr { position: absolute !important; left: 0 !important; top: 60px !important; margin: 0 !important; z-index: 1; }
 }
+/* Au téléphone, le NOM du point garde toute sa ligne (« Phone C… » était rogné par « 4 colis · 1 code à venir ·
+   Masquer ») ; l'adresse dessous, puis le compte du point (banc colis-retirer-propre, « le nom garde sa ligne »). */
+@media (max-width: 599px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete .vrm-rpf-nom { grid-column: 1 / -1 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete .vrm-rpf-n { grid-row: 3 !important; grid-column: 1 / -1 !important; }
+}
+/* « Argent à vérifier » sous la liste : la liste garde 12 px de marge basse, la section n'ajoute que le reste (28 px
+   d'air entre deux sections, comme partout ; il en mesurait 41 — banc colis-retirer-propre, 20–40 px). */
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-section[data-colis-hote="achats"]:has(.vrm-rpf) [data-colis-retraits] [data-rp-section="argent"] { margin-top: 15px !important; }

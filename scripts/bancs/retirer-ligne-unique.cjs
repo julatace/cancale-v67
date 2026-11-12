@@ -47,7 +47,9 @@ const ACHATS_A = [achat(9301, 'Nike Dunk Low panda taille 38', AU_RELAIS, 9, { t
 const RELAIS = { 9301: { code: '012345', lieu: LIEU, transporteur: 'mondialrelay', at: ilYa(0) } };
 const TRACKS = [
   track('mondialrelay', '90000031', '313131'),
-  track('vinted', 'VG0001234567', '565656', { limite: jourDans(3) }),                  // Vinted Go, code + n°                                         // code + n°, sans article
+  track('vinted', 'VG0001234567', '565656', { limite: jourDans(3) }),                  // Vinted Go, code + n°
+  // Le serveur le vérifie chez le transporteur (agent2-restes, api/_lib/suivi-colis.js) : mention neutre, rien à faire.
+  track('mondialrelay', '90000041', '414141', { aVerifierTransporteur: 'Retiré puis « changé de plan » : VRM le vérifie chez le transporteur' }),                                         // code + n°, sans article
   track('mondialrelay', '90000021', null, { limite: null }),                           // code à venir, sans date limite
   track('chronopost', 'XW123456789FR', '454545', { qrB64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', qrType: 'image/png', limite: jourDans(2) }),   // code + QR (Pickup Pass)
   // « Ton achat t'attend au point relais » : l'article LU dans l'e-mail, ni code, ni n° de suivi.
@@ -143,13 +145,13 @@ const ouvrir = async (b, vp, sombre) => {
         await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' })));
         await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
-        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-point .vrm-rpf-ligne[data-cc-carte]').length >= 5, null, { timeout: 30000 }).catch(() => {});
+        await pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-point .vrm-rpf-ligne[data-cc-carte]').length >= 6, null, { timeout: 30000 }).catch(() => {});
         await pg.evaluate(() => { const p = document.querySelector('.vrm-rpf-point'); if (p) p.scrollIntoView({ block: 'start' }); });
         await pg.waitForTimeout(600);
         const m = await pg.evaluate(() => {
           const R = (e) => (e ? e.getBoundingClientRect() : null);
           // Le point mélangé (5 colis) et les autres lignes de la liste : UNE forme pour toutes, d'un point à l'autre.
-          const pt = [...document.querySelectorAll('.vrm-rpf-point')].find((p) => p.querySelectorAll(".vrm-rpf-ligne[data-cc-carte]").length >= 5);
+          const pt = [...document.querySelectorAll('.vrm-rpf-point')].find((p) => p.querySelectorAll(".vrm-rpf-ligne[data-cc-carte]").length >= 6);
           if (!pt) return { dbg: [...document.querySelectorAll('.vrm-rpf-point')].map((p) => p.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]').length).join(' | ') };
           const tete = pt.querySelector('.vrm-rpf-n');
           const lignes = [...document.querySelectorAll('.vrm-rpf .vrm-rpf-ligne[data-cc-carte]')].filter((l) => l.getBoundingClientRect().height > 0).map((l) => {
@@ -173,13 +175,14 @@ const ouvrir = async (b, vp, sombre) => {
               marque: (l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp]') || { getAttribute: () => null }).getAttribute('data-colis-logo-transp'),
               fondMarque: (() => { const e = l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp] [data-marque]'); return e ? getComputedStyle(e).backgroundColor : null; })(),
               l3: (l.querySelector('.vrm-rpf-suivi-ligne') || {}).textContent || '',
+              verif: (() => { const v = l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]'); return v ? { txt: v.textContent.trim(), ambre: v.getAttribute('data-rp-delai-ambre'), couleur: getComputedStyle(v.querySelector('.vrm-rpf-delai-txt')).color } : null; })(),
             };
           });
           return { lignes, tete: tete ? tete.innerText : '', sansCode: tete && tete.querySelector('[data-relais-sans-code]') ? tete.querySelector('[data-relais-sans-code]').getAttribute('data-relais-sans-code') : null };
         });
         if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `retirer-ligne-${nom}.png`) }); }
         if (m && m.dbg) console.log('DBG', m.dbg);
-        dit(!!m && !!m.lignes && m.lignes.length >= 5, `${nom} : les colis du point mélangé, une ligne chacun`, m && m.lignes.map((l) => l.titre).join(' | '));
+        dit(!!m && !!m.lignes && m.lignes.length >= 6, `${nom} : les colis du point mélangé, une ligne chacun`, m && m.lignes.map((l) => l.titre).join(' | '));
         if (!m || !m.lignes) return;
         const L = m.lignes, egal = (k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != null;
         dit(egal('vignette'), `${nom} : la vignette au même endroit, de la même taille, sur chaque ligne`, L.map((l) => l.vignette).join(' / '));
@@ -199,10 +202,12 @@ const ouvrir = async (b, vp, sombre) => {
         dit(!mauvais.length && L.some((l) => /Vinted Go/.test(l.titre)), `${nom} : chaque logo est celui de SON transporteur (Chronopost, Mondial Relay, Vinted Go), aucun cube générique`, L.map((l) => `${l.titre}=${l.marque}`).join(' | '));
         const chrono = L.find((l) => l.marque === 'chronopost');
         dit(!!chrono && chrono.fondMarque === 'rgb(255, 210, 0)', `${nom} : Chronopost Pickup sur le jaune Pickup (pas un cube noir sur blanc)`, chrono && chrono.fondMarque);
+        const vt = L.filter((l) => l.verif);
+        dit(vt.length === 1 && /^Vérification chez Mondial Relay en cours$/.test(vt[0].verif.txt) && vt[0].verif.ambre === '0' && !/\?/.test(vt[0].verif.txt), `${nom} : le colis que VRM vérifie chez le transporteur le dit, neutre, à la place du délai (rien à faire)`, JSON.stringify(vt.map((l) => l.verif)));
         const nike = L.find((l) => /Nike Dunk Low/.test(l.titre));
         dit(!!nike && /^Mondial Relay/.test(nike.l3), `${nom} : sous un article relié, le transporteur écrit en clair (« Mondial Relay »)`, nike && nike.l3);
         dit(L.every((l) => !l.sansSuiviDit), `${nom} : « sans n° de suivi » n'est répété sur aucune ligne`);
-        dit(m.sansCode === '1' && /1 code à venir/.test(m.tete) && /^5 colis/.test(m.tete), `${nom} : l'en-tête du point « 5 colis · 1 code à venir »`, m.tete);
+        dit(m.sansCode === '1' && /1 code à venir/.test(m.tete) && /^6 colis/.test(m.tete), `${nom} : l'en-tête du point « 6 colis · 1 code à venir »`, m.tete);
         const q = L.find((l) => l.qrAttendu);
         dit(!!q && !!q.qr && q.qr.split('x').every((v) => Number(v) >= 44), `${nom} : le QR (Pickup Pass) se touche depuis sa ligne, 44 px`, q ? String(q.qr) : 'ligne absente');
       });

@@ -423,6 +423,11 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // Ligne 3 : le nom du transporteur EN CLAIR quand le titre est l'article (sinon le titre le dit déjà), puis le n°.
   const ligne3 = [titreSansArticle ? '' : nomAffiche, suLigne ? `n° ${suLigne}` : ''].filter(Boolean).join(' · ');
   const ouvrirQr = qrDe ? qrDe(x) : null;
+  // (12 nov., finitions) Le serveur vérifie CE colis chez son transporteur (« retiré » puis « changé de plan »,
+  // `aVerifierTransporteur`, api/_lib/suivi-colis.js) : rien à faire pour le vendeur ⇒ une mention NEUTRE à la
+  // place du délai (jamais une question, jamais ambre), même place, même hauteur.
+  const verifT = !!(x.src && x.src.t && x.src.t.aVerifierTransporteur);
+  const dl4 = verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours`, valeurTexte: 'Vérification en cours' } : dl;
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
   // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).
@@ -457,7 +462,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
               : <span className="vrm-rpf-code-venir" data-rp-code-a-venir="">{x.horsCompte ? 'Code pas lu' : 'Code à venir'}</span>)}
           </span>
           {ligne3 ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={suLigne || undefined} data-rp-sans-suivi={suLigne ? undefined : ''} data-rp-transp-nom={titreSansArticle ? undefined : nomAffiche || undefined}>{ligne3}</span> : <span className="vrm-rpf-suivi-ligne is-vide" data-rp-sans-suivi="" aria-hidden="true">{'\u00a0'}</span>}
-          <span className="vrm-rpf-ligne-delai" data-rp-l4=""><BarreDelai d={dl}/></span>
+          <span className="vrm-rpf-ligne-delai" data-rp-l4="" data-rp-verif-transporteur={verifT ? '' : undefined}><BarreDelai d={dl4}/></span>
           {(st || e || x.lieuDeplace || ancien) ? <span className="vrm-rpf-puces">
             {st ? <span className="vrm-rpf-puce is-ambre" data-rp-statut="">{st}</span> : null}
             {x.lieuDeplace ? <span className="vrm-rpf-puce is-ambre" data-rp-deplace={x.lieuDeplace.carrier || ''}>{texteDeplace(x.lieuDeplace)}</span> : null}

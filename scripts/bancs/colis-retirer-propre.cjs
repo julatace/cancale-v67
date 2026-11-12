@@ -188,6 +188,7 @@ const ouvrir = async (b, vp, sombre) => {
             rangs: lignes.filter(vis).map((l) => { const r = l.querySelector('.vrm-rpf-ouvrir'); const v = l.querySelector('.vrm-rpf-vignette'); return { id: l.getAttribute('data-cc-carte'), code: !!l.querySelector('[data-rp-code]'), avenir: !!l.querySelector('[data-rp-code-a-venir]'), retire: !!l.querySelector('.vrm-rpf-rang [data-colis-retire]'), ech: (l.querySelector('[data-rp-echeance]') || { getAttribute: () => null }).getAttribute('data-rp-echeance'), statut: (l.querySelector('[data-rp-statut]') || {}).textContent || '', vw: v ? Math.round(v.getBoundingClientRect().width) : 0, boutons: [...l.querySelectorAll('.vrm-rpf-rang button')].map((x) => Math.round(x.getBoundingClientRect().height)), detail: !!l.querySelector('[data-rp-detail]') }; }),
             sections: [...document.querySelectorAll('[data-rp-section]')].map((x) => x.getAttribute('data-rp-section')),
             dansSection: Object.fromEntries([...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].map((l) => [l.getAttribute('data-cc-carte'), (l.closest('[data-rp-section]') || { getAttribute: () => '' }).getAttribute('data-rp-section')])),
+            airIds: [...document.querySelectorAll('[data-rp-section]')].map((x) => x.getAttribute('data-rp-section')),
             air: (() => { const t = [...document.querySelectorAll('[data-rp-section]')]; return t.slice(1).map((x, i) => Math.round(x.getBoundingClientRect().top - t[i].getBoundingClientRect().bottom)); })(),
             verif: (() => { const d = document.querySelector('.vrm-rpf-verifier'); return d ? { n: d.getAttribute('data-retirer-a-verifier'), ouvert: d.open } : null; })(),
             enRoute: (document.querySelector('[data-retirer-en-route-sans]') || { getAttribute: () => null }).getAttribute('data-retirer-en-route-sans'),
@@ -255,7 +256,7 @@ const ouvrir = async (b, vp, sombre) => {
           dit(sec('prets').some((k) => /9301/.test(k)) && sec('prets').some((k) => /90000022/.test(k)) && sec('prets').some((k) => /90000021/.test(k)) && sec('prets').some((k) => /cmd01|conv|commande/.test(k)) && !m.sections.includes('avenir'), '« À retirer » : les colis avec code et ceux au code à venir, dans la même section', sec('prets').join(','));
           dit(!(await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-section:not(.is-repli) [data-relais-point-suite]').length)), 'chaque point UNE fois (aucune carte « suite » dans une autre section)');
           dit(sec('lieu').length === 1 && /90000008/.test(sec('lieu')[0]), '« Lieu à confirmer » : le colis sans lieu', sec('lieu').join());
-          dit(m.air.every((a) => a >= 20 && a <= 40), 'de l’air entre les sections (20–40 px)', m.air.join(','));
+          dit(m.air.every((a) => a >= 20 && a <= 40), 'de l’air entre les sections (20–40 px)', m.air.join(',') + ' · ' + (m.airIds || []).join(','));
           dit(m.verif && m.verif.n === '3' && !m.verif.ouvert, '« À vérifier · 3 » replié', JSON.stringify(m.verif));
                     dit(m.enRoute === '13', '« En route » (13 sans point) replié à la fin', m.enRoute);
           // Les villes : lues dans l'adresse (CP + ville) ; choisir une ville filtre la liste, la carte sombre suit,
