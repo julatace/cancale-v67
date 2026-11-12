@@ -28,7 +28,34 @@ export function reglageDiscretion(v) {
   const pj = Math.round(Number(o.parJour));
   const reprises = {};
   if (o.reprises && typeof o.reprises === 'object') for (const k of Object.keys(o.reprises)) { const t = Number(o.reprises[k]); if (/^\d{1,20}$/.test(k) && Number.isFinite(t) && t > 0) reprises[k] = t; }
-  return { parJour: Number.isFinite(pj) && pj >= PAR_JOUR_MIN && pj <= PAR_JOUR_MAX ? pj : PAR_JOUR_DEFAUT, reprises };
+  const parHeure = {};
+  for (const k of SORTES_LIMITEES) { const x = Math.round(Number(o.parHeure && o.parHeure[k])); parHeure[k] = Number.isFinite(x) && x >= 1 && x <= PAR_HEURE_MAX ? x : PAR_HEURE_SORTE_DEFAUT; }
+  const tout = o.tout && typeof o.tout === 'object' && Number(o.tout.at) > 0 ? { on: o.tout.on === true, at: Number(o.tout.at) } : null;
+  return { parJour: Number.isFinite(pj) && pj >= PAR_JOUR_MIN && pj <= PAR_JOUR_MAX ? pj : PAR_JOUR_DEFAUT, reprises, parHeure, tout };
+}
+// (12 nov., ajout validé) La limite PAR SORTE, en plus des 50/h : messages aux favoris et réponses
+// automatiques aux offres, 15/h chacune par défaut (réglable de 1 à 50).
+export const SORTES_LIMITEES = ['favori', 'offre'];
+export const PAR_HEURE_SORTE_DEFAUT = 15;
+export const PAR_HEURE_MAX = 50;
+export function parHeureTape(texte) {
+  const s = String(texte == null ? '' : texte).trim();
+  if (!/^\d{1,2}$/.test(s)) return { ok: false, erreur: 'Un nombre entier.' };
+  const n = Number(s);
+  if (n < 1) return { ok: false, erreur: 'Au moins 1.' };
+  if (n > PAR_HEURE_MAX) return { ok: false, erreur: `Au plus ${PAR_HEURE_MAX}.` };
+  return { ok: true, valeur: n };
+}
+// « Tout arrêter » / « Reprendre » : le réglage avec l'interrupteur à SON heure (rien d'autre ne change).
+export function avecToutArrete(v, on, maintenant = Date.now()) {
+  const brut = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  return { ...brut, tout: { on: on === true, at: maintenant } };
+}
+// La phrase d'un arrêt de compte (vérification, modération, déconnexion).
+export function phraseArretCompte(quoi) {
+  if (quoi === 'moderation') return { titre: 'Vinted a modéré ce compte', geste: 'Regarde ce qui s’est passé, puis touche Reprendre.' };
+  if (quoi === 'deconnecte') return { titre: 'Ce compte n’est plus connecté sur Vinted', geste: 'Reconnecte-toi sur vinted.fr : VRM reprendra.' };
+  return { titre: 'Vinted demande une vérification', geste: 'Fais-la sur vinted.fr, puis touche Reprendre.' };
 }
 // Ce qu'il tape dans le champ : un entier entre 20 et 1000, sinon une phrase.
 export function parJourTape(texte) {

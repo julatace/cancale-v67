@@ -66,7 +66,7 @@ export default function JaugeActions({ uid, nom = '' }) {
         {t.suite ? <span className="vrm-jauge-suite">{t.suite}</span> : null}
       </span>
     </div>
-    {j && j.captcha ? <AlerteVerification uid={u} captcha={j.captcha} nom={nom} /> : null}
+    {j && j.captcha ? <AlerteVerification uid={u} captcha={j.captcha} arret={j.arret || 'captcha'} nom={nom} /> : null}
     </>
   );
 }

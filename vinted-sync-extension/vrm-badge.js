@@ -657,6 +657,8 @@
     const moisHtml = mois ? ligneMois(mois) : '';
     const outils = [
       moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : '',
+      // 5.370 : « Tout arrêter » — les gestes automatiques de TOUS les comptes, jusqu'à « Reprendre ».
+      connecte ? (e.toutArrete ? '<button class="lien" data-tout-reprendre>Reprendre les gestes automatiques</button>' : '<button class="lien" data-tout-arreter>Tout arrêter</button>') : '',
       v && v.connecte && !changerCompte ? '<button class="lien" data-changer-vrm>Changer de compte VRM</button>' : '',
       `<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`,
       posPerso ? '<button class="lien" data-replacer-logo>Logo en bas à droite</button>' : '',
@@ -693,6 +695,17 @@
         chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'resumeMasque', masque: masquer }, (r) => {
           void chrome.runtime.lastError;
           if (r && r.ok) { if (masquer) { e.mois = { masque: true }; moisOuvert = false; rendre(); } else { e.mois = null; rafraichir(); } return; }
+          el.disabled = false;
+        });
+      } catch (_) { el.disabled = false; }
+    }));
+    carte.querySelectorAll('[data-tout-arreter],[data-tout-reprendre]').forEach((el) => el.addEventListener('click', () => {
+      const on = el.hasAttribute('data-tout-arreter');
+      el.disabled = true;
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'toutArreter', on }, (r) => {
+          void chrome.runtime.lastError;
+          if (r && r.ok) { e.toutArrete = on; rendre(); return; }
           el.disabled = false;
         });
       } catch (_) { el.disabled = false; }

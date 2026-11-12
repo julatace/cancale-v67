@@ -20,7 +20,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const PREFIXE_ACTIONS = 'actions_compte_';
-export const SELECT_ACTIONS = 'id,ts:data->ts,max:data->>max,reserve:data->>reserve,prudence:data->>prudence,maxp:data->>maxPrudence,jour:data->jour,maxj:data->>maxJour,pj:data->>parJour,montee:data->>montee,captcha:data->>captcha,ev:data->ev';
+export const SELECT_ACTIONS = 'id,ts:data->ts,max:data->>max,reserve:data->>reserve,prudence:data->>prudence,maxp:data->>maxPrudence,jour:data->jour,maxj:data->>maxJour,pj:data->>parJour,montee:data->>montee,captcha:data->>captcha,arret:data->>arret,ta:data->ta,ev:data->ev';
 // (12 nov., ext. 5.370 — la discrétion) LE JOUR : chaque Chrome publie `jour: { d, n }` (jour de
 // Paris, ses actions du jour) et le plafond du jour TIRÉ (`maxJour`, 70-100 % du réglage
 // `parJour`). La somme des `n` du jour de Paris fait le compte ; le plus petit `maxJour` du jour,
@@ -52,14 +52,14 @@ export function jaugeDuCompte(rows, uid, maintenant = Date.now()) {
   const heures = [];
   let max = null, reserve = null, prudence = null, maxp = null;
   const aujourdhui = jourParisDe(maintenant);
-  let nJour = null, maxJour = null, parJour = null, montee = null, captcha = null;
+  let nJour = null, maxJour = null, parJour = null, montee = null, captcha = null, arret = null;
   for (const r of miennes) {
     if (r.jour && typeof r.jour === 'object' && r.jour.d === aujourdhui) { const k = Math.floor(Number(r.jour.n)); if (Number.isFinite(k) && k >= 0 && k < 100000) nJour = (nJour || 0) + k; }
     else if (r.jour && typeof r.jour === 'object' && typeof r.jour.d === 'string') nJour = nJour || 0;   // un jour d'avant : 0 aujourd'hui pour ce Chrome
     const mj = Number(r.maxj); if (r.maxj != null && Number.isFinite(mj) && mj > 0 && (maxJour == null || mj < maxJour)) maxJour = mj;
     const pj = Number(r.pj); if (r.pj != null && Number.isFinite(pj) && pj > 0 && parJour == null) parJour = pj;
     const mo = Number(r.montee); if (r.montee != null && Number.isFinite(mo) && mo > 0 && (montee == null || mo < montee)) montee = mo;
-    const cp = Number(r.captcha); if (r.captcha != null && Number.isFinite(cp) && cp > 0 && cp <= maintenant + 60000 && (captcha == null || cp > captcha)) captcha = cp;
+    const cp = Number(r.captcha); if (r.captcha != null && Number.isFinite(cp) && cp > 0 && cp <= maintenant + 60000 && (captcha == null || cp > captcha)) { captcha = cp; arret = ['captcha', 'moderation', 'deconnecte'].includes(r.arret) ? r.arret : 'captcha'; }
     for (const x of (Array.isArray(r.ts) ? r.ts : [])) {
       const v = Number(x);
       if (Number.isFinite(v) && maintenant - v < HEURE && v <= maintenant + 60000) heures.push(v);
@@ -85,7 +85,7 @@ export function jaugeDuCompte(rows, uid, maintenant = Date.now()) {
     // La plus ancienne action de l'heure sort du compte à cette heure-là : une place se libère.
     repartA: n ? heures[0] + HEURE : null,
     // (5.370) Le jour (null = pas su), le compte neuf, la vérification demandée.
-    nJour: maxJour == null ? null : nJour, maxJour, parJour, montee, captcha,
+    nJour: maxJour == null ? null : nJour, maxJour, parJour, montee, captcha, arret,
   };
 }
 
@@ -116,4 +116,15 @@ function texteJaugeHeure(j, valeur) {
   if (!j.n) return { valeur, suite: '', ton: '' };
   if (j.plein) return { valeur, suite: `VRM attend · repart à ${heureFr(j.repartA)}`, ton: 'geste' };
   return { valeur, suite: `repart à ${heureFr(j.repartA)}`, ton: '' };
+}
+
+// (12 nov., ajout validé) « TOUT ARRÊTER » : chaque Chrome publie SON interrupteur (`ta` : { on, at })
+// dans ses lignes ; l'app range le sien dans `vinted_discretion.tout`. Le plus RÉCENT gagne
+// (la même règle que l'extension, `toutArreteDepuis`). Rend { on, at, source } ou null (rien de posé).
+export function toutArreteDe(rows, tout) {
+  const c = [];
+  for (const r of Array.isArray(rows) ? rows : []) if (r && r.ta && typeof r.ta === 'object' && Number(r.ta.at) > 0) c.push({ on: r.ta.on === true, at: Number(r.ta.at), source: 'extension' });
+  if (tout && typeof tout === 'object' && Number(tout.at) > 0) c.push({ on: tout.on === true, at: Number(tout.at), source: 'app' });
+  if (!c.length) return null;
+  return c.sort((a, b) => b.at - a.at)[0];
 }

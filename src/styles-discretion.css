@@ -40,3 +40,13 @@
 /* La jauge : « 112/200 aujourd’hui » à côté de l'heure. */
 .vrm-jauge-jour::before { content: "· "; }
 .vrm-jauge-jour { color: var(--w-gris, #6E6E73); }
+
+/* « Tout arrêter » : une rangée, un bouton ; ambre seulement quand c'est arrêté. */
+.vrm-disc-tout { display: flex; align-items: center; gap: 12px; padding: 4px 0 10px; border-bottom: 0.5px solid var(--w-filet, rgba(60,60,67,.18)); }
+.vrm-disc-tout-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 15px; color: var(--w-encre, #1D1D1F); }
+.vrm-disc-tout-txt small { font-size: 13px; color: var(--w-gris, #6E6E73); }
+[data-tout-etat="arrete"] .vrm-disc-tout-txt b { color: var(--vrm-warn, #B25000); }
+.vrm-disc-tout-btn { flex: none; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: 15px; font-weight: 700;
+  background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); }
+.vrm-disc-tout-btn.is-on { background: var(--vrm-warn, #B25000); color: #fff; }
+.vrm-disc-tout-btn:focus-visible { outline: 2px solid var(--w-encre, #1D1D1F); outline-offset: 2px; }

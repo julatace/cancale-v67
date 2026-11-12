@@ -3723,6 +3723,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // nommé par le message) — c'est la règle « garde » de l'extension.
     // 5.344 : « Tout récupérer » depuis la carte du logo — le compte de l'onglet seulement.
     // 5.354 : « Masquer / Afficher le résumé du mois » — un réglage de CE navigateur.
+    // 5.370 : « Tout arrêter » / « Reprendre » depuis la carte du logo (sa main, sur la page).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'toutArreter') {
+      poserToutArrete(msg.on === true).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'resumeMasque') {
       poserMoisMasque(msg.masque === true).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
@@ -5868,6 +5873,9 @@ async function rangerModeration(uid, nouveaux, opts) {
     try { notifierApp({ type: 'maj', quoi: 'moderation', uid: String(uid) }); } catch (_) {}
   }
   if (f.ajoutes.length) await signalerModeration(true);
+  // (12 nov., ajout validé) Une modération NEUVE lue sur ce compte ⇒ ses gestes automatiques
+  // s'arrêtent jusqu'à SON « Reprendre » (le même arrêt que la vérification).
+  if (f.ajoutes.length) await poserArret(String(uid), 'moderation', 0);
   return { ajoutes: f.ajoutes, ouverts: f.liste.filter((e) => !e.f && e.a).map((e) => e.a) };
 }
 // Le frein de 24 h posé sans refus (compte fermé par Vinted) : mêmes gestes arrêtés.
@@ -6211,6 +6219,11 @@ function requeteVinted(quoi, fn, qui) {
     //    vérification demandée (captcha) — jusqu'à SA reprise.
     if (r && freinVinted(r.status) && !surAutreMembre) { const u = await uidDeQui(qui).catch(() => null); if (u) { noterCarnet(u, String(Number(r.status))); noterCarnet(u, 'pause'); } }
     if (r && !surAutreMembre && estCaptchaVinted(r)) await poserCaptcha(qui, Number(r.status) || 0);
+    // (ajout validé) 6. Une requête de L'ONGLET refusée 401 : la session Vinted du compte a
+    //    expiré ⇒ arrêt de ses gestes automatiques (aucune nouvelle tentative en boucle) ;
+    //    une réponse réussie de l'onglet sur ce compte le lève.
+    if (r && r.viaPage && Number(r.status) === 401) await poserArret(qui, 'deconnecte', 401);
+    else if (r && r.viaPage && r.ok) await leverDeconnecte(qui);
     return r;
   };
   const suite = _fileRequetes.then(tour, tour);
@@ -13474,7 +13487,7 @@ async function vintedPage(acc, method, endpoint, body, options = {}) {
       if (!o || typeof o !== 'object') return { status: 0, ok: false, json: null };
       let hote = ''; try { hote = new URL(String(o.origine || '')).hostname; } catch (_) {}
       if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('page_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true, sansPage: 'onglet' }; }
-      return { status: o.status, ok: o.ok, json: o.json };
+      return { status: o.status, ok: o.ok, json: o.json, viaPage: true };
     } catch (_) { return { status: 0, ok: false, json: null }; }
   }, acc);
 }
@@ -14728,10 +14741,11 @@ function idNavigateur() {
 async function actionsAutresNavigateurs(uid) {
   const moi = await idNavigateur();
   // 5.370 (discrétion) : aussi les actions du JOUR (`jour`) et la vérification demandée (`captcha`).
-  let rows; try { rows = await sbGet(`app_data?id=like.${ACTIONS_PARTAGEES}${uid}_*&select=id,ts:data->ts,lec:data->lec,pr:data->>prudence,jour:data->jour,cap:data->>captcha`); } catch (_) { rows = null; }
+  let rows; try { rows = await sbGet(`app_data?id=like.${ACTIONS_PARTAGEES}${uid}_*&select=id,ts:data->ts,lec:data->lec,pr:data->>prudence,jour:data->jour,cap:data->>captcha,so:data->so,ta:data->ta`); } catch (_) { rows = null; }
   if (!Array.isArray(rows)) return null;
   const t = Date.now(); let n = 0; const toutes = [];
-  const aujourdhui = jourParis(t); let nJour = 0, captcha = 0;
+  const aujourdhui = jourParis(t); let nJour = 0, captcha = 0, ta = null;
+  const so = Object.fromEntries(SORTES_LIMITEES.map((k) => [k, []]));
   // 5.362 (revue, moyenne 33) : les LECTURES des autres Chrome de ce compte (`lec`).
   const lectures = [];
   // 5.357 : la prudence posée par un AUTRE Chrome de ce compte s'applique ici aussi.
@@ -14746,11 +14760,13 @@ async function actionsAutresNavigateurs(uid) {
     if (!r || !new RegExp(`^${ACTIONS_PARTAGEES}${uid}_[0-9a-f]{16}$`).test(String(r.id || ''))) continue;
     { const c = Number(r.cap); if (Number.isFinite(c) && c > 0 && c <= t + 60000 && c > captcha) captcha = c; }
     if (String(r.id) === `${ACTIONS_PARTAGEES}${uid}_${moi}`) continue;
+    if (r.ta && typeof r.ta === 'object' && Number(r.ta.at) > 0 && Number(r.ta.at) <= t + 60000 && (!ta || Number(r.ta.at) > ta.at)) ta = { on: r.ta.on === true, at: Number(r.ta.at) };
+    if (r.so && typeof r.so === 'object') for (const k of SORTES_LIMITEES) for (const x of (Array.isArray(r.so[k]) ? r.so[k] : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) so[k].push(v); }
     if (r.jour && typeof r.jour === 'object' && r.jour.d === aujourdhui) { const k = Math.floor(Number(r.jour.n)); if (Number.isFinite(k) && k > 0 && k < 100000) nJour += k; }
     for (const x of (Array.isArray(r.ts) ? r.ts : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) { n++; toutes.push(v); } }
     for (const x of (Array.isArray(r.lec) ? r.lec : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) lectures.push(v); }
   }
-  return { n, toutes, prudence, lectures, nJour, captcha };
+  return { n, toutes, prudence, lectures, nJour, captcha, so, ta };
 }
 async function publierActions(uid, list) {
   const moi = await idNavigateur(); if (!moi) return;
@@ -14774,7 +14790,9 @@ async function publierActions(uid, list) {
     try { disc.jour = { d: jourParis(t), n: (await actionsDuJour(String(uid), t)).length }; } catch (_) {}
     try { const reg = await reglagesDiscretion(); disc.parJour = reg.parJour; disc.maxJour = await plafondJourDe(String(uid), reg.parJour, t); } catch (_) {}
     try { const m = plafondMontee(await debutMontee(String(uid), t), t); if (m) disc.montee = m; } catch (_) {}
-    try { const c = Number(((await lireLocal('vrmCaptcha'))[String(uid)] || {}).depuis); if (c > 0) disc.captcha = c; } catch (_) {}
+    try { const e = (await lireLocal('vrmCaptcha'))[String(uid)] || {}; const c = Number(e.depuis); if (c > 0) { disc.captcha = c; disc.arret = ARRETS.includes(e.quoi) ? e.quoi : 'captcha'; } } catch (_) {}
+    try { const so = {}; for (const k of SORTES_LIMITEES) so[k] = await sortesHeure(String(uid), k, t); disc.so = so; } catch (_) {}
+    try { const l = await lireLocal('vrmToutArrete'); if (Number(l.at) > 0) disc.ta = { on: l.on === true, at: Number(l.at) }; } catch (_) {}
     try { disc.ev = await carnetDe(String(uid)); } catch (_) {}
   }
   let ok = false;
@@ -14932,8 +14950,10 @@ async function compterActionUn(uid, plafond, n = 1) {
     //    autre du compte) ⇒ AUCUN geste automatique tant qu'il n'a pas touché « Reprendre ».
     //    Ses clics (plafond entier) passent.
     if (max < ACTIONS_MAX_HEURE && /^\d{1,20}$/.test(String(uid))) {
+      const ta = await toutArreteDepuis(autres);
+      if (ta) return { ok: false, code: 'tout-arrete', depuis: ta, n: list.length };
       const cap = await captchaEnCours(String(uid), autres);
-      if (cap) return { ok: false, code: 'verification', depuis: cap, n: list.length };
+      if (cap) return { ok: false, code: 'verification', depuis: cap, arret: await quoiArret(String(uid)), n: list.length };
     }
     // 5.357 : en PRUDENCE (refus de Vinted il y a moins de 24 h, ce Chrome ou un
     //    autre du compte), le plafond descend à `PRUDENCE_ACTIONS_HEURE`. Le
@@ -15046,6 +15066,11 @@ const MONTEE_PALIERS = [10, 20, 35];               // semaines 1, 2, 3 ; puis le
 const MONTEE_VRM_JOURS = 28, MONTEE_VINTED_JOURS = 30;
 const CARNET_JOURS = 7, CARNET_MAX = 120;
 const DISCRETION_CACHE_MS = 60000;
+// (12 nov., ajout validé par Julien) 5. LIMITE PAR SORTE en plus des 50/h : messages aux
+//    favoris et réponses AUTOMATIQUES aux offres, 15/h chacune par défaut (réglable), comptées
+//    sur tous les Chrome du compte (`so` dans la ligne `actions_compte_`).
+const SORTES_LIMITEES = ['favori', 'offre'];
+const PAR_HEURE_SORTE_DEFAUT = 15;
 const tirerEntre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // Le jour de Paris (« 2026-11-12 ») et l'heure de Paris (0-23), quel que soit le fuseau.
 function jourParis(t) {
@@ -15075,12 +15100,17 @@ async function reglagesDiscretion() {
   const c = await lireLocal('vrmDiscretionReglages');
   if (c.at && t - Number(c.at) < DISCRETION_CACHE_MS && c.v) return c.v;
   let m = null; try { m = await lireMain(['vinted_discretion']); } catch (_) { m = null; }
-  if (m === null) return c.v || { parJour: DISCRETION_JOUR_DEFAUT, reprises: {}, passu: true };
+  if (m === null) return c.v || { parJour: DISCRETION_JOUR_DEFAUT, reprises: {}, parHeure: Object.fromEntries(SORTES_LIMITEES.map((k) => [k, PAR_HEURE_SORTE_DEFAUT])), tout: null, passu: true };
   const brut = m.vinted_discretion && typeof m.vinted_discretion === 'object' ? m.vinted_discretion : {};
   const pj = Math.round(Number(brut.parJour));
   const reprises = {};
   if (brut.reprises && typeof brut.reprises === 'object') for (const k of Object.keys(brut.reprises)) { const v = Number(brut.reprises[k]); if (/^\d{1,20}$/.test(k) && Number.isFinite(v) && v > 0) reprises[k] = v; }
-  const v = { parJour: Number.isFinite(pj) && pj >= DISCRETION_JOUR_MIN && pj <= DISCRETION_JOUR_MAX ? pj : DISCRETION_JOUR_DEFAUT, reprises };
+  // (12 nov., ajout validé) `parHeure` : la limite PAR SORTE (messages aux favoris, réponses
+  // automatiques aux offres), 15/h par défaut, en plus des 50/h ; `tout` : « Tout arrêter ».
+  const parHeure = {};
+  for (const k of SORTES_LIMITEES) { const x = Math.round(Number(brut.parHeure && brut.parHeure[k])); parHeure[k] = Number.isFinite(x) && x >= 1 && x <= ACTIONS_MAX_HEURE ? x : PAR_HEURE_SORTE_DEFAUT; }
+  const tout = brut.tout && typeof brut.tout === 'object' && Number(brut.tout.at) > 0 ? { on: brut.tout.on === true, at: Number(brut.tout.at) } : null;
+  const v = { parJour: Number.isFinite(pj) && pj >= DISCRETION_JOUR_MIN && pj <= DISCRETION_JOUR_MAX ? pj : DISCRETION_JOUR_DEFAUT, reprises, parHeure, tout };
   try { await chrome.storage.local.set({ vrmDiscretionReglages: { at: t, v } }); } catch (_) {}
   return v;
 }
@@ -15150,7 +15180,7 @@ async function debutMontee(uid, t) {
   return debut;
 }
 // 14. Le carnet : un événement daté (refus 403/429, pause, captcha, prudence) par compte.
-const CARNET_SORTES = ['403', '429', 'pause', 'captcha', 'prudence', 'reprise'];
+const CARNET_SORTES = ['403', '429', 'pause', 'captcha', 'prudence', 'reprise', 'moderation', 'deconnecte'];
 function noterCarnet(uid, sorte) {
   const u = String(uid || '');
   if (!/^\d{1,20}$/.test(u) || !CARNET_SORTES.includes(sorte)) return Promise.resolve(false);
@@ -15181,21 +15211,85 @@ function estCaptchaVinted(r) {
   try { t = typeof r.text === 'string' && r.text ? r.text.slice(0, 6000) : (r.json == null ? '' : JSON.stringify(r.json).slice(0, 6000)); } catch (_) {}
   return /captcha|datadome|je ne suis pas un robot|not a robot|are you a robot|\brobot\b/i.test(t);
 }
-function poserCaptcha(qui, statut) {
+// (12 nov., ajouts validés) LE MÊME ARRÊT NET pour trois causes, compte par compte :
+//   · `captcha`    : Vinted demande une vérification (n° 13) ;
+//   · `moderation` : VRM vient de lire une modération de Vinted sur ce compte (annonce masquée
+//                    ou disparue, compte restreint ou banni — `rangerModeration`, lot alerte-moderation) ;
+//   · `deconnecte` : Vinted répond 401 à une requête PARTIE DE L'ONGLET de ce compte (session
+//                    expirée) — aucune nouvelle tentative en boucle ; levé tout seul par la
+//                    première réponse réussie de l'onglet sur ce compte (il s'est reconnecté),
+//                    ou par SA reprise.
+// Les deux autres ne sont levés QUE par SA reprise (« Reprendre » dans l'app).
+const ARRETS = ['captcha', 'moderation', 'deconnecte'];
+function poserArret(qui, quoi, statut) {
   return surDiscretion(async () => {
     const uid = await uidDeQui(qui);
-    if (!uid || !/^\d{1,20}$/.test(String(uid))) { noterDiag('captcha_compte_pas_su'); return; }
+    if (!ARRETS.includes(quoi)) return;
+    if (!uid || !/^\d{1,20}$/.test(String(uid))) { noterDiag('arret_compte_pas_su'); return; }
     const m = await lireLocal('vrmCaptcha');
-    if (m[uid] && Number(m[uid].depuis) > 0) return;          // déjà arrêté : la première heure fait foi
-    m[uid] = { depuis: Date.now(), statut: Number(statut) || 0 };
+    if (m[uid] && Number(m[uid].depuis) > 0) return;          // déjà arrêté : la première cause fait foi
+    m[uid] = { depuis: Date.now(), statut: Number(statut) || 0, quoi };
     try { await chrome.storage.local.set({ vrmCaptcha: m }); } catch (_) {}
-    noterDiag('captcha_vinted');
-    logActivity('🛑 Vinted demande une vérification : VRM arrête tous les gestes automatiques de ce compte. Fais-la sur vinted.fr, puis touche « Reprendre » dans VRM.');
+    noterDiag('arret_' + quoi);
+    logActivity(quoi === 'captcha' ? '🛑 Vinted demande une vérification : VRM arrête tous les gestes automatiques de ce compte. Fais-la sur vinted.fr, puis touche « Reprendre » dans VRM.'
+      : quoi === 'moderation' ? '🛑 Vinted a modéré ce compte : VRM arrête tous les gestes automatiques. Regarde Ma journée, puis touche « Reprendre » dans VRM.'
+        : '🛑 Ce compte n’est plus connecté sur vinted.fr : VRM arrête ses gestes automatiques. Reconnecte-toi sur vinted.fr.');
     Promise.resolve().then(() => publierJaugeMaintenant(String(uid))).catch(() => {});
-    Promise.resolve().then(() => signalerVerification(String(uid))).catch(() => {});
-    try { notifierApp({ type: 'maj', quoi: 'discretion', uid: String(uid), captcha: true }); } catch (_) {}
-    Promise.resolve().then(() => noterCarnet(String(uid), 'captcha')).catch(() => {});
+    // La notification : la vérification et la déconnexion (la modération a déjà la sienne, action `moderation`).
+    if (quoi !== 'moderation') Promise.resolve().then(() => signalerVerification(String(uid))).catch(() => {});
+    try { notifierApp({ type: 'maj', quoi: 'discretion', uid: String(uid), arret: quoi }); } catch (_) {}
+    Promise.resolve().then(() => noterCarnet(String(uid), quoi)).catch(() => {});
   });
+}
+function poserCaptcha(qui, statut) { return poserArret(qui, 'captcha', statut); }
+// Il s'est reconnecté : la première réponse réussie DE L'ONGLET sur ce compte lève l'arrêt `deconnecte`.
+function leverDeconnecte(qui) {
+  return surDiscretion(async () => {
+    const uid = await uidDeQui(qui);
+    if (!uid) return;
+    const m = await lireLocal('vrmCaptcha');
+    if (!(m[uid] && m[uid].quoi === 'deconnecte')) return;
+    delete m[uid];
+    try { await chrome.storage.local.set({ vrmCaptcha: m }); } catch (_) {}
+    noterDiag('arret_deconnecte_leve');
+    Promise.resolve().then(() => publierJaugeMaintenant(String(uid))).catch(() => {});
+  });
+}
+async function quoiArret(uid) { const e = (await lireLocal('vrmCaptcha'))[String(uid)]; return e && ARRETS.includes(e.quoi) ? e.quoi : 'captcha'; }
+function phraseArret(quoi) {
+  if (quoi === 'moderation') return 'Vinted a modéré ce compte : regarde Ma journée, puis touche « Reprendre » dans VRM. Rien n’est parti.';
+  if (quoi === 'deconnecte') return 'Ce compte n’est plus connecté sur vinted.fr : reconnecte-toi, VRM reprendra. Rien n’est parti.';
+  if (quoi === 'tout') return 'Tout est arrêté : touche « Reprendre » dans VRM pour que les gestes automatiques repartent. Rien n’est parti.';
+  return PHRASE_CAPTCHA;
+}
+// 4. « TOUT ARRÊTER » (ajout validé) : un interrupteur pour TOUS les comptes. Trois sources,
+//    la plus RÉCENTE gagne : ce Chrome (`vrmToutArrete`, posé depuis l'app ou la carte du logo),
+//    les autres Chrome (champ `ta` de leurs lignes), et l'app (`vinted_discretion.tout`).
+//    Rend l'heure de l'arrêt en cours, ou 0. Ses clics manuels ne passent pas par là.
+async function toutArreteDepuis(autres) {
+  const cands = [];
+  const l = await lireLocal('vrmToutArrete'); if (Number(l.at) > 0) cands.push({ on: l.on === true, at: Number(l.at) });
+  if (autres && autres.ta && Number(autres.ta.at) > 0) cands.push({ on: autres.ta.on === true, at: Number(autres.ta.at) });
+  try { const reg = await reglagesDiscretion(); if (reg.tout) cands.push(reg.tout); } catch (_) {}
+  if (!cands.length) return 0;
+  const d = cands.sort((a, b) => b.at - a.at)[0];
+  return d.on ? d.at : 0;
+}
+async function poserToutArrete(on) {
+  const t = Date.now();
+  try { await chrome.storage.local.set({ vrmToutArrete: { on: on === true, at: t } }); } catch (_) { return { ok: false }; }
+  try { await chrome.storage.local.remove('vrmDiscretionReglages'); } catch (_) {}
+  noterDiag(on ? 'tout_arrete' : 'tout_repris');
+  logActivity(on ? '⏹ Tout est arrêté : aucun geste automatique, sur aucun compte, jusqu’à « Reprendre ».' : '▶️ Les gestes automatiques reprennent.');
+  try { const uid = await compteConnecte('www.vinted.fr'); if (uid) await publierJaugeMaintenant(String(uid)); } catch (_) {}
+  try { notifierApp({ type: 'maj', quoi: 'discretion', tout: on === true }); } catch (_) {}
+  return { ok: true, on: on === true, at: t };
+}
+// 5. La limite par sorte : les heures de l'heure (ce Chrome) — `vrmSortes`.
+async function sortesHeure(uid, sorte, t) {
+  const m = await lireLocal('vrmSortes');
+  const l = m[uid] && Array.isArray(m[uid][sorte]) ? m[uid][sorte] : [];
+  return l.filter((x) => typeof x === 'number' && t - x < 3600000);
 }
 // La notification « Vinted demande une vérification » : le serveur relit la ligne
 // au nom du vendeur (aucun texte, aucun pseudo dans le corps), une fois par vérification.
@@ -15228,7 +15322,8 @@ const PHRASE_CAPTCHA = 'Vinted demande une vérification : fais-la sur vinted.fr
 // Le refus du compteur dû à la discrétion (jour, vérification, compte neuf), ou `null`.
 function phraseRefusDiscretion(c) {
   if (!c || c.ok) return null;
-  if (c.code === 'verification') return { ok: false, code: 'verification', depuis: c.depuis, attendreMs: 0, error: PHRASE_CAPTCHA };
+  if (c.code === 'tout-arrete') return { ok: false, code: 'tout-arrete', depuis: c.depuis, attendreMs: 0, error: phraseArret('tout') };
+  if (c.code === 'verification') return { ok: false, code: 'verification', depuis: c.depuis, arret: c.arret || 'captcha', attendreMs: 0, error: phraseArret(c.arret) };
   if (c.code === 'plafond-jour') return { ok: false, code: 'plafond-jour', attendreMs: Number(c.resteMs) || 0, error: `${c.nJour}/${c.maxJour} actions aujourd’hui sur ce compte : VRM reprend demain.` };
   if (c.montee && !c.prudence) { const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000)); return { ok: false, code: 'plafond', montee: c.montee, error: `Compte neuf : ${c.montee} actions/heure cette semaine. La suite dans ${min} min.` }; }
   return null;
@@ -15274,11 +15369,21 @@ async function porteDiscretion(uid, sorte, opts = {}) {
   const u = String(uid || '');
   if (!/^\d{1,20}$/.test(u)) return null;                 // Vestiaire / Leboncoin : pas cette porte
   const t = Date.now();
-  const cap = await captchaEnCours(u, opts.autres || null);
-  if (cap) return { ok: false, code: 'verification', depuis: cap, attendreMs: 0, error: PHRASE_CAPTCHA };
+  // Les autres Chrome du compte : lus seulement pour une sorte limitée (favoris, offres).
+  const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) ? await actionsAutresNavigateurs(u) : null);
+  const ta = await toutArreteDepuis(autres);
+  if (ta) return { ok: false, code: 'tout-arrete', depuis: ta, attendreMs: 0, error: phraseArret('tout') };
+  const cap = await captchaEnCours(u, autres);
+  if (cap) return { ok: false, code: 'verification', depuis: cap, arret: await quoiArret(u), attendreMs: 0, error: phraseArret(await quoiArret(u)) };
   if (sorte === 'bordereau') return null;
   const att = (ms, quoi, error) => ({ ok: false, code: 'discretion', quoi, attendreMs: Math.max(1000, ms), jusqua: t + Math.max(1000, ms), error });
   const minutes = (ms) => Math.max(1, Math.ceil(ms / 60000));
+  if (SORTES_LIMITEES.includes(sorte)) {
+    const reg = await reglagesDiscretion();
+    const lim = Number((reg.parHeure || {})[sorte]) || PAR_HEURE_SORTE_DEFAUT;
+    const tous = (await sortesHeure(u, sorte, t)).concat(autres && autres.so && Array.isArray(autres.so[sorte]) ? autres.so[sorte] : []).sort((a, b) => a - b);
+    if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
+  }
   const ouv = (await lireLocal('vrmOuverture'))[u];
   if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `Vinted vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
   const v = await lireLocal('vrmVerrouCompte');
@@ -15300,6 +15405,12 @@ function noterGesteAuto(uid, sorte) {
   return surDiscretion(async () => {
     const t = Date.now();
     const maj = { vrmVerrouCompte: { uid: u, jusqua: t + VERROU_COMPTE_MS, at: t } };
+    if (SORTES_LIMITEES.includes(sorte)) {
+      const so = await lireLocal('vrmSortes');
+      const e = so[u] && typeof so[u] === 'object' ? so[u] : {};
+      e[sorte] = (Array.isArray(e[sorte]) ? e[sorte] : []).filter((x) => typeof x === 'number' && t - x < 3600000).concat([t]).slice(-200);
+      e.at = t; so[u] = e; maj.vrmSortes = bornerRegistre(so, 3600000, 100);
+    }
     if (SORTES_SERIE.includes(sorte)) {
       const s = await lireLocal('vrmSeries');
       const c = s[sorte];
@@ -16444,7 +16555,9 @@ async function etatSite(url,tabId) {
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
   // 5.354 : le mini-résumé du mois (connecté seulement ; compte de l'onglet prouvé).
   const mois = vrm && vrm.connecte === true ? await moisPourCarte(plateforme, site, tabId).catch(() => null) : null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu };
+  // 5.370 : « Tout arrêter » (les gestes automatiques de TOUS les comptes) — l'état pour la carte.
+  let toutArrete = false; try { toutArrete = (await toutArreteDepuis(null)) > 0; } catch (_) {}
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -16850,6 +16963,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted({ ...msg, programme: false }); await journalCommande(msg, r); return r; }
   // 12 nov. (5.370) : les baisses ÉTALÉES dans la journée, sur son clic (voir `planifierBaisses`).
   if (msg && msg.cmd === 'planifierBaisses') return await planifierBaisses(msg);
+  // 12 nov. (5.370) : « Tout arrêter » / « Reprendre » depuis l'app (voir `poserToutArrete`).
+  if (msg && msg.cmd === 'toutArreter') { const r = await poserToutArrete(msg.on === true); return r.ok ? { accepte: true, etape: 'fait', on: r.on, at: r.at } : { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
   if (msg && msg.cmd === 'annulerBaisses') return await annulerBaisses(msg);
   if (msg && msg.cmd === 'etatBaisses') return await etatBaisses(msg);
   // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).

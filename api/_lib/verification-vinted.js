@@ -35,15 +35,20 @@ async function lire(chemin) {
 
 // La vérification la plus récente posée sur CE compte (lignes de CE vendeur), ou 0.
 export function verificationRecente(rows, uid, maintenant = Date.now()) {
-  let v = 0;
+  return arretRecent(rows, uid, maintenant).at;
+}
+// La plus récente, et sa cause (`captcha` · `deconnecte` ; la modération a sa propre notification).
+export function arretRecent(rows, uid, maintenant = Date.now()) {
+  let v = 0, quoi = 'captcha';
   for (const r of Array.isArray(rows) ? rows : []) {
     if (!r || !new RegExp(`^actions_compte_${uid}_[0-9a-f]{16}$`).test(String(r.id || ''))) continue;
     const c = Number(r.cap);
-    if (Number.isFinite(c) && c > 0 && c <= maintenant + 60000 && maintenant - c <= VERIF_FENETRE_MS && c > v) v = c;
+    if (Number.isFinite(c) && c > 0 && c <= maintenant + 60000 && maintenant - c <= VERIF_FENETRE_MS && c > v) { v = c; quoi = r.arr === 'deconnecte' ? 'deconnecte' : r.arr === 'moderation' ? 'moderation' : 'captcha'; }
   }
-  return v;
+  return { at: v, quoi };
 }
-export function texteVerification(nom) {
+export function texteVerification(nom, quoi = 'captcha') {
+  if (quoi === 'deconnecte') return { title: '🛑 Compte Vinted déconnecté', body: `${nom ? nom + ' : ' : ''}reconnecte-toi sur vinted.fr. VRM n’agit plus seul sur ce compte en attendant.` };
   return { title: '🛑 Vinted demande une vérification', body: `${nom ? nom + ' : ' : ''}fais-la sur vinted.fr, puis touche Reprendre dans VRM. Rien ne part en attendant.` };
 }
 
@@ -52,12 +57,13 @@ export async function notifierVerificationVinted(uidBrut, { maintenant = Date.no
   const uid = String(uidBrut == null ? '' : uidBrut);
   if (!/^\d{1,20}$/.test(uid)) return { status: 400, envoye: false, raison: 'compte invalide' };
   if (!proprietaireCourant()) return { status: 401, envoye: false, raison: 'vendeur inconnu' };
-  const rows = await lire(`app_data?id=like.actions_compte_${uid}_*&select=id,cap:data->>captcha`);
+  const rows = await lire(`app_data?id=like.actions_compte_${uid}_*&select=id,cap:data->>captcha,arr:data->>arret`);
   if (rows === null) return { status: 503, envoye: false, raison: 'ligne illisible — rien envoyé' };
-  const cap = verificationRecente(rows, uid, maintenant);
-  if (!cap) return { status: 200, envoye: false, raison: 'aucune vérification récente sur ce compte' };
+  const ar = arretRecent(rows, uid, maintenant);
+  const cap = ar.at;
+  if (!cap || ar.quoi === 'moderation') return { status: 200, envoye: false, raison: 'aucune vérification récente sur ce compte' };
   const comptes = await lire(`vinted_accounts?vinted_user_id=eq.${uid}&select=login`);
   const nom = Array.isArray(comptes) && comptes[0] && typeof comptes[0].login === 'string' ? comptes[0].login.slice(0, 40) : '';
-  const envoi = await sendPushToAll({ cat: 'capture', urgent: true, ...texteVerification(nom), tag: `vrm-verif-${uid}-${cap}`, url: DESTINATIONS.journee() });
+  const envoi = await sendPushToAll({ cat: 'capture', urgent: true, ...texteVerification(nom, ar.quoi), tag: `vrm-verif-${uid}-${cap}`, url: DESTINATIONS.journee() });
   return { status: 200, envoye: !!(envoi && envoi.sent), raison: (envoi && (envoi.coupe || envoi.erreur || (envoi.calme ? 'heures calmes' : ''))) || '' };
 }

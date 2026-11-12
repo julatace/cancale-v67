@@ -51076,7 +51076,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'', question:r.question||null }; }
-          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu", question:(r&&r.question)||null };
+          return { etat:'echec', code:(r&&r.code)||'', attendreMs:(r&&Number(r.attendreMs))||0, raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu", question:(r&&r.question)||null };
         };
         // (28 oct., 5.252) Modifier SUR PLACE : le PUT mesuré (`republierVinted`), le
         // prix et le titre EXACTS de l'aperçu ; jamais sous le prix d'achat.
@@ -51086,7 +51086,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const r=await vmrCmdSuivi({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000);
           if (r.sansReponse) return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE };
           if (r && r.accepte && r.etape==='fait') { if(ownerPrix&&AUTH.user?.id===ownerPrix)noterPrix(a,r); return { etat:'fait', nouveau:r.nouveau }; }
-          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+          return { etat:'echec', code:(r&&r.code)||'', attendreMs:(r&&Number(r.attendreMs))||0, raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
         // (28 oct., 5.252) En ligne → brouillon : la même recréation, arrêtée au
         // brouillon (`versBrouillon`) : enregistrée, retirée, PUIS le brouillon
@@ -51097,7 +51097,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (r.sansReponse) { brRefaire.relire(); brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' }; }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) { if (r.etape==='fait') brVinted.relire(); return { etat:r.etape, raison:r.raison||'' }; }
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'', question:r.question||null }; }
-          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu", question:(r&&r.question)||null };
+          return { etat:'echec', code:(r&&r.code)||'', attendreMs:(r&&Number(r.attendreMs))||0, raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu", question:(r&&r.question)||null };
         };
         // (28 oct., 5.252) Brouillons → en ligne, à la suite : ses brouillons (la liste
         // de « Voir mes brouillons », §11) ; seuls ceux PRÊTS se cochent.
@@ -51107,7 +51107,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (r.sansReponse) { brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.etape==='fait') { brVinted.relire(); return { etat:'fait' }; }
           if (r && r.accepte && r.etape==='incertain') return { etat:'incertain', raison:r.raison||'' };
-          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+          return { etat:'echec', code:(r&&r.code)||'', attendreMs:(r&&Number(r.attendreMs))||0, raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
         const RAISON_BR = { inconnu:"VRM n'a pas encore son contenu : ouvre-le sur Vinted et enregistre-le une fois", incomplet:'incomplet — finis-le sur Vinted', publie:'déjà mis en ligne par VRM', lecture:'lecture…', passu:"VRM n'a pas pu lire ce qu'il sait de tes brouillons" };
         const annoncesBr = (brVinted.liste||[]).map(b=>{ const i=b._info; const p=i&&i.prix!=null&&i.prix!==''?Number(i.prix):Number(b.price&&typeof b.price==='object'?b.price.amount:b.price);
