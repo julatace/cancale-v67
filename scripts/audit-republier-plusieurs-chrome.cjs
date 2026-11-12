@@ -96,8 +96,11 @@ async function aFaire(src) {
   // Base qui ne répond pas : chaque Chrome retombe sur SON compte (jamais tout bloqué).
   const c = monter(src, { lectureKO: (u) => /actions_compte_/.test(u) });
   let m = 0; for (let i = 0; i < 60; i++) { const g = await c.ctx.gardeStricte('111', { vinted_user_id: '111', domain: 'www.vinted.fr' }, {}); if (g === null) m++; else break; }
-  if (m !== 50) ko++;
-  console.log(`${m === 50 ? '  ✅' : '  ❌'} E. base muette : le compte de CE Chrome seul (${m} sur 50), aucun blocage de toutes les actions`);
+  // 5.362 (revue, moyenne 40 — règle voulue) : base muette ⇒ ce Chrome ne prend que SA MOITIÉ
+  // (`ACTIONS_SANS_AUTRES`, 25) — deux Chrome en panne de base ne font plus 50 + 50 sur le compte ;
+  // jamais un blocage de toutes les actions (0). Avant la 5.362 : 50.
+  if (m !== 25) ko++;
+  console.log(`${m === 25 ? '  ✅' : '  ❌'} E. base muette : CE Chrome prend sa moitié (${m} sur 25), aucun blocage de toutes les actions`);
   return ko;
 }
 

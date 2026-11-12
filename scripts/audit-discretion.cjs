@@ -320,6 +320,32 @@ const sansMain = (f) => { if (f.lignes.main === undefined) f.lignes.main = {}; }
     g.store.vrmCmdConnus = { [`${UID}_orders_sold`]: { complet: false, etats: f.store.vrmCmdConnus[`${UID}_orders_sold`].etats, at: Date.now() } };
     await g.ctx.rafraichirVentes(UID);
     dit(g.j.vinted.filter((x) => /my_orders/.test(x.chemin)).length === 8, 'pas capté en entier : rien n’est sauté (8 pages)');
+    // La moisson faite DANS la page (`pageActiveFetch`, 100 par page, 10 pages au plus) : la même règle.
+    const vPage = (e) => {
+      if (/users\/current/.test(e.chemin)) return { status: 200, body: { user: { id: 5 } } };
+      if (/wardrobe/.test(e.chemin)) return { status: 200, body: { items: [], pagination: { total_pages: 1 } } };
+      if (/my_orders\?type=purchased/.test(e.chemin)) return { status: 200, body: { my_orders: [], pagination: { total_pages: 1 } } };
+      if (/my_orders\?type=sold/.test(e.chemin)) return vinted(e);
+      return { status: 200, body: {} };
+    };
+    const h = fond({ vinted: vPage }); sansMain(h);
+    h.ctx.storeHarvestRow = async () => 'ecrit'; h.ctx.lastProfileId = async () => null;
+    await h.ctx.pageActiveFetch();
+    const p1 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length;
+    h.store.vrmImport = { [UID]: { sold: { fini: true }, purchased: { fini: true } } };
+    ventes = [{ transaction_id: 999998, status: 'Bordereau d’envoi commandé', transaction_user_status: 'needs_action' }].concat(ventes);
+    await h.ctx.pageActiveFetch();
+    const p2 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length - p1;
+    // (La vente EN COURS posée plus haut est maintenant 102e : la page 2 est relue pour elle.)
+    dit(p1 === 10 && p2 === 2, 'moisson dans la page : 10 pages avant ; une fois le compte capté, la page 1 + celle de la vente en cours connue (2)', `${p1} puis ${p2}`);
+    const enCours = String(ventes[101].transaction_id);
+    ventes[101] = { ...ventes[101], transaction_user_status: 'completed', status: 'Commande finalisée' };
+    await h.ctx.pageActiveFetch();
+    ventes = [{ transaction_id: 999997, status: 'Bordereau d’envoi commandé', transaction_user_status: 'needs_action' }].concat(ventes);
+    const avant3 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length;
+    await h.ctx.pageActiveFetch();
+    const p3 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length - avant3;
+    dit(p3 === 1 && /completed/.test(h.store.vrmCmdConnus[`${UID}_orders_sold`].etats[enCours]), 'moisson dans la page : la vente en cours finalisée (état appris), ensuite 1 seule requête', `${p3}`);
   });
 
   // ── 8. VARIABLES (copie identique, remplacement) ─────────────────────────
@@ -333,6 +359,32 @@ const sansMain = (f) => { if (f.lignes.main === undefined) f.lignes.main = {}; }
     dit(t === 'Salut lea_75, Nike Air Max 90 à 45 € ? lea_75', 'variables : {pseudo}, {article}, {prix} remplacés', t);
     dit(C.erreurVariablesFavori('Bonjour {pseudo} {article} {prix}') === '' && /inconnue/.test(C.erreurVariablesFavori('{prenom}')), 'variables : acceptées par la règle, une inconnue refusée');
     dit(C.prixRequisFavori('à {prix}') && !C.prixTexteFavori(null), 'variables : {prix} sans prix lu ⇒ le message ne part pas');
+  });
+
+  // ── L'IMPORT LEBONCOIN PAR LE CANAL PRIVÉ (comme les ordres de 5.362) ─────
+  await essai('import-lbc', async () => {
+    const vm = require('vm');
+    const REL = fs.readFileSync(path.join(path.dirname(SRC0), 'lbc-relay.js'), 'utf8');
+    const ecoutes = [], onMsg = [], vus = [];
+    const win = {};
+    // « Un script de la page » : il lit chaque ordre posté sur `window` et répond un faux résultat 200.
+    win.postMessage = (m) => { const d = JSON.parse(JSON.stringify(m)); setTimeout(() => {
+      for (const f of ecoutes.slice()) { try { f({ source: win, origin: 'https://www.leboncoin.fr', data: d, ports: [] }); } catch (_) {} }
+      if (d && d.__tag === 'CANCALE_LBC_ORDRE') { vus.push(d.kind); win.postMessage({ __tag: 'CANCALE_LBC', kind: 'lbcimportresultat', jeton: d.jeton, statut: 200, corps: '{"faux":true}' }); }
+    }, 0); };
+    win.addEventListener = (t, f) => { if (t === 'message') ecoutes.push(f); };
+    win.top = win;
+    const modeles = [];
+    const ctx = { window: win, self: win, location: { origin: 'https://www.leboncoin.fr', hostname: 'www.leboncoin.fr', href: 'https://www.leboncoin.fr/' }, console: { log() {}, warn() {}, error() {} },
+      setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms, 60)), clearTimeout, setInterval: () => 0, clearInterval() {}, TextEncoder, URL, crypto: { randomUUID: () => 'jeton-' + Math.random().toString(16).slice(2, 12) },
+      chrome: { runtime: { id: 'ext', lastError: null, sendMessage: (m, cb) => { if (m && m.action === 'lbcImportModele') modeles.push(m); if (typeof cb === 'function') cb({ ok: true }); }, onMessage: { addListener: (f) => onMsg.push(f) } } } };
+    vm.createContext(ctx); vm.runInContext(REL, ctx, { filename: 'lbc-relay.js' });
+    const r = await new Promise((res) => { let g = false; for (const f of onMsg) { if (f({ from: 'vrm-fond', action: 'lbcImportPage', url: 'https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions?page=2', compte: 'abc' }, { id: 'ext' }, res) === true) g = true; } if (!g) setTimeout(() => res(undefined), 30); });
+    await new Promise((x) => setTimeout(x, 80));
+    dit(!(r && r.ok === true) && !vus.includes('importpage'), 'import Leboncoin : l’ordre ne passe plus par `window` et un faux résultat de la page n’est JAMAIS cru', JSON.stringify({ r, vus }));
+    win.postMessage({ __tag: 'CANCALE_LBC', kind: 'lbcimportmodele', url: 'https://api.leboncoin.fr/x?page=1', moi: 'abc' });
+    await new Promise((x) => setTimeout(x, 30));
+    dit(modeles.length === 0, 'import Leboncoin : un « modèle » posté par la page sur `window` n’est pas appris', JSON.stringify(modeles));
   });
 
   // ── RÈGLES DE L'APP ──────────────────────────────────────────────────────

@@ -86,6 +86,7 @@ exécuter dans ces comptes les actions qu'il demande depuis l'app VRM.
 | `scripting` | Lire, dans l'onglet de la plateforme déjà ouvert par l'utilisateur, les données de ses annonces et ventes (et remplir le formulaire de dépôt Leboncoin quand il publie depuis VRM). |
 | `tabs` | Retrouver l'onglet de la plateforme déjà ouvert, ouvrir la page de dépôt Leboncoin ou la conversation d'une vente quand l'utilisateur le demande. |
 | `downloads` | Repérer le PDF du bordereau d'expédition que l'utilisateur télécharge depuis Vinted, pour le ranger dans VRM avec la vente. Observation seule : l'extension ne déclenche aucun téléchargement. |
+| `contextMenus` | Ajouter au clic droit sur l'icône de l'extension deux entrées, « Connexion à VRM » et « État de l'extension », qui ouvrent la page de connexion de l'extension dans un onglet. Aucun autre menu, aucune lecture de page. |
 | hôtes `*.vinted.*`, `*.leboncoin.fr`, `*.ebay.*` | Les plateformes de revente de l'utilisateur. |
 | hôte `*.vinted.net` | Les photos de ses annonces (CDN de Vinted), pour les joindre à une annonce Leboncoin/eBay. |
 | hôte `*.amazonaws.com` | Les bordereaux PDF de Vinted sont servis par un stockage Amazon S3 (`svc-shipping-labels…amazonaws.com`). |

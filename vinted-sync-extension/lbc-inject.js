@@ -390,16 +390,18 @@
       if (u.origin !== 'https://api.leboncoin.fr' || !LISTE_TX.test(u.pathname) || !pagineLbc(u)) return;
       const moi = moiLbc(); if (!moi) return;
       const cle = moi + '|' + u.href; if (modelesLbcVus.has(cle)) return; modelesLbcVus.add(cle);
-      post({ kind: 'lbcimportmodele', url: u.href.slice(0, 600), moi });
+      versRelais({ kind: 'lbcimportmodele', url: u.href.slice(0, 600), moi });   // 5.370 : canal privé (comme la recette apprise, 5.362)
     } catch (_) {}
   };
   let importLbcEnCours = false;
-  try { window.addEventListener('message', async (event) => {
-    const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'importpage') return;
+  // ⚠️ 5.370 (comme les ordres de 5.362) : l'ordre d'importer une page et son résultat passent
+  //    par le CANAL PRIVÉ (`surOrdre` / `versRelais`), jamais par `window.postMessage` : un script
+  //    de la page ne lit plus l'ordre et ne peut plus poster un faux résultat.
+  try { surOrdre(async (d) => {
+    if (!d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'importpage') return;
     const jeton = String(d.jeton || '');
     if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
-    const fin = (o) => post(Object.assign({ kind: 'lbcimportresultat', jeton }, o));
+    const fin = (o) => versRelais(Object.assign({ kind: 'lbcimportresultat', jeton }, o));
     if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-leboncoin' });
     let u; try { u = new URL(String(d.url || '')); } catch (_) { return fin({ statut: 0, erreur: 'adresse' }); }
     if (u.origin !== 'https://api.leboncoin.fr' || u.username || u.password || !((LISTE_TX.test(u.pathname) && pagineLbc(u)) || (DETAIL_TX.test(u.pathname) && !u.search))) return fin({ statut: 0, erreur: 'adresse' });

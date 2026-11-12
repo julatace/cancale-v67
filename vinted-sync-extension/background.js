@@ -4773,6 +4773,7 @@ const WREQ_SENSIBLE = /bank_account|credit_card|payments|payment|payout|user_2fa
 // longueur — pour pouvoir un jour proposer le virement sans rien deviner.
 // VRM n'appelle JAMAIS cette adresse : c'est une lecture de ce que la page a fait.
 const WREQ_FORME = /payout/i;
+const WREQ_SANS_FORME = /bank_account|credit_card|payments?(?![a-z])|checkout|password|user_2fa|identity|purchases\//i;
 function formeCorps(body) {
   const out = [];
   const t = String(body == null ? '' : body).trim();
@@ -4828,7 +4829,10 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabI
       }
     }
   }
-  const forme = (WREQ_FORME.test(path) || WREQ_SENSIBLE.test(path)) ? formeCorps(body) : null;   // AVANT de retirer le contenu
+  // ⚠️ 5.370 (régression de 5.356, `audit-extension-5186`) : la FORME d'une écriture sensible,
+  //    oui (réponse, profil, téléphone) — mais JAMAIS celle d'un moyen de paiement, d'un mot de
+  //    passe ou d'une identité (une carte bancaire ne gagne pas de forme). Le retrait (`payout`) garde la sienne.
+  const forme = (WREQ_FORME.test(path) || (WREQ_SENSIBLE.test(path) && !WREQ_SANS_FORME.test(path))) ? formeCorps(body) : null;   // AVANT de retirer le contenu
   if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
   // (ex: /api/v2/items/123 et /api/v2/items/456 -> meme cle).
@@ -11745,6 +11749,10 @@ async function visiteVintedUnPassage() {
     // (Mondial Relay toujours) — un passage au plus toutes les 5 min, son
     // propre budget : rien de la visite Vinted n'est consommé ni attendu.
     transpTick('visite').catch(() => {});
+    // ⚠️ 5.370 (régression de 5.361, `audit-liaison-visite`) : depuis que `compteNonCapte` rend
+    //    « pas su » sans session VRM, une visite SANS SESSION sortait en se disant « compte
+    //    supprimé ». Rien ne partait chez Vinted, mais le diagnostic mentait : la session d'abord.
+    if (await sansSessionPourEcrire()) { noterDiag('visite_sans_session'); return; }
     if (await compteNonCapte(uid)) { noterDiag('visite_compte_supprime'); return; }
     // (5.337) La jauge du plafond : ce Chrome dit ses actions de l'heure pour ce compte, même zéro.
     publierJaugeVisite(uid).catch(() => {});
