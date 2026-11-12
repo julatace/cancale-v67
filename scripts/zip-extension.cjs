@@ -105,9 +105,9 @@ function manifesteOrion(m){
  const f=JSON.parse(JSON.stringify(m));
  f.manifest_version=2;
  f.background={scripts:['compat-orion.js',m.background.service_worker],persistent:false};
- f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads'].includes(p)),...(m.host_permissions||[])])];
+ f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads','contextMenus'].includes(p)),...(m.host_permissions||[])])];
  delete f.host_permissions;delete f.externally_connectable;
- f.browser_action=f.action;delete f.action;
+ f.browser_action=f.action;delete f.action;if(!f.browser_action.default_popup)f.browser_action.default_popup='popup.html';   /* 5.370 : Orion (pas de clic droit) garde la fenêtre de l'icône */
  // 31 oct. : Orion sur iPhone a refusé le paquet. On ne garde que ce qu'un
  // lecteur WebExtension ancien connaît : l'identifiant, sans
  // `data_collection_permissions` (clé de 2025 propre à addons.mozilla.org).

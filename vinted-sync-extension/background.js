@@ -217,9 +217,40 @@ async function saveSession(sess) {
 // ici (`chrome.action.onClicked`) et ouvre VRM directement. Pas connecté : la
 // petite fenêtre de connexion, et elle seule.
 const APP_URL_VRM = 'https://vrm.center';
+// ⚠️ 5.370 (12 nov., Julien : « comme Vintex, quand on clique sur l'extension VRM, ça ouvre
+//    un onglet séparé ») : le clic ouvre TOUJOURS VRM dans un onglet — celui déjà ouvert DANS
+//    CETTE FENÊTRE est mis au premier plan, sinon un nouveau. Pas connecté ⇒ vrm.center sur la
+//    connexion, avec `lier-extension` (l'app connectée adresse sa session à l'extension).
+//    Le manifeste n'a plus de `default_popup`. Ce que faisait la fenêtre (connexion e-mail /
+//    code / Google / Discord, lier à VRM, se déconnecter, version, permission transporteur,
+//    ouvrir VRM) reste joignable : clic DROIT sur l'icône ⇒ « Connexion à VRM » / « État de
+//    l'extension » (la même page, dans un onglet), la carte du logo sur les sites, et
+//    Paramètres → « Tout va bien ? » dans l'app.
+//    Sans menu contextuel (Orion iPhone : pas de clic droit), déconnecté ⇒ la fenêtre de
+//    connexion comme avant (sinon on ne pourrait plus l'atteindre).
+const sansMenuIcone = () => { try { return !(chrome.contextMenus && typeof chrome.contextMenus.create === 'function'); } catch (_) { return true; } };
 function majIcone(connecte) {
-  try { chrome.action.setPopup({ popup: connecte ? '' : 'popup.html' }); } catch (_) {}
+  try { chrome.action.setPopup({ popup: connecte || !sansMenuIcone() ? '' : 'popup.html' }); } catch (_) {}
 }
+// Le menu du clic droit sur l'icône : la fenêtre d'avant, dans un onglet.
+const MENU_ICONE = [['vrm-connexion', 'Connexion à VRM'], ['vrm-etat', 'État de l’extension']];
+function poserMenuIcone() {
+  if (sansMenuIcone()) return false;
+  try {
+    chrome.contextMenus.removeAll(() => {
+      try { void chrome.runtime.lastError; } catch (_) {}
+      for (const [id, title] of MENU_ICONE) { try { chrome.contextMenus.create({ id, title, contexts: ['action'] }, () => { try { void chrome.runtime.lastError; } catch (_) {} }); } catch (_) {} }
+    });
+    return true;
+  } catch (_) { return false; }
+}
+function surMenuIcone(info) {
+  const id = String((info && info.menuItemId) || '');
+  if (!MENU_ICONE.some(([m]) => m === id)) return false;
+  try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') + '?mode=onglet' + (id === 'vrm-etat' ? '&vue=etat' : '') }); } catch (_) {}
+  return true;
+}
+try { if (!sansMenuIcone()) { poserMenuIcone(); chrome.contextMenus.onClicked.addListener(surMenuIcone); } } catch (_) {}
 // Le site d'où l'on vient décide l'onglet de VRM : on arrive là où l'on travaille.
 function plateformeDe(url) {
   const u = String(url || '');
@@ -245,8 +276,10 @@ function ouvrirVRMDepuis(urlActive, opts) {
   // 5.351 : « Colis · Messages · Offres · Ma journée » depuis la carte du logo.
   const ecran = !lier && opts && Object.prototype.hasOwnProperty.call(ECRANS_CARTE, String(opts.ecran || '')) ? ECRANS_CARTE[String(opts.ecran)] : '';
   const cible = ecran ? APP_URL_VRM + '/?' + ecran : APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '') + (connexion ? '&connexion=' + connexion : '');
+  // 5.370 : l'onglet VRM de CETTE fenêtre (celle du clic), quand on la connaît.
+  const fenetre = opts && Number.isInteger(opts.fenetre) ? opts.fenetre : null;
   try {
-    chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
+    chrome.tabs.query(fenetre != null ? { url: APP_URL_VRM + '/*', windowId: fenetre } : { url: APP_URL_VRM + '/*' }, (ouverts) => {
       const t = (ouverts || [])[0];
       // Déjà sur VRM : on ne recharge pas la page (on garde l'écran où l'on est)
       // — sauf pour une liaison, que l'app lit dans l'adresse.
@@ -261,12 +294,16 @@ try {
     // Le clic n'arrive ici que si le popup est vide, donc si une session
     // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
     const e = await authEtat().catch(() => ({ connecte: true }));
+    const fenetre = tab && Number.isInteger(tab.windowId) ? tab.windowId : null;
     // 5.329 : « pas su, renouvellement en cours » n'est PAS « déconnecté ».
     if (!e.connecte && !e.incertain) {
       majIcone(false);
-      try { await chrome.action.openPopup(); return; } catch (_) {}
+      // 5.370 : sans menu (Orion iPhone), la fenêtre de connexion ; sinon VRM, page de connexion.
+      if (sansMenuIcone()) { try { await chrome.action.openPopup(); return; } catch (_) {} }
+      ouvrirVRMDepuis(tab && tab.url, { lier: true, fenetre });
+      return;
     }
-    ouvrirVRMDepuis(tab && tab.url);
+    ouvrirVRMDepuis(tab && tab.url, { fenetre });
   });
 } catch (_) {}
 // 5.329 : la session rangée par un AUTRE contexte (ou un réveil d'avant) remplace
