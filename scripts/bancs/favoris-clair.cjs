@@ -247,7 +247,7 @@ createRoot(document.getElementById('r')).render(<><Banc/><SuiviTravailHote/></>)
       // 3. QUAND : comme Vintex
       await pg.click('[data-fc-rythme="vintex"]');
       const phrase = await pg.evaluate(() => document.querySelector('[data-fc-rythme-phrase]')?.innerText || '');
-      dit(/6 à 10 secondes/.test(phrase), `${T} QUAND : « comme Vintex » expliqué en une phrase (6 à 10 s)`, phrase);
+      dit(/6 à 10 secondes/.test(phrase), `${T} QUAND : « Rapide » expliqué en une phrase (6 à 10 s)`, phrase);
       // 7. historique
       const h = await pg.evaluate(() => ({ achats: Number(document.querySelector('[data-fc-achats]')?.getAttribute('data-fc-achats')), envoyes: Number(document.querySelector('[data-fc-envoyes]')?.getAttribute('data-fc-envoyes')), sans: Number(document.querySelector('[data-fc-sans-acheteur]')?.getAttribute('data-fc-sans-acheteur') || 0), lignes: [...document.querySelectorAll('[data-fc-achat]')].map((e) => e.getAttribute('data-fc-achat')), lots: [...document.querySelectorAll('[data-fc-lot]')].map((e) => [e.getAttribute('data-fc-lot'), e.getAttribute('data-fc-lot-achats')]), groupes: Number(document.querySelector('[data-fc-groupes]')?.getAttribute('data-fc-groupes') || 0) }));
       dit(h.achats === 1 && JSON.stringify(h.lignes) === '["9001"]', `${T} historique : 1 achat après un message (même annonce ET même personne)`, JSON.stringify(h));

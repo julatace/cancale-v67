@@ -93,7 +93,7 @@ function controles(lire) {
   // Hors repli : le texte de l'élément `data-favoris-avertissement` avant son <Pourquoi>.
   const av = /data-favoris-avertissement[^>]*>([\s\S]*?)<Pourquoi>/.exec(fav);
   dit(!!av && /Aucune garantie contre un blocage Vinted/.test(av[1]), 'T2 Favoris : « Aucune garantie contre un blocage Vinted » reste à l’écran (pas replié)', av && av[1]);
-  dit(/Un message toutes les 6 à 10 s/.test(fav) && /rythme mesuré chez Vintex/.test(fav), 'T2 Favoris : le rythme « 6 à 10 s, au hasard » reste dit à l’écran');
+  dit(/Un message toutes les 6 à 10 s/.test(fav) && /rythme rapide/.test(fav), 'T2 Favoris : le rythme « 6 à 10 s, au hasard » reste dit à l’écran');
   const temoins = [
     ['src/FavorisVinted.jsx', 'Une conversation qui contient déjà des messages est ignorée.'],
     ['src/FavorisVinted.jsx', 'Si le prix de l’annonce ne peut pas être lu, le message part sans offre.'],

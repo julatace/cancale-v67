@@ -10565,7 +10565,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === 'vrm-relais') lance('relais', () => relaisTick('alarme'));
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
-  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); }   // 5.370 : les baisses programmées
+  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
@@ -16754,7 +16754,7 @@ async function executerMessageFavori(uid,acc,body){
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
   // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
   // (5.369) `variante` = le n° de la version envoyée (1 à 5), rendu au serveur pour le journal (jamais le texte).
-  let ecrits=0,frein='',variante=null;
+  let ecrits=0,frein='',variante=null,attente=null;
   const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,ecrits,...(resultat==='envoye'&&Number.isInteger(variante)?{variante}:{})}});
   if(typeof body?.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(body.jeton))return rep('refuse',400);
   const jeton=body.jeton;
@@ -16887,6 +16887,14 @@ async function executerMessageFavori(uid,acc,body){
   if(prixRequisFavori(version.texte)&&!prixTexteFavori(infosMsg.prix))return rep('refuse',0,'offre_prix_inconnu');
   const texteFinal=personnaliserMessageFavori(version.texte,String(c?.opposite_user?.login||''),undefined,infosMsg).slice(0,2000);
   if(!texteFinal.trim())return rep('refuse',400);
+  // (5.372) L'offre acceptée par Vinted : 8 à 20 s au hasard AVANT d'écrire le message
+  // (écrit dans chrome.storage.local, repris après un réveil du worker ; Tout arrêter,
+  // captcha, pause, autre compte ou onglet fermé pendant l'attente ⇒ le message ne part pas).
+  if(prixOffreFait!=null){
+    attente=jeton;
+    const att=await attendreOffreMessage(jeton,{uid:String(uid),convId,texte:texteFinal,variante:version.n,tRes,suivi:grant.suivi||null,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
+    if(!att.ok){noterDiag('favori_message_pas_parti_'+att.raison);return rep('refuse',0,att.raison);}
+  }
   await pauseFavori('reponse', uid);
   // (5.369) Le temps qu'un humain mettrait à taper CE texte, puis l'envoi d'un coup.
   // Pause de Vinted ou autre compte pendant l'attente ⇒ rien ne part (places rendues).
@@ -16904,7 +16912,7 @@ async function executerMessageFavori(uid,acc,body){
   if(r.pause)return rep('refuse',0,'pause_vinted');
   if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
-  }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);}
+  }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);}}
 }
 // (5.309, 2 nov.) LES FREINS DE VINTED, pour le mode automatique des favoris : un
 // 429/403 (la pause de l'extension est déjà posée par `requeteVinted`), une page
@@ -16921,12 +16929,128 @@ function freinFavoriAuto(r) {
 }
 // Mesuré sur Vintex (29 oct., 9 favoris) : création → transaction 3,2–6,0 s ;
 // transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.
+// (5.372) Le temps APRÈS l'offre est désormais de 8 à 20 s (`attendreOffreMessage`) ; `offre` reste
+// la courte pause entre la transaction relue et l'offre.
 const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550] };
 async function pauseFavori(quoi, uid) {
   const p = PAUSES_FAVORI[quoi] || [400, 800];
   const ms = Math.round(p[0] + Math.random() * (p[1] - p[0])) * (await facteurPrudence(uid));   // 5.357 : doublée en prudence
   try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['favori:' + quoi, ms]); } catch (_) {}
   return new Promise((ok) => setTimeout(ok, ms));
+}
+// ══ 5.372 (12 nov.) — LE TEMPS ENTRE L'OFFRE ET LE MESSAGE ═════════════════
+// Julien : « je veux aussi que tu espaces le temps où tu envoies l'offre et tu
+// envoies le message car je crois qu'il est très faible » ; puis « peut-être
+// moins de temps d'écart entre offre et message mais il doit être aléatoire et
+// marqué quand même ». Avant : 0,3 à 0,8 s. Désormais, une fois l'offre ACCEPTÉE
+// par Vinted, un temps tiré au hasard entre 8 et 20 s (uniforme, à la seconde,
+// jamais deux fois de suite la même valeur — `vrmOffreMessageDernier`), PUIS le
+// temps d'écriture humain (5.369), puis l'envoi d'un coup.
+//  · L'attente ne prend AUCUNE action du plafond (les places de l'offre et du
+//    message sont réservées depuis le départ, X3) ;
+//  · avant chaque tranche, et juste avant le message : « Tout arrêter » (5.366 /
+//    5.370), vérification anti-robot ou captcha du compte, pause 429/403, compte
+//    de l'onglet, onglet vinted.fr ouvert — un seul « non » ⇒ le message ne part
+//    PAS, la raison est rendue (et dite à l'app) ; la place du message est rendue ;
+//  · §4.9 : l'attente est ÉCRITE dans `chrome.storage.local` (`vrmFavoriAttente` :
+//    compte, conversation, texte prêt, fin prévue — jamais dans la base). Si Chrome
+//    endort le service worker pendant l'attente, le réveil `vrm-offres` (1 min) la
+//    REPREND (`reprendreMessagesFavoris`) avec les mêmes vérifications ; trop
+//    tard (10 min après la fin prévue) ⇒ rien ne part, c'est noté.
+const OFFRE_MESSAGE_S = [8, 20];
+const FAVORI_ATTENTE = 'vrmFavoriAttente';
+const FAVORI_ATTENTE_TRANCHE_MS = 2000;
+const FAVORI_ATTENTE_TROP_TARD_MS = 10 * 60000;
+const _favorisAttenteIci = new Set();   // les attentes tenues par CE worker (un worker neuf n'en a aucune)
+async function tirerAttenteOffreMessage() {
+  const [a, b] = OFFRE_MESSAGE_S;
+  let der = NaN;
+  try { der = Number(((await chrome.storage.local.get('vrmOffreMessageDernier')).vrmOffreMessageDernier || {}).s); } catch (_) {}
+  let s = a + Math.floor(Math.random() * (b - a + 1));
+  if (s === der) s = a + ((s - a + 1 + Math.floor(Math.random() * (b - a))) % (b - a + 1));
+  try { await chrome.storage.local.set({ vrmOffreMessageDernier: { s, at: Date.now() } }); } catch (_) {}
+  return s;
+}
+async function lireAttentesFavori() {
+  try { const v = (await chrome.storage.local.get(FAVORI_ATTENTE))[FAVORI_ATTENTE]; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; }
+}
+async function poserAttenteFavori(jeton, e) {
+  const t = await lireAttentesFavori(); if (t === null) return false;
+  if (e) t[jeton] = e; else delete t[jeton];
+  try { await chrome.storage.local.set({ [FAVORI_ATTENTE]: t }); return true; } catch (_) { return false; }
+}
+// Un « non » avant le message : la raison que le serveur comprend, sinon ''.
+async function arretAvantMessageFavori(uid, acc) {
+  try { if ((await toutArreteDepuis(null)) > 0) return 'tout_arrete'; } catch (_) {}
+  try { const s = await secuLire(); if (s && secuArretEffectif(s.evts).arrete) return 'tout_arrete'; } catch (_) {}
+  try { const c = (await lireLocal('vrmCaptcha'))[String(uid)]; if (c && Number(c.depuis) > 0) return 'vinted_robot'; } catch (_) {}
+  const g = await gardeStricte(uid, acc, { lecture: true });
+  if (g) return g.code === 'vinted-pause' ? 'pause_vinted' : g.code === 'vinted-autre' ? 'compte_vinted_different' : g.code === 'vinted-absent' ? 'compte_vinted_absent' : /robot|verification|captcha/.test(String(g.code || '')) ? 'vinted_robot' : 'vinted_refus';
+  const pg = await pageVintedPour(acc);
+  if (pg && pg.refus) return 'onglet_vinted';
+  return '';
+}
+// Attendre `reste` ms par tranches, en revérifiant tout avant chacune.
+async function tenirAttenteFavori(uid, acc, reste) {
+  let r = Math.max(0, Number(reste) || 0);
+  for (;;) {
+    const non = await arretAvantMessageFavori(uid, acc);
+    if (non) return { ok: false, raison: non };
+    if (r <= 0) return { ok: true };
+    const t = Math.min(FAVORI_ATTENTE_TRANCHE_MS, r);
+    await new Promise((ok) => setTimeout(ok, t));
+    r -= t;
+  }
+}
+// Le chemin normal : l'offre vient d'être acceptée ; `etape` dit à l'app « message dans ~N s ».
+async function attendreOffreMessage(jeton, e, etape) {
+  const s = await tirerAttenteOffreMessage();
+  const ms = s * 1000;
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['favori:offre-message', ms]); } catch (_) {}
+  _favorisAttenteIci.add(jeton);
+  const { acc: _acc, ...aGarder } = e;
+  await poserAttenteFavori(jeton, { ...aGarder, jusqua: Date.now() + ms, s, v: CODE_VERSION });
+  noterDiag('favori_attente_offre_message');
+  if (typeof etape === 'function') etape('attente_message', { dans: s });
+  return tenirAttenteFavori(e.uid, e.acc || null, ms);
+}
+// Après un réveil du worker : les attentes que personne ne tient plus.
+let _repriseFavorisEnCours = false;
+async function reprendreMessagesFavoris() {
+  if (_repriseFavorisEnCours) return 0;
+  _repriseFavorisEnCours = true;
+  let n = 0;
+  try {
+    const t = await lireAttentesFavori();
+    if (!t) return 0;
+    for (const jeton of Object.keys(t)) {
+      if (_favorisAttenteIci.has(jeton)) continue;
+      const e = t[jeton];
+      const finir = async (resultat, raison) => {
+        await poserAttenteFavori(jeton, null);
+        if (resultat !== 'envoye' && e && e.tRes) { try { await rendreActions(String(e.uid), Number(e.tRes), 1); } catch (_) {} }
+        logActivity(resultat === 'envoye' ? '💬 Message au favori envoyé après la reprise de l’extension (offre faite avant)' : `⚠️ Offre faite, message au favori PAS envoyé (${raison})`);
+        try { notifierApp({ type: 'favoris', uid: String(e && e.uid || ''), suivi: e && e.suivi || null, etape: resultat === 'envoye' ? 'confirmation' : 'message_pas_parti', raison }); } catch (_) {}
+      };
+      if (!e || !/^\d{1,20}$/.test(String(e.uid || '')) || !/^[1-9]\d{0,19}$/.test(String(e.convId || '')) || typeof e.texte !== 'string' || !e.texte.trim()) { await poserAttenteFavori(jeton, null); continue; }
+      if (Date.now() > Number(e.jusqua) + FAVORI_ATTENTE_TROP_TARD_MS) { await finir('refuse', 'trop_tard'); continue; }
+      _favorisAttenteIci.add(jeton);
+      try {
+        const acc = (await getStoredAccounts()).find((a) => String(a.vinted_user_id) === String(e.uid));
+        if (!acc) { await finir('refuse', 'compte_vinted_absent'); continue; }
+        const att = await tenirAttenteFavori(e.uid, acc, Number(e.jusqua) - Date.now());
+        if (!att.ok) { await finir('refuse', att.raison); continue; }
+        const ec = await attendreEcriture(e.uid, acc, e.texte, 'serie');
+        if (!ec.ok) { await finir('refuse', ec.code === 'vinted-pause' ? 'pause_vinted' : 'compte_vinted_different'); continue; }
+        const non = await arretAvantMessageFavori(e.uid, acc);
+        if (non) { await finir('refuse', non); continue; }
+        const r = await vintedPage(acc, 'POST', `/api/v2/conversations/${e.convId}/replies`, corpsReponseVinted(e.texte), { timeoutMs: 12000 });
+        if (r && r.ok && r.json && r.json.code === 0) { if (Number.isInteger(e.variante)) await noterVarianteDerniere(e.uid, 'favori', e.variante); n++; await finir('envoye', ''); }
+        else await finir('refuse', r && r.pause ? 'pause_vinted' : r && r.sansPage ? 'onglet_vinted' : 'vinted_refus');
+      } finally { _favorisAttenteIci.delete(jeton); }
+    }
+  } catch (_) {} finally { _repriseFavorisEnCours = false; }
+  return n;
 }
 // La réponse de création suffit-elle à vérifier le fil (destinataire, article, historique) ?
 function filVerifiable(c) {

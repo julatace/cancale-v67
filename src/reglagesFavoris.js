@@ -40,7 +40,7 @@ export function validerReglagesFavoris({message='',variantes=[],pourcentage=null
   for(let i=0;i<autres.length;i++){const mv=preparerMessageFavori(autres[i],null);if(mv.erreur)throw Error(`Version ${i+2} : ${mv.erreur}`);}
   const intervalle=String(intervalleMinutes??'').trim();
   // 0 = « comme Vintex » (6 à 10 s, tiré par le serveur) ; sinon des minutes entières.
-  if(!/^\d{1,6}$/.test(intervalle)||Number(intervalle)>1440)throw Error('Choisis un intervalle entier entre 0 et 1 440 minutes (0 = comme Vintex).');
+  if(!/^\d{1,6}$/.test(intervalle)||Number(intervalle)>1440)throw Error('Choisis un intervalle entier entre 0 et 1 440 minutes (0 = rapide, 6 à 10 s).');
   const maxTexte=String(intervalleMaxMinutes??'').trim();let max=null;
   if(maxTexte&&Number(intervalle)>0){
     if(!/^\d{1,6}$/.test(maxTexte)||Number(maxTexte)<1||Number(maxTexte)>1440)throw Error('Choisis un maximum entier entre 1 et 1 440 minutes.');

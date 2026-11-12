@@ -285,7 +285,7 @@ const projette = (row, sel) => {
         await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-ordre-' + vp.width + '.png') });
         const petits = await pg.$$eval('[data-republier-monter],[data-republier-descendre],[data-republier-melanger]', (els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).length);
         dit(petits === 0, 'flèches et « Mélanger » font 44 px au doigt', String(petits));
-        dit(await pg.locator('[data-republier-esp-choix="vintex"]').getAttribute('aria-pressed') === 'true', '« Comme Vintex » est le rythme par défaut (8 à 16 s entre deux paires)');
+        dit(await pg.locator('[data-republier-esp-choix="vintex"]').getAttribute('aria-pressed') === 'true', '« Rapide » est le rythme par défaut (8 à 16 s entre deux paires)');
         await pg.locator('[data-republier-esp-choix="fixe"]').click();
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0');
         await pg.locator('[data-republier-confirme]').check();
