@@ -42,7 +42,7 @@ const MIGRES = [
   ['src/PublierPartout.jsx', ['*']],
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
-  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes']],
+  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes', 'ImpressionBordereaux', 'nomPapier']],
   ['src/composants/SuiviTravail.jsx', ['*']],   // (11 nov., lot suivi-travail)
   ['src/TvaMargeCarte.jsx', ['*']],
 ];

@@ -45,6 +45,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumero
 const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
 import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
+import { bilanThermique } from '../App.jsx';   // (11 nov., lot thermique) ce que l'aperçu a fait
 import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart } from '../App.jsx';
 
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
@@ -74,6 +75,8 @@ import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.j
 // ⟦← App.jsx #2⟧
 import { filtrerReglages } from '../rechercheReglages.js';
 import { preparerApercusModes } from '../apercusBordereaux.js';
+import { CLE_IMPRESSION, FORMATS_THERMIQUES, TAMPONS, ENCRES, CONTRASTES, MARGE_MAX_MM, AUTRE_MIN_MM, AUTRE_MAX_MM, reglageImpression, papierThermique, fmtMm } from '../impression/thermique.js';   // (11 nov., lot thermique)
+import { fabriquerBordereau } from '../impression/bordereauExemple.js';
 import { actionsReglages } from '../reglagesActions.js';
 // ⟦← App.jsx #3⟧
 import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
@@ -316,6 +319,111 @@ function ApercuPdf({ octets, page = 1, largeur, zone, label }) {
   );
 }
 
+// ── RÉGLAGES → IMPRESSION DES BORDEREAUX (11 nov., lot thermique) ───────────
+// Julien : « bordereaux pour imprimante thermique, PERSONNALISABLES en fonction de
+// l'imprimante ; tu dois prendre en compte le tamponnage ; peut-être qu'il ne veut
+// pas le titre du produit dessus car visible ». LE réglage `vrm_impression`
+// (SYNC_KEYS, le même sur ses appareils), lu par `poserBordereau` pour « Tout
+// imprimer », « Imprimer » d'une vente et Leboncoin. L'aperçu imprime, par LE code
+// d'impression, un bordereau INVENTÉ (src/impression/bordereauExemple.js : le dépôt
+// est public, aucun vrai bordereau) — ce qu'on voit est ce qui sortira.
+const nomPapier = (p) => (p.id === 'autre' ? `${fmtMm(p.w)} × ${fmtMm(p.h)} mm` : tr(`impression.format.${p.id}`));
+// Un titre d'exemple neutre (VRM sert aussi les vendeurs qui ne vendent pas de baskets).
+const TITRE_EXEMPLE = 'Veste en jean bleue';
+const champMm = { width: 76, minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' };
+const ImpressionBordereaux = ({ mode, reg, changer }) => {
+  useLangue();
+  const th = mode === 'thermique';
+  const papier = papierThermique(reg);
+  const fmt = FORMATS_THERMIQUES.find((f) => f.id === reg.format) || FORMATS_THERMIQUES[0];
+  const [ap, setAp] = React.useState(null);   // null · {etat:'charge'} · {etat:'ko'} · {etat:'lu', octets, pages, r1}
+  const cle = JSON.stringify([mode, reg]);
+  React.useEffect(() => { setAp(null); }, [cle]);
+  const voir = async () => {
+    if (ap && ap.etat === 'charge') return;
+    setAp({ etat: 'charge' });
+    try {
+      const [PL, qr] = await Promise.all([import('pdf-lib'), import('qrcode-generator')]);
+      const src = await PL.PDFDocument.load(await fabriquerBordereau(PL, qr.default || qr, 'a4-notice'));
+      const out = await PL.PDFDocument.create();
+      const r1 = await poserBordereau(PL, out, src, { numero: 'B125', title: TITRE_EXEMPLE, pos: null, thermique: th, impression: { reg, taille: 'M', photo: null, emplacement: '' } });
+      setAp({ etat: 'lu', octets: await out.save(), pages: out.getPageCount(), r1, b: bilanThermique(r1.details) });
+    } catch (_) { setAp({ etat: 'ko' }); }
+  };
+  const tampon = th ? reg.tamponTh : reg.tamponA4;
+  const mm = (nom, val, min, max, vide) => (
+    <input key={`${nom}-${val}`} type="text" inputMode="decimal" aria-label={tr(`impression.${nom}`)} data-impression-champ={nom} defaultValue={val == null ? '' : fmtMm(val)} placeholder={vide}
+      style={champMm} onBlur={(e) => { const v = e.target.value.trim(); changer({ [nom]: v === '' ? null : v }); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}/>
+  );
+  const ligne = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 };
+  const lib = { fontSize: 13, fontWeight: 600, color: C.text, minWidth: 92 };
+  const aide = { fontSize: 12, color: C.muted, lineHeight: 1.45, marginTop: 4 };
+  return (
+    <section data-impression-reglage={th ? reg.format : 'a4'} data-impression-tampon={tampon} style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{tr('impression.titre')}</div>
+      {th ? <>
+        <div style={ligne}>
+          <label htmlFor="vrm-impression-papier" style={lib}>{tr('impression.papier')}</label>
+          <select id="vrm-impression-papier" data-impression-papier={reg.format} value={reg.format} onChange={(e) => changer({ format: e.target.value })}
+            style={{ minHeight: 44, flex: '1 1 180px', maxWidth: 320, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit' }}>
+            {FORMATS_THERMIQUES.map((f) => <option key={f.id} value={f.id}>{tr(`impression.format.${f.id}`)}</option>)}
+          </select>
+        </div>
+        <div style={aide}>{tr(`impression.format.${fmt.id}.aide`)}</div>
+        {reg.format === 'autre' && <div style={ligne} data-impression-autre="">
+          {mm('l', reg.l, AUTRE_MIN_MM, AUTRE_MAX_MM, '100')}<span aria-hidden="true" style={{ color: C.muted }}>×</span>{mm('h', reg.h, AUTRE_MIN_MM, AUTRE_MAX_MM, '150')}
+          <span style={{ fontSize: 12, color: C.muted }}>{tr('impression.autre.bornes', { min: AUTRE_MIN_MM, max: AUTRE_MAX_MM })}</span>
+        </div>}
+        <div style={ligne}>
+          <span style={lib}>{tr('impression.marge')}</span>{mm('marge', reg.marge, 0, MARGE_MAX_MM, fmtMm(fmt.marge))}
+          <span style={{ fontSize: 12, color: C.muted }}>{tr('impression.marge.aide', { defaut: fmtMm(fmt.marge), max: MARGE_MAX_MM })}</span>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Segmente label={tr('impression.encre')} plein value={reg.encre} onChange={(v) => changer({ encre: v })}
+            options={ENCRES.map((v) => ({ v, l: tr(`impression.encre.${v}`), data: { 'data-impression-encre': v } }))}/>
+          <div style={aide}>{tr(reg.encre === 'noir' ? 'impression.encre.noir.aide' : 'impression.encre.tel.aide')}</div>
+        </div>
+        {reg.encre === 'noir' && <div style={{ marginTop: 12 }}>
+          <Segmente label={tr('impression.contraste')} plein value={reg.contraste} onChange={(v) => changer({ contraste: v })}
+            options={Object.keys(CONTRASTES).map((v) => ({ v, l: tr(`impression.contraste.${v}`), data: { 'data-impression-contraste': v } }))}/>
+        </div>}
+      </> : <div style={aide}>{tr('impression.a4')}</div>}
+      <div style={{ marginTop: 12 }}>
+        {/* Une liste, pas des pastilles : quatre choix ne tiennent pas sur 390 px (« Rie… » coupé). */}
+        <div style={{ ...ligne, marginTop: 0 }}>
+          <label htmlFor="vrm-impression-tampon" style={lib}>{tr('impression.tampon')}</label>
+          <select id="vrm-impression-tampon" data-impression-tampon-choix={tampon} value={tampon} onChange={(e) => changer(th ? { tamponTh: e.target.value } : { tamponA4: e.target.value })}
+            style={{ minHeight: 44, flex: '1 1 180px', maxWidth: 320, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit' }}>
+            {TAMPONS.map((v) => <option key={v} value={v}>{tr(`impression.tampon.${v}`)}</option>)}
+          </select>
+        </div>
+        {th && <div data-impression-pourquoi-titre="" style={aide}>{tr('impression.tampon.pourquoi')}</div>}
+        <div style={aide}>{tr('impression.tampon.jamais')}</div>
+      </div>
+      {th && tampon !== 'rien' && <label style={{ ...ligne, cursor: 'pointer', minHeight: 44 }}>
+        <input type="checkbox" data-impression-fiche={reg.fiche ? '1' : '0'} checked={reg.fiche} onChange={(e) => changer({ fiche: e.target.checked })} style={{ width: 20, height: 20 }}/>
+        <span style={{ fontSize: 13, color: C.text, lineHeight: 1.45, flex: '1 1 200px' }}><b>{tr('impression.fiche')}</b><br/><span style={{ color: C.muted }}>{tr('impression.fiche.aide')}</span></span>
+      </label>}
+      <div style={{ marginTop: 12 }}>
+        <Bouton variante="secondaire" icone="printer" data-impression-apercu-voir="" disabled={ap && ap.etat === 'charge'} onClick={voir}>{tr(ap && ap.etat === 'lu' ? 'impression.apercu.actualiser' : 'impression.apercu.voir')}</Bouton>
+        {ap && ap.etat === 'charge' && <div role="status" style={aide}>{tr('impression.apercu.charge')}</div>}
+        {ap && ap.etat === 'ko' && <p role="alert" style={{ ...aide, color: C.warn }}>{tr('impression.apercu.ko')}</p>}
+        {ap && ap.etat === 'lu' && <div data-impression-apercu={ap.pages} data-impression-issue={(ap.r1.tampons || []).join(',')} style={{ marginTop: 10 }}>
+          <div style={aide}>{tr('impression.apercu.exemple', { papier: th ? nomPapier(papier) : 'A4' })}</div>
+          {th && !ap.r1.isole && <div style={{ ...aide, color: C.text }}>{tr('impression.apercu.entiere')}</div>}
+          {ap.b && ap.b.fichesPrep > 0 && <div style={{ ...aide, color: C.text }}>{tr('impression.apercu.fiche')}</div>}
+          {ap.b && ap.b.sansTampon > 0 && <div style={{ ...aide, color: C.text }}>{tr('impression.apercu.aucun')}</div>}
+          {ap.b && ap.b.codesFins > 0 && <div style={{ ...aide, color: C.warn }}>{tr('impression.apercu.fin', { n: ap.b.codesFins })}</div>}
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, alignItems: 'flex-start' }}>
+            {Array.from({ length: ap.pages }, (_, i) => <ApercuPdf key={i} octets={ap.octets} page={i + 1} largeur={th ? 150 : 200}
+              label={ap.pages > 1 ? tr('impression.apercu.page', { n: i + 1, total: ap.pages }) : tr('impression.lot.apercu')}/>)}
+          </div>
+        </div>}
+      </div>
+    </section>
+  );
+};
 // ── RÉGLAGES → IMPRIMANTE ET BORDEREAUX (17 octobre) ────────────────────────
 // Julien : « dans les paramètres, imprimante thermique et normale ; tous les
 // types de bordereau avec une visualisation pour chaque type collecté par
@@ -336,6 +444,13 @@ const ImprimanteSetting = ({ nu = false }) => {
     catch(_){setErreurMode('Le format n’a pas pu être appliqué sur cet appareil. Réessaie après avoir libéré du stockage.');return;}
     setErreurMode('');setMode(m);save('vrm_imprimante',m);
   };
+  // (11 nov., lot thermique) Le papier thermique, la marge, l'encre, le tampon, la fiche :
+  // `vrm_impression`, synchronisé ; lu au moment d'imprimer (`reglageImpressionChoisi`).
+  const [reg, setReg] = React.useState(() => reglageImpression(load(CLE_IMPRESSION, null)));
+  const toucheReg = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!toucheReg.current) setReg(reglageImpression(load(CLE_IMPRESSION, null))); }), []);
+  const changerReg = (patch) => { toucheReg.current = true; setReg((r) => { const n = reglageImpression({ ...r, ...patch }); save(CLE_IMPRESSION, n); return n; }); };
+  const papier = papierThermique(reg);
   const [ap, setAp] = React.useState(null);   // null = pas demandé · {etat:'charge'|'pasSu'|'vide'|'lu', ...}
   const chargerBrut = async () => {
     setAp({ etat: 'charge' });
@@ -388,18 +503,19 @@ const ImprimanteSetting = ({ nu = false }) => {
     <div data-imprimante-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Imprimante et bordereaux</div>}
       <Segmente label="Imprimante" plein value={mode} onChange={choisir} style={{marginTop:nu?0:10}}
-        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', data: { 'data-imprimante-choix': v } }))}/>
-      <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||`Format appliqué sur cet appareil : ${mode==='thermique'?'étiquettes 100 × 150 mm':'papier A4'}.`}</div>
+        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papier) }) : tr('reglages.imprimante.normale'), data: { 'data-imprimante-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||`Format appliqué sur cet appareil : ${mode==='thermique'?`étiquettes ${nomPapier(papier)}`:'papier A4'}.`}</div>
       <GuideReglage titre="Avant d’imprimer" etapes={[
-        ['Choisis le papier', 'A4 en classique, 100 × 150 mm en thermique.'],
+        ['Choisis le papier', 'A4 en classique, celui de ton rouleau en thermique.'],
         ['Vérifie un aperçu', 'Codes lisibles, N° et titre hors des codes.'],
         ['À l’impression', 'Vérifie le papier et l’échelle : ton imprimante décide.']
       ]}/>
       <div data-imprimante-phrase style={{fontSize:13,color:C.muted,marginTop:10,lineHeight:1.5}}>
         {mode === 'thermique'
-          ? <>Une étiquette par page, <b style={{color:C.text}}>10 × 15 cm</b>, ton N° dessus ; étiquette pas repérée ⇒ page <b style={{color:C.text}}>entière</b>. <Pourquoi label="Détail">Chaque étiquette sort seule, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part entière et l’écran le dit — jamais un code-barres coupé.</Pourquoi></>
+          ? <>Une étiquette par page, <b style={{color:C.text}}>{nomPapier(papier)}</b>, ton N° dessus ; étiquette pas repérée ⇒ page <b style={{color:C.text}}>entière</b>. <Pourquoi label="Détail">Chaque étiquette sort seule, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part entière et l’écran le dit — jamais un code-barres coupé.</Pourquoi></>
           : <>A4, <b style={{color:C.text}}>une feuille par bordereau</b>, ton N° dans un blanc du PDF. <Pourquoi label="Recto-verso ?">Le document n’est pas réduit. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</Pourquoi></>}
       </div>
+      <ImpressionBordereaux mode={mode} reg={reg} changer={changerReg}/>
       <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
         {ap&&ap.etat!=='charge'&&<button type="button" onClick={charger} style={{marginTop:8,minHeight:44,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,padding:'8px 12px',font:'inherit',cursor:'pointer'}}>Actualiser les aperçus</button>}
@@ -426,7 +542,7 @@ const ImprimanteSetting = ({ nu = false }) => {
                 {e.exemple.normale && <ApercuPdf octets={e.exemple.normale.octets} largeur={180} zone={e.exemple.zone} label={e.exemple.zone ? 'Normale · A4 (en pointillés : ce qui part en thermique)' : 'Normale · A4'}/>}
                 {e.exemple.thermique && Array.from({ length: e.exemple.thermique.pages }, (_, i) => (
                   <ApercuPdf key={i} octets={e.exemple.thermique.octets} page={i + 1} largeur={e.exemple.thermique.r1.isole ? 120 : 180}
-                    label={e.exemple.thermique.r1.isole ? `Thermique · 10×15${e.exemple.thermique.pages > 1 ? ` (${i + 1}/${e.exemple.thermique.pages})` : ''}` : 'Thermique · page entière'}/>
+                    label={e.exemple.thermique.r1.isole ? `Thermique · ${nomPapier(papier)}${e.exemple.thermique.pages > 1 ? ` (${i + 1}/${e.exemple.thermique.pages})` : ''}` : 'Thermique · page entière'}/>
                 ))}
               </div>}
             </div>
@@ -1977,7 +2093,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:tr('reglages.modeles.lib'), desc:tr('reglages.modeles.desc'), val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
     ]},
     { id:'impression', titre:tr('reglages.groupe.impression'), items:[
-      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:tr('reglages.imprimante.lib'), desc:tr('reglages.imprimante.desc'), val: imprimanteChoisie() === 'thermique' ? tr('reglages.imprimante.thermique') : tr('reglages.imprimante.normale'), el:<ImprimanteSetting nu/> },
+      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:tr('reglages.imprimante.lib'), desc:tr('reglages.imprimante.desc'), val: imprimanteChoisie() === 'thermique' ? tr('reglages.imprimante.thermique', { papier: nomPapier(papierThermique(reglageImpression(load(CLE_IMPRESSION, null)))) }) : tr('reglages.imprimante.normale'), el:<ImprimanteSetting nu/> },
     ]},
     { id:'compta', titre:tr('reglages.groupe.compta'), items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :

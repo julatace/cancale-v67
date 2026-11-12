@@ -408,6 +408,7 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
+import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
 import './comptes-lies.css';
@@ -2761,6 +2762,8 @@ const SYNC_KEYS = [
   // (5 nov.) Le PROGRAMME du mode stream (ce qu'il cache quand il filme) : le même sur
   // tous ses appareils. L'interrupteur, lui (`vrm_stream`), reste propre à l'appareil.
   'vrm_stream_regles','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  // (11 nov., lot thermique) Le papier thermique choisi, ses marges, l'encre, ce que dit le tampon (src/impression/thermique.js).
+  CLE_IMPRESSION,
   // (5 nov.) Où et sous quelle forme le N° s'écrit dans le texte d'une annonce Vinted (src/etiquetteNumero.js).
   'vrm_num_vinted',
   // (7 nov.) « Je numérote moi-même dans mes annonces » (src/numeroEcrit.js) : { actif, depuis }.
@@ -12246,11 +12249,11 @@ const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge, opts = {})
 };
 // Rend la page 1 de `pdf` (pdf-lib) avec pdf.js : { pixels, w, h, s } dans le
 // sens AFFICHÉ, `s` pixels par point. Lève si pdf.js manque (hors ligne…).
-const rendrePremierePage = async (pdf) => {
+const rendrePremierePage = async (pdf, echelle = TAMPON.echelle) => {
   const L = await chargerPdfjs();
   const d = await L.getDocument({ data: await pdf.save(), isEvalSupported: false }).promise;
   try {
-    const page = await d.getPage(1), s = TAMPON.echelle, v = page.getViewport({ scale: s });
+    const page = await d.getPage(1), s = echelle, v = page.getViewport({ scale: s });
     const w = Math.ceil(v.width), h = Math.ceil(v.height);
     if (w * h > 12000000) throw Error('page trop grande');
     const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
@@ -12263,13 +12266,15 @@ const rendrePremierePage = async (pdf) => {
 // ① Où poser le cartouche sur la page affichée (recherche automatique) ?
 // `rendu` : la page déjà rendue (l'aperçu la réutilise). Rend { x, y, c, v }
 // (points, page affichée ; `v` = l'indice de la variante) ou null.
-const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null) => {
+const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null, bloques = []) => {
   rendu = rendu || await rendrePremierePage(pdf); const s = rendu.s;
   const marge = { mx: Math.round(TAMPON.mx * s), my: Math.round(TAMPON.my * s) };
+  // (11 nov., lot thermique) Les codes et les adresses de l'étiquette posée, comptés comme de l'encre.
+  const bl = (bloques || []).map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
   for (let v = 0; v < CARTOUCHES.length; v++) {
     const c = cartoucheTampon(bold, reg, numero, titre, CARTOUCHES[v]); if (!c) continue;
     const bw = Math.ceil(c.w * s), bh = Math.ceil(c.h * s);
-    const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge);
+    const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge, { bloques: bl });
     if (p) return { x: p.x / s, y: p.y / s, c, v };
   }
   return null;
@@ -12304,9 +12309,27 @@ const placeMentionVrm = (rendu, bw, bh, interdits) => {
 // Pose la mention sur la page 1 si une place sûre existe. `rendu` : la page
 // AVANT le tampon ; `tampon` : la boîte du cartouche (points, page affichée).
 // Rend true si posée. Ne lève jamais (le bordereau s'imprime toujours).
-const poserMentionVrm = (PL, pdf, reg, rendu, tampon) => {
+// (11 nov., lot thermique) `th` : la page EST le papier thermique ({ boite, bloques, marge } en
+// points, page affichée) — la mention ne va que dans le blanc AUTOUR de l'étiquette posée, en
+// NOIR fin (une tête thermique trame le gris en pointillés), jamais sur un code ni le N°.
+const poserMentionVrm = (PL, pdf, reg, rendu, tampon, th = null) => {
   try {
-    if (!rendu || typeof zoneEtiquette !== 'function') return false;
+    if (!rendu) return false;
+    if (th) {
+      const page = pdf.getPages()[0], interdits = [elargir(th.boite, 2 * MM_PT), ...(th.bloques || [])];
+      if (tampon) interdits.push(elargir(tampon, 6 * MM_PT));
+      for (const q of zonesCodesTampon(rendu)) interdits.push(elargir(q, MENTION.codes));
+      const txt = texteEcrivable(reg, MENTION.texte), T = 5.5; if (!txt) return false;
+      const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris: 0 }] };
+      const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = Math.max(1.5 * MM_PT, th.marge || 0);
+      const zones = [...interdits, { x: 0, y: 0, w: W, h: B }, { x: 0, y: H - B, w: W, h: B }, { x: 0, y: 0, w: B, h: H }, { x: W - B, y: 0, w: B, h: H }];
+      const bloques = zones.map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
+      const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(c.w * s), Math.ceil(c.h * s), { mx: Math.round(1 * MM_PT * s), my: Math.round(1 * MM_PT * s) }, { depuisBas: true, bloques });
+      if (!p) return false;
+      ecrireCartouche(PL, page, c, p.x / s, p.y / s);
+      return true;
+    }
+    if (typeof zoneEtiquette !== 'function') return false;
     const page = pdf.getPages()[0], b = page.getCropBox(), r = rotationPage(page);
     const z = zoneEtiquette(PL, page); if (!z || !z.ok) return false;
     const interdits = [];
@@ -12438,13 +12461,43 @@ const ajouterFicheColis = (PL, pdf, bold, reg, numero, titre) => {
   for (const l of couperLignes(reg, 15, t, W - 2 * m, 6)) { y -= 18; p.drawText(l, { x: m, y, size: 15, font: reg, color: PL.rgb(0, 0, 0) }); }
   p.drawText(texteEcrivable(reg, 'Fiche colis VRM — pas une étiquette de transport'), { x: m, y: m, size: 7.5, font: reg, color: PL.rgb(0.35, 0.35, 0.35) });
 };
+// ③ bis (11 nov., lot thermique) LA FICHE DE PRÉPARATION : en thermique, quand aucune place
+// sûre n'existe sur l'étiquette (hors codes, hors adresses), une 2ᵉ étiquette du MÊME papier
+// suit : N°, titre, taille, photo en noir (tramée), emplacement. Elle va DANS le colis, pas
+// dessus — le titre n'y est vu de personne. Tout en noir (pas de gris en thermique).
+const ajouterFichePreparation = async (PL, pdf, bold, reg, { numero = '', titre = '', taille = '', photo = null, emplacement = '', W, H }) => {
+  const p = pdf.insertPage(1, [W, H]), m = Math.max(3 * MM_PT, Math.min(W, H) * 0.04), noir = PL.rgb(0, 0, 0), L = W - 2 * m;
+  let y = H - m;
+  const ligne = (t, f, taille) => { y -= taille * 1.05; if (y < m) return false; p.drawText(t, { x: m, y, size: taille, font: f, color: noir }); y -= taille * 0.25; return true; };
+  const tt = Math.max(6, Math.min(9, W / 32));
+  for (const l of couperLignes(bold, tt, texteEcrivable(bold, 'Fiche de préparation · à mettre DANS le colis, pas dessus'), L, 2)) ligne(l, bold, tt);
+  p.drawLine({ start: { x: m, y: y - 1 }, end: { x: W - m, y: y - 1 }, thickness: 0.8, color: noir }); y -= 3;
+  const n = texteEcrivable(bold, numero);
+  if (n) { const txt = `N° ${n}`; let tn = Math.min(64, H * 0.16); while (tn > 10 && bold.widthOfTextAtSize(txt, tn) > L) tn--; ligne(txt, bold, tn); }
+  if (typeof photo === 'function') { try { photo = await photo(); } catch (_) { photo = null; } }
+  if (photo) {
+    try {
+      const img = await pdf.embedPng(photo), hMax = Math.max(0, Math.min(H * 0.34, y - m - 40)), k = Math.min(L / img.width, hMax / img.height);
+      if (k > 0 && img.height * k > 20) { const iw = img.width * k, ih = img.height * k; y -= ih; p.drawImage(img, { x: m + (L - iw) / 2, y, width: iw, height: ih }); y -= 4; }
+    } catch (_) {}
+  }
+  const tl = Math.max(7, Math.min(13, W / 22));
+  for (const l of couperLignes(reg, tl, texteEcrivable(reg, titre), L, 4)) if (!ligne(l, reg, tl)) break;
+  const t2 = String(taille || '').trim(); if (t2) ligne(texteEcrivable(bold, `Taille ${t2}`), bold, tl);
+  const e = String(emplacement || '').trim(); if (e) for (const l of couperLignes(reg, tl * 0.9, texteEcrivable(reg, `Rangé : ${e}`), L, 2)) if (!ligne(l, reg, tl * 0.9)) break;
+  return true;
+};
 // LE chemin unique. Tamponne la page 1 de `pdf` (pdf-lib, déjà la COPIE
 // d'impression). `thermique` : la page doit garder sa taille (pas de bande).
 // `choix` : la place choisie à la main ({ vx, vy, vw, v }, voir « LE TAMPON
 // LIBRE ») — posée telle quelle, même sur du texte, fond blanc dessous.
 // Rend { mode: 'libre'|'blanc'|'bande'|'fiche'|'rien', raison }. Ne lève
 // jamais : le bordereau s'imprime toujours.
-const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null } = {}) => {
+// (11 nov., lot thermique) `bloques` : codes et adresses de l'étiquette posée (points, page
+// affichée), jamais sous le tampon ; `fiche` : en thermique, { actif, W, H, … } — sans place sûre,
+// la fiche de préparation (actif) ou RIEN de tamponné (mode 'aucun', dit), jamais la fiche
+// 10×15 d'une A4 ; `th` : la mention en noir fin autour de l'étiquette (`poserMentionVrm`).
+const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, bloques = [], fiche = null, th = null } = {}) => {
   const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
   if (!n && !t) return { mode: 'rien', raison: '' };
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
@@ -12454,15 +12507,15 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
       let rendu = null; try { rendu = await rendrePremierePage(pdf); } catch (_) {}
       const place = { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k };
       ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k, true);
-      return { mode: 'libre', raison: '', place, mention: poserMentionVrm(PL, pdf, reg, rendu, place) };
+      return { mode: 'libre', raison: '', place, mention: poserMentionVrm(PL, pdf, reg, rendu, place, th) };
     }
   }
   let raison = '';
   try {
     const rendu = await rendrePremierePage(pdf);
-    const place = await chercherPlaceTampon(pdf, bold, reg, n, t, rendu);
-    if (place) { ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '', mention: poserMentionVrm(PL, pdf, reg, rendu, { x: place.x, y: place.y, w: place.c.w, h: place.c.h }) }; }
-    raison = 'aucun espace libre sur la page';
+    const place = await chercherPlaceTampon(pdf, bold, reg, n, t, rendu, bloques);
+    if (place) { const boite = { x: place.x, y: place.y, w: place.c.w, h: place.c.h }; ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '', place: boite, mention: poserMentionVrm(PL, pdf, reg, rendu, boite, th) }; }
+    raison = (bloques || []).length ? 'aucune place sûre (hors codes et adresses)' : 'aucun espace libre sur la page';
   } catch (e) {
     raison = 'aperçu du PDF indisponible (' + String((e && e.message) || e).slice(0, 60) + ')';
   }
@@ -12472,6 +12525,11 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
   // (3 nov.) BANDE COUPÉE : le 28 oct. Julien a « explicitement refusé une bande ajoutée » (passation 2026-10-28). Sans zone libre, c'est la fiche colis qui suit l'étiquette. Rallumer seulement sur sa demande.
   if (BANDE_PERMISE && !thermique && tientA4(w, h + TAMPON.bande)) {
     try { if (await pageAvecBande(PL, pdf, bold, reg, n, t)) return { mode: 'bande', raison }; } catch (_) {}
+  }
+  if (thermique && fiche) {
+    if (!fiche.actif) return { mode: 'aucun', raison };
+    await ajouterFichePreparation(PL, pdf, bold, reg, { numero: n, titre: fiche.titre != null ? fiche.titre : t, taille: fiche.taille, photo: fiche.photo, emplacement: fiche.emplacement, W: fiche.W, H: fiche.H });
+    return { mode: 'fiche', raison };
   }
   ajouterFicheColis(PL, pdf, bold, reg, n, t);
   return { mode: 'fiche', raison };
@@ -12815,72 +12873,225 @@ const posePrefsImpression = (PL, doc) => {
 // Une page qui porte deux étiquettes (envoi international : celle de Mondial
 // Relay ET celle du transporteur partenaire) en donne deux.
 const TH_MARGE = 2.5 * MM_PT, TH_BANDE = 5 * MM_PT;
-// La géométrie, à part (et pure) : `audit-impression.cjs` la vérifie seule.
+// (11 nov., lot thermique) La géométrie de TOUS les papiers est `placementEtiquette`
+// (src/impression/thermique.js) ; celle-ci en est le cas 10×15 (marge 2,5 mm), gardée
+// telle quelle pour `audit-impression.cjs`.
+const PAPIER_10X15 = { id: '10x15', w: 100, h: 150, marge: 2.5, continu: false };
 const placementThermique = (r, sens, avecNum) => {
-  const bande = avecNum ? TH_BANDE : 0;
-  const tourne = r.w > r.h;
-  const lw = tourne ? r.h : r.w, lh = tourne ? r.w : r.h;          // une fois tournée
-  const dispoW = ETIQ_TH.w - 2 * TH_MARGE, dispoH = ETIQ_TH.h - 2 * TH_MARGE - bande;
-  const s = Math.min(dispoW / lw, dispoH / lh, 1.25);
-  const dw = lw * s, dh = lh * s;
-  const x0 = (ETIQ_TH.w - dw) / 2, y0 = TH_MARGE + bande + (dispoH - dh) / 2;
-  const angle = !tourne ? 0 : (sens === 90 ? 90 : -90);
-  // Le point d'ancrage de `drawPage` selon la rotation (pdf-lib tourne autour
-  // du coin bas-gauche de l'objet posé).
-  const x = angle === 90 ? x0 + dw : x0, y = angle === -90 ? y0 + dh : y0;
-  return { x, y, s, angle, boite: { x: x0, y: y0, w: dw, h: dh }, bande };
+  const p = placementEtiquette(r, sens, PAPIER_10X15, { bande: avecNum ? TH_BANDE : 0 });
+  return { x: p.x, y: p.y, s: p.s, angle: p.angle, boite: p.boite, bande: p.bande };
 };
-// Pose les étiquettes de `page` (zone `z`, déjà reconnue) dans `out`, une page
-// 100×150 chacune. Rend le nombre de pages ajoutées.
-const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre = '', choisir = null) => {
+// ── LE PAPIER THERMIQUE CHOISI (11 nov., lot thermique) ────────────────────
+// Julien : « bordereaux pour imprimante thermique, PERSONNALISABLES en fonction de
+// l'imprimante ; tu dois prendre en compte le tamponnage ; peut-être qu'il ne veut
+// pas le titre du produit dessus car visible ». Pour CHAQUE étiquette :
+//   ① découpée de la feuille (1, 2 ou 4 par A4 : `zoneEtiquette`, puis l'ENCRE et
+//      les CODES — `decouperFeuille`) et recadrée sur sa zone utile (`boiteEncre`,
+//      3 mm de blanc gardés autour : la zone de silence des codes) ;
+//   ② posée ENTIÈRE sur le papier choisi, dans la marge, une seule échelle (jamais
+//      déformée), tournée si elle tient plus grande couchée (`placementEtiquette`) ;
+//   ③ « noir pur » : repassée en noir et blanc à 300 dpi (aucun gris) ;
+//   ④ ses codes RETROUVÉS sur la page posée, et la plus fine barre mesurée : sous
+//      0,25 mm imprimés (2 points d'une tête 203 dpi), l'écran le dit ;
+//   ⑤ le tampon (ce qu'il a choisi : N° seul par défaut) jamais sur un code ni une
+//      adresse ; sans place sûre, la fiche de préparation suit (à mettre DANS le
+//      colis) — ou rien, s'il l'a coupée.
+const reglageImpressionChoisi = () => { try { return reglageImpression(load(CLE_IMPRESSION, null)); } catch (_) { return reglageImpression(null); } };
+const TH_RENDU = 4;                         // px par point pour découper et mesurer (288 dpi)
+// Tout ce qui est écrit sur la page, relevé comme `zoneEtiquette` le fait (coordonnées PDF).
+const textesDePage = (PL, page) => {
+  const ctx = page.doc.context, out = [];
+  let res = null; try { res = ctx.lookup(page.node.get(PL.PDFName.of('Resources'))); } catch (_) {}
+  const fluxDe = (ref) => { try { const o = ctx.lookup(ref); if (!o) return '';
+    if (o instanceof PL.PDFRawStream) return new TextDecoder('latin1').decode(PL.decodePDFRawStream(o).decode());
+    if (o.asArray) return o.asArray().map((r) => fluxDe(r)).join('\n'); return ''; } catch (_) { return ''; } };
+  relevePage(PL, ctx, fluxDe(page.node.get(PL.PDFName.of('Contents'))), res, [1, 0, 0, 1, 0, 0], out, 0);
+  return out;
+};
+// Le rectangle `r` (points PDF de `page`, sans la rotation d'affichage) seul, à 1:1.
+const isolerZone = async (PL, page, r) => {
+  const d = await PL.PDFDocument.create();
+  const e = await d.embedPage(page, { left: r.x, bottom: r.y, right: r.x + r.w, top: r.y + r.h });
+  d.addPage([r.w, r.h]).drawPage(e, { x: 0, y: 0 });
+  return d;
+};
+// ① Les étiquettes de la zone `r` d'après l'encre : recadrées, avec leurs codes
+// (boîtes en points PDF de `page`, `modulePt` = la plus fine barre). `decouper` :
+// la zone peut porter 2 ou 4 étiquettes. Lève si pdf.js manque (l'appelant garde r).
+const analyserZone = async (PL, page, r, { decouper = false } = {}) => {
+  const d = await isolerZone(PL, page, r), rendu = await rendrePremierePage(d, TH_RENDU), S = rendu.s;
+  const carte = carteEncre(rendu.pixels, rendu.w, rendu.h, { seuil: 235, k: 3 });
+  // Un CODE, ici, mesure au moins 8 × 15 mm (un code-barres de transporteur, un QR) : un
+  // titre en gras (« Mondial Relay », « 24R ») a les alternances d'un code, pas sa taille.
+  const codesPx = fusionnerProches(zonesCodesTampon(rendu), 3 * MM_PT).filter((q) => Math.min(q.w, q.h) >= 8 * MM_PT && Math.max(q.w, q.h) >= 15 * MM_PT).map((q) => ({ x: q.x * S, y: q.y * S, w: q.w * S, h: q.h * S }));
+  const parts = decouper ? decouperFeuille(carte, { x: 0, y: 0, w: rendu.w, h: rendu.h }, codesPx, { minCote: 80 * MM_PT * S, gouttiere: 4 * MM_PT * S }) : null;
+  const versPdf = (b) => ({ x: r.x + b.x / S, y: r.y + (rendu.h - b.y - b.h) / S, w: b.w / S, h: b.h / S });
+  const etiquettes = (parts || [{ x: 0, y: 0, w: rendu.w, h: rendu.h }]).map((z) => {
+    const b = boiteEncre(carte, z, Math.round(3 * MM_PT * S)) || z;
+    const codes = codesPx.filter((q) => q.x + q.w / 2 > b.x && q.x + q.w / 2 < b.x + b.w && q.y + q.h / 2 > b.y && q.y + q.h / 2 < b.y + b.h)
+      .map((q) => { const mod = moduleDuCode(rendu.pixels, rendu.w, rendu.h, q); return { ...versPdf(q), modulePt: mod != null ? mod / S : null }; });
+    return { ...versPdf(b), codes, analysee: true };
+  });
+  return { etiquettes, coupe: !!parts };
+};
+// Une boîte en points PDF de la page source → la page AFFICHÉE du papier (y vers le bas).
+const versPapier = (e, pl, q) => {
+  const b = pl.boite;
+  const pts = [[q.x, q.y], [q.x + q.w, q.y], [q.x, q.y + q.h], [q.x + q.w, q.y + q.h]].map(([X, Y]) => {
+    const u = (X - e.x) * pl.s, v = (Y - e.y) * pl.s;
+    if (pl.angle === 90) return [b.x + b.w - v, b.y + u];
+    if (pl.angle === -90) return [b.x + v, b.y + b.h - u];
+    return [b.x + u, b.y + v];
+  });
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return { x: Math.min(...xs), y: pl.H - Math.max(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+};
+const recouvrementBoites = (a, b) => { const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y); return w > 0 && h > 0 ? (w * h) / Math.max(1, Math.min(a.w * a.h, b.w * b.h)) : 0; };
+// ② L'étiquette `e` posée sur le papier : un document d'une page.
+const composerEtiquette = async (PL, page, e, sens, papier, bande) => {
+  const pl = placementEtiquette(e, sens, papier, { bande });
+  const d = await PL.PDFDocument.create();
+  const emb = await d.embedPage(page, { left: e.x, bottom: e.y, right: e.x + e.w, top: e.y + e.h });
+  d.addPage([pl.W, pl.H]).drawPage(emb, { x: pl.x, y: pl.y, xScale: pl.s, yScale: pl.s, rotate: PL.degrees(pl.angle) });
+  return { d, pl };
+};
+// ③ Le noir pur : la page repassée en noir et blanc (≤ 300 dpi, ≤ 10 Mpx), une image.
+const noircirPage = async (PL, d, W, H, seuil) => {
+  const dpi = Math.min(300, Math.sqrt(10e6 / Math.max(1, (W / 72) * (H / 72))));
+  const rendu = await rendrePremierePage(d, dpi / 72);
+  seuillerNoir(rendu.pixels, seuil);
+  const c = document.createElement('canvas'); c.width = rendu.w; c.height = rendu.h;
+  c.getContext('2d').putImageData(new ImageData(rendu.pixels, rendu.w, rendu.h), 0, 0);
+  const png = await new Promise((ok, ko) => c.toBlob((b) => (b ? b.arrayBuffer().then((x) => ok(new Uint8Array(x)), ko) : ko(Error('png'))), 'image/png'));
+  const n = await PL.PDFDocument.create(), img = await n.embedPng(png);
+  n.addPage([W, H]).drawImage(img, { x: 0, y: 0, width: W, height: H });
+  return { d: n, rendu };
+};
+// La photo de la paire en noir tramé (PNG), pour la fiche de préparation. null si
+// elle ne se lit pas (hors ligne, image refusée) : la fiche part sans photo.
+const photoNoirePourFiche = async (url) => {
+  try {
+    if (!url || typeof document === 'undefined') return null;
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null; const t = setTimeout(() => { try { ctl && ctl.abort(); } catch (_) {} }, 5000);
+    const rep = await fetch(url, { mode: 'cors', signal: ctl ? ctl.signal : undefined }).finally(() => clearTimeout(t));
+    if (!rep.ok) return null;
+    const bmp = await globalThis.createImageBitmap(await rep.blob());
+    const k = Math.min(1, 480 / Math.max(bmp.width, bmp.height)), w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(bmp, 0, 0, w, h);
+    const im = x.getImageData(0, 0, w, h); tramerNoir(im.data, w, h); x.putImageData(im, 0, 0);
+    return await new Promise((ok) => c.toBlob((b) => (b ? b.arrayBuffer().then((a) => ok(new Uint8Array(a)), () => ok(null)) : ok(null)), 'image/png'));
+  } catch (_) { return null; }
+};
+// L'emplacement d'un N° dans le plan du Stock (pièce · meuble · case), jamais deviné.
+const emplacementDuNumero = (num) => {
+  try { if (!num) return ''; const p0 = load('vrm_room_plan', null); const plan = p0 ? normalizePlan(p0) : null; const place = plan ? ouEstNumero(plan, num) : null; return place ? [place.roomName, place.itemName, place.nom].filter(Boolean).join(' · ') : ''; } catch (_) { return ''; }
+};
+// Ce que la fiche de préparation et « N° + titre + taille » lisent d'une paire : la fiche
+// UNIQUE de son N° (deux fiches au même N° ⇒ rien, jamais deviné — §5), sa taille (fiche,
+// sinon le titre), sa photo (lue seulement si la fiche est imprimée) et son emplacement.
+const extrasImpression = (numero, title, extra = {}) => {
+  let f = null; try { const k = cleNum(numero || ''); f = k ? ficheUniqueDuNumero(load('vinted_annonce_numeros', {}) || {}, k) : null; } catch (_) { f = null; }
+  const tl = [extra.taille, f && f.size, extractSize(title || '')].find((x) => (typeof x === 'string' && x.trim()) || typeof x === 'number');
+  const url = extra.photo || (f && f.photo) || null;
+  return { taille: tl != null ? String(tl) : '', photo: url ? () => photoNoirePourFiche(url) : null, emplacement: extra.emplacement != null ? extra.emplacement : emplacementDuNumero(numero) };
+};
+// Ce qui a été fait, compté pour l'écran (codes trop fins, sans tampon, fiches de préparation).
+const bilanThermique = (details) => {
+  const d = details || [];
+  return { codesFins: d.filter((x) => x.fins > 0).length, moduleMin: d.reduce((m, x) => (x.moduleMm != null && (m == null || x.moduleMm < m) ? x.moduleMm : m), null),
+    codesPerdus: d.filter((x) => x.retrouves != null && x.retrouves < x.codes).length, sansTampon: d.filter((x) => x.mode === 'aucun').length, fichesPrep: d.filter((x) => x.mode === 'fiche').length };
+};
+// Pose les étiquettes de `page` (zone `z`, déjà reconnue) dans `out`, une page du
+// papier choisi chacune. `imp` : { reg, taille, photo, emplacement }. Rend le nombre
+// de pages d'étiquette, l'issue du tampon de chacune et ce qui a été mesuré.
+const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre = '', choisir = null, imp = null) => {
+  const reg = (imp && imp.reg) || reglageImpressionChoisi(), papier = papierThermique(reg);
   const n = numero != null ? String(numero).trim() : '';
-  const modes = [];
-  const rects = z.etiquettes && z.etiquettes.length ? z.etiquettes : [z];
-  let k = 0;
+  const modes = [], details = [];
+  const rects = (z.etiquettes && z.etiquettes.length ? z.etiquettes : [z]).map((r) => ({ ...r, sens: r.sens != null ? r.sens : z.sens }));
+  let textes = []; try { textes = textesDePage(PL, page); } catch (_) { textes = []; }
+  const etiquettes = [];
   for (const r of rects) {
-    const temp=await PL.PDFDocument.create();
-    const emb = await temp.embedPage(page, { left:r.x,bottom:r.y,right:r.x+r.w,top:r.y+r.h });
-    const pl=placementThermique(r,r.sens!=null?r.sens:z.sens,false);
-    const p=temp.addPage([ETIQ_TH.w,ETIQ_TH.h]);
-    p.drawPage(emb,{x:pl.x,y:pl.y,xScale:pl.s,yScale:pl.s,rotate:PL.degrees(pl.angle)});
-    // La page reste 100×150 : pas de bande en thermique (fiche à la suite).
-    // La place du tampon : celle choisie (aperçu) ou mémorisée pour la forme.
-    const choix = choisir ? await choisir(temp, { isole: true, k }) : null;
-    modes.push((await tamponnerBordereau(PL, temp, { numero: n, titre, thermique: true, choix })).mode);
-    (await out.copyPages(temp,temp.getPageIndices())).forEach(p=>out.addPage(p));
+    if (r.analysee) { etiquettes.push(r); continue; }
+    let a = null;
+    try { a = await analyserZone(PL, page, r, { decouper: rects.length === 1 && Math.max(r.w, r.h) >= 160 * MM_PT }); } catch (_) { a = null; }
+    if (!a) { etiquettes.push({ x: r.x, y: r.y, w: r.w, h: r.h, sens: r.sens, codes: null }); continue; }
+    for (const e of a.etiquettes) etiquettes.push({ ...e, sens: a.coupe ? avecSens({ ok: true, ...e }, textes).sens : r.sens });
+  }
+  let k = 0;
+  for (const e of etiquettes) {
+    const contenu = contenuTampon(reg.tamponTh, { numero: n, titre, taille: imp && imp.taille });
+    const bande = papier.continu && (contenu.numero || contenu.titre) ? BANDE_CONTINU_MM * MM_PT : 0;
+    let { d, pl } = await composerEtiquette(PL, page, e, e.sens, papier, bande);
+    let rendu = null, noir = false;
+    if (reg.encre === 'noir') { try { const nn = await noircirPage(PL, d, pl.W, pl.H, CONTRASTES[reg.contraste]); d = nn.d; rendu = nn.rendu; noir = true; } catch (_) { rendu = null; } }
+    // ④ Les codes : la plus fine barre une fois imprimée, et chacun RETROUVÉ sur la page posée.
+    const codes = (e.codes || []).map((q) => ({ mm: q.modulePt != null ? moduleImprimeMm(q.modulePt, pl.s) : null, boite: versPapier(e, pl, q) }));
+    let retrouves = null;
+    if (codes.length) { try { rendu = rendu || await rendrePremierePage(d, TH_RENDU); const vus = zonesCodesTampon(rendu); retrouves = codes.filter((c) => vus.some((v) => recouvrementBoites(v, c.boite) >= 0.5)).length; } catch (_) { retrouves = null; } }
+    // ⑤ Le tampon : jamais sur un code (+ 5 mm) ni sur une adresse de l'étiquette.
+    const dansE = (o) => { const cx = (o.x + o.X) / 2, cy = (o.y + o.Y) / 2; return cx > e.x && cx < e.x + e.w && cy > e.y && cy < e.y + e.h; };
+    const clip = (q) => { const x = Math.max(e.x, q.x), y = Math.max(e.y, q.y), X = Math.min(e.x + e.w, q.x + q.w), Y = Math.min(e.y + e.h, q.y + q.h); return X > x && Y > y ? { x, y, w: X - x, h: Y - y } : null; };
+    const adresses = zonesAdresse(textes.filter(dansE)).map(clip).filter(Boolean).map((q) => versPapier(e, pl, q));
+    const bloques = [...codes.map((c) => elargir(c.boite, MENTION.codes)), ...adresses];
+    const boiteAff = { x: pl.boite.x, y: pl.H - pl.boite.y - pl.boite.h, w: pl.boite.w, h: pl.boite.h };
+    const choix = choisir ? await choisir(d, { isole: true, k }) : null;
+    const fiche = { actif: reg.fiche, W: pl.W, H: papier.continu ? Math.max(pl.W * 1.45, 60 * MM_PT) : pl.H, titre, taille: imp && imp.taille, photo: imp && imp.photo, emplacement: imp && imp.emplacement };
+    const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, marge: papier.marge * MM_PT } });
+    modes.push(t.mode);
+    const mms = codes.map((c) => c.mm).filter((x) => x != null);
+    details.push({ mode: t.mode, raison: t.raison || '', echelle: pl.s, tourne: pl.tourne, noir, W: pl.W, H: pl.H, codes: codes.length, retrouves,
+      moduleMm: mms.length ? Math.min(...mms) : null, fins: codes.filter((c) => !codeAssezGros(c.mm)).length, mention: !!t.mention, place: t.place || null, boite: boiteAff, bloques });
+    (await out.copyPages(d, d.getPageIndices())).forEach((p) => out.addPage(p));
     k++;
   }
-  return { k, modes };
+  return { k, modes, details };
 };
 // LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
 // `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
 const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
 // UN bordereau posé dans `out`, la même règle pour les trois chemins
 // d'impression (une vente, un lot, Leboncoin) :
-//   thermique + étiquette reconnue ⇒ pages 100×150 (et les pages suivantes du
-//   PDF, une déclaration en douane par exemple, telles quelles) ;
+//   thermique + étiquette reconnue ⇒ une page du papier choisi par étiquette (et
+//   les pages suivantes du PDF, une déclaration en douane par exemple, telles
+//   quelles) ; (11 nov.) une A4 à 2 ou 4 étiquettes que `zoneEtiquette` ne sait
+//   pas lire est découpée d'après l'encre et les codes (`analyserZone`) ;
 //   sinon ⇒ page originale, tamponnée par `tamponnerBordereau` (zone libre,
-//   sinon bande 1:1, sinon fiche colis — jamais un refus).
-// Rend `{ isole, etiquettes, raison }` — l'écran dit ce qui a vraiment été fait.
+//   sinon fiche colis — jamais un refus).
+// Rend `{ isole, etiquettes, raison, tampons, details }` — l'écran dit ce qui a vraiment été fait.
 // `choisir(doc, { isole, k })` (facultatif) : rend la place choisie à la main
 // pour la page 1 de `doc` (aperçu ou position mémorisée de sa forme), sinon null.
-const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, choisir = null }) => {
+// `impression` (facultatif) : { reg, taille, photo, emplacement } — sans `reg`, le réglage
+// synchronisé (`vrm_impression`) ; c'est lui qui dit ce que le tampon écrit (A4 et thermique).
+const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, choisir = null, impression = null }) => {
   const { StandardFonts } = PL;
+  const reg = (impression && impression.reg) || reglageImpressionChoisi(), imp = { ...(impression || {}), reg };
   const first = src.getPages()[0];
-  const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
+  let z = thermique ? zoneEtiquette(PL, first) : { ok: false };
+  // Pas su, ou une zone qui ne fait qu'un QUART de la feuille (le cadre d'UNE des étiquettes
+  // d'une A4 à 2 ou 4) : la feuille entière est découpée d'après l'encre et les codes.
+  if (thermique && (!z.ok || (z.via !== 'page' && z.part != null && z.part < 0.4 && !(z.etiquettes && z.etiquettes.length > 1)))) {
+    try {
+      const { width: W, height: H } = first.getSize();
+      const a = await analyserZone(PL, first, { x: 0, y: 0, w: W, h: H }, { decouper: true });
+      if (a && a.coupe) { const tx = textesDePage(PL, first); z = { ok: true, x: 0, y: 0, w: W, h: H, via: 'encre', etiquettes: a.etiquettes.map((e) => ({ ...e, sens: avecSens({ ok: true, ...e }, tx).sens })) }; }
+    } catch (_) {}
+  }
   if (thermique && z.ok) {
     if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
-    const { k: n, modes } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title, choisir);
+    const { k: n, modes, details } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title, choisir, imp);
     const reste = src.getPageIndices().slice(1);
     if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
-    return { isole: true, etiquettes: n, raison: '', tampons: modes };
+    return { isole: true, etiquettes: n, raison: '', tampons: modes, details };
   }
   // Page entière (A4 normale, ou thermique sans étiquette repérée) : le même
-  // tampon ; la bande n'est permise que si la page agrandie tient sur un A4.
+  // tampon ; ce qu'il écrit est SON choix (`tamponA4`, ou `tamponTh` en thermique).
+  const contenu = contenuTampon(thermique ? reg.tamponTh : reg.tamponA4, { numero, titre: title, taille: imp.taille });
   const choix = pos || (choisir ? await choisir(src, { isole: false, k: 0 }) : null);
-  const t = await tamponnerBordereau(PL, src, { numero, titre: title, thermique, choix });
+  const t = await tamponnerBordereau(PL, src, { numero: contenu.numero, titre: contenu.titre, thermique, choix });
   (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
-  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode] };
+  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode], details: [] };
 };
 // ⟦→ ecrans/Reglages.jsx #25⟧
 const typeBordereau = (PL, doc) => {
@@ -12924,13 +13135,16 @@ let _placeurTampon = null;
 const demanderPlacementTampon = (o) => new Promise((resolve) => { if (!_placeurTampon) return resolve(undefined); _placeurTampon({ ...o, resolve }); });
 // (4 nov.) `deja` partagé par tout un lot : UNE question par forme, la place choisie vaut pour les
 // bordereaux suivants de la même forme (le premier de chaque forme est celui qu'on montre).
-const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {} }) => {
+// (11 nov., lot thermique) `thermique` : l'aperçu de placement montre ce que le tampon ÉCRIRA
+// (`contenuTampon` du réglage : N° seul par défaut en thermique, rien ⇒ aucun aperçu).
+const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {}, thermique = false }) => {
   let type = 'autre'; try { type = typeBordereau(PL, src).type; } catch (_) {}
   return async (doc, info = {}) => {
     const forme = formeTampon(type, doc.getPages()[0], !!info.isole);
     if (forme.cle in deja) return deja[forme.cle];
     let choix = positionTampon(forme.cle);
-    const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
+    const rg = reglageImpressionChoisi(), ct = contenuTampon(thermique ? rg.tamponTh : rg.tamponA4, { numero, titre });
+    const n = String(ct.numero == null ? '' : ct.numero).trim(), t = String(ct.titre == null ? '' : ct.titre).trim();
     if ((n || t) && (apercu === 'force' || (apercu && !choix)) && _placeurTampon) {
       libererOngletPdf();
       const r = await demanderPlacementTampon({ octets: await doc.save(), forme, numero: n, titre: t, choix });
@@ -13173,8 +13387,8 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   const src = await PDFDocument.load(pdfArrayBuffer);
   const pdf = await PDFDocument.create();
-  const choisir = choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu });
-  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir });
+  const choisir = choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu, thermique });
+  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir, impression: extrasImpression(numero, title, opts.extra || {}) });
   const hasNum = numero != null && String(numero).trim() !== '';
   posePrefsImpression(PL, pdf);
   const bytes = await pdf.save();
@@ -13188,7 +13402,7 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const tp = r0.tampons || [];
   return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
            fiches: tp.filter((m) => m === 'fiche').length, bandes: tp.filter((m) => m === 'bande').length,
-           entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [] };
+           entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [], ...bilanThermique(r0.details) };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const annotateAndDownloadBordereau = async (...a) => { try { return await annotateAndDownloadBordereauBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
@@ -13205,6 +13419,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
+  const details = [];   // (11 nov., lot thermique) ce qui a été mesuré, étiquette par étiquette
   const reussis = [], rates = [];
   // (4 nov., Julien : « pareil pour le tamponnage, on doit pouvoir le faire quand tous les bordereaux
   // sont sélectionnés ») `opts.apercu` : true ⇒ la feuille s'ouvre UNE fois par forme sans place gardée ;
@@ -13219,8 +13434,9 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
       // La position mémorisée de la forme de CE bordereau (`positionTampon`), sinon le choix automatique.
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot }) });
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null }), choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
+      details.push(...(r1.details || []));
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
       else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
       count++; reussis.push(index);
@@ -13239,7 +13455,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, filename);
-  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes };
+  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes, ...bilanThermique(details) };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAndDownloadBordereauxBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
@@ -40752,7 +40968,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    seulement si on SAIT où elle est (sinon page entière).
       const src = await PDFDocument.load(buf);
       const thermique = imprMode(imprimante) === 'thermique';
-      const r1 = await poserBordereau(PL, out, src, { numero, title, pos, thermique, choisir: choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu }) });
+      const r1 = await poserBordereau(PL, out, src, { numero, title, pos, thermique, impression: extrasImpression(numero, title), choisir: choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu, thermique }) });
       const thermiqueOK = r1.isole, thermiqueRaison = r1.raison;
       // 2) la facture pro (si elle existe)
       let joined = false;
@@ -40768,7 +40984,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Chrome). Sur iPhone : la modale « Ouvrir → Partager → Imprimer ».
       const printed = ouvrirPdfOnglet(url);
       setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
-                      thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
+                      thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, ...bilanThermique(r1.details), entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
     } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur impression : '+String(err)); }
   };
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
@@ -48687,16 +48903,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {ebayL.map((l) => <div key={l.cle} className="vrm-tip-ligne is-off" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-cochable="0" data-coche="0"><input type="checkbox" className="vrm-tip-case" disabled checked={false} readOnly aria-label={`${l.titre||'Commande'} : eBay`}/><PhotoVente src={l.photo||null} size={44} portrait/><span className="vrm-tip-corps"><span className="vrm-titre-entier vrm-tip-titre">{l.titre}</span><span className="vrm-tip-sous"><span data-lot-ebay="1">eBay</span></span></span></div>)}
                         </section>}
                         {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
-                        {choisis.length > 0 && <section className="vrm-tip-groupe" data-lot-section="apercu" aria-label="Aperçu">
-                          <h3>Aperçu <span>{choisis.length} page{choisis.length>1?'s':''} A4</span></h3>
+                        {/* (11 nov., lot thermique) Le papier et le tampon CHOISIS (Paramètres → Impression des bordereaux,
+                            `vrm_impression`) : l'aperçu dit ce qui sortira, et « Changer » y mène. */}
+                        {choisis.length > 0 && (()=>{ const th = imprimanteChoisie() === 'thermique', rg = reglageImpressionChoisi(), pp = papierThermique(rg), mt = th ? rg.tamponTh : rg.tamponA4;
+                          const papierLot = th ? (pp.id === 'autre' ? pp.nom : tr(`impression.format.${pp.id}`)) : 'A4';
+                          return <section className="vrm-tip-groupe" data-lot-section="apercu" data-lot-papier={th ? rg.format : 'a4'} data-lot-tampon={mt} aria-label={tr('impression.lot.apercu')}>
+                          <h3>{tr('impression.lot.apercu')} <span>{tr('impression.lot.pages', { n: choisis.length, papier: papierLot })}</span></h3>
+                          <button type="button" className="vrm-tip-lien" data-lot-reglage-impression="" disabled={batchBusy} onClick={()=>{ setLot(null); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=imprimante' })); } catch (_) {} }}>{tr('impression.lot.changer')}</button>
                           <div className="vrm-tip-pages">
-                            {choisis.slice(0, 8).map((l) => <figure key={l.cle} className="vrm-tip-a4" data-lot-apercu={l.cle}>
+                            {choisis.slice(0, 8).map((l) => { const c = contenuTampon(mt, { numero: l.num || '', titre: l.titre || '' }); return <figure key={l.cle} className="vrm-tip-a4" data-lot-apercu={l.cle}>
                               <span className="vrm-tip-a4-etiquette">{logo(l)}<i/><i/><i/></span>
-                              <figcaption className="vrm-tip-a4-tampon"><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b><span>{l.titre}</span></figcaption>
-                            </figure>)}
+                              <figcaption className="vrm-tip-a4-tampon">{mt === 'rien' ? <b>{tr('impression.lot.sansTampon')}</b> : <><b>{l.num ? `N° ${l.num}` : 'sans N°'}</b>{c.titre ? <span>{c.titre}</span> : null}</>}</figcaption>
+                            </figure>; })}
                             {choisis.length > 8 ? <span className="vrm-tip-plus">+{choisis.length - 8}</span> : null}
                           </div>
-                        </section>}
+                        </section>; })()}
                         <div className="vrm-lot-pied vrm-tip-pied">
                           <button type="button" className="vrm-tip-lien" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}>Placer le tampon</button>
                           <Bouton variante="primaire" icone="printer" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), false, true)}>
@@ -49706,11 +49927,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
                 <div style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.45,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px'}}>
                   <div style={{color:C.text,fontWeight:600,marginBottom:ent.length?4:0}}>
-                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} au format 10×15 cm (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
+                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} au format ${papierThermique(reglageImpressionChoisi()).nom} (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
                     {(bordResult.etiquettes||0)>iso ? ` · ${bordResult.etiquettes} pages : un envoi international porte aussi l'étiquette du transporteur partenaire, colle-les toutes` : ''}
                     {ent.length>0 ? ` · ${ent.length} page${ent.length>1?'s':''} entière${ent.length>1?'s':''}` : ''}
                   </div>
                   {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 : découpe à la main.</div>}
+                  {/* (11 nov., lot thermique) Ce qui a été mesuré sur les étiquettes posées : dit, jamais caché. */}
+                  {(bordResult.codesFins||0)>0 && <div data-bord-codes-fins={bordResult.codesFins} style={{color:C.warn,fontWeight:600,marginTop:4}}>{bordResult.codesFins===1?'1 étiquette a':`${bordResult.codesFins} étiquettes ont`} un code-barres trop fin sur ce papier ({String(Math.round((bordResult.moduleMin||0)*100)/100).replace('.',',')} mm, il faut {String(MODULE_MIN_MM).replace('.',',')} mm) : il risque de ne pas se lire. Choisis un papier plus grand dans Paramètres → Impression des bordereaux.</div>}
+                  {(bordResult.codesPerdus||0)>0 && <div data-bord-codes-perdus={bordResult.codesPerdus} style={{color:C.warn,fontWeight:600,marginTop:4}}>Vérifie les codes-barres de {bordResult.codesPerdus===1?'1 étiquette':`${bordResult.codesPerdus} étiquettes`} sur l’aperçu avant d’imprimer : je ne les ai pas tous retrouvés.</div>}
+                  {(bordResult.fichesPrep||0)>0 && <div data-bord-fiches-prep={bordResult.fichesPrep} style={{marginTop:4}}>Pas de place sûre pour le N° sur {bordResult.fichesPrep===1?'1 étiquette':`${bordResult.fichesPrep} étiquettes`} : la fiche de préparation suit, à mettre DANS le colis.</div>}
+                  {(bordResult.sansTampon||0)>0 && <div data-bord-sans-tampon={bordResult.sansTampon} style={{color:C.warn,marginTop:4}}>{bordResult.sansTampon===1?'1 étiquette part':`${bordResult.sansTampon} étiquettes partent`} sans N° (aucune place sûre, fiche de préparation coupée) : écris-le à la main.</div>}
                 </div>
               ); })()}
             <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
@@ -58563,6 +58789,7 @@ function AppCoeur() {
 export { useProfilFiscal, profilFiscalLu };
 export { useJourneePerso, JourneePersoSetting };
 export { lireLitigesVinted, changerCompteVrm };
+export { bilanThermique };   // (11 nov., lot thermique) l'aperçu de Paramètres → Impression des bordereaux
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
