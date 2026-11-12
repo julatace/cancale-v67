@@ -90,7 +90,10 @@ async function auditer(S) {
       const item = 444, tx = 9001, oid = 7001;
       const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: 45 }),
         main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: { num: '7', min: '40' } }, vinted_offre_refus_msg: '',
-          vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 } } };
+          vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 },
+          // (12 nov., intégration) C juge le VERROU du moteur, pas l'heure : le repos de nuit de la sécurité des
+          // comptes (5.366, allumé par défaut) est éteint ici, sinon C rougit entre 23 h et 7 h (heure de Paris).
+          vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } } };
       return fond({ lignes, store, connecte: UID, vinted: () => ({ status: 200, body: {} }) });
     };
     const due = (f) => { const pv = f.store.vrmOffresPrevues || {}; for (const k in pv) if (pv[k]) pv[k].at = Date.now() - 1000; };
