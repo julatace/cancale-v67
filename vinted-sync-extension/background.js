@@ -19429,7 +19429,21 @@ async function capterRetraits(uid) {
     if (!acc) return 0;
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_purchased&select=data`);
     const achats = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
-    const attend = achats.filter(o => o && AT_RELAY(o.status) && o.conversation_id != null);
+    // ⚠️⚠️ 5.372 (12 nov., Julien : « il ne peut pas y avoir de colis sans code de retrait ») —
+    //    seuls les achats dont le STATUT disait « au point relais » étaient relus. Un colis
+    //    arrivé dont Vinted dit encore « Colis expédié » mais demande SON geste (`needs_action`),
+    //    ou dont le SUIVI rangé dit déjà « disponible / à retirer », restait « Code à venir ».
+    //    Désormais : statut au point, OU geste demandé (pas fini), OU dernière étape du suivi =
+    //    arrivée — les arrivés au point d'abord (statut), le plus ANCIEN d'abord (son délai court).
+    let arrivesSuivi = new Set();
+    try {
+      const sv = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,dt:data->dernier->>t`);
+      for (const r of Array.isArray(sv) ? sv : []) { const tx = (/_suivi_(\d+)$/.exec(String((r && r.id) || '')) || [])[1]; if (tx && SUIVI_ARRIVE.test(String((r && r.dt) || '')) && !/\blivr[ée]e?s?\b|\bretir[ée]e?s?\b|\bremis/i.test(String(r.dt || ''))) arrivesSuivi.add(tx); }
+    } catch (_) {}
+    const pasFini = (o) => !SUIVI_FINI.test(String(o.status || '')) && !['completed', 'failed'].includes(String(o.transaction_user_status || ''));
+    const auPoint = (o) => AT_RELAY(o.status) || (pasFini(o) && (String(o.transaction_user_status || '') === 'needs_action' || arrivesSuivi.has(String(o.transaction_id || ''))));
+    const attend = achats.filter(o => o && o.conversation_id != null && auPoint(o))
+      .sort((a, b) => (AT_RELAY(b.status) ? 1 : 0) - (AT_RELAY(a.status) ? 1 : 0) || ((Date.parse(a.date || '') || 0) - (Date.parse(b.date || '') || 0)));
     if (!attend.length) { if (rows !== null) await noterLecturesDues(uid, 'retrait', 0); return 0; }
     // Ce qu'on a déjà : inutile de redemander une conversation dont le code est
     // en base (lecture d'une seule ligne, quelques Ko).

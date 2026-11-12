@@ -97,6 +97,34 @@ const TXA = '32000000001', TXB = '32000000002', TXC = '32000000003', TXD = '3200
     const uniq = ordre.filter((x, i) => ordre.indexOf(x) === i);
     dit(uniq[0] === '32000000103' && uniq[1] === '32000000102', 'E. d’abord les achats expédiés sans n° (au point relais, puis en route), puis les autres', uniq.join(' '));
   }
+
+  // ── G. (Julien : « il ne peut pas y avoir de colis sans code de retrait ») le CODE ──
+  { const conv = (cid, tx, code) => ({ conversation: { id: Number(cid), transaction: { id: Number(tx), item_id: 4242, current_user_side: 'buyer' },
+      messages: code === 'inconnu' ? [{ entity_type: 'nouveau_type', entity: { x: 1 } }] : [{ entity_type: 'action_message', created_at_ts: H(3), entity: { title: 'Ton colis est arrivé !',
+        subtitle: `Il t'attend à l'adresse suivante : Épicerie Banc, 1 Rue Inventée, 99000 Nulle-Part, France. Scanne ton code de retrait ou saisis le code ${code} pour le récupérer.` } }] } });
+    const achat = (tx, status, tus, cid, h) => ({ ...commande(tx, status, tus, h), conversation_id: Number(cid) });
+    const lignes = {
+      harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: [
+        achat('33000000001', 'Colis expédié', 'needs_action', '81', 80),             // Vinted demande SON geste : arrivé
+        achat('33000000002', 'En cours de livraison', 'waiting', '82', 70),           // le SUIVI dit « disponible »
+        achat('33000000003', 'Colis expédié', 'waiting', '83', 60),                   // en route : pas de code à chercher
+        achat('33000000004', 'Colis expédié', 'needs_action', '84', 50),             // forme inconnue
+      ] } },
+      harvest_111_suivi_33000000002: { v: 1, tx: '33000000002', source: 'journey', capturedAt: H(2), etapes: [], dernier: { t: 'Colis disponible au point relais', at: H(3), code: 'at_pickup' }, transporteur: null, suivi: 'XY12345678', forme: {} },
+    };
+    const f = faireFond({ src: BG, lignes, vinted: (req) => {
+      const m = /\/conversations\/(\d+)$/.exec(req.chemin);
+      if (m) return { status: 200, body: conv(m[1], { 81: '33000000001', 82: '33000000002', 83: '33000000003', 84: '33000000004' }[m[1]], m[1] === '84' ? 'inconnu' : 'C' + m[1] + '77') };
+      return { status: 200, body: { user: { id: 111 } } };
+    } });
+    await f.ctx.capterRetraits('111');
+    const panel = (lignes.panel_colis_relais) || {};
+    dit(panel['33000000001'] && panel['33000000001'].code === 'C8177', 'G. « Colis expédié » mais Vinted demande son geste : le code de retrait est lu', JSON.stringify(panel['33000000001']));
+    dit(panel['33000000002'] && panel['33000000002'].code === 'C8277', 'G. le suivi dit « disponible au point relais » : le code est lu', JSON.stringify(panel['33000000002']));
+    dit(!f.j.vinted.some((v) => /conversations\/83$/.test(v.chemin)), 'G. un achat encore en route : sa conversation n’est pas lue pour un code', f.j.vinted.map((v) => v.chemin).join(' '));
+    dit(!panel['33000000004'], 'G. forme inconnue : rien d’écrit', JSON.stringify(panel['33000000004']));
+    dit(f.j.vinted.every((v) => v.methode === 'GET'), 'G. lecture seule');
+  }
   // ── compte pas connecté ──
   { const lignes = { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: [commande(TXA, 'En attente de livraison')] } } };
     const f = monter(lignes, { connecte: '999' });
