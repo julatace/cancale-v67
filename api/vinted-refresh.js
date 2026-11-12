@@ -145,6 +145,6 @@ export default async function handler(req, res) {
     const nonRange = summary.some((x) => x.action === 'refreshed_not_saved');
     res.status(nonRange ? 502 : 200).json({ ok: !nonRange, count: accounts.length, summary });
   } catch (err) {
-    res.status(500).json({ error: 'Echec du refresh global', detail: String(err) });
+    res.status(500).json({ error: 'Echec du refresh global' });   // (12 nov.) jamais le détail interne
   }
 }

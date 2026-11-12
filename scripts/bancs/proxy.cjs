@@ -17,7 +17,8 @@
 //      session et filtrée sur lui ;
 //   7. jeton expiré : le relais rafraîchit, RANGE lui-même les jetons neufs en
 //      base (avec la session du vendeur) et le dit à l'app — une écriture
-//      refusée est dite (`persiste: false`), jamais supposée.
+//      refusée est dite (`persiste: false`), jamais supposée ; (12 nov.) AUCUN
+//      jeton dans la réponse, l'écriture est réessayée 3 fois par le relais.
 // Aucune donnée réelle : tout est inventé, le banc vit dans le dépôt.
 const path = require('path');
 const RACINE = process.env.RACINE || path.join(__dirname, '..', '..');
@@ -129,7 +130,8 @@ const faireRes = () => {
     poserFetch({ expire: true });
     const r = await appel(SESSION, attaque);
     dit(r.code === 200 && r.corps && r.corps.ok === true, 'le relais rafraîchit puis rejoue la lecture', `HTTP ${r.code} · ok=${r.corps && r.corps.ok}`);
-    dit(r.corps && r.corps.refreshed && r.corps.refreshed.access_token === 'JETON_NEUF', 'et rend les jetons neufs à l’app', JSON.stringify(r.corps && r.corps.refreshed));
+    // (12 nov., sécurité des comptes) Les jetons neufs ne sortent JAMAIS vers la page.
+    dit(r.corps && r.corps.refreshed && !/JETON_NEUF|REF_NEUF|JETON_BASE|REF_BASE/.test(JSON.stringify(r.corps)), 'et ne rend AUCUN jeton à la page (seulement « rangé ou non »)', JSON.stringify(r.corps && r.corps.refreshed));
     // Vinted vient de CONSOMMER l'ancien refresh_token : le relais, qui relit
     // les jetons en base à chaque appel, doit ranger les neufs LUI-MÊME.
     const e = ecritures[0] || {};
@@ -144,6 +146,8 @@ const faireRes = () => {
     const r = await appel(SESSION, attaque);
     dit(r.code === 200 && r.corps && r.corps.ok === true, 'écriture des jetons refusée : la lecture passe quand même', `HTTP ${r.code}`);
     dit(r.corps && r.corps.refreshed && r.corps.refreshed.persiste === false, 'et l’app est prévenue que rien n’est rangé (persiste: false) — jamais un succès supposé', JSON.stringify(r.corps && r.corps.refreshed));
+    dit(ecritures.length === 3, 'le relais réessaie l’écriture (3 fois) puisque la page ne peut plus la faire', `${ecritures.length} essai(s)`);
+    dit(!/JETON_NEUF|REF_NEUF/.test(JSON.stringify(r.corps)), 'et même ratés, les jetons neufs ne sortent pas', JSON.stringify(r.corps).slice(0, 120));
   });
 
   console.log(ko ? `\n❌ vinted-proxy : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ vinted-proxy : ${ok} verts, 0 rouge`);

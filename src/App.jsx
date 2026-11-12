@@ -39,6 +39,7 @@ import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionV
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {contreOffreMini} from './messagesVolets.js';
 import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
+import { lignesRisqueMessage, phraseRisqueMessage, risquesMessage, erreurMessageAuto } from './messageSur.js';
 import { problemesAnnonce, problemesLot, champsNonJuges, CLE_VERIF_COUPEES, sansCoupees, couperAlerte, rallumerAlerte, lireCoupees, POURQUOI_ALERTE, NOMS_ALERTES, numeroEcritAttendu } from './verifAnnonce.js';
 import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urgencesJournee } from './journeePerso.js';
 import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
@@ -3007,6 +3008,16 @@ const verifierAvantPublication = async (tout, opts = {}) => {
   return (await askConfirm({ kind: 'verif', site: opts.site || '', lignes, titrePerso: opts.titre || '', title: opts.titre || `${n} point${n > 1 ? 's' : ''} à vérifier`, desc: lignes.map((l) => `${l.qui ? l.qui + ' · ' : ''}${l.texte} — ${l.geste}`).join('\n'), ok: opts.ok })) === true;
 };
 
+// (12 nov., sécurité des comptes) AVANT D'ENVOYER UN MESSAGE À LA MAIN (tous les sites) :
+// un numéro, un e-mail, un lien, PayPal, WhatsApp, « hors Vinted »… (src/messageSur.js) ⇒
+// la feuille ambre ; l'envoi part seulement sur SON « Envoyer quand même ». Rien à dire ⇒ true.
+const verifierMessageAvantEnvoi = async (texte, site = 'vinted') => {
+  const lignes = lignesRisqueMessage(texte, site);
+  if (!lignes.length) return true;
+  const titre = phraseRisqueMessage(site);
+  return (await askConfirm({ kind: 'verif', site, lignes, titrePerso: titre, title: titre, desc: lignes.map((l) => `${l.texte} — ${l.geste}`).join('\n'), ok: 'Envoyer quand même' })) === true;
+};
+
 // Meme chose pour window.prompt : une saisie, dans la feuille de l'app.
 // Renvoie la chaine saisie, ou null si on annule — exactement comme avant,
 // pour que les appels existants (`|| ''`, `!= null`) continuent de marcher.
@@ -3395,9 +3406,9 @@ function ListeVerif({ lignes, titre = '' }) {
         const lien = !premier.has(l.code); premier.add(l.code);
         return (
           <div key={i} data-verif-probleme={l.code} data-verif-qui={l.qui || undefined} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:2}}>
-            <span style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
+            <span data-verif-ambre={l.ambre ? '' : undefined} style={{fontSize:15,fontWeight:600,color:l.ambre ? C.warn : C.text,lineHeight:1.35}}>{l.qui ? <span style={{color:C.muted,fontWeight:600}}>{l.qui} · </span> : null}{l.texte}</span>
             <span style={{fontSize:13,color:C.muted,lineHeight:1.4}}>{l.geste}</span>
-            {lien && POURQUOI_ALERTE[l.code] ? <span data-verif-pourquoi={l.code} style={{fontSize:12,color:C.muted,lineHeight:1.4}}>{POURQUOI_ALERTE[l.code]}</span> : null}
+            {lien && (l.pourquoi || POURQUOI_ALERTE[l.code]) ? <span data-verif-pourquoi={l.code} style={{fontSize:12,color:C.muted,lineHeight:1.4}}>{l.pourquoi || POURQUOI_ALERTE[l.code]}</span> : null}
             {lien && NOMS_ALERTES[l.code] ? <button type="button" className="vrm-lien-action" data-verif-couper={l.code} onClick={() => couper(l.code)} style={{alignSelf:'flex-start',minHeight:44,padding:'0 2px',fontSize:13,fontWeight:600,background:'transparent',border:0,boxShadow:'none',color:C.accentTexte || C.accent,cursor:'pointer'}}>Ne plus me le dire</button> : null}
           </div>
         );
@@ -4986,13 +4997,20 @@ const sondeLectureSansCompte = async () => {
   } catch (_) { return null; }
 };
 
+// Les colonnes de `vinted_accounts` que la page lit (mesuré le 12 nov. : id, vinted_user_id,
+// login, domain, updated_at, created_at, owner — plus les jetons, jamais lus ici).
+const SELECT_COMPTES_VINTED = 'id,owner,vinted_user_id,login,domain,created_at,updated_at';
+// Une copie locale d'avant (jetons compris) est nettoyée au chargement.
+const sansJetonsVinted = (a) => { if (!a || typeof a !== 'object') return a; const { access_token, refresh_token, csrf_token, anon_id, ...reste } = a; return reste; };
 const fetchVintedAccounts = async () => {
   const owner = AUTH.user?.id;
   if (!owner || !AUTH.session?.access_token) return null;
   const filtre = `&owner=eq.${encodeURIComponent(owner)}`;
   try {
     const [res, blk] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, { headers: sbAuth() }),
+      // (12 nov., sécurité des comptes) Projeté SANS les jetons (access, refresh, csrf, anon) :
+      // la page n'en a besoin pour rien (le relais les lit lui-même en base).
+      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=${SELECT_COMPTES_VINTED}${filtre}`, { headers: sbAuth() }),
       fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data${filtre}`, { headers: sbAuth() }),
     ]);
     if (!res.ok) return null;                 // la base a répondu autre chose qu'une liste
@@ -5014,6 +5032,7 @@ const fetchVintedAccounts = async () => {
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
       reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}${filtre}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
     }
+    list = list.map(sansJetonsVinted);   // (12 nov.) jamais un jeton Vinted dans la page, même d'une vieille base
     memoriserComptesLies(owner, list);   // (6 nov.) ce que le préchargement lira à la prochaine ouverture
     return list;
   } catch (_) { return null; }                 // réseau coupé, DNS, CORS : on ne sait pas
@@ -8095,45 +8114,13 @@ const VINTED_NOTIF_API_HOST = {
   'www.vinted.it': 'api.vinted.it', 'www.vinted.de': 'api.vinted.de',
 };
 
-// Persistance des tokens rafraichis automatiquement par le proxy (voir
-// api/vinted-proxy.js : quand un appel renvoie 401, le proxy refait un refresh
-// et nous renvoie de nouveaux tokens dans json.refreshed). Il FAUT les persister
-// car Vinted invalide l'ancien refresh_token a chaque refresh - sinon le refresh
-// suivant echouerait. Le composant App enregistre un handler pour repercuter les
-// nouveaux tokens dans son state ; en parallele on met a jour la ligne Supabase
-// pour que l'extension et les autres appareils repartent du bon refresh_token.
-let onVintedTokensRefreshed = null;
-const setVintedTokensRefreshedHandler = (fn) => { onVintedTokensRefreshed = fn; };
-
+// (12 nov., sécurité des comptes) LES JETONS VINTED NE PASSENT PLUS PAR LA PAGE.
+// Le relais (api/vinted-proxy.js) range lui-même en base les jetons qu'il renouvelle
+// et ne rend que `refreshed: { persiste }`. Ici, seulement le dire quand ce n'est pas
+// rangé (le compte cessera de répondre au relais jusqu'à la prochaine visite sur Vinted).
 const persistRefreshedTokens = async (account, refreshed) => {
-  if (!refreshed || !refreshed.access_token) return;
-  // L'état local suit (affichage, extension) — mais depuis le 4 octobre le
-  // relais relit les jetons EN BASE à chaque appel : seule la base compte.
-  account.access_token = refreshed.access_token;
-  account.refresh_token = refreshed.refresh_token;
-  // Le relais range lui-même les jetons qu'il vient de renouveler
-  // (`refreshed.persiste`). S'il n'a pas pu, on réessaie d'ici — et on regarde
-  // la réponse : une écriture ratée laisse en base un refresh_token déjà
-  // consommé, et le compte cesse de répondre au relais (revue du 5 octobre).
-  if (refreshed.persiste !== true && account.vinted_user_id) {
-    let ok = false;
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
-        method: 'PATCH',
-        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-        body: JSON.stringify({
-          access_token: refreshed.access_token,
-          refresh_token: refreshed.refresh_token,
-          updated_at: new Date().toISOString(),
-        }),
-      });
-      ok = r.ok;
-    } catch (_) { ok = false; }
-    if (!ok) { try { console.warn('[VRM] jetons Vinted renouvelés mais non enregistrés — repasse sur Vinted avec ce compte pour les recapter'); } catch (_) {} }
-  }
-  if (onVintedTokensRefreshed) {
-    try { onVintedTokensRefreshed(account.vinted_user_id, refreshed); } catch (_) { /* ignore */ }
-  }
+  if (!refreshed || refreshed.persiste === true) return;
+  try { console.warn('[VRM] jetons Vinted renouvelés mais non enregistrés — repasse sur Vinted avec ce compte pour les recapter'); } catch (_) {}
 };
 
 // Appelle un endpoint de l'API Vinted pour le compte donne, via le proxy
@@ -15585,21 +15572,26 @@ function RapidesConv({ liste, onChoisir, desactive = false, style }) {
     </div>
   );
 }
-function ComposeConv({ valeur, onChange, onEnvoyer, desactive = false, placeholder = 'Écris ta réponse…', etiquette = 'Réponse à la conversation', libelleEnvoyer = 'Envoyer', entreeEnvoie = false, envoiBloque = false, enCours = false, attrsChamp, attrsEnvoyer }) {
+function ComposeConv({ valeur, onChange, onEnvoyer, desactive = false, placeholder = 'Écris ta réponse…', etiquette = 'Réponse à la conversation', libelleEnvoyer = 'Envoyer', entreeEnvoie = false, envoiBloque = false, enCours = false, attrsChamp, attrsEnvoyer, site = 'vinted' }) {
+  // (12 nov., sécurité des comptes) Un mot qui fait bannir (src/messageSur.js) : dit en
+  // ambre PENDANT la saisie, puis la feuille « Envoyer quand même » avant de partir.
+  const risques = risquesMessage(valeur, site);
+  const envoyerSur = async () => { if (risques.length && !(await verifierMessageAvantEnvoi(valeur, site))) return; onEnvoyer(); };
   // (1er nov., finition) Un Envoyer grisé dit POURQUOI (infobulle) : champ vide,
   // envoi en cours, ou la raison déjà écrite au-dessus du champ. Le libellé
   // lu par les lecteurs d'écran reste « Envoyer ».
   const raisonBloque = !envoiBloque ? libelleEnvoyer : enCours ? 'Envoi en cours…' : !String(valeur || '').trim() ? 'Écris d’abord ta réponse' : 'Envoi impossible ici pour le moment — la raison est écrite au-dessus';
-  return (
+  return (<>
+    {risques.length > 0 && <p className="vrm-message-risque" role="status" data-message-risque={risques.map((r) => r.code).join(' ')} style={{margin:'0 0 6px',fontSize:13,lineHeight:1.4,fontWeight:600,color:C.warn}}>{risques[0].texte} · {phraseRisqueMessage(site)}</p>}
     <div className="vrm-chat-compose">
-      <textarea aria-label={etiquette} disabled={desactive} value={valeur} onChange={e=>onChange(e.target.value)} rows={1} placeholder={placeholder} onKeyDown={entreeEnvoie ? (e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); onEnvoyer(); } }) : undefined} style={{color:C.text}} {...(attrsChamp || {})}/>
+      <textarea aria-label={etiquette} disabled={desactive} value={valeur} onChange={e=>onChange(e.target.value)} rows={1} placeholder={placeholder} onKeyDown={entreeEnvoie ? (e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); envoyerSur(); } }) : undefined} style={{color:C.text}} {...(attrsChamp || {})}/>
       {/* (31 oct.) La dictée : la reconnaissance vocale DU NAVIGATEUR
           (`MicDictee`, déjà celle de la recherche) — aucune IA, aucune
           clé (§2.9). Elle AJOUTE au champ ; rien ne part sans « Envoyer ». */}
       {!desactive && <MicDictee titre="Dicter la réponse" onText={(t)=>onChange((valeur&&valeur.trim()?valeur.replace(/\s*$/,' '):'')+t)}/>}
-      <button type="button" className="vrm-chat-send" aria-label={enCours?'Envoi en cours':libelleEnvoyer} title={raisonBloque} data-envoi-bloque={envoiBloque?'':undefined} onClick={onEnvoyer} disabled={envoiBloque} {...(attrsEnvoyer || {})}><Icon name={enCours?'sync':'send'} size={19}/></button>
+      <button type="button" className="vrm-chat-send" aria-label={enCours?'Envoi en cours':libelleEnvoyer} title={raisonBloque} data-envoi-bloque={envoiBloque?'':undefined} onClick={envoyerSur} disabled={envoiBloque} {...(attrsEnvoyer || {})}><Icon name={enCours?'sync':'send'} size={19}/></button>
     </div>
-  );
+  </>);
 }
 // Le pied d'un fil où VRM NE PEUT PAS répondre : la raison, puis le seul geste qui marche.
 function PiedSansEnvoi({ raison, lien, texteLien, attrs, children }) {
@@ -31515,6 +31507,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (29 oct.) Le détail de l'acceptation automatique ne s'affiche que sur ⓘ.
   const [offresInfo, setOffresInfo] = useState(false);
   React.useEffect(() => onCloudReady(() => setRefusMsg(v => (v && v.trim()) ? v : (load('vinted_offre_refus_msg', '') || ''))), []);
+  // (12 nov., sécurité des comptes) Le refus automatique envoie CE texte sans lui : un mot qui
+  // fait bannir (numéro, PayPal, « hors Vinted »… src/messageSur.js) ⇒ jamais rangé (l'extension
+  // refuse alors sans message) ; le champ garde ce qu'il a tapé et le dit en ambre.
+  const ecrireRefusMsg = (v) => { setRefusMsg(v); save('vinted_offre_refus_msg', erreurMessageAuto(v) ? '' : v); };
+  React.useEffect(() => onCloudReady(() => { const v = load('vinted_offre_refus_msg', '') || ''; if (v && erreurMessageAuto(v)) save('vinted_offre_refus_msg', ''); }), []);
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
@@ -46399,8 +46396,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {offresAuto && (
                   <div data-offre-refus className="vrm-offres-auto-refus">
                     <label htmlFor="vrm-offre-refus-msg">Message quand VRM refuse <span>(vide = refus sans message)</span></label>
-                    <textarea id="vrm-offre-refus-msg" data-offre-refus-msg value={refusMsg} onChange={e=>{ setRefusMsg(e.target.value); save('vinted_offre_refus_msg', e.target.value); }}
+                    <textarea id="vrm-offre-refus-msg" data-offre-refus-msg value={refusMsg} onChange={e=>ecrireRefusMsg(e.target.value)}
                       rows={2} placeholder="Ex. : Merci pour ton offre ! Je ne peux pas descendre aussi bas, mais n'hésite pas à m'en refaire une 🙂"/>
+                    {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{margin:'6px 0 0',fontSize:13,fontWeight:600,color:C.warn}}>{erreurMessageAuto(refusMsg)}</p> : null}
                   </div>
                 )}
               </div>
@@ -47487,7 +47485,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
         <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>
         {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
-          refusMsg={refusMsg} setRefusMsg={(v)=>{ setRefusMsg(v); save('vinted_offre_refus_msg', v); }}
+          refusMsg={refusMsg} setRefusMsg={ecrireRefusMsg}
           annonces={Array.isArray(listings.items) && !listings.error ? annSelectionnables.filter(a=>a.etat==='en-ligne') : null} numeros={numeros}
           offres={offresConv} lireGarde={lireGardeOffres} comptes={(accounts||[]).filter(a=>/^\d{1,20}$/.test(String(a.vinted_user_id||''))&&!acctOffOf({_acc:a})).map(a=>({ uid:String(a.vinted_user_id), nom:accNameOf(a) }))}
           uidOnglet={(vintedDeChrome()||{}).uid||''} pause={__vmrEtat && __vmrEtat.pause ? __vmrEtat.pause : null} freinsVus={lireFreinsVus()}
@@ -55040,22 +55038,8 @@ function AppCoeur() {
     return () => { main.removeEventListener('scroll', surDefilement); if (raf) cancelAnimationFrame(raf); };
   }, [tab]);
   const titreCourant = titreEcran(tab); TITRE_BARRE = titreCourant;
-  // Repercute dans le state React les tokens rafraichis automatiquement par le
-  // proxy (via persistRefreshedTokens). Sans ca, seuls l'objet compte en memoire
-  // et Supabase seraient a jour, mais pas le state -> le prochain rendu
-  // repartirait de l'ancien token expire.
-  useEffect(()=>{
-    setVintedTokensRefreshedHandler((vintedUserId, refreshed)=>{
-      setVintedAccounts(prev=>{
-        const next=prev.map(a=> String(a.vinted_user_id)===String(vintedUserId)
-          ? {...a, access_token:refreshed.access_token, refresh_token:refreshed.refresh_token}
-          : a);
-        try{ localStorage.setItem('vinted_accounts', JSON.stringify(next)); }catch(_){}
-        return next;
-      });
-    });
-    return ()=> setVintedTokensRefreshedHandler(null);
-  },[]);
+  // (12 nov.) Plus de jetons Vinted dans la page : rien à répercuter (api/vinted-proxy.js les range).
+
 
   // NOTE (profil discret vis-a-vis de Vinted) : on NE rafraichit PLUS tous les
   // comptes en arriere-plan au demarrage. Rafraichir plusieurs comptes en meme
@@ -58238,4 +58222,4 @@ export { lireLitigesVinted, changerCompteVrm };
 export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
-export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif };
+export { NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, verifierMessageAvantEnvoi, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif };

@@ -18,10 +18,16 @@
 // POST /web/api/auth/refresh (host www.vinted.fr) avec le refresh_token_web,
 // récupère un nouveau access_token ET un nouveau refresh_token (Vinted fait
 // tourner le refresh_token à chaque refresh - l'ancien devient invalide), puis
-// rejoue la requête d'origine. Les nouveaux tokens sont renvoyés au client dans
-// le champ "refreshed" pour qu'App.jsx les persiste (state + Supabase). SANS
-// cette persistance, le refresh suivant échouerait car le refresh_token stocké
-// serait déjà consommé.
+// rejoue la requête d'origine. Les nouveaux tokens sont rangés ICI, en base
+// (3 essais) ; SANS cette persistance, le refresh suivant échouerait car le
+// refresh_token stocké serait déjà consommé.
+// ⚠️⚠️ (12 nov., sécurité des comptes) AUCUN JETON VINTED NE SORT D'ICI. Avant, le
+//    champ `refreshed` renvoyait access_token et refresh_token à la page (revue de
+//    robustesse, H1) : un script de la page, une extension curieuse ou une capture
+//    d'écran de la console les emportait. La page reçoit seulement `refreshed:
+//    { persiste }` (rangé ou non) ; aucune fonction de l'app ne lit plus ces jetons.
+//    `scripts/audit-jetons-vinted.cjs` EXÉCUTE la route et cherche les jetons dans
+//    chaque réponse.
 
 import './_lib/sans-bruit.js';
 import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur } from './_lib/session.js';
@@ -220,27 +226,32 @@ export default async function handler(req, res) {
         //    laissée au navigateur — qui pouvait échouer en silence — cassait le
         //    compte pour tous les appels suivants (revue du 5 octobre). On écrit
         //    avec SA session (RLS : seulement sa ligne), filtré sur lui.
-        const n = await modifierCommeVendeur(req,
-          `vinted_accounts?vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&select=vinted_user_id`,
-          { access_token: nt.access_token, refresh_token: nt.refresh_token, updated_at: new Date().toISOString() });
-        refreshed = { ...nt, persiste: n != null && n > 0 };
+        // (12 nov.) La page ne reçoit plus les jetons : c'est ICI que l'écriture doit
+        // réussir — 3 essais ; ratée, elle est DITE (`persiste: false`), jamais supposée.
+        let n = null;
+        for (let essai = 0; essai < 3 && !(n != null && n > 0); essai++) {
+          n = await modifierCommeVendeur(req,
+            `vinted_accounts?vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&select=vinted_user_id`,
+            { access_token: nt.access_token, refresh_token: nt.refresh_token, updated_at: new Date().toISOString() });
+        }
+        refreshed = { persiste: n != null && n > 0 };
         vintedRes = await doCall(nt.access_token, nt.refresh_token);
       }
     }
 
     const text = await vintedRes.text();
     let json;
-    try { json = JSON.parse(text); } catch { json = { raw: text }; }
+    // Une page HTML (Cloudflare, maintenance) : 2 Ko au plus, jamais la page entière.
+    try { json = JSON.parse(text); } catch { json = { raw: String(text).slice(0, 2048) }; }
 
     res.status(200).json({
       status: vintedRes.status,
       ok: vintedRes.ok,
       data: json,
-      // Présent uniquement si un refresh a eu lieu. `persiste` dit si le relais
-      // les a rangés lui-même ; sinon le client les réécrit (et le vérifie).
+      // Présent uniquement si un refresh a eu lieu : `{ persiste }`, JAMAIS les jetons.
       refreshed,
     });
   } catch (err) {
-    res.status(500).json({ error: 'Échec de la requête vers Vinted', detail: String(err) });
+    res.status(500).json({ error: 'Échec de la requête vers Vinted' });
   }
 }

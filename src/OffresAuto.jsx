@@ -29,6 +29,7 @@ import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { apercuMoteur, journalOffres, lignesSeuils, alertePlafond, journeeCalme, seuilsIllisibles, montantSeuil, LIBELLE_DECISION, RAISON_GARDE, DELAI_OFFRE_MIN, DELAI_OFFRE_MAX, OFFRES_PAR_VISITE } from './offresSures.js';
 import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth } from './App.jsx';
 import './offres-auto.css';
+import { erreurMessageAuto } from './messageSur.js';
 
 const PAR_PAGE = 30;
 const quand = (t) => {
@@ -227,6 +228,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
       <h3 className="vrm-oa-titre">Message de refus</h3>
       <div className="vrm-oa-groupe">
         <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder="Vide : refus sans message." aria-label="Message envoyé quand VRM refuse une offre"/>
+        {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{ margin: '6px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--vrm-warn, #B25000)' }}>{erreurMessageAuto(refusMsg)}</p> : null}
       </div>
     </section>
   );

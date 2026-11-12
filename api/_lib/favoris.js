@@ -9,6 +9,7 @@ import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
 import {DESTINATIONS} from './lien-notif.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
+import {messageAutoPermis} from '../../src/messageSur.js';
 import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
 import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
@@ -91,6 +92,8 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
     if(rows.some(x=>x.owner!==owner))return await stop('lecture');
     const lire=id=>rows.find(x=>x.id===id)?.data;
     const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)return await stop('reglages');
+    // (12 nov.) Un mot qui fait bannir dans le message enregistré : rien ne part, le geste est demandé.
+    if(typeof prefs.message==='string'&&!messageAutoPermis(prefs.message,'vinted'))return await stop('message_risque');
     let p;try{p=validerReglagesFavoris(prefs);}catch{return await stop('reglages');}
     const message=preparerMessageFavori(p.message,p.pourcentage).message;if(!message)return await stop('reglages');
     const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
