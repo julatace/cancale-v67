@@ -367,6 +367,31 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
 // entre l'arrivée au point (LUE) et la date limite (LUE, sinon la garde du transporteur, « estimée »), et ce
 // qui reste en mots. Neutre ; AMBRE dans les dernières 24 h et au-delà (un geste à faire, §7) ; jamais
 // rouge. Sans date d'arrivée : pas de barre (la puce d'échéance reste). Règle : src/delaiRetrait.js.
+// (12 nov., finitions) « vérifié par e-mail hier 11:19 » ⇒ « e-mail, hier 11:19 » dans la fiche (l'étiquette dit déjà
+// « Vérifié »). Après des sources déjà nommées : « · hier 11:19 ».
+const verifieCourt = (t, apresSources = false) => {
+  const s = String(t || '').replace(/^vérifié\s*/, '');
+  const m = /^par (.+?) ((?:à|hier|le) .*)$/.exec(s);
+  if (m) return `${m[1]}, ${m[2]}`;
+  return apresSources ? s : s.replace(/^à /, 'à ');
+};
+// (12 nov., finitions — Julien) L'ORTHOGRAPHE OFFICIELLE DES ENSEIGNES connues (casse, accents, point) : « INTERMARCHE »,
+// « Intermarche » ⇒ « Intermarché ». Ce n'est pas deviner un lieu : seul le NOM de l'enseigne en tête est réécrit,
+// le reste du nom lu est gardé tel quel.
+const ENSEIGNES = [
+  ['intermarche', 'Intermarché'], ['carrefour market', 'Carrefour Market'], ['carrefour city', 'Carrefour City'], ['carrefour express', 'Carrefour Express'],
+  ['carrefour contact', 'Carrefour Contact'], ['carrefour', 'Carrefour'], ['e.leclerc', 'E.Leclerc'], ['e. leclerc', 'E.Leclerc'], ['e leclerc', 'E.Leclerc'], ['leclerc', 'E.Leclerc'],
+  ['super u', 'Super U'], ['hyper u', 'Hyper U'], ['u express', 'U Express'], ['casino', 'Casino'], ['monoprix', 'Monoprix'], ['franprix', 'Franprix'],
+  ['auchan', 'Auchan'], ['bureau vallee', 'Bureau Vallée'], ['relay', 'Relay'], ['maison de la presse', 'Maison de la Presse'], ['tabac presse', 'Tabac Presse'],
+  ['lidl', 'Lidl'], ['aldi', 'Aldi'], ['netto', 'Netto'], ['spar', 'Spar'], ['vival', 'Vival'], ['proxi', 'Proxi'], ['cocci market', 'Cocci Market'],
+];
+const sansAccentsEns = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export function nomEnseigne(nom) {
+  const n = String(nom || '').trim(); if (!n) return n;
+  const b = sansAccentsEns(n);
+  for (const [k, v] of ENSEIGNES) if (b === k || b.startsWith(k + ' ') || b.startsWith(k + ',') || b.startsWith(k + '-')) return v + n.slice(k.length);
+  return n;
+}
 export function BarreDelai({ d, enTete = false }) {
   if (!d) return null;
   return (
@@ -378,7 +403,7 @@ export function BarreDelai({ d, enTete = false }) {
     </span>
   );
 }
-function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false, suiviDe = null }) {
+function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false, suiviDe = null, qrDe = null }) {
   const [ouvert, setOuvert] = React.useState(false);
   const detailId = React.useId();
   const [copie,setCopie]=React.useState(false);
@@ -387,8 +412,16 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const voirCode=async()=>{setOuvert(true);if(!x.code)return;const gen=copieGen.current;try{await navigator.clipboard.writeText(String(x.code));if(gen===copieGen.current)setCopie(true);}catch(_){if(gen===copieGen.current)setCopie(false);}};
   const ph = x.photo && Photo ? Photo(x.photo) : null;
   // La barre dit l'échéance (§7 : jamais deux fois) ; sans barre, la puce d'échéance reste.
-  const dl = !x.horsCompte && delai ? delai(x) : null;
-  const e = (dl || delaiEnTete) ? null : (echeance ? echeance(x) : null);
+  // (12 nov., finitions — Julien : « rien n'est cohérent ») UNE FORME DE LIGNE, la même pour chaque colis :
+  // vignette (photo de l'article relié, sinon le logo du transporteur) avec le logo TOUJOURS au coin ;
+  // 1 · le nom de l'article (relié par identité) ou « Colis {transporteur} » — jamais le n° de suivi ;
+  // 2 · le code en gros, ou « Code à venir », à la même place ; 3 · le n° de suivi discret, ou rien ;
+  // 4 · la barre du délai TOUJOURS : « encore N j », « · estimée », ou « Date limite inconnue » (barre vide).
+  // Seul l'AFFICHAGE change : les mêmes sources, les mêmes règles (`delai`, `echeance`, `titreDe`, `suiviDe`).
+  const dl0 = !x.horsCompte && delai ? delai(x) : null;
+  const e0 = dl0 ? null : (echeance ? echeance(x) : null);
+  const dl = dl0 || (e0 ? { code: e0.code || 'date', pct: 0, ambre: !!e0.ambre, texte: e0.t, valeurTexte: e0.t } : { code: 'inconnue', pct: 0, ambre: false, texte: 'Date limite inconnue', valeurTexte: 'Date limite inconnue' });
+  const e = null;
   const st = statut ? statut(x) : null;
   // (10 nov., retraits irréprochables) Deux sources donnent deux codes différents : rien n'est choisi,
   // la ligne le dit en ambre et le détail montre les deux valeurs avec leur source (src/sourcesRetrait.js).
@@ -407,7 +440,25 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const basculer = () => setOuvert((o) => !o);
   const suLigne = suiviDe ? String(suiviDe(x) || '') : '';
   const titreLigne = (titreDe && titreDe(x)) || x.titre || '';
-  const titreSansArticle = !titreLigne || /^n°\s*…/.test(titreLigne);
+  const titreSansArticle = !titreLigne || /^n°/i.test(titreLigne) || /^colis\b/i.test(titreLigne);
+  const nomTransp = x.transp && !x.trInconnu ? String(x.transp.nom || '') : '';
+  // Au point relais, un colis Chronopost est un colis « Chronopost Pickup » (le nom du réseau de points).
+  const nomAffiche = nomTransp ? (x.transp.cle === 'chronopost' ? 'Chronopost Pickup' : nomTransp) : '';
+  const titreAffiche = titreSansArticle ? (nomAffiche ? `Colis ${nomAffiche}` : 'Colis') : titreLigne;
+  // Ligne 3 : le nom du transporteur EN CLAIR quand le titre est l'article (sinon le titre le dit déjà), puis le n°.
+  const ligne3 = [titreSansArticle ? '' : nomAffiche, suLigne ? `n° ${suLigne}` : ''].filter(Boolean).join(' · ');
+  const ouvrirQr = qrDe ? qrDe(x) : null;
+  // (12 nov., finitions — règle 3 de Julien) Arrivé SANS code : on dit OÙ il est, jamais « à venir » comme si c'était
+  // normal. Un achat Vinted (sa page, ou l'e-mail « Ton achat t'attend ») : le code est sur Vinted ; un colis du
+  // transporteur : son code arrive dans l'e-mail du transporteur. La phrase entière est dans le dépli.
+  const tSrc = (x.src && x.src.t) || null;
+  const codeSurVinted = !tSrc || tSrc.source === 'vinted-commande';
+  const sansCodeCourt = codeSurVinted ? 'Code sur Vinted' : x.horsCompte ? 'Code pas lu' : 'Code pas encore reçu';
+  // (12 nov., finitions) Le serveur vérifie CE colis chez son transporteur (« retiré » puis « changé de plan »,
+  // `aVerifierTransporteur`, api/_lib/suivi-colis.js) : rien à faire pour le vendeur ⇒ une mention NEUTRE à la
+  // place du délai (jamais une question, jamais ambre), même place, même hauteur.
+  const verifT = !!(x.src && x.src.t && x.src.t.aVerifierTransporteur);
+  const dl4 = verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: 'Vérification en cours', valeurTexte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours` } : dl;
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
   // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).
@@ -423,15 +474,15 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
       <div className="vrm-rpf-rang">
         <button type="button" className="vrm-rpf-ouvrir" aria-expanded={ouvert} aria-controls={detailId} onClick={basculer}>
         <span className={'vrm-rpf-vignette' + (ph ? '' : ' is-sans')} aria-hidden="true" data-sans-photo={ph ? undefined : ''}>
-          {ph || <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>}
-          {/* (7 nov.) Le logo du transporteur LU, dans le coin de la vignette — seulement quand le nom
-              est dit par l'en-tête du point (sinon la puce de la ligne le porte déjà, logo compris). */}
-          {!avecTransp && x.transp ? <BadgeTransporteur t={x.transp}/> : null}
+          {ph || (x.transp && x.transp.cle && !x.trInconnu ? <span className="vrm-rpf-vignette-logo" data-rp-vignette-logo={x.transp.cle}><PastilleTransporteur t={x.transp} C={C} seul taille={32}/></span>
+            : <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>)}
+          {/* Le logo du transporteur au coin de la PHOTO ; sans photo, la vignette EST le logo (jamais deux fois). */}
+          {ph || !(x.transp && x.transp.cle && !x.trInconnu) ? <BadgeTransporteur t={x.trInconnu ? null : x.transp}/> : null}
         </span>
         <span className="vrm-rpf-quoi">
           {/* (11 nov.) Un colis sans titre d'article s'appelait « n°…0010 » juste au-dessus de « n° 81000010 » : le même
               n° deux fois. Son titre EST son n° de suivi complet (la clé), et la ligne du code ne le redit pas. */}
-          <span className="vrm-rpf-titre" title={x.titre} data-rp-titre="">{x.num ? `N°${x.num} · ` : ''}{titreSansArticle ? (suLigne ? `n° ${suLigne}` : 'Colis') : titreLigne}</span>
+          <span className="vrm-rpf-titre" title={titreAffiche} data-rp-titre="" data-rp-titre-article={titreSansArticle ? undefined : ''}>{x.num ? `N°${x.num} · ` : ''}{titreAffiche}</span>
           {/* (11 nov., Julien : « des QR codes, des infos dans tous les sens, on ne comprend rien » ; « le n° de suivi
               est une clé ») CE QU'IL FAUT AU COMPTOIR, sans toucher : le code (gros), le n° de suivi, l'échéance.
               Plus de ligne de sources (« Vinted · e-mail · message · vérifié à… ») : elles restent en data-*. */}
@@ -439,10 +490,12 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
             {desaccord ? <span className="vrm-rpf-code-gros is-ambre" data-rp-code-visible="desaccord" data-rp-code-desaccord="">2 codes</span>
               : x.code ? <span className="vrm-rpf-code-gros" data-rp-code-visible={x.code}>{x.code}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
-              : (!x.horsCompte ? <span className="vrm-rpf-code-venir" data-rp-code-a-venir="">Code à venir</span> : null))}
-            {avecTransp && x.transp ? <span className="vrm-rpf-transp-ligne"><PastilleTransporteur t={x.transp} C={C} seul taille={16}/></span> : null}
-            {titreSansArticle && suLigne ? <span hidden data-rp-suivi-ligne={suLigne}/> : suLigne ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={suLigne}>n° {suLigne}</span> : <span className="vrm-rpf-suivi-ligne is-sans" data-rp-sans-suivi="">sans n° de suivi</span>}
+              : <span className="vrm-rpf-code-venir" data-rp-code-a-venir="" data-rp-code-ou={codeSurVinted ? 'vinted' : 'email'}>{sansCodeCourt}</span>)}
+            {/* Le QR : une petite icône à côté du code, au doigt ⇒ le QR en grand (le reste de la ligne ouvre la fiche). */}
+            {ouvrirQr ? <span className="vrm-rpf-qr-mini" data-rp-qr-ligne="" role="img" aria-label="QR de retrait : touche pour l’afficher en grand" title="QR en grand" onClick={(ev) => { ev.stopPropagation(); ev.preventDefault(); ouvrirQr(); }}><IcoCode/></span> : null}
           </span>
+          {ligne3 ? <span className="vrm-rpf-suivi-ligne" data-rp-suivi-ligne={suLigne || undefined} data-rp-sans-suivi={suLigne ? undefined : ''} data-rp-transp-nom={titreSansArticle ? undefined : nomAffiche || undefined}>{ligne3}</span> : <span className="vrm-rpf-suivi-ligne is-vide" data-rp-sans-suivi="" aria-hidden="true">{'\u00a0'}</span>}
+          <span className="vrm-rpf-ligne-delai" data-rp-l4="" data-rp-verif-transporteur={verifT ? '' : undefined}><BarreDelai d={dl4}/></span>
           {(st || e || x.lieuDeplace || ancien) ? <span className="vrm-rpf-puces">
             {st ? <span className="vrm-rpf-puce is-ambre" data-rp-statut="">{st}</span> : null}
             {x.lieuDeplace ? <span className="vrm-rpf-puce is-ambre" data-rp-deplace={x.lieuDeplace.carrier || ''}>{texteDeplace(x.lieuDeplace)}</span> : null}
@@ -459,7 +512,6 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
       {/* La barre hors du bouton de la ligne (un bouton rend ses enfants muets pour un lecteur d'écran). */}
-      {dl && !delaiEnTete ? <div className="vrm-rpf-ligne-delai"><BarreDelai d={dl}/></div> : null}
       {ouvert ? <div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
         {desaccord ? <div className="vrm-rpf-desaccord" data-rp-desaccord="" role="note">
           <span className="vrm-rpf-desaccord-t">Deux codes différents — vérifie sur place</span>
@@ -468,7 +520,8 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
         {/* (11 nov.) D'où vient ce que la ligne dit (les sources qui ont vu CE colis, l'heure de la dernière vérification) :
             dans le détail ouvert, plus sur la ligne (Julien : « des infos dans tous les sens »). */}
-        {marquesVues.length || verifie ? <span className="vrm-rpf-sources is-detail" data-rp-sources-ligne="">{marquesVues.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="">{verifie}</span> : null}</span> : null}
+        {/* (12 nov., finitions) La dernière ligne de la fiche : « Vérifié · e-mail · par Mondial Relay à 14:26 », étiquetée comme les autres. */}
+        {marquesVues.length || verifie ? <div className="vrm-rpf-fiche-l vrm-rpf-sources is-detail" data-rp-sources-ligne=""><span className="vrm-rpf-fiche-k">Vérifié</span><span className="vrm-rpf-fiche-v">{marquesVues.map((m) => <span key={m} className="vrm-rpf-source" data-rp-source={m}>{NOMS_SOURCES[m] || m}</span>)}{verifie ? <span className={'vrm-rpf-verifie' + (ancien ? ' is-ambre' : '')} data-rp-verifie-texte="">{verifieCourt(verifie, marquesVues.length > 0)}</span> : null}</span></div> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
       </div> : null}
       {tiroirG}
@@ -562,7 +615,7 @@ const NOMS_RESEAU = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', v
 export const texteDeplace = (d) => { if (!d) return ''; const h = Number.isFinite(d.at) ? new Date(d.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : ''; return `déplacé · selon ${NOMS_RESEAU[d.carrier] || 'le transporteur'}${h ? ' à ' + h : ''}`; };
 const PREF_ORDRE = 'vrm_retirer_ordre';
 const PREF_MASQUES = 'vrm_retirer_points_masques';
-function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null }) {
+function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null }) {
   const enLigne = useEnLigne();
   // (8 nov., Julien : « réaffiche la carte ») La carte est AUSSI au téléphone (en haut de la liste, ~200 px) ;
   // hors réseau, pas de carte.
@@ -607,7 +660,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
     if (el) { try { el.scrollIntoView({ behavior: mouvementReduit() ? 'auto' : 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } }
   };
   const trConnu = (x) => !!(x.transp && !x.trInconnu && cleStatTransporteur(x.transp) !== 'pas-lu');
-  const ligne = (x, parLigne = true, delaiEnTete = false) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={x.horsCompte ? null : echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe} delai={delai} delaiEnTete={delaiEnTete} suiviDe={suiviDe}/>;
+  const ligne = (x, parLigne = true, delaiEnTete = false) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe} delai={delai} delaiEnTete={delaiEnTete} suiviDe={suiviDe} qrDe={qrDe}/>;
   // Le rangement : chaque colis dans SA section, avec son point.
   const parSection = { aujourdhui: [], prets: [], avenir: [], lieu: [], verifier: [], double: [] };
   // (3 nov., 19 h) Une ville choisie : un point SANS ville (nom seul, homonyme) va sous « Lieu à
@@ -639,10 +692,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
     const tStats = [...new Set(rows.map((c) => cleStatTransporteur(c.transp)))];
     const tCommun = rows.length && rows.every((c) => c.transp && !c.trInconnu) && tStats.length === 1 && tStats[0] !== 'pas-lu' ? rows[0].transp : null;
     const ep = nombreEpingle(p);
-    // (8 nov.) Tous les colis comptés du point ont la MÊME barre (même arrivée, même limite) : une fois, en tête (§7).
-    const comptesP = rows.filter((c) => !c.horsCompte);
-    const dls = delai && comptesP.length >= 2 ? comptesP.map((c) => delai(c)) : [];
-    const dTete = dls.length && dls.every((d) => d && d.cle === dls[0].cle) ? dls[0] : null;
+    // (12 nov., finitions) Plus de barre unique en tête de point : chaque ligne porte SA barre (une forme pour toutes).
     const prem = !premiere.has(p.cle); premiere.add(p.cle);
     const attrs = prem ? { 'data-relais-point': p.cle, 'data-relais-numero': p.numero, 'data-relais-point-arrives': p.nArrives, 'data-relais-point-comptes': p.nComptes, 'data-relais-point-attendus': p.nAttendus, 'data-relais-epingle-n': ep.n, 'data-relais-ville': (villeDuPoint(p) || {}).cle || '',
       'data-relais-repere': !avecCarte ? 'sans-carte' : repereDe(p, reperes) ? 'oui' : 'non', 'data-relais-pas-carte': avecCarte ? codePasSurCarte(p, reperes) : undefined, 'data-relais-urgent': p.urgent ? '1' : undefined } : { 'data-relais-point-suite': p.cle };
@@ -650,20 +700,21 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
       <section key={cleSec + ':' + p.cle} className={'vrm-rpf-point' + (choisi === p.cle ? ' is-choisi' : '')} {...attrs}>
         <header className="vrm-rpf-tete">
           <span className="vrm-rpf-ident">
-            <b className="vrm-rpf-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
+            <b className="vrm-rpf-nom" data-relais-nom="">{nomEnseigne(p.nom) || p.adresseCourte || 'Point relais'}</b>
             {/* (11 nov.) Plus de carte (Julien : « ça sert à rien ») : l'itinéraire vers l'adresse LUE, d'un geste, au bout de l'adresse. */}
             {(() => { const adr = p.nom ? (p.adresse || p.adresseCourte || '') : ''; const lieu = [p.nom, p.adresse || p.adresseCourte].filter(Boolean).join(', '); const href = lieu && (p.adresse || p.adresseCourte) && !p.adressePasLue ? lienItineraire(lieu, appareilApple()) : '';   // (intégration) jamais un itinéraire vers un nom seul : l'adresse LUE ou rien
               return (adr || href) ? <span className="vrm-rpf-adr" data-relais-adresse="">{adr}{href ? <>{adr ? ' · ' : ''}<a className="vrm-rpf-itineraire" href={href} target="_blank" rel="noreferrer" data-relais-itineraire="" aria-label={`Itinéraire vers ${p.nom || 'ce point'}`}>Itinéraire</a></> : null}</span> : null; })()}
             {p.adressePasLue ? <span className="vrm-rpf-adr" data-relais-adresse-pas-lue="">Adresse pas lue</span> : null}
           </span>
           <span className="vrm-rpf-meta">
-            {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
-            <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n && n < rows.length ? <span data-relais-sans-code={n}> · {n} code à venir</span> : null; })()}
+            {/* (12 nov., finitions) Le logo du transporteur est sur CHAQUE ligne, au coin de la vignette : plus ici.
+                Le compte : « N colis · K codes à venir » dès K > 0 (la même règle sur chaque point) ; « sans n° de
+                suivi » une fois ici quand AUCUN colis du point n'en a (plus répété sur chaque ligne). */}
+            <span className="vrm-rpf-n" data-relais-compte={rows.length} data-relais-transporteur={tCommun ? (tCommun.cle || '') : undefined}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n ? <span data-relais-sans-code={n}> · {plur(n, 'code à venir', 'codes à venir')}</span> : null; })()}{suiviDe && rows.length && rows.every((c) => !String(suiviDe(c) || '')) ? <span data-relais-sans-suivi=""> · sans n° de suivi</span> : null}
               {!p.inconnu && !pressant(p) ? <> · <button type="button" className="vrm-rpf-masquer" data-relais-masquer={p.cle} aria-label={`Masquer ${p.nom || 'ce point'}`} onClick={() => { const m = new Set(masques); m.add(p.cle); setMasques(m); }}>Masquer</button></> : null}</span>
           </span>
         </header>
-        {dTete ? <div className="vrm-rpf-tete-delai"><BarreDelai d={dTete} enTete/></div> : null}
-        <div className="vrm-rpf-liste">{rows.map((x) => ligne(x, !tCommun, !!dTete && !x.horsCompte))}</div>
+        <div className="vrm-rpf-liste">{rows.map((x) => ligne(x, false, false))}</div>
       </section>
     );
   };
@@ -743,8 +794,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, ordi = true, delai = null, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null }) {
-  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} ordi={ordi} delai={delai} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute} suiviDe={suiviDe}/>;
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, ordi = true, delai = null, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null }) {
+  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} ordi={ordi} delai={delai} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute} suiviDe={suiviDe} qrDe={qrDe}/>;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;

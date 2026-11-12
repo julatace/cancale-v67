@@ -446,6 +446,10 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         const e = await etat(pg);
         const n = await pg.evaluate(() => document.querySelectorAll('[data-colis-section="ventes"] ~ [data-colis-leboncoin] [data-lbc-colis-vide], [data-colis-section="ventes"] ~ [data-colis-leboncoin] [data-bord-card]').length);
         dit(e.tache === 'ventes' && e.site === 'leboncoin' && n > 0, 'L. Ventes · Leboncoin : « À expédier » rend les colis Leboncoin', JSON.stringify({ t: e.tache, s: e.site, n }));
+        // (12 nov., finitions) « Pas encore lu » : la carte reste (rien lu ≠ rien), mais le geste « ouvre Mes
+        // transactions » ne s'écrit qu'UNE fois sur l'écran (§7) — la carte des ventes juste dessous le porte.
+        const mt = await pg.evaluate(() => { const v = document.querySelector('[data-colis-leboncoin] [data-lbc-colis-vide="jamais"]'); if (!v) return null; const s = v.closest('section.vrm-tache') || document.querySelector('.vrm-main'); return (s.innerText.match(/Mes transactions/g) || []).length; });
+        dit(mt === null || mt === 1, 'L. Ventes · Leboncoin pas encore lu : « Mes transactions » dit une seule fois', String(mt));
         dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
         await ctx.close();
       });

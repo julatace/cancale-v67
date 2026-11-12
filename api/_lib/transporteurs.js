@@ -468,6 +468,9 @@ export const MR_LIBELLES = [
   [/^(\d{1,2}) jours? restants? pour retirer le colis\b/, 'disponible'],
   [/^colis disponible au point de retrait\b/, 'disponible'],
   [/^colis livre\b/, 'livre'],
+  // (12 nov., capture de Julien, colis 80380675) « Sollicitation Client pour replace colis » : le destinataire (ou
+  // Vinted) a demandé à REPLACER le colis vers un autre point — il roule, son point change. Jamais « disponible ».
+  [/\bsollicitation client\b|\breplace(?:ment)? (?:du |de |le )?colis\b|\bchangement de point (?:relais|de (?:retrait|livraison))\b/, 'replace'],
 ];
 const classeMr = (lib) => { const t = normLibelle(lib); for (const [re, c] of MR_LIBELLES) { const m = re.exec(t); if (m) return { c, jours: m[1] ? Number(m[1]) : null }; } return null; };
 // (29 oct., revue n° 3) Le premier évènement de PRISE EN CHARGE ou de ROUTE daté
@@ -515,6 +518,7 @@ export function lireReponseMondialRelay(statut, ctype, corps, { suivi = '', cp =
   const dernier = evs[evs.length - 1] || null;
   const base = { evenements, cpRendu, libelle: propre(dernier ? dernier.libelle : '', 160), etatAt: dernier ? dernier.at : isoParisVersUtc(etapes[String(k)] && etapes[String(k)].Evenement.Date) };
   if (dernier && !classeMr(dernier.libelle)) return rendu('ok', { ...base, etat: 'inconnu' });
+  if (dernier && classeMr(dernier.libelle).c === 'replace') return rendu('ok', { ...base, etat: 'en_route', detail: 'changement_point' });
   const dateEtape = (x) => isoParisVersUtc(etapes[String(x)] && etapes[String(x)].Evenement && etapes[String(x)].Evenement.Date);
   if (k >= 5) {
     const livre = [...evs].reverse().find((e) => (classeMr(e.libelle) || {}).c === 'livre');
@@ -612,6 +616,7 @@ export function lireReponseMondialRelayMvc(statut, ctype, corps, { suivi = '', c
   const base = { evenements, cpRendu: c, libelle: propre(dernier.libelle, 160), etatAt: dernier.at, lieuNonLu: true };
   if (!classeMr(dernier.libelle)) return rendu('ok', { ...base, etat: 'inconnu' });
   const classe = (e) => (classeMr(e.libelle) || {}).c;
+  if (classe(dernier) === 'replace') return rendu('ok', { ...base, etat: 'en_route', detail: 'changement_point' });
   const livre = [...evs].reverse().find((e) => classe(e) === 'livre');
   const arr = [...evs].reverse().find((e) => classe(e) === 'disponible');
   if (k >= 5 || livre) {
@@ -1150,11 +1155,9 @@ export function changementANotifier(avant, apres, { maintenant = Date.now(), arr
   }
   if (e === 'retour_expediteur') return { etat: e, etape: 'retour', jour, fait, categorie: 'colis', cle: `retour-${k}`, prefixesSilence: [] };
   if (e === 'incident') return { etat: e, etape: 'incident', jour, fait, categorie: 'colis', cle: `incident-${k}-${apres.detail || 'x'}`, prefixesSilence: [] };
-  if (e === 'inconnu') {
-    const apresArrivee = (a && a.etat === 'disponible') || (Number.isFinite(arriveeMs) && arriveeMs && at >= arriveeMs);
-    if (!apresArrivee) return null;
-    return { etat: e, etape: 'inconnu', jour, fait: `${fait}|${empreinte(normLibelle(apres.libelle))}`, categorie: 'colis', cle: `inconnu-${k}-${empreinte(normLibelle(apres.libelle))}`, prefixesSilence: [] };
-  }
+  // (12 nov., Julien : rien à faire pour lui) Un libellé pas encore appris ne notifie plus : il ne dit rien de plus
+  // que les autres preuves. Il reste écrit, neutre, sur la carte du colis.
+  if (e === 'inconnu') return null;
   if (e === 'retire' || e === 'livre') return { etat: e, etape: 'retire', jour, fait, categorie: 'suivi', cle: `retire-${k}`, prefixesSilence: [] };
   if (e === 'en_route') { if (a) return null; return { etat: e, etape: 'track', jour, fait, categorie: 'suivi', cle: `track-${k}`, prefixesSilence: [] }; }
   return null;
@@ -1207,7 +1210,7 @@ export function texteCodePostalMr({ cherche = 0, inconnu = 0 } = {}) {
 }
 // ══ CE QUE DIT LA CARTE D'UN COLIS (l'app) ═══════════════════════════════════
 const ageCourt = (ms) => { if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.round(ms / 60000); if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`; const h = Math.round(m / 60); if (h < 36) return `il y a ${h} h`; return `il y a ${Math.round(h / 24)} j`; };
-const AMBRE = new Set(['retour_expediteur', 'incident', 'inconnu']);
+const AMBRE = new Set(['retour_expediteur', 'incident']);
 // `t` : la ligne `transp_` (ou undefined : jamais lue). Rend
 // { etatAffiche, texte, consequence, ambre, age } — `etatAffiche` ∈
 // 'lu' · 'passu' · 'jamais' · 'cp-inconnu' · 'expire' · 'introuvable'.
@@ -1234,8 +1237,10 @@ export function ligneTransporteur(t, carrier, maintenant = Date.now(), { preuve 
     else if (t.etat === 'disponible') consequence = `disponible${lieu ? ` au point ${lieu}` : ''}${t.limite ? ` — à retirer ${t.limiteSure ? "jusqu'au" : 'vers le'} ${jjmm(t.limite)}${t.limiteSure && heureParis(t.limiteAt) ? ` à ${heureParis(t.limiteAt)}` : ''}` : ''}`;
     else if (t.etat === 'retour_expediteur') consequence = t.detail === 'rendu' ? "rendu à l'expéditeur — ne te déplace pas" : "repart chez l'expéditeur — ne te déplace pas";
     else if (t.etat === 'incident') consequence = t.detail === 'quitte_relais' ? 'a quitté le point relais sans être retiré — ne te déplace pas' : 'un problème signalé — vérifie avant de te déplacer';
-    else if (t.etat === 'inconnu') consequence = 'statut que VRM ne connaît pas encore — vérifie avant de te déplacer';
-    else if (t.etat === 'en_route') consequence = t.detail === 'prepare' ? "pas encore remis au transporteur" : (t.detail === 'retarde' ? 'en route, retardé' : 'en route');
+    // (12 nov., Julien : rien à faire pour lui) Un libellé pas encore appris ne dit RIEN de plus : neutre, et l'état du
+    // colis reste celui des autres preuves (e-mails, SMS) — `fusionTransporteur` n'en tire rien.
+    else if (t.etat === 'inconnu') consequence = '';
+    else if (t.etat === 'en_route') consequence = t.detail === 'prepare' ? "pas encore remis au transporteur" : t.detail === 'retarde' ? 'en route, retardé' : t.detail === 'changement_point' ? 'en route — changement de point en cours' : 'en route';
     return { etatAffiche: 'lu', texte: `${nom} : « ${propre(t.libelle, 120) || '—'} » · lu ${ageCourt(age)}${dernierRate ? ' (la lecture suivante n’a pas abouti)' : ''}`, consequence, ambre: AMBRE.has(t.etat), age };
   }
   // (29 oct., revue n° 7) Un code postal SAISI que Mondial Relay refuse : la carte
