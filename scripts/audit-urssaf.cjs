@@ -690,8 +690,9 @@ enDur.length
   ? ok("les mois à venir ne se déclarent pas")
   : nok("les mois à venir ne se déclarent pas");
 
-(/let nMasq=0, caMasq=0, nAttente=0, caAttente=0;/.test(SRC) &&
- /nAttente\+=1;\s*caAttente\+=montantCommande\(o\);/.test(SRC))
+// (12 nov., revue fin) le prix lu (`montantCommandeLu`) : pas lu ⇒ compté à part (« au moins »), jamais 0 €.
+(/let nMasq=0, caMasq=0, nAttente=0, caAttente=0, caAttentePasLu=0;/.test(SRC) &&
+ /nAttente\+=1;\s*const m = montantCommandeLu\(o\); if \(m == null\) caAttentePasLu\+=1; else caAttente\+=m;/.test(SRC))
   ? ok("les ventes du mois pas encore finalisées sont comptées (montantCommande : le prix est un objet)")
   : nok("les ventes du mois pas encore finalisées sont comptées");
 
@@ -703,7 +704,7 @@ enDur.length
   ? ok("elles sont annoncées dans la modale, avec leur montant")
   : nok("elles sont annoncées dans la modale");
 
-(/L\.push\(\[`Ventes de ce mois pas encore finalisees \(hors CA\)`/.test(SRC) &&
+(/L\.push\(\[`Ventes de ce mois pas encore finalisees \(hors CA\)/.test(SRC) &&
  /kv\('Ventes de ce mois pas encore finalisees \(hors CA\)'/.test(SRC))
   ? ok("le CSV et le PDF emportent la réserve avec eux")
   : nok("le CSV et le PDF emportent la réserve");

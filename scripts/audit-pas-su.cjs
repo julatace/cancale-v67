@@ -100,11 +100,12 @@ const imp = async (f) => { try { return await import('file://' + path.join(R, f)
   };
   // Plafonds au 11 nov. (après corrections). Un nouveau motif ⇒ rouge ; un motif retiré ⇒ baisser le plafond.
   const PLAFOND = {
-    'somme de montantCommande (0 sur prix illisible)': { 'src/App.jsx': 3 },
-    'prix Vinted absent ⇒ 0': { 'src/App.jsx': 18 },
-    '(+x.prix || 0)': { 'src/App.jsx': 2 },
+    // (12 nov., revue fin) abaissés : 18 → 0, 3 → 1 (le reste : zone Colis, déjà « au moins »), 2 → 0, 1 → 0.
+    'somme de montantCommande (0 sur prix illisible)': { 'src/App.jsx': 1 },
+    'prix Vinted absent ⇒ 0': {},
+    '(+x.prix || 0)': {},
     'Number(valeur(m)) || 0': {},
-    'médiane = élément du haut': { 'src/App.jsx': 1 },
+    'médiane = élément du haut': {},
   };
   const textes = fichiers(path.join(R, 'src')).map((f) => [path.relative(R, f).split(path.sep).join('/'), sansCommentaires(fs.readFileSync(f, 'utf8'))]);
   for (const [nom, re] of Object.entries(MOTIFS)) {
