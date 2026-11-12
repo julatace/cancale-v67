@@ -252,6 +252,8 @@ const mesurer = (pg) => pg.evaluate(() => {
         dit(em.tx === '7020' && em.langue === 'en', '6. « Envoyer avec VRM » émet la facture (bilingue)', JSON.stringify(em).slice(0, 120));
         dit(en.tx === '7020' && en.via === 'vrm' && en.confirme === true, '6. … puis l’envoie par VRM (`via: vrm`)', JSON.stringify(en).slice(0, 120));
         dit(await f.locator('[data-fp-envoi="envoyee"]').count() === 1, '6. la feuille dit « envoyée »');
+        const re = f.locator('[data-fp-envoyer-vrm]');
+        dit(await re.count() === 1 && /^Renvoyer avec VRM$/.test((await re.innerText()).trim()), '6. déjà partie : le bouton dit « Renvoyer avec VRM » (jamais « Envoyer » une 2e fois)', await re.count() ? await re.innerText() : '');
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fm-envoyee-${nf}.png`) });
         await pg.keyboard.press('Escape');
         await pg.waitForTimeout(300);
