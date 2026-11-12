@@ -225,6 +225,11 @@ const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
     const deja = M.stripe.subs[pF.sub]; const rejeu = M.evenement('invoice.paid', { id: 'in_rejoue', customer: pF.client, amount_paid: 1699, subscription: deja.id });
     await appeler(compte, { method: 'POST', mode: 'webhook', headers: { 'stripe-signature': M.signer(rejeu) }, corps: rejeu });
     dit((M.stripe.soldes[pF.client] || []).length === 1 && (M.stripe.soldes[pP.client] || []).length === 1, '  webhook rejoué : rien en double', JSON.stringify({ c: (M.stripe.soldes[pF.client] || []).length, p: (M.stripe.soldes[pP.client] || []).length }));
+    // Stripe a crédité mais la base n'a pas noté (écriture perdue) : le rejeu ne crédite pas deux fois.
+    M.base.parrainages[F.id].credit_filleul_le = null; M.base.parrainages[F.id].credit_parrain_le = null;
+    const rejeu2 = M.evenement('invoice.paid', { id: 'in_rejoue2', customer: pF.client, amount_paid: 1699, subscription: deja.id });
+    await appeler(compte, { method: 'POST', mode: 'webhook', headers: { 'stripe-signature': M.signer(rejeu2) }, corps: rejeu2 });
+    dit((M.stripe.soldes[pF.client] || []).length === 1 && (M.stripe.soldes[pP.client] || []).length === 1, '  crédit déjà posé chez Stripe mais pas noté en base : toujours UN mois (relu chez Stripe)', JSON.stringify({ c: (M.stripe.soldes[pF.client] || []).length, p: (M.stripe.soldes[pP.client] || []).length }));
     const pirate = M.evenement('customer.subscription.updated', { ...deja, status: 'canceled' });
     const rp = await appeler(compte, { method: 'POST', mode: 'webhook', headers: { 'stripe-signature': M.signer(pirate, 'whsec_pirate') }, corps: pirate });
     dit(rp.code === 400 && M.base.abonnements[F.id].statut === 'active', '  un webhook mal signé ne change RIEN', `HTTP ${rp.code}`);
