@@ -361,7 +361,9 @@ export function filtrerArticles(cartes,filtre){
 // et l'offre sur le prix d'un article réel quand VRM le connaît.
 //   personnaliser, prixOffre : les fonctions de src/favorisMessage.js (règle unique).
 export function apercuMessageFavori({message='',offre=null,exemple=null,personnaliser,prixOffre}={}){
-  const texte=message?personnaliser(message,exemple?.pseudo||'',()=>0):'';
+  // (5.370) {article} et {prix} aussi : le titre de l'exemple et le prix de l'offre (sinon de l'article).
+  const pxEx=Number(exemple?.prix);const pxOffre=offre&&offre.mode&&Number.isFinite(pxEx)&&pxEx>0?prixOffre(pxEx,offre):null;
+  const texte=message?personnaliser(message,exemple?.pseudo||'',()=>0,{article:exemple?.titre||'',prix:pxOffre!=null?pxOffre:(Number.isFinite(pxEx)&&pxEx>0?pxEx:null)}):'';
   let offreTxt='';
   if(offre&&offre.mode){
     const prix=Number(exemple?.prix);

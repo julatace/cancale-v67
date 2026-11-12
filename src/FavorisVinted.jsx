@@ -215,8 +215,8 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         {etape==='message'&&<div className="vrm-favoris-compose">
           {blocDestinataires}
           <label>Ton message<textarea ref={champMessage} data-favoris-message disabled={preparation} maxLength={2000} rows={4} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Bonjour {username}, merci pour ton favori !"/></label>
-          <div className="vrm-favoris-variables" role="group" aria-label="Variables du message"><button type="button" data-favoris-variable="username" disabled={preparation} onClick={()=>inserer('{username}')}>{'{username}'}</button><button type="button" data-favoris-variable="variante" disabled={preparation} onClick={()=>inserer('{Bonjour|Salut}')}>{'{a|b}'} variante</button></div>
-          <small>{'{username}'} = son pseudo · {'{Bonjour|Salut}'} = un choix au hasard par message.</small>
+          <div className="vrm-favoris-variables" role="group" aria-label="Variables du message"><button type="button" data-favoris-variable="pseudo" disabled={preparation} onClick={()=>inserer('{pseudo}')}>{'{pseudo}'}</button><button type="button" data-favoris-variable="article" disabled={preparation} onClick={()=>inserer('{article}')}>{'{article}'}</button><button type="button" data-favoris-variable="prix" disabled={preparation} onClick={()=>inserer('{prix}')}>{'{prix}'}</button><button type="button" data-favoris-variable="variante" disabled={preparation} onClick={()=>inserer('{Bonjour|Salut}')}>{'{a|b}'} variante</button></div>
+          <small>{'{pseudo}'} = son pseudo · {'{article}'} = le titre · {'{prix}'} = le prix (ton offre) · {'{Bonjour|Salut}'} = un choix au hasard.</small>
           <AutresVersions nom="favoris" premier={message} variantes={variantes} desactive={preparation} extOk={favorisVariantes} placeholder="Une autre façon de le dire" onChange={l=>{setVariantes(l);change();}}/>
           {!message.trim()&&offreChoix!=='aucune'&&<small data-favoris-message-defaut>Message vide : VRM enverra « {MESSAGE_PAR_DEFAUT} » avec ton offre.</small>}
           <div className="vrm-favoris-offre" data-favoris-offre={offreChoix}>
@@ -286,7 +286,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   // son pseudo tel que Vinted l'écrit et le prix de SON article quand VRM le connaît.
   const exempleCarte=cartes.find(c=>c.geste==='envoyer')||cartes[0]||null;
   const exemplePersonne=exempleCarte?.personnes.find(x=>x.etat==='a_envoyer'&&x.pseudo)||exempleCarte?.personnes.find(x=>x.pseudo)||null;
-  const apercuEcran=apercuMessageFavori({message:messageAffiche,offre:offreObjet,exemple:{pseudo:exemplePersonne?.pseudo||'',prix:exempleCarte?.prix},personnaliser:personnaliserMessageFavori,prixOffre:prixOffreFavori});
+  const apercuEcran=apercuMessageFavori({message:messageAffiche,offre:offreObjet,exemple:{pseudo:exemplePersonne?.pseudo||'',prix:exempleCarte?.prix,titre:exempleCarte?.titre||''},personnaliser:personnaliserMessageFavori,prixOffre:prixOffreFavori});
   const envoyerArticle=c=>{
     if(fileActive||preparation||importation)return;
     const ids=c.personnes.filter(x=>x.etat==='a_envoyer').map(x=>x.id).filter(id=>{const l=ligneParId.get(id);return l&&!bloque(l);}).slice(0,10);

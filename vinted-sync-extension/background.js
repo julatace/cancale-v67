@@ -10482,8 +10482,8 @@ async function offreAutoReglages() {
 async function offresEnAttente(uid) {
   const out = [];
   try {
-    const rows = (await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,descr:data->payload->conversation->>description,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`) || [])
-      .map((r) => ({ cap: r.cap, cid: r.cid, opp: r.opp, descr: r.descr, it: r.it, msgs: Array.isArray(r.msgs) ? r.msgs : [] }));
+    const rows = (await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,login:data->payload->conversation->opposite_user->>login,ti:data->payload->conversation->transaction->>item_title,descr:data->payload->conversation->>description,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`) || [])
+      .map((r) => ({ cap: r.cap, cid: r.cid, opp: r.opp, descr: r.descr, it: r.it, login: typeof r.login === 'string' ? r.login : '', ti: typeof r.ti === 'string' ? r.ti : '', msgs: Array.isArray(r.msgs) ? r.msgs : [] }));
     rows.sort((a, b) => (Date.parse(b.cap || '') || 0) - (Date.parse(a.cap || '') || 0));
     const vus = new Set();
     for (const r of rows) {
@@ -10501,7 +10501,7 @@ async function offresEnAttente(uid) {
         const prix = Number(String(px == null ? '' : px).replace(',', '.'));
         if (!isFinite(prix) || prix <= 0) continue;
         if (e.transaction_id == null || e.offer_request_id == null) continue;
-        derniere = { conv: cid, prix, tx: String(e.transaction_id), oid: String(e.offer_request_id), item: String(r.it || ''), titre: String(r.descr || '') };
+        derniere = { conv: cid, prix, tx: String(e.transaction_id), oid: String(e.offer_request_id), item: String(r.it || ''), titre: String(r.descr || ''), article: r.ti, pseudo: r.login };
       }
       if (derniere) out.push(derniere);
     }
@@ -10512,7 +10512,7 @@ async function offresEnAttente(uid) {
 // vraies requêtes (`{ reply: { body, … } }`, docs/automatisation-vinted.md §3).
 // Une seule fabrique pour tous les envois (5.361, haute 21).
 function corpsReponseVinted(texte) { return { reply: { body: String(texte == null ? '' : texte), photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } }; }
-async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
+async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '', article = '' }) {
   if (!uid || !tx || !oid) return { ok: false, error: 'offre incomplète' };
   const accts = await getStoredAccounts({ ouNull: true });
   if (accts === null) return { ok: false, code: 'pas-su', error: 'tes comptes n’ont pas pu être relus — rien n’est parti, réessaie' };
@@ -10555,9 +10555,13 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
       // (5.369) Le temps d'écriture DANS la file une-à-la-fois, puis l'envoi d'un coup ;
       // une pause de Vinted ou un autre compte pendant l'attente ⇒ rien ne part.
       parti = await avecVinted(async () => {
-        const ec = await attendreEcriture(uid, acc, version.texte, 'serie');
+        // (5.370) {pseudo}, {article}, {prix} (le prix de l'OFFRE refusée) — inconnu ⇒ rien ne part.
+        if (prixRequisFavori(version.texte) && !prixTexteFavori(prix)) { noterDiag('offre_auto_refus_message_prix_inconnu'); return false; }
+        const texteRefus = personnaliserMessageFavori(version.texte, String(pseudo || ''), undefined, { article: String(article || ''), prix }).slice(0, 2000);
+        if (!texteRefus.trim()) return false;
+        const ec = await attendreEcriture(uid, acc, texteRefus, 'serie');
         if (!ec.ok) return false;
-        const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, corpsReponseVinted(version.texte), { timeoutMs: 12000 });
+        const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, corpsReponseVinted(texteRefus), { timeoutMs: 12000 });
         noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
         return !!(rm && rm.ok);
       });
@@ -10671,7 +10675,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       const stFrais = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
       if (stFrais[o.oid]) { st[o.oid] = stFrais[o.oid]; continue; }
       for (const k in stFrais) if (!st[k]) st[k] = stFrais[k];
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null });
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
         const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
@@ -14820,6 +14824,7 @@ async function executerMessageFavori(uid,acc,body){
   // « je t'ai fait une offre » partait QUAND MÊME, compté « envoyé » : l'acheteuse
   // lisait une offre qui n'existe pas. Offre refusée / prix inconnu ⇒ AUCUN message,
   // « refusé » avec la raison ; réponse incertaine ⇒ « incertain » (jamais renvoyé).
+  let prixOffreFait=null;   // (5.370) le prix de l'offre FAITE, pour {prix}
   if(offre){
     const prix=id(tx)?prixOffreFavori(prixAnnonce,offre):null;
     if(!prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
@@ -14833,6 +14838,7 @@ async function executerMessageFavori(uid,acc,body){
     const offreFaite=!!(o.ok&&(o.json?.code==null||Number(o.json.code)===0));
     noterDiag(offreFaite?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
     if(!offreFaite)return (o.status>=400&&o.status<500)||(o.ok&&!offreFaite)?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
+    prixOffreFait=prix;
   }
   // (5.369) La VERSION du message : tirée au hasard parmi celles qu'il a écrites,
   // jamais celle du message précédent de ce compte ; une seule ⇒ le texte d'avant.
@@ -14840,7 +14846,11 @@ async function executerMessageFavori(uid,acc,body){
   if(!version)return rep('refuse',400);
   // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
   // {a|b} = une variante tirée au hasard pour ce message.
-  const texteFinal=personnaliserMessageFavori(version.texte,String(c?.opposite_user?.login||'')).slice(0,2000);
+  // (5.370) {pseudo} = {username} ; {article} = le titre lu dans CE fil ; {prix} = l'offre faite,
+  // sinon le prix de l'annonce — inconnu ⇒ rien ne part (jamais « à  € »).
+  const infosMsg={article:String(c?.transaction?.item_title||''),prix:prixOffreFait!=null?prixOffreFait:prixAnnonce};
+  if(prixRequisFavori(version.texte)&&!prixTexteFavori(infosMsg.prix))return rep('refuse',0,'offre_prix_inconnu');
+  const texteFinal=personnaliserMessageFavori(version.texte,String(c?.opposite_user?.login||''),undefined,infosMsg).slice(0,2000);
   if(!texteFinal.trim())return rep('refuse',400);
   await pauseFavori('reponse', uid);
   // (5.369) Le temps qu'un humain mettrait à taper CE texte, puis l'envoi d'un coup.
@@ -14903,25 +14913,41 @@ function prixDeTransaction(tr) {
 // <favoris-message-regle>) : le test `favoris-message.test.mjs` exige les deux
 // copies identiques. Changer l'une sans l'autre le rend rouge.
 // <favoris-message-regle>
+// (12 nov., 5.370 — sa demande) {pseudo} (= {username}), {article} (le titre de l'annonce
+// lu dans CE fil, sinon « cet article ») et {prix} (le prix de l'offre faite, sinon celui de
+// l'annonce ; inconnu ⇒ le message ne part pas : `prixRequisFavori`).
+const VARIABLES_FAVORI = ['username', 'pseudo', 'article', 'prix'];
 function erreurVariablesFavori(modele) {
   const texte = String(modele || '');
   const reste = texte.replace(/\{([^{}]*)\}/g, (tout, dedans) => {
-    if (dedans === 'username') return '';
+    if (VARIABLES_FAVORI.includes(dedans)) return '';
     const options = dedans.split('|');
     if (options.length >= 2 && options.every((o) => o.length <= 200)) return '';
     return '\u0000' + tout + '\u0000';
   });
   const inconnue = /\u0000(\{[^{}]*\})\u0000/.exec(reste);
-  if (inconnue) return 'Variable inconnue : ' + inconnue[1].slice(0, 40) + '. Utilise {username} ou {a|b} (au moins deux choix séparés par |).';
-  if (/[{}]/.test(reste)) return 'Une accolade n’est pas fermée. Utilise {username} ou {a|b}.';
+  if (inconnue) return 'Variable inconnue : ' + inconnue[1].slice(0, 40) + '. Utilise {pseudo}, {article}, {prix} ou {a|b} (au moins deux choix séparés par |).';
+  if (/[{}]/.test(reste)) return 'Une accolade n’est pas fermée. Utilise {pseudo}, {article}, {prix} ou {a|b}.';
   return '';
 }
-function personnaliserMessageFavori(modele, pseudo, hasard) {
+function prixRequisFavori(modele) { return /\{prix\}/.test(String(modele || '')); }
+function prixTexteFavori(v) {
+  const n = Number(v);
+  if (!(isFinite(n) && n > 0)) return '';
+  const c = Math.round(n * 100);
+  return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €';
+}
+function personnaliserMessageFavori(modele, pseudo, hasard, infos) {
   const tirer = typeof hasard === 'function' ? hasard : Math.random;
   const nom = typeof pseudo === 'string' ? pseudo.replace(/[{}\s]+/g, ' ').trim().slice(0, 80) : '';
+  const x = infos && typeof infos === 'object' ? infos : {};
+  const article = typeof x.article === 'string' && x.article.replace(/[{}\s]+/g, ' ').trim() ? x.article.replace(/[{}\s]+/g, ' ').trim().slice(0, 80) : 'cet article';
+  const prix = prixTexteFavori(x.prix);
   return String(modele || '')
     .replace(/\{([^{}]*)\}/g, (tout, dedans) => {
-      if (dedans === 'username') return nom;
+      if (dedans === 'username' || dedans === 'pseudo') return nom;
+      if (dedans === 'article') return article;
+      if (dedans === 'prix') return prix;
       const options = dedans.split('|');
       if (options.length < 2) return tout;
       return options[Math.min(options.length - 1, Math.floor(tirer() * options.length))];
