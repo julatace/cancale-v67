@@ -136,7 +136,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   if (opts.memoire !== false && MEMOIRE) await pg.addInitScript(([qui, uids]) => { try { localStorage.setItem('vrm_comptes_lies', JSON.stringify({ qui, uids })); } catch (_) {} }, [UID_BANC, [...UIDS_LIES]]);
   if (opts.rendus) await pg.addInitScript(crochetRendus, opts.rendus);
   if (opts.initScript) await pg.addInitScript(opts.initScript);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  // (12 nov.) une photo Vinted qui échoue fait SONDER le CDN par l'app (`essaiSonde`, fetch no-cors,
+  // src/photosVinted.js) : coupée comme l'image elle-même — rien ne sort du banc (garde réseau).
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // (11 nov.) `opts.cpu` : le ralentissement de CETTE ouverture (budget-vitesse relève à ×1 et ×4).
   const cpu = opts.cpu != null ? opts.cpu : CPU;
   if (vp.width < 600 && (cpu > 1 || RESEAU)) { const cdp = await ctx.newCDPSession(pg); if (cpu > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu }); if (RESEAU) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', RESEAU); } }
