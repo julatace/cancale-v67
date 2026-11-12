@@ -3,11 +3,13 @@
 // au parrain quand le filleul paie son premier mois.
 // ═══════════════════════════════════════════════════════════════════════════
 // LA RÈGLE (écrite aussi dans les CGV, article 2 bis) :
-//   · un lien personnel `https://vrm.center/?parrain=CODE` (8 signes) ;
+//   · un lien personnel `https://vrm.center/r/CODE` (8 signes ; redirigé vers
+//     `/?parrain=CODE`, vercel.json — l'ancienne forme reste lue) ;
 //   · le filleul est un compte VRM NEUF : inscrit depuis moins de 30 jours,
 //     jamais client Stripe, n'ayant jamais consommé d'essai gratuit (même
 //     registre que l'essai, 022 : par e-mail ET par compte Vinted) ;
-//   · pas soi-même (même compte, ou un compte Vinted en commun) ;
+//   · pas soi-même (même compte, ou un compte Vinted en commun ; et, au premier
+//     paiement, la même CARTE chez Stripe — empreinte `card.fingerprint`, 11 nov.) ;
 //   · UNE fois par filleul (clé primaire) ; au plus 12 mois offerts par
 //     parrain sur 365 jours ;
 //   · la récompense part au PREMIER paiement réel du filleul (facture payée,
@@ -85,14 +87,20 @@ export async function codeDe(owner) {
 }
 
 // Le suivi du parrain : des NOMBRES, jamais qui.
+// (11 nov.) `refus` (037) : lu s'il existe ; la 037 pas passée ⇒ relu sans (jamais « pas installé » pour ça).
+async function lireLignes(filtre, champs) {
+  const avec = await lireJson(`${SUPABASE_URL}/rest/v1/parrainages?${filtre}&select=${champs},refus`);
+  if (avec) return avec;
+  return lireJson(`${SUPABASE_URL}/rest/v1/parrainages?${filtre}&select=${champs}`);
+}
 export async function suiviDe(owner) {
-  const j = await lireJson(`${SUPABASE_URL}/rest/v1/parrainages?parrain=eq.${encodeURIComponent(owner)}&select=paye_le,credit_parrain_le`);
+  const j = await lireLignes(`parrain=eq.${encodeURIComponent(owner)}`, 'paye_le,credit_parrain_le');
   if (!j) return undefined;
   return {
     inscrits: j.length,
     payes: j.filter((x) => x.paye_le).length,
     moisOfferts: j.filter((x) => x.credit_parrain_le).length,
-    enAttente: j.filter((x) => x.paye_le && !x.credit_parrain_le).length,
+    enAttente: j.filter((x) => x.paye_le && !x.credit_parrain_le && !x.refus).length,
   };
 }
 export async function filleulDe(owner) {
@@ -169,13 +177,45 @@ async function clientDe(owner) {
   return (j[0] && j[0].client_stripe) || null;
 }
 
+// ── PAS SOI-MÊME, PAR LA CARTE (11 nov.) ─────────────────────────────────────
+// Stripe donne à une même carte la même empreinte (`card.fingerprint`) chez tous
+// les clients du compte : une carte en commun entre filleul et parrain, c'est la
+// même personne ⇒ aucun mois offert. Rend un Set · `null` (Stripe muet : pas su).
+async function empreintesCartes(client) {
+  if (!/^cus_/.test(String(client || ''))) return new Set();
+  const r = await stripeApi('GET', 'payment_methods', { customer: client, type: 'card', limit: 100 });
+  if (!r.ok || !r.data || !Array.isArray(r.data.data)) return null;
+  return new Set(r.data.data.map((pm) => pm && pm.card && pm.card.fingerprint).filter((x) => typeof x === 'string' && x));
+}
+// true (même carte) · false · null (pas su ⇒ on ne crédite pas, Stripe rejouera).
+export async function memeCarte(clientA, clientB) {
+  if (!/^cus_/.test(String(clientA || '')) || !/^cus_/.test(String(clientB || ''))) return false;
+  const [a, b] = await Promise.all([empreintesCartes(clientA), empreintesCartes(clientB)]);
+  if (!a || !b) return null;
+  for (const x of a) if (b.has(x)) return true;
+  return false;
+}
+async function refuser(filleul, raison) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/parrainages?filleul=eq.${encodeURIComponent(filleul)}`, {
+      method: 'PATCH', headers: { ...h(), Prefer: 'return=minimal' }, body: JSON.stringify({ refus: raison }),
+    });
+  } catch (_) { /* 037 pas passée : la comparaison sera refaite, rien n'est crédité */ }
+}
+
 // Le parrain d'une ligne : crédité s'il a un client Stripe et n'a pas dépassé
 // 12 mois offerts sur 365 jours. `true` fait / rien à faire · `false` à réessayer.
 async function crediterParrain(ligne, centimes, maintenant) {
-  if (!ligne.paye_le || ligne.credit_parrain_le) return true;
+  if (!ligne.paye_le || ligne.credit_parrain_le || ligne.refus) return true;
   const client = await clientDe(ligne.parrain);
   if (client === undefined) return false;
   if (!client) return true;                               // en attente : crédité à son premier abonnement
+  // (11 nov.) Une carte en commun avec le filleul : la même personne ⇒ rien.
+  const clientFilleul = await clientDe(ligne.filleul);
+  if (clientFilleul === undefined) return false;
+  const meme = await memeCarte(client, clientFilleul);
+  if (meme === null) return false;
+  if (meme) { await refuser(ligne.filleul, 'meme-carte'); return true; }
   const recents = await lireJson(`${SUPABASE_URL}/rest/v1/parrainages?parrain=eq.${encodeURIComponent(ligne.parrain)}&select=credit_parrain_le`);
   if (!recents) return false;
   const an = recents.filter((x) => x.credit_parrain_le && Date.parse(x.credit_parrain_le) > maintenant - 365 * 86400000).length;
@@ -195,12 +235,21 @@ export async function factureFilleulPayee(owner, client, facture, centimes, main
   const ouvert = await parrainageOuvert();
   if (ouvert === null) return { ok: false };
   if (!ouvert) return { ok: true, ignore: 'ferme' };        // éteint : rien n'est crédité (ni noté)
-  const lignes = await lireJson(`${SUPABASE_URL}/rest/v1/parrainages?filleul=eq.${encodeURIComponent(owner)}&select=filleul,parrain,paye_le,credit_filleul_le,credit_parrain_le`);
+  const lignes = await lireLignes(`filleul=eq.${encodeURIComponent(owner)}`, 'filleul,parrain,paye_le,credit_filleul_le,credit_parrain_le');
   if (!lignes) return { ok: false };
   const l = lignes[0];
   let ok = true;
-  if (l && paye) {
+  if (l && paye && !l.refus) {
     if (!l.paye_le) { l.paye_le = new Date(maintenant).toISOString(); if (!(await patch(owner, { paye_le: l.paye_le }))) return { ok: false }; }
+    // (11 nov.) PAS SOI-MÊME, PAR LA CARTE : avant tout crédit, la carte du filleul
+    // comparée à celles du parrain (s'il a un client Stripe). Pas su ⇒ 503, Stripe rejoue.
+    if (!l.credit_filleul_le || !l.credit_parrain_le) {
+      const clientParrain = await clientDe(l.parrain);
+      if (clientParrain === undefined) return { ok: false };
+      const meme = clientParrain ? await memeCarte(client, clientParrain) : false;
+      if (meme === null) return { ok: false };
+      if (meme) { await refuser(owner, 'meme-carte'); return { ok: true, refus: 'meme-carte' }; }
+    }
     if (!l.credit_filleul_le) {
       if (await crediter(client, `${owner}:filleul`, centimes)) { if (!(await patch(owner, { credit_filleul_le: new Date(maintenant).toISOString() }))) ok = false; }   // (12 nov., B135)
       else ok = false;
@@ -209,7 +258,7 @@ export async function factureFilleulPayee(owner, client, facture, centimes, main
   }
   // Ce vendeur est peut-être AUSSI un parrain dont des mois attendaient un client Stripe.
   {
-    const attente = await lireJson(`${SUPABASE_URL}/rest/v1/parrainages?parrain=eq.${encodeURIComponent(owner)}&paye_le=not.is.null&credit_parrain_le=is.null&select=filleul,parrain,paye_le,credit_parrain_le`);
+    const attente = await lireLignes(`parrain=eq.${encodeURIComponent(owner)}&paye_le=not.is.null&credit_parrain_le=is.null`, 'filleul,parrain,paye_le,credit_parrain_le');
     if (!attente) ok = false;
     else for (const x of attente) if (!(await crediterParrain(x, centimes, maintenant))) ok = false;
   }

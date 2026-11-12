@@ -268,7 +268,7 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
       await essaie('parrainage ' + largeur, async () => {
         const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif, largeur, sombre });
         const r = await pg.evaluate(() => { const g = document.querySelector('[data-parrainage]'); return g ? { etat: g.getAttribute('data-parrainage'), i: g.getAttribute('data-inscrits'), p: g.getAttribute('data-payes'), lien: (g.querySelector('[data-lien-parrainage]') || {}).innerText, t: g.innerText } : null; });
-        dit(!!r && r.etat === 'ouvert' && r.lien === 'https://vrm.center/?parrain=K7MQ4RZP' && r.i === '2' && r.p === '1' && /un mois offert/i.test(r.t), `${largeur} px : le lien personnel et « 2 inscrits, 1 a payé »`, JSON.stringify(r && { ...r, t: r.t.replace(/\n/g, ' ').slice(0, 100) }));
+        dit(!!r && r.etat === 'ouvert' && r.lien === 'https://vrm.center/r/K7MQ4RZP' && r.i === '2' && r.p === '1' && /un mois offert/i.test(r.t), `${largeur} px : le lien personnel et « 2 inscrits, 1 a payé »`, JSON.stringify(r && { ...r, t: r.t.replace(/\n/g, ' ').slice(0, 100) }));
         dit(appels.every((a) => a.m === 'GET'), '  ouvrir la page ne rattache rien (lecture seule)');
         if (largeur === 390) { const d = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); dit(d <= 0, '  390 px : rien ne déborde', String(d)); }
         await pg.locator('[data-parrainage]').scrollIntoViewIfNeeded().catch(() => {});

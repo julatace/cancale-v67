@@ -129,4 +129,11 @@ export function codeParrainDe(search) {
     return CODE_PARRAIN_RE.test(c) ? c : '';
   } catch (_) { return ''; }
 }
-export const lienParrainage = (code) => (CODE_PARRAIN_RE.test(String(code || '')) ? `https://vrm.center/?parrain=${code}` : '');
+// (11 nov.) Le lien court `vrm.center/r/CODE` (redirigé vers `/?parrain=CODE` par vercel.json).
+export const lienParrainage = (code) => (CODE_PARRAIN_RE.test(String(code || '')) ? `https://vrm.center/r/${code}` : '');
+// Le code d'un chemin `/r/CODE` (si la redirection n'a pas eu lieu : aperçu local, autre hôte).
+export function codeParrainDuChemin(chemin) {
+  const m = /^\/r\/([A-Za-z0-9]{8})\/?$/.exec(String(chemin || ''));
+  const c = m ? m[1].toUpperCase() : '';
+  return CODE_PARRAIN_RE.test(c) ? c : '';
+}

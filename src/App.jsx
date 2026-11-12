@@ -519,7 +519,7 @@ import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
-import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, codeParrainDe } from "./abonnement/etatAbonnement.js";
+import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
@@ -589,6 +589,8 @@ import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche } from "./design/carteChiffres.js";
 import { aExpedierPourCarte } from "./resumeCarte.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
+import { detailFraisFiche } from "./coutPlateformes.js";
+import { PrevisionLigne } from "./ArgentPlus.jsx";
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { useValeurStock as useValeurStockCarte } from "./CascadeVente.jsx";   // (11 nov., lot stats-plus) la case « Valeur du stock »
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
@@ -1421,7 +1423,7 @@ installerGardeEcriture(SUPABASE_URL);
 installerGardeHorsLigne(SUPABASE_URL);
 // (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
 // compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
-try { const c = codeParrainDe(window.location.search); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}
+try { const c = codeParrainDe(window.location.search) || codeParrainDuChemin(window.location.pathname); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}   // (11 nov.) + le lien court `/r/CODE`
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -39630,6 +39632,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
       const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
         montant: montantCommandeLu, achat: (o) => achatDe(entreeVenteLot(o, effEntry(o))), frais: (o) => chargesVente(effEntry(o)),
+        fraisDetail: (o) => detailFraisFiche(effEntry(o)),   // (11 nov.) [11] : boost, port, commission (src/coutPlateformes.js)
         // (11 nov., lot ventes-lot) Les articles d'un lot, chacun à SA part du prix (src/venteLot.js).
         articles: (o) => { const l = lotDeVente(o); return l && l.lu ? l.articles.map((a) => [a.titre, a.num || '', a.part, a.achat, a.item || '']) : null; },
         compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
@@ -45701,6 +45704,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 passée se touche dans la frise de la tête (« Semaine du … »), avec les MÊMES règles
                 (src/journalSemaine.js). `JournalSemaineCarte` reste pour qui voudrait la remettre. */}
             {/* (11 nov.) « Quoi de neuf » : une ligne discrète après une mise en ligne, jamais une fenêtre. */}
+            {/* (11 nov., agent2-argent-parrainage) « À ce rythme, novembre finira vers … » : une ligne, seulement quand c'est su (src/ArgentPlus.jsx). */}
+            {!baseKO && !premierJour && <PrevisionLigne liveStats={liveStats} onOuvrir={onNav ? () => onNav('dashboard') : null}/>}
             {/* (11 nov., lot journee-perso) « Quoi de neuf » n'est pas une carte réglable : une ligne PASSAGÈRE (après
                 une mise en ligne seulement), toujours à sa place. Les notifications coupées vivent « En bas ». */}
             {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}
