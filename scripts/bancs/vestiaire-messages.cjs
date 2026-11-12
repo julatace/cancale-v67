@@ -112,11 +112,12 @@ async function ouvrir(b, vp, { version = '5.295.0', suite = 'fait', appris = tru
       dit(rep && rep.h >= 44 && rep.hf >= 44, '« Envoyer » et « Fermer » se touchent au doigt (44 px)', JSON.stringify(rep && { h: rep.h, f: rep.hf }));
       await pg.fill('[data-vc-repondre] textarea', 'Je peux faire 115 €, envoi demain.');
       await pg.click('[data-vc-envoyer]');
-      await pg.waitForSelector('[data-vc-resultat]', { timeout: 8000 }).catch(() => {});
-      const apres = await pg.evaluate(() => ({ cmds: window.__cmds, res: (document.querySelector('[data-vc-resultat]') || {}).getAttribute ? document.querySelector('[data-vc-resultat]').getAttribute('data-vc-resultat') : null, t: (document.querySelector('[data-vc-resultat]') || {}).textContent || '' }));
+      // (12 nov.) « Envoyé ✓ » est dit SOUS la bulle, dans le fil (data-envoi="ok"), plus au-dessus du champ.
+      await pg.waitForSelector('.vrm-chat-panel [data-envoi="ok"]', { timeout: 8000 }).catch(() => {});
+      const apres = await pg.evaluate(() => ({ cmds: window.__cmds, res: document.querySelector('.vrm-chat-panel [data-envoi="ok"]') ? 'ok' : null, t: (document.querySelector('.vrm-chat-panel [data-envoi]') || {}).textContent || '', dessus: !!document.querySelector('[data-vc-resultat]') }));
       const cmds = apres.cmds.map((x) => JSON.parse(x)).filter((x) => x.cmd === 'vcRepondre');
       dit(cmds.length === 1 && cmds[0].conv === 'C7777' && cmds[0].texte === 'Je peux faire 115 €, envoi demain.', 'UNE commande `vcRepondre { conv, texte }` part, sur SON clic', JSON.stringify(cmds));
-      dit(apres.res === 'ok' && /Envoyé sur Vestiaire/.test(apres.t), 'le résultat est dit : envoyé', apres.t);
+      dit(apres.res === 'ok' && /Envoyé ✓/.test(apres.t) && !apres.dessus, 'le résultat est dit sous la bulle : envoyé, une seule fois', apres.t);
       await pg.screenshot({ path: path.join(CAP, `vestiaire-messages-${L}.png`), fullPage: false });
       // (31 oct., soir) Les favoris de ses annonces Vestiaire sont dits sous « Publier »,
       // dans Annonces · Vestiaire (plus de page Vestiaire unique).

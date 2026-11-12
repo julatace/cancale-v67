@@ -34,7 +34,7 @@ async function juger(src, code, dire) {
   dit(/const tri=trierRecents\(/.test(app) && !/reponseAttendue\(b\)\)-Number\(!!reponseAttendue\(a\)\)/.test(app), 'Vinted : la liste est rangée par `trierRecents` (plus « à répondre » ni offre devant)');
   dit(/convsSansDoublons\(r\.items/.test(app), 'Vinted : chaque boîte lue passe par `sansDoublons`');
   dit(/data-conv-sans-date=\{nSansDate\}/.test(app), 'Vinted : « N sans date lue » est dit sous la liste');
-  dit(/trierRecents\(d\.fils/.test(sansCom(code.lbc)), 'Leboncoin : `trierRecents` sur les fils');
+  dit(/trierRecents\((sansDoublons\()?d\.fils/.test(sansCom(code.lbc)), 'Leboncoin : `trierRecents` sur les fils (doublons fondus avant, 12 nov.)');
   dit(/trierRecents\(liste, \(v\) => v\.date\)/.test(sansCom(code.vc)), 'Vestiaire : `trierRecents` (plus les non-lus devant)');
   dit(/const affiches=trierRecents\(/.test(sansCom(code.eb)), 'eBay · Tout : `trierRecents`');
   dit(/\(b\.tsDerniere \|\| 0\) - \(a\.tsDerniere \|\| 0\)/.test(code.qe) && !/if \(!!a\.nSans !== !!b\.nSans\)/.test(code.qe), 'eBay · Questions : la plus récente en haut (une attente ne passe plus devant)');
