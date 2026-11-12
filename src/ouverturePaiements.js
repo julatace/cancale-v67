@@ -64,7 +64,7 @@ export function etapesPaiement({ serveur, cgv = null, proAccueil = false } = {})
         : 'Adresse vrm.center/api/stripe-webhook, 5 événements.',
       ou: 'Stripe → Développeurs → Webhooks.' },
     { cle: 'proAccueil', titre: 'Offre Pro sur l’accueil', etat: proAccueil === true ? 'ok' : 'manque',
-      geste: 'Quand le prix Pro est ✓, dis à Claude : « ouvre Pro sur l’accueil ».',
+      geste: 'Prix Pro ✓ ? Dis à Claude : « ouvre Pro sur l’accueil ».',
       ou: 'src/accueil-reglages.js (PRO_OUVERT).' },
     { cle: 'modeReel', titre: 'Mode réel', etat: e('modeReel'),
       geste: 'Refais prix, webhook et clés en mode réel.',
