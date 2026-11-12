@@ -27,7 +27,9 @@ export function cgvManquants(texte) {
 
 const ETAT = (x) => (x === 'ok' || x === 'manque' ? x : 'pas-su');
 
-export function etapesPaiement({ serveur, cgv = null, proAccueil = false } = {}) {
+// `proprio` : ces consignes d'administrateur (Stripe, Vercel) ne s'écrivent qu'au propriétaire de l'installation
+// (l'écran est monté sous `proprioInst` dans Réglages ; audit-vendeur-neutre B).
+export function etapesPaiement({ serveur, cgv = null, proAccueil = false, proprio = true } = {}) {
   if (serveur === undefined) return undefined;
   const s = serveur && serveur.etapes ? serveur.etapes : null;
   const e = (k) => (s && s[k] ? ETAT(s[k].etat) : 'pas-su');
@@ -44,7 +46,7 @@ export function etapesPaiement({ serveur, cgv = null, proAccueil = false } = {})
       ou: 'vrm.center/legal/cgv.html et /legal/retractation.html.' },
     { cle: 'cle', titre: 'Clé secrète Stripe', etat: e('cle'),
       geste: 'Colle la clé sk_… dans Vercel, puis redéploie.',
-      ou: 'Stripe → Développeurs → Clés API ; Vercel → Settings → Environment Variables → STRIPE_SECRET_KEY.',
+      ou: proprio ? 'Stripe → Développeurs → Clés API ; Vercel → Settings → Environment Variables → STRIPE_SECRET_KEY.' : '',
       detail: s && s.cle && s.cle.mode ? (s.cle.mode === 'test' ? 'Clé de test' : 'Clé réelle') : null },
     { cle: 'prixSolo', titre: 'Prix Solo 16,99 € / mois', etat: e('prixSolo'),
       geste: s && s.prixSolo && s.prixSolo.texteStripe ? `Stripe dit ${s.prixSolo.texteStripe} : recrée le prix.` : 'Crée le prix mensuel, clé de recherche vrm_mensuel.',
