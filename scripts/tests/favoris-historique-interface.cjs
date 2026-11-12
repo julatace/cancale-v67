@@ -16,30 +16,31 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  if(url.includes('_favoris_archive'))return ok(window.pages?[{owner:'owner-test',data:{archiveVersion:1,uid:'123',type:'notifications',domain:'www.vinted.fr',payload:{notifications:[note(1),...Array.from({length:window.pages+2},(_,i)=>note(i+2))]},sync:{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',pagesLues:window.pages,totalPages:2,complete:window.pages===2},limite:false}}]:[]);
  if(url.includes('vrm_favoris_reglages_'))return ok([]);
  return ok([{owner:'owner-test',data:{uid:'123',domain:'www.vinted.fr',type:'notifications',payload:{notifications:[note(1)]}}}]);};
- window.afficherFavoris=()=>root.render(<Favoris articlesVendus={new Set(window.idsVendus||[])} uid="123" owner="owner-test" chargementAutomatique ownerActuel={()=>'owner-test'} base="https://base.invalid" headers={()=>({})} ouvrirFavori={async x=>{window.ouvertures.push(x.id);return await new Promise(r=>window.accuserOuverture=r);}} executerFavori={async()=>{window.envois++;throw Error('No real sending');}} verifierExtension={async()=>({disponible:true,canal:'Chrome direct'})} recupererPage={async()=>{window.pages++;return{ok:true,data:{pagesLues:window.pages,totalPages:2,complete:window.pages===2}};}}/>);window.afficherFavoris();`},bundle:true,write:false,format:'iife',logLevel:'silent',plugins:[sansApp]});
+ window.afficherFavoris=()=>root.render(<Favoris articlesVendus={new Set(window.idsVendus||[])} uid="123" owner="owner-test" chargementAutomatique uidOnglet="123" listingsFavoris={{items:[101,102,103,104,105,106].map(id=>({id,_acc:{vinted_user_id:'123'}})),aConfirmer:[],lues:{'123':Date.now()-3600000},complets:{'123':true},ko:[],error:false}} ownerActuel={()=>'owner-test'} base="https://base.invalid" headers={()=>({})} ouvrirFavori={async x=>{window.ouvertures.push(x.id);return await new Promise(r=>window.accuserOuverture=r);}} executerFavori={async()=>{window.envois++;throw Error('No real sending');}} verifierExtension={async()=>({disponible:true,canal:'Chrome direct'})} recupererPage={async()=>{window.pages++;return{ok:true,data:{pagesLues:window.pages,totalPages:2,complete:window.pages===2}};}}/>);window.afficherFavoris();`},bundle:true,write:false,format:'iife',logLevel:'silent',plugins:[sansApp]});
  const b=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});let n=0;const check=(v,m)=>{assert.ok(v,m);n++;};
  try{for(const width of [320,390,1512]){const p=await b.newPage({viewport:{width,height:950}});await p.setContent('<div id="root"></div>');await p.addStyleTag({content:'body{margin:12px;font-family:Arial}'+fs.readFileSync(path.join(racine,'src/styles-captures.css'),'utf8')});await p.addScriptTag({content:bundle.outputFiles[0].text});
- // (12 nov.) L'écran Favoris est la page en trois temps (lot favoris-clair, 11 nov.) : plus de liste PAR PERSONNE
- // (« VRM ne montre jamais qui ») ; les annonces portent le NOMBRE de personnes (data-fc-personnes) et ce qui reste
- // à écrire (data-fc-aecrire). Ce test juge les mêmes règles de l'historique sur cette forme : pages fusionnées sans
- // perdre la première, « lu » ≠ « envoyé », vérification sans envoi ni double ouverture, refus visible, contrôle
- // copiable sans donnée privée, lancement refusé expliqué, article vendu jamais choisi. Les noms (« Camille ») ne sont
- // plus à l'écran : ils ne servent qu'à prouver qu'ils ne fuient pas dans les contrôles copiés.
- const annonces=()=>p.evaluate(()=>[...document.querySelectorAll('[data-fc-annonce]')].map(e=>({id:e.dataset.fcAnnonce,personnes:Number(e.querySelector('[data-fc-personnes]').dataset.fcPersonnes),aEcrire:Number(e.dataset.fcAecrire),choisissable:e.getAttribute('role')==='checkbox',choisie:e.dataset.fcChoisie==='1',texte:e.textContent})));
- const somme=l=>l.reduce((n,a)=>n+a.personnes,0);
- await p.locator('[data-fc-annonce]').first().waitFor({state:'attached'});
+ // (12 nov., ext. 5.372) L'écran Favoris est UNE LISTE PAR COMPTE (src/favorisParCompte.js) : une ligne par favori
+ // (data-fav-ligne, data-fav-id = la notification), sa case si elle peut partir (data-fav-case, compte de l'onglet
+ // seulement), son état d'envoi (data-fav-etat) ; les favoris d'un article VENDU sont retirés et comptés
+ // (data-fav-retires). Ce test juge les mêmes règles de l'historique sur cette forme : pages fusionnées sans perdre
+ // la première, « lu » ≠ « envoyé », vérification sans envoi ni double ouverture, refus visible, contrôle copiable
+ // sans donnée privée, lancement refusé expliqué, article vendu jamais choisi. Les notifications n1..n5 désignent les
+ // annonces 101..105 (une chacune) ; le compte de l'onglet est « 123 » et ses annonces en ligne sont fournies.
+ const annonces=()=>p.evaluate(()=>[...document.querySelectorAll('[data-fav-section="123"] [data-fav-ligne]')].map(e=>({id:e.dataset.favId,etat:e.dataset.favEtat,article:e.dataset.favArticle,choisissable:!!e.querySelector('input[data-fav-case]'),choisie:e.dataset.favCoche==='1',texte:e.textContent})));
+ const retires=()=>p.evaluate(()=>Number(document.querySelector('[data-fav-section="123"] [data-fav-retires]')?.dataset.favRetires||0));
+ await p.locator('[data-fav-section="123"] [data-fav-ligne]').first().waitFor({state:'attached'});
  let l=await annonces();
- check(l.length===1&&l[0].id==='101'&&somme(l)===1&&l[0].aEcrire===0&&!l[0].choisissable,'confirmed sent favorite cannot be selected');
+ check(l.length===1&&l[0].id==='n1'&&l[0].etat==='envoye'&&!l[0].choisissable,'confirmed sent favorite cannot be selected : '+JSON.stringify(l));
  check(l[0].texte.includes('Déjà écrit'),'the confirmed send is shown as written');
  const outils=p.getByRole('button',{name:'Plus d’outils',exact:true});await outils.click();
  const feuille=p.locator('.vrm-favoris-voile:not([hidden]) [data-favoris-feuille]');await feuille.waitFor();
  check(await feuille.locator('.vrm-favoris-diagnostic').evaluate(e=>!e.open),'technical assistance is collapsed initially');
  await p.getByRole('button',{name:'Récupérer toutes les pages',exact:true}).click();await p.getByRole('status').filter({hasText:'Toutes les pages disponibles ont été récupérées.'}).waitFor();
  l=await annonces();
- check(l.length===5&&somme(l)===5&&l.some(a=>a.id==='101'),'all available pages merged without losing first page');
- check(l.filter(a=>a.texte.includes('Déjà écrit')).length===1,'is_read never counts as sent');
+ check(l.length===5&&new Set(l.map(a=>a.id)).size===5&&l.some(a=>a.id==='n1'),'all available pages merged without losing first page');
+ check(l.filter(a=>a.texte.includes('Déjà écrit')).length===1&&l.filter(a=>a.etat==='envoye').map(a=>a.id).join()==='n1','is_read never counts as sent');
  // n3 et n5 : lus (is_read) et sans envoi ⇒ à écrire. n2 interrompu et n4 clôturé : jamais reproposés d'eux-mêmes (favoris-clair).
- check(l.filter(a=>a.aEcrire>0).map(a=>a.id).sort().join()==='103,105','only read-but-never-sent favorites are to write; interrupted and closed ones are not re-proposed : '+JSON.stringify(l.map(a=>[a.id,a.aEcrire])));
+ check(l.filter(a=>a.choisissable).map(a=>a.id).sort().join()==='n3,n5'&&l.filter(a=>a.etat==='a_envoyer').map(a=>a.id).sort().join()==='n3,n5','only read-but-never-sent favorites are to write; interrupted and closed ones are not re-proposed : '+JSON.stringify(l.map(a=>[a.id,a.etat,a.choisissable])));
  check(await p.evaluate(()=>window.envois===0&&window.pages===2),'loading history never dispatches a message');
 
  const boutonHaut=p.getByRole('button',{name:'Vérifier un favori',exact:true});
@@ -65,7 +66,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  await feuille.getByRole('button',{name:'Fermer',exact:true}).click();await p.locator('[data-favoris-feuille]').waitFor({state:'hidden'});
 
  // Un lancement refusé par le serveur : dit sur la page, copié avec sa vraie cause, sans champ inconnu.
- await p.locator('[data-fc-tout]').click();
+ await p.locator('[data-fav-compte-tete="123"] [data-fav-tout]').click();
  check(Number(await p.locator('[data-fc-choisis]').getAttribute('data-fc-choisis'))===2,'choosing every annonce picks only the favorites still to write');
  await p.locator('[data-fc-page] [data-favoris-message]').fill('Bonjour de démonstration');
  await p.locator('[data-fc-verifier]').click();
@@ -101,13 +102,13 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  await p.locator('[data-fc-recap] .vrm-fa-fermer').click();await p.locator('[data-fc-recap]').waitFor({state:'detached'});
 
  // Un article vendu (103) : jamais choisi, dit « Vendu », et retiré du choix en cours.
- check((await annonces()).find(a=>a.id==='103').choisie,'the annonce is chosen before it sells');
- await p.evaluate(()=>{window.idsVendus=['103'];window.afficherFavoris();});await p.waitForFunction(()=>{const e=document.querySelector('[data-fc-annonce="103"]');return e&&e.getAttribute('role')!=='checkbox';});
- l=await annonces();const vendu=l.find(a=>a.id==='103');
- check(vendu&&!vendu.choisissable&&vendu.aEcrire===0,'a sold article cannot be selected');
- check(vendu.texte.includes('Vendu'),'sold article is labelled on its row');
- check(l.filter(a=>a.choisissable).map(a=>a.id).join()==='105','contact list excludes sold favorites and retains other items');
- check(!vendu.choisie&&Number(await p.locator('[data-fc-choisis]').getAttribute('data-fc-choisis'))===1,'an article newly marked sold is removed from the current selection');
+ check((await annonces()).find(a=>a.id==='n3').choisie,'the annonce is chosen before it sells');
+ await p.evaluate(()=>{window.idsVendus=['103'];window.afficherFavoris();});await p.waitForFunction(()=>!document.querySelector('[data-fav-id="n3"] input[data-fav-case]'));
+ l=await annonces();const vendu=l.find(a=>a.id==='n3');
+ check(!vendu||(!vendu.choisissable&&vendu.etat!=='a_envoyer'),'a sold article cannot be selected');
+ check(!vendu&&await retires()===1&&l.length===4,'the sold article’s favorite leaves the list and is counted as removed');
+ check(l.filter(a=>a.choisissable).map(a=>a.id).join()==='n5','contact list excludes sold favorites and retains other items');
+ check(!(vendu&&vendu.choisie)&&Number(await p.locator('[data-fc-choisis]').getAttribute('data-fc-choisis'))===1,'an article newly marked sold is removed from the current selection');
  check(await p.evaluate(()=>window.envois===0),'marking a favorite sold does not send a message');
  check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');
  if(process.env.SHOTS){fs.mkdirSync(process.env.SHOTS,{recursive:true});await p.screenshot({path:path.join(process.env.SHOTS,'historique-'+width+'.png'),fullPage:true});}await p.close();}}
