@@ -10,6 +10,9 @@ import { cleFacture, verifierFichier } from '../factureAchat.js';
 import { lireTicketAchat, lireTexteTicket, texteMontantSaisie } from '../depensesTicket.js';
 import { ticketVersBrouillon, prixEncoreLu, champEncoreLu, resumeTicket } from '../achatTicket.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
+import { BlocGrosLot, LOT0, repartitionDuLot } from '../GrosLot.jsx';
+import { nombreArticles, centimesTapes, listeRangs } from '../grosLot.js';
+import { SegmenteBase } from '../composants/Bouton.jsx';
 import { DejaEnStock } from '../DejaEnStock.jsx';
 import { prendreDemandeAchat, EVT_ACHAT_LIEN } from '../raccourcisSiri.js';
 import { ReventeModele } from '../ReventeModele.jsx';
@@ -318,11 +321,13 @@ const lirePhotosAchatsHors = async () => {
 // lieux d'abord, puis la liste courte), la date, le N° de rangement — le prochain N° libre PROPOSÉ en
 // pastille, posé seulement par SON toucher, et réservé dans le pool à l'enregistrement (`onReserverNumero`,
 // append-only : jamais redonné à une annonce). Une colonne, gros boutons. Rien n'est deviné (§2.5).
-function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null, importer = null, onReserverNumero = null, horsLigne = false, garderPhotoHorsLigne = null }) {
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero, stock = null, chargerStock = null, facture = null, importer = null, onReserverNumero = null, horsLigne = false, garderPhotoHorsLigne = null, lot = null }) {
+  // (11 nov., lot gros-lot) `lot` = { creer, moiMeme, apercu, cleNum } (App.jsx, `creerGrosLot`) : « Un lot » de N articles,
+  // UNE saisie (src/GrosLot.jsx, règle src/grosLot.js). Absent ⇒ pas de choix « Un lot ».
   // (10 nov., lot J) « Importer un tableur » (src/importAchats.js) : `importer` = { existants, numeroDe, etatNumero, onImporter }.
   const [importOuvert, setImportOuvert] = useState(false);
   // (10 nov., lot AN) `facture` (src/FactureAchat.jsx) : joindre une facture d'achat (PDF ou photo) à l'achat saisi.
-  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false, facture: null, ticket: null });
+  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', ref: '', photo: null, photoAvant: false, facture: null, ticket: null, mode: 'article', lot: LOT0() });
   const factureRef = useRef(null);
   // (11 nov., lot achat-photo) La photo du TICKET : lue DANS la page (src/depensesTicket.js, aucun service
   // payant, §2.9), elle PROPOSE prix, date et lieu dans les champs vides (src/achatTicket.js). Le prix lu
@@ -407,11 +412,37 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     if (!b64) { setErreur("Cette photo n'a pas pu être lue — essaie une autre, ou enregistre sans photo."); return; }
     setForm(d => d && ({ ...d, photo: b64 }));
   };
+  const [erreursNum, setErreursNum] = useState(null);
+  const enLot = !!(form && form.mode === 'lot' && lot && !editId);
+  const repLot = enLot ? repartitionDuLot(form.lot, form.price) : null;
+  const enregistrerLot = async () => {
+    if (!form || envoi || !repLot || !repLot.ok) return;
+    setEnvoi(true); setErreur(''); setErreursNum(null);
+    const n = nombreArticles(form.lot.n);
+    let r;
+    try {
+      r = await lot.creer({ titre: form.title.trim(), date: form.date || dateLocaleISO(), source: form.source.trim(), ref: String(form.ref || '').trim(),
+        total: centimesTapes(form.price), frais: centimesTapes(form.lot.frais), mode: form.lot.mode,
+        articles: form.lot.articles.slice(0, n), apercu: lot.moiMeme ? null : (lot.apercu ? lot.apercu(n) : null) });
+    } catch (e) { r = { ok: false, raison: 'lecture' }; }
+    setEnvoi(false);
+    if (!r || !r.ok) {
+      if (r && Array.isArray(r.erreurs)) setErreursNum(r.erreurs);
+      setErreur(r && r.raison === 'numeros' ? tr('groslot.refus.numeros', { rangs: listeRangs((r.erreurs || []).map((e) => e.i)) }) : tr(r && r.raison === 'decale' ? 'groslot.refus.decale' : 'groslot.refus.lecture'));
+      return;
+    }
+    if (form.facture && facture) await facture.joindre(cleFacture('hors', r.id), form.facture);
+    if (!ouvert) onBasculer(true);
+    fermer();
+  };
   const enregistrer = async () => {
     if (!form || envoi) return;
+    if (enLot) return enregistrerLot();
     const titre = form.title.trim();
     if (!titre) { setErreur(`Donne un nom à cet achat (${exemplesActuels().achat}).`); return; }
-    const prix = prixAchatSaisi(form.price);
+    // (11 nov., lot gros-lot) Un LOT modifié garde son prix et ses N° : son coût est réparti sur ses fiches.
+    const lotEdite = editId ? (liste.find(x => x.id === editId) || {}).lot : null;
+    const prix = lotEdite ? (liste.find(x => x.id === editId) || {}).price : prixAchatSaisi(form.price);
     if (prix === null) { setErreur('Le prix payé doit être un montant en euros (ex : 25 ou 25,50).'); return; }
     setEnvoi(true);
     const id = editId || ('ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
@@ -426,7 +457,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
       if (ok) { photoOk = true; const b64 = form.photo; setPhotos(p => ({ ...(p || {}), [idPhotoAchatHors(id)]: b64 })); }
       else photoRatee = true;
     }
-    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: String(form.numero || '').trim(), ref: String(form.ref || '').trim().slice(0, 40) || undefined, photo: photoOk || undefined };
+    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: lotEdite ? '' : String(form.numero || '').trim(), ref: String(form.ref || '').trim().slice(0, 40) || undefined, photo: photoOk || undefined };
     if (!editId && horsLigne && !rec.numero) rec.numeroAuRetour = true;
     if (editId) onModifier(editId, rec); else onAjouter({ id, ...rec });
     // La facture jointe part dans SA ligne, par l'identité de l'achat (jamais son titre).
@@ -498,6 +529,9 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
             {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>Importer un tableur</Bouton> : null}
           </div>
+          {/* (11 nov., lot gros-lot) Un article · Un lot de N articles (même formulaire, une saisie). */}
+          {!editId && lot ? <SegmenteBase label={tr('groslot.type')} plein value={form.mode} onChange={(v) => { setErreur(''); setErreursNum(null); setForm(d => ({ ...d, mode: v })); }}
+            options={[{ v: 'article', l: tr('groslot.unArticle'), data: { 'data-achat-mode': 'article' } }, { v: 'lot', l: tr('groslot.unLot'), data: { 'data-achat-mode': 'lot' } }]} /> : null}
           {/* 0. (11 nov., lot achat-photo) Le TICKET en photo : il propose prix, date et lieu. */}
           {!editId && (() => {
             const t = form.ticket;
@@ -526,19 +560,21 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             );
           })()}
           {/* 1. La photo d'abord : une grande tuile, un toucher (appareil photo ou galerie). */}
-          <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? 'Changer la photo de l’article' : 'Photo de l’article : ajouter une photo'} style={{ borderColor: C.border, background: C.card, color: C.text }}>
+          {!enLot && <button type="button" className="vrm-ahp-photo" data-achat-hors-photo data-achat-hors-photo-pleine={photoForm ? '1' : '0'} onClick={() => fichierRef.current && fichierRef.current.click()} aria-label={photoForm ? 'Changer la photo de l’article' : 'Photo de l’article : ajouter une photo'} style={{ borderColor: C.border, background: C.card, color: C.text }}>
             {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" /> : <span className="vrm-ahp-photo-vide"><Icon name="camera" size={28} /><span>Photo de l’article</span></span>}
             {photoForm ? <span className="vrm-ahp-photo-changer">Changer</span> : null}
-          </button>
-          {form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>Retirer la photo</Bouton>}
+          </button>}
+          {!enLot && form.photo && <Bouton variante="discret" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>Retirer la photo</Bouton>}
           <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
           {/* 2. Ce que c'est. */}
-          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder={exemplesActuels().achat} enterKeyHint="next" autoComplete="off" style={inp} />)}
-          {!editId && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
+          {champ(enLot ? tr('groslot.nomLot') : 'Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder={exemplesActuels().achat} enterKeyHint="next" autoComplete="off" style={inp} />)}
+          {!editId && !enLot && <DejaEnStock r={dejaStock} C={C} Photo={PhotoVinted} />}
           {/* (10 nov., lot AV) Ce que tu as revendu ce modèle : le passé, jamais un conseil (src/reventeModele.js). */}
-          {titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}
+          {!enLot && titreForm.trim().length >= 3 && <ReventeModele C={C} cible={{ titre: titreForm }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs} />}
           {/* 3. Le prix payé, en grand : c'est LUI qui le tape (§2.5). */}
-          {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>Lu sur le ticket — vérifie</span> : 'Prix payé', <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label="Prix payé" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
+          {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>Lu sur le ticket — vérifie</span> : (enLot ? tr('groslot.prixTotal') : 'Prix payé'), <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label="Prix payé" readOnly={!!(editId && (liste.find(x => x.id === editId) || {}).lot)} value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
+          {enLot ? <BlocGrosLot lot={form.lot} setLot={(f) => { setErreursNum(null); setForm(d => d && ({ ...d, lot: typeof f === 'function' ? f(d.lot) : f })); }} totalTexte={form.price} C={C} Icon={Icon} Bouton={Bouton}
+            moiMeme={!!lot.moiMeme} apercuNumeros={lot.apercu} compresser={compressImage} clavier={clavierNum()} cleNum={lot.cleNum} erreursNum={erreursNum} /> : null}
           {/* 4. Où : ses derniers lieux d'abord, puis la liste courte ; un champ libre. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {champ(champEncoreLu(form, 'source') ? 'Où · lu sur le ticket' : 'Où', <input data-champ="lieu" data-champ-lu={champEncoreLu(form, 'source') ? '1' : undefined} value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, magasin…" autoComplete="off" style={inp} />)}
@@ -553,10 +589,10 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           {/* 5. La date (aujourd'hui par défaut). */}
           {champ(champEncoreLu(form, 'date') ? 'Date · lue sur le ticket' : 'Date', <input data-champ="date" data-champ-lu={champEncoreLu(form, 'date') ? '1' : undefined} type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
           {/* 6. Le N° de rangement : le prochain libre PROPOSÉ, posé par SON toucher seulement. */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {!enLot && <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {champ('N° de rangement (facultatif)', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder="—" style={inp} />)}
             {numPropose && form.numero !== numPropose ? <Bouton variante="secondaire" data-achat-hors-num-propose={numPropose} onClick={() => setForm(d => ({ ...d, numero: numPropose }))} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{`Prendre le N°${numPropose}`}</Bouton> : null}
-          </div>
+          </div>}
           {/* (10 nov., lot BH) La référence de l'achat : c'est ELLE (jamais le nom ni le prix) qui dit qu'un achat est saisi deux fois. */}
           {champ('N° de commande ou de facture (facultatif)', <input data-champ="ref" value={form.ref || ''} onChange={e => setForm(d => ({ ...d, ref: e.target.value }))} placeholder="ex : n° de transaction Vinted" autoComplete="off" spellCheck={false} maxLength={40} style={inp} />)}
           {facture ? (() => {
@@ -575,7 +611,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
               </div>
             );
           })() : null}
-          <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} >
+          {!enLot && <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} >
             <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 13 }}>Relier à une annonce (facultatif)</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
               {Array.isArray(paires) && paires.length > 0 && champ('Une de tes annonces en ligne',
@@ -585,11 +621,11 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                 </select>)}
               <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de l'article dans son bénéfice.</div>
             </div>
-          </details>
+          </details>}
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 13, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
           <div className="vrm-ahp-gestes" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Bouton variante="primaire" data-achat-hors-enregistrer data-prix-a-valider={prixEncoreLu(form) ? '1' : '0'} disabled={envoi} onClick={enregistrer}
-              style={{ width: '100%', minHeight: 54, fontSize: 17, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : (prixEncoreLu(form) ? `Valider ${form.price}\u00a0€ et ajouter` : "Ajouter l'achat"))}</Bouton>
+            <Bouton variante="primaire" data-achat-hors-enregistrer data-prix-a-valider={prixEncoreLu(form) ? '1' : '0'} data-lot-pret={enLot ? (repLot && repLot.ok ? '1' : '0') : undefined} disabled={envoi || (enLot && !(repLot && repLot.ok))} onClick={enregistrer}
+              style={{ width: '100%', minHeight: 54, fontSize: 17, opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : enLot ? tr('groslot.ajouter', { n: nombreArticles(form.lot.n) || 0 }) : (editId ? 'Enregistrer' : (prixEncoreLu(form) ? `Valider ${form.price}\u00a0€ et ajouter` : "Ajouter l'achat"))}</Bouton>
             <Bouton variante="discret" data-achat-hors-annuler onClick={fermer} style={{ width: '100%', minHeight: 44 }}>Annuler</Bouton>
           </div>
           {editId && <Bouton variante="discret" icone="trash" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start' }}>Supprimer cet achat</Bouton>}
@@ -615,6 +651,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || 'Achat'}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginTop: 2, minWidth: 0 }}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{meta || '—'}</span>
+                    {b.lot && Array.isArray(b.lot.articles) && b.lot.articles.length ? <span data-achat-hors-lot={b.lot.n} style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 6, padding: '1px 6px' }}>{`${tr('groslot.listeLot', { n: b.lot.n })} · N°${b.lot.articles[0].numero}–${b.lot.articles[b.lot.articles.length - 1].numero}`}</span> : null}
                     {b.numero && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 6, padding: '1px 6px' }}>N°{b.numero}</span>}
                     {!b.numero && b.numeroAuRetour ? <span data-achat-num-au-retour="" style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.muted, borderRadius: 6, padding: '1px 6px', border: `1px solid ${C.border}` }}>{tr('horsligne.achat.numeroAuRetour')}</span> : null}
                     {facture && facture.factures && facture.factures[cleFacture('hors', b.id)] ? <span data-achat-hors-a-facture="" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, color: C.text }}><Icon name="doc" size={12} />Facture</span> : null}
