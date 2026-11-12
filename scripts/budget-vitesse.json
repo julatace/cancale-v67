@@ -9,7 +9,7 @@
     "octets": 3203944,
     "doublons": 23,
     "entieres": 0,
-    "js": 1692,
+    "js": 1725,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -44,7 +44,7 @@
     "octets": 338045,
     "doublons": 22,
     "entieres": 0,
-    "js": 1692,
+    "js": 1725,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -146,7 +146,7 @@
     "octets": 3414342,
     "doublons": 27,
     "entieres": 0,
-    "js": 1688,
+    "js": 1721,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -185,7 +185,7 @@
     "octets": 548441,
     "doublons": 25,
     "entieres": 0,
-    "js": 1688,
+    "js": 1721,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -227,7 +227,7 @@
     "octets": 3156654,
     "doublons": 28,
     "entieres": 0,
-    "js": 1713,
+    "js": 1746,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -267,7 +267,7 @@
     "octets": 418053,
     "doublons": 28,
     "entieres": 0,
-    "js": 1713,
+    "js": 1746,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -365,7 +365,7 @@
     "octets": 3888582,
     "doublons": 25,
     "entieres": 0,
-    "js": 1725,
+    "js": 1757,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -386,7 +386,11 @@
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=eq.ebay_orders&select=orders:data->orders,capturedAt:data->>capturedAt|": 3,
+     "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.lbc_ventes&select=data|": 2,
+     "app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt|": 2
     }
    },
    "neuf_mesure": {
@@ -401,7 +405,7 @@
     "octets": 1022692,
     "doublons": 28,
     "entieres": 0,
-    "js": 1725,
+    "js": 1757,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -422,7 +426,11 @@
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "app_data?id=eq.ebay_orders&select=orders:data->orders,capturedAt:data->>capturedAt|": 3,
+     "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
+     "app_data?id=eq.lbc_ventes&select=data|": 2,
+     "app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt|": 2
     }
    },
    "deuxieme_mesure": {
@@ -440,7 +448,7 @@
     "octets": 3836053,
     "doublons": 20,
     "entieres": 0,
-    "js": 1811,
+    "js": 1824,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -472,7 +480,7 @@
     "octets": 1097434,
     "doublons": 12,
     "entieres": 0,
-    "js": 1811,
+    "js": 1824,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
@@ -576,6 +584,17 @@
     "emails"
    ],
    "raison": "fusion de main 2084be1 : app installable (2e ouverture 60-70 % d'octets lus en moins, budget baissé) ; Ma journée : email_reception_* lu 2 fois (nouveau, à corriger)"
+  },
+  {
+   "date": "2026-11-12",
+   "ecrans": [
+    "journee",
+    "annonces",
+    "achats",
+    "messages",
+    "compta"
+   ],
+   "raison": "intégration 11nov-f (14 lots) : JS+CSS +22-23 Ko (Ma journée, Annonces, Achats, Messages) et +3 Ko (Argent), le code des lots ; les lectures en double nées du croisement sont CORRIGÉES (vrm_pro_facture ×5, panel_comptes_etat, vc_listings) ; Messages : les sources du compteur de la coque (ebay_orders ×3, ebay_listings, lbc_ventes, harvest_*_orders_sold) relues une 2e fois depuis les fils eBay (publier-partout) — nouveau, à corriger"
   }
  ]
 }
