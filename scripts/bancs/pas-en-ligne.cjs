@@ -131,6 +131,22 @@ const lignesFeuille = (pg) => pg.evaluate(() => [...document.querySelectorAll('[
           dit(l150.ou && /Étagère banc/.test(l150.t) && /79/.test(l150.t) && l150.j === '50', `${t} : B — N°150 : sa case, son prix d'achat (79 €), 50 jours`, l150.t);
           dit(/49/.test(l120.t) && !l120.ou && l120.j === '20', `${t} : B — N°120 : 49 € et 20 jours, pas d'emplacement inventé`, l120.t);
           await shot(pg, nomShot + '-feuille');
+          // (intégration 11nov-g2) G — « Créer sur Vinted » en série : une case par article à N° prouvé, rien coché d'office ;
+          // la feuille du lot annonce-vinted s'ouvre sur LES N° cochés, et laisse taper ce que la fiche n'a pas.
+          const g0 = await pg.evaluate(() => ({ cases: document.querySelectorAll('[data-pel-liste] [data-pel-cocher]').length, n: (document.querySelector('[data-pel-creer-vinted]') || {}).getAttribute?.('data-pel-creer-vinted'), off: !!(document.querySelector('[data-pel-creer-vinted]') || {}).disabled }));
+          dit(g0.cases === 36 && g0.n === '0' && g0.off, `${t} : G — une case par article à N° (36), rien coché, « Créer sur Vinted » éteint`, JSON.stringify(g0));
+          await toucher(pg, tel, '[data-pel-cocher="150"]');
+          await toucher(pg, tel, '[data-pel-cocher="149"]');
+          const g1 = await pg.evaluate(() => (document.querySelector('[data-pel-creer-vinted]') || {}).getAttribute?.('data-pel-creer-vinted'));
+          dit(g1 === '2', `${t} : G — deux cochées ⇒ « Créer sur Vinted · 2 »`, String(g1));
+          await toucher(pg, tel, '[data-pel-creer-vinted]');
+          await pg.waitForSelector('[data-creer-vinted]', { timeout: 15000 }).catch(() => {});
+          const g2 = await pg.evaluate(() => ({ n: (document.querySelector('[data-creer-vinted]') || {}).getAttribute?.('data-creer-vinted'), nums: [...document.querySelectorAll('[data-creer-vinted-fiche]')].map((x) => x.getAttribute('data-creer-vinted-fiche')), saisie: [...document.querySelectorAll('[data-creer-vinted-saisie]')].map((x) => x.getAttribute('data-creer-vinted-saisie')) }));
+          dit(g2.n === '2' && g2.nums.join(',') === '150,149' && g2.saisie.length === 2 && g2.saisie.every((x) => /prix/.test(x) && /description/.test(x)), `${t} : G — la feuille « Créer sur Vinted » : N°150 et N°149, prix et description à taper (rien deviné)`, JSON.stringify(g2));
+          await shot(pg, nomShot + '-creer-vinted');
+          await toucher(pg, tel, '[data-creer-vinted-fermer]');
+          await toucher(pg, tel, '[data-pas-en-ligne]');
+          await pg.waitForSelector('[data-feuille-pas-en-ligne] [data-pel="lu"]', { timeout: 15000 }).catch(() => {});
           await toucher(pg, tel, '[data-pel-seuil="30"]');
           await pg.waitForFunction(() => { const el = document.querySelector('[data-pel="lu"]'); return el && el.getAttribute('data-pel-n') === '21'; }, null, { timeout: 8000 }).catch(() => {});
           const L30 = await lignesFeuille(pg);
