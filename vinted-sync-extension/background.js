@@ -16781,7 +16781,15 @@ async function reparerExtension(tabId) {
 // lu sur un site, un pseudo, une adresse, un e-mail, un montant. Le serveur rejoue
 // sa propre liste blanche (api/_lib/rapport-extension.js) : ce qui n'y est pas ne passe pas.
 const RAPPORT_API = 'https://vrm.center/api/compte?mode=rapport-extension';
-function etiquetteRapport(s) { return String(s == null ? '' : s).replace(/[^\w.:-]/g, '_').replace(/\d{4,}/g, '#').slice(0, 60); }
+// Une étiquette TECHNIQUE est écrite par le code : minuscules, sans espace, sans « @ »,
+// sans nom de domaine. Tout le reste (une majuscule, un espace, un e-mail, « € »,
+// « 45,50 », « exemple.fr ») devient « masque » ; une suite de 4 chiffres ou plus « # ».
+// La même règle que le serveur (api/_lib/rapport-extension.js, `etiquette`).
+function etiquetteRapport(s) {
+  const x = String(s == null ? '' : s).slice(0, 80);
+  if (!/^[a-z0-9_.:-]*$/.test(x) || /\.[a-z]{2,}/.test(x)) return 'masque';
+  return x.replace(/\d{4,}/g, '#').slice(0, 60);
+}
 async function construireRapport() {
   const t = Date.now();
   let local = {};

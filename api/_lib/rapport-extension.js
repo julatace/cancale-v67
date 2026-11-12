@@ -27,7 +27,9 @@ const NAVIGATEURS = ['Chrome', 'Edge', 'Opera', 'Vivaldi', 'Firefox', 'Orion', '
 const SESSIONS = ['connectee', 'expiree', 'morte', 'absente', 'pas-su'];
 const cfg = (env) => ({ url: env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co', service: env.SUPABASE_SERVICE_KEY || '' });
 
-export const etiquette = (s) => String(s == null ? '' : s).replace(/[^\w.:-]/g, '_').replace(/\d{4,}/g, '#').slice(0, 60);
+// Une étiquette technique : minuscules, sans espace, sans « @ », sans nom de domaine ;
+// sinon « masque » ; 4 chiffres ou plus ⇒ « # ». La MÊME règle que l'extension (`etiquetteRapport`).
+export const etiquette = (s) => { const x = String(s == null ? '' : s).slice(0, 80); if (!/^[a-z0-9_.:-]*$/.test(x) || /\.[a-z]{2,}/.test(x)) return 'masque'; return x.replace(/\d{4,}/g, '#').slice(0, 60); };
 const heure = (x, maintenant) => { const n = Number(x); return Number.isFinite(n) && n > 1.5e12 && n <= maintenant + 60000 ? Math.floor(n) : null; };
 const entier = (x, max = 1e6) => { const n = Math.floor(Number(x)); return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0; };
 const version = (v) => (/^\d{1,4}\.\d{1,5}\.\d{1,6}$/.test(String(v || '')) ? String(v) : null);
