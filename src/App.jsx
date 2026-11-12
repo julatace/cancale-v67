@@ -732,6 +732,7 @@ import { langueNavigateur, poserLangueUneFois } from "./langueCompte.js";
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
 import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, monnaie as monnaieI18n, ajouterSourceApp } from "./i18n/index.js";
+import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
@@ -1201,7 +1202,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { lbcprix: '5.363.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { vcprix: '5.364.0', lbcprix: '5.363.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -24677,11 +24678,13 @@ const dateCourteVc = (iso) => { const t = Date.parse(iso || ''); return isFinite
 async function lireVestiaireColis() {
   try {
     // (1er nov.) Relue une fois sur un échec passager (`lireBaseRelue`).
-    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens`);
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings,vc_offres)&select=id,ventes:data->ventes,compteur:data->compteur,compteurs:data->compteurs,achats:data->achats,liens:data->liens,offres:data->offres`);
     if (!Array.isArray(j)) return null;
     const par = Object.fromEntries(j.map((x) => [x.id, x]));
     return { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, compteur: (par.vc_messages && par.vc_messages.compteur) || null, compteurs: (par.vc_messages && par.vc_messages.compteurs) || null,
-      achats: (par.vc_achats && par.vc_achats.achats) || null, liens: (par.vc_listings && par.vc_listings.liens) || {} };
+      achats: (par.vc_achats && par.vc_achats.achats) || null, liens: (par.vc_listings && par.vc_listings.liens) || {},
+      // (11 nov., lot vestiaire-plus) Les offres reçues, pour Ma journée (src/offresVestiaire.js `offresJourneeVc`).
+      offres: par.vc_offres ? { offres: par.vc_offres.offres || null } : undefined };
   } catch (_) { return null; }
 }
 // ── (1er nov.) LES VENTES VESTIAIRE, POUR LES TOTAUX ET L'ANTI DOUBLE VENTE ──
@@ -43880,6 +43883,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
           tuiles.messages = { ...tuiles.messages, ebay: null, sub: `${tuiles.messages.sub} · messages eBay pas lus` };
         }
+        // (11 nov., lot vestiaire-plus) Messages et offres Vestiaire ⇒ Messages FILTRÉ sur Vestiaire. Avant,
+        //    `plat_vestiaire` menait à la section par défaut de Vestiaire (Annonces) : la ligne
+        //    « N messages Vestiaire non lus » ouvrait les annonces.
+        const allerMessagesVc = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=messages&site=vestiaire' })); } catch (_) {} };
         // (27 oct., 5.240) VESTIAIRE : ventes à envoyer, messages non lus — la
         //    règle de Colis (`colisVestiaire`, §11). Jamais rien sur « pas su ».
         { const vc = colisVestiaire(vcEtat);
@@ -43892,7 +43899,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
           }
           if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
-            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'plat_vestiaire', prio: 2.1 }); }
+            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'messages', avant: allerMessagesVc, prio: 2.1 });
+          // (11 nov., lot vestiaire-plus) LES OFFRES VESTIAIRE REÇUES, encore à toi : une ligne par
+          //    offre, celle qui expire le plus tôt d'abord (échéance LUE ; ambre sous 6 h), avec le
+          //    geste « Répondre » (Messages → Vestiaire : Accepter · Refuser · Contre-offre si appris,
+          //    sinon « Répondre sur Vestiaire »). La même liste que Messages (`offresVestiaire`) ;
+          //    pas lue ⇒ rien (Ma journée se tait). Au-delà de 4, le reste est COMPTÉ, jamais caché.
+          const oj = vcEtat && vcEtat.offres ? offresJourneeVc(offresVestiaire(vcEtat.offres)) : null;
+          if (oj) {
+            const liensVc = (vcEtat && vcEtat.liens) || {};
+            oj.lignes.forEach((o, i) => {
+              const num = o.produit ? cleNum(liensVc[o.produit] || '') : '';
+              const article = [num ? `N°${num}` : '', o.titre || tr('journee.vcOffre.article')].filter(Boolean).join(' · ');
+              const reste = o.expire != null ? resteAvantOffre(o.expire) : '';
+              jobs.push({ id: 'vestiaire-offre', n: 1, icon: 'tag', color: o.bientot ? C.warn : C.text, urgent: !!o.bientot, photos: o.photo ? [urlPhotoVc(o.photo)] : null,
+                court: tr('journee.vcOffre.court', { prix: eurosOffre(o.offre) }),
+                detail: o.expire == null ? tr('journee.vcOffre.sansEcheance', { article }) : o.bientot ? tr('journee.vcOffre.expire', { article, reste }) : tr('journee.vcOffre.reste', { article, reste }),
+                action: tr('journee.vcOffre.repondre'), attrs: { 'data-vc-offre-journee': o.id, 'data-vc-offre-expire': o.expire == null ? '' : String(o.expire), 'data-vc-offre-bientot': o.bientot ? '1' : undefined },
+                tab: 'messages', avant: allerMessagesVc, prio: (o.bientot ? 0.25 : 1.25) + i / 1000 });
+            });
+            if (oj.reste > 0) jobs.push({ id: 'vestiaire-offres-reste', n: oj.reste, icon: 'tag', color: C.text, court: tr('journee.vcOffres.autres', { n: oj.reste }), detail: tr('journee.vcOffres.autresDetail'),
+              action: tr('journee.vcOffre.voir'), tab: 'messages', avant: allerMessagesVc, prio: 1.26 + oj.lignes.length / 1000 });
+          } }
         tuiles.prix = { n: repriceList.length, sub: repriceList.length ? `Des ${motsVendeur().noms} vu${motsVendeur().e}s mais qui ne partent pas` : `${motsVendeur().Aucune} à baisser` };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
@@ -44364,7 +44392,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </span>
         </>);
         const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court; return (
-          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} data-plein={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} data-plein={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} {...(j.attrs||{})} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
             {corpsTache(j, x, plein.replace(/\n/g, ' — '))}
             <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || VERBES.voir}</span><span aria-hidden="true">›</span></span>
           </button>

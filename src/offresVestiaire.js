@@ -86,3 +86,15 @@ export function etiquetteOffre(r, geste) {
   const t = r.raison ? r.raison.charAt(0).toUpperCase() + r.raison.slice(1) : "Rien n'est parti.";
   return { ton: 'ko', texte: t + (/[.!]$/.test(t) ? '' : '.') };
 }
+
+// ── LES OFFRES VESTIAIRE DANS MA JOURNÉE (11 nov., lot vestiaire-plus) ───────
+// Les offres REÇUES encore à toi (la même liste que Messages : `aTrancher`, jamais
+// une expirée), celles qui expirent le plus tôt d'abord (une échéance LUE ;
+// sans échéance, après). Au plus `max` lignes, le reste COMPTÉ (`reste`), jamais
+// caché. `bientot` : expire dans moins de 6 h (ambre, le geste presse).
+// Rend null tant que les offres ne sont pas lues (« pas su » : Ma journée se tait).
+export function offresJourneeVc(etat, maintenant = Date.now(), max = 4) {
+  if (!etat || etat.etat !== 'lu' || !Array.isArray(etat.aTrancher)) return null;
+  const l = etat.aTrancher.slice().sort((a, b) => (a.expire == null ? Infinity : a.expire) - (b.expire == null ? Infinity : b.expire));
+  return { lignes: l.slice(0, max).map((o) => ({ ...o, bientot: expireBientot(o, maintenant) })), reste: Math.max(0, l.length - max), total: l.length };
+}
