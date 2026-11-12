@@ -636,7 +636,7 @@ import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAb
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { deconnecterSansPerte, TEXTES_DECONNEXION } from "./deconnexionSure.js";
 import { sessionAAdopter, sousVerrou, VERROU_RENOUVELLEMENT } from "./sessionOnglets.js";
-import { modifierLigneCas } from "./ligneCas.js";
+import { modifierLigneCas, ecrireDifference } from "./ligneCas.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
@@ -3510,6 +3510,10 @@ const cloudLoad = async () => {
 // est mise en attente et rejouée juste après ; (2) refus d'un payload vide.
 let _cloudTimer = null;
 let _pushPending = false;
+// (12 nov., revue de robustesse, point 36) L'envoi au nuage en attente (`_cloudRun`), et
+// « l'app se ferme » (`_enSortie`) : la page masquée ou quittée part TOUT DE SUITE, en
+// `keepalive` quand le corps le permet (`viderAvantFermeture`, plus bas).
+let _cloudRun = null, _enSortie = false;
 // ── CE QU'ON N'ENVOIE PAS DANS LA LIGNE PARTAGÉE ──────────────────────────
 // La ligne `main` repart EN ENTIER à chaque sauvegarde (mesuré : 138 Ko), donc
 // tout ce qu'elle porte inutilement coûte à chaque frappe validée.
@@ -3699,8 +3703,8 @@ const cloudPush = () => {
   if (_pushBloque) { _emitSync('refus'); return; }
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
-  _cloudTimer = setTimeout(async () => {
-    _cloudTimer = null;
+  const envoi = async () => {
+    _cloudTimer = null; _cloudRun = null;
     if (AUTH.user?.id !== owner || readSession()?.user?.id !== owner) return;
     // Un envoi à la fois : celui qui arrive pendant un aller-retour repart après.
     if (_pushEnVol) { _pushRelance = true; return; }
@@ -3757,10 +3761,13 @@ const cloudPush = () => {
           if (res.status === 409) res = { ok: true, devance: true };
         } else {
           const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
+          const corps = JSON.stringify({ data, updated_at: maj });
           const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
             method: 'PATCH',
             headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-            body: JSON.stringify({ data, updated_at: maj }),
+            body: corps,
+            // L'app se ferme : la requête survit à la page (le navigateur borne `keepalive` à 64 Ko).
+            ...(_enSortie && corps.length < 60000 ? { keepalive: true } : {}),
           });
           if (r.ok) { let out = null; try { out = await r.json(); } catch (_) { out = null; } res = Array.isArray(out) ? (out.length >= 1 ? { ok: true } : { ok: true, devance: true }) : { ok: false, status: 0 }; }
           else res = r;
@@ -3818,7 +3825,9 @@ const cloudPush = () => {
       _pushEnVol = false;
       if (_pushRelance) { _pushRelance = false; cloudPush(); }
     }
-  }, 800);
+  };
+  _cloudRun = envoi;
+  _cloudTimer = setTimeout(envoi, 800);
 };
 // Dès que le cloud est chargé, on rejoue la sauvegarde mise en attente.
 onCloudReady(() => { if (_pushPending) { _pushPending = false; cloudPush(); } });
@@ -4011,6 +4020,16 @@ const save = (k,v,quand) => {
 // chemin : fusion, file d'envoi, nuage). Au passage en arrière-plan seulement : iOS peut
 // tuer l'app avant les 500 ms (l'écran et la recherche de la reprise se perdaient).
 const viderSave = (k) => { const f = _saveRun[k]; if (_saveTimers[k] && f) { clearTimeout(_saveTimers[k]); f(); } };
+// ⚠️ (12 nov., revue de robustesse, point 36) L'APP SE FERME (glissée sur iPhone, onglet
+//    fermé, page masquée) : TOUTES les sauvegardes en attente (500 ms) sont faites tout
+//    de suite — navigateur ET file d'envoi (rejouée au prochain chargement) — puis
+//    l'envoi au nuage part sans attendre ses 800 ms. Un prix tapé puis l'app fermée
+//    dans la demi-seconde n'est plus perdu sans trace.
+const viderAvantFermeture = () => {
+  _enSortie = true;
+  for (const k of Object.keys(_saveTimers)) { try { viderSave(k); } catch (_) {} }
+  if (_cloudTimer && _cloudRun) { clearTimeout(_cloudTimer); const f = _cloudRun; f(); }
+};
 
 // ── (11 nov., reprise-ecrans) LA REPRISE SYNCHRONISÉE : un écrivain différé ──
 // Filtres, tri, recherche, compte par site, dernier écran : UNE clé légère
@@ -4067,8 +4086,8 @@ const filtreRetenuCompte = (tab) => { try { const s = siteReprise(carteReprise()
 const siteDuTab = (tab, sub) => (estTacheSite(tab) ? siteDeTache(tab, sub) : ({ plat_vinted: 'vinted', plat_leboncoin: 'leboncoin', plat_ebay: 'ebay', plat_vestiaire: 'vestiaire' }[tab] || tab));
 if (typeof document !== 'undefined') {
   const auRepos = () => { try { quitterRecherches(_histoOnglet.tab || ''); } catch (_) {} ecrireRepriseMaintenant(); viderSave(CLE_REPRISE_ECRANS); };
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') auRepos(); });
-  window.addEventListener('pagehide', auRepos);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { auRepos(); viderAvantFermeture(); } else _enSortie = false; });
+  window.addEventListener('pagehide', () => { auRepos(); viderAvantFermeture(); });
 }
 
 // ── « ANNULER » PARTOUT, GESTES INSTANTANÉS (6 nov., v36, src/gesteAnnulable.js) ─
@@ -20142,14 +20161,14 @@ export { PlateformesSetting };
 // `push_prefs` LUE (trois états), et l'écriture : `save` rend son issue locale
 // (`quand(ok)`), la ligne des notifications est réécrite entière, comme dans
 // Réglages → Notifications. Un refus n'avance pas l'étape.
-async function ecrirePushPrefs(next) {
+// (12 nov., revue de robustesse, point 18) Seul ce que Ma configuration a changé
+// (de `avant`, la ligne qu'elle a lue, à `next`) est posé sur la ligne RELUE, par
+// comparer-et-échanger (src/ligneCas.js) : un réglage fait ailleurs entre-temps reste.
+async function ecrirePushPrefs(next, avant) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-      method: 'POST',
-      headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([withOwner({ id: 'push_prefs', data: next })]),
-    });
-    return !!(r && r.ok);
+    const res = await ecrireDifference({ base: SUPABASE_URL, id: 'push_prefs', entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner,
+      avant: avant && typeof avant === 'object' ? avant : {}, apres: next });
+    return !!(res && res.ok);
   } catch (_) { return false; }
 }
 function ConfigurationDepartApp({ onFin, seule = null }) {
@@ -20161,7 +20180,7 @@ function ConfigurationDepartApp({ onFin, seule = null }) {
     affichage: load(CLE_AFFICHAGE, null), configuration: load(CLE_CONFIGURATION, null),
   }), []);
   const ecrire = React.useCallback((liste) => Promise.all((liste || []).map((w) => w.ligne
-    ? ecrirePushPrefs(w.valeur)
+    ? ecrirePushPrefs(w.valeur, w.avant)
     : new Promise((res) => save(w.cle, w.valeur, (ok) => res(ok !== false))))).then((r) => r.every(Boolean)), []);
   // (11 nov., lot DJ2) La question seule « Tu vends quoi ? » : « Plus tard » ⇒ `vu` (rien d'autre).
   const vuSeule = React.useCallback(() => { const w = ecritureVendsVu(load(CLE_JE_VENDS, null)); return w ? ecrire([w]) : Promise.resolve(true); }, [ecrire]);

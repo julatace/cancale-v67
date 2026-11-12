@@ -18,24 +18,28 @@
 //  `scripts/audit-robustesse-donnees.cjs`.
 // ════════════════════════════════════════════════════════════════════════════
 
+import { fusion3, egal } from './fusionNuage.js';
+
 const estObjet = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const revDe = (d) => (estObjet(d) && Number.isSafeInteger(d.rev) && d.rev >= 0 ? d.rev : null);
 
 // `modifier(actuel)` reçoit la donnée relue (`null` = pas de ligne) et rend la
 // nouvelle donnée, ou `undefined` (rien à écrire). Rend { ok, data } ou
 // { ok:false, raison: 'lecture' | 'ecriture' | 'devance', statut?, texte? }.
-export async function modifierLigneCas({ base, id, entetes, modifier, filtre = '', estampille = (o) => o, essais = 5, fetch: f = fetch }) {
+// (12 nov.) `select` / `deLigne` : une ligne LOURDE se relit PROJETÉE (§4.4) — ex.
+// `ebay_brouillons` : `select: 'items:data->items,rev:data->rev'`, `deLigne: (r) => ({ items: r.items, rev: r.rev })`.
+export async function modifierLigneCas({ base, id, entetes, modifier, filtre = '', estampille = (o) => o, essais = 5, fetch: f = fetch, select = 'data', deLigne = (row) => row.data }) {
   const enc = encodeURIComponent(id);
   for (let i = 0; i < essais; i++) {
     let rows;
     try {
-      const r = await f(`${base}/rest/v1/app_data?id=eq.${enc}${filtre}&select=data`, { headers: entetes(), cache: 'no-store' });
+      const r = await f(`${base}/rest/v1/app_data?id=eq.${enc}${filtre}&select=${select}`, { headers: entetes(), cache: 'no-store' });
       if (!r.ok) return { ok: false, raison: 'lecture', statut: r.status };
       rows = await r.json();
     } catch (_) { return { ok: false, raison: 'lecture' }; }
     if (!Array.isArray(rows) || rows.length > 1) return { ok: false, raison: 'lecture' };
     const existe = rows.length === 1;
-    const actuel = existe ? rows[0].data : null;
+    const actuel = existe ? deLigne(rows[0]) : null;
     const neuf = modifier(actuel == null ? null : JSON.parse(JSON.stringify(actuel)));
     if (neuf === undefined) return { ok: true, data: actuel, inchange: true };
     const rev = revDe(actuel);
@@ -56,4 +60,19 @@ export async function modifierLigneCas({ base, id, entetes, modifier, filtre = '
     return { ok: true, data };
   }
   return { ok: false, raison: 'devance' };
+}
+
+// ── Écrire PAR DIFFÉRENCE (12 nov., revue de robustesse, points 18 et 21) ────
+// Un écran qui a LU une ligne de réglages (`push_prefs`, `vrm_pro_facture`) et
+// la montre : il n'y pose que CE QU'IL A CHANGÉ (de `avant` à `apres`), sur la
+// ligne RELUE à l'instant, par comparer-et-échanger. Un réglage changé ailleurs
+// entre-temps (autre appareil, Ma configuration, Ma facture) reste. Rien changé
+// ici ⇒ rien écrit. Rend ce que rend `modifierLigneCas` (`data` = la ligne écrite).
+export function ecrireDifference({ avant, apres, ...o }) {
+  return modifierLigneCas({ ...o, modifier: (actuel) => {
+    if (egal(avant, apres)) return undefined;
+    const lu = estObjet(actuel) ? actuel : {};
+    const out = fusion3(estObjet(avant) ? avant : {}, estObjet(apres) ? apres : {}, lu);
+    return estObjet(out) ? out : {};
+  } });
 }

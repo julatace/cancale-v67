@@ -7,6 +7,8 @@ import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
+import { ecrireDifference } from '../ligneCas.js';
+import { fusion3 } from '../fusionNuage.js';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { L, VERBES, PAS_SU } from '../libelles.js';
 import { dateVenteVc } from '../../api/_lib/vestiaire-regle.js';
@@ -1681,20 +1683,22 @@ function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
   const minuteur = React.useRef(null);
-  React.useEffect(() => { let mort = false; lireReglage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
+  // (12 nov., revue de robustesse, point 21) `lue` : la ligne telle que la base l'a
+  //    (lue, puis écrite) — on n'y pose que ce qui a changé ICI depuis.
+  const lue = React.useRef(null);
+  React.useEffect(() => { let mort = false; lireReglage('vrm_pro_facture').then((d) => { if (!mort) { lue.current = d === null ? null : { ...(d || {}) }; setCfg(d === null ? null : { ...d }); } }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
   const ecrire = (next) => {
     if (!cfg) return;                                      // pas lu : on n'écrit rien
     setCfg(next); setStatut('enregistrement…');
     try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: next })); } catch (_) {}
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
+      // Plus jamais la ligne ENTIÈRE lue à l'ouverture : un SIRET, un régime de TVA
+      // saisis ailleurs entre-temps (Ma facture, Ma configuration) restent.
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-          method: 'POST',
-          headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify([withOwner({ id: 'vrm_pro_facture', data: next })]),
-        });
-        setStatut(r.ok ? '✓ enregistré' : "⚠ pas enregistré — la base n'a pas répondu, réessaie");
+        const res = await ecrireDifference({ base: SUPABASE_URL, id: 'vrm_pro_facture', entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner, avant: lue.current || {}, apres: next });
+        if (res && res.ok && res.data && typeof res.data === 'object') { lue.current = { ...res.data }; setCfg((c) => fusion3(next, c || {}, res.data)); }   // ce qui vient d'ailleurs s'affiche ; une frappe faite depuis reste
+        setStatut(res && res.ok ? '✓ enregistré' : "⚠ pas enregistré — la base n'a pas répondu, réessaie");
       } catch (_) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); }
     }, 600);
   };

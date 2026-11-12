@@ -1,6 +1,6 @@
 import { PlateformesSetting } from '../App.jsx';
 import { fusion3 } from '../fusionNuage.js';
-import { modifierLigneCas } from '../ligneCas.js';
+import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 import { RappelsSetting } from '../App.jsx';
@@ -1401,15 +1401,16 @@ function PushPrefsSetting({ comptes, onMuets }) {
     setPrefs(next);
     // (5 nov.) Une écriture refusée (réseau, 4xx, 5xx) n'est JAMAIS montrée comme
     // faite : l'interrupteur revient à ce que la base a vraiment, et on le dit.
-    let ok = false;
+    // (12 nov., revue de robustesse, point 18) Plus jamais la ligne ENTIÈRE lue au
+    //    montage : seul CE réglage (de `avant` à `next`) est posé sur la ligne RELUE,
+    //    par comparer-et-échanger (src/ligneCas.js) — un réglage changé sur un autre
+    //    appareil, ou par Ma configuration, n'est plus effacé.
+    let ok = false, ecrite = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-        method: 'POST',
-        headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([withOwner({ id: 'push_prefs', data: next })]),
-      });
-      ok = !!(r && r.ok);
+      const res = await ecrireDifference({ base: SUPABASE_URL, id: 'push_prefs', entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner, avant, apres: next });
+      ok = !!(res && res.ok); if (ok && res.data && typeof res.data === 'object') ecrite = res.data;
     } catch (_) { ok = false; }
+    if (ok && ecrite) setPrefs(ecrite);
     if (!ok) { setPrefs(avant); toast(`${quoi} n’a pas été enregistré — réessaie quand tu as du réseau.`); }
     setBusy(false);
   };

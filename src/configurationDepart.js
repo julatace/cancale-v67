@@ -255,7 +255,7 @@ export function ecrituresEtape(cle, choix, initial, lus = {}, at = new Date().to
   } else if (cle === 'notifs') {
     if (!c.familles || !i.familles || !lus.pushPrefs || typeof lus.pushPrefs !== 'object') return out;
     const diff = Object.keys(c.familles).some((k) => c.familles[k] !== i.familles[k]);
-    if (diff) out.push({ cle: 'push_prefs', ligne: true, valeur: { ...lus.pushPrefs, familles: { ...((lus.pushPrefs && lus.pushPrefs.familles) || {}), ...c.familles } } });
+    if (diff) out.push({ cle: 'push_prefs', ligne: true, avant: lus.pushPrefs, valeur: { ...lus.pushPrefs, familles: { ...((lus.pushPrefs && lus.pushPrefs.familles) || {}), ...c.familles } } });
   }
   return out;
 }
