@@ -43088,7 +43088,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (6 nov., vague 2) Ma journée : « N annonces sans achat relié » et « N ventes annulées avant l'envoi ».
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
       if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
-      if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
+      // (12 nov., finitions) Comme « offresauto » : le fil « Tous » (sans section Favoris) ne PREND pas la demande —
+      // monté le premier, il la consommait et Messages · Vinted restait sur « Conversations » (banc navigation-fusion L).
+      if(only==='messages' && !filTous && prendreVue('favoris')) setZoneMessages('favoris');
       // (11 nov., lot prix-mini) Le fil « Tous » (FilsTous, `filTous`) ne PREND pas la demande : il n'a pas
       // d'Offres auto ; elle est pour Messages · Vinted, monté juste après (`cat_msg`).
       if(only==='messages' && !filTous && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
