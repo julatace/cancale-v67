@@ -495,6 +495,26 @@ function lancerCadre() {
   s.src = 'vrm-badge.js';
   (document.head || document.documentElement).appendChild(s);
 }
-if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
+// ⚠️ 5.362 (revue, moyenne 68) — QUI PEUT M'ENCADRER. `popup.html` est accessible aux
+//    pages de vinted, leboncoin, ebay, vestiaire et vrm.center : n'importe quel cadre
+//    de ces sites (pub, script tiers) pouvait le poser en `?mode=carte` (formulaire de
+//    connexion encadré, sous un calque) ou `?mode=reparer`. Désormais la carte et la
+//    réparation ne s'affichent que posées par la PAGE PRINCIPALE (`parent === top`,
+//    un seul ancêtre) d'un de ces sites — sinon rien. Une page de l'extension
+//    elle-même (fenêtre classique) n'est pas concernée.
+const HOTES_CADRE = /^https:\/\/(?:vrm\.center|(?:[a-z0-9-]+\.)*(?:vinted\.(?:fr|com|it|de)|leboncoin\.fr|ebay\.(?:fr|com)|vestiairecollective\.com))$/;
+function cadreAutorise() {
+  try {
+    if (window.parent === window) return true;                 // pas encadré
+    if (window.parent !== window.top) return false;             // un cadre DANS un cadre
+    const anc = location.ancestorOrigins;
+    if (anc && typeof anc.length === 'number') return anc.length === 1 && HOTES_CADRE.test(String(anc[0]));
+    // Firefox : pas d'`ancestorOrigins` ; le référent dit qui nous a posés.
+    let o = ''; try { o = new URL(document.referrer).origin; } catch (_) { o = ''; }
+    return HOTES_CADRE.test(o);
+  } catch (_) { return false; }
+}
+if ((REPARER || CARTE) && !cadreAutorise()) { try { document.body.setAttribute('data-cadre', 'refuse'); document.body.replaceChildren(); } catch (_) {} }
+else if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
 else if (CARTE) lancerCadre();
 else chargerAuth();

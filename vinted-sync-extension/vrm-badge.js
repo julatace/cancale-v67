@@ -43,6 +43,7 @@
   // site ne peut pas écrire dans le monde de l'extension) : le formulaire seul,
   // sans logo ni état (la carte du site les montre).
   const CADRE = (() => { try { return globalThis.__vrmCadre === true && window.top !== window; } catch (_) { return false; } })();
+  const MDP_PERMIS = CADRE;   // 5.362 (moyenne 69) : le mot de passe seulement dans l'iframe de l'extension
   if (window.top !== window && !CADRE) return;       // une seule carte par onglet
   if (document.getElementById('vrm-badge')) return;  // déjà posée (SPA, double injection)
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
@@ -710,6 +711,13 @@
   // chargement : une page qui ferait naviguer l'iframe vers SA page (une fausse
   // connexion) n'est jamais montrée — la carte retombe sur son formulaire.
   const CADRE_DELAI_MS = 1500;
+  // ⚠️ 5.362 (revue, moyenne 69) — JAMAIS LE MOT DE PASSE DANS LA CARTE DESSINÉE.
+  //    Dessinée (Orion, ou cadre muet), la carte vit dans le DOM de la page du site :
+  //    un écouteur de touches posé par la page AVANT le nôtre recevait chaque lettre.
+  //    Le mot de passe n'est donc proposé QUE dans l'iframe de l'extension (`CADRE`,
+  //    origine de l'extension) ; dessinée, la carte connecte par CODE reçu par e-mail
+  //    (tout compte VRM) — un code à usage unique, sans valeur une fois utilisé.
+  //    (`MDP_PERMIS` est posé en tête, juste après `CADRE`.)
   const ORIGINE_EXT = (() => { try { return new URL(chrome.runtime.getURL('popup.html')).origin; } catch (_) { return ''; } })();
   let cadreH = 0, cadreEl = null, cadreChanger = false, cadreMuet = false, cadreMinuteur = null, cadreChargements = 0, cadrePret = false;
   function cadreVoulu() {
@@ -827,7 +835,7 @@
       ${pied}
       <button type="button" class="b sec" data-code-renvoyer disabled>Renvoyer le code</button>
       <button type="button" class="lien" data-code-changer>Changer d’e-mail</button>`;
-    } else if (modeCx === 'mdp') {
+    } else if (modeCx === 'mdp' && MDP_PERMIS) {
       corps = `${mail}
       <label class="lab" for="vrm-cx-mdp">Mot de passe VRM</label>
       <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" data-1p-ignore data-lpignore="true">
@@ -841,7 +849,7 @@
       <button type="submit" class="b" data-principal data-code-demander>Me connecter avec un code</button>
       <div class="aide">Un code à 6 chiffres arrive sur cet e-mail. Marche aussi si tu as créé ton compte avec Google ou Discord.</div>
       ${pied}
-      <button type="button" class="b sec" data-basculer-mode>J’ai un mot de passe</button>`;
+      ${MDP_PERMIS ? '<button type="button" class="b sec" data-basculer-mode>J’ai un mot de passe</button>' : ''}`;
     }
     poserHtml(connexion, `<form class="cx" data-connexion-carte data-mode="${modeCx}" novalidate autocomplete="off">${corps}
       <div data-fournisseurs-carte hidden></div></form>`);
@@ -852,7 +860,7 @@
     });
     formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { if (CADRE) { direAuSite({ __vrmCarte: 'annuler' }); return; } changerCompte = false; formulaireDemande = false; modeCx = 'code'; rendre(); });
     const bascule = formulaireEl.querySelector('[data-basculer-mode]');
-    if (bascule) bascule.addEventListener('click', () => { modeCx = modeCx === 'mdp' ? 'code' : 'mdp'; poserFormulaire(true, true); focaliser(); });
+    if (bascule) bascule.addEventListener('click', () => { modeCx = (modeCx === 'mdp' || !MDP_PERMIS) ? 'code' : 'mdp'; poserFormulaire(true, true); focaliser(); });
     if (modeCx === 'saisie') brancherCases();
     if (erreurAuRetour) { direErreur(erreurAuRetour); erreurAuRetour = ''; }
     rendreFournisseurs(); majAnnuler();

@@ -94,6 +94,15 @@ function mesurerCapacites() {
 const CAP = mesurerCapacites();
 // `executeScript` existe mais refuse le monde MAIN (constaté au premier essai).
 let CAP_MAIN_REFUSE = false;
+// ⚠️ 5.362 (revue, moyenne 74) : `CAP_MAIN_REFUSE` passe à vrai pour toute la vie du
+//    worker — seulement sur une erreur de CAPACITÉ avérée (le navigateur refuse le
+//    monde MAIN : « Unexpected property "world" », « world … not supported »). Avant,
+//    tout texte contenant « MAIN » ou « is not a function » (une erreur de la page,
+//    d'un onglet qui navigue) coupait toutes les republications jusqu'au redémarrage.
+function estRefusMondeMain(m) {
+  const t = String(m || '');
+  return /Unexpected property\s*["'“]?world/i.test(t) || /\bworld\b[^]{0,60}\b(?:unsupported|not supported|not implemented|invalid|unknown)\b/i.test(t) || /\b(?:unsupported|not supported|not implemented|invalid|unknown)\b[^]{0,60}\bworld\b/i.test(t);
+}
 
 // ⚠️ 5.361 (revue de robustesse, moyennes 97-98 — famille « `chrome.storage`
 //    sans borne ») : les registres PAR COMPTE de `chrome.storage.local`
@@ -2963,7 +2972,7 @@ async function naviguerFavoriDansPage(tabId,action,cible){
   try{return await chrome.scripting.executeScript({target:{tabId},world:'MAIN',func,args});}
   catch(e){
    // Only a read may choose another channel. Never replay an ambiguous click.
-   if(!lecture||!/world|MAIN|unsupported|not supported|not implemented|is not a function|Unexpected property/i.test(String(e?.message||e)))throw e;
+   if(!lecture||!estRefusMondeMain(String(e?.message||e)))throw e;
    CAP_MAIN_REFUSE=true;
   }
  }
@@ -7076,7 +7085,7 @@ async function tickPhotosUn() {
     await viderFiches();                               // une fiche en attente depuis 10 min part (rien sinon)
     const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
     if (!tabs || !tabs.length) return;                 // pas d'onglet Vinted : on ne touche à rien
-    const uid = await activeUidForDomain('www.vinted.fr');
+    const uid = await activeUidForDomain(await domaineVintedOuvert());
     if (!uid) return;                                  // pas connecté : rien à capter
     if (await pauseVinted()) return;                   // 5.162 : Vinted a demandé de ralentir
     if (await freinPhotos()) return;                   // 22 oct. : Vinted a refusé une page photo il y a moins de 24 h
@@ -7247,7 +7256,7 @@ async function executerMain(tabId, func, args) {
     catch (e) {
       const m = String((e && e.message) || e || '');
       // Un refus ORDINAIRE (onglet fermé, page qui navigue) reste un refus, comme avant.
-      if (!/world|MAIN|unsupported|not supported|not implemented|is not a function|Unexpected property/i.test(m)) throw e;
+      if (!estRefusMondeMain(m)) throw e;
       CAP_MAIN_REFUSE = true;
       try { noterDiag('nav_main_refuse'); } catch (_) {}
     }
@@ -8968,6 +8977,17 @@ async function getStoredAccounts(opts) {
 // ⚠️ Comme les cookies sont ceux du compte actif, on ne rafraichit QUE ce
 // compte-la (sinon on rangerait ses donnees sous un autre uid). Les autres se
 // mettront a jour quand tu basculeras dessus. C'est aussi le plus discret.
+// ⚠️ 5.362 (revue, moyenne 75) : le domaine de L'ONGLET Vinted ouvert (fr, com, it,
+//    de), jamais `www.vinted.fr` en dur — un vendeur sur vinted.com voyait la garde
+//    lue sur le mauvais cookie (compte « absent »). Aucun onglet : www.vinted.fr.
+async function domaineVintedOuvert() {
+  try {
+    const tabs = await chrome.tabs.query({ url: VINTED_DOMAINS.map((d) => `https://${d}/*`) });
+    const t = (tabs || []).find((x) => x && !x.discarded && x.status === 'complete' && x.url) || (tabs || []).find((x) => x && x.url);
+    const h = t ? new URL(t.url).host : '';
+    return VINTED_DOMAINS.includes(h) ? h : 'www.vinted.fr';
+  } catch (_) { return 'www.vinted.fr'; }
+}
 async function activeUidForDomain(domain) {
   const tok = await getCookie(domain, 'access_token_web');
   if (!tok) return null;
@@ -9310,13 +9330,13 @@ async function runActiveUnPassage() {
   //    propriétaire ne passe pas RLS). Vingt requêtes Vinted pour rien (§3 :
   //    aucune requête sans raison), et une garde de 5 min consommée.
   if (await sansSessionPourEcrire()) { noterDiag('moisson_sans_session'); return false; }
-  try { if (await compteNonCapte(await activeUidForDomain('www.vinted.fr'))) { noterDiag('moisson_compte_supprime'); return false; } } catch (_) {}
+  try { if (await compteNonCapte(await activeUidForDomain(await domaineVintedOuvert()))) { noterDiag('moisson_compte_supprime'); return false; } } catch (_) {}
   // Revue 5.165 : NOTRE base refuse tout depuis peu (panne, RLS) — rien ne part
   // chez Vinted pour une lecture qu'on ne pourrait pas ranger. Ici, et pas
   // seulement dans la visite : l'alarme des 20 min et le changement de cookie
   // appellent `runActive` sans la garde de la visite.
   if (await reculBase()) { noterDiag('moisson_base_en_recul'); return 'recul'; }
-  { const u = await activeUidForDomain('www.vinted.fr').catch(() => null);
+  { const u = await activeUidForDomain(await domaineVintedOuvert()).catch(() => null);
     if (u && !(await moissonPermise(String(u)))) { noterDiag('moisson_plafond_heure'); return false; } }
   const p = await pageActiveFetch();
   if (p === true) return true;
@@ -10384,7 +10404,7 @@ async function offresTick() {
     const now = Date.now();
     const dues = Object.values(pv).filter((x) => x && x.at <= now && x.at > now - 2 * 86400000);
     if (!dues.length) return;
-    const uid = await activeUidForDomain('www.vinted.fr');
+    const uid = await activeUidForDomain(await domaineVintedOuvert());
     if (!uid || !dues.some((x) => String(x.uid) === String(uid))) return;
     await autoAccepterOffres(uid);
   } catch (_) {}
@@ -10668,7 +10688,7 @@ async function visiteVintedUnPassage() {
   // qu'il ait fini (`PHOTOS_CALME_MS` après la fin de la visite, `finally`).
   await noterActiviteVinted();
   try {
-    const uid = await activeUidForDomain('www.vinted.fr');
+    const uid = await activeUidForDomain(await domaineVintedOuvert());
     if (!uid) return;                                   // pas connecté : rien à capter
     // 5.183 : une commande du téléphone attend peut-être — relevée à chaque
     // visite aussi (NOTRE base, pas Vinted ; ses propres gardes s'appliquent).
@@ -10840,6 +10860,16 @@ try {
 // Recapture immediatement quand un cookie de session Vinted change (login,
 // refresh...). Debounce pour eviter les rafales.
 let cookieTimer = null;
+async function compteCookieChange(dom) {
+  try {
+    const uid = await activeAccountId(dom);
+    const m = (await chrome.storage.local.get('vrmCompteCookie')).vrmCompteCookie || {};
+    if (!uid) { if (m[dom]) { delete m[dom]; await chrome.storage.local.set({ vrmCompteCookie: m }); } return false; }
+    if (m[dom] && m[dom].uid === String(uid)) { m[dom].at = Date.now(); await chrome.storage.local.set({ vrmCompteCookie: m }); noterDiag('cookie_jeton_rafraichi'); return false; }
+    m[dom] = { uid: String(uid), at: Date.now() }; await chrome.storage.local.set({ vrmCompteCookie: bornerRegistre(m, 30 * 864e5, 20) });
+    return true;
+  } catch (_) { return true; }
+}
 try {
   chrome.cookies.onChanged.addListener((info) => {
     const dom = info && info.cookie && info.cookie.domain ? info.cookie.domain.replace(/^\./, '') : '';
@@ -10849,7 +10879,10 @@ try {
     clearTimeout(cookieTimer);
     // Changement de session (login / bascule de compte) : on recapte le compte
     // ET on rafraichit ses donnees par cookie dans la foulee.
-    cookieTimer = setTimeout(() => { sansRejet(captureDomain(dom).then(() => runActive()), 'cookie'); }, 2000);
+    // ⚠️ 5.362 (revue, moyenne 72) : Vinted rafraîchit son jeton toutes les ~2 h — ce
+    //    n'est pas un changement de compte. La moisson ne repart que si le COMPTE du
+    //    cookie a changé (`vrmCompteCookie`, par domaine) ; sinon le jeton seul est relu.
+    cookieTimer = setTimeout(() => { sansRejet(captureDomain(dom).then(() => compteCookieChange(dom)).then((change) => (change ? runActive() : null)), 'cookie'); }, 2000);
   });
 } catch (_) {}
 
@@ -16456,7 +16489,7 @@ async function tickVersements() {
   try {
     const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*'] });
     if (!tabs || !tabs.length) return 0;
-    const uid = await activeUidForDomain('www.vinted.fr');
+    const uid = await activeUidForDomain(await domaineVintedOuvert());
     if (!uid) return 0;
     if (await pauseVinted()) return 0;
     if (await sansSessionPourEcrire()) return 0;
@@ -16732,7 +16765,7 @@ async function tickImport() {
   try {
     const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*'] });
     if (!tabs || !tabs.length) return 0;
-    const uid = await activeUidForDomain('www.vinted.fr');
+    const uid = await activeUidForDomain(await domaineVintedOuvert());
     if (!uid) return 0;
     if (await pauseVinted()) return 0;
     if (await sansSessionPourEcrire()) return 0;
