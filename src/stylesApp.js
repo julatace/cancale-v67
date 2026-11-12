@@ -75,3 +75,5 @@ import './styles-lisible.css';
 import './styles-ecrans-gardes.css';
 // Les composants partagés gardent le dernier mot sur la coque.
 import './styles-composants.css';
+// (11 nov.) Messages plus naturel et simple (liste, fil, réponses rapides, fiche) — le dernier mot sur Messages seul.
+import './styles-messages-naturel.css';

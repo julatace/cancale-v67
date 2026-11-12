@@ -9,6 +9,7 @@ import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaqu
 import { motifDeLApercu } from '../antiArnaque.js';
 // (11 nov., anti-arnaque) L'aperçu d'un fil Leboncoin : son auteur se lit dans `dernierDeMoi` (texte ⇒ « true »/« false »).
 const deMoiMeta = (v) => (v === 'true' || v === true ? true : v === 'false' || v === false ? false : null);
+import { trierRecents } from '../ordreConversations.js';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 
 
@@ -165,7 +166,8 @@ function ConversationsLeboncoin() {
   const lignes = ids.map((id) => ({ id, nom: nomDe(id), type: typeDe(id), c: d.compteurs[id] || d.compteurs['lbc-account:' + id] || null }));
   const releves = lignes.filter((l) => l.c);
   const pasLus = lignes.filter((l) => !l.c);
-  const fils = Array.isArray(d.fils) ? d.fils.slice().sort((a, z) => String(z.da || '').localeCompare(String(a.da || ''))) : [];
+  // (11 nov.) Le plus récent en haut par HORODATAGE (avant : comparaison de textes) ; sans date, en bas.
+  const fils = Array.isArray(d.fils) ? trierRecents(d.fils, (f) => f && f.da) : [];
   if (!releves.length && !fils.length) {
     return (
       <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
