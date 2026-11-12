@@ -667,6 +667,8 @@ import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
+import { variantesLues } from "./variantesMessage.js";
+import AutresVersions from "./AutresVersions.jsx";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -2686,7 +2688,7 @@ const SYNC_KEYS = [
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
   'vrm_colis_qr_poses',
@@ -18923,7 +18925,7 @@ function PiloteFavorisAutoConnecte({comptes}){
   if(!owner||!comptes.length)return null;
   return <PiloteFavorisAuto comptes={comptes} owner={owner} ownerActuel={()=>AUTH.user?.id||''} headers={()=>sbAuth()}
     disponible={async uid=>{try{await sondageConnu();}catch(_){}return etatExtensionFavorisAuto(uid);}}
-    executer={(uid,t)=>vmrExecUn({uid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},90000)}/>;
+    executer={(uid,t)=>vmrExecUn({uid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},110000)}/>;
 }
 function FavorisConnectes(props){
   const [,maj]=React.useReducer(n=>n+1,0),transport=React.useRef(null),directVu=React.useRef(null);
@@ -18963,12 +18965,12 @@ function FavorisConnectes(props){
     const body=lire==='ouvrir'?{owner:props.owner,notificationId:t.id}:lire?t:{jeton:t.jeton};
     if(transport.current?.mode==='direct'){
       const type=lire==='ouvrir'?'favorisOuvrir':lire?'favorisLire':'favorisExec';
-      const r=await appelerFavorisDirect(canalExt(),transport.current.id,{type,uid:props.uid,endpoint,body},90000);
+      const r=await appelerFavorisDirect(canalExt(),transport.current.id,{type,uid:props.uid,endpoint,body},lire?90000:110000);
       return retour(r||{ok:false,error:lire==='ouvrir'?'L’ouverture n’a pas été confirmée. Vérifie les onglets Vinted avant de réessayer.':lire?'La lecture a été interrompue. Les pages déjà reçues sont conservées.':'Accusé de l’extension absent. Aucun renvoi automatique.',incertain:!lire},r?'commande':'transport');
     }
-    const r=await vmrExecUn({uid:props.uid,method:'POST',endpoint,body},90000);return retour(r,r?'commande':'transport');
+    const r=await vmrExecUn({uid:props.uid,method:'POST',endpoint,body},lire?90000:110000);return retour(r,r?'commande':'transport');
   };
-  return <FavorisVinted {...props} extensionAuto={etatExtensionFavorisAuto(props.uid)} FermeAuRetour={FermeAuRetour} favorisDisponible={etat.disponible} favorisRaison={etat.raison} favorisPerso={etat.perso===true} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)} ouvrirFavori={typeof canalExt()?.sendMessage==='function'||vmrExtPresent()?t=>executer(t,'ouvrir'):undefined}/>;
+  return <FavorisVinted {...props} extensionAuto={etatExtensionFavorisAuto(props.uid)} FermeAuRetour={FermeAuRetour} favorisDisponible={etat.disponible} favorisRaison={etat.raison} favorisPerso={etat.perso===true} favorisVariantes={extSait('variantes')==='ok'} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)} ouvrirFavori={typeof canalExt()?.sendMessage==='function'||vmrExtPresent()?t=>executer(t,'ouvrir'):undefined}/>;
 }
 const CMD_ACTIVE = ['file', 'generation', 'pdf', 'relais-attente', 'relais-pris'];
 // Une demande est EN COURS tant que l'extension la dit réellement dans sa file
@@ -31034,6 +31036,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (29 oct.) Le détail de l'acceptation automatique ne s'affiche que sur ⓘ.
   const [offresInfo, setOffresInfo] = useState(false);
   React.useEffect(() => onCloudReady(() => setRefusMsg(v => (v && v.trim()) ? v : (load('vinted_offre_refus_msg', '') || ''))), []);
+  // (12 nov., ext. 5.369) Ses AUTRES versions du refus (2 à 5), rangées à côté (une source) :
+  // l'extension en tire une, jamais celle du refus précédent. Même rattrapage au nuage.
+  const [refusVariantes, setRefusVariantes] = useStateCle('vinted_offre_refus_variantes', () => variantesLues(load('vinted_offre_refus_variantes', [])));
+  React.useEffect(() => onCloudReady(() => setRefusVariantes(v => (v && v.some(t => t && t.trim())) ? v : variantesLues(load('vinted_offre_refus_variantes', [])))), []);
+  const changerRefusVariantes = (l) => { const v = variantesLues(l); setRefusVariantes(v); save('vinted_offre_refus_variantes', v); };
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
@@ -45699,6 +45706,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <label htmlFor="vrm-offre-refus-msg">Message quand VRM refuse <span>(vide = refus sans message)</span></label>
                     <textarea id="vrm-offre-refus-msg" data-offre-refus-msg value={refusMsg} onChange={e=>{ setRefusMsg(e.target.value); save('vinted_offre_refus_msg', e.target.value); }}
                       rows={2} placeholder="Ex. : Merci pour ton offre ! Je ne peux pas descendre aussi bas, mais n'hésite pas à m'en refaire une 🙂"/>
+                    <AutresVersions nom="refus-annonces" premier={refusMsg} variantes={refusVariantes} onChange={changerRefusVariantes} extOk={extSait('variantes')==='ok'}/>
                   </div>
                 )}
               </div>
@@ -46770,13 +46778,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>
         {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
           refusMsg={refusMsg} setRefusMsg={(v)=>{ setRefusMsg(v); save('vinted_offre_refus_msg', v); }}
+          refusVariantes={refusVariantes} setRefusVariantes={changerRefusVariantes} variantesOk={extSait('variantes')==='ok'}
           annonces={Array.isArray(listings.items) && !listings.error ? annSelectionnables.filter(a=>a.etat==='en-ligne') : null} numeros={numeros}
           offres={offresConv} lireGarde={lireGardeOffres} comptes={(accounts||[]).filter(a=>/^\d{1,20}$/.test(String(a.vinted_user_id||''))&&!acctOffOf({_acc:a})).map(a=>({ uid:String(a.vinted_user_id), nom:accNameOf(a) }))}
           uidOnglet={(vintedDeChrome()||{}).uid||''} pause={__vmrEtat && __vmrEtat.pause ? __vmrEtat.pause : null} freinsVus={lireFreinsVus()}
           poserSeuils={(liste)=>{ const idx=new Map((listings.items||[]).map(it=>[String(it.id),it])); let n=0; for (const w of liste||[]) { const it=idx.get(String(w.id)); if (!it) continue; const patch={}; if (w.min!==undefined) patch.min=montantSeuil(w.min); if (w.refuse!==undefined) patch.refuse=montantSeuil(w.refuse); updatePair(it, patch); n++; } if ((liste||[]).length>1) toast(`${n} seuil${n>1?'s':''} posé${n>1?'s':''}`); }}
           ouvrirSerie={(ids)=>{ const set=new Set(ids.map(String)); setMiniSel(annSelectionnables.filter(a=>a.etat==='en-ligne'&&set.has(String(a.id)))); }}/>}
         <div hidden={zoneFav==='offres'} style={{display:zoneFav==='offres'?'none':undefined}}>
-        <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;const px=Number(it?.price&&typeof it.price==='object'?it.price.amount:it?.price);return it||n?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null,prix:Number.isFinite(px)&&px>0?px:null}:null;}} ecranActif={zoneMessages==='favoris'&&zoneFav!=='offres'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;const px=Number(it?.price&&typeof it.price==='object'?it.price.amount:it?.price);return it||n?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null,prix:Number.isFinite(px)&&px>0?px:null}:null;}} ecranActif={zoneMessages==='favoris'&&zoneFav!=='offres'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},110000))} PhotoVinted={PhotoVinted}/>
         </div>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">

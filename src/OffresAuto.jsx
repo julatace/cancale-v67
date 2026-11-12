@@ -28,6 +28,7 @@ import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { apercuMoteur, journalOffres, lignesSeuils, alertePlafond, journeeCalme, seuilsIllisibles, montantSeuil, LIBELLE_DECISION, RAISON_GARDE, DELAI_OFFRE_MIN, DELAI_OFFRE_MAX, OFFRES_PAR_VISITE } from './offresSures.js';
 import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth } from './App.jsx';
 import './offres-auto.css';
+import AutresVersions from './AutresVersions.jsx';
 
 const PAR_PAGE = 30;
 const quand = (t) => {
@@ -61,7 +62,7 @@ function ChampSeuil({ valeur, onPoser, label, data }) {
   );
 }
 
-export default function OffresAuto({ actif, virguleLue = false, basculer, refusMsg = '', setRefusMsg, annonces, numeros, offres, lireGarde = () => null, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null }) {
+export default function OffresAuto({ actif, virguleLue = false, basculer, refusMsg = '', setRefusMsg, refusVariantes = [], setRefusVariantes, variantesOk = true, annonces, numeros, offres, lireGarde = () => null, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null }) {
   const nomDe = React.useCallback((u) => { const a = (comptes || []).find((c) => String(c.uid) === String(u)); return a ? a.nom : ''; }, [comptes]);
   const uids = React.useMemo(() => new Set((comptes || []).map((c) => String(c.uid))), [comptes]);
   // 1. Le plafond du compte de l'onglet (la jauge, et l'alerte avant l'arrêt).
@@ -214,7 +215,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
           : !histo.length ? <p className="vrm-oa-vide">Aucune offre notée par l’extension.</p>
           : histo.map((h) => { const f = h.item ? (numeros || {})[h.item] : null; return (
             <div key={`${h.uid}:${h.t}:${h.tx || ''}:${h.sorte}`} className="vrm-oa-histo" data-oa-histo={h.sorte} data-oa-histo-auto={h.auto ? '1' : '0'}>
-              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? 'Acceptée' : 'Refusée'}{h.auto ? ' (auto)' : ''}</span>
+              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? 'Acceptée' : 'Refusée'}{h.auto ? ' (auto)' : ''}{h.variante ? ` · version ${h.variante}` : ''}</span>
               <span className="vrm-oa-nom">{f && f.numero ? <Numero n={f.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{(h.item && titreDe.get(h.item)) || (f && f.title) || (h.tx ? `commande ${h.tx}` : '')}</span></span>
               <span className="vrm-oa-chiffres">{h.prix != null ? <b>{montant(h.prix)}</b> : '—'} · {quand(h.t)}{nomDe(h.uid) ? ` · ${nomDe(h.uid)}` : ''}</span>
             </div>
@@ -226,6 +227,8 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
       <h3 className="vrm-oa-titre">Message de refus</h3>
       <div className="vrm-oa-groupe">
         <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder="Vide : refus sans message." aria-label="Message envoyé quand VRM refuse une offre"/>
+        {/* (12 nov., ext. 5.369) Ses autres versions : une au hasard, jamais celle du refus précédent. */}
+        {setRefusVariantes ? <AutresVersions nom="refus" premier={refusMsg} variantes={refusVariantes} onChange={setRefusVariantes} extOk={variantesOk}/> : null}
       </div>
     </section>
   );

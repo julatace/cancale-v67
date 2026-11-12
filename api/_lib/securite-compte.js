@@ -184,7 +184,9 @@ export function evenementsJournal(sources) {
     if (!resultat) continue;          // en attente, annulé, ignoré : rien n'est parti
     const at = ms(j.envoyeLe) || ms(j.traiteLe);
     if (!at && resultat !== 'en_cours') continue;
-    out.push({ at, type: j.offre || j.pourcentage ? 'favori_offre' : 'favori', site: 'vinted', compte: f.compte || null, cle: { item: j.itemId ? String(j.itemId) : null }, resultat, source: 'favoris' });
+    const ev = { at, type: j.offre || j.pourcentage ? 'favori_offre' : 'favori', site: 'vinted', compte: f.compte || null, cle: { item: j.itemId ? String(j.itemId) : null }, resultat, source: 'favoris' };
+    if (Number.isInteger(j.variante) && j.variante >= 1 && j.variante <= 5) ev.variante = j.variante;   // (5.369) n° de version, jamais le texte
+    out.push(ev);
   }
   for (const b of s.brouillons || []) {
     if (!b || b.parVRM !== true) continue;
@@ -250,6 +252,8 @@ export function evenementsExtension(lignes) {
       vus.add(k);
       const ev = { at, type, site: 'vinted', compte: m[1], cle, resultat: 'ok', source: 'extension' };
       if (e.auto === true) ev.auto = true;
+      // (5.369) Le n° de la version du message envoyée (1 à 5), jamais le texte.
+      if (Number.isInteger(e.v) && e.v >= 1 && e.v <= 5) ev.variante = e.v;
       const de = prixOk(e.de), vers = prixOk(e.vers), p = prixOk(e.p);
       if (de != null && vers != null) ev.prix = { de, vers };
       else if (p != null) ev.prix = { p };
@@ -300,7 +304,7 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   // Favoris
   if (lireService && neutre) {
     const rows = await lireService(`app_data?owner=eq.${neutre}&id=like.favoris_file_*&data->proprietaires=cs.${encodeURIComponent(JSON.stringify([userId]))}&select=id,groupe:data->groupes->${encodeURIComponent('"' + userId + '"')}&limit=100`);
-    if (Array.isArray(rows)) sources.favoris = rows.filter((r) => /^favoris_file_[a-f0-9]{64}$/.test(String(r && r.id || ''))).map((r) => ({ compte: parHache.get(String(r.id).slice(13)) || null, jobs: r.groupe && Array.isArray(r.groupe.jobs) ? r.groupe.jobs.map((j) => ({ etat: j.etat, envoyeLe: j.envoyeLe, traiteLe: j.traiteLe, itemId: j.itemId, offre: j.offre ? true : undefined, pourcentage: j.pourcentage })) : [] }));
+    if (Array.isArray(rows)) sources.favoris = rows.filter((r) => /^favoris_file_[a-f0-9]{64}$/.test(String(r && r.id || ''))).map((r) => ({ compte: parHache.get(String(r.id).slice(13)) || null, jobs: r.groupe && Array.isArray(r.groupe.jobs) ? r.groupe.jobs.map((j) => ({ etat: j.etat, envoyeLe: j.envoyeLe, traiteLe: j.traiteLe, itemId: j.itemId, offre: j.offre ? true : undefined, pourcentage: j.pourcentage, variante: j.variante })) : [] }));
     else { sources.favoris = null; pasLu.push('favoris'); }
   } else { sources.favoris = null; pasLu.push('favoris'); }
   const lignes = async (nom, chemin, map) => {

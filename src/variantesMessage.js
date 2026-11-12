@@ -68,9 +68,10 @@ function variantesARanger(autres) {
   return l.filter((t) => t.trim()).slice(0, VARIANTES_MAX - 1);
 }
 // Une liste RELUE (base, autre appareil) : rien d'autre que des textes, 4 au plus.
+// Un champ vide garde sa place (il est en cours d'écriture ; il n'est jamais envoyé).
 function variantesLues(v) {
   if (!Array.isArray(v)) return [];
-  return v.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.slice(0, 2000)).slice(0, VARIANTES_MAX - 1);
+  return v.filter((t) => typeof t === 'string').map((t) => t.slice(0, 2000)).slice(0, VARIANTES_MAX - 1);
 }
 
 export { VARIANTES_MAX, ECRITURE_HUMAINE, versionsMessage, choisirVariante, tempsEcritureMs, variantesARanger, variantesLues };
