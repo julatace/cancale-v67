@@ -16879,6 +16879,19 @@ function apercuNumerosLot(n) {
   ajouterNumerosHorsEcran(pris, prisK);
   try { return numerosDuLot(n, { pris: { int: pris, cles: prisK }, pref: prefixeNumeros(), prochainLibre, cleNum }); } catch (_) { return null; }
 }
+// (intégration g1, branchement gros-lot ↔ rangement-guide) Les CASES proposées aux N articles d'un lot :
+// la règle du rangement guidé (`casesEnSerie` : la première case libre après la dernière rangée — arrivée
+// OU lot —, empilement respecté). Rien n'est réservé ici ; « Ajouter » rejoue la même règle et refuse si la
+// suite a bougé. null = pas su (Stock pas lu) ; { cases: [null…], aucunMeuble } = pas de meuble.
+function casesLotApercu(n) {
+  const m0 = load('vrm_meubles', []), meubles = Array.isArray(m0) ? m0 : null;
+  const s0 = load('vrm_slots', {}), slots = s0 && typeof s0 === 'object' && !Array.isArray(s0) ? s0 : null;
+  if (!meubles || !slots) return null;
+  const fiches = load(CLE_FICHES_RANGEES, {}) || {};
+  const r = casesEnSerie({ meubles, slots, n, habitude: caseHabitude({ fiches, meubles }) });
+  return r && r.su ? { cases: r.cases || [], aucunMeuble: !!r.aucunMeuble } : null;
+}
+const cleCaseLot = (c) => (c ? String(c.meubleId) + ':' + Number(c.i) : '-');
 // Une photo d'article du lot : SA ligne (jamais `main`, §4.4), vidée par « Annuler ».
 const ecrirePhotoLot = async (id, b64) => {
   try {
@@ -16910,13 +16923,21 @@ async function creerGrosLot(d, setters = {}) {
     // L'aperçu montré n'est plus le bon (un autre appareil a pris des N°) : il le revoit avant d'écrire.
     if (Array.isArray(d.apercu) && d.apercu.join(',') !== numeros.join(',')) return { ok: false, raison: 'decale' };
   }
+  // Les cases (s'il les a gardées) : la même règle, rejouée maintenant ; une suite qui a bougé ⇒ il revoit.
+  let places = null;
+  if (Array.isArray(d.cases)) {
+    const now = casesLotApercu(n);
+    if (!now || now.cases.length !== n || now.cases.map(cleCaseLot).join(',') !== d.cases.map(cleCaseLot).join(',')) return { ok: false, raison: 'decale' };
+    places = now.cases.map((c) => (c ? { m: String(c.meubleId), i: Number(c.i) } : null));
+    if (!places.some(Boolean)) places = null;
+  }
   const lotId = 'ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const ids = numeros.map((_, i) => 'n' + Date.now().toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5));
   const photosOk = await Promise.all(articles.map((a, i) => (a.photo ? ecrirePhotoLot(ids[i], a.photo) : Promise.resolve(false))));
   let plan;
   try {
     plan = planGrosLot({ lotId, titre: d.titre, date: d.date, source: d.source, ref: d.ref, total: d.total, frais: d.frais, mode: d.mode,
-      articles: articles.map((a, i) => ({ titre: a.titre, taille: a.taille, visee: centimesLotTapes(a.visee), photo: !!photosOk[i] })), numeros, repartition: rep, ids });
+      articles: articles.map((a, i) => ({ titre: a.titre, taille: a.taille, visee: centimesLotTapes(a.visee), photo: !!photosOk[i] })), numeros, repartition: rep, ids, cases: places });
   } catch (_) { return { ok: false, raison: 'lecture' }; }
   // Le pool d'abord : ces N° ont pu être écrits sur les cartons pendant la saisie (§5).
   const pool = (load('vinted_used_numeros', []) || []).slice();
@@ -16926,6 +16947,8 @@ async function creerGrosLot(d, setters = {}) {
   const texte = tr('groslot.ajoute', { de: numeros[0], a: numeros[numeros.length - 1] });
   gesteMorceaux(texte, morceauxGrosLot(plan), setters, (sens) => {
     if (sens === 'avant') ids.forEach((id, i) => { if (photosOk[i]) ecrirePhotoLot(id, null); });
+    // Le Stock relit ses cases (rangées ou rendues par « Annuler »).
+    if (places) setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues(['vrm_slots', CLE_FICHES_RANGEES]); }, 300);
   });
   return { ok: true, id: lotId, numeros };
 }
@@ -47372,7 +47395,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
           prochainNumero={horsLigneVue ? null : nextNumero} onReserverNumero={recordUsed} horsLigne={horsLigneVue} garderPhotoHorsLigne={garderPhotoHorsLigne}
-          lot={horsLigneVue ? null : { creer: (d) => creerGrosLot(d, { vinted_offvinted_buys: setOffBuys, vinted_buyprice_by_num: setBuyByNum }), moiMeme: numeroEcritActif(), apercu: apercuNumerosLot, cleNum }}
+          lot={horsLigneVue ? null : { creer: (d) => creerGrosLot(d, { vinted_offvinted_buys: setOffBuys, vinted_buyprice_by_num: setBuyByNum }), moiMeme: numeroEcritActif(), apercu: apercuNumerosLot, cases: casesLotApercu, cleNum }}
           stock={Array.isArray(listings.items)&&!listings.error?stockPourModele:null}
           chargerStock={()=>{ if (accounts.length && listings.items===null && !listings.loading) loadListings(false, true); }}
           onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>}

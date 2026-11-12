@@ -11,7 +11,7 @@ import { cleFacture, verifierFichier } from '../factureAchat.js';
 import { lireTicketAchat, lireTexteTicket, texteMontantSaisie } from '../depensesTicket.js';
 import { ticketVersBrouillon, prixEncoreLu, champEncoreLu, resumeTicket } from '../achatTicket.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
-import { BlocGrosLot, LOT0, repartitionDuLot } from '../GrosLot.jsx';
+import { BlocGrosLot, LOT0, repartitionDuLot, casesDuLot } from '../GrosLot.jsx';
 import { nombreArticles, centimesTapes, listeRangs } from '../grosLot.js';
 import { SegmenteBase } from '../composants/Bouton.jsx';
 import { DejaEnStock } from '../DejaEnStock.jsx';
@@ -438,7 +438,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     try {
       r = await lot.creer({ titre: form.title.trim(), date: form.date || dateLocaleISO(), source: form.source.trim(), ref: String(form.ref || '').trim(),
         total: centimesTapes(form.price), frais: centimesTapes(form.lot.frais), mode: form.lot.mode,
-        articles: form.lot.articles.slice(0, n), apercu: lot.moiMeme ? null : (lot.apercu ? lot.apercu(n) : null) });
+        articles: form.lot.articles.slice(0, n), apercu: lot.moiMeme ? null : (lot.apercu ? lot.apercu(n) : null),
+        cases: form.lot.ranger !== false ? casesDuLot(form.lot, lot.cases) : null });
     } catch (e) { r = { ok: false, raison: 'lecture' }; }
     setEnvoi(false);
     if (!r || !r.ok) {
@@ -589,7 +590,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           {/* 3. Le prix payé, en grand : c'est LUI qui le tape (§2.5). */}
           {champ(prixEncoreLu(form) ? <span data-prix-lu-note="" style={{ color: C.warn }}>Lu sur le ticket — vérifie</span> : (enLot ? tr('groslot.prixTotal') : 'Prix payé'), <div className="vrm-ahp-prix" style={{ position: 'relative' }}><input data-champ="prix" data-prix-lu={prixEncoreLu(form) ? '1' : undefined} aria-label="Prix payé" readOnly={!!(editId && (liste.find(x => x.id === editId) || {}).lot)} value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" enterKeyHint="next" placeholder="0,00" autoComplete="off" style={{ ...inp, height: 58, fontSize: 28, fontWeight: 700, paddingRight: 40, fontVariantNumeric: 'tabular-nums', ...(prixEncoreLu(form) ? { borderColor: C.warn, boxShadow: `0 0 0 3px ${C.warnSoft || 'transparent'}`, background: C.warnSoft || C.card } : null) }} /><span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 22, fontWeight: 600, pointerEvents: 'none' }}>€</span></div>)}
           {enLot ? <BlocGrosLot lot={form.lot} setLot={(f) => { setErreursNum(null); setForm(d => d && ({ ...d, lot: typeof f === 'function' ? f(d.lot) : f })); }} totalTexte={form.price} C={C} Icon={Icon} Bouton={Bouton}
-            moiMeme={!!lot.moiMeme} apercuNumeros={lot.apercu} compresser={compressImage} clavier={clavierNum()} cleNum={lot.cleNum} erreursNum={erreursNum} /> : null}
+            moiMeme={!!lot.moiMeme} apercuNumeros={lot.apercu} apercuCases={lot.cases} compresser={compressImage} clavier={clavierNum()} cleNum={lot.cleNum} erreursNum={erreursNum} /> : null}
           {/* 4. Où : ses derniers lieux d'abord, puis la liste courte ; un champ libre. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {champ(champEncoreLu(form, 'source') ? 'Où · lu sur le ticket' : 'Où', <input data-champ="lieu" data-champ-lu={champEncoreLu(form, 'source') ? '1' : undefined} value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante, vide-grenier, magasin…" autoComplete="off" style={inp} />)}

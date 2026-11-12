@@ -185,14 +185,18 @@ export function verifierNumerosTapes(tapes, { pris, archive = '', cleNum } = {})
 //   · couts : `vinted_buyprice_by_num` — le coût de chaque N° (« 12,50 »), la
 //     clé que le bénéfice et la compta lisent déjà (`prixAchatDe`).
 // `articles` : [{ titre, taille, visee (centimes|null), photo: bool }] ; `ids` : n ids de fiche.
-export function planGrosLot({ lotId, titre, date, source = '', ref = '', total, frais = null, mode, articles, numeros, repartition, ids, maintenant = new Date().toISOString() } = {}) {
+// (intégration g1, branchement rangement-guide) `cases` (facultatif) : une place par article, { m, i } ou null,
+// déjà choisie par la règle du rangement guidé (src/rangementArrivee.js, `casesEnSerie`) et VÉRIFIÉE par l'appelant.
+// Une place ⇒ la fiche la porte (`case`, `rangeAt`) et la case du Stock est notée (`vrm_slots`, par N°).
+export function planGrosLot({ lotId, titre, date, source = '', ref = '', total, frais = null, mode, articles, numeros, repartition, ids, cases = null, maintenant = new Date().toISOString() } = {}) {
   const n = (articles || []).length;
   if (!lotId || !n || !repartition || !repartition.ok || repartition.parts.length !== n) throw new Error('répartition');
   if (!Array.isArray(numeros) || numeros.length !== n || !Array.isArray(ids) || ids.length !== n) throw new Error('numéros');
+  if (cases != null && (!Array.isArray(cases) || cases.length !== n)) throw new Error('cases');
   const somme = repartition.parts.reduce((s, p) => s + p, 0);
   if (somme !== total + (frais || 0)) throw new Error('somme');
   const nomLot = str(titre) || `Lot de ${n} articles`;
-  const fiches = {}, couts = {};
+  const fiches = {}, couts = {}, slots = {};
   const liste = articles.map((a, i) => {
     const id = String(ids[i]); const numero = String(numeros[i]); const part = repartition.parts[i];
     const titreA = str(a && a.titre).slice(0, 200) || `${nomLot} · ${i + 1}/${n}`;
@@ -202,6 +206,8 @@ export function planGrosLot({ lotId, titre, date, source = '', ref = '', total, 
       origine: ORIGINE_LOT, achat: String(lotId), rang: i + 1, cout: part,
       ...(a && a.photo ? { photoLigne: PREFIXE_PHOTO_LOT + id } : {}),
     };
+    const place = cases && cases[i] && cases[i].m != null && Number.isInteger(Number(cases[i].i)) ? { m: String(cases[i].m), i: Number(cases[i].i) } : null;
+    if (place) { fiches[id].case = place; fiches[id].rangeAt = maintenant; slots[numero] = place; }
     couts[numero] = texteCentimes(part);
     return { fiche: id, numero, part };
   });
@@ -210,7 +216,7 @@ export function planGrosLot({ lotId, titre, date, source = '', ref = '', total, 
     date: str(date), source: str(source), ...(str(ref) ? { ref: str(ref).slice(0, 40) } : {}),
     lot: { n, prix: total, frais: frais || 0, mode, articles: liste },
   };
-  return { achat, fiches, couts };
+  return { achat, fiches, couts, slots };
 }
 
 // Les morceaux du geste annulable (src/corbeille.js : 'element' / 'cle').
@@ -220,6 +226,7 @@ export function morceauxGrosLot(plan) {
   const m = [{ k: 'vinted_offvinted_buys', type: 'element', idCle: 'id', id: plan.achat.id, avant: undefined, apres: plan.achat, index: 0, defaut: [] }];
   for (const [id, f] of Object.entries(plan.fiches)) m.push({ k: 'vrm_fiches_neuves', type: 'cle', id, avant: undefined, apres: f });
   for (const [num, c] of Object.entries(plan.couts)) m.push({ k: 'vinted_buyprice_by_num', type: 'cle', id: num, avant: undefined, apres: c });
+  for (const [num, c] of Object.entries(plan.slots || {})) m.push({ k: 'vrm_slots', type: 'cle', id: num, avant: undefined, apres: c });
   return m;
 }
 

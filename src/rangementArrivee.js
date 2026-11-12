@@ -89,8 +89,11 @@ export function caseHabitude({ fiches, meubles } = {}) {
   if (!estObjet(fiches) || !estListe(meubles)) return null;
   let der = null;
   for (const f of Object.values(fiches)) {
-    if (!f || f.origine !== ORIGINE || !f.case || f.case.m == null) continue;
-    if (!der || String(f.rangeAt || '') > String(der.rangeAt || '')) der = f;
+    // (intégration g1) un gros lot rangé dans ses cases (src/grosLot.js, origine « gros-lot ») est aussi un rangement.
+    if (!f || (f.origine !== ORIGINE && f.origine !== 'gros-lot') || !f.case || f.case.m == null) continue;
+    // À la même heure (les N articles d'un lot), le dernier rang l'emporte : la suite repart après lui.
+    const a = String(f.rangeAt || ''), b = der ? String(der.rangeAt || '') : '';
+    if (!der || a > b || (a === b && (Number(f.rang) || 0) > (Number(der.rang) || 0))) der = f;
   }
   if (!der) return null;
   const m = meubles.find((x) => x && String(x.id) === String(der.case.m));

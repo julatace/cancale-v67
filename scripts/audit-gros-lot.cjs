@@ -25,6 +25,8 @@ const MUTATIONS = [
   ['numero-deja-servi', "if (!num || avant.has(k) || out.some((x) => cleNum(x) === k)) throw new Error('numéro déjà servi');", "if (!num) throw new Error('vide');"],
   ['tape-deja-servi', "else if (pris.has(c)) raison = 'pris';", ""],
   ['fiche-sans-lot', "origine: ORIGINE_LOT, achat: String(lotId), rang: i + 1, cout: part,", "origine: ORIGINE_LOT, cout: part,"],
+  ['case-oubliee', "if (place) { fiches[id].case = place; fiches[id].rangeAt = maintenant; slots[numero] = place; }", ""],
+  ['case-hors-geste', "  for (const [num, c] of Object.entries(plan.slots || {})) m.push({ k: 'vrm_slots', type: 'cle', id: num, avant: undefined, apres: c });\n", ""],
   ['pool-annule', "export function morceauxGrosLot(plan) {\n  const m = [", "export function morceauxGrosLot(plan) {\n  const m = [{ k: 'vinted_used_numeros', type: 'cle', id: 'lot', avant: undefined, apres: 1 }, "],
 ];
 
@@ -122,6 +124,17 @@ async function jouer(dir, { silencieux = false } = {}) {
         const retour = {}; for (const k of Object.keys(avant)) retour[k] = Cb.appliquerMorceaux(apres[k], m, 'avant', k).valeur;
         dit(Object.keys(avant).every((k) => Cb.egal(retour[k], avant[k])), '« Annuler » rend exactement l’état d’avant (achat, fiches, coûts)');
       } else dit(false, 'src/corbeille.js se charge');
+      // (intégration g1) avec des cases : la fiche porte sa case, la case est notée par N°, « Annuler » la rend.
+      const cases = numeros.map((_, i) => (i < 2 ? { m: 'meuble_a', i: 7 + i } : null));
+      let pc = null; try { pc = G.planGrosLot({ lotId: 'ob_lot2', total: TOTAL, frais: FRAIS, mode: 'egal', articles, numeros, repartition: rep, ids, cases, maintenant: '2026-11-11T10:00:00.000Z' }); } catch (e) { dit(false, 'le plan avec cases se calcule', e.message); }
+      if (pc) {
+        const f0 = pc.fiches.fiche_0, f2 = pc.fiches.fiche_2;
+        dit(f0.case && f0.case.m === 'meuble_a' && f0.case.i === 7 && f0.rangeAt === '2026-11-11T10:00:00.000Z' && !f2.case && Object.keys(pc.slots).join() === '45,46' && pc.slots['46'].i === 8, 'cases : la fiche porte SA case, la case est notée sous SON N° ; un article sans case libre n’en reçoit aucune');
+        const mc = G.morceauxGrosLot(pc).filter((x) => x.k === 'vrm_slots');
+        dit(mc.length === 2 && mc.every((x) => x.avant === undefined), 'les cases font partie du MÊME geste annulable (« Annuler » les libère)');
+      }
+      let refusC = false; try { G.planGrosLot({ lotId: 'y', total: TOTAL, frais: FRAIS, mode: 'egal', articles, numeros, repartition: rep, ids, cases: [null] }); } catch (_) { refusC = true; }
+      dit(refusC, 'des cases qui ne vont pas avec les articles ⇒ refus');
       let refus = false; try { G.planGrosLot({ lotId: 'x', total: 100, mode: 'egal', articles: [{}, {}], numeros: ['1', '2'], ids: ['a', 'b'], repartition: { ok: true, parts: [40, 40], reste: { centimes: 0, sur: [] } } }); } catch (_) { refus = true; }
       dit(refus, 'un plan dont les parts ne font pas le total est refusé (rien n’est écrit)');
     }
@@ -145,7 +158,13 @@ function appli() {
   dit(c.indexOf("save('vinted_used_numeros'") > 0 && c.indexOf("save('vinted_used_numeros'") < c.indexOf('gesteMorceaux('), 'le pool est écrit AVANT le geste annulable (jamais rendu)');
   dit(/gesteMorceaux\([^)]*morceauxGrosLot\(plan\)/.test(c), 'UN geste annulable 5 s (la pilule « Annuler »)');
   dit(/d\.apercu[\s\S]*'decale'/.test(c), 'une suite de N° qui a bougé depuis l’aperçu ⇒ rien écrit, dit');
-  dit(/lot=\{\{\s*creer:/.test(app), 'le formulaire « Nouvel achat » reçoit le mode lot');
+  dit(/lot=\{(?:horsLigneVue \? null : )?\{\s*creer:/.test(app), 'le formulaire « Nouvel achat » reçoit le mode lot (hors ligne : pas de lot, ses N° viennent du serveur)');
+  // (intégration g1) le branchement gros-lot ↔ rangement-guide : les cases en série par la règle du rangement guidé.
+  const cl = (() => { const i = app.indexOf('function casesLotApercu'); return i < 0 ? '' : app.slice(i, app.indexOf('\n}\n', i)); })();
+  dit(/casesEnSerie\(\{[^}]*habitude: caseHabitude\(/.test(cl), 'les cases du lot : la règle du rangement guidé (`casesEnSerie`, après la dernière rangée)');
+  dit(/Array\.isArray\(d\.cases\)[\s\S]*casesLotApercu\(n\)[\s\S]*'decale'/.test(c) && /cases: places/.test(c), 'les cases REJOUÉES à « Ajouter » ; une suite qui a bougé ⇒ rien écrit, dit');
+  dit(/cases: casesLotApercu/.test(app) && /apercuCases=\{lot\.cases\}/.test(ach) && /casesDuLot\(form\.lot, lot\.cases\)/.test(ach), 'le formulaire montre les cases et envoie celles qu’il a gardées');
+  dit(/data-lot-ranger/.test(bloc) && /data-lot-case=/.test(bloc), 'l’écran : « Ranger dans ces cases » (décochable) et la case de chaque article');
   dit(/data-achat-mode/.test(ach) && /BlocGrosLot/.test(ach) && /lot\.creer\(/.test(ach), 'le formulaire : « Un article · Un lot », le bloc, « Ajouter le lot »');
   dit(/cleFacture\('hors', r\.id\)/.test(ach), 'UNE pièce justificative, rangée sous l’identité du lot');
   dit(/repartirGrosLot\(/.test(bloc) || /repartitionDuLot/.test(bloc), 'l’écran calcule les parts par la même règle');

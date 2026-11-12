@@ -14,7 +14,7 @@ import { SegmenteBase } from './composants/Bouton.jsx';
 import './styles-gros-lot.css';
 import { repartirGrosLot, centimesTapes, texteCentimes, nombreArticles, listeRangs, suiteDepuis, LOT_MAX } from './grosLot.js';
 
-export const LOT0 = () => ({ n: '', frais: '', mode: 'egal', articles: [] });
+export const LOT0 = () => ({ n: '', frais: '', mode: 'egal', articles: [], ranger: true });
 const ART0 = () => ({ titre: '', taille: '', visee: '', main: '', photo: null, numero: '' });
 
 // Les articles suivent le nombre tapé (on garde ce qui est déjà saisi).
@@ -23,6 +23,16 @@ export const avecNombre = (lot, v) => {
   const a = Array.isArray(lot.articles) ? lot.articles.slice(0, n || lot.articles.length) : [];
   if (n) while (a.length < n) a.push(ART0());
   return { ...lot, n: v, articles: n ? a : lot.articles };
+};
+
+// (intégration g1, branchement rangement-guide) Une case dite en mots, par tr (meuble · niveau · case).
+export const caseLot = (c) => (c ? tr('groslot.case', { meuble: c.meuble, rangee: c.rangee, colonne: c.colonne }) : '');
+// Les cases montrées sont celles qui partent : `apercuCases(n)` (la règle du rangement guidé), si « Ranger » est coché.
+export const casesDuLot = (lot, apercuCases) => {
+  const n = nombreArticles(lot && lot.n);
+  if (!n || typeof apercuCases !== 'function') return null;
+  const r = apercuCases(n);
+  return r && !r.aucunMeuble && Array.isArray(r.cases) && r.cases.some(Boolean) ? r.cases : null;
 };
 
 // La répartition de l'écran : la MÊME fonction que la coque rejouera à « Ajouter ».
@@ -52,11 +62,15 @@ export function phraseRepartition(r) {
   return tr('groslot.refus.total');
 }
 
-export function BlocGrosLot({ lot, setLot, totalTexte, C, Icon, Bouton, moiMeme = false, apercuNumeros = null, compresser = null, clavier = 'numeric', cleNum = null, erreursNum = null }) {
+export function BlocGrosLot({ lot, setLot, totalTexte, C, Icon, Bouton, moiMeme = false, apercuNumeros = null, apercuCases = null, compresser = null, clavier = 'numeric', cleNum = null, erreursNum = null }) {
   const fichiers = React.useRef({});
   const r = repartitionDuLot(lot, totalTexte);
   const n = nombreArticles(lot.n);
   const apercu = !moiMeme && n && typeof apercuNumeros === 'function' ? apercuNumeros(n) : null;
+  const casesP = casesDuLot(lot, apercuCases);
+  const ranger = !!casesP && lot.ranger !== false;
+  const nSansCase = casesP ? casesP.filter((c) => !c).length : 0;
+  const premiere = casesP ? casesP.find(Boolean) : null, derniere = casesP ? [...casesP].reverse().find(Boolean) : null;
   const majArt = (i, patch) => setLot((l) => ({ ...l, articles: l.articles.map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
   const inp = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', height: 44, fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', minWidth: 0 };
   const lab = { fontSize: 12, color: C.muted, fontWeight: 600 };
@@ -99,6 +113,17 @@ export function BlocGrosLot({ lot, setLot, totalTexte, C, Icon, Bouton, moiMeme 
               {apercu && apercu.length ? tr('groslot.numeros', { de: apercu[0], a: apercu[apercu.length - 1] }) : tr('groslot.numerosPasSu')}
             </div>
           )}
+          {casesP ? (
+            <label className="vrm-gl-ranger" data-lot-ranger={ranger ? '1' : '0'} data-lot-cases={casesP.map((c) => (c ? c.meubleId + ':' + c.i : '-')).join(',')}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, fontSize: 13, color: C.muted, cursor: 'pointer' }}>
+              <input type="checkbox" checked={ranger} onChange={(ev) => setLot((l) => ({ ...l, ranger: ev.target.checked }))} style={{ width: 20, height: 20, flexShrink: 0 }} />
+              <span style={{ minWidth: 0 }}>
+                <b style={{ color: C.text, fontWeight: 600 }}>{tr('groslot.ranger')}</b>
+                {' · '}{premiere === derniere ? caseLot(premiere) : tr('groslot.cases', { de: caseLot(premiere), a: caseLot(derniere) })}
+                {nSansCase ? ` · ${tr('groslot.sansCase', { n: nSansCase })}` : ''}
+              </span>
+            </label>
+          ) : null}
           <ol className="vrm-gl-liste" aria-label={tr('groslot.articles')}>
             {lot.articles.map((a, i) => {
               const e = errNum(i);
@@ -134,6 +159,7 @@ export function BlocGrosLot({ lot, setLot, totalTexte, C, Icon, Bouton, moiMeme 
                     ) : <span style={{ flex: 1 }} />}
                     <span className="vrm-gl-part" aria-label={tr('groslot.partDe', { i: i + 1 })}>{part == null ? '—' : `${texteCentimes(part)} €`}</span>
                   </div>
+                  {ranger ? <div className="vrm-gl-case" data-lot-case={casesP[i] ? casesP[i].meubleId + ':' + casesP[i].i : ''} style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{casesP[i] ? caseLot(casesP[i]) : '—'}</div> : null}
                   {e ? <div role="alert" data-lot-num-erreur={e.raison} style={{ fontSize: 12, color: C.warn, marginTop: 4 }}>{tr('groslot.num.' + e.raison, { n: e.num })}</div> : null}
                 </li>
               );

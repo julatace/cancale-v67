@@ -63,6 +63,11 @@ async function controles(racine, silencieux) {
     const fiches = { f: { origine: 'arrivee', case: { m: 'mA', i: 3 }, rangeAt: '2026-11-10' } };
     const h = R.caseHabitude({ fiches, meubles: [A] });
     const r = R.casesEnSerie({ meubles: [A], slots: { 7: { m: 'mA', i: 3 } }, n: 2, habitude: h }); return JSON.stringify(r.cases.map((c) => c && c.i)) === '[4,5]' || r; });
+  essai('C2b · (intégration g1) un gros lot rangé (origine « gros-lot », même heure) : la suite repart APRÈS son dernier rang', () => {
+    const t = '2026-11-11T10:00:00.000Z';
+    const fiches = { a: { origine: 'arrivee', case: { m: 'mA', i: 0 }, rangeAt: '2026-11-10' }, l1: { origine: 'gros-lot', rang: 1, case: { m: 'mA', i: 1 }, rangeAt: t }, l2: { origine: 'gros-lot', rang: 2, case: { m: 'mA', i: 2 }, rangeAt: t }, l3: { origine: 'gros-lot', rang: 3, rangeAt: t } };
+    const h = R.caseHabitude({ fiches, meubles: [A] });
+    return (h && h.m === 'mA' && h.i === 2) || JSON.stringify(h); });
   essai('C3 · meuble empilé : seule la case la plus basse libre d’une colonne (jamais une case en l’air)', () => {
     const r = R.casesEnSerie({ meubles: [B], slots: {}, n: 3 }); return JSON.stringify(r.cases.map((c) => c && c.i)) === '[4,5,2]' || JSON.stringify(r.cases.map((c) => c && c.i)); });
   essai('C4 · plan pas lu ⇒ rien proposé ; aucun meuble ⇒ « sans case », jamais une case inventée', () => {
@@ -133,6 +138,8 @@ async function controles(racine, silencieux) {
 }
 
 const MUTATIONS = [
+  ['un gros lot rangé ignoré par l’habitude (intégration g1)', 'src/rangementArrivee.js', "(f.origine !== ORIGINE && f.origine !== 'gros-lot')", '(f.origine !== ORIGINE)'],
+  ['à la même heure, le 1er rang gagne (intégration g1)', 'src/rangementArrivee.js', '(a === b && (Number(f.rang) || 0) > (Number(der.rang) || 0))', 'false'],
   ['prochainLibre comble les trous (App.jsx)', 'src/App.jsx', 'for (const x of prisInt) { const n = Number(x); if (Number.isFinite(n) && n >= c) c = n + 1; }', 'while (prisInt.has(c)) c++;'],
   ['un N° servi réattribué (garde de la série retirée)', 'src/rangementArrivee.js', 'if (!c || avant.has(c) || out.some((x) => cleNum(x) === c)) return null;', 'if (!c) return null;'],
   ['N° tapé déjà servi accepté', 'src/rangementArrivee.js', "if (pris.has(c)) return { ok: false, raison: 'pris' };\n  if ((autres", 'if ((autres'],
