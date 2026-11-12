@@ -415,7 +415,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     ? ok('avant l\'arrivée du nuage, le registre vaut « pas su » (rien n\'est déplacé sur un appareil neuf)')
     : nok('le registre attend le nuage', 'lu au montage sans garde');
   const defD = (() => { const i = SRC.indexOf('const declarables = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf(']);', i)); })();
-  /declare: declUrssaf/.test(defD) && /\bdeclUrssaf$/.test(defD.trim())
+  /declare: declUrssaf/.test(defD) && /\[[^\]]*\bdeclUrssaf\b[^\]]*$/.test(defD.trim())   // (12 nov.) dans les dépendances (« vendu ailleurs » suit)
     ? ok('la règle commune (tableau de bord, mensuel, annuel) reçoit le registre et se recalcule quand il change')
     : nok('la règle commune reçoit le registre', 'declare absent du memo declarables');
   // Jamais l'app ne coche « déclaré » à sa place : on n'écrit QUE dans les deux
@@ -566,7 +566,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     const run = (declarables, lbcLu, ebayCmd) => {
       // (1er nov.) + `ventesVc` (les ventes Vestiaire, lues à part) : aucune ici.
       c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {}, ventesVc: [], excluAutre: null, ventesImp: [] };   // (11 nov.) + les ventes importées (Paramètres → Importer) : aucune ici   // (3 nov.) aucun compte d'un autre site écarté
-      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf, ventesVc, excluAutre, ventesImp } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; return (${corps})(); })()`, c);
+      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf, ventesVc, excluAutre, ventesImp } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; const ventesAilleursDe = () => []; /* (12 nov.) « vendu ailleurs » : aucune ici */ return (${corps})(); })()`, c);
     };
     const EB = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: '2026-10-03T10:00:00.000Z', pricingSummary: { total: { value: '72.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '66.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' } }];
     const pasSu = run(null, true, EB);

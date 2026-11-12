@@ -31,6 +31,7 @@ const RACINE = path.join(__dirname, '..');
 
 // Les textes de chaussure PERMIS hors garde « sneakers » (fichier, motif, raison).
 const PERMIS = [
+  ['src/simulationCompte.js', /^'Sneakers · Solo · /, 'nom d’un scénario de la simulation de création de compte (propriétaire seul) : le profil « Sneakers » nommé'],
   ['src/App.jsx', /^'\^\(\?:chaussures|^'\(taille\|pointure/, 'expression de lecture d’un titre (aucun texte affiché)'],
   ['src/App.jsx', /^'Chaussures( enfants)?'$/, 'catégorie Leboncoin (le nom du site), choisie seulement pour un article chaussure'],
   ['src/publierPartout.js', /^'Chaussures( enfants)?'$/, 'LBC_CATEGORIES : les noms EXACTS des catégories Leboncoin (liste du site), proposés parmi les autres catégories (11 nov., publier-partout)'],

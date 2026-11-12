@@ -35,6 +35,7 @@
 //  (api/_lib/veille-chiffres.js) et scripts/audit-veille.cjs l'exécutent tels quels.
 // ══════════════════════════════════════════════════════════════════════════════
 
+import { motsVendeur } from './profilVendeur.js';   // (12 nov., intégration) « paire » seulement pour Sneakers
 import { jourParis, moisDecale } from './dateParis.js';   // (12 nov., intégration) famille « dates à l'heure de Paris »
 export const CLE_VEILLE = 'vrm_veille_chiffres';
 export const MEMO_VEILLE = 'veille_chiffres_dit';     // le mémo des notifications (écrit par le serveur seul)
@@ -230,7 +231,7 @@ export function texteAlerte(a) {
       titre: `Ton stock est passé de ${a.de} à ${a.a} ${quand(a.j0, a.j1)}`,
       phrase: 'Vérifie tes annonces Vinted.',
       pourquoi: expl > 0
-        ? `${a.ventes} ${pl(a.ventes, 'vente', 'ventes')} et ${a.suppressions} ${pl(a.suppressions, 'suppression vue', 'suppressions vues')} expliquent ${expl} ${pl(expl, 'paire', 'paires')} sur ${a.de - a.a}.`
+        ? `${a.ventes} ${pl(a.ventes, 'vente', 'ventes')} et ${a.suppressions} ${pl(a.suppressions, 'suppression vue', 'suppressions vues')} expliquent ${expl} ${pl(expl, motsVendeur().nom, motsVendeur().noms)} sur ${a.de - a.a}.`
         : 'Aucune vente ni suppression vue ne l’explique.',
       geste: { libelle: 'Voir mes annonces', aller: '/?tab=cat_annonces' },
     };

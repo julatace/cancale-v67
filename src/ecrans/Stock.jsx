@@ -1872,7 +1872,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             : ((syncResult.sold + syncResult.pending) > 0
                 ? `✅ ${syncResult.sold} vente(s) finalisée(s) comptée(s)${syncResult.pending?`, ${syncResult.pending} en cours (non comptée(s), en attente de validation)`:''} — sur ${syncResult.scanned} commandes analysées.`
                 : `Aucune vente à reporter (${syncResult.scanned} commandes analysées).`)}
-          {syncResult.annulees ? ` ${syncResult.annulees} vente(s) annulée(s) : la paire revient en stock.` : ''}
+          {syncResult.annulees ? ` ${syncResult.annulees} vente(s) annulée(s) : ${motsVendeur().le} revient en stock.` : ''}
         </div>
       )}
       {propositions.length > 0 && (

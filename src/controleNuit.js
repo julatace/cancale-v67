@@ -25,6 +25,7 @@
 //  Module PUR : l'app (src/VeilleJournee.jsx), le serveur et l'audit l'exécutent.
 // ══════════════════════════════════════════════════════════════════════════════
 
+import { motsVendeur } from './profilVendeur.js';   // (12 nov., intégration) « paire » seulement pour Sneakers
 export const CLE_CONTROLE = 'vrm_controle_nuit';
 export const CLE_CONTROLE_INSTALLATION = 'vrm_controle_installation';
 export const VERSEMENT_JOURS = 30;
@@ -39,8 +40,8 @@ const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null
 
 // L'ordre = la gravité. `ou` : 'vendeur' (sa ligne) ou 'installation' (le propriétaire).
 export const CONTROLES = [
-  { cle: 'numeros-double', ou: 'vendeur', ton: 'rouge', nom: 'Deux paires sous un N°',
-    phrase: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux paires en ligne`,
+  { cle: 'numeros-double', ou: 'vendeur', ton: 'rouge', get nom() { return `Deux ${motsVendeur().noms} sous un N°`; },
+    phrase: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux ${motsVendeur().noms} en ligne`,
     geste: { libelle: 'Corriger', aller: '/?tab=cat_bord' } },
   { cle: 'versement-30j', ou: 'vendeur', nom: 'Ventes sans versement',
     phrase: (n) => `${n} ${pl(n, 'vente', 'ventes')} sans date de versement depuis 30 jours`,
