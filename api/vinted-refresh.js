@@ -28,7 +28,9 @@ import { repondreSansCleService } from './_lib/cle-service.js';
 // est invalide), donc rafraichir inutilement multiplie les rotations et les
 // risques de course entre appareils. On decode l'exp du JWT pour l'eviter.
 
-const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+// (12 nov.) Lue de l'environnement comme toutes les autres fonctions (`SUPABASE_URL`) :
+// une base de banc ou de prévisualisation n'écrit plus dans la production.
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
 // vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
 // publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
