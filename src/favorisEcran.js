@@ -58,6 +58,7 @@ const MODE={
   capture:{texte:'Rien ne part : VRM n’a pas encore vu les favoris de ce compte.',geste:'Ouvre la cloche de Vinted avec ce compte.'},
   destinataire_non_prouve:{texte:'Rien ne part : VRM ne sait pas encore à qui écrire.',geste:'Touche « Ouvrir » sur un favori plus bas : VRM apprend à qui écrire.'},
   reglages:{texte:'Rien ne part : aucun message enregistré.',geste:'Écris ton message ci-dessous, puis Enregistrer.'},
+  message_risque:{texte:'Rien ne part : ton message contient un mot que Vinted bannit.',geste:'Retire le numéro, le lien ou le moyen de paiement, puis Enregistrer.'},
   extension:{texte:'Un message est prêt, mais l’extension ne peut pas l’envoyer.',geste:`Ouvre vinted.fr ${NAV.dansNu} sur ce compte, avec l’extension à jour.`},
   onglet_vinted:{texte:'Un message attend : aucun onglet vinted.fr n’est ouvert sur ce compte.',geste:`Ouvre vinted.fr ${NAV.dansNu}, connecté sur ce compte, et laisse l’onglet ouvert.`},
   compte_vinted_absent:{texte:`Un message attend : ${NAV.ce} n’est pas connecté à Vinted.`,geste:`Connecte-toi à Vinted avec ce compte ${NAV.dansNu}.`},

@@ -16,6 +16,7 @@
 //    ressemble » — un nom faux sur ses factures.
 // ⚠️ TROIS ÉTATS : `trouve` · `inconnu` (l'API a répondu, aucun SIREN égal) ·
 //    pas su (l'API n'a pas répondu ⇒ 503, jamais « inconnu »).
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 const API = 'https://recherche-entreprises.api.gouv.fr/search';
 
 export function chiffresSiret(v) { return String(v == null ? '' : v).replace(/\D/g, ''); }
@@ -74,7 +75,7 @@ export function lireReponseEntreprise(json, saisi) {
 }
 
 // La route : { status, body }.
-export async function routeEntreprise(saisi, fetchFn = fetch) {
+export async function routeEntreprise(saisi, fetchFn = fetchAvecDelai) {
   const ch = chiffresSiret(saisi);
   if (ch.length !== 9 && ch.length !== 14) return { status: 400, body: { erreur: 'Un SIREN a 9 chiffres, un SIRET 14.' } };
   let rep;

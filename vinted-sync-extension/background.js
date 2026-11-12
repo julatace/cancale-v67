@@ -15824,6 +15824,10 @@ async function secuObserver(pf, compte, rep) {
         c.robot = { depuis: t };
         logActivity(`⛔ ${secuTexte(SECU_PHRASES, 'robot', secuMots(pf))} — tout s'arrête pour ce compte jusqu'à une lecture normale`);
       }
+    } else if (pf === 'vinted') {
+      // (12 nov., intégration 5.372) UNE seule prudence par compte Vinted : celle de 5.357 (`poserPrudence`,
+      // 24 h, 20 actions/heure, délais doublés, lectures de fond suspendues), posée juste après — plus de
+      // seconde prudence ici (un 403/429 les déclenchait toutes les deux).
     } else {
       const ms = defi === 'restreint' ? SECU_PRUDENCE_MS.restreint : Math.max(st === 429 ? SECU_PRUDENCE_MS[429] : SECU_PRUDENCE_MS[403], ra);
       const jusqua = Math.max(Number(c.prudence && c.prudence.jusqua) || 0, t + ms);
@@ -15833,6 +15837,7 @@ async function secuObserver(pf, compte, rep) {
     await secuEcrire(s);
   });
   noterDiag('secu_vu_' + (defi || st) + '_' + pf);
+  if (pf === 'vinted' && defi !== 'robot') await poserPrudence(String(compte), st || (defi === 'restreint' ? 403 : 0), 'secu');
   await secuPublier(true);
   return defi === 'robot' ? 'robot' : 'prudence';
 }
@@ -15848,9 +15853,11 @@ async function secuLectureNormale(pf, compte) {
     if (!c || !c.robot) return;
     const t = Date.now();
     delete c.robot;
-    c.prudence = { jusqua: Math.max(Number(c.prudence && c.prudence.jusqua) || 0, t + SECU_PRUDENCE_MS.apresRobot), raison: 'apres-verification', depuis: t };
+    // (12 nov., intégration 5.372) Vinted : la prudence unique du compte (`poserPrudence`), posée juste après.
+    if (pf !== 'vinted') c.prudence = { jusqua: Math.max(Number(c.prudence && c.prudence.jusqua) || 0, t + SECU_PRUDENCE_MS.apresRobot), raison: 'apres-verification', depuis: t };
     leve = await secuEcrire(s);
   });
+  if (leve && pf === 'vinted') await poserPrudence(String(compte), 0, 'verification');
   if (leve) { logActivity(`✅ ${SECU_NOMS[pf] || 'Le site'} répond normalement : VRM reprend doucement (prudence jusqu'à ${secuHeure(Date.now() + SECU_PRUDENCE_MS.apresRobot)})`); await secuPublier(true); }
   return leve;
 }

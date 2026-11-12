@@ -82,9 +82,40 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 // tuile. Le moteur s'ouvre après « Choisir » ; « Retour » ramène à son étape « Choisir » (la
 // liste complète du compte), où l'annonce pivot est décochée : la suite du parcours est jugée
 // exactement comme avant (aucune règle du moteur n'a changé).
-async function moteurPar(pg, k) {
-  await pg.locator('[data-actions-ouvrir]').first().click();
+// (12 nov.) Depuis le lot AL (9 nov.), « Republier… » ouvre la VUE « Republier » (cocher, puis « Par VRM » /
+// « À la main ») ; la feuille « Actions » (quatre tuiles) vit dans la vue « Sélectionner ». Le banc entre donc
+// par « Sélectionner » pour juger les tuiles (build d'avant le lot AL : « Republier… » y menait).
+// (12 nov.) LE SUIVI COMMUN DES TRAVAUX (src/composants/SuiviTravail.jsx, posé après ce banc) : une file lancée
+// se suit dans SA feuille, au-dessus de tout (aria-modal), qui reste ouverte une fois finie (« Fermer ») ou en
+// pause (« Reprendre » / « Arrêter »). L'utilisateur la ferme pour revenir à l'écran : le banc fait le même geste,
+// là où le doigt le trouve, avant de toucher l'écran du dessous (jamais un clic forcé à travers).
+async function sortirDuSuivi(pg) {
+  for (let i = 0; i < 4; i++) {
+    const vis = async (sel) => { const l = pg.locator(sel); return (await l.count()) > 0 && await l.first().isVisible().catch(() => false); };
+    if (await vis('[data-suivi-fermer]')) { await pg.locator('[data-suivi-fermer]').first().click(); await pg.waitForTimeout(250); continue; }
+    if (await vis('[data-suivi-arreter]')) { await pg.locator('[data-suivi-arreter]').first().click(); await pg.locator('[data-suivi-arreter-oui]').first().click(); await pg.waitForTimeout(400); continue; }
+    return;
+  }
+}
+// L'atelier (voile) encore ouvert après sa file : sa croix « Fermer », comme lui, avant de revenir à Annonces.
+async function fermerAtelier(pg) {
+  await sortirDuSuivi(pg);
+  for (let i = 0; i < 3; i++) {
+    const x = pg.locator('.vrm-atelier-voile button[aria-label="Fermer"]').first();
+    if (!(await x.count()) || !(await x.isVisible().catch(() => false))) return;
+    await x.click(); await pg.waitForTimeout(250);
+    const oui = pg.locator('[role="alertdialog"] button, [data-confirm-ok]').filter({ hasText: /^(Fermer|Quitter|Oui.*)$/ }).first();
+    if (await oui.count() && await oui.isVisible().catch(() => false)) { await oui.click(); await pg.waitForTimeout(250); }
+  }
+}
+async function vueSelection(pg) {
+  await fermerAtelier(pg);
+  const sel = pg.locator('[data-vue-selection]').first();
+  if (await sel.count()) await sel.click(); else await pg.locator('[data-actions-ouvrir]').first().click();
   await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
+}
+async function moteurPar(pg, k) {
+  await vueSelection(pg);
   const etat = k === 'enLigne' ? 'brouillon' : 'en-ligne';
   const pivot = await pg.evaluate((e) => { const x = document.querySelector(`[data-selection-compte="111"] [data-selection-annonce][data-selection-etat="${e}"]:not([aria-disabled="true"])`); return x ? x.getAttribute('data-selection-annonce') : null; }, etat);
   await pg.evaluate(() => { for (const c of document.querySelectorAll('[data-selection-annonce] input:checked')) c.click(); });
@@ -166,6 +197,14 @@ const projette = (row, sel) => {
         await bouton.click();
         await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
         dit(await pg.locator('[data-actions-menu]').count() === 0, '« Republier… » mène à la vue « Sélectionner » (plus de second menu)');
+        // (12 nov., lot AL) La vue « Republier » : ses annonces EN LIGNE à cocher, puis « Par VRM » / « À la main ».
+        if (await pg.locator('[data-selection-vue="republier"]').count()) {
+          await pg.locator('[data-selection-annonce="9102"] input').check();
+          dit(await pg.locator('[data-republier-lancer="1"]').count() === 1 && await pg.locator('[data-republier-main-lancer="1"]').count() === 1 && await pg.locator('[data-selection-annonce][data-selection-etat="brouillon"]').count() === 0,
+            'vue « Republier » : une annonce en ligne cochée ⇒ « Par VRM · 1 » et « À la main · 1 », aucun brouillon proposé');
+          await pg.locator('[data-selection-annonce="9102"] input').uncheck();
+          await vueSelection(pg);
+        }
         await pg.locator('[data-selection-annonce="9102"] input').check();
         await pg.locator('[data-actions-possibles]').click();
         await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
@@ -362,12 +401,13 @@ const projette = (row, sel) => {
         const vuCr = await cr.waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
         const tcr = vuCr ? await cr.innerText() : '';
         dit(vuCr && await pg.locator('[data-cr-encours="9103"]').count() === 1 && /Création du brouillon/.test(tcr) && await pg.locator('[data-cr-restent="3"]').count() === 1, 'après un rechargement : le compte rendu dit la paire en cours (et son étape) et les 3 pas commencées', tcr.slice(0, 300));
+        await sortirDuSuivi(pg);
         await pg.locator('[data-cr-reprendre]').click().catch(() => {});
         const suiv = pg.locator('[data-republier-suivant]');
         await suiv.waitFor({ timeout: 4000 }).catch(() => {});
         dit(/\(3\)/.test(await suiv.innerText().catch(() => '')), '« Reprendre » rouvre Republier avec les 3 pas commencées déjà choisies', await suiv.innerText().catch(() => 'absent'));
         dit(!errs.length, 'aucune erreur d’app', errs[0]);
-      } catch (e) { dit(false, 'le scénario « Republier » a tourné', String(e.message).slice(0, 1500)); }
+      } catch (e) { dit(false, 'le scénario « Republier » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-' + vp.width + '.png') });
       await ctx.close();
     }
@@ -434,7 +474,7 @@ const projette = (row, sel) => {
         dit(e3.length === 1 && e3[0].cmd === 'recreerVinted' && e3[0].versBrouillon === true && e3[0].id === '9103', '… la commande est la recréation arrêtée au brouillon (versBrouillon)', JSON.stringify(e3));
         await fermer();
         // « Plus sur Vinted » : retiré de la liste, et « Les remettre ».
-        await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();   // (chantier C) « Voir mes brouillons » = « Un par un » de la vue Brouillons
+        await fermerAtelier(pg); await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();   // (chantier C) « Voir mes brouillons » = « Un par un » de la vue Brouillons
         await pg.locator('[data-brouillon="9202"] [data-brouillon-ecarter]').click();
         dit(await pg.locator('[data-brouillon="9202"]').count() === 0 && await pg.locator('[data-brouillons-ecartes="1"]').count() === 1, '« Plus sur Vinted » : le brouillon sort de la liste, et c’est dit');
         await pg.locator('[data-brouillons-remettre]').click();
@@ -442,7 +482,7 @@ const projette = (row, sel) => {
         const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
         dit(!errs.length, 'aucune erreur d’app', errs[0]);
-      } catch (e) { dit(false, 'le scénario « Actions » a tourné', String(e.message).slice(0, 300)); }
+      } catch (e) { dit(false, 'le scénario « Actions » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
       await ctx.close();
     }
     // ── Temps ALÉATOIRE entre deux paires (sa demande) : horloge simulée.
@@ -508,13 +548,15 @@ const projette = (row, sel) => {
         const env = await pg.evaluate(() => window.__repub || []);
         dit(env.length === 2 && env.every((x) => /^[a-z]$/.test(x.lettre || '')), 'chaque annonce part avec SA lettre (une seule lettre)', JSON.stringify(env.map((x) => x.lettre)));
         dit(env.length === 2 && env.every((x) => x.viaBrouillon === true), 'par défaut, chaque annonce passe par un brouillon Vinted puis est mise en ligne', JSON.stringify(env.map((x) => x.viaBrouillon)));
-      } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, 160)); }
+      } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
       await ctx.close(); }
     // ── (28 oct., sa demande) « un bouton pour refaire un brouillon raté » :
     //    sur la ligne ratée de Republier, et dans « Brouillons à refaire ».
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── brouillons à refaire · ${vp.width} px`);
-      const vieux = new Date(auj - 3600e3).toISOString(), recent = new Date(auj - 120e3).toISOString();
+      // (12 nov.) Datés au moment du SCÉNARIO, pas au lancement du banc : le banc dure plus de 10 min, et un
+      // passage « en cours » daté du lancement passait « interrompu » (la règle : plus de 10 min sans fin).
+      const vieux = new Date(Date.now() - 3600e3).toISOString(), recent = new Date(Date.now() - 120e3).toISOString();
       const vb = (o) => ({ corps: '{"draft":{}}', titre: 'Puma Suede bleu taille 42', prix: 55, at: vieux, majAt: vieux, uid: '111', publier: true, supprime: true, ...o });
       const rows2 = rows.concat([
         { id: 'coffre_111_9500', data: { id: '9500', uid: '111', title: 'Puma Suede', photos: [], versBrouillon: vb({ etat: 'a-refaire' }) } },
@@ -613,6 +655,7 @@ const projette = (row, sel) => {
         for (let i = 0; i < 40 && !(await pg.locator('[data-republier-refaire="9102"]').count()); i++) await pg.waitForTimeout(100);
         dit(await pg.locator('[data-republier-refaire="9102"]').count() === 1, '… et porte « Refaire le brouillon »');
         dit(/1 brouillon à refaire/.test(await pg.locator('[data-republier-bilan]').innerText().catch(() => '')), 'le bilan compte « 1 brouillon à refaire »');
+        await sortirDuSuivi(pg);
         await pg.locator('[data-republier-refaire="9102"]').click();
         await pg.getByRole('button', { name: 'Refaire le brouillon' }).last().click();
         for (let i = 0; i < 40 && (await l.getAttribute('data-republier-statut')) !== 'fait'; i++) await pg.waitForTimeout(100);
@@ -621,7 +664,7 @@ const projette = (row, sel) => {
         const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
         dit(!errs.length, 'aucune erreur d’app', errs[0]);
-      } catch (e) { dit(false, 'le scénario « à refaire » a tourné', String(e.message).slice(0, 300)); }
+      } catch (e) { dit(false, 'le scénario « à refaire » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
       await ctx.close();
     }
     // ── (28 oct.) L'extension ne répond pas à temps : « pas su », jamais « échec ».
@@ -683,6 +726,7 @@ const projette = (row, sel) => {
         dit(env.length === 1 && env[0].id === '9102', 'la paire suivante n’est PAS envoyée derrière', JSON.stringify(env.map((x) => x.id)));
         await pg.locator('[data-republier] [aria-label="Fermer"]').first().click().catch(() => {});
         await pg.waitForTimeout(300);
+        await fermerAtelier(pg);
         await pg.locator('[data-refaire-ouvrir]').first().click();
         await pg.locator('[data-refaire-liste]').waitFor({ state: 'visible', timeout: 4000 });
         await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').click();
@@ -692,7 +736,7 @@ const projette = (row, sel) => {
         dit(await lr.getAttribute('data-refaire-statut') === 'incertain', 'Brouillons à refaire, sans réponse : « pas su »', await lr.getAttribute('data-refaire-statut'));
         dit(await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').count() === 0, '… et AUCUN « Réessayer » (un second brouillon serait créé)');
         dit(!errs.length, 'aucune erreur d’app', errs[0]);
-      } catch (e) { dit(false, 'le scénario « sans réponse » a tourné', String(e.message).slice(0, 300)); }
+      } catch (e) { dit(false, 'le scénario « sans réponse » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }

@@ -24,6 +24,7 @@
 //  les exécute, et compare `cleNum` à celui de l'app.
 // ════════════════════════════════════════════════════════════════════════════
 
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 export const cleNum = (v) => {
   let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, '');
   if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
@@ -91,7 +92,7 @@ export function numeroDuTitreApresCoupure(numero, titre, mk, fiches) {
 // `url` est déjà portée par le vendeur (filtre d'owner posé par l'appelant).
 export async function lireMarqueur(url, headers) {
   try {
-    const r = await fetch(url, { headers });
+    const r = await fetchAvecDelai(url, { headers });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;

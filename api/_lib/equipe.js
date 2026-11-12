@@ -20,6 +20,7 @@
 // sans boutique arrive directement sur les colis de l'équipe. `null` = pas su.
 import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -45,7 +46,7 @@ const RAISONS = {
 const commeAppelant = (jeton) => ({ apikey: ANON, Authorization: `Bearer ${jeton}` });
 export async function rpcEquipe(nom, args, auth) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nom}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/${nom}`, {
       method: 'POST',
       headers: { ...auth, 'Content-Type': 'application/json' },
       body: JSON.stringify(args || {}),
@@ -61,7 +62,7 @@ export async function rpcEquipe(nom, args, auth) {
 
 async function aUneBoutique(jeton) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j.length > 0 : null;

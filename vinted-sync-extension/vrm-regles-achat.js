@@ -105,9 +105,11 @@ var __vrmReglesAchat = (() => {
   var c = (x) => Math.round(Number(x) * 100);
   var eurLu = (m) => m && typeof m === "object" && m.value != null && String(m.value).trim() !== "" && isFinite(Number(m.value)) && m.currency === "EUR" ? Number(m.value) : null;
   var jourOk = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(s);
-  function fraisParPlateforme({ releve, ebay, packs, de, a, excluAutre, R } = {}) {
+  function fraisParPlateforme({ releve, ebay, packs, de, a, excluAutre, R, vestiaire } = {}) {
     const P = {};
-    const site = (k) => P[k] || (P[k] = { plateforme: k, n: 0, nLus: 0, cBase: 0, cFrais: 0, cPacks: 0, nPacks: 0, baseLue: true, passu: false, commission: k === "eBay" || k === "Vestiaire" });
+    const site = (k) => P[k] || (P[k] = { plateforme: k, n: 0, nLus: 0, cBase: 0, cFrais: 0, cPacks: 0, nPacks: 0, cPrixLus: 0, baseLue: true, passu: false, commission: k === "eBay" || k === "Vestiaire" });
+    const vcParId = /* @__PURE__ */ new Map();
+    for (const v of Array.isArray(vestiaire) ? vestiaire : []) if (v && v.id != null) vcParId.set("vestiaire:" + String(v.id), v);
     const dans = (t) => Number.isFinite(t) && t >= de && t < a;
     if (Array.isArray(releve)) {
       for (const l of releve) {
@@ -122,7 +124,15 @@ var __vrmReglesAchat = (() => {
           continue;
         }
         S.cBase += c(l[4]);
-        if (plat === "Vestiaire") continue;
+        if (plat === "Vestiaire") {
+          const f = R && typeof R.fraisVc === "function" ? R.fraisVc(vcParId.get(String(l[2] || ""))) : { lu: false };
+          if (f.lu && f.cVerse === c(l[4])) {
+            S.nLus += 1;
+            S.cFrais += f.cFrais;
+            S.cPrixLus += f.cPrix;
+          }
+          continue;
+        }
         S.nLus += 1;
         S.cFrais += l[6] == null ? 0 : c(l[6]);
       }
@@ -157,7 +167,7 @@ var __vrmReglesAchat = (() => {
       const base = S.cBase / 100;
       const couverture = S.commission ? { lus: S.nLus, n: S.n } : null;
       const complet = !S.passu && S.baseLue && (!couverture || couverture.lus === couverture.n);
-      const pct = S.plateforme === "Vestiaire" || S.plateforme === "Autre" || !(S.cBase > 0) || S.passu || couverture && couverture.lus === 0 ? null : Math.round((S.cFrais + S.cPacks) / S.cBase * 1e3) / 10;
+      const pct = S.plateforme === "Vestiaire" ? S.passu || !S.nLus || !(S.cPrixLus > 0) ? null : Math.round(S.cFrais / S.cPrixLus * 1e3) / 10 : S.plateforme === "Autre" || !(S.cBase > 0) || S.passu || couverture && couverture.lus === 0 ? null : Math.round((S.cFrais + S.cPacks) / S.cBase * 1e3) / 10;
       return {
         plateforme: S.plateforme,
         n: S.n,
@@ -170,7 +180,7 @@ var __vrmReglesAchat = (() => {
         couverture,
         complet,
         passu: S.passu,
-        commissionPasLue: S.plateforme === "Vestiaire" && S.n > 0
+        commissionPasLue: S.plateforme === "Vestiaire" && S.n > 0 && S.nLus === 0
       };
     }).filter((s) => s.passu || s.n > 0 || s.options > 0).sort((x, y) => ORDRE.indexOf(x.plateforme) + 99 * (x.plateforme === "Autre") - (ORDRE.indexOf(y.plateforme) + 99 * (y.plateforme === "Autre")));
     return { sites, total: Math.round(sites.reduce((t, s) => t + (s.frais == null ? 0 : c(s.frais)), 0)) / 100, partiel: sites.some((s) => !s.complet || s.commissionPasLue) };

@@ -104,10 +104,21 @@ const PONT = ({ version }) => {
 };
 
 let ko = 0, ok = 0; const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d != null && d !== '' ? ' — ' + d : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 200)); } };
+const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, Number(process.env.BANC_ERR || 200))); } };
 const TAILLES = [{ nom: '390', vp: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, { nom: '1512', vp: { width: 1512, height: 950 } }]
   .filter((t) => !process.env.BANC_TAILLE || t.nom === process.env.BANC_TAILLE);
 
+// (12 nov.) Le geste là où il est TOUCHABLE : la feuille du suivi commun (SuiviTravail) d'abord, sinon celle de la
+// baisse (builds d'avant le suivi commun). « Arrêter » du suivi demande confirmation (2 touches).
+const visible = async (pg, sel) => { const l = pg.locator(sel); return (await l.count()) > 0 && await l.first().isVisible(); };
+async function fermerFin(pg) {
+  if (await visible(pg, '[data-suivi-fermer]')) { await pg.locator('[data-suivi-fermer]').first().click(); await pg.waitForTimeout(400); }
+  if (await visible(pg, '[data-bp-fermer-fin]')) { await pg.locator('[data-bp-fermer-fin]').first().click(); await pg.waitForTimeout(400); }
+}
+async function arreter(pg) {
+  if (await visible(pg, '[data-suivi-arreter]')) { await pg.locator('[data-suivi-arreter]').first().click(); await pg.locator('[data-suivi-arreter-oui]').first().click(); return; }
+  await pg.locator('[data-bp-arreter]').click();
+}
 async function page(b, T, { sombre = false, version = '5.336.0' } = {}) {
   const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
@@ -234,7 +245,10 @@ const attendreCmds = (pg, n) => pg.waitForFunction((k) => window.__cmds.length >
           dit(c.length === 2 && !c.some((x) => x.id === '900005' || x.id === '900002'), 'C7 aucune commande pour l’autre compte (900005) ni pour la décochée sous le plancher (900002)', JSON.stringify(c.map((x) => x.id)));
           dit(!ecrits.some((u) => /cmd_relais|vinted_offres_auto/.test(u)), 'C8 rien de programmé, aucun relais posé', ecrits.filter((u) => /cmd|offres/.test(u)).join(','));
           await capture(pg, `feuille-bilan-${suf}`);
-          await pg.locator('[data-bp-fermer-fin]').click(); await pg.waitForTimeout(400);
+          // (12 nov.) Depuis le suivi commun des travaux (src/composants/SuiviTravail.jsx), la série se suit dans
+          // SA feuille, posée PAR-DESSUS celle de la baisse (aria-modal) : « Fermer » est le sien. Le geste est
+          // joué là où le doigt le trouve, jamais par-dessous une feuille (un clic forcé mentirait).
+          await fermerFin(pg);
           q = await lireQD(pg);
           dit(q && q.lignes.every((x) => x.coche === '0'), 'C9 après la série, les cases sont décochées', q && JSON.stringify(q.lignes));
           const prixLigne = await pg.evaluate(() => { const e = document.querySelector('[data-qd-ligne="900001"]'); return e ? e.innerText.replace(/\s+/g, ' ') : ''; });
@@ -249,7 +263,7 @@ const attendreCmds = (pg, n) => pg.waitForFunction((k) => window.__cmds.length >
         const { ctx, pg, errs } = await page(b, T);
         await ouvrirQD(pg); await ouvrirFeuille(pg, ['900001', '900003']);
         await confirmer(pg); await attendreCmds(pg, 1); await pg.waitForTimeout(300);
-        await pg.locator('[data-bp-arreter]').click();
+        await arreter(pg);
         await relacher(pg, { accepte: true, etape: 'fait', ancien: 80, voulu: 75, prixVu: 75 });
         await pg.waitForSelector('[data-bp-bilan]', { timeout: 10000 }).catch(() => {});
         await pg.waitForTimeout(500);

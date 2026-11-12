@@ -217,13 +217,18 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   try { await f.ctx.storeHarvest('www.vinted.fr', 'profile', UID, JSON.stringify({ user: { id: 111, login: 'x' } })); } catch (_) {}
   await new Promise((ok) => setTimeout(ok, 30));
   const etat2 = (f.store.vrmSecu.comptes['vinted:' + UID]) || {};
-  dit(!etat2.robot && Number(etat2.prudence && etat2.prudence.jusqua) > Date.now(), 'E7 une lecture normale (sa page Vinted) lève l’arrêt ; une prudence le remplace', etat2);
+  // (12 nov., intégration 5.372) Vinted : UNE prudence par compte — celle de 5.357 (`vrmPrudence`, 24 h, 20/h) ;
+  // la sécurité des comptes n'en pose plus une seconde (`vrmSecu…prudence`).
+  const prU = (f.store.vrmPrudence || {})[UID] || {};
+  dit(!etat2.robot && Number(prU.jusqua) > Date.now() && !(etat2.prudence && Number(etat2.prudence.jusqua) > Date.now()), 'E7 une lecture normale (sa page Vinted) lève l’arrêt ; LA prudence du compte le remplace (une seule)', { etat2, prU });
   // Retry-After : le 429 qui demande 3 h ⇒ pause d'au moins 3 h (le palier dit 15 min) + prudence.
   f = monter({ reglages: { plateformes: { vinted: { repos: { actif: false } } } }, vinted: (q) => (/replies$/.test(q.chemin) ? { status: 429, body: {}, headers: { 'Retry-After': '10800' } } : { status: 200, body: {} }) });
   try { await f.ctx.executerPourApp({ method: 'POST', endpoint: '/api/v2/conversations/57/replies', uid: UID, body: { message: 'Re' } }, { origin: 'https://vrm.center' }); } catch (_) {}
   await new Promise((ok) => setTimeout(ok, 30));
   const pz = f.store.vrmPauseVinted || {};
-  const pr = ((f.store.vrmSecu.comptes || {})['vinted:' + UID] || {}).prudence || {};
+  const pr = (f.store.vrmPrudence || {})[UID] || {};   // (12 nov.) la prudence unique du compte (5.357)
+  const prSecu = ((f.store.vrmSecu.comptes || {})['vinted:' + UID] || {}).prudence || null;
+  dit(!(prSecu && Number(prSecu.jusqua) > Date.now()), 'E8 un 429 ne pose qu’UNE prudence (pas de seconde dans la sécurité des comptes)', prSecu);
   dit(Number(pz.jusqua) - Date.now() > 2.9 * 3600000 && Number(pr.jusqua) - Date.now() > 2.9 * 3600000, 'E8 Retry-After 3 h respecté (pause ≥ 3 h, palier 15 min) et prudence sur ce compte', { pause: pz.jusqua && Math.round((pz.jusqua - Date.now()) / 60000), prudence: pr.jusqua && Math.round((pr.jusqua - Date.now()) / 60000) });
   // Le plafond horaire est inchangé.
   const bgTxt = fs.readFileSync(SRC_BG, 'utf8');

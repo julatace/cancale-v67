@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ── LES NOTES REÇUES, COMPTE PAR COMPTE (3 nov.) — LECTURE SEULE ───────────
 // Julien : moyenne, nombre, dernières, celles sous 5 étoiles, par compte.
 // AUCUN rappel (il a refusé « rappel des évaluations à laisser » le 11 oct.).
@@ -68,7 +69,7 @@ export const evolutionHistorique = (hist, maintenant = Date.now()) => {
   }).filter(Boolean).sort((a, b) => a.t - b.t);
   if (pts.length < 2) return null;
   const a = pts[0], b = pts[pts.length - 1];
-  if (new Date(a.t).toISOString().slice(0, 10) === new Date(b.t).toISOString().slice(0, 10)) return null;
+  if (jourParis(a.t) === jourParis(b.t)) return null;   // (11 nov.) même jour À PARIS
   const nouveaux = a.total != null && b.total != null && b.total >= a.total ? b.total - a.total : null;
   return { depuis: a.t, jusqua: b.t, points: pts.length, nouveaux, moyAvant: a.moy, moyApres: b.moy };
 };

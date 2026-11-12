@@ -16,6 +16,14 @@
 //   · Vestiaire : la vente rangée ne garde que ce que Vestiaire VERSE
 //                 (`sellerEarning`) — la commission n'y est pas : « pas lue »,
 //                 dit, jamais devinée (prix − versé n'est pas rangé).
+//                 (11 nov. soir, Julien : « voir les frais que la plateforme prend ») :
+//                 depuis l'extension 5.340/5.364 la vente porte aussi le PRIX affiché
+//                 (`prixVente`, `sellerPrice`) ⇒ commission LUE = prix − versé, par la
+//                 règle `fraisVc` (api/_lib/vestiaire-regle.js, passée en `R.fraisVc` comme
+//                 `commandeEbayEngagee` : module sans import), vente par vente ; `vestiaire`
+//                 (les ventes rangées, `ventesVcDe`) est passé par l'appelant. Une vente
+//                 sans les deux reste « pas lue » et comptée dans la couverture ; le % est
+//                 calculé sur le PRIX des seules ventes aux frais lus.
 // Le « vendu » d'un site, base du %, est ce que l'acheteur a payé pour l'article
 // AVANT les frais du site : Vinted et Leboncoin le prix de vente ; eBay le dû
 // au vendeur (`totalDueSeller`, port exclu, §2.8) ; Vestiaire le versé (la
@@ -33,9 +41,12 @@ const jourOk = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
 // `releve` : les lignes de `vrm_stats_ventes` ([plateforme, compte, id, ts,
 // vente, achat, frais, …]) | null (pas publié) ; `ebay` : commandes | null ;
 // `packs` : `vrm_compta.packs` ; [de, a) en ms.
-export function fraisParPlateforme({ releve, ebay, packs, de, a, excluAutre, R } = {}) {
+export function fraisParPlateforme({ releve, ebay, packs, de, a, excluAutre, R, vestiaire } = {}) {
   const P = {};
-  const site = (k) => (P[k] || (P[k] = { plateforme: k, n: 0, nLus: 0, cBase: 0, cFrais: 0, cPacks: 0, nPacks: 0, baseLue: true, passu: false, commission: k === 'eBay' || k === 'Vestiaire' }));
+  const site = (k) => (P[k] || (P[k] = { plateforme: k, n: 0, nLus: 0, cBase: 0, cFrais: 0, cPacks: 0, nPacks: 0, cPrixLus: 0, baseLue: true, passu: false, commission: k === 'eBay' || k === 'Vestiaire' }));
+  // Vestiaire : les ventes rangées par leur identifiant (celui du relevé : `vestiaire:{id}`).
+  const vcParId = new Map();
+  for (const v of (Array.isArray(vestiaire) ? vestiaire : [])) if (v && v.id != null) vcParId.set('vestiaire:' + String(v.id), v);
   const dans = (t) => Number.isFinite(t) && t >= de && t < a;
 
   if (Array.isArray(releve)) {
@@ -48,7 +59,11 @@ export function fraisParPlateforme({ releve, ebay, packs, de, a, excluAutre, R }
       S.n += 1;
       if (l[4] == null || !isFinite(Number(l[4]))) { S.baseLue = false; continue; }
       S.cBase += c(l[4]);
-      if (plat === 'Vestiaire') continue;                         // commission pas lue
+      if (plat === 'Vestiaire') {                                 // commission LUE vente par vente, sinon pas lue
+        const f = R && typeof R.fraisVc === 'function' ? R.fraisVc(vcParId.get(String(l[2] || ''))) : { lu: false };
+        if (f.lu && f.cVerse === c(l[4])) { S.nLus += 1; S.cFrais += f.cFrais; S.cPrixLus += f.cPrix; }
+        continue;
+      }
       S.nLus += 1;
       S.cFrais += l[6] == null ? 0 : c(l[6]);
     }
@@ -86,11 +101,12 @@ export function fraisParPlateforme({ releve, ebay, packs, de, a, excluAutre, R }
     const complet = !S.passu && S.baseLue && (!couverture || couverture.lus === couverture.n);
     // Le % : seulement sur ce qu'on connaît des deux côtés (ventes aux frais lus),
     // et jamais pour Vestiaire (commission pas lue) ni sans vente.
-    const pct = S.plateforme === 'Vestiaire' || S.plateforme === 'Autre' || !(S.cBase > 0) || S.passu || (couverture && couverture.lus === 0) ? null
+    const pct = S.plateforme === 'Vestiaire' ? (S.passu || !S.nLus || !(S.cPrixLus > 0) ? null : Math.round((S.cFrais / S.cPrixLus) * 1000) / 10)
+      : S.plateforme === 'Autre' || !(S.cBase > 0) || S.passu || (couverture && couverture.lus === 0) ? null
       : Math.round(((S.cFrais + S.cPacks) / S.cBase) * 1000) / 10;
     return {
       plateforme: S.plateforme, n: S.n, base, frais: S.passu ? null : frais, commission: S.cFrais / 100, options: S.cPacks / 100, nOptions: S.nPacks,
-      pct, couverture, complet, passu: S.passu, commissionPasLue: S.plateforme === 'Vestiaire' && S.n > 0,
+      pct, couverture, complet, passu: S.passu, commissionPasLue: S.plateforme === 'Vestiaire' && S.n > 0 && S.nLus === 0,
     };
   }).filter((s) => s.passu || s.n > 0 || s.options > 0)
     .sort((x, y) => (ORDRE.indexOf(x.plateforme) + 99 * (x.plateforme === 'Autre')) - (ORDRE.indexOf(y.plateforme) + 99 * (y.plateforme === 'Autre')));

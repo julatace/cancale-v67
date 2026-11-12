@@ -65,7 +65,8 @@ import * as T from './transporteurs.js';
 import * as D from './depart-colis.js';
 import { envoyerNotifTransp, notifEncoreValable } from './transporteurs-notif.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
-import { ordreStable } from './ordre-stable.js';
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -135,7 +136,7 @@ const pauseConnue = (p) => {
 const pauseEnCours = (p, carrier) => T.enPause(pauseConnue(p), carrier, Date.now());
 async function lirePauseServeur() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${T.ID_PAUSE}&owner=eq.${PROPRIETAIRE_NEUTRE}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${T.ID_PAUSE}&owner=eq.${PROPRIETAIRE_NEUTRE}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -147,11 +148,13 @@ async function lireTout(chemin) {
   const owner = proprietaireCourant();
   if (!owner) return null;
   const out = []; const page = 1000;
-  for (let from = 0; from < 200000; from += page) {
+  for (let from = 0; ; from += page) {
+    if (from >= 200000) return null;   // (11 nov., familles-serveur) au plafond : « pas su », jamais une demi-liste
     let r;
     try {
-      r = await fetch(ordreStable(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
+      r = await fetchAvecDelai(ordreStable(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
     } catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
@@ -300,7 +303,7 @@ export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, si
     try {
       const signaux = [AbortSignal.timeout(Math.min(_delaiMs, reste))];
       if (signal) signaux.push(signal);
-      const r = await fetch(url, {
+      const r = await fetchAvecDelai(url, {
         redirect: 'error',
         signal: signaux.length > 1 && typeof AbortSignal.any === 'function' ? AbortSignal.any(signaux) : signaux[0],
         headers: { 'User-Agent': UA_HONNETE, ...(ENTETES[carrier] || { Accept: 'application/json' }) },

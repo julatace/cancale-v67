@@ -39,6 +39,7 @@ const MUTATIONS = {
 async function charger(srcP = SRC_P, srcH = SRC_H, srcL = SRC_L) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-'));
   fs.writeFileSync(path.join(dir, 'ligneCas.mjs'), srcL);
+  fs.copyFileSync(path.join(R, 'src', 'fusionNuage.js'), path.join(dir, 'fusionNuage.js'));   // (12 nov.) importé par ligneCas.js (ecrireDifference)
   fs.writeFileSync(path.join(dir, 'p.mjs'), srcP.replace("from './ligneCas.js'", "from './ligneCas.mjs'"));
   fs.writeFileSync(path.join(dir, 'h.mjs'), srcH.replace("from './ligneCas.js'", "from './ligneCas.mjs'"));
   try { return { P: await import(pathToFileURL(path.join(dir, 'p.mjs')).href), H: await import(pathToFileURL(path.join(dir, 'h.mjs')).href) }; }

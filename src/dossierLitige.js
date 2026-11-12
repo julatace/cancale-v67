@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // LE DOSSIER DE LITIGE EN UN PDF (10 nov., lot BJ)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -28,7 +29,7 @@ const str = (v) => String(v == null ? '' : v).trim();
 const _jour = (() => { try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return null; } })();
 const _heure = (() => { try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }); } catch (_) { return null; } })();
 const ms = (v) => { if (typeof v === 'number') return Number.isFinite(v) && v > 1e11 ? v : null; const t = Date.parse(str(v)); return Number.isFinite(t) ? t : null; };
-export const jourDossier = (v) => { const t = ms(v); if (t == null) return ''; try { return _jour ? _jour.format(new Date(t)) : new Date(t).toISOString().slice(0, 10); } catch (_) { return ''; } };
+export const jourDossier = (v) => { const t = ms(v); if (t == null) return ''; try { return _jour ? _jour.format(new Date(t)) : jourParis(t); } catch (_) { return ''; } };
 const jourHeure = (v) => { const t = ms(v); if (t == null) return ''; const j = jourDossier(t); try { return _heure ? `${j}, ${_heure.format(new Date(t))}` : j; } catch (_) { return j; } };
 const NOM_PLATEFORME = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective' };
 
@@ -75,7 +76,7 @@ export function contenuDossierLitige({ carte, vente = null, compte = '', frise =
 export function nomFichierDossier(contenu, maintenant = Date.now()) {
   const n = str(contenu && contenu.num).replace(/[^A-Za-z0-9]+/g, '') || 'sans-numero';
   let d = '';
-  try { d = new Date(maintenant).toISOString().slice(0, 10); } catch (_) {}
+  try { d = jourParis(maintenant); } catch (_) {}
   return `dossier-litige-${n}${d ? '-' + d : ''}.pdf`;
 }
 

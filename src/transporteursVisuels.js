@@ -67,7 +67,10 @@ export const DESSINS_TRANSPORTEURS = Object.freeze({
   // bordereaux Chronopost (relevé sur une vraie étiquette, retournée à l'endroit) : un cube en hexagone,
   // couvercle entrouvert — la fente gauche et la verticale jusqu'au bas, la droite arrêtée aux deux tiers.
   // Encre noire sur blanc, comme sur l'étiquette.
-  chronopost: { fond: '#FFFFFF', svg: CUBE_CHRONOPOST },
+  // (12 nov., finitions — Julien, capture iPhone : le cube noir sur blanc « ressemble au cube générique », il croyait ses
+  // Chronopost rangés avec Mondial Relay) Le colis Chronopost qu'on va CHERCHER est un colis Chronopost Pickup : le cube
+  // du bordereau, sur le JAUNE Pickup de ses e-mails et de ses points. Shop2Shop garde sa tuile blanche.
+  chronopost: { fond: '#FFD200', svg: CUBE_CHRONOPOST },
   colissimo: { fond: '#FFD100', svg: `<path d="M6 21.5c3.5 3.3 10.5 4 16 .2" fill="none" stroke="#1D2C5E" stroke-width="1.6" stroke-linecap="round"/><text x="16" y="18.2" text-anchor="middle" fill="#1D2C5E" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="9.4" letter-spacing="-0.4" textLength="26" lengthAdjust="spacingAndGlyphs">colissimo</text>` },
   // (11 nov., lot DJ3) « InPost » = Mondial Relay en France : le logo du bordereau (une ancienne clé rangée).
   inpost: { fond: '#C8105F', svg: `<circle cx="15.2" cy="7.7" r="2.5" fill="#FFFFFF"/><path d="M10 28.8V19.6A7 7 0 0 1 17 12.6H19.6V17.2H17.4A2.6 2.6 0 0 0 14.8 19.8V26.6Z" fill="#FFFFFF"/><rect x="19.6" y="12.6" width="4.8" height="4.6" fill="#F4B9CC"/>` },
@@ -86,7 +89,7 @@ export const PAS_LU = 'Transporteur inconnu';  // (3 nov., critique #15) des mot
 // Couleurs : celles que chaque transporteur montre sur ses colis et ses points (repères
 // publics), jamais son dessin. `logos` reste (vide) pour les anciens appelants.
 export const TRANSPORTEURS = Object.freeze({
-  chronopost:   { nom: 'Chronopost',    logos: [], marque: { fond: '#FFFFFF', encre: '#1C0A1C', sigle: 'CH' } },
+  chronopost:   { nom: 'Chronopost',    logos: [], marque: { fond: '#FFD200', encre: '#1C0A1C', sigle: 'CH' } },
   mondialrelay: { nom: 'Mondial Relay', logos: [], marque: { fond: '#C8105F', encre: '#FFFFFF', sigle: 'MR' } },
   colissimo:    { nom: 'Colissimo',     logos: [], marque: { fond: '#FFD100', encre: '#1D2C5E', sigle: 'CO' } },
   vinted:       { nom: 'Vinted Go',     logos: [], marque: { fond: '#007782', encre: '#FFFFFF', sigle: 'VG' } },

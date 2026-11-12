@@ -40,6 +40,7 @@ import { calculerBilan, minuitParis, dateParis } from './bilan-semaine.js';
 import { beneficeDesJours } from './benefice-regle.js';
 import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
 import { sbCle } from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const SITE = 'https://vrm.center';
 export const ID_CHOIX = 'bilan_mois_choix';
@@ -231,7 +232,7 @@ async function ligne(owner, id) {
   const service = process.env.SUPABASE_SERVICE_KEY || '';
   if (!service || !UUID.test(String(owner || ''))) return undefined;
   try {
-    const r = await fetch(`${URL_BASE()}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&id=eq.${id}&select=data&limit=1`, { headers: { ...sbCle(service) } });
+    const r = await fetchAvecDelai(`${URL_BASE()}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&id=eq.${id}&select=data&limit=1`, { headers: { ...sbCle(service) } });
     if (!r.ok) return undefined;
     const j = await r.json();
     if (!Array.isArray(j)) return undefined;
@@ -245,7 +246,7 @@ export async function ecrireChoixBilan(owner, actif) {
   const service = process.env.SUPABASE_SERVICE_KEY || '';
   if (!service || !UUID.test(String(owner || '')) || typeof actif !== 'boolean') return false;
   try {
-    const r = await fetch(`${URL_BASE()}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${URL_BASE()}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify([{ owner: String(owner).toLowerCase(), id: ID_CHOIX, data: { actif, at: new Date().toISOString() } }]),

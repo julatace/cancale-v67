@@ -17,7 +17,7 @@ import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
-import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -28,6 +28,8 @@ import { DEMANDE_INVENTAIRE_ANNUEL } from "../inventaireAnnuel.js";   // (11 nov
 const BANDE_MAX = 60;   // la bande « À ranger » (pire cas, 11 nov.)
 import { figerAttendu, ecrireAttendu } from "../inventaireHorsLigne.js";
 import { motsVendeur } from '../profilVendeur.js';
+import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
+import { planSynchroInventaire, relierProposition } from "../inventaireSynchro.js";   // (11 nov.) synchro par identité
 
 // ⟦← App.jsx #3⟧
 
@@ -799,7 +801,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const L = lignes(cles);
         const csv = csvDe(['N°', 'Article', 'État', 'Meuble', 'Rangée', 'Colonne'], L.map((f) => { const ou = ouEst(f); return [f.numero, f.title || '', rangeeEtat(f) === 'vendue' ? 'vendue à sortir' : 'plus en ligne', ou ? ou.meuble.name : '', ou ? ou.rangee : '', ou ? ou.colonne : '']; }));
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a');
-        a.href = url; a.download = `stock-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+        a.href = url; a.download = `stock-${jourParis()}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
         return resumeSerie({ faits: L, pasFaits: [] }, { un: `${motsVendeur().nom} exporté${motsVendeur().e}`, plusieurs: `${motsVendeur().noms} exporté${motsVendeur().es}` });
       } },
     ];
@@ -1444,7 +1446,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   const [search,setSearch]=useState('');
 
   // Normalise un numéro (string, trim)
-  const norm=(v)=>String(v||'').trim();
+  const norm=(v)=>cleNum(v);   // (11 nov., famille « N° par cleNum ») « 007 » au garage = « 7 » en ligne
 
   // Ajoute un numéro à l'unité
   const addOne=()=>{
@@ -1519,7 +1521,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   },[stockVinted,search]);
 
   return (
-    <div>
+    <div style={{padding:16}}>
       <ScreenHead icon="tag" title={`Stock Vinted (${stockVinted.length})`}
         desc="L'ancienne liste des numéros en ligne."
         right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:12,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
@@ -1539,9 +1541,9 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           onKeyDown={e=>{ if(e.key==='Enter') addOne(); }}
           placeholder="N° de l'annonce (ex : 1908)"
           inputMode="numeric"
-          style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:15}}
+          style={{flex:1,minWidth:0,boxSizing:'border-box',padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:15}}
         />
-        <button type="button" onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
+        <button type="button" onClick={addOne} style={{flexShrink:0,background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
           Ajouter
         </button>
       </div>
@@ -1694,16 +1696,16 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const garageNums = useMemo(() => {
     const s = new Set();
     Object.values(garageGrid || {}).forEach(arr => {
-      if (Array.isArray(arr)) arr.forEach(v => { const t = (v||'').trim().toLowerCase(); if (t) s.add(t); });
+      if (Array.isArray(arr)) arr.forEach(v => { const t = cleNum(v); if (t) s.add(t); });
     });
     return s;
   }, [garageGrid]);
-  const inGarage = (numero) => !!numero && garageNums.has(String(numero).trim().toLowerCase());
+  const inGarage = (numero) => !!numero && garageNums.has(cleNum(numero));   // (11 nov.) par cleNum
 
   const accName = (accId) => (labels && labels[accId]) || accounts.find(a=>a.vinted_user_id===accId)?.login || `Compte #${accId}`;
 
   const numeroExists = (numero, exceptId=null) =>
-    inventory.some(p => String(p.numero).trim().toLowerCase() === String(numero).trim().toLowerCase() && p.id !== exceptId);
+    inventory.some(p => cleNum(p.numero) && cleNum(p.numero) === cleNum(numero) && p.id !== exceptId);   // (11 nov.) « 007 » = « 7 » (cleNum, §5)
 
   const addPair = () => {
     const numero = addForm.numero.trim();
@@ -1749,7 +1751,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const associate = (acc, listing) => {
     const numero = String(importNums[listing.id] || '').trim();
     if (!numero) { toast('Indique le numéro à associer à cette annonce.'); return; }
-    const existing = inventory.find(p => String(p.numero).trim().toLowerCase() === numero.toLowerCase());
+    const existing = inventory.find(p => cleNum(p.numero) && cleNum(p.numero) === cleNum(numero));
     if (existing) {
       // On sauvegarde le titre EXACT de l'annonce : c'est ce même titre qui
       // reviendra dans la commande vendue, et qui permettra de retrouver le
@@ -1776,14 +1778,12 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const syncSalesFromVinted = async () => {
     if (accounts.length === 0) { setSyncResult({ msg:'Aucun compte Vinted lié.' }); return; }
     setSyncing(true); setSyncResult(null);
-    // Matching par TITRE : les annonces Vinted n'exposent pas d'id d'article
-    // dans les commandes, seulement le titre exact. On a sauvegardé ce titre
-    // sur chaque paire au moment de l'association -> on relie ainsi la vente au
-    // numéro sans dépendre d'un "nXX" dans le titre.
-    const byTitle = new Map();
-    inventory.forEach(p => { const k = normTitle(p.title); if (k) byTitle.set(k, p); });
-    const updates = new Map(); // id -> patch
-    let sold = 0, pending = 0, scanned = 0;
+    // (11 nov., revue robustesse) PAR IDENTITÉ seulement (§5) : n° de transaction
+    // posé sur la paire, ou transaction → identifiant d'annonce (Vinted). Un titre
+    // identique n'est qu'une PROPOSITION, reliée par SON clic (src/inventaireSynchro.js).
+    const itemDeTx = await fetchTxnItemIds();
+    const toutes = [];
+    let scanned = 0;
     for (const acc of accounts) {
       // Priorité aux ventes moissonnées par l'extension (aucun appel Vinted).
       // Sinon repli sur le proxy (jusqu'à 3 pages).
@@ -1800,37 +1800,25 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           if (!res.pagination || page >= (res.pagination.total_pages || 1)) break;
         }
       }
-      for (const orders of pages) {
-        scanned += orders.length;
-        for (const o of orders) {
-          const cls = classifyOrderStatus(o.status);
-          const pair = byTitle.get(normTitle(o.title));
-          if (!pair) continue;
-          const base = {
-            transactionId: o.transaction_id || pair.transactionId || null,
-            photo: pair.photo || orderPhoto(o) || null,
-            price: pair.price ?? (o.price?.amount != null ? Number(o.price.amount) : null),
-            vintedAccountId: pair.vintedAccountId || acc.vinted_user_id,
-          };
-          if (cls === 'completed') {
-            // Vente FINALISÉE = argent reçu -> on la comptabilise.
-            if (pair.status !== 'sold') { updates.set(pair.id, { ...base, status:'sold', soldAt: o.date ? new Date(o.date).toLocaleDateString('fr-FR') : tod() }); sold++; }
-          } else if (cls === 'cancelled') {
-            // Annulée/remboursée : si on l'avait mise "en cours", on la remet en ligne.
-            if (pair.status === 'pending_sale') updates.set(pair.id, { status:'online' });
-          } else {
-            // Vente en cours (expédiée, en acheminement...) : on l'affiche mais on
-            // NE la compte PAS tant que l'acheteur n'a pas validé (argent reçu).
-            if (pair.status === 'online' || pair.status === 'stock') { updates.set(pair.id, { ...base, status:'pending_sale' }); pending++; }
-          }
-        }
-      }
+      for (const orders of pages) { scanned += orders.length; for (const o of orders) if (o) toutes.push({ ...o, _uid: acc.vinted_user_id }); }
     }
+    const plan = planSynchroInventaire({ inventaire: inventory, commandes: toutes, itemDeTx, classer: classifyOrderStatus, normTitre: normTitle, photoDe: orderPhoto });
+    const updates = plan.maj, sold = plan.sold, pending = plan.pending;
+    setPropositions(plan.propositions);
     if (updates.size > 0) {
       persist(inventory.map(p => updates.has(p.id) ? { ...p, ...updates.get(p.id) } : p));
     }
     setSyncing(false);
-    setSyncResult({ sold, pending, scanned });
+    setSyncResult({ sold, pending, scanned, annulees: plan.annulees, propositions: plan.propositions.length });
+  };
+  // SON clic relie une proposition (même titre, sans identité) à UNE paire.
+  const [propositions, setPropositions] = useState([]);
+  const relierProp = (prop, pairId) => {
+    const p = inventory.find(x => x.id === pairId);
+    const patch = relierProposition(prop, p);
+    if (!patch) return;
+    persist(inventory.map(x => x.id === pairId ? { ...x, ...patch } : x));
+    setPropositions(l => l.filter(x => x.tx !== prop.tx));
   };
 
   const filtered = useMemo(() => {
@@ -1883,7 +1871,21 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             ? syncResult.msg
             : ((syncResult.sold + syncResult.pending) > 0
                 ? `✅ ${syncResult.sold} vente(s) finalisée(s) comptée(s)${syncResult.pending?`, ${syncResult.pending} en cours (non comptée(s), en attente de validation)`:''} — sur ${syncResult.scanned} commandes analysées.`
-                : `Aucune vente à reporter (${syncResult.scanned} commandes analysées). Chaque article doit avoir le même titre que son annonce Vinted (via « Importer mes annonces »).`)}
+                : `Aucune vente à reporter (${syncResult.scanned} commandes analysées).`)}
+          {syncResult.annulees ? ` ${syncResult.annulees} vente(s) annulée(s) : ${motsVendeur().le} revient en stock.` : ''}
+        </div>
+      )}
+      {propositions.length > 0 && (
+        <div data-inv-propositions={propositions.length} style={{display:'flex',flexDirection:'column',gap:8,marginBottom:12,padding:'10px 12px',borderRadius:12,background:C.surface,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Même titre, sans preuve : à toi de relier</div>
+          {propositions.map(prop => (
+            <div key={prop.tx} data-inv-proposition={prop.tx} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6,fontSize:13,color:C.text}}>
+              <span style={{flex:'1 1 160px',minWidth:0}}>{prop.titre}{prop.finalisee ? ' · vendue' : ' · en cours'}</span>
+              {prop.paires.map(id => { const p = inventory.find(x => x.id === id); return p ? (
+                <button key={id} type="button" data-inv-relier={id} onClick={()=>relierProp(prop, id)} style={{minHeight:44,padding:'0 12px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>C'est la N°{p.numero}</button>
+              ) : null; })}
+            </div>
+          ))}
         </div>
       )}
 

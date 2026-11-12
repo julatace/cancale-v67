@@ -415,7 +415,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     ? ok('avant l\'arrivée du nuage, le registre vaut « pas su » (rien n\'est déplacé sur un appareil neuf)')
     : nok('le registre attend le nuage', 'lu au montage sans garde');
   const defD = (() => { const i = SRC.indexOf('const declarables = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf(']);', i)); })();
-  /declare: declUrssaf/.test(defD) && /\bdeclUrssaf$/.test(defD.trim())
+  /declare: declUrssaf/.test(defD) && /\[[^\]]*\bdeclUrssaf\b[^\]]*$/.test(defD.trim())   // (12 nov.) dans les dépendances (« vendu ailleurs » suit)
     ? ok('la règle commune (tableau de bord, mensuel, annuel) reçoit le registre et se recalcule quand il change')
     : nok('la règle commune reçoit le registre', 'declare absent du memo declarables');
   // Jamais l'app ne coche « déclaré » à sa place : on n'écrit QUE dans les deux
@@ -523,7 +523,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   // Constat 3 — on ne note pas une déclaration sur une lecture incomplète.
   essaie('la lecture complète', () => {
     const L = c.lectureIncomplete;
-    const base = { registre: {}, ventes: [], ventesErreur: false, comptesEchec: [], versements: {}, lbc: true, ebay: [] };
+    const base = { registre: {}, ventes: [], ventesErreur: false, comptesEchec: [], versements: {}, lbc: true, ebay: [], vestiaire: [] };
     L(base) === null
       ? ok('tout est lu ⇒ rien ne bloque (l\'autre sens : le geste reste possible)')
       : nok('tout est lu ⇒ rien ne bloque', JSON.stringify(L(base)));
@@ -536,6 +536,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       ['Leboncoin illisible', { lbc: null }, 'rates'],
       ['eBay illisible', { ebay: null }, 'rates'],
       ['registre pas encore chargé', { registre: null }, 'enCours'],
+      // (11 nov., revue robustesse) Vestiaire raté ⇒ « pas su », jamais une liste vide.
+      ['Vestiaire illisible', { vestiaire: null }, 'rates'],
+      ['Vestiaire en cours', { vestiaire: undefined }, 'enCours'],
     ];
     const rates = cas.filter(([, d, ou]) => { const r = L({ ...base, ...d }); return !(r && r[ou] && r[ou].length); }).map(([n]) => n);
     rates.length === 0
@@ -547,6 +550,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   iGarde > 0 && iEcrit > iGarde && /if \(manque\b[^\n]*return; \}/.test(geste)
     ? ok('le GESTE refuse lui-même avant d\'écrire (pas seulement le bouton) : une lecture peut tomber formulaire ouvert')
     : nok('declarerMois refuse une lecture incomplète avant d\'écrire', 'garde absente ou après l\'écriture');
+  /lectureIncomplete\(\{[^}]*vestiaire:\s*ventesVc\b/.test(geste)
+    ? ok('le geste passe la lecture Vestiaire telle quelle (null = pas su, jamais [])')
+    : nok('le geste passe la lecture Vestiaire à la garde', 'vestiaire absent de lectureIncomplete dans declarerMois');
   /data-decl-ouvrir disabled=\{!!report\.incomplet\}/.test(SRC)
     ? ok('le bouton « J\'ai déclaré ce mois » est grisé par la même règle')
     : nok('le bouton est grisé par la même règle');
@@ -560,7 +566,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     const run = (declarables, lbcLu, ebayCmd) => {
       // (1er nov.) + `ventesVc` (les ventes Vestiaire, lues à part) : aucune ici.
       c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {}, ventesVc: [], excluAutre: null, ventesImp: [] };   // (11 nov.) + les ventes importées (Paramètres → Importer) : aucune ici   // (3 nov.) aucun compte d'un autre site écarté
-      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf, ventesVc, excluAutre, ventesImp } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; return (${corps})(); })()`, c);
+      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf, ventesVc, excluAutre, ventesImp } = __arg; const datesLbc = {}; const avecDatesLbc = (v) => v; const ventesAilleursDe = () => []; /* (12 nov.) « vendu ailleurs » : aucune ici */ return (${corps})(); })()`, c);
     };
     const EB = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: '2026-10-03T10:00:00.000Z', pricingSummary: { total: { value: '72.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '66.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' } }];
     const pasSu = run(null, true, EB);
@@ -684,8 +690,9 @@ enDur.length
   ? ok("les mois à venir ne se déclarent pas")
   : nok("les mois à venir ne se déclarent pas");
 
-(/let nMasq=0, caMasq=0, nAttente=0, caAttente=0;/.test(SRC) &&
- /nAttente\+=1;\s*caAttente\+=montantCommande\(o\);/.test(SRC))
+// (12 nov., revue fin) le prix lu (`montantCommandeLu`) : pas lu ⇒ compté à part (« au moins »), jamais 0 €.
+(/let nMasq=0, caMasq=0, nAttente=0, caAttente=0, caAttentePasLu=0;/.test(SRC) &&
+ /nAttente\+=1;\s*const m = montantCommandeLu\(o\); if \(m == null\) caAttentePasLu\+=1; else caAttente\+=m;/.test(SRC))
   ? ok("les ventes du mois pas encore finalisées sont comptées (montantCommande : le prix est un objet)")
   : nok("les ventes du mois pas encore finalisées sont comptées");
 
@@ -697,7 +704,7 @@ enDur.length
   ? ok("elles sont annoncées dans la modale, avec leur montant")
   : nok("elles sont annoncées dans la modale");
 
-(/L\.push\(\[`Ventes de ce mois pas encore finalisees \(hors CA\)`/.test(SRC) &&
+(/L\.push\(\[`Ventes de ce mois pas encore finalisees \(hors CA\)/.test(SRC) &&
  /kv\('Ventes de ce mois pas encore finalisees \(hors CA\)'/.test(SRC))
   ? ok("le CSV et le PDF emportent la réserve avec eux")
   : nok("le CSV et le PDF emportent la réserve");

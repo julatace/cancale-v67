@@ -22,6 +22,7 @@
 
 import { createHash } from 'node:crypto';
 import { evenementsJournalModeration, SELECT_MODERATION } from '../../src/moderationVinted.js';   // (11 nov., 5.350)
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -93,7 +94,7 @@ async function rpc(base, cle, nom, corps, f) {
 // `deps` : { base, cle, user:{id}, jeton, methode, corps, fetch }.
 export async function traiterAppareils(deps) {
   const { base, cle, user, jeton, methode, corps } = deps;
-  const f = deps.fetch || fetch;
+  const f = deps.fetch || fetchAvecDelai;
   if (!user || !UUID.test(String(user.id || ''))) return { status: 401, body: { erreur: 'session' } };
   if (!cle) return { status: 503, body: { erreur: 'non-configure', message: "La liste des appareils n'est pas branchée sur le serveur." } };
   const ici = sessionDuJeton(jeton);

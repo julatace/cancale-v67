@@ -109,7 +109,7 @@ export function CaseSerie({ serie, cle, etiquette, surPhoto = false }) {
   const k = String(cle);
   const on = serie.estCoche(k);
   return (
-    <label className={surPhoto ? 'vrm-serie-case vrm-serie-case-photo' : 'vrm-serie-case'} data-serie-case={k} data-serie-actif={serie.actif ? '1' : '0'} onClick={(e) => e.stopPropagation()}>
+    <label className={surPhoto ? 'vrm-serie-case vrm-serie-case-photo' : 'vrm-serie-case'} data-serie-case={k} data-serie-on={on ? "1" : "0"} data-serie-actif={serie.actif ? '1' : '0'} onClick={(e) => e.stopPropagation()}>
       <input type="checkbox" checked={on} aria-label={etiquette ? `Sélectionner ${etiquette}` : 'Sélectionner cette ligne'}
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); serie.cocher(k, e); }} onChange={() => {}}/>
     </label>

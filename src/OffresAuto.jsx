@@ -37,6 +37,7 @@ import AutresVersions from './AutresVersions.jsx';
 // (intégration g1) prix-mini (textes par tr) × vocabulaire-article (« paire » seulement pour un vendeur
 // Sneakers) : les clés qui nomment l'article ont une variante `.art`, choisie par le vocabulaire du vendeur.
 const tv = (k, p) => tr(motsVendeur().nom === 'paire' ? k : k + '.art', p);
+import { erreurMessageAuto } from './messageSur.js';
 
 const PAR_PAGE = 30;
 const quand = (t) => {
@@ -245,6 +246,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
         <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder={tr('oa.refus.vide')} aria-label={tr('oa.refus.label')}/>
         {/* (12 nov., ext. 5.369) Ses autres versions : une au hasard, jamais celle du refus précédent. */}
         {setRefusVariantes ? <AutresVersions nom="refus" premier={refusMsg} variantes={refusVariantes} onChange={setRefusVariantes} extOk={variantesOk}/> : null}
+        {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{ margin: '6px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--vrm-warn, #B25000)' }}>{erreurMessageAuto(refusMsg)}</p> : null}
       </div>
     </section>
   );

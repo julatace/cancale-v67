@@ -107,11 +107,12 @@ async function ouvrir(b, vp, { version = '5.318.0', suite = 'fait', appris = tru
       await pg.fill('[data-lbc-repondre] textarea', 'Oui, Mondial Relay, envoi demain.');
       await pg.screenshot({ path: path.join(CAP, `lbc-repondre-${vp.width}-${sombre ? 'sombre' : 'clair'}.png`), fullPage: false });
       await pg.click('[data-lbc-envoyer]');
-      await pg.waitForSelector('[data-lbc-resultat]', { timeout: 8000 }).catch(() => {});
-      const apres = await pg.evaluate(() => ({ cmds: window.__cmds, res: document.querySelector('[data-lbc-resultat]') ? document.querySelector('[data-lbc-resultat]').getAttribute('data-lbc-resultat') : null, t: (document.querySelector('[data-lbc-resultat]') || {}).textContent || '' }));
+      // (12 nov.) « Envoyé ✓ » est dit SOUS la bulle, dans le fil (data-envoi="ok"), plus au-dessus du champ.
+      await pg.waitForSelector('.vrm-chat-panel [data-envoi="ok"]', { timeout: 8000 }).catch(() => {});
+      const apres = await pg.evaluate(() => ({ cmds: window.__cmds, res: document.querySelector('.vrm-chat-panel [data-envoi="ok"]') ? 'ok' : null, t: (document.querySelector('.vrm-chat-panel [data-envoi]') || {}).textContent || '', dessus: !!document.querySelector('[data-lbc-resultat]') }));
       const cmds = apres.cmds.map((x) => JSON.parse(x)).filter((x) => x.cmd === 'lbcRepondre');
       dit(cmds.length === 1 && cmds[0].conv === CONV && cmds[0].texte === 'Oui, Mondial Relay, envoi demain.', `${L} : UNE commande \`lbcRepondre { conv, texte }\`, sur SON clic`, JSON.stringify(cmds));
-      dit(apres.res === 'ok' && /Envoyé sur Leboncoin/.test(apres.t), `${L} : le résultat est dit`, apres.t);
+      dit(apres.res === 'ok' && /Envoyé ✓/.test(apres.t) && !apres.dessus, `${L} : le résultat est dit sous la bulle, une seule fois`, apres.t);
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(r.sw <= r.cw + 1, `${L} : aucun débordement horizontal`, `${r.sw} > ${r.cw}`);
       dit(errs.length === 0, `${L} : aucune erreur d’app`, errs.join(' | ').slice(0, 160));

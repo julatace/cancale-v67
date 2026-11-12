@@ -32,7 +32,10 @@ export function useLignesActions(uid, actif = true) {
     const minuteur = setInterval(lire, 60000);
     const auRetour = () => { if (document.visibilityState === 'visible') lire(); };
     document.addEventListener('visibilitychange', auRetour);
-    return () => { mort = true; clearInterval(minuteur); document.removeEventListener('visibilitychange', auRetour); };
+    // (11 nov., temps réel) La veille a vu la ligne de jauge de ce compte changer (src/tempsReel.js).
+    const neuf = (e) => { const d = e && e.detail; if (d && Array.isArray(d.quoi) && d.quoi.some((q) => q.quoi === 'jauge' && (!uid || String(q.uid) === String(uid)))) lire(); };
+    window.addEventListener('vrm:neuf', neuf);
+    return () => { mort = true; clearInterval(minuteur); document.removeEventListener('visibilitychange', auRetour); window.removeEventListener('vrm:neuf', neuf); };
   }, [uid, actif]);
   return [rows, maintenant];
 }

@@ -73,5 +73,7 @@ import './styles-barre-iphone.css';
 import './styles-lisible.css';
 // (8 nov.) Les écrans gardés (src/ecransGardes.jsx) et le passage d'un onglet à l'autre (fondu, pastille de la barre).
 import './styles-ecrans-gardes.css';
+// (11 nov.) Messages plus naturel et simple (liste, fil, réponses rapides, fiche) — le dernier mot sur Messages seul.
+import './styles-messages-naturel.css';
 // Les composants partagés gardent le dernier mot sur la coque.
 import './styles-composants.css';

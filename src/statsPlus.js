@@ -26,6 +26,7 @@
 
 import { classementRapporte } from './ceQuiRapporte.js';
 import { ecartPct } from './statsVentes.js';
+import { moisParis } from './dateParis.js';
 
 export const MIN_DONNEES = 3;
 const cents = (v) => Math.round(Number(v) * 100);
@@ -133,7 +134,7 @@ export const venduEtRecu = (barres, recuEntre) => {
 // de `MIN_DONNEES` ventes classables ⇒ `pasAssez`, jamais un « record » d'une
 // vente. `partiel` (un site pas lu, des montants pas lus) ⇒ « parmi les ventes lues ».
 const J = 86400000;
-const ymLocal = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const ymLocal = (ts) => moisParis(ts);   // (11 nov.) mois de PARIS
 const lundiLocal = (ts) => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)).getTime(); };
 const meilleurGroupe = (vendu, cle) => {
   const par = new Map();

@@ -51,6 +51,7 @@ import { DAC7, verdictDac7, PLATEFORMES } from './seuilsAnnee.js';
 import { anneeSureDeVente } from './aDaterAnnee.js';
 import { eurosTexte, jourFr } from './registres.js';
 import { compteDeVente, SANS_COMPTE_VC } from '../api/_lib/comptes-exclus.js';
+import { anneeParis } from './dateParis.js';
 
 export { DAC7, PLATEFORMES };
 // Le versement suit la vente de près (au plus 25 jours mesurés le 6 oct.) : la
@@ -70,7 +71,7 @@ export const OU_TROUVER = Object.freeze({
 });
 
 const cts = (x) => { const n = Number(x); return Number.isFinite(n) ? Math.round(n * 100) : null; };
-const anneeDe = (t) => new Date(t).getFullYear();
+const anneeDe = (t) => Number(anneeParis(t)) || NaN;   // (11 nov.) année de PARIS
 const ymOk = (ym, annee) => typeof ym === 'string' && ym.slice(0, 4) === String(annee);
 const referenceDe = (id) => String(id || '').replace(/^(vinted|lbc|ebay|vestiaire):/, '');
 const cleCarte = (p, c) => `${p}|${c}`;
@@ -147,7 +148,9 @@ export function dac7ParCompte({ decl, annee, compteDe = () => null, comptes = []
     reference: referenceDe(l.id), num: String(numDe(String(l.id)) || ''), titre: String(l.titre || ''), note: note || '',
   });
   for (const l of decl.lignes) {
-    if (!l || !ymOk(l.ym, annee)) continue;
+    // (11 nov.) DAC7 compte une vente dans l'année de son VERSEMENT : déclarée à l'URSSAF un autre mois
+    //    (versée en décembre, déclarée en janvier), elle reste dans l'année du versement (`ymVers`).
+    if (!l || !ymOk(l.declaree && l.ymVers ? l.ymVers : l.ym, annee)) continue;
     const q = quiDe(l);
     if (exclu.has(cleCarte(q.plateforme, q.cle))) continue;
     const c = cts(l.eur); if (c == null) continue;

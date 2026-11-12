@@ -16,11 +16,16 @@
 //   POST { action:'avis', uid }              → (11 nov.) l'extension vient de lire les avis de CE
 //                                              compte : la route RELIT la ligne et sonne une fois
 //                                              par avis ≤ seuil (_lib/avis-negatif.js)
+//   POST { action:'veille' }                 → un chiffre a chuté sans raison : la route RELIT
+//                                              `vrm_veille_chiffres` et sonne une fois (_lib/veille-chiffres.js)
+//   POST { action:'prixachat', ventes }      → (11 nov.) des ventes PROUVÉES sans prix d'achat :
+//                                              chaque transaction est RELUE ici, une notification
+//                                              une fois par vente, jamais la nuit (_lib/prix-achat-demande.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
 import {nettoyerAbonnementPush} from './_lib/abonnement-push.js';
-import { loadSubs, modifierSubs, sendPushToAll, pushConfigure } from './_lib/push.js';
+import { loadSubs, modifierSubs, sendPushToAll, pushConfigure, PUSH_MAX_APPAREILS } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
@@ -30,6 +35,8 @@ import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';
 import { notifierVerificationVinted } from './_lib/verification-vinted.js';
+import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
+import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -137,10 +144,26 @@ async function traiter(req, res) {
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
+    // (11 nov., lot agent2-veille) UN CHIFFRE QUI A CHUTÉ SANS RAISON : l'app a écrit une alerte
+    // dans `vrm_veille_chiffres`. Le corps ne dit rien : la ligne est relue ici, au nom de CE
+    // vendeur, et l'alerte sonne une fois (api/_lib/veille-chiffres.js).
+    if (body.action === 'veille') {
+      const r = await notifierAlertesDuVendeur();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.n ? { n: r.n } : {}), ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? »
+    if (body.action === 'prixachat') {
+      const r = await notifierPrixAchat(body);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
     if (body.action === 'subscribe') {
       const sub = nettoyerAbonnementPush(body.sub);
       if (!sub || !sub.endpoint) { res.status(400).json({ error: 'abonnement invalide' }); return; }
-      const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub]));
+      // (11 nov., M49) au plus PUSH_MAX_APPAREILS : un navigateur qui renouvelle son
+      // abonnement en boucle ne fait pas grossir la ligne sans fin (les plus récents gardés).
+      const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub].slice(-PUSH_MAX_APPAREILS)));
       if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
       res.status(200).json({ ok: true, devices: r.subs.length });
       return;
@@ -170,6 +193,7 @@ async function traiter(req, res) {
 
     res.status(400).json({ error: 'action inconnue' });
   } catch (e) {
+    console.warn('push : erreur interne', e && e.name, String((e && e.message) || '').slice(0, 120));   // (11 nov., B126) une panne se voit
     res.status(500).json({ error: 'Erreur interne. Réessaie dans un instant.' });
   }
 }

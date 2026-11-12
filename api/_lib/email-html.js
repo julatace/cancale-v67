@@ -46,6 +46,7 @@
 //    `allow-scripts`, sa propre CSP) — ce module n'est pas la seule barrière, mais
 //    il est la première.
 
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 export const HTML_MAX = 150 * 1024;
 export const HTML_BRUT_MAX = 3 * 1024 * 1024;   // au-delà, on n'essaie même pas (temps de calcul)
 export const HTML_JOURS = 30;
@@ -333,7 +334,7 @@ export function requetePurgeHtml(avant) {
   const a = encodeURIComponent(new Date(avant).toISOString());
   return `app_data?id=like.${PREFIXE_HTML}*&or=(meta->>at.lt.${a},and(meta->>at.is.null,updated_at.lt.${a}))&select=id`;
 }
-export async function purgerHtml({ url, headers, fetcher = fetch, maintenant = Date.now() }) {
+export async function purgerHtml({ url, headers, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   const avant = limitePurge(maintenant);
   try {
     const r = await fetcher(`${url}/rest/v1/${requetePurgeHtml(avant)}`, { method: 'DELETE', headers: { ...headers, Prefer: 'return=representation' } });

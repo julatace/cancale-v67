@@ -15,6 +15,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (12 nov.) chaque appel sortant a un délai
 import { sendPushToAll } from './push.js';
 import { DESTINATIONS } from './lien-notif.js';
 
@@ -26,7 +27,7 @@ async function lire(chemin) {
   const owner = proprietaireCourant();
   if (!owner || !cle()) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(cle()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(cle()) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;

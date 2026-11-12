@@ -51,6 +51,9 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
   const arriveApres = (n, ligneMs) => {
     const t = transp && typeof transp.get === 'function' ? transp.get(n) : null;
     if (!t || !ETATS_ARRIVE.has(t.etat)) return false;
+    // (12 nov., « le transporteur tranche ») Retiré ou reparti chez le transporteur est FINAL : plus d'alerte,
+    // quelle que soit la date de l'e-mail du changement (ex. retiré le 9, « changé de plan » le 10).
+    if (t.etat === 'retire' || t.etat === 'retour_expediteur') return true;
     const e = msDe(t.etatAt);
     return e != null && (ligneMs == null || e > ligneMs);
   };
@@ -82,7 +85,22 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
     const apres = avecCode.filter((x) => at != null && dateDe(x) != null && dateDe(x) > at);
     const code = codeOk(t.code) ? String(t.code).trim() : (apres[0] ? String(apres[0].code).trim() : '');
     const codeDe = codeOk(t.code) ? 'changement' : code ? 'autre-email' : avecCode.length ? 'a-confirmer' : '';
-    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at, code, codeDe });
+    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at, code, codeDe, emailRecu: t.emailRecu || null, lieuLuDansTexte: !!t.lieuLuDansTexte });
   }
   return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+
+// (12 nov., Julien sur capture : quatre cartes identiques empilées) LES COLIS REDIRIGÉS, PAR NOUVEAU POINT : une
+// carte par point (même nom + même adresse une fois casse, accents et espaces retirés — jamais par titre
+// d'article) ; ceux dont le point n'est pas encore lu forment leur propre groupe (`cle: ''`).
+const cleLieuRelais = (l) => String(l || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+export function groupesRelaisChange(liste) {
+  if (!Array.isArray(liste)) return liste;
+  const g = new Map();
+  for (const x of liste) {
+    const k = cleLieuRelais(x.lieu);
+    if (!g.has(k)) g.set(k, { cle: k, lieu: x.lieu || '', nom: x.nom || '', adresse: x.adresse || '', colis: [] });
+    g.get(k).colis.push(x);
+  }
+  return [...g.values()].sort((a, b) => (a.cle ? 0 : 1) - (b.cle ? 0 : 1) || b.colis.length - a.colis.length);
 }

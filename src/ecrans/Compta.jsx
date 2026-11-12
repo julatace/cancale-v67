@@ -8,6 +8,8 @@ import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { montant } from '../format.js';
+import { ecrireDifference } from '../ligneCas.js';
+import { fusion3 } from '../fusionNuage.js';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { L, VERBES, PAS_SU } from '../libelles.js';
 import { dateVenteVc } from '../../api/_lib/vestiaire-regle.js';
@@ -28,12 +30,15 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
+import { prochainNumeroFacture, noterNumeroPris } from '../factureNumero.js';   // (11 nov.) numérotation continue, jamais réutilisée
+import { reserverNumeroFacture, accesCompteurFactures } from '../factureNumeroCas.js';   // (12 nov.) réservé en base, deux appareils
+import { achatVenteManuelle, beneficeVenteManuelle, totauxVentesManuelles } from '../venteManuelle.js';   // (11 nov.) achat inconnu = pas su, jamais 0
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
 import { gesteCorbeille, lireVentesImportees } from '../App.jsx';   // (10 nov., lot Y) la corbeille 30 jours
@@ -77,6 +82,8 @@ const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
 import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'année »
 import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
+import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
+import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -391,7 +398,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           const url=URL.createObjectURL(blob);
           const a=document.createElement('a');
           a.href=url;
-          a.download=`catalogue-${new Date().toISOString().slice(0,10)}.csv`;
+          a.download=`catalogue-${jourParis()}.csv`;
           document.body.appendChild(a);a.click();document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }} color={C.blue} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>}/>
@@ -402,7 +409,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
             placeholder="Numéro... puis Entrée"
             style={{flex:1,minWidth:120}}/>
-          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
         </div>
         {['all','stock','vendu'].map(f=>(
@@ -412,8 +419,8 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         ))}
       </div>
       {oldStockCount>0&&(
-        <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:500}}>
-          ⚠️ {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
+        <div style={{background:C.card2||C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.muted,fontWeight:500}}>
+          {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -426,7 +433,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           <tbody>
             {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucun article</td></tr>}
             {list.map(p=>(
-              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
+              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return 'transparent';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:600,color:C.accentTexte,fontSize:15,minWidth:60}}>
                   <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
                 </td>
@@ -435,12 +442,12 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <span onClick={()=>toggleStatus(p.id)} style={{cursor:'pointer'}}>
-                    <Badge color={p.status==='stock'?C.accent:C.danger}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
+                    <Badge color={p.status==='stock'?C.accent:C.muted}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
                   </span>
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
                   <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
-                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:days>60?C.danger:C.warn,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
+                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:C.muted,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
@@ -487,7 +494,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} articles</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} articles</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
     </div>
@@ -555,10 +562,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
     const u=sales.map(s=>{
       if(s.id!==id) return s;
       const ns={...s,[field]:val};
-      const sell=+(field==='sellPrice'?val:ns.sellPrice);
-      const buy=+(field==='buyPrice'?val:ns.buyPrice);
-      ns.profit=+(sell-buy).toFixed(2);
-      ns.multi=buy>0?+(sell/buy).toFixed(2):0;
+      // (11 nov.) Un achat vide ou illisible = « pas su » (null), jamais 0 € (§5).
+      const b=beneficeVenteManuelle(ns), buy=achatVenteManuelle([],[],ns.buyPrice);
+      ns.profit=b==null?null:+b.toFixed(2);
+      ns.multi=b!=null&&buy>0?+((+String(ns.sellPrice).replace(',','.'))/buy).toFixed(2):null;
       return ns;
     });
     setSales(u); save('vinted_sales',u);
@@ -580,10 +587,12 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
     const foundItems=pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
     const alreadySold=pids.find(id=>{const cp=catalog.find(x=>x.id===id);return cp&&cp.status==='vendu';});
     if(alreadySold){setErr(`#${alreadySold} déjà vendue`);return;}
-    const buy=foundItems.length>0?foundItems.reduce((s,cp)=>s+(+cp.buyPrice),0):(+newRow.buyPrice||0);
+    // (11 nov., revue robustesse) Un N° du lot introuvable, ou l'achat vide : `null`
+    // (« pas su »), jamais 0 € — sinon bénéfice = prix de vente (src/venteManuelle.js).
+    const buy=achatVenteManuelle(pids,catalog,newRow.buyPrice);
     const sell=+newRow.sellPrice;
-    const sale={id:uid(),productId:pid,buyPrice:+buy.toFixed(2),sellPrice:sell,
-      profit:+(sell-buy).toFixed(2),multi:buy>0?+(sell/buy).toFixed(2):0,
+    const sale={id:uid(),productId:pid,buyPrice:buy==null?null:+buy.toFixed(2),sellPrice:sell,
+      profit:buy==null?null:+(sell-buy).toFixed(2),multi:buy!=null&&buy>0?+(sell/buy).toFixed(2):null,
       saleDate:newRow.saleDate,receiveDate:newRow.receiveDate,createdAt:new Date().toISOString(),
       ...(pids.length>1?{isLot:true}:{})};
     const ns=[sale,...sales]; setSales(ns); save('vinted_sales',ns);
@@ -598,13 +607,13 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const filtered=showAll?fullFiltered:fullFiltered.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
 
-  const totalCA=useMemo(()=>fullFiltered.reduce((s,v)=>s+ +v.sellPrice,0),[fullFiltered]);
-  const totalProfit=useMemo(()=>fullFiltered.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0),[fullFiltered]);
+  const totauxF=useMemo(()=>totauxVentesManuelles(fullFiltered),[fullFiltered]);
+  const totalCA=totauxF.ca, totalProfit=totauxF.benefice;
 
   const _pids=newRow.productId.trim().split(/[+,;]+/).map(v=>v.trim()).filter(Boolean);
   const p=_pids.length===1?catalog.find(x=>x.id===_pids[0]):null;
   const _foundItems=_pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
-  const previewBuy=_foundItems.length>0?_foundItems.reduce((s,x)=>s+(+x.buyPrice),0):(+newRow.buyPrice||null);
+  const previewBuy=achatVenteManuelle(_pids,catalog,newRow.buyPrice);
   const previewSell=newRow.sellPrice?+newRow.sellPrice:null;
 
   // CA + bénéfice du mois en cours (basé sur la date de réception JJ/MM/AAAA = argent encaissé)
@@ -612,16 +621,13 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
     const now=new Date();
     const mm=String(now.getMonth()+1).padStart(2,'0');
     const yyyy=String(now.getFullYear());
-    let caM=0, profitM=0, countM=0;
-    sales.forEach(v=>{
-      const dt=(v.receiveDate||'').trim();
-      const parts=dt.split('/');
-      if(parts.length===3 && parts[1]===mm && parts[2]===yyyy){
-        caM+=+v.sellPrice; profitM+=(+v.sellPrice-+v.buyPrice); countM++;
-      }
+    const duMois=sales.filter(v=>{
+      const parts=(v.receiveDate||'').trim().split('/');
+      return parts.length===3 && parts[1]===mm && parts[2]===yyyy;
     });
+    const t=totauxVentesManuelles(duMois);
     const labels=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    return {ca:caM, profit:profitM, count:countM, nom:labels[now.getMonth()]};
+    return {ca:t.ca, profit:t.benefice, connus:t.nConnus, count:t.n, nom:labels[now.getMonth()]};
   },[sales]);
 
   return (
@@ -633,7 +639,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           📅 {moisVentes.nom} — mois en cours
         </div>
         <div><span style={{fontSize:11,color:C.muted}}>CA finalisé</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
-        <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div style={{fontSize:20,fontWeight:600,color:moisVentes.profit>=0?C.accent:C.danger}}>{fmt(moisVentes.profit)}</div></div>
+        <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div data-ventes-man-benef={moisVentes.profit==null?'':moisVentes.profit} style={{fontSize:20,fontWeight:600,color:C.text}}>{moisVentes.profit==null?'—':fmt(moisVentes.profit)}</div>{moisVentes.connus<moisVentes.count?<div style={{fontSize:11,color:C.muted}}>sur {moisVentes.connus} vente{moisVentes.connus>1?'s':''} sur {moisVentes.count}</div>:null}</div>
         <div><span style={{fontSize:11,color:C.muted}}>Ventes</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
       </div>
 
@@ -641,21 +647,21 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <h2 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>Ventes ({sales.length})</h2>
         <div style={{display:'flex',gap:12,fontSize:13,flexWrap:'wrap',alignItems:'center'}}>
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
-          <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
+          <span style={{color:C.muted}}>Bénéf. : <b data-ventes-man-total={totalProfit==null?'':totalProfit} style={{color:C.text}}>{totalProfit==null?'—':fmt(totalProfit)}</b>{totauxF.nConnus<totauxF.n?` sur ${totauxF.nConnus} vente${totauxF.nConnus>1?'s':''} sur ${totauxF.n}`:''}</span>
           <Btn small onClick={()=>{
             if(fullFiltered.length===0){toast('Aucune vente à exporter');return;}
             const headers=['ID','N° Article','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
             const rows=fullFiltered.map(s=>[
               s.id||'',s.productId||'',s.saleDate||'',s.receiveDate||'',
-              String(s.buyPrice||'').replace('.',','),String(s.sellPrice||'').replace('.',','),
-              String(s.profit||'').replace('.',','),String(s.multi||'').replace('.',','),
+              String(s.buyPrice??'').replace('.',','),String(s.sellPrice??'').replace('.',','),
+              String(s.profit??'').replace('.',','),String(s.multi??'').replace('.',','),
             ]);
             const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
             const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
             const url=URL.createObjectURL(blob);
             const a=document.createElement('a');
             a.href=url;
-            a.download=`ventes-${new Date().toISOString().slice(0,10)}.csv`;
+            a.download=`ventes-${jourParis()}.csv`;
             document.body.appendChild(a);a.click();document.body.removeChild(a);
             URL.revokeObjectURL(url);
           }} color={C.blue}>📤 Exporter Excel</Btn>
@@ -667,7 +673,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
           placeholder="Article, date... puis Entrée"
           style={{maxWidth:280,flex:1,minWidth:160}}/>
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -684,9 +690,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
               ))}
             </tr></thead>
             <tbody>
-              {filtered.length===0&&<tr><td colSpan={9} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune vente</td></tr>}
+              {/* (12 nov., finitions) À gauche : centré dans ce tableau large, « Aucune vente » sortait de l'écran du téléphone. */}
+              {filtered.length===0&&<tr><td colSpan={9} data-ventes-vide="" style={{padding:20,textAlign:'left',color:C.muted}}>Aucune vente</td></tr>}
               {filtered.map(v=>{
-                const b=+(+v.sellPrice-+v.buyPrice);
+                const b=beneficeVenteManuelle(v);
                 const isSelected=selectedIds.has(v.id);
                 return (
                   <tr key={v.id}
@@ -719,13 +726,13 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                       <Cell value={v.receiveDate||''} onChange={val=>updateSale(v.id,'receiveDate',val)}/>
                     </td>
                     <td style={{padding:'2px 10px',minWidth:65}}>
-                      <Cell value={String(v.buyPrice)} onChange={val=>updateSale(v.id,'buyPrice',val)} align="right"/>
+                      <Cell value={v.buyPrice==null?'':String(v.buyPrice)} onChange={val=>updateSale(v.id,'buyPrice',val)} align="right"/>
                     </td>
                     <td style={{padding:'2px 10px',minWidth:65}}>
                       <Cell value={String(v.sellPrice)} onChange={val=>updateSale(v.id,'sellPrice',val)} align="right"/>
                     </td>
-                    <td style={{padding:'2px 10px',color:b>=0?C.accent:C.danger,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(b)}</td>
-                    <td style={{padding:'2px 10px',color:C.warn,whiteSpace:'nowrap'}}>×{fmtN(v.multi)}</td>
+                    <td data-ventes-man-ligne={b==null?'':b} style={{padding:'2px 10px',color:b==null?C.muted:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{b==null?'—':fmt(b)}</td>
+                    <td style={{padding:'2px 10px',color:C.muted,whiteSpace:'nowrap'}}>{v.multi==null||b==null?'—':`×${fmtN(v.multi)}`}</td>
                     <td style={{padding:'2px 10px',whiteSpace:'nowrap'}}>
                       {(() => {
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
@@ -776,7 +783,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
+                  {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{previewBuy==null?'—':fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
                   <input value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
                     type="number" placeholder="Achat&nbsp;€"
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
@@ -790,10 +797,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
-                <td style={{padding:'6px 6px',color:previewBuy!==null&&previewSell!==null?(previewSell-previewBuy>=0?C.accent:C.danger):C.muted,fontWeight:600,fontSize:12,whiteSpace:'nowrap'}}>
+                <td style={{padding:'6px 6px',color:previewBuy!==null&&previewSell!==null?C.text:C.muted,fontWeight:600,fontSize:12,whiteSpace:'nowrap'}}>
                   {previewBuy!==null&&previewSell!==null?fmt(previewSell-previewBuy):''}
                 </td>
-                <td style={{padding:'6px 6px',color:C.warn,fontSize:12}}>
+                <td style={{padding:'6px 6px',color:C.muted,fontSize:12}}>
                   {previewBuy&&previewBuy>0&&previewSell?`×${(previewSell/previewBuy).toFixed(2)}`:''}
                 </td>
                 <td style={{padding:'6px 6px'}}>
@@ -815,7 +822,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
       
@@ -832,12 +839,12 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             {selectedIds.size>0&&(()=>{
               const sel=fullFiltered.filter(v=>selectedIds.has(v.id));
               const sumCA=sel.reduce((s,v)=>s+ +v.sellPrice,0);
-              const sumProfit=sel.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0);
+              const totSel=totauxVentesManuelles(sel), sumProfit=totSel.benefice;
               const sumRecu=sel.filter(v=>v.receiveDate&&v.receiveDate.trim()!=='').reduce((s,v)=>s+ +v.sellPrice,0);
               return (<>
                 <span style={{fontSize:13,color:C.muted,marginLeft:'auto'}}>Σ : <b style={{color:C.text}}>{fmt(sumCA)}</b></span>
                 <span style={{fontSize:13,color:C.muted}}>💰 Reçu : <b style={{color:C.accentTexte}}>{fmt(sumRecu)}</b></span>
-                <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:sumProfit>=0?C.accent:C.danger}}>{fmt(sumProfit)}</b></span>
+                <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:C.text}}>{sumProfit==null?'—':fmt(sumProfit)}</b>{totSel.nConnus<totSel.n?` sur ${totSel.nConnus} sur ${totSel.n}`:''}</span>
               </>);
             })()}
           </>}
@@ -898,15 +905,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // Chaque micro-entreprise garde ainsi sa propre numérotation continue (légal).
   const firstEntId=(Array.isArray(entreprises)&&entreprises[0]&&entreprises[0].id)||'ent_1';
   const invBelongsToActive=(i)=>{ const eid=i.entrepriseId||firstEntId; return eid===(activeEnt||firstEntId); };
-  const nextInvoiceNumber=useMemo(()=>{
-    const year=new Date().getFullYear();
-    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`)&&invBelongsToActive(i));
-    const maxNum=yearInvoices.reduce((mx,i)=>{
-      const n=parseInt(i.number.split('-')[1],10);
-      return isNaN(n)?mx:Math.max(mx,n);
-    },0);
-    return `${year}-${String(maxNum+1).padStart(6,'0')}`;
-  },[invoices,activeEnt,firstEntId]);
+  // (11 nov., revue robustesse) Continu et JAMAIS réutilisé : le compteur
+  // `vrm_factures_pris` ne fait que monter ; une facture supprimée garde son numéro
+  // pris (src/factureNumero.js). L'année est relue au moment d'ajouter.
+  const numeroSuivant=()=>prochainNumeroFacture({ factures: invoices, pris: load('vrm_factures_pris', {}), ent: activeEnt||firstEntId, annee: new Date().getFullYear(), appartient: invBelongsToActive });
+  const nextInvoiceNumber=useMemo(()=>numeroSuivant(),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [invoices,activeEnt,firstEntId]);
   
   // Set des productIds qui sont déjà dans Ventes (= comptabilisés)
   const accountedSet=useMemo(()=>{
@@ -958,18 +963,34 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       ? `⚠️ L’article #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
       : 'Supprimer cette facture ?';
     if(!await askConfirm(msg)) return;
+    // Son numéro reste PRIS : la suivante ne le reprendra jamais (un avoir corrige une facture).
+    if(inv&&inv.number) save('vrm_factures_pris', noterNumeroPris(load('vrm_factures_pris', {}), inv.number, inv.entrepriseId||firstEntId));
     const u=invoices.filter(i=>i.id!==id);
     setInvoices(u); save('vinted_invoices',u);
   };
   
-  const addInvoice=(data)=>{
+  // (12 nov., revue fin) Le numéro est RÉSERVÉ en base (comparer-et-échanger, src/factureNumeroCas.js) :
+  // deux appareils qui créent une facture au même moment ne prennent plus le même n°. Pas su ⇒ aucune facture.
+  const [reserveEnCours,setReserveEnCours]=useState(false);
+  const addInvoice=async (data)=>{
+    if(reserveEnCours) return false;
+    setReserveEnCours(true);
+    const ent=activeEnt||firstEntId;
+    let r=null;
+    try{
+      const acces=accesCompteurFactures({ url: SUPABASE_URL, entetes: sbAuth, owner: AUTH.user && AUTH.user.id });
+      r=await reserverNumeroFacture({ factures: invoices, pris: load('vrm_factures_pris', {}), ent, annee: new Date().getFullYear(), appartient: invBelongsToActive, lire: acces.lire, ecrire: acces.ecrire });
+    }catch(_){ r=null; }
+    setReserveEnCours(false);
+    if(!r){ toast('⚠ Numéro de facture pas réservé (base injoignable) : aucune facture créée. Réessaie.'); return false; }
     const newInvoice={
       id:'inv_'+Date.now(),
-      number:nextInvoiceNumber,
-      entrepriseId:activeEnt||firstEntId, // à quelle micro-entreprise cette facture appartient
+      entrepriseId:ent, // à quelle micro-entreprise cette facture appartient
       ...data,
+      number:r.numero,
       createdAt:new Date().toISOString(),
     };
+    save('vrm_factures_pris', noterNumeroPris(load('vrm_factures_pris', {}), newInvoice.number, newInvoice.entrepriseId));
     const u=[newInvoice,...invoices];
     setInvoices(u); save('vinted_invoices',u);
     setShowForm(false);
@@ -993,7 +1014,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;
-    a.download=`factures-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download=`factures-${jourParis()}.csv`;
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
@@ -1055,10 +1076,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
       </div>
-      {search&&<div style={{fontSize:12,color:C.warn}}>
+      {search&&<div style={{fontSize:12,color:C.muted}}>
         🔍 « {search} » : {fullList.length} résultat{fullList.length>1?'s':''} dans toutes les factures.
       </div>}
       
@@ -1077,29 +1098,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       </div>
       {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
           identique, faisait doublon.) */}
-      {search.trim()&&<div style={{fontSize:11,color:C.warn,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
+      {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
       
       {/* Tableau factures */}
       <Card style={{padding:0,overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
-          <thead>
-            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
-                développeur — « Aucune facture en attente » ne se rattrape
-                nulle part). D'où l'origine des lignes, et la porte : le même
-                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
-                constate le vide. */}
-            {list.length===0&&<tr><td colSpan={7} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
+        {/* (12 nov., finitions) Le vide se dit HORS du tableau : dans un tableau de 700 px, sur
+            téléphone, la phrase et « + Nouvelle facture » étaient coupés au bord de la carte. */}
+        {list.length===0 ? <div data-factures-vide={zone} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
               {search.trim()
                 ? <>Aucune facture trouvée pour « {search} ».</>
                 : zone==='attente'
@@ -1118,16 +1123,35 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   : <>Aucune facture comptabilisée.<br/>
                       <span style={{fontSize:12}}>Une facture arrive ici quand tu la marques comptabilisée.</span>
                     </>}
-            </td></tr>}
+
+        </div> :
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
+          <thead>
+            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
+                développeur — « Aucune facture en attente » ne se rattrape
+                nulle part). D'où l'origine des lignes, et la porte : le même
+                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
+                constate le vide. */}
             {list.map(inv=>{
               const isAccounted=accountedSet.has(String(inv.productId).trim());
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:'8px',color:C.warn,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
+                  <td style={{padding:'8px',color:C.text,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
                   <td style={{padding:'8px',color:C.accentTexte,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
+                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(valeurSue(inv.sellPrice))}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label="Imprimer la facture" title="Imprimer la facture"><Icon name="printer" size={15}/></Btn>
@@ -1138,7 +1162,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               );
             })}
           </tbody>
-        </table>
+        </table>}
       </Card>
       
       {/* Pagination */}
@@ -1151,7 +1175,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} factures</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} factures</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
       
@@ -1414,7 +1438,7 @@ async function generateFacturXPdf(inv, ent){
     a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
+  }catch(e){ try{toast('Facture électronique impossible : '+e.message);}catch(_){} }
 }
 // ⟦← App.jsx #24⟧
 const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
@@ -1437,7 +1461,8 @@ const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length 
 // ⟦← App.jsx #25⟧
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
-const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// (11 nov.) LA lecture d'un montant saisi (`lireMontantSaisi`) : « 1.234,56 » ou « 12.5.3 » sont refusés, jamais lus 1,23 € / 12,5 €.
+const parseMontant = (s) => { const n = lireMontantSaisi(s); return n != null && n > 0 ? n : null; };
 // ⟦← App.jsx #26⟧
 // (3 nov.) Les LIGNES des charges d'un mois — les mêmes que `comptaChargesMois`
 // somme (fixes, dépenses et packs du mois, échéances d'abonnement) : le récap du
@@ -1551,6 +1576,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   const ventesEmailCa = useVentesEmailFraiches(ventes, ko, accounts, (u) => compteEcarte(u, new Set(hAccCle ? hAccCle.split(',') : []), panelOff || {}), hAccCle + '|' + JSON.stringify(panelOff || {}));
   const ventesVendu = React.useMemo(() => avecVentesEmail(ventes, ventesEmailCa), [ventes, ventesEmailCa]);
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
+  const [decAilleurs] = useLigneSynchro('vrm_cycle_decisions', () => load('vrm_cycle_decisions', {}));   // (11 nov.) « Vendu ailleurs »
   const ventesVc = useVentesVestiaire();
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode'); return PERIODES_CA.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode', p); } catch (_) {} };
@@ -1570,8 +1596,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vestiaire = ventesVc || [];
-    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre, importees: lireVentesImportees() });
-    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees: lireVentesImportees() });
+    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre, importees: lireVentesImportees(), main: ventesAilleursDe(ventesVendu || ventes) });
+    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees: lireVentesImportees(), main: ventesAilleursDe(ventes) });
     let finSansDate = 0;
     const finalise = [];
     for (const l of [...decl.lignes, ...decl.aDater]) {
@@ -1591,7 +1617,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas : dites, jamais 0 €.
     return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente, venduNonComptees: vf.nonComptees || [], recuNonComptees: (decl.ecartees || []).filter((x) => x && x.manque) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ventesVendu, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre]);
+  }, [ventes, ventesVendu, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre, decAilleurs]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
   const cur = lignes ? lignes[0] : null;
   // Les périodes d'avant, sans les plus anciennes toutes vides (même règle qu'avant).
@@ -1691,7 +1717,10 @@ function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
   const minuteur = React.useRef(null);
-  React.useEffect(() => { let mort = false; lireReglageMontage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
+  // (12 nov., revue de robustesse, point 21) `lue` : la ligne telle que la base l'a
+  //    (lue, puis écrite) — on n'y pose que ce qui a changé ICI depuis.
+  const lue = React.useRef(null);
+  React.useEffect(() => { let mort = false; lireReglageMontage('vrm_pro_facture').then((d) => { if (!mort) { lue.current = d === null ? null : { ...(d || {}) }; setCfg(d === null ? null : { ...d }); } }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
   const ecrire = (next) => {
     if (!cfg) return;                                      // pas lu : on n'écrit rien
     setCfg(next); setStatut('enregistrement…');
@@ -1699,13 +1728,12 @@ function ProfilFiscalCarte({ onNav }) {
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
       oublierReglageMontage('vrm_pro_facture');
+      // Plus jamais la ligne ENTIÈRE lue à l'ouverture : un SIRET, un régime de TVA
+      // saisis ailleurs entre-temps (Ma facture, Ma configuration) restent.
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-          method: 'POST',
-          headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify([withOwner({ id: 'vrm_pro_facture', data: next })]),
-        });
-        setStatut(r.ok ? '✓ enregistré' : "⚠ pas enregistré — la base n'a pas répondu, réessaie");
+        const res = await ecrireDifference({ base: SUPABASE_URL, id: 'vrm_pro_facture', entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner, avant: lue.current || {}, apres: next });
+        if (res && res.ok && res.data && typeof res.data === 'object') { lue.current = { ...res.data }; setCfg((c) => fusion3(next, c || {}, res.data)); }   // ce qui vient d'ailleurs s'affiche ; une frappe faite depuis reste
+        setStatut(res && res.ok ? '✓ enregistré' : "⚠ pas enregistré — la base n'a pas répondu, réessaie");
       } catch (_) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); }
     }, 600);
   };
@@ -1814,10 +1842,10 @@ const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS
 // écartés (`compteEcarte`, `excluAutre`). Pure : `scripts/audit-registres.cjs`
 // l'EXÉCUTE. Les ventes Vinted ne passent que si les dates de versement sont
 // lues (sinon une vente serait datée à tort).
-const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u), importees = [] }) => {
+const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u), importees = [], main = [] }) => {
   const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
   const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees });
+  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees, main });
   // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
   // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
   const ncER = phraseNonComptees((decl.ecartees || []).filter((x) => x && x.manque));
@@ -1829,6 +1857,7 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   const { ventes, ko } = useVentesCoque();
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVcER = useVentesVestiaire();
+  const [decAilleurs] = useLigneSynchro('vrm_cycle_decisions', () => load('vrm_cycle_decisions', {}));   // (11 nov.) « Vendu ailleurs »
   const [versements, setVersements] = React.useState(undefined);
   React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
   const [tick, setTick] = React.useState(0);
@@ -1842,10 +1871,10 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const rates = [...(lbcCoqueLu === null ? ['Leboncoin'] : []), ...(ebayCommandes === null ? ['eBay'] : []), ...(ventesVcER === null ? ['Vestiaire'] : [])];
-    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe, importees: lireVentesImportees() });
+    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe, importees: lireVentesImportees(), main: ventesAilleursDe(ventes) });
     return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined || ventesVcER === undefined };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre, decAilleurs]);
   return { calc, versements };
 }
 // ── (3 nov.) LES REGISTRES : LIVRE DES RECETTES ET REGISTRE DES ACHATS ──────
@@ -2377,7 +2406,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
-            ['Ce que VRM prépare', 'Une facture Factur-X par vente, le récap mensuel aux particuliers (e-reporting).'],
+            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récapitulatif du mois de tes ventes aux particuliers.'],
             ["Où l'envoyer", "Super PDP : connecte TON compte ci-dessous. Ailleurs : dépose-les toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
@@ -2423,7 +2452,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── RÉCAP E-REPORTING ── */}
         <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Déclaration des ventes à l’administration · {libelleYm(ym)}</div>
           {!recap ? (
             <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
               {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total plutôt qu'un faux zéro."}
@@ -2443,8 +2472,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             </div>}
             <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Toutes tes ventes du mois y sont : retire celles faites à une entreprise. <Pourquoi>VRM ne sait pas si un acheteur est une entreprise. Une vente à une entreprise demande une facture, pas ce récapitulatif.</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récap en tableur</button>
-              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, au format JSON (pour un logiciel de compta)"><Icon name="save" size={14} />Récap JSON</button>
+              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récapitulatif (tableur)</button>
+              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, en fichier pour un logiciel de compta"><Icon name="save" size={14} />Récapitulatif (fichier)</button>
             </div>
             {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas tout seul : dépose-le toi-même sur Super PDP. <Pourquoi>La forme de son envoi par l'API n'a pas pu être vérifiée dans la documentation officielle de Super PDP.</Pourquoi></div>}
           </div>)}
@@ -2452,7 +2481,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── FACTURES FACTUR-X ── */}
         <div style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures Factur-X · ventes de {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures électroniques · ventes de {libelleYm(ym)}</div>
           {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 13, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 12, padding: '10px 12px' }}>
             {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }}> {etat.geste}</span> : null}
           </div>}
@@ -2964,7 +2993,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
   const lignes = ouvert ? suivi.lignes : suivi.lignes.slice(0, 4);
   const a = suivi.annee;
-  const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+  const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${jourParis()}.csv`, 'text/csv;charset=utf-8');
   const ouvrirEdit = (ym) => { const d = (regLu || {})[ym] || {}; setEdit({ ym, montant: d.montant != null ? String(d.montant).replace('.', ',') : '', paye: d.paye != null ? String(d.paye).replace('.', ',') : '' }); };
   const enregistrer = () => {
     const m = lireMontantSaisi(edit.montant), p = lireMontantSaisi(edit.paye);
@@ -3072,7 +3101,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const urssafMois = v ? v.mois : null;
   // `declare` : le registre « J'ai déclaré ce mois » était-il lu quand la ligne
   // a été publiée (`lu`) ou pas encore (`pasSu`) ? (revue du 6 octobre)
-  const urssafInfo = v ? { aDater: v.aDater || null, sources: v.sources || null, declare: v.declare || null } : null;
+  // (11 nov., revue robustesse) `nonComptees` recopié : sans lui, « ce total est un minimum » ne s'affichait jamais.
+  const urssafInfo = v ? { aDater: v.aDater || null, sources: v.sources || null, declare: v.declare || null, nonComptees: v.nonComptees || null } : null;
   const TAUX_URSSAF = tauxUrssaf() / 100;
   const now0 = new Date();
   const moisCourant = { nom: MOIS_NOMS_FR[now0.getMonth()] };
@@ -3325,7 +3355,7 @@ function RecapComptableMensuel() {
       const rows = [['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'CA apres URSSAF']];
       moisRecap.forEach((m) => rows.push([m.label, m.count, m.ca.toFixed(2), m.profit == null ? '' : m.profit.toFixed(2), m.urssaf.toFixed(2), m.net.toFixed(2)]));
       const csv = rows.map((r) => r.join(';')).join('\n');
-      telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+      telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${jourParis()}.csv`, 'text/csv;charset=utf-8');
     } catch (err) { toast('Erreur export : ' + err.message); }
   };
   // ── (3 nov.) « RÉCAP DE [MOIS] » : un PDF et un tableur (src/recapMois.js) ──

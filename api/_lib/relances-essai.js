@@ -44,6 +44,8 @@ import { sbCle } from './cle.js';
 import { envoyerSmtp, emailSur, hoteValide } from './smtp.js';
 import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
 import { lireMentions } from './mentions-legales.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { reserverMemo, modifierLigneCas } from './cas.js';   // (11 nov.) réservation par comparer-et-échanger
 
 export const SITE = 'https://vrm.center';
 export const ID_ENVOIS = 'relances_essai';
@@ -180,7 +182,7 @@ export function texteRelance(etape, { fin, annule = false, relie = {}, lien = ''
 async function lire(chemin) {
   if (!SERVICE()) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL()}/rest/v1/${chemin}`, { headers: { ...sbCle(SERVICE()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL()}/rest/v1/${chemin}`, { headers: { ...sbCle(SERVICE()) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -189,11 +191,17 @@ async function lire(chemin) {
 // Les comptes en essai (pagination : jamais une demi-liste prise pour complète).
 export async function listerEssais() {
   const out = [];
-  for (let from = 0; from < 100000; from += 1000) {
-    const page = await lire(`abonnements?statut=eq.trialing&select=owner,statut,fin_periode,annule_fin_periode,mode_test&order=owner.asc&offset=${from}&limit=1000`);
+  // (11 nov., familles-serveur) pagination PAR CLÉ (`owner=gt.` le dernier lu),
+  // jamais par `offset=` : une ligne qui change pendant la lecture ne fait ni
+  // sauter ni doubler une autre.
+  let apres = '';
+  for (let n = 0; n < 100; n++) {
+    const page = await lire(`abonnements?statut=eq.trialing${apres ? `&owner=gt.${encodeURIComponent(apres)}` : ''}&select=owner,statut,fin_periode,annule_fin_periode,mode_test&order=owner.asc&limit=1000`);
     if (!page) return null;
     out.push(...page);
     if (page.length < 1000) break;
+    apres = String(page[page.length - 1].owner || '');
+    if (!apres) return null;
   }
   return out;
 }
@@ -210,7 +218,7 @@ export async function proprietaires() {
 export async function adresseDuCompte(owner) {
   if (!SERVICE() || !UUID.test(String(owner))) return { etat: 'passu' };
   try {
-    const r = await fetch(`${SUPABASE_URL()}/auth/v1/admin/users/${encodeURIComponent(owner)}`, { headers: { ...sbCle(SERVICE()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL()}/auth/v1/admin/users/${encodeURIComponent(owner)}`, { headers: { ...sbCle(SERVICE()) } });
     if (r.status === 404) return { etat: 'absent' };
     if (!r.ok) return { etat: 'passu' };
     const u = await r.json();
@@ -228,10 +236,31 @@ const ligneDe = async (owner, id) => {
 };
 export const lireEnvois = (owner) => ligneDe(owner, ID_ENVOIS);
 export const lireChoix = (owner) => ligneDe(owner, ID_CHOIX);
+// (12 nov., M92) Les deux lignes de TOUS les essais du passage, en lots de 100
+// vendeurs (une lecture par lot, au lieu de deux par essai). Rend Map owner →
+// { choix, envois } (lignes absentes ⇒ {}), ou null (pas su : on relit vendeur par
+// vendeur, comme avant). La liste est entière : `limit` = lignes possibles.
+export async function lireLignesEnLot(owners) {
+  const out = new Map();
+  const liste = [...new Set(owners.filter((o) => UUID.test(String(o))))];
+  for (let i = 0; i < liste.length; i += 100) {
+    const lot = liste.slice(i, i + 100);
+    const r = await lire(`app_data?owner=in.(${lot.map(encodeURIComponent).join(',')})&id=in.(${ID_ENVOIS},${ID_CHOIX})&select=owner,id,data&order=owner.asc,id.asc&limit=${lot.length * 2}`);
+    if (!r) return null;
+    for (const o of lot) out.set(o, { choix: {}, envois: {} });
+    for (const l of r) {
+      const o = String((l && l.owner) || '').toLowerCase(); const x = out.get(o);
+      if (!x) continue;
+      const d = l.data && typeof l.data === 'object' ? l.data : {};
+      if (l.id === ID_ENVOIS) x.envois = d; else if (l.id === ID_CHOIX) x.choix = d;
+    }
+  }
+  return out;
+}
 async function ecrire(owner, id, data) {
   if (!SERVICE()) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL()}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL()}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: { ...sbCle(SERVICE()), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify([{ owner, id, data }]),
@@ -276,6 +305,7 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
   if (!essais) return { pret: true, envoyes: 0, arret: 'essais illisibles' };
   const ignores = {}; const ign = (r) => { ignores[r] = (ignores[r] || 0) + 1; };
   let envoyes = 0;
+  const enLot = await lireLignesEnLot(essais.filter((a) => a && a.statut === 'trialing').map((a) => String(a.owner || '').toLowerCase()));
   for (const a of essais) {
     if (envoyes >= MAX_PAR_PASSAGE) { ign('plafond du passage'); continue; }
     if (horloge() >= jusqua) { ign('temps du passage'); continue; }
@@ -284,7 +314,8 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     if (a.statut !== 'trialing') { ign('pas en essai'); continue; }
     if (proprio.has(owner)) { ign('proprietaire'); continue; }
     if (a.mode_test !== false && !cfg.modeTest) { ign('mode test'); continue; }
-    const [choix, envois] = await Promise.all([lireChoix(owner), lireEnvois(owner)]);
+    const lu = enLot && enLot.get(owner);
+    const [choix, envois] = lu ? [lu.choix, lu.envois] : await Promise.all([lireChoix(owner), lireEnvois(owner)]);
     if (!choix || !envois) { ign('pas su'); continue; }
     if (choix.desinscrit === true) { ign('desinscrit'); continue; }
     const etape = etapeDuJour({ fin: a.fin_periode, maintenant, envois: envois.envois || {} });
@@ -296,9 +327,13 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     const t = texteRelance(etape, { fin: a.fin_periode, annule: a.annule_fin_periode === true, relie, lien });
     if (!t || !lien) { ign('texte'); continue; }
     // Réserver AVANT d'envoyer : non confirmé ⇒ rien ne part.
-    const base = { ...(envois.envois || {}) };
-    const reserve = await ecrire(owner, ID_ENVOIS, { envois: { ...base, [etape]: { at: new Date(maintenant).toISOString(), issue: 'en-cours' } } });
-    if (!reserve) { ign('reservation non confirmee'); continue; }
+    // (11 nov., H15) par COMPARER-ET-ÉCHANGER (_lib/cas.js) : deux passages qui se
+    // chevauchent ⇒ un seul réserve l'étape (l'autre la voit déjà prise).
+    const ligneEnvois = { url: SUPABASE_URL(), entetes: sbCle(SERVICE()), owner, id: ID_ENVOIS };
+    const res = await reserverMemo({ ...ligneEnvois,
+      deja: (d) => !!(d && d.envois && d.envois[etape]),
+      nouveau: (d) => ({ ...(d || {}), envois: { ...((d && d.envois) || {}), [etape]: { at: new Date(maintenant).toISOString(), issue: 'en-cours' } } }) });
+    if (!res.reserve) { ign(res.raison === 'deja' ? 'deja reserve' : 'reservation non confirmee'); continue; }
     let r;
     try {
       r = await envoyer({
@@ -309,10 +344,12 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     } catch (e) { r = { issue: 'incertain', message: String(e && e.message || e).slice(0, 200) }; }
     const issue = ['envoye', 'refuse', 'incertain'].includes(r && r.issue) ? r.issue : 'incertain';
     // Un refus AVANT le message : rien n'est parti ⇒ l'étape est libérée (demain).
-    const fin = issue === 'refuse'
-      ? { ...base }
-      : { ...base, [etape]: { at: new Date(maintenant).toISOString(), issue } };
-    await ecrire(owner, ID_ENVOIS, { envois: fin, ...(issue === 'refuse' ? { dernierRefus: { etape, at: new Date(maintenant).toISOString(), etapeSmtp: String((r && r.etape) || '') } } : {}) });
+    await modifierLigneCas({ ...ligneEnvois, modifier: (d) => {
+      const envoisLus = { ...((d && d.envois) || {}) };
+      if (issue === 'refuse') delete envoisLus[etape]; else envoisLus[etape] = { at: new Date(maintenant).toISOString(), issue };
+      const { dernierRefus: _ancien, ...reste } = d || {};
+      return { ...reste, envois: envoisLus, ...(issue === 'refuse' ? { dernierRefus: { etape, at: new Date(maintenant).toISOString(), etapeSmtp: String((r && r.etape) || '') } } : {}) };
+    } });
     if (issue === 'envoye') envoyes++; else ign(`smtp ${issue}`);
   }
   return { pret: true, envoyes, essais: essais.length, ignores };

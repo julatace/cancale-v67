@@ -27,7 +27,13 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
   assert.equal(u.searchParams.get('owner'),'eq.'+user);
   if(u.searchParams.get('id')==='like.harvest_123_conv_*'&&aucunePreuve)return json([]);
   if(u.searchParams.get('id')==='like.harvest_123_conv_*')return json([{id:'harvest_123_conv_900',owner:user,uid:'123',conversationId:'900',item:'101',recipient:'201'},{id:'harvest_123_conv_901',owner:user,uid:'123',conversationId:'901',item:'102',recipient:'202'}]);
-  return json(archiveSeule?[{id:'harvest_123_favoris_archive',owner:user,data:{...captures[0],archiveVersion:1}},...ids.slice(1).map((id,i)=>({id,owner:user,data:captures[i+1]}))]:ids.map((id,i)=>({id,owner:user,data:captures[i]})));
+  // (11 nov., M82) La vraie forme : filtre `id=in.(…)` / `id=eq.…` et projection `select=` (alias:data->a->b).
+  let lignes=archiveSeule?[{id:'harvest_123_favoris_archive',owner:user,data:{...captures[0],archiveVersion:1}},...ids.slice(1).map((id,i)=>({id,owner:user,data:captures[i+1]}))]:ids.map((id,i)=>({id,owner:user,data:captures[i]}));
+  const fid=u.searchParams.get('id')||'';
+  if(fid.startsWith('in.(')){const set=new Set(fid.slice(4,-1).split(','));lignes=lignes.filter(r=>set.has(r.id));}else if(fid.startsWith('eq.'))lignes=lignes.filter(r=>r.id===fid.slice(3));
+  const sel=u.searchParams.get('select');
+  if(sel&&sel!=='id,owner,data')lignes=lignes.map(r=>Object.fromEntries(sel.split(',').map(c=>{const [nom,chemin]=c.includes(':')?c.split(':'):[c,c];let v=r;for(const k of chemin.split(/->>?/))v=v==null?undefined:v[k];return [nom,v===undefined?null:v];})));
+  return json(lignes);
  };
  const call=async(action,extra={},token='fixture.session.jwt')=>{
   let code,body;const res={setHeader(){},status(v){code=v;return this;},json(v){body=v;return this;}};

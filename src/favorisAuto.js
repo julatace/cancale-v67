@@ -186,6 +186,8 @@ export const DEMANDES_AUTO = {
   capture: 'Ouvre la cloche de Vinted avec ce compte : VRM n’a pas encore vu ses favoris.',
   reglages: 'Enregistre ton message : Envoyer un message aux favoris → 2. Message → Enregistrer sans envoyer.',
   a_verifier: 'Un message est « à vérifier » : regarde la conversation sur Vinted, puis « J’ai vérifié » dans la file des favoris. Le mode auto attend.',
+  // (12 nov., sécurité des comptes) src/messageSur.js : un numéro, PayPal, « hors Vinted »…
+  message_risque: 'Ton message contient un mot que Vinted bannit : change-le (Envoyer un message aux favoris → 2. Message). Rien n’est parti.',
 };
 // Les états de la file qui DEMANDENT un geste (les autres attendent seuls).
 export const ETATS_DEMANDE = ['destinataire_non_prouve', 'garde_absente', 'dressing_absent', 'dressing_ancien', 'dressing_partiel', 'boite_ancienne', 'capture', 'reglages', 'a_verifier'];
@@ -214,4 +216,5 @@ export const ETATS_AUTO = {
   extension: 'Un message est prêt, mais l’extension ne peut pas l’envoyer maintenant (voir le geste demandé).',
   reglages: 'Rien ne part : enregistre d’abord ton message (Envoyer un message aux favoris → 2. Message → Enregistrer).',
   lecture: 'La base VRM n’a pas répondu : rien n’est parti, nouvel essai dans quelques minutes.',
+  message_risque: 'Rien ne part : ton message contient un mot que Vinted bannit (numéro, PayPal, « hors Vinted »…). Change-le.',
 };

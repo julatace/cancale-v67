@@ -2,6 +2,7 @@ import './_lib/sans-bruit.js';
 import { sbCle } from './_lib/cle.js';
 import { vendeurExige } from './_lib/session.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // api/vinted-refresh.js
 //
 // ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE, ET ELLE RAFRAÎCHISSAIT TOUS LES COMPTES DE
@@ -28,7 +29,7 @@ import { repondreSansCleService } from './_lib/cle-service.js';
 // est invalide), donc rafraichir inutilement multiplie les rotations et les
 // risques de course entre appareils. On decode l'exp du JWT pour l'eviter.
 
-const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';   // (11 nov., M89) comme toutes les routes
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
 // vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
 // publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
@@ -69,6 +70,8 @@ export const HOTE_VINTED = /^www\.vinted\.(fr|com|it|de|be|es|nl|pl)$/;
 export const hoteRefresh = (domain) => (typeof domain === 'string' && HOTE_VINTED.test(domain)) ? domain : 'www.vinted.fr';
 const REFRESH_MAX_COMPTES = 25;
 const REFRESH_DELAI_MS = 10000;
+const REFRESH_PARALLELE = 4;
+const REFRESH_BUDGET_MS = 40000;
 
 async function refreshOne(acc) {
   const host = hoteRefresh(acc.domain);
@@ -77,7 +80,7 @@ async function refreshOne(acc) {
     acc.refresh_token ? `refresh_token_web=${acc.refresh_token}` : '',
     acc.anon_id ? `anon_id=${acc.anon_id}` : '',
   ].filter(Boolean).join('; ');
-  const res = await fetch(`https://${host}/web/api/auth/refresh`, {
+  const res = await fetchAvecDelai(`https://${host}/web/api/auth/refresh`, {
     method: 'POST',
     headers: {
       'Cookie': cookie,
@@ -105,7 +108,7 @@ async function refreshOne(acc) {
 // compte cassé sans un mot (revue du 17 octobre, `audit-routes-revue.cjs` F).
 async function persist(acc, tokens, filtre) {
   try {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}`, {
+  const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}`, {
     method: 'PATCH',
     headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, updated_at: new Date().toISOString() }),
@@ -122,7 +125,7 @@ export default async function handler(req, res) {
   if (repondreSansCleService(res)) return;
   const filtre = `&owner=eq.${encodeURIComponent(u.id)}`;
   try {
-    const listRes = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, {
+    const listRes = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!listRes.ok) { res.status(502).json({ error: 'Lecture Supabase impossible' }); return; }
@@ -130,21 +133,28 @@ export default async function handler(req, res) {
     if (!Array.isArray(accounts) || accounts.some(a => a.owner !== u.id)) { res.status(503).json({ error: "Propriété des comptes non confirmée. Aucun renouvellement effectué." }); return; }
     const now = Math.floor(Date.now() / 1000);
     const summary = [];
-    for (const [i, acc] of accounts.entries()) {
-      if (i >= REFRESH_MAX_COMPTES) { summary.push({ id: acc.vinted_user_id, action: 'skip_trop_de_comptes' }); continue; }
-      if (!acc.refresh_token) { summary.push({ id: acc.vinted_user_id, action: 'skip_no_refresh' }); continue; }
+    // (11 nov., M39) Plusieurs comptes : REFRESH_PARALLELE à la fois (jamais tous
+    // en série, la route dépassait son temps et la dernière écriture n'avait pas
+    // lieu) et un budget : un compte pas commencé à temps est dit, jamais tu.
+    const debut = Date.now();
+    const un = async (acc, i) => {
+      if (i >= REFRESH_MAX_COMPTES) return { id: acc.vinted_user_id, action: 'skip_trop_de_comptes' };
+      if (!acc.refresh_token) return { id: acc.vinted_user_id, action: 'skip_no_refresh' };
       const exp = jwtExp(acc.access_token);
-      if (exp && exp - now > REFRESH_MARGIN_S) { summary.push({ id: acc.vinted_user_id, action: 'still_valid' }); continue; }
+      if (exp && exp - now > REFRESH_MARGIN_S) return { id: acc.vinted_user_id, action: 'still_valid' };
+      if (Date.now() - debut > REFRESH_BUDGET_MS) return { id: acc.vinted_user_id, action: 'skip_budget' };
       const tokens = await refreshOne(acc);
-      if (tokens) {
-        if (await persist(acc, tokens, filtre)) summary.push({ id: acc.vinted_user_id, action: 'refreshed' });
-        else summary.push({ id: acc.vinted_user_id, action: 'refreshed_not_saved' });
-      }
-      else { summary.push({ id: acc.vinted_user_id, action: 'refresh_failed' }); }
-    }
+      if (tokens) return { id: acc.vinted_user_id, action: (await persist(acc, tokens, filtre)) ? 'refreshed' : 'refreshed_not_saved' };
+      return { id: acc.vinted_user_id, action: 'refresh_failed' };
+    };
+    const resultats = new Array(accounts.length);
+    let prochain = 0;
+    const ouvrier = async () => { while (prochain < accounts.length) { const i = prochain++; resultats[i] = await un(accounts[i], i); } };
+    await Promise.all(Array.from({ length: Math.min(REFRESH_PARALLELE, accounts.length) }, ouvrier));
+    summary.push(...resultats);
     const nonRange = summary.some((x) => x.action === 'refreshed_not_saved');
     res.status(nonRange ? 502 : 200).json({ ok: !nonRange, count: accounts.length, summary });
   } catch (err) {
-    res.status(500).json({ error: 'Echec du refresh global', detail: String(err) });
+    res.status(500).json({ error: 'Echec du refresh global' });   // (12 nov.) jamais le détail interne
   }
 }

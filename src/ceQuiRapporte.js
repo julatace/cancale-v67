@@ -179,7 +179,7 @@ export const classementRapporte = (lignes, axe = 'modele') => {
 // (centimes), achat (centimes|null), item]] (src/venteLot.js) — rangés en [10] de SA ligne, la vente
 // reste UNE ligne (CA, frais, compte inchangés) ; `eclaterReleveLots` en fait une ligne par article
 // pour les marges par modèle / marque / taille.
-export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, numero = () => '', versement = () => '', autres = [], titreDe = {}, an0, articles = () => null }) => {
+export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, numero = () => '', versement = () => '', autres = [], titreDe = {}, an0, articles = () => null, fraisDetail = () => null }) => {
   const out = [];
   for (const o of (Array.isArray(vinted) ? vinted : [])) {
     if (!o || estMasquee(o) || !estFinalisee(o)) continue;
@@ -189,6 +189,11 @@ export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalis
     const ligne = ['Vinted', String(compte(o) || ''), String(o.transaction_id || ''), t, montant(o), achat(o), frais(o), String(o.title || '').slice(0, 90), String(numero(o) || ''), vers ? String(vers) : ''];
     const arts = articles(o);
     if (Array.isArray(arts) && arts.length > 1) ligne.push(arts);
+    // (11 nov., agent2-argent-parrainage) [11] le détail des frais de la fiche, en centimes :
+    // [boost, port payé par lui, commission, reste] (src/coutPlateformes.js `detailFraisFiche`) ;
+    // seulement quand la fiche note des frais ([10] vaut alors `null` s'il n'y a pas de lot).
+    const det = fraisDetail(o);
+    if (Array.isArray(det) && det.length === 4) { if (ligne.length === 10) ligne.push(null); ligne.push(det); }
     out.push(ligne);
   }
   for (const x of (Array.isArray(autres) ? autres : [])) {

@@ -16,6 +16,7 @@
 // comparer-et-échanger sur `data.rev` : deux envois simultanés, un seul gagne, l'autre
 // relit). Une lecture ratée n'écrit RIEN (503).
 import { sbCle } from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (12 nov.) chaque appel sortant a un délai
 import { proprietaireInstallation } from './signalement.js';
 
 export const PREFIXE_RAPPORT = 'ext_rapport_';
@@ -87,7 +88,7 @@ async function lireLigne({ env, fetcher, owner, id }) {
 }
 
 // POST (session de l'extension) : ranger.
-export async function recevoirRapportExt({ utilisateur, corps, env = process.env, fetcher = fetch, pousser = null, maintenant = Date.now() }) {
+export async function recevoirRapportExt({ utilisateur, corps, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
   const { url, service } = cfg(env);
   if (!service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   if (!utilisateur || !UUID.test(String(utilisateur.id || ''))) return { code: 401, corps: { ok: false, raison: 'session' } };
@@ -129,7 +130,7 @@ export async function recevoirRapportExt({ utilisateur, corps, env = process.env
 
 // GET : le vendeur lit SA ligne ; le PROPRIÉTAIRE lit la liste de tous (projetée), ou
 // UN vendeur en entier (`?de=<uid>`).
-export async function listerRapportsExt({ utilisateur, de = null, env = process.env, fetcher = fetch, maintenant = Date.now() }) {
+export async function listerRapportsExt({ utilisateur, de = null, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
   const { url, service } = cfg(env);
   if (!service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const moi = String(utilisateur && utilisateur.id || '').toLowerCase();

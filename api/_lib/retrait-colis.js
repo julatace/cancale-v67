@@ -151,24 +151,50 @@ const PAS_UN_NOM = /\b(?:mondial\s*relay|chronopost|vinted|pickup\s+services?|ex
 // perdu et le colis restait « point pas connu ». Deux points DIFFÉRENTS dans le
 // même extrait (le relais et l'adresse de quelqu'un, par exemple) ⇒ rien :
 // on ne choisit pas.
+// (12 nov.) MESURÉ (lecture seule, Chronopost 08448881184010) : le Relais Pickup écrit
+// « NOM | RUE DE LA … | CP VILLE » — une rue SANS numéro. Elle était refusée (la règle
+// exigeait un numéro en tête) : `lieu` restait vide, l'extrait (55 car.) était là. Une rue
+// sans numéro est acceptée seulement si elle COMMENCE par un type de voie écrit en toutes
+// lettres (rue, avenue, place…) : c'est le texte de l'e-mail, rien n'est complété.
+const VOIE_SANS_NUMERO = /^(?:rue|avenue|av\.?|boulevard|bd|place|chemin|route|impasse|all[ée]e|quai|cours|square|passage|sentier|voie|esplanade|promenade|parvis|rond[\s-]point|lieu[\s-]dit|hameau|lotissement|r[ée]sidence|zac|za|zi|zone|centre\s+commercial|parc|faubourg|mail|cit[ée]|galerie)\s+[A-Za-zÀ-ÿ'’]/i;
 const tripletLieu = (nom, rue, ville) => {
   if (!nom || nom.length < 2 || nom.length > 60 || /\d{5}/.test(nom) || PAS_UN_NOM.test(nom)) return null;
   if (nom.replace(/[^a-zà-ÿ]/gi, '').length < 3) return null;
-  if (!/^\d{1,4}(?:\s*(?:bis|ter))?[\s,]+[A-Za-zÀ-ÿ]/.test(rue) || rue.length > 80 || /\d{5}/.test(rue)) return null;
-  if (!/^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(ville)) return null;
+  const rueNumerotee = /^\d{1,4}(?:\s*(?:bis|ter))?[\s,]+[A-Za-zÀ-ÿ]/.test(rue);
+  if (!(rueNumerotee || (VOIE_SANS_NUMERO.test(rue) && !PAS_UN_NOM.test(rue))) || rue.length > 80 || /\d{5}/.test(rue)) return null;
+  if (!CP_VILLE.test(ville)) return null;
   return `${nom}, ${rue}, ${ville}`;
 };
+// (12 nov.) « CP Ville » : la ville peut finir par « CEDEX » (et son numéro), forme des grandes villes.
+const CP_VILLE = /^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}(?:\s+cedex(?:\s+\d{1,2})?)?$/i;
+const cleLieu = (l) => l.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const partsExtrait = (extrait) => decoderEntitesHtml(extrait || '').split('|').map((x) => x.replace(/[*_]+/g, ' ').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
 export function lieuDepuisExtrait(extrait) {
-  const parts = decoderEntitesHtml(extrait || '').split('|').map((x) => x.replace(/[*_]+/g, ' ').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
-  if (parts.length < 3) return null;
+  const parts = partsExtrait(extrait);
   const vus = new Map();
-  for (let k = 2; k < parts.length; k++) {
-    const l = tripletLieu(parts[k - 2], parts[k - 1], parts[k]);
-    if (!l) continue;
-    const cle = l.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    if (!vus.has(cle)) vus.set(cle, l);   // le même point écrit deux fois : la 1re écriture
-  }
+  const noter = (l) => { if (!l) return; const cle = cleLieu(l); if (!vus.has(cle)) vus.set(cle, l); };   // le même point écrit deux fois : la 1re écriture
+  // (12 nov.) Les trois morceaux peuvent tenir sur UNE ligne de l'e-mail (tableau aplati, « NOM, 12 rue …,
+  // CP Ville » ou « NOM - rue - CP Ville ») : la même règle les lit, morceau par morceau.
+  for (const x of parts) { const m = /^(.{2,60}?)\s*(?:,|\s[-–]\s)\s*(.{4,80}?)\s*(?:,|\s[-–]\s)\s*(\d{5}\s+.{2,52})$/.exec(x); if (m) noter(tripletLieu(m[1].trim(), m[2].trim(), m[3].trim())); }
+  for (let k = 2; k < parts.length; k++) noter(tripletLieu(parts[k - 2], parts[k - 1], parts[k]));
   return vus.size === 1 ? [...vus.values()][0] : null;
+}
+
+// (12 nov., Julien : « peu importe comment c'est écrit ») LE REPLI : l'extrait gardé a un point mais pas la
+// forme « NOM | rue | CP Ville » (nom et rue collés, deux morceaux…). On montre alors LE TEXTE DE L'E-MAIL,
+// nettoyé — jamais une adresse recomposée : les morceaux du pied d'e-mail (siège du transporteur, mentions
+// légales, liens, « ne pas répondre ») sont écartés ; il reste UN code postal au plus, sur au plus trois
+// morceaux qui finissent par lui. Rien de tel (deux points, rien que le siège) ⇒ `null` : « — ».
+const PIED_EMAIL = /capital|rcs\b|si[eè]ge|donn[ée]es|confidentialit|https?:|<http|www\.|r[ée]pondre|cliquez|en\s+savoir|vos\s+droits|immatricul|soci[ée]t[ée]|avec\s+\d[\d\s]*points|partout\s+en\s+france|^\s*(?:mondial\s*relay|chronopost|pickup\s+services?|colissimo|la\s+poste\s+sa|dpd\s+france|gls\s+france|ups\s+france|inpost\s+france|relais\s+colis\s+sas|vinted)\b.*\d{5}|\b(?:19|20)\d\d\s*$/i;
+export function lieuLisibleDepuisExtrait(extrait) {
+  const parts = partsExtrait(extrait).filter((x) => !PIED_EMAIL.test(x) && x.length <= 120 && !EN_TETE_LIEU.test(x));
+  const avecCp = parts.map((x, i) => (/\b\d{5}\b/.test(x) ? i : -1)).filter((i) => i >= 0);
+  const cps = new Set(parts.flatMap((x) => x.match(/\b\d{5}\b/g) || []));
+  if (avecCp.length !== 1 || cps.size !== 1) return null;
+  const fin = avecCp[0];
+  const garde = parts.slice(Math.max(0, fin - 2), fin + 1);
+  const t = garde.join(', ').replace(/\s{2,}/g, ' ').trim();
+  return t.replace(/[^a-zà-ÿ]/gi, '').length >= 4 ? t : null;
 }
 
 // LE LIEU SOUS SON EN-TÊTE (« POINT RELAIS® », « LOCKER », « Consigne », « Adresse »
@@ -184,11 +210,25 @@ export function lieuDepuisExtrait(extrait) {
 // suivantes (5 morceaux au plus, rien du pied d'e-mail avant elle) ; sinon rien de
 // plus qu'avant.
 // La date limite et le pied de l'e-mail (« Avec 19 000 points… », le siège) ne sont pas le lieu.
+// (12 nov., Julien : « elle doit pouvoir voir tous les points relais, peu importe comment c'est écrit »)
+// L'EN-TÊTE D'UN POINT, tous transporteurs : Mondial Relay (« Point Relais® », LOCKER 24/7), Chronopost /
+// Pickup (« Relais Pickup », « Pickup Station », « Consigne Pickup »), InPost (casier, locker), Relais Colis,
+// Colissimo / La Poste (« Bureau de poste », « Point de retrait »), UPS Access Point, DPD Pickup, GLS
+// ParcelShop, Shop2Shop, Vinted Go (« Adresse »), avec ou sans « Votre / Ton », un numéro de point ou des
+// deux-points. Seul sur sa ligne : `EN_TETE_LIEU` ; suivi du nom : `EN_TETE_EN_LIGNE`.
+const TYPE_POINT = String.raw`(?:point\s+(?:relais|de\s+retrait|retrait|pickup|de\s+collecte|shop2shop)|relais(?:\s+(?:pickup|colis))?|pickup(?:\s+(?:station|point))?|locker(?:\s*24\s*\/?\s*7)?(?:\s+inpost)?|consigne(?:\s+(?:automatique|pickup|vinted\s*go))?|casier(?:\s+(?:inpost|automatique))?|inpost(?:\s+locker)?|(?:gls\s+)?parcel\s*shop|(?:ups\s+)?access\s+point|dpd\s+pickup|bureau\s+de\s+poste|lieu\s+de\s+retrait|shop2shop|adresse(?:\s+(?:de\s+retrait|du\s+point(?:\s+(?:relais|de\s+retrait))?|du\s+relais|du\s+casier))?)`;
+const AVANT_POINT = String.raw`(?:(?:votre|ton|le|la|mon|ma)\s+)?`;
+const NUM_POINT = String.raw`(?:\s+(?:n°|no\.?|num[ée]ro)\s*[A-Z0-9-]{2,12})?`;
+const EN_TETE_LIEU_TOUS = new RegExp(`^${AVANT_POINT}(?:nouveau\\s+)?${TYPE_POINT}${NUM_POINT}\\b[\\s:：–-]*$`, 'i');
+// La liste du 11 nov. (retraits fiables) OU celle du 12 nov. : un en-tête reconnu par l'une l'est.
+const EN_TETE_LIEU = { test: (x) => EN_TETE_LIEU_TOUS.test(x) || EN_TETE_LIEU_RESEAUX.test(x) };
+const EN_TETE_EN_LIGNE = new RegExp(`^${AVANT_POINT}${TYPE_POINT}${NUM_POINT}\\s*[:：]\\s*`, 'i');
+const NUMERO_DE_POINT = /^(?:(?:point\s+(?:relais\s+)?)?(?:n°|no\.?|num[ée]ro)|identifiant(?:\s+du\s+point)?|id\s+point|r[ée]f[ée]rence\s+du\s+point)\s*[:：]?\s*[A-Z0-9-]{2,12}$/i;
 const STOP_LIEU = /horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis|retrait|jusqu|avec\s+\d|mondial\s*relay|chronopost|villeneuve\s+d/i;
 // (11 nov., retraits fiables) Les en-têtes des autres réseaux, seuls sur leur ligne : « Relais
 // Pickup » (Chronopost, DPD, Shop2Shop), « Locker InPost », « UPS Access Point », « GLS ParcelShop »,
 // « Relais Colis », « Point de retrait », « Bureau de poste » (Colissimo, La Poste).
-const EN_TETE_LIEU = /^(?:(?:votre|ton)\s+)?(?:(?:nouveau\s+)?point\s+(?:relais|de\s+retrait)(?:\s+(?:mondial\s+relay|colissimo))?|locker(?:\s*24\s*\/?\s*7)?(?:\s+inpost)?|consigne(?:\s+(?:automatique|pick-?up|inpost))?|casier|adresse|relais\s+(?:pick-?up|colis|shop2shop)|ups\s+access\s+point|gls\s+parcel\s*shop|bureau\s+de\s+poste)\b[\s:–-]*$/i;
+const EN_TETE_LIEU_RESEAUX = /^(?:(?:votre|ton)\s+)?(?:(?:nouveau\s+)?point\s+(?:relais|de\s+retrait)(?:\s+(?:mondial\s+relay|colissimo))?|locker(?:\s*24\s*\/?\s*7)?(?:\s+inpost)?|consigne(?:\s+(?:automatique|pick-?up|inpost))?|casier|adresse|relais\s+(?:pick-?up|colis|shop2shop)|ups\s+access\s+point|gls\s+parcel\s*shop|bureau\s+de\s+poste)\b[\s:–-]*$/i;
 // (11 nov., retraits fiables — LA CAUSE de « tout regroupé à Super U ») LES LISTES DE SUGGESTIONS NE SONT
 // PAS LE POINT DU COLIS. Les e-mails et bordereaux des transporteurs portent souvent un bloc « Points de
 // proximité », « Autres points près de chez vous », « Pour vos prochains envois, déposez… » : des relais près
@@ -227,12 +267,21 @@ export function lieuSousEnTete(txt0) {
   return lieuSousEnTeteNu(txt);
 }
 function lieuSousEnTeteNu(txt) {
-  const lines = String(txt || '').split('\n').map((l) => l.trim());
+  // (12 nov.) Un tableau HTML aplati met le nom, la rue et « CP Ville » sur UNE ligne, séparés par des
+  // tabulations ou de grands blancs : chaque cellule redevient une ligne.
+  const lines = String(txt || '').split('\n').flatMap((l) => l.split(/\t+|\s{3,}|\s\|\s/)).map((l) => l.trim());
   const enTete = (l) => l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
-  const idx = lines.findIndex((l) => EN_TETE_LIEU.test(enTete(l)));
-  if (idx < 0) return null;
+  let idx = lines.findIndex((l) => EN_TETE_LIEU.test(enTete(l)));
   const parts = [];
-  const cpVille = (l) => /^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(String(l || '').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
+  // (12 nov.) L'en-tête et le nom sur la MÊME ligne (« Point Relais : TABAC DU PORT », « Votre casier InPost :
+  // … ») : le texte après les deux-points est le premier morceau.
+  if (idx < 0) {
+    idx = lines.findIndex((l) => EN_TETE_EN_LIGNE.test(enTete(l)));
+    if (idx < 0) return null;
+    const apres = enTete(lines[idx]).replace(EN_TETE_EN_LIGNE, '').trim();
+    if (apres && !STOP_LIEU.test(apres)) parts.push(apres);
+  }
+  const cpVille = (l) => CP_VILLE.test(String(l || '').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
   const suivante = (i) => { let j = i + 1; while (j < lines.length && !lines[j]) j++; return j; };
   for (let i = idx + 1; i < lines.length && parts.length < 5; i++) {
     const l = lines[i];
@@ -253,6 +302,9 @@ function lieuSousEnTeteNu(txt) {
       break;
     }
     if (parts.some(cpVille)) break;
+    // (12 nov.) Le numéro du point (« Point relais n° 012345 », « Identifiant : FR-1234 ») n'est ni le nom
+    // ni l'adresse : passé, jamais rangé dans le lieu.
+    if (NUMERO_DE_POINT.test(l)) continue;
     if (parts.length >= 4 && !cpVille(l)) break;
     if (STOP_LIEU.test(l)) break;
     const propre = l.replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -270,7 +322,11 @@ function lieuSousEnTeteNu(txt) {
 export function nouveauPointDansTexte(txt) {
   const lines = String(txt || '').split('\n').map((l) => l.trim());
   const norm = (l) => String(l).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const nomme = (l) => { const n = norm(l); return /\b(?:nouveau|nouvel|nouvelle|suivant|suivante)\b/.test(n) && /\b(?:point|relais|lieu|adresse|locker|consigne|casier)\b/.test(n) && !/\b(?:ancien|initial|prevu|choisi)\b/.test(n); };
+  // (12 nov., mesuré : Mondial Relay « Votre colis a changé de plan 📍 », transféré par Vinted) La forme
+  // « Il sera finalement livré ici : » puis, une ligne vide entre chaque, « POINT RELAIS® / NOM / RUE ou
+  // lieu-dit / CP VILLE ». La phrase désigne le NOUVEAU point comme « nouveau / suivant ».
+  const nomme = (l) => { const n = norm(l); return (/\b(?:nouveau|nouvel|nouvelle|suivant|suivante)\b/.test(n) && /\b(?:point|relais|lieu|adresse|locker|consigne|casier)\b/.test(n) && !/\b(?:ancien|initial|prevu|choisi)\b/.test(n))
+    || /\bsera\s+(?:finalement\s+|desormais\s+)?livre\s+(?:ici|a\s+cette\s+adresse|dans\s+ce\s+point)\b/.test(n); };
   const enTete = (l) => EN_TETE_LIEU.test(l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
   for (let i = 0; i < lines.length; i++) {
     if (!nomme(lines[i])) continue;

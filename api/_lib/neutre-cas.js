@@ -17,6 +17,8 @@
 // n'agit pas.
 import { sbCle } from './cle.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { conditionRev, revSuivant } from './cas.js';   // (11 nov.) une règle de version pour tout le serveur
 
 const SUPABASE_URL = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 
@@ -30,7 +32,7 @@ export async function modifierNeutre(id, decider, { essais = 12 } = {}) {
   for (let n = 0; n < essais; n++) {
     let rows;
     try {
-      const r = await fetch(`${base}?${filtre}&select=data`, { headers: lecture });
+      const r = await fetchAvecDelai(`${base}?${filtre}&select=data`, { headers: lecture });
       if (!r.ok) return null;
       rows = await r.json();
     } catch (_) { return null; }
@@ -39,16 +41,16 @@ export async function modifierNeutre(id, decider, { essais = 12 } = {}) {
     const d = present ? (rows[0].data || {}) : null;
     const choix = decider(d);
     if (!choix || choix.data === undefined) return { valeur: choix ? choix.valeur : undefined };
-    const rev0 = d && Number.isSafeInteger(d.rev) && d.rev >= 0 ? d.rev : null;
-    const data = { ...choix.data, rev: (rev0 == null ? 0 : rev0) + 1 };
+    // (11 nov., M71) la version comparée SOUS SA FORME LUE (entier, chaîne, objet) : _lib/cas.js
+    const data = { ...choix.data, rev: revSuivant(d) };
     try {
       if (!present) {
-        const w = await fetch(base, { method: 'POST', headers: { ...ecriture, Prefer: 'return=minimal' }, body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id, data }]) });
+        const w = await fetchAvecDelai(base, { method: 'POST', headers: { ...ecriture, Prefer: 'return=minimal' }, body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id, data }]) });
         if (w.ok) return { valeur: choix.valeur };
         if (w.status !== 409) return null;            // créée entre-temps : on relit
       } else {
-        const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
-        const w = await fetch(`${base}?${filtre}&${cond}&select=id`, { method: 'PATCH', headers: { ...ecriture, Prefer: 'return=representation' }, body: JSON.stringify({ data }) });
+        const cond = conditionRev(d);
+        const w = await fetchAvecDelai(`${base}?${filtre}&${cond}&select=id`, { method: 'PATCH', headers: { ...ecriture, Prefer: 'return=representation' }, body: JSON.stringify({ data }) });
         if (!w.ok) return null;
         const out = await w.json().catch(() => null);
         if (!Array.isArray(out)) return null;

@@ -66,14 +66,18 @@ async function exemple() {
   EX = { uid: d.UID_EXEMPLE, servir: b.servirTable, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes } };
   return EX;
 }
-async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = false, vue = 'abonnement', parrain = PARRAIN, donnees = false }) {
+// (12 nov.) `nouveau` : un compte NEUF (« Tu vends quoi ? » pas encore fait). Depuis le 9-11 nov., ce compte
+// voit d'abord Ma configuration puis le parcours d'arrivée en plein écran : les essais d'un vendeur EN COURS
+// d'abonnement (J-5, J-3, J-1, résilier…) sont joués par un vendeur qui a déjà fait sa configuration (la forme
+// réelle d'un abonné depuis plusieurs jours) ; le compte neuf a son propre essai (« le compte neuf voit l'offre »).
+async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = false, vue = 'abonnement', parrain = PARRAIN, donnees = false, nouveau = false }) {
   const ex = donnees ? await exemple() : null;
   const SESSION = ex ? { ...SESSION_BANC, user: { ...SESSION_BANC.user, id: ex.uid } } : SESSION_BANC;
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
-  await pg.addInitScript(({ s, vue, sombre }) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_mfa_plus_tard_' + s.user.id, String(Date.now())); if (vue) localStorage.setItem('vrm_reglages_vue', vue); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {} }, { s: SESSION, vue, sombre });
+  await pg.addInitScript(({ s, vue, sombre, nouveau }) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_mfa_plus_tard_' + s.user.id, String(Date.now())); if (vue) localStorage.setItem('vrm_reglages_vue', vue); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); if (!nouveau) { localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); localStorage.setItem('vrm_parcours_plus_tard', (() => { const t = new Date().toISOString(); return JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t }); })()); } } catch (_) {} }, { s: SESSION, vue, sombre, nouveau });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => ['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue());
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   const rest = { lectures: 0, ecritures: 0, origine: '' };
@@ -88,6 +92,13 @@ async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = fal
       return r.fulfill({ status: x.status, headers: x.headers, body: x.status === 204 || x.body == null ? '' : (typeof x.body === 'string' ? x.body : JSON.stringify(x.body)) });
     }
     if (/select=owner/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    // (12 nov.) Une écriture (POST/PATCH) est ACCEPTÉE et rendue telle quelle, comme PostgREST avec
+    // `return=representation` : sans ça, « Plus tard » de Ma configuration attendait sa confirmation sans fin
+    // (le compte neuf restait devant « Enregistrement… »). Aucune écriture n'est gardée : rien n'est relu.
+    if (m !== 'GET' && !/\/rpc\//.test(u)) {
+      let rows = []; try { const b = JSON.parse(r.request().postData() || '[]'); rows = Array.isArray(b) ? b : [{ id: (/id=eq\.([^&]+)/.exec(u) || [])[1] || 'main', ...b }]; } catch (_) {}
+      return r.fulfill({ status: m === 'POST' ? 201 : 200, contentType: 'application/json', body: JSON.stringify(rows) });
+    }
     return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });
   });
   const appels = [];
@@ -101,6 +112,9 @@ async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = fal
   });
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3800);
+  // (12 nov.) Machine lente : la page Abonnement peut encore dire « Je regarde… » à 3,8 s — on attend
+  // qu'elle ait LU son état (10 s au plus), jamais un délai de plus à l'aveugle.
+  await pg.waitForFunction(() => { const w = document.querySelector('[data-abonnement]'); return !w || w.getAttribute('data-abonnement') !== 'chargement'; }, null, { timeout: 10000 }).catch(() => {});
   return { ctx, pg, erreurs, appels, rest };
 }
 const lirePage = (pg) => pg.evaluate(() => {
@@ -262,13 +276,36 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
       dit(conf > 0, 'clic 1 : la rangée « Résilier » ouvre la confirmation (clic 2) — rien ne part avant');
       await ctx.close();
     });
+    // (12 nov.) LE COMPTE NEUF VOIT L'OFFRE D'ESSAI : « Tu vends quoi ? » (et le parcours d'arrivée) d'abord, en
+    // plein écran ; « Plus tard » s'y trouve toujours, et l'offre « 7 jours gratuits » est alors à portée de doigt.
+    for (const largeur of [390, 1512]) {
+      await essaie('compte neuf ' + largeur, async () => {
+        const { ctx, pg, appels } = await ouvrir(nav, { abo: { ...base, essaiDispo: true }, largeur, nouveau: true });
+        const cfg = await pg.locator('[data-configuration-plus-tard]').count();
+        dit(cfg > 0, `${largeur} px : compte neuf ⇒ « Tu vends quoi ? » d’abord (le parcours d’arrivée n’est pas cassé)`);
+        if (cfg) { await pg.locator('[data-configuration-plus-tard]').first().click(); await pg.locator('.vrm-cfg').first().waitFor({ state: 'detached', timeout: 15000 }).catch(() => {}); }
+        for (let i = 0; i < 6; i++) {
+          const pt = pg.locator('[data-parcours-plus-tard]:visible, [data-guide-plus-tard]:visible');
+          if (!(await pt.count())) break;
+          await pt.first().click(); await pg.waitForTimeout(300);
+        }
+        const offre = pg.locator('[data-abonnement] [data-sabonner][data-essai]');
+        await offre.first().waitFor({ state: 'visible', timeout: 8000 });
+        await offre.first().scrollIntoViewIfNeeded();
+        const r = await pg.evaluate(() => { const b = document.querySelector('[data-abonnement] [data-sabonner][data-essai]'); const x = b.getBoundingClientRect(); const dessus = document.elementFromPoint(x.left + x.width / 2, x.top + x.height / 2); return { texte: (document.querySelector('[data-abonnement]') || {}).innerText || '', libre: !!dessus && (dessus === b || b.contains(dessus)), h: x.height }; });
+        dit(/7 jours|gratuit/i.test(r.texte) && r.libre && r.h >= 44, `${largeur} px : puis l’offre d’essai est visible et touchable (rien ne la recouvre)`, JSON.stringify(r));
+        dit(appels.every((a) => a.mode !== 'checkout'), `${largeur} px : rien ne part vers le paiement sans son clic`);
+        await capture(pg, `compte-neuf-${largeur}`);
+        await ctx.close();
+      });
+    }
 
     console.log('\n── Le parrainage');
     for (const [largeur, sombre] of [[1512, false], [390, true]]) {
       await essaie('parrainage ' + largeur, async () => {
         const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif, largeur, sombre });
         const r = await pg.evaluate(() => { const g = document.querySelector('[data-parrainage]'); return g ? { etat: g.getAttribute('data-parrainage'), i: g.getAttribute('data-inscrits'), p: g.getAttribute('data-payes'), lien: (g.querySelector('[data-lien-parrainage]') || {}).innerText, t: g.innerText } : null; });
-        dit(!!r && r.etat === 'ouvert' && r.lien === 'https://vrm.center/?parrain=K7MQ4RZP' && r.i === '2' && r.p === '1' && /un mois offert/i.test(r.t), `${largeur} px : le lien personnel et « 2 inscrits, 1 a payé »`, JSON.stringify(r && { ...r, t: r.t.replace(/\n/g, ' ').slice(0, 100) }));
+        dit(!!r && r.etat === 'ouvert' && r.lien === 'https://vrm.center/r/K7MQ4RZP' && r.i === '2' && r.p === '1' && /un mois offert/i.test(r.t), `${largeur} px : le lien personnel et « 2 inscrits, 1 a payé »`, JSON.stringify(r && { ...r, t: r.t.replace(/\n/g, ' ').slice(0, 100) }));
         dit(appels.every((a) => a.m === 'GET'), '  ouvrir la page ne rattache rien (lecture seule)');
         if (largeur === 390) { const d = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); dit(d <= 0, '  390 px : rien ne déborde', String(d)); }
         await pg.locator('[data-parrainage]').scrollIntoViewIfNeeded().catch(() => {});

@@ -184,6 +184,9 @@ const TRI_ANNONCES = {
   views: 'Plus de vues', boost: 'Vues sans favoris', sleeping: 'En ligne depuis longtemps', nonum: 'Sans numéro',
 };
 export const nomVue = (nom) => NOMS_VUE[nom] || 'Filtre';
+// (12 nov., finitions) Les pastilles d'Annonces (« Republier », « Sélection »…) passent par la même vue
+// que le tri (`annonces-tri`), mais ce sont des FILTRES : le bandeau les nomme ainsi.
+const FILTRES_ANNONCES = new Set(['republier', 'selection', 'brouillons', 'masquees', 'sansachat', 'acompleter']);
 export function texteValeur(nom, v) {
   if (estRecherche(nom)) return typeof v === 'string' && v.trim() ? `« ${v.trim().slice(0, 40)} »` : '';
   if (v && typeof v === 'object' && v.from) {
@@ -202,8 +205,12 @@ export function retenusAffiches(montees, tab) {
     if (!m || vus.has(m.nom) || !vueSynchronisee(m.nom) || !ecransDeVue(m.nom).includes(tab)) continue;
     if (memeValeur(m.valeur, m.initial)) continue;
     if (estRecherche(m.nom) && !(typeof m.valeur === 'string' && m.valeur.trim())) continue;
+    // (12 nov., finitions) Un choix fait ICI, à l'instant (un toucher, un lien du menu), se voit déjà à
+    // l'écran (la pastille choisie) : le redire dans le bandeau le dirait deux fois. Le bandeau parle de
+    // ce qui est REVENU (autre appareil, autre jour), jamais de ce qu'on vient de toucher.
+    if (m.touche) continue;
     vus.add(m.nom);
-    out.push({ nom: m.nom, quoi: nomVue(m.nom), valeur: texteValeur(m.nom, m.valeur) });
+    out.push({ nom: m.nom, quoi: m.nom === 'annonces-tri' && FILTRES_ANNONCES.has(m.valeur) ? 'Filtre' : nomVue(m.nom), valeur: texteValeur(m.nom, m.valeur) });
   }
   return out;
 }

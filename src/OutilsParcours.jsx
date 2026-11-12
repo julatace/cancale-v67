@@ -1,6 +1,7 @@
 import React from 'react';
 import {resumeSelection,lireParcours} from './parcoursQuotidien.js';
 import './styles-parcours.css';
+import { cleNum } from '../api/_lib/numerotation.js';   // (11 nov.) deux N° se comparent par cleNum
 export function RecapSelection({lignes,coches}){
  const r=resumeSelection(lignes,coches);
  return <section className="vrm-parcours-recap" aria-label="Récapitulatif avant impression" data-recap-selection={r.total}>
@@ -17,7 +18,7 @@ export function HistoriqueModifications({owner,numero}){
  React.useEffect(()=>{const fn=()=>reviser();window.addEventListener('vrm:modification-notee',fn);return()=>window.removeEventListener('vrm:modification-notee',fn)},[]);
  let storage=null;try{storage=sessionStorage;}catch{}
  const liste=lireParcours(storage,owner,'modifications',[]);
- const lignes=(Array.isArray(liste)?liste:[]).filter(l=>!numero||String(l.numero)===String(numero)).slice(0,30);
+ const lignes=(Array.isArray(liste)?liste:[]).filter(l=>!numero||cleNum(l.numero)===cleNum(numero)).slice(0,30);
  return <details className="vrm-parcours-historique" key={owner} data-historique-local={revision}>
   <summary>Modifications enregistrées sur cet appareil ({lignes.length})</summary>
   <p>Depuis ce navigateur, sur les sept derniers jours. Ce journal ne confirme pas la synchronisation et ne reconstitue pas les changements antérieurs.</p>

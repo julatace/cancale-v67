@@ -88,6 +88,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     fs.copyFileSync(path.join(RACINE, 'src', 'bilanSynchronisation.js'), path.join(dir, 'src', 'bilanSynchronisation.js'));
     fs.copyFileSync(path.join(RACINE, 'src', 'profilVendeur.js'), path.join(dir, 'src', 'profilVendeur.js'));   // (11 nov., 5.355) vocabulaire
     fs.copyFileSync(path.join(RACINE, 'api', '_lib', 'numerotation.js'), path.join(dir, 'api', '_lib', 'numerotation.js'));
+    fs.copyFileSync(path.join(RACINE, 'api', '_lib', 'fetch-delai.js'), path.join(dir, 'api', '_lib', 'fetch-delai.js'));   // (12 nov.) importé par numerotation.js
     try { R = await import(pathToFileURL(path.join(dir, 'src', 'retirerAilleurs.js')).href); B = await import(pathToFileURL(path.join(dir, 'src', 'bilanSynchronisation.js')).href); }
     catch (e) { dit(false, 'la règle ne se charge pas : ' + e.message); }
   } else dit(false, 'src/retirerAilleurs.js absent : aucun « Retirer des autres sites »');

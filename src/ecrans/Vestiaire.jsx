@@ -5,12 +5,16 @@ import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaqu
 import { motifDeLApercu } from '../antiArnaque.js';
 import { ordreRecent, quandVestiaire } from '../ordreRecent.js';
 import { STYLE_FLOU, vcFloute } from '../flouCompte.js';
+import { ListeParCompte } from '../GroupesComptes.jsx'; // (11 nov.) lignes floutées regroupées par compte
 import { lienDe, vcReliable } from '../lienVestiaire.js';
 import React, { useState, useEffect } from 'react';
 import { suivi, suivreJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
-import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut } from '../../api/_lib/vestiaire-regle.js';
+import { trierRecents } from '../ordreConversations.js';
+import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   // (12 nov.) l'envoi vu dans le fil
+import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
+import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut, fraisVc } from '../../api/_lib/vestiaire-regle.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis } from '../transporteursVisuels.js';
 import { texteBenefice, euros as eurosLigne } from '../beneficeLigne.js';
@@ -329,7 +333,8 @@ function AnnoncesVestiaire() {
         {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
             (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
         <section className="vrm-lbc-catalog vrm-vc-catalog" aria-label="Mes annonces Vestiaire" style={{ margin: 0 }}>
-          <ul>{liste.map(({ id, it, num, etat, label, brut }) => {
+          {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
+          <ul><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={liste} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
             const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
@@ -350,7 +355,7 @@ function AnnoncesVestiaire() {
                 <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
               </li>
             );
-          })}</ul>
+          }}/></ul>
         </section>
         {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
             la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par
@@ -653,7 +658,10 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
   const nomLigne = v.num ? `N°${v.num} · ${titre}` : titre;
   // Comme Vinted : la date sur la ligne (et, à expédier, « à envoyer avant … » — le
   // « à poster avant » de la carte Colis) ; le transporteur à côté du bouton bordereau.
-  const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : ''].filter(Boolean).join(' · ');
+  // (11 nov. soir) Les frais que Vestiaire prend, LUS (prix affiché − versé, `fraisVc`) : sur la
+  // ligne seulement quand ils sont lus ; la fiche dit « frais pas lus » sinon (jamais 0).
+  const fv = vcVenteAnnulee(v) ? null : fraisVc(v);
+  const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : '', fv && fv.lu ? `Frais Vestiaire ${eurosRecap(fv.frais)} (${String(fv.pct).replace('.', ',')}\u00a0%)` : ''].filter(Boolean).join(' · ');
   const trV = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi });
   const benef = lb.etat === 'annulee' ? null : { etat: lb.etat, achatCentimes: lb.achat != null ? Math.round(lb.achat * 100) : null, benefCentimes: lb.benefice != null ? Math.round(lb.benefice * 100) : null,
     achatTxt: lb.achat != null ? `${eurosLigne(lb.achat)}\u00a0€` : (v.num ? 'à saisir' : '—'), benefTxt: texteBenefice(lb),
@@ -703,7 +711,11 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       <section className="vrm-recap-argent" aria-label="L'argent">
         <h3 className="vrm-recap-titre">L'argent</h3>
         <dl>
-          <div className="vrm-recap-ligne"><dt>Vestiaire te verse</dt><dd data-prix-vente={lb.verse != null ? Math.round(lb.verse * 100) : undefined}>{lb.verse != null ? eurosRecap(lb.verse) : '— pas sûr'}</dd></div>
+          {/* (11 nov. soir, Julien) « Prix · Frais Vestiaire (%) · Pour toi » : les frais LUS (`fraisVc`),
+              « frais pas lus » sinon — jamais 0, jamais devinés. */}
+          {fv ? <div className="vrm-recap-ligne" data-vc-prix={fv.lu ? fv.cPrix : ''}><dt>Prix</dt><dd><span className="vrm-recap-montant">{fv.lu ? eurosRecap(fv.prix) : '—'}</span></dd></div> : null}
+          {fv ? <div className="vrm-recap-ligne" data-vc-frais={fv.lu ? fv.cFrais : ''} data-vc-frais-etat={fv.lu ? 'lu' : 'passu'}><dt>Frais Vestiaire</dt><dd>{fv.lu ? <><span className="vrm-recap-montant">{eurosRecap(-fv.frais)}</span> <small data-vc-frais-pct={fv.pct}>({String(fv.pct).replace('.', ',')}{'\u00a0'}%)</small></> : <span className="vrm-recap-montant">— <small>frais pas lus</small></span>}</dd></div> : null}
+          <div className="vrm-recap-ligne"><dt>{fv ? 'Pour toi' : 'Vestiaire te verse'}</dt><dd data-prix-vente={lb.verse != null ? Math.round(lb.verse * 100) : undefined}>{lb.verse != null ? eurosRecap(lb.verse) : '— pas sûr'}</dd></div>
           {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap onSaisir={(p) => poserAchatVc(v.num, p)}/> : '—'}</dd></div> : null}
           {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={lb.benefice != null ? lb.benefice.toFixed(2) : undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur"><span className="vrm-recap-montant">{lb.benefice == null ? '—' : eurosRecap(lb.benefice)}</span></span>{lb.etat === 'prix' ? <small> montant versé pas sûr</small> : null}</dd></div> : null}
           {/* (11 nov., lot vestiaire-plus) Le moment où l'argent arrive (versé ⇒ le mois du CA ; estimé ⇒ pas encore dans le CA). */}
@@ -804,7 +816,9 @@ function VentesVestiaire({ comptes }) {
         <div className="vrm-ventes-liste" data-vc-ventes-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           <div className="vrm-ventes-entete" aria-hidden="true" data-ventes-entete-cols=""><span/><span>Article</span><span>État</span><span className="is-droite">Versé</span><span className="is-droite">Achat</span><span className="is-droite">Bénéfice</span><span/></div>
-          {liste.slice(0, 30).map((v, i) => <LigneVenteVc key={v.id} i={i} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>)}
+          {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
+          <ListeParCompte lignes={liste.slice(0, 30)} ouvert={vcOuvert} floute={(v) => vcFloute(vcOuvert, v.compte)} compteDe={(v) => String(v.compte == null ? '' : v.compte).trim()} unite="vente" libelle="Compte ouvert sur Vestiaire" nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})}
+            rendre={(v, i) => <LigneVenteVc key={v.id} i={i} v={v} fait={vcLoc.fait[v.id] || null} enV={v.num && enLigne ? enLigneParNum.get(v.num) : null} flou={vcFloute(vcOuvert, v.compte)}/>}/>
         </div>
         {liste.length > 30 ? <div style={style}>Les 30 plus récentes sont montrées (sur {liste.length}).</div> : null}
       </div>
@@ -860,11 +874,13 @@ function ficheVestiaireDe(v, items) {
   return { item: v.pid || undefined, num: v.num, photo: f && f.photo, titre: f && f.titre, sous: ['Vestiaire'],
     blocs: [{ cle: 'rangement', lib: 'Rangée', val: rangementDuNum(v.num) }, { cle: 'attention', lib: 'Attention', val: fav != null ? `${fav} favori${fav > 1 ? 's' : ''}` : null }] };
 }
-function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
+function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, onFerme }) {
   const [fil, setFil] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const [texte, setTexte] = React.useState('');
   const [enCours, setEnCours] = React.useState(false);
   const [res, setRes] = React.useState(null);
+  // (12 nov.) L'envoi se voit DANS le fil (src/envoiFil.js) : { etat, texte, depuis }.
+  const [envoiFil, setEnvoiFil] = React.useState(null);
   const relire = React.useCallback(async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page,at:data->>capturedAt`, { headers: sbAuth() });
@@ -884,15 +900,22 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
     const t = texte.trim();
     if (!t || enCours || !peut) return;
     setEnCours(true); setRes(null);
+    const depuis = Date.now(); setEnvoiFil({ etat: 'envoi', texte: t, depuis });
     let r = null; try { r = await vmrCmd({ cmd: 'vcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
-    setEnCours(false); setRes(etiquetteResultatVc(r));
-    if (r && r.accepte === true && r.etape === 'fait') { setTexte(''); relire(); }
+    const etat = etatEnvoiExtension(r);
+    setEnCours(false); setEnvoiFil({ etat, texte: t, depuis });
+    // « Envoyé ✓ » est dit sous la bulle ; au-dessus du champ, seulement ce qui demande un geste.
+    setRes(etat === 'ok' ? null : etiquetteResultatVc(r));
+    if (etat === 'ok') { setTexte((v) => (v.trim() === t ? '' : v)); relire(); }
   };
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
-  else if (fil === null) corps = <div data-vc-fil="pas-su" style={style}>Je n'ai pas pu lire cette conversation — rien n'est perdu, réessaie dans un moment.</div>;
+  // (12 nov.) Lecture ratée ≠ vide : la raison et « Réessayer ».
+  else if (fil === null) corps = <FilIllisible attrs={{ 'data-vc-fil': 'pas-su' }} texte="Je n'ai pas pu lire cette conversation — rien n'est perdu." onRelire={() => { setFil(undefined); relire(); }}/>;
   else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Pas encore lue : ouvre-la une fois sur Vestiaire, avec l'extension{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
+  // (12 nov.) La liste annonce un message mais le fil est vide : « pas encore lu · Relire », jamais « aucun ».
+  else if (filPasLu(fil.messages, annonce)) corps = <FilPasLu attrs={{ 'data-vc-fil': 'vide' }} onRelire={relire}/>;
   else if (!fil.messages.length) corps = <div data-vc-fil="vide" style={style}>Conversation lue, mais Vestiaire n'y a rendu aucun message lisible.</div>;
   else corps = (
     <div data-vc-fil="lu" data-vc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -905,13 +928,15 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   );
   const page = fil && /^\/[\w/.-]*$/.test(fil.page || '') ? fil.page : '';
   const lien = `https://fr.vestiairecollective.com${page || '/'}`;
+  const envoiVu = <EnvoiDansFil envoi={envoiFil} Bulle={BulleConv} site="Vestiaire" onReessayer={envoyer} reessayerDesactive={enCours || !texte.trim()}
+    dejaLu={!!(envoiFil && fil && dejaDansFil(fil.messages, envoiFil.texte, envoiFil.depuis))}/>;
   const resultat = res && <div role="status" data-vc-resultat={res.ton} style={{ fontSize: 13, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
   let pied;
   if (fil && fil.messages && peut) pied = (
     <div className="vrm-chat-foot" data-vc-repondre="pret" style={{ borderTop: `1px solid ${C.border}`, background: C.card }}>
       {resultat}
       <RapidesConv liste={reponsesRapidesPartagees()} onChoisir={(t) => setTexte(String(t).slice(0, 2000))} desactive={enCours}/>
-      <ComposeConv valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Vestiaire" libelleEnvoyer="Envoyer sur Vestiaire"
+      <ComposeConv site="vestiaire" valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Vestiaire" libelleEnvoyer="Envoyer sur Vestiaire"
         envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-vc-envoyer': '' }}/>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Part de l'onglet Vestiaire {NAV.dans}, à ton nom, un à la fois.</span>
@@ -933,9 +958,13 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   return (
     <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à un article VRM'} titre={titre || ''} compte="Vestiaire"/>
+      {/* (12 nov.) L'offre de CET article (même productId, §5), en carte, en tête du fil : ses gestes seulement
+          quand c'est à lui de répondre (`OffresVestiaire`, recettes apprises, inchangé). */}
+      {offre ? <div className="vrm-vc-fil-offre" data-vc-fil-offre="" style={{ padding: '10px 16px 0', flexShrink: 0 }}>{offre}</div> : null}
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {fil && fil.messages ? <AlerteArnaque site="vestiaire" lien={lien} messages={fil.messages}/> : null}
         {corps}
+        {envoiVu}
       </div>
       {pied}
     </CadreFil>
@@ -1007,10 +1036,19 @@ function MessagesVestiaire() {
       const it = (pid && d.items && d.items[pid]) || null;
       return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, deMoiSu, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '',
         titreArticle: String(v.titre || (it && it.titre) || ''), photoArticle: urlPhotoVc(v.photo || (it && it.photo) || '') };
-    }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
+    }); // (11 nov.) le plus récent en haut, par horodatage (avant : les non-lus devant, puis un tri de textes)
+    liste.splice(0, liste.length, ...trierRecents(liste, (v) => v.date));
     const choisie = liste.find((v) => v.id === ouvert) || null;
     const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
     const offresEtat = offresVestiaire(d.offres);
+    // (12 nov.) L'offre d'un article se lit DANS sa conversation (même productId, jamais le titre) ;
+    // en haut ne restent que les offres dont la conversation n'est pas ouverte (le même prix jamais deux fois).
+    const pidOuvert = choisie && choisie.pid ? choisie.pid : '';
+    const offresDu = (garder) => (offresEtat.etat === 'lu' ? { ...offresEtat, aTrancher: offresEtat.aTrancher.filter((o) => garder(o.produit)), enAttente: offresEtat.enAttente.filter((o) => garder(o.produit)) } : offresEtat);
+    const propsOffres = { recettes: d.recettesOffres, cap: extSait('vcoffrerepondre'), numDe: (pid) => cleNum((pid && d.liens[pid]) || ''),
+      envoyer: async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }, Photo: PhotoOffreVc };
+    const offreFil = pidOuvert && offresEtat.etat === 'lu' && (offresEtat.aTrancher.some((o) => o.produit === pidOuvert) || offresEtat.enAttente.some((o) => o.produit === pidOuvert))
+      ? <OffresVestiaire etat={offresDu((p) => p === pidOuvert)} {...propsOffres}/> : null;
     corps = (
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0 12px' }}>
@@ -1018,8 +1056,7 @@ function MessagesVestiaire() {
             : <span><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</span>}
           <a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-pied-lien" data-pied-lien="ouvrir-vc">{page ? 'Ouvrir la messagerie ↗' : 'Ouvrir Vestiaire ↗'}</a>
         </div>
-        <OffresVestiaire etat={offresEtat} recettes={d.recettesOffres} cap={extSait('vcoffrerepondre')} numDe={(pid) => cleNum((pid && d.liens[pid]) || '')}
-          envoyer={async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }} Photo={PhotoOffreVc}/>
+        <OffresVestiaire etat={offreFil ? offresDu((p) => p !== pidOuvert) : offresEtat} {...propsOffres}/>
         <div className="vrm-message-workspace">
           <div className="vrm-inbox-column">
             {liste.length ? <>
@@ -1046,7 +1083,7 @@ function MessagesVestiaire() {
               : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire {NAV.dans}.</div>)}
           </div>
           <div className="vrm-chat-column">{choisie
-            ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || choisie.titreArticle || ''} envoi={d.envoi} onFerme={() => setOuvert('')}/>
+            ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || choisie.titreArticle || ''} envoi={d.envoi} annonce={!!choisie.apercu} offre={offreFil} onFerme={() => setOuvert('')}/>
             : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Lis-la et réponds-y depuis VRM.</small></div>}</div>
           {!choisie ? <FicheConvVolet site="vestiaire" etat="aucune"/>
             : <FicheConvVolet site="vestiaire" etat={fcChoisie ? 'reliee' : 'non-reliee'} fc={fcChoisie} raison={`Cet article Vestiaire ne porte aucune référence VRM : VRM ne devine pas ${motsVendeur().le} d’après le titre.`}/>}
