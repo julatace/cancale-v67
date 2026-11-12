@@ -31,6 +31,7 @@ import { conserverRetrait, normaliserSuivi } from './etat-colis-email.js';
 import { vendeurParIndex, ecrireIndexJeton, memeJeton } from './jeton-index.js';
 import { arriveLeAuRangement } from './arrivee-colis.js';
 import { sbCle } from './cle.js';
+import { limiteRetraitDepuisTexte, jourParis } from './retrait-colis.js';
 // (9 nov.) Les autres expéditeurs (Chronopost, Vinted Go, Pickup, VestiaireCo) : api/_lib/sms-autres.js.
 import { lireAutreSms, rangerAutreSms, messageAutre, resumeEssaiAutre } from './sms-autres.js';
 
@@ -42,7 +43,7 @@ export { plat, AUTHENTIFICATION };
 const MARQUE_MR = /mondial\s*relay|mondialrelay\.|mrcolis|\bMRELAY\b/i;
 const N_COLIS = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\b/i;
 // « Votre colis 81234567 est disponible au LOCKER 24/7 ENSEIGNE. Retirez-le vite avec le code 712345. »
-const DISPONIBLE = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+est\s+disponible\s+(?:au|à\s+la|a\s+la|à\s+l['’]|a\s+l['’]|dans\s+(?:le|la|votre)|chez)\s+([^.\n]{2,60}?)\s*\.\s.*?\bcode\s*:?\s*(\d{6})\b/i;
+const DISPONIBLE = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+est\s+disponible\s+(?:au|à\s+la|a\s+la|à\s+l['’]|a\s+l['’]|dans\s+(?:le|la|votre)|chez)\s+([^.\n]{2,120}?)\s*\.\s.*?\bcode\s*:?\s*(\d{6})\b/i;
 // « Au cas où le point de retrait pour votre colis 81234567 serait indisponible, sélectionnez-en un autre… »
 const EN_ROUTE = /au\s+cas\s+o[uù]\s+le\s+point\s+de\s+retrait\s+pour\s+votre\s+colis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+serait\s+indisponible/i;
 export const CONSIGNE = /locker|consigne|casier/i;
@@ -52,11 +53,20 @@ export const CONSIGNE = /locker|consigne|casier/i;
 const ARRIVE = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+est\s+arriv[ée]e?\s+(?:au|à\s+la|a\s+la|à\s+l['’]|a\s+l['’]|dans\s+(?:le|la|votre)|chez)\s+(?:(?:P\.|Point)\s*Relais\s+)?(.{2,60}?)\s*\.\s+Retirez[- ]le\b.*?\bcode\s*:?\s*(\d{6})\b/i;
 // Le RAPPEL : « Retirez vite votre colis 81234560 avec le code 712340! Il vous attend au Point Relais TABAC DU PORT »
 // (pas de point final, « ! » collé). Même colis (même n°) ⇒ la même ligne ; le rappel ne date jamais l'arrivée.
+// (12 nov., Julien : « aucune erreur ») Deux formes de plus, écrites sur le modèle des formes RÉELLES
+// (mêmes mots-clés, valeurs inventées) — une forme qui diffère tombe sur « à vérifier » avec son n°,
+// jamais perdue :
+//   DERNIER JOUR : « Dernier jour pour retirer votre colis 81234569 au Point Relais TABAC DU PORT avec le code 712349. »
+//   RETOURNÉ     : « Votre colis 81234570 n'a pas été retiré : il a été retourné à l'expéditeur. »
+//                  (un constat au PASSÉ ; « sera retourné si… » est une condition et ne constate rien).
+const DERNIER_JOUR = /\bdernier\s+jour\b.{0,40}?\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+(?:au|à\s+la|a\s+la|dans\s+(?:le|la))\s+(?:(?:P\.|Point)\s*Relais\s+)?(.{2,120}?)\s+avec\s+le\s+code\s*:?\s*(\d{6})\b/i;
+const RETOURNE = /\bcolis\s+(?:n[°ºo]\s*)?(\d{8,14})\b[^.!?]{0,80}?\b(?:a\s+[ée]t[ée]|est)\s+(?:retourn[ée]|renvoy[ée]|reparti)e?\s+(?:à|a|chez|vers)\s+(?:l['’]\s*)?exp[ée]diteur/i;
 const RAPPEL = /Retirez\s+vite\s+votre\s+colis\s+(?:n[°ºo]\s*)?(\d{8,14})\s+avec\s+le\s+code\s*:?\s*(\d{6})\b\s*!?\s*Il\s+vous\s+attend\s+(?:au|à\s+la|a\s+la|dans\s+(?:le|la))\s+(?:(?:P\.|Point)\s*Relais\s+)?([^.!\n]{2,60})/i;
 
 const lieuPropre = (s) => {
   const l = plat(s).replace(/[®™©*_]+/g, ' ').replace(/[\s,;:–-]+$/, '').replace(/\s+/g, ' ').trim();
-  if (l.length < 2 || l.length > 60 || /https?:|www\.|@/i.test(l) || !/[A-Za-zÀ-ÿ]{2}/.test(l)) return '';
+  // (12 nov.) jusqu'à 120 caractères : le nom du point SUIVI de son adresse (« TABAC, 12 rue …, CP Ville »).
+  if (l.length < 2 || l.length > 120 || /https?:|www\.|@/i.test(l) || !/[A-Za-zÀ-ÿ]{2}/.test(l)) return '';
   return l;
 };
 
@@ -65,7 +75,16 @@ const lieuPropre = (s) => {
 //   { type: 'disponible', suivi, lieu, code, consigne }
 //   { type: 'en_route', suivi }
 //   { type: 'inconnu', suivi }             (Mondial Relay, forme pas apprise ; suivi peut être '')
-export function lireSmsMondialRelay({ texte = '', expediteur = '' } = {}) {
+export function lireSmsMondialRelay({ texte = '', expediteur = '', date = '' } = {}) {
+  const lu = lireSmsMondialRelaySansLimite({ texte, expediteur, date });
+  if (lu.type !== 'disponible') return lu;
+  // (12 nov.) LA DATE LIMITE quand le SMS l'écrit (« avant le 20/11 », « jusqu'au 20/11/2026 ») : la règle des
+  // e-mails (année = celle de la réception). « Dernier jour » ⇒ le jour du SMS (heure de Paris). Sinon rien.
+  const recu = Number.isFinite(Date.parse(String(date || ''))) ? String(date) : new Date().toISOString();
+  const limite = lu.dernierJour ? jourParis(Date.parse(recu)) : limiteRetraitDepuisTexte(plat(texte), recu);
+  return limite ? { ...lu, limite } : lu;
+}
+function lireSmsMondialRelaySansLimite({ texte = '', expediteur = '' } = {}) {
   const t = plat(texte);
   if (!t) return { type: 'ignore', raison: 'vide' };
   if (AUTHENTIFICATION.test(t)) return { type: 'ignore', raison: 'authentification' };
@@ -85,6 +104,13 @@ export function lireSmsMondialRelay({ texte = '', expediteur = '' } = {}) {
     const suivi = normaliserSuivi(rp[1]); const code = rp[2]; const lieu = lieuPropre(rp[3]);
     if (suivi && lieu && code && code !== suivi) return { type: 'disponible', suivi, lieu, code, consigne: CONSIGNE.test(lieu), rappel: true };
   }
+  const dj = DERNIER_JOUR.exec(t);
+  if (dj) {
+    const suivi = normaliserSuivi(dj[1]); const lieu = lieuPropre(dj[2]); const code = dj[3];
+    if (suivi && lieu && code && code !== suivi) return { type: 'disponible', suivi, lieu, code, consigne: CONSIGNE.test(lieu), rappel: true, dernierJour: true };
+  }
+  const rt = RETOURNE.exec(t);
+  if (rt) return { type: 'retour', suivi: normaliserSuivi(rt[1]) };
   const r = EN_ROUTE.exec(t);
   if (r) return { type: 'en_route', suivi: normaliserSuivi(r[1]) };
   const n = N_COLIS.exec(t);
@@ -111,7 +137,7 @@ export function ligneSms(lu, prev, { smsAt, maintenant } = {}) {
     if (!p) {
       return { action: 'range', data: { ...base, status: 'available', statusLabel: 'Arrivé au point de retrait (SMS)',
         subject, receivedAt: now, emailAt: at, arriveLe: lu.rappel ? null : arriveLeAuRangement(null, subject, 'available', at),
-        code: lu.code, code2: null, artTitle: null, lieu: lu.lieu, limite: null, consigne: !!lu.consigne,
+        code: lu.code, code2: null, artTitle: null, lieu: lu.lieu, limite: lu.limite || null, consigne: !!lu.consigne,
         qrB64: null, qrType: null, qrUrl: null, account: '', source: 'sms', sms: smsTrace } };
     }
     const garde = conserverRetrait(p, { status: 'available', label: 'Arrivé au point de retrait (SMS)' }, plusRecent);
@@ -122,11 +148,19 @@ export function ligneSms(lu, prev, { smsAt, maintenant } = {}) {
       subject: status === p.status ? (p.subject || subject) : subject,
       receivedAt: now, emailAt,
       code: p.code || lu.code, lieu: p.lieu || lu.lieu, consigne: !!(p.consigne || lu.consigne),
-      limite: p.limite || null, sms: smsTrace, aussiSms: true };
+      limite: p.limite || lu.limite || null, sms: smsTrace, aussiSms: true };
     if (p.code && String(p.code) !== lu.code) data.codeSms = lu.code;       // dit à l'écran, jamais caché
     const a = lu.rappel ? (p.arriveLe || null) : arriveLeAuRangement(p, subject, status, at); if (a) data.arriveLe = a;
     if (p.smsAVerifier) delete data.smsAVerifier;
     return { action: status === 'available' ? 'fusionne' : 'garde-etat', data };
+  }
+  if (lu.type === 'retour') {
+    // Un retour CONSTATÉ (au passé) : le colis n'est plus au point. Un retiré reste retiré.
+    if (p && p.status === 'delivered') return { data: null, action: 'deja-retire' };
+    if (p && p.status === 'retour') return { data: null, action: 'deja-connu' };
+    return { action: p ? 'fusionne' : 'range', data: { ...(p || { code: null, code2: null, artTitle: null, lieu: null, limite: null, consigne: false, qrB64: null, qrType: null, qrUrl: null, account: '', source: 'sms' }),
+      ...base, status: 'retour', statusLabel: 'Reparti chez l’expéditeur (SMS Mondial Relay)', subject: `SMS Mondial Relay : colis ${lu.suivi} retourné à l’expéditeur`,
+      receivedAt: now, emailAt, sms: smsTrace, ...(p ? { aussiSms: true } : {}) } };
   }
   if (lu.type === 'en_route') {
     // « Au cas où… » ne prouve rien d'une arrivée ni d'un départ : il ne fait
@@ -156,7 +190,8 @@ export function messageSms(lu, action) {
   const c = `Colis ${fin4(lu.suivi)}`;
   if (action === 'deja-retire') return `${c} déjà retiré : rien changé`;
   if (action === 'deja-connu') return `${c} déjà connu : rien changé`;
-  if (lu.type === 'disponible') return `${c} rangé · code ✓ · ${lu.lieu}`;
+  if (lu.type === 'disponible') return `${c} rangé · code ✓ · ${lu.lieu}${lu.limite ? ` · avant le ${lu.limite.slice(8, 10)}/${lu.limite.slice(5, 7)}` : ''}`;
+  if (lu.type === 'retour') return `${c} rangé · retourné à l’expéditeur`;
   if (lu.type === 'en_route') return `${c} rangé · en route`;
   return `${c} rangé · à vérifier (SMS pas reconnu)`;
 }

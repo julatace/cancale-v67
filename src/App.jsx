@@ -487,6 +487,7 @@ import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDes
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
+import VoirEmailColis from "./VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
@@ -46613,7 +46614,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (10 nov.) « Votre colis a changé de plan » : POINT RELAIS CHANGÉ, en ambre, avec le
             nouveau point LU dans l'e-mail et son itinéraire (src/AlerteRelaisChange.jsx). */}
         {/* (11 nov., lot DJ3) Sur Achats, l'alerte est rendue une fois, dans la section « À retirer » (ses outils). */}
-        {(aFilter==='attente' || (aFilter==='route' && !modeListeAchats)) && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>}
+        {(aFilter==='attente' || (aFilter==='route' && !modeListeAchats)) && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap} headers={sbAuth}/>}
         {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
             des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
@@ -49469,6 +49470,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>; })())}
               {/* (11 nov.) Le n° de suivi est sur la ligne (une fois, §7) : ici le compte seul. */}
               {(plusieursComptesRet && cpt) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{`compte ${cpt}`}</span> : (su || cpt !== undefined ? <span hidden data-rp-suivi={su} data-colis-compte={cpt}/> : null)}
+              {/* (12 nov.) « Voir l'e-mail » : l'e-mail source gardé par la ligne (`emailRecu`) ; pas su ⇒ rien. */}
+              {t && t.emailRecu ? <VoirEmailColis id={t.emailRecu} headers={sbAuth}/> : null}
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
                   quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
               {x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">Transporteur pas encore connu : le suivi Vinted ne le nomme pas</span> : null}

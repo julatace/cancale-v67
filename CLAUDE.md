@@ -550,7 +550,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · Finitions écran par écran** : 8 défauts vus et corrigés (Factures vides, Catalogue, Stock Vinted, Colis Leboncoin, Numéros, « N à imprimer », lien Favoris) ; restes à décider : `docs/passation/2026-11-12-finitions.md`. Geste : aucun.
+- **12 nov. · Finitions (2 passes)** : défauts écran par écran, ligne unique d'« À retirer » (logo et nom du transporteur), cartes « À expédier », couleurs §7. `docs/passation/2026-11-12-finitions.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

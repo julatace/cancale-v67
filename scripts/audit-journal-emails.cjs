@@ -84,6 +84,24 @@ const LIGNE_J = { owner: J, data: { adresses: { 'recu@vrm.center': { owner: J } 
     const r = o.suivi && o.suivi.data.resume;
     dit(r && r.t === 'suivi' && r.st === 'available' && r.code === '418205' && r.s === '12345678' && /Tabac du Port/.test(r.lieu || ''), 'code de retrait : code, lieu et n° de suivi dans le résumé', JSON.stringify(r));
     dit(o.suivi.data.etat === 'integre', 'un colis relié par son n° de suivi est « rangé »');
+    // (12 nov.) « Voir l'e-mail » : la ligne de suivi garde l'id de SA ligne `email_reception_*`.
+    const tr = o.ecrites.find((x) => /^email_track_/.test(x.id));
+    dit(tr && o.suivi && tr.data.emailRecu === o.suivi.id, 'la ligne de suivi garde l’e-mail source (`emailRecu` = id de SA ligne email_reception_*)', tr && String(tr.data.emailRecu));
+  });
+  await essaie('chronopost sans numéro de rue', async () => {
+    // (12 nov.) Forme MESURÉE d'un Relais Pickup Chronopost (données inventées) : la rue n'a pas de numéro.
+    const o = await envoyer({ from: 'Chronopost <noreply@chronopost.fr>', subject: 'Votre colis XY123456789FR est disponible en Relais Pickup', text: 'Bonjour,\nVotre colis XY123456789FR vous attend.\nEPICERIE DU TEST\nRUE DE LA FONTAINE\n35000 RENNES\nCode de retrait : 482913\nVous avez jusqu’au 20/11/2026 pour le retirer.' });
+    const tr = o.ecrites.find((x) => /^email_track_chronopost_/.test(x.id));
+    const { lieuDepuisExtrait } = await import('file://' + path.join(R, 'api/_lib/retrait-colis.js'));
+    const lu = tr ? (tr.data.lieu || lieuDepuisExtrait(tr.data.extraitLieu || '')) : null;
+    dit(lu === 'EPICERIE DU TEST, RUE DE LA FONTAINE, 35000 RENNES', 'Chronopost : le point à rue SANS numéro est lu (rangé ou relu dans l’extrait)', JSON.stringify(tr && { lieu: tr.data.lieu, extraitLieu: tr.data.extraitLieu }));
+    dit(tr && o.suivi && tr.data.emailRecu === o.suivi.id, 'Chronopost : la ligne de suivi garde l’e-mail source', tr && String(tr.data.emailRecu));
+  });
+  await essaie('sans Message-ID', async () => {
+    const res = faireRes(); etat = {}; ecrites.length = 0;
+    await route.default({ method: 'POST', query: {}, headers: { 'x-vrm-email-key': 'cle-banc-journal' }, body: { to: 'recu@vrm.center', html: '', attachments: [], from: 'Mondial Relay <noreply@mondialrelay.fr>', subject: 'Votre colis 87654321 est disponible', text: 'Votre code de retrait est 551234\nPoint Relais\nRelais Test\n3 Rue Exemple\n56000 Vannes' } }, res);
+    const tr = ecrites.find((x) => /^email_track_/.test(x.id));
+    dit(tr && !('emailRecu' in tr.data), 'sans Message-ID : aucun e-mail source deviné (rien gardé)', tr && String(tr.data.emailRecu));
   });
   await essaie('reçu d’achat', async () => {
     const o = await envoyer({ from: 'Vinted <no-reply@vinted.fr>', subject: 'Ton reçu pour la commande « Nike Air Force 1 »', text: 'Merci pour ton achat !\nMontant payé : 45,00 €\n*N° de transaction* 98765432101\n' });
