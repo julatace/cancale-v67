@@ -42,7 +42,7 @@ export default function AutresVersions({ nom, premier = '', variantes = [], onCh
   return (
     <div className="vrm-versions" data-versions={nom} data-versions-n={remplies}>
       {liste.map((t, i) => (
-        <div key={i} className="vrm-versions-ligne">
+        <div key={`version-${i + 2}`} className="vrm-versions-ligne">{/* une case par n° de version (2 à 5) : la position EST son identité */}
           <label className="vrm-versions-label" htmlFor={`vrm-version-${nom}-${i + 2}`}>Version {i + 2}</label>
           <div className="vrm-versions-champ">
             <textarea id={`vrm-version-${nom}-${i + 2}`} data-version={i + 2} rows={2} maxLength={2000} disabled={desactive}

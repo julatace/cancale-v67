@@ -88,7 +88,7 @@ function LigneCarnet({ c }) {
   if (!c.total) return <span className="vrm-disc-carnet" data-carnet="0">Aucun frein en 7 jours</span>;
   return (
     <span className="vrm-disc-carnet is-geste" data-carnet={c.total}>
-      {MOTS_CARNET.filter(([k]) => c[k]).map(([k, un, plusieurs]) => <span key={k} data-carnet-sorte={k}>{c[k]} {c[k] > 1 ? plusieurs : un}</span>)}
+      {MOTS_CARNET.filter(([sorte]) => c[sorte]).map(([sorte, un, plusieurs]) => <span key={sorte} data-carnet-sorte={sorte}>{c[sorte]} {c[sorte] > 1 ? plusieurs : un}</span>)}
       {c.dernier ? <span className="vrm-disc-dernier">dernier {new Date(c.dernier).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' })} {heureFr(c.dernier)}</span> : null}
     </span>
   );
