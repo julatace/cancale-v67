@@ -266,6 +266,31 @@ const ligneFausseLivree = (suivi, o) => ({ type: 'suivi', carrier: 'mondialrelay
     dit(/<AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}(?: headers=\{sbAuth\})?\/>/.test(app), 'l’alerte « point changé » lit aussi le transporteur');
   });
 
+  // (12 nov., décision de Julien : « tout doit être fait automatiquement, tu regardes sur le site du transporteur »)
+  console.log('§T deux preuves se contredisent : le transporteur tranche (api/_lib/suivi-colis.js, src/relaisChange.js)');
+  await essaie('T', async () => {
+    const S = await importer('api/_lib/suivi-colis.js');
+    const M = await importer('src/relaisChange.js');
+    const l = S.relireLigneSuivi(ligneFausseLivree('87650050'));
+    dit(l.status === 'transit' && !!l.aVerifierTransporteur, 'T1 « retiré » le 9 puis « changé de plan » le 10 ⇒ en route, contradiction DITE (à vérifier chez le transporteur)', J({ s: l.status, v: l.aVerifierTransporteur }));
+    const lu = '2026-11-12T08:00:00.000Z', now = Date.parse('2026-11-12T09:00:00.000Z');
+    const retire = { suivi: '87650050', carrier: 'mondialrelay', etat: 'retire', etatAt: '2026-11-09T18:00:00.000Z', lu, fini: true };
+    const fR = S.fusionTransporteur(l, retire, now);
+    dit(fR.status === 'delivered' && fR.viaTransporteur && !fR.aVerifierTransporteur, 'T2 le transporteur dit retiré (même daté AVANT l’e-mail) ⇒ retiré', J({ s: fR.status }));
+    dit(M.colisRelaisChange([l], { maintenant: now, transp: new Map([['87650050', retire]]) }).length === 0, 'T3 …et plus d’alerte « point relais changé »');
+    const route = { suivi: '87650050', carrier: 'mondialrelay', etat: 'en_route', etatAt: '2026-11-11T18:00:00.000Z', lu };
+    const fE = S.fusionTransporteur(l, route, now);
+    dit(fE.status === 'transit' && !fE.aVerifierTransporteur, 'T4 le transporteur dit en route ⇒ en route (contradiction levée)', J({ s: fE.status, v: fE.aVerifierTransporteur }));
+    const fN = S.fusionTransporteur(l, null, now);
+    dit(fN.status === 'transit' && !!fN.aVerifierTransporteur, 'T5 pas de réponse du transporteur ⇒ rien deviné, « à vérifier » reste (retenté au passage suivant)');
+    const sansLieu = { type: 'suivi', carrier: 'mondialrelay', suivi: '87650060', status: 'available', code: '123456', lieu: null, subject: 'Votre colis 87650060 est disponible', emailAt: '2026-11-11T08:00:00.000Z' };
+    const dispo = { suivi: '87650060', carrier: 'mondialrelay', etat: 'disponible', etatAt: '2026-11-11T07:00:00.000Z', lu, lieuNom: 'TABAC TEST', lieuRue: '3 rue Exemple', lieuCp: '35000', lieuVille: 'Rennes' };
+    const fL = S.fusionTransporteur(sansLieu, dispo, now);
+    dit(fL.lieu === 'TABAC TEST, 3 rue Exemple, 35000 Rennes' && fL.lieuDuTransporteur, 'T6 « Lieu à confirmer » avec un n° de suivi : le point vient du transporteur', J(fL.lieu));
+    const vrai = S.relireLigneSuivi(ligneFausseLivree('87650070', { retireLe: '2026-11-10T10:02:30.000Z' }));
+    dit(vrai.status === 'transit' && !vrai.aVerifierTransporteur, 'T7 le faux « retiré » posé PAR l’e-mail du changement (même heure) : en route, sans contradiction');
+  });
+
   console.log(`\n${ok} vérifications, ${ko} en échec`);
   process.exit(ko ? 1 : 0);
 })();

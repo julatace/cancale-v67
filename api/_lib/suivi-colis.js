@@ -78,7 +78,14 @@ export function relireLigneSuivi(d) {
   // (le corps parlait du point, « livré dans le Point Relais suivant ») : la ligne garde le
   // sujet de l'e-mail qui a posé son état — c'est donc lui qui l'avait mal classée. Le colis
   // roule vers le nouveau point (api/_lib/etat-colis-email.js, `changementDeRelais`).
-  if (etat === 'transit' && changementDeRelais(d.subject || d.sujet || '') && d.status !== 'transit') return { ...d, status: 'transit', statusLabel: 'Point relais changé', relaisChange: true, retireLe: null };
+  if (etat === 'transit' && changementDeRelais(d.subject || d.sujet || '') && d.status !== 'transit') {
+    // (12 nov.) Un « retiré » posé par une AUTRE preuve que cet e-mail (daté à plus de 5 min de son rangement)
+    // contredit le changement de plan : la contradiction est DITE et le transporteur la tranchera (`fusionTransporteur`).
+    const autrePreuve = d.status === 'delivered' && Number.isFinite(Date.parse(d.retireLe || '')) && Number.isFinite(Date.parse(d.receivedAt || ''))
+      && Math.abs(Date.parse(d.retireLe) - Date.parse(d.receivedAt)) > 5 * 60000;
+    return { ...d, status: 'transit', statusLabel: 'Point relais changé', relaisChange: true, retireLe: null,
+      ...(autrePreuve ? { aVerifierTransporteur: 'Retiré puis « changé de plan » : VRM le vérifie chez le transporteur' } : {}) };
+  }
   if (d.status === 'transit' && d.relaisChange && !d.statusLabel) return { ...d, statusLabel: 'Point relais changé' };
   // (10 nov., retraits irréprochables) « Action requise : le colis semble avoir été perdu » rangé
   // « livré / retiré » avant la règle du 3 nov. (mesuré : une ligne du 2 nov. l'est encore) : un colis
@@ -303,11 +310,25 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
     if (lectureEnRetard(p, preuve)) return { ...l, transp: t, transpEnRetard: true };
     return l;
   }
+  // (12 nov., décision de Julien : « tout doit être fait automatiquement, tu regardes sur le site du transporteur »)
+  // LE TRANSPORTEUR TRANCHE. Retiré ou reparti chez lui est un état FINAL : il l'emporte sur les e-mails qui se
+  // contredisent (ex. « retiré » le 9 nov. puis « changé de plan » le 10) — jamais Julien à qui l'on demande.
+  // « En route » ⇒ la ligne reste en route (ci-dessus pour une ligne disponible). Pas de réponse ⇒ rien de
+  // changé : la contradiction reste dite (`aVerifierTransporteur`) et la lecture est retentée au passage suivant.
+  if (t.etat === 'retire' && st !== 'delivered' && luMs != null) {
+    return { ...l, status: 'delivered', statusLabel: 'Retiré (lu chez le transporteur)', retireLe: t.etatAt || t.lu, relaisChange: false, viaTransporteur: true, transp: t, aVerifierTransporteur: null };
+  }
+  if (t.etat === 'retour_expediteur' && st !== 'delivered' && st !== 'retour' && luMs != null) {
+    return { ...l, status: 'retour', statusLabel: 'Reparti chez l’expéditeur (lu chez le transporteur)', relaisChange: false, viaTransporteur: true, transp: t, aVerifierTransporteur: null };
+  }
+  if (t.etat === 'en_route' && l.aVerifierTransporteur && luMs != null) return { ...l, transp: t, aVerifierTransporteur: null };
   if (t.etat !== 'disponible') return l;
   const em = dernierEmailMs(l);
   const recent = luMs != null && maintenant - luMs < DISPO_LEVE_GARDE_MS ? luMs : null;
   if (st === 'available') {
     const out = { ...l, transp: t };
+    // (12 nov.) « Lieu à confirmer » avec un n° de suivi : le point vient du transporteur quand l'e-mail ne le dit pas.
+    if (!l.lieu && lieuTransp(t)) { out.lieu = lieuTransp(t); out.lieuDuTransporteur = true; }
     if (!l.limite && t.limite && t.limiteSure) { out.limite = t.limite; out.limiteDuTransporteur = true; }
     // (29 oct.) L'HEURE de la limite (Vinted Go) quand c'est le même jour.
     if (t.limiteSure && t.limiteAt && out.limite && out.limite === t.limite) out.limiteAt = t.limiteAt;

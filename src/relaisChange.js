@@ -51,6 +51,9 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
   const arriveApres = (n, ligneMs) => {
     const t = transp && typeof transp.get === 'function' ? transp.get(n) : null;
     if (!t || !ETATS_ARRIVE.has(t.etat)) return false;
+    // (12 nov., « le transporteur tranche ») Retiré ou reparti chez le transporteur est FINAL : plus d'alerte,
+    // quelle que soit la date de l'e-mail du changement (ex. retiré le 9, « changé de plan » le 10).
+    if (t.etat === 'retire' || t.etat === 'retour_expediteur') return true;
     const e = msDe(t.etatAt);
     return e != null && (ligneMs == null || e > ligneMs);
   };
