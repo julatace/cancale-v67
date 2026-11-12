@@ -1717,3 +1717,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · Messages Leboncoin, Vestiaire, eBay comme Vinted** : envoi vu dans le fil (`src/envoiFil.js`, règles d'envoi inchangées), fil vide = « pas encore lu · Relire », lecture ratée = « Réessayer », doublons eBay fondus, offre Vestiaire dans sa conversation. `docs/passation/2026-11-12-messages-sites.md`. Geste : aucun.
 - **12 nov. · Sécurité des comptes (second agent)** : mots qui font bannir (`src/messageSur.js`) — message à la main ⇒ ambre + « Envoyer quand même », automatique (favoris, refus auto) ⇒ jamais envoyé, annonce ⇒ ligne de « vérifier avant » ; « Copie de mes annonces » (zip par compte, dans le navigateur) ; carte « Protège ton compte VRM » ; aucun jeton Vinted vers la page (proxy, connect, liste projetée). `docs/passation/2026-11-12-securite-comptes.md`. Geste : aucun.
 - **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
+
+## Déplacé tel quel de CLAUDE.md §9 (12 nov., intégration 12nov-a — fichier sous 59 000 octets)
+
+- **12 nov. · Restes (agent2-restes)** : points relais tous transporteurs (rue sans n°, repli extrait), « Voir l'e-mail », « Où vous livrer… » = en route, « livré ici » relu, SMS, bancs. `2026-11-12-restes.md`. Geste : aucun.

@@ -44,7 +44,9 @@ import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque ap
 //    chez lui. Elle exige la session et range le compte chez CE vendeur
 //    (audit de sécurité, 4 octobre — banc routes-ecriture.cjs).
 
-const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+// (12 nov.) Lue de l'environnement comme toutes les autres fonctions (`SUPABASE_URL`) :
+// une base de banc ou de prévisualisation n'écrit plus dans la production.
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
 // vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
 // publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
