@@ -1,0 +1,49 @@
+/* Groupes par compte (11 nov., src/GroupesComptes.jsx) — style DA6 : libellés
+   13/600 gris, rangées de 44 px au doigt, chevron › qui pivote, aucun accent,
+   aucune couleur d'alerte (ce n'est pas un geste à faire). Dans une grille
+   (Achats sur ordinateur, annonces en cartes), l'en-tête prend toute la largeur. */
+.vrm-gc-tete, .vrm-gc-compte, .vrm-gc-suite {
+  grid-column: 1 / -1;
+  box-sizing: border-box;
+  width: 100%;
+  font-family: var(--vrm-police, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif);
+}
+.vrm-gc-tete {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px 6px;
+  font-size: 13px; font-weight: 600; line-height: 1.3;
+  color: var(--w-gris, #6E6E73);
+}
+.vrm-gc-tete b { color: var(--w-encre, #1D1D1F); font-weight: 700; overflow-wrap: anywhere; }
+.vrm-gc-titre { min-width: 0; }
+.vrm-gc-n { font-variant-numeric: tabular-nums; }
+.vrm-gc-autres { padding-top: 22px; border-top: 0.5px solid var(--w-filet, rgba(60,60,67,.18)); }
+.vrm-gc-compte {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 48px; padding: 0 16px;
+  background: transparent; border: 0; border-top: 0.5px solid var(--w-filet, rgba(60,60,67,.18));
+  text-align: left; cursor: pointer; color: var(--w-encre, #1D1D1F);
+  font-size: 15px; font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-gc-compte:focus-visible, .vrm-gc-suite:focus-visible { outline: 2px solid var(--w-accent, #0071E3); outline-offset: -2px; }
+.vrm-gc-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-gc-compte .vrm-gc-n { color: var(--w-gris, #6E6E73); font-weight: 500; font-size: 14px; flex-shrink: 0; }
+.vrm-gc-chevron { color: var(--w-gris-2, #AEAEB2); font-size: 20px; line-height: 1; flex-shrink: 0; transition: transform 160ms ease-out; }
+.vrm-gc-compte[aria-expanded="true"] .vrm-gc-chevron { transform: rotate(90deg); }
+.vrm-gc-suite {
+  display: block; min-height: 44px; padding: 0 16px;
+  background: transparent; border: 0; border-top: 0.5px solid var(--w-filet, rgba(60,60,67,.18));
+  color: var(--w-accent, #0071E3); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
+}
+.vrm-gc-geste {
+  min-height: 44px; padding: 0 4px; background: transparent; border: 0; cursor: pointer;
+  color: var(--w-accent, #0071E3); font-size: 13px; font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) { .vrm-gc-chevron { transition: none; } }
+/* Dans une liste d'annonces en fiches (<ul> en grille) : l'en-tête est un <li>
+   pleine largeur, sans la forme d'une fiche. */
+html body .vrm-app-shell .vrm-lbc-catalog li.vrm-gc-li,
+.vrm-lbc-catalog li.vrm-gc-li { display: block; grid-column: 1 / -1; padding: 0; border-top: 0; background: transparent; box-shadow: none; }
+.vrm-lbc-catalog li.vrm-gc-li .vrm-gc-tete { padding-left: 2px; padding-right: 2px; }
+.vrm-lbc-catalog li.vrm-gc-li .vrm-gc-compte { padding-left: 2px; padding-right: 2px; }
