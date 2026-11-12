@@ -1273,7 +1273,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setBusy(true); setRes(null); setCheck(null);
     // (11 nov., lot suivi-travail) La feuille « VRM travaille » : envoi, puis la réponse d'eBay telle quelle.
     const t = suivi.demarrer({ sorte: 'publier-ebay', titre: 'Publier sur eBay', etapes: [['envoi', 'Envoi de l’annonce à eBay'], ['accepte', 'Mise en vente acceptée par eBay ✓']],
-      articles: [{ id: 'ebay', num: (b.item && b.item.numero) || '', titre: titre || '' }] });
+      articles: [{ id: 'ebay', num: (b.item && b.item.numero) || '', titre: titre || '' }], seuilMs: 1000 });
     if (t) t.etape('ebay', 'envoi');
     // `appelEbay` ne lève jamais : une coupure (code 0) ou une réponse illisible
     // n'est PAS « impossible » — la requête a pu arriver, l'annonce exister.
@@ -1304,6 +1304,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) t.fin('ebay', { etat: 'main', raison: 'eBay n’a pas répondu : l’annonce est peut-être partie', geste: 'Rafraîchis depuis eBay (Paramètres → Comptes eBay) avant de recommencer' });
       else t.fin('ebay', { etat: 'refus', raison: (j && j.error) || 'eBay a refusé la publication' });
       t.terminer('');
+      // (intégration g1) Comme « Imprimer les bordereaux » : une publication réussie en moins d'une seconde
+      // n'est pas un « travail » — la feuille ne s'ouvre pas (l'écran dit déjà le résultat) ; sinon elle se montre.
+      { const s1 = t.etat && t.etat(); const toutBon = s1 && s1.articles.every((x) => x.etat === 'ok'); if (s1 && toutBon && s1.visibleDes && Date.now() < s1.visibleDes) suivi.oublier(); else suivi.montrer(); }
     }
     setBusy(false);
   };

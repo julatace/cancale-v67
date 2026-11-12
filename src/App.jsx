@@ -49913,7 +49913,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* (intégration E3 — Julien, « inadmissible » : plus de « non vérifié » sur chaque ligne) Dit seulement quand il est CONNU. */}
                           {place ? <span className="vrm-tip-place" data-lot-emplacement={place}>{place}</span> : null}
                         </span>
-                        <span className="vrm-tip-logo" aria-label={libelleTransp(l.trNom)} title={libelleTransp(l.trNom)}>{logo(l)}</span>
+                        <span className="vrm-tip-logo" role="img" aria-label={libelleTransp(l.trNom)} title={libelleTransp(l.trNom)}>{logo(l)}</span>
                       </label>);
                   };
                   const choisis = L.filter((l) => lot.coches.has(l.cle) && l.cochable !== false);
