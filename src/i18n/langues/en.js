@@ -465,6 +465,8 @@ export default {
   "reglages.securite.desc": "Check that only you can read and write your data.",
   "reglages.securite.lib": "Data security",
   "reglages.signalements.lib": "Reports received",
+  "reglages.simulation.lib": "Simulate an account creation",
+  "reglages.simulation.desc": "A new seller’s journey, on made-up accounts.",
   "reglages.signaler.desc": "Say what’s wrong: you see everything that’s sent before sending.",
   "reglages.signaler.lib": "Report a problem",
   "reglages.sms-colis.desc": "Forward your Mondial Relay, Vinted Go and Pickup texts to VRM, like your emails.",

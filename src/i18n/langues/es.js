@@ -465,6 +465,8 @@ export default {
   "reglages.securite.desc": "Comprobar que solo tú puedes leer y escribir tus datos.",
   "reglages.securite.lib": "Seguridad de los datos",
   "reglages.signalements.lib": "Informes recibidos",
+  "reglages.simulation.lib": "Simular la creación de una cuenta",
+  "reglages.simulation.desc": "El recorrido de un nuevo vendedor, con cuentas ficticias.",
   "reglages.signaler.desc": "Di qué falla: ves todo lo que se envía antes de enviarlo.",
   "reglages.signaler.lib": "Informar de un problema",
   "reglages.sms-colis.desc": "Reenviar a VRM tus SMS de Mondial Relay, Vinted Go y Pickup, como tus e-mails.",

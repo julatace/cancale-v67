@@ -115,6 +115,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
 import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
+import { SimulationCompte } from "../SimulationCompte.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -2190,6 +2191,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // voit l'entrée, et la route refuse tout autre compte (403).
       proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:tr('reglages.pilotage.lib'), desc:tr('reglages.pilotage.desc'), data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
+      proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'spark', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>
       <details><summary>{tr('reglages.depannage.emails.q')}</summary><p>{tr('reglages.depannage.emails.r')}</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
