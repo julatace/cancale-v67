@@ -196,7 +196,7 @@ import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
 import { requeteDeLaVoix, ficheDeLaVoix, ventesDuMois } from "./rechercheVocale.js";
 import { ventesAilleursPour, opsVenduAilleurs } from "./venteAilleurs.js";   // (11 nov., saisie rapide) « Vendu ailleurs »
-import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
+import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande, FENETRE_MS as FENETRE_PRIX_MS } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
 import { VenduAilleurs, FeuillePrixAchat, poserDemandesPrix, abonnerDemandesPrix, lireDemandesPrix } from "./SaisieRapide.jsx";
 import { VOIX, PHRASES_VOIX, ecouter, annulerVoix, arreterVoix, ecouteEnCours } from "./dicteeNavigateur.js";
 import { useEtatVoix, LigneVoix } from "./composants/voix.jsx";
@@ -503,6 +503,7 @@ import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDes
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
+import VoirEmailColis from "./VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
@@ -28833,10 +28834,16 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
     // non terminal) : leur panne vaut « pas su » — jamais une demi-preuve.
     const juger = comptesAJuger(bords, preuvesParTransaction(rows).items, rows);
     const parCompte = {};
-    if (juger.length) {
-      const lignes = await ordres(juger);
+    // (12 nov., intégration) Les ventes DÉJÀ LUES par l'appelant (la coque : `ventesCoque`, par compte)
+    // servent telles quelles — la relecture des ventes de tous les comptes (≈ 650 Ko) ne part que pour
+    // ceux qu'il n'a pas.
+    const connues = opts.ventesConnues && typeof opts.ventesConnues === 'object' ? opts.ventesConnues : null;
+    const aLire = connues ? juger.filter((u) => !Array.isArray(connues[u])) : juger;
+    if (connues) for (const u of juger) if (Array.isArray(connues[u])) parCompte[u] = connues[u];
+    if (aLire.length) {
+      const lignes = await ordres(aLire);
       if (lignes === null) return null;
-      Object.assign(parCompte, ventesParCompteDe(lignes, juger));
+      Object.assign(parCompte, ventesParCompteDe(lignes, aLire));
     }
     const parTx = preuvesParTransaction(rows, parCompte);
     const vendus = new Set(parTx.items);
@@ -46993,7 +47000,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (10 nov.) « Votre colis a changé de plan » : POINT RELAIS CHANGÉ, en ambre, avec le
             nouveau point LU dans l'e-mail et son itinéraire (src/AlerteRelaisChange.jsx). */}
         {/* (11 nov., lot DJ3) Sur Achats, l'alerte est rendue une fois, dans la section « À retirer » (ses outils). */}
-        {(aFilter==='attente' || (aFilter==='route' && !modeListeAchats)) && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>}
+        {(aFilter==='attente' || (aFilter==='route' && !modeListeAchats)) && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap} headers={sbAuth}/>}
         {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
             des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}
@@ -49859,6 +49866,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>; })())}
               {/* (11 nov.) Le n° de suivi est sur la ligne (une fois, §7) : ici le compte seul. */}
               {(plusieursComptesRet && cpt) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{`compte ${cpt}`}</span> : (su || cpt !== undefined ? <span hidden data-rp-suivi={su} data-colis-compte={cpt}/> : null)}
+              {/* (12 nov.) « Voir l'e-mail » : l'e-mail source gardé par la ligne (`emailRecu`) ; pas su ⇒ rien. */}
+              {t && t.emailRecu ? <VoirEmailColis id={t.emailRecu} headers={sbAuth}/> : null}
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
                   quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
               {x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">Transporteur pas encore connu : le suivi Vinted ne le nomme pas</span> : null}
@@ -59035,12 +59044,27 @@ function AppCoeur() {
   },[]);
   // Les preuves : relues quand les ventes changent, et tous les quarts d'heure — jamais à
   // chaque fiche touchée (la lecture des transactions est la plus lourde).
+  // (12 nov., intégration) La lecture des transactions est lourde (≈ 650 Ko, budget-vitesse) : seulement quand une
+  // vente des 3 derniers jours (la fenêtre de `ventesSansPrix`) existe, et relue quand CES ventes changent — pas
+  // à chaque nouvelle liste des ventes. Aucune ⇒ rien à demander, sans lire.
+  const clePrixRecentes=useMemo(()=>{
+    if(!Array.isArray(ventesCoque)) return null;
+    const now=Date.now();
+    return ventesCoque.filter((o)=>{ if(!o||o.transaction_id==null||classifyOrderStatus(o.status)==='cancelled') return false; const t=Date.parse(o.date||''); return Number.isFinite(t)&&now-t<=FENETRE_PRIX_MS&&t-now<=86400000; })
+      .map((o)=>String(o.transaction_id)).sort().join(',');
+  },[ventesCoque]);
   useEffect(()=>{
-    if(!AUTH.user||!Array.isArray(ventesCoque)) return undefined;
+    if(!AUTH.user||clePrixRecentes===null) return undefined;
+    if(clePrixRecentes===''){ setPrixPreuves({ paires: [] }); return undefined; }
     let mort=false;
-    lirePreuvesVenteVinted().then((pv)=>{ if(!mort) setPrixPreuves(pv&&Array.isArray(pv.paires)?pv:null); }).catch(()=>{ if(!mort) setPrixPreuves(null); });
+    // Les ventes déjà lues par la coque, par compte (les comptes en échec n'y sont pas : relus).
+    const connues={}; const ko=new Set((ventesKO||[]).map(String));
+    for(const a of (vintedAccounts||[])){ const u=String((a&&a.vinted_user_id)||''); if(u&&!ko.has(u)) connues[u]=[]; }
+    for(const o of (Array.isArray(ventesCoque)?ventesCoque:[])){ const u=o&&o._acc?String(o._acc.vinted_user_id):''; if(u&&Array.isArray(connues[u])) connues[u].push(o); }
+    lirePreuvesVenteVinted({ ventesConnues: connues }).then((pv)=>{ if(!mort) setPrixPreuves(pv&&Array.isArray(pv.paires)?pv:null); }).catch(()=>{ if(!mort) setPrixPreuves(null); });
     return ()=>{ mort=true; };
-  },[ventesCoque,prixQuart]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[clePrixRecentes,prixQuart]);
   useEffect(()=>{
     if(prixPreuves===undefined||!Array.isArray(ventesCoque)) return;
     { const pv=prixPreuves;

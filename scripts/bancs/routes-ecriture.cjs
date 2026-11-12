@@ -37,6 +37,12 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 // `vintedRefuse` : Vinted répond non-ok au /auth/refresh (jeton expiré/invalide).
 const ecrites = []; // { method, table, body } de chaque écriture vers Supabase
 const lectures = []; // URL des lectures de vinted_accounts
+// (12 nov.) La base du banc : posée AVANT l'import, comme Vercel pose `SUPABASE_URL`. Toute requête
+// Supabase (rest/auth) doit partir vers ELLE — une adresse de production en dur dans la route
+// (`api/vinted-refresh.js`, `api/vinted-connect.js` jusqu'au 12 nov.) est rouge ici.
+const BASE_BANC = 'https://base-du-banc.exemple.test';
+process.env.SUPABASE_URL = BASE_BANC;
+const hotesBase = new Set(); // hôtes de chaque requête /rest/v1 ou /auth/v1
 let appelsVinted = 0;
 const VENDEUR = '11111111-1111-4111-8111-111111111111';
 const SESSION = { authorization: 'Bearer aa.bb.cc' };   // un jeton inventé, reconnu par la fausse base
@@ -45,6 +51,7 @@ function poserFetch({ vintedRefuse }) {
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
     const method = (opts.method || 'GET').toUpperCase();
+    if (/\/(rest|auth)\/v1\//.test(u)) { try { hotesBase.add(new URL(u).origin); } catch (_) { hotesBase.add(u); } }
     const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
     if (/\/auth\/v1\/user/.test(u)) {
       const h = opts.headers || {};
@@ -172,6 +179,11 @@ const faireRes = () => {
       'vinted-connect : le compte collé est rangé chez le vendeur de la SESSION (pas chez le propriétaire de l\'installation)',
       'owner=' + (posts[0] && posts[0].body[0] && posts[0].body[0].owner));
   }
+
+  // ── 7. La base vient de l'environnement (SUPABASE_URL), jamais la production en dur ──
+  dit(hotesBase.size === 1 && hotesBase.has(BASE_BANC),
+    'vinted-refresh / vinted-connect : chaque requête à la base part vers SUPABASE_URL (pas la production en dur)',
+    [...hotesBase].join(' | '));
 
   console.log(ko
     ? `\n${ko} contrôle(s) en échec`
