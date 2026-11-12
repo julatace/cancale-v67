@@ -1519,7 +1519,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   },[stockVinted,search]);
 
   return (
-    <div>
+    <div style={{padding:16}}>
       <ScreenHead icon="tag" title={`Stock Vinted (${stockVinted.length})`}
         desc="L'ancienne liste des numéros en ligne."
         right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:12,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
@@ -1539,9 +1539,9 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           onKeyDown={e=>{ if(e.key==='Enter') addOne(); }}
           placeholder="N° de l'annonce (ex : 1908)"
           inputMode="numeric"
-          style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:15}}
+          style={{flex:1,minWidth:0,boxSizing:'border-box',padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:12,fontSize:15}}
         />
-        <button type="button" onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
+        <button type="button" onClick={addOne} style={{flexShrink:0,background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
           Ajouter
         </button>
       </div>

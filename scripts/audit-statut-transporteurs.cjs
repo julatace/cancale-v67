@@ -752,6 +752,28 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const g2 = S.leverGarde({ etat: 'trop_long', age: 6, garde: 5 }, { transpDispoLu: NOW - H, limiteVers: T.jourParis(NOW + 48 * H) }, NOW);
     dit(g1.etat === 'trop_long' && g2.etat === 'a_retirer', 'n° 3 : une limite DÉDUITE (« vers le ») déjà passée ne lève jamais la garde (à venir : levée)', `${g1.etat} · ${g2.etat}`);
   });
+  // (12 nov., capture de Julien, Mondial Relay 80380675) « Sollicitation Client pour replace colis » : le colis
+  // est REPLACÉ vers un autre point ⇒ en route, changement de point — jamais « disponible », jamais ambre.
+  await essaie('12 nov. : tous les libellés tombent dans un état connu ; l’inconnu est neutre', async () => {
+    const t1 = NOW - 3 * 24 * H, t2 = NOW - 2 * 24 * H, t3 = NOW - 20 * H;
+    const evs = [{ ms: t1, libelle: 'Colis remis &#224; Mondial Relay' }, { ms: t2, libelle: '5 jours restants pour retirer le colis en Point Relais' }, { ms: t3, libelle: 'Sollicitation Client pour replace colis' }];
+    const mvc = T.lireReponse('mondialrelay', 200, 'application/json; charset=utf-8', mvcJson('12345678', '99999', 4, evs), { suivi: '12345678', cp: '99999', voie: 'mr-fr-mvc' });
+    dit(mvc.res === 'ok' && mvc.etat === 'en_route' && mvc.detail === 'changement_point', '« Sollicitation Client pour replace colis » ⇒ en route, changement de point en cours (route _mvc)', `${mvc.etat}/${mvc.detail}`);
+    const be = T.lireReponseMondialRelay(200, 'application/json', mrBe('12345678', '99999', 4, evs.map((e) => ({ ...e, libelle: e.libelle.replace('&#224;', 'à'), dpr: /restants/.test(e.libelle) }))), { suivi: '12345678', cp: '99999' });
+    dit(be.res === 'ok' && be.etat === 'en_route' && be.detail === 'changement_point', '…la même règle pour l’API .be', `${be.etat}/${be.detail}`);
+    const lt = T.ligneTransporteur({ ...mvc, carrier: 'mondialrelay', suivi: '12345678', lu: iso(NOW - H) }, 'mondialrelay', NOW);
+    dit(lt.ambre === false && /changement de point en cours/.test(lt.consequence), 'la carte dit « en route — changement de point en cours », sans ambre', JSON.stringify(lt));
+    const inc = T.lireReponse('mondialrelay', 200, 'application/json; charset=utf-8', mvcJson('12345678', '99999', 4, [...evs.slice(0, 2), { ms: t3, libelle: 'Libell&#233; jamais vu ZORGLUB' }]), { suivi: '12345678', cp: '99999', voie: 'mr-fr-mvc' });
+    const li = T.ligneTransporteur({ ...inc, carrier: 'mondialrelay', suivi: '12345678', lu: iso(NOW - H) }, 'mondialrelay', NOW);
+    dit(inc.etat === 'inconnu' && li.ambre === false && !/vérifie avant de te déplacer/.test(li.consequence), 'un libellé vraiment inconnu reste NEUTRE (pas ambre, rien à faire)', JSON.stringify(li));
+    dit(T.changementANotifier({ etat: 'disponible', essaiRes: 'ok' }, { ...inc, suivi: '12345678', essaiRes: 'ok', etatAt: iso(NOW - H) }, { maintenant: NOW }) === null, '…et ne notifie pas');
+    const S2 = await import('file://' + path.join(R, 'api/_lib/suivi-colis.js'));
+    const ligne = { suivi: '12345678', carrier: 'mondialrelay', status: 'available', code: '123456', lieu: 'TABAC TEST, 1 rue Test, 99999 TESTVILLE' };
+    dit(S2.fusionTransporteur(ligne, { ...inc, lu: iso(NOW - H) }, NOW).status === 'available', '…le colis garde l’état prouvé par les autres preuves (e-mail « disponible »)');
+    const CONNUS = new Set(['prepare', 'route', 'disponible', 'livre', 'retour', 'retarde', 'message', 'replace', 'incident', 'retire']);
+    const tous = [...T.MR_LIBELLES.map(([, c]) => c), ...Object.values(T.CP_CODES), ...Object.values(T.VG_GROUPES)];
+    dit(tous.every((c) => CONNUS.has(c)), 'chaque libellé appris (Mondial Relay, Chronopost/Shop2Shop, Vinted Go) a une classe connue', tous.filter((c) => !CONNUS.has(c)).join(','));
+  });
   await essaie('n° 7 : un code postal saisi faux ne ferme jamais le n°', async () => {
     resetBase(); await oublis();
     base.set(`${A}|colis_suivi_mondialrelay_12345678`, { suivi: '12345678', transporteur: 'mondialrelay', codePostal: '35000', at: iso(NOW - 24 * H) });
