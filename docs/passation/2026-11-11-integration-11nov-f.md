@@ -63,6 +63,8 @@ capteur/relais Leboncoin, `EXT_ATTENDUE` alignés ; zips Chrome + Orion refaits 
   (`essaiSonde`, fetch no-cors, src/photosVinted.js — voulue) qui passait par `continue()` : coupée comme
   l'image. Preuve : traceur de sorties (requête ni coupée ni servie) : 0 sur les 6 bancs ; mutation (ligne
   Nominatim retirée de retraits-suivi) ⇒ 6 sorties vers nominatim.openstreetmap.org.
+  Même sonde dans messagerie (vue sur GitHub au run suivant) : la route commune `image/media/font ⇒ abort`
+  de 215 bancs coupe aussi `*.vinted.net` (photos-vinted exclu : il sert le CDN par ses propres règles).
 - **nouveau-vendeur** : la note de Statistiques passait à la ligne devant « · » : espaces insécables avant
   chaque « · » (`&nbsp;·`).
 - **parcours-critiques / comptes-et-reception** (sur main il tombait avant, garde absente) : atelier-brouillon
