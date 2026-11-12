@@ -274,8 +274,9 @@ Stripe → **Développeurs** → **Webhooks** → **Ajouter une destination / un
 Puis ouvrir l'endpoint → **Secret de signature** → **Révéler** → copier le
 `whsec_…` → Vercel → `STRIPE_WEBHOOK_SECRET` (Production) → Redeploy.
 
-**Vérifier (mode test).** `https://vrm.center/api/sante` répond
-`"stripe": true` et `"stripeWebhook": true`. Puis avec un compte VRM d'essai
+**Vérifier (mode test).** Vercel → Settings → Environment Variables : `STRIPE_SECRET_KEY` et
+`STRIPE_WEBHOOK_SECRET` sont dans la liste (depuis le 12 nov., `/api/sante` ne dit plus ces
+oui/non qu'au propriétaire connecté, dans `config`). Puis avec un compte VRM d'essai
 (pas le tien : le propriétaire ne paie pas, l'app répond « Ton compte est
 gratuit ») : Paramètres → Abonnement → cocher les CGV et l'accès immédiat →
 payer avec la carte de test `4242 4242 4242 4242` → retour sur VRM « merci » →
@@ -313,9 +314,10 @@ Vinted) : le premier passage ne prélève rien. Pour voir un vrai prélèvement 
 
 Où : Vercel → projet → **Settings** → **Environment Variables** (Production),
 puis **Redeploy**. GitHub : dépôt → **Settings** → **Secrets and variables** →
-**Actions**. Vérifier ce qui est posé, sans rien révéler :
-`https://vrm.center/api/sante` (oui/non pour `serviceKey`, `owner`, `stripe`,
-`stripeWebhook`, `relancesEssai`, `ia`, `detourage`).
+**Actions**. Vérifier ce qui est posé, sans rien révéler : la liste de Vercel elle-même
+(le nom est là, la valeur reste cachée) ; `https://vrm.center/api/sante` ne dit plus en public
+que `serviceKey` et `owner` (12 nov. : `stripe`, `stripeWebhook`, `relancesEssai`, `ia`,
+`detourage` ne partent qu'au propriétaire connecté, dans `config`).
 
 **Indispensables pour des clients**
 - [ ] `STRIPE_SECRET_KEY` (Vercel) — étape 4.

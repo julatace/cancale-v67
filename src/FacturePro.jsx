@@ -115,13 +115,28 @@ function useEtatEnvoi(deps) {
   React.useEffect(() => { _ecoutesEtat.add(setE); if (_etat === undefined || _etat === null) relireEtatEnvoi(deps); return () => { _ecoutesEtat.delete(setE); }; }, [deps]);
   return e;
 }
+// (12 nov.) Pourquoi l'envoi par VRM n'est pas possible ('' = possible) — la même règle que la
+// route (api/_lib/facture-pro.js : serveur d'envoi configuré, e-mail du vendeur, plafond du jour).
+function vrmIndisponible(cfg, etat) {
+  if (!etat || !etat.vrm || !etat.vrm.pret) return 'L’envoi par VRM n’est pas encore ouvert.';
+  if (!emailValide(cfg && cfg.email)) return 'Pour l’envoi par VRM, ajoute ton e-mail dans « Ma facture ».';
+  if (Number.isInteger(etat.vrm.aujourdhui) && etat.vrm.aujourdhui >= etat.vrm.plafond) return 'L’envoi par VRM a atteint son plafond du jour.';
+  return '';
+}
 // Ce qui manque pour qu'une facture PARTE (pas pour qu'elle existe) : null = possible.
 // Rend { geste, champ, texte } — le bouton dit le geste et y mène.
 function bloqueEnvoi(cfg, etat) {
   if (!cfg || etat === undefined) return { geste: 'Lecture…', champ: null, texte: '' };
   if (etat === null) return { geste: 'Réessayer', champ: null, texte: "L'état de l'envoi n'a pas pu être lu (la base n'a pas répondu)." };
   if (cfg.envoiPar === 'boite') {
-    if (!etat.boite || etat.boite.etat !== 'posee') return { geste: 'Connecter ma boîte', champ: 'boite', texte: 'Tu as choisi d’envoyer depuis ta propre boîte : connecte-la, ou laisse VRM envoyer.' };
+    // (12 nov., Julien, capture : la phrase disait « laisse VRM envoyer » sans bouton pour le
+    // faire.) Boîte pas connectée : si l'envoi par VRM est possible, `vrm: true` ⇒ la feuille
+    // offre « Envoyer avec VRM » pour CETTE facture (son clic ; le réglage reste « ma boîte ») ;
+    // sinon la phrase dit pourquoi VRM ne peut pas, et seuls les deux autres gestes restent.
+    if (!etat.boite || etat.boite.etat !== 'posee') {
+      const pasVrm = vrmIndisponible(cfg, etat);
+      return { geste: 'Connecter ma boîte', champ: 'boite', vrm: !pasVrm, texte: pasVrm ? `Ta boîte n’est pas connectée. ${pasVrm}` : 'Ta boîte n’est pas connectée : VRM peut l’envoyer à ta place.' };
+    }
     return null;
   }
   if (!emailValide(cfg.email)) return { geste: 'Ajouter mon e-mail', champ: 'email', texte: "VRM met ton adresse e-mail en copie et en « répondre à » : ajoute-la dans « Ma facture »." };
@@ -141,6 +156,8 @@ export function ApercuFacture({ contenu, provisoire = false, numeroLibelle = '',
   const trous = [c.vendeur.nom, ...c.vendeur.adresse, ...c.vendeur.legal, ...c.mentions, c.numeroTrou].filter(estTrou).length;
   // (10 nov., lot T) Facture en anglais : les mêmes libellés « français / English » que le PDF.
   const en = !!c.anglais; const B = (fr) => bi(fr, en);
+  // En-tête de colonne bilingue : le français, puis l'anglais dessous (comme le PDF).
+  const BH = (fr) => (en && EN[fr] ? <>{fr}<br/><span className="vrm-fp-a-en">{EN[fr]}</span></> : fr);
   return (
     <div className="vrm-fp-apercu" data-fp-apercu={c.numero} data-fp-trous={trous} data-fp-langue={en ? 'fr-en' : 'fr'} style={{ '--fp-accent': c.couleur }}>
       <div className="vrm-fp-a-tete">
@@ -157,7 +174,10 @@ export function ApercuFacture({ contenu, provisoire = false, numeroLibelle = '',
         <div data-fp-a-acheteur="" {...S}><small>{B('Facturé à')}</small><b>{c.acheteur.nom}</b>{[...c.acheteur.adresse, c.acheteur.email].filter(Boolean).map((l, i) => <span key={i}>{l}</span>)}</div>
       </div>
       <p className="vrm-fp-a-infos">{B('Date de la vente')} : {c.venteJour} · {en && EN[c.nature] ? `${c.nature} / ${EN[c.nature]}` : c.nature}{c.reference ? ` · ${B('Référence')} : ${c.reference}` : ''}</p>
-      <table className="vrm-fp-a-table"><thead><tr><th>{B('Désignation')}</th><th>{B('Qté')}</th><th>{B(marge ? 'Prix unitaire' : 'Prix unit. HT')}</th><th>{B(marge ? 'Total' : 'Total HT')}</th></tr></thead>
+      {/* (12 nov.) Largeurs posées par la facture elle-même : Qté, Prix, Total en largeur fixe,
+          « Désignation » prend le reste — jamais une lettre par ligne, quel que soit l'écran. */}
+      <table className="vrm-fp-a-table"><colgroup><col/><col className="vrm-fp-a-col-qte"/><col className="vrm-fp-a-col-prix"/><col className="vrm-fp-a-col-prix"/></colgroup>
+        <thead><tr><th>{BH('Désignation')}</th><th>{BH('Qté')}</th><th>{BH(marge ? 'Prix unitaire' : 'Prix unit. HT')}</th><th>{BH(marge ? 'Total' : 'Total HT')}</th></tr></thead>
         <tbody>{c.lignes.map((l, i) => <tr key={i}><td>{l.designation}</td><td>{l.quantite}</td><td>{euros(l.unite)}</td><td>{euros(l.total)}</td></tr>)}</tbody></table>
       <dl className="vrm-fp-a-totaux">
         {c.regime === 'normal' ? <><div><dt>{B('Total HT')}</dt><dd>{euros(T.ht)}</dd></div><div><dt>{B('TVA')} {String(c.taux).replace('.', ',')}&nbsp;%</dt><dd>{euros(T.tva)}</dd></div><div className="is-fort"><dt>{B('Total TTC')}</dt><dd>{euros(T.ttc)}</dd></div></>
@@ -171,6 +191,44 @@ export function ApercuFacture({ contenu, provisoire = false, numeroLibelle = '',
     </div>
   );
 }
+
+// ── (12 nov.) L'aperçu en MINIATURE, dans une feuille ─────────────────────────
+// Julien, captures iPhone : la facture dessinée à la largeur de la feuille (358 px)
+// coupait « FACTUR… », écrasait « Désignation » à une lettre par ligne et faisait
+// défiler la page de côté. Ici, comme la première page d'un PDF : la facture est
+// rendue à SA largeur (`LARGEUR_PAGE_FP`), puis réduite (transform) pour tenir dans
+// la place qu'elle a — jamais agrandie. Un toucher l'ouvre en grand (`ouvrir`).
+export const LARGEUR_PAGE_FP = 520;
+export function MiniatureFacture({ children, ouvrir, libelle = 'Voir la facture en grand' }) {
+  const boite = React.useRef(null); const page = React.useRef(null);
+  const [m, setM] = React.useState({ k: 1, h: null });
+  React.useLayoutEffect(() => {
+    const b = boite.current, p = page.current; if (!b || !p) return undefined;
+    const mesurer = () => {
+      const w = b.clientWidth; if (!w) return;
+      const k = w >= LARGEUR_PAGE_FP ? 1 : w / LARGEUR_PAGE_FP;
+      const h = k < 1 ? Math.ceil(p.offsetHeight * k) : null;
+      setM((x) => (Math.abs(x.k - k) < 0.001 && x.h === h ? x : { k, h }));
+    };
+    mesurer();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(mesurer); ro.observe(b); ro.observe(p);
+    return () => ro.disconnect();
+  }, []);
+  const reduit = m.k < 1;
+  const toucher = (e) => { if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return; e.preventDefault(); if (ouvrir) ouvrir(); };
+  return (
+    <div ref={boite} className="vrm-fp-miniature" data-fp-miniature="" data-fp-echelle={m.k.toFixed(3)} role="button" tabIndex={0} aria-label={libelle}
+      onClick={toucher} onKeyDown={toucher} style={reduit && m.h ? { height: m.h } : undefined}>
+      <div ref={page} className="vrm-fp-miniature-page" style={reduit ? { width: LARGEUR_PAGE_FP, transform: `scale(${m.k})` } : undefined}>{children}</div>
+      <span className="vrm-fp-miniature-loupe" aria-hidden="true">Agrandir</span>
+    </div>
+  );
+}
+
+// En grand, une facture PAS encore émise dit qu'elle est un aperçu (son numéro n'est donné
+// qu'à l'émission) : le PDF ouvert ne passe jamais pour la facture définitive.
+export const apercuEnGrand = (c) => ({ ...c, numero: `${c.numero} (aperçu)` });
 
 // ── Le logo : réduit dans le navigateur avant d'être rangé ──────────────────
 async function reduireLogo(fichier) {
@@ -838,10 +896,12 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
     try { apercu = contenuFacture(cfg, donnees, { numero: numero || (etat && Number.isInteger(etat.prochain) ? numeroFacture(cfg.prefixe, anneeParis(Date.now()), etat.prochain) : '…'), emiseLe: Date.now(), langue: anglais ? 'en' : 'fr' }); mail = emailFacture(cfg, apercu, { via: cfg.envoiPar === 'boite' ? 'boite' : 'vrm' }); } catch (_) {}
   }
 
-  const envoyerFacture = async (renvoyer) => {
+  // `via` : 'vrm' seulement sur « Envoyer avec VRM » (son clic, pour CETTE facture) ; sinon
+  // le serveur suit le réglage de « Ma facture ».
+  const envoyerFacture = async (renvoyer, via = '') => {
     if (renvoyer && !(await deps.askConfirm({ title: 'Renvoyer la facture ?', desc: `La même facture (${numero}) repart à l'acheteur.`, ok: 'Renvoyer' }))) return false;
     setOccupe('envoyer'); setRetour(null);
-    const r = await route(deps, { action: 'envoyer', confirme: true, tx, renvoyer: !!renvoyer });
+    const r = await route(deps, { action: 'envoyer', confirme: true, tx, renvoyer: !!renvoyer, ...(via === 'vrm' ? { via: 'vrm' } : {}) });
     setOccupe('');
     if (r.j.envoi) setEnvoiIci(r.j.envoi);
     if (Array.isArray(r.j.envois)) setEnvoisIci(r.j.envois);
@@ -851,15 +911,15 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
     relireFactures(deps); relireEtatEnvoi(deps);
     return r.j.issue === 'envoye';
   };
-  const emettre = async (envoyer) => {
+  const emettre = async (envoyer, via = '') => {
     if (!(await deps.askConfirm(envoyer
-      ? { title: 'Envoyer la facture ?', desc: `À ${preuve.acheteur.nom} (${preuve.acheteur.email}).${cfg.envoiPar === 'boite' ? '' : ' Elle part de VRM à ton nom, avec toi en copie.'} Elle reçoit son numéro définitif et ne se modifie plus (pour la corriger, il faudra un avoir).`, ok: 'Envoyer' }
+      ? { title: 'Envoyer la facture ?', desc: `À ${preuve.acheteur.nom} (${preuve.acheteur.email}).${cfg.envoiPar === 'boite' && via !== 'vrm' ? '' : ' Elle part de VRM à ton nom, avec toi en copie.'} Elle reçoit son numéro définitif et ne se modifie plus (pour la corriger, il faudra un avoir).`, ok: 'Envoyer' }
       : { title: 'Émettre la facture sans l’envoyer ?', desc: 'Elle reçoit son numéro définitif et ne se modifie plus. Tu pourras l’envoyer ensuite, ou partager le PDF.', ok: 'Émettre' }))) return;
     setOccupe('emettre'); setRetour(null);
     const r = await route(deps, { action: 'emettre', confirme: true, tx, compte: vente.compte || '', designation, langue: anglais ? 'en' : 'fr' });
     if (r.code !== 200) { setOccupe(''); setRetour({ ko: true, t: r.j.manquants ? `Il manque : ${r.j.manquants.map((m) => m.l).join(', ')}.` : (r.j.message || "La facture n'a pas pu être émise. Réessaie : elle gardera le même numéro.") }); return; }
     setEmiseIci(r.j.facture);
-    if (envoyer) { await envoyerFacture(false); } else { setOccupe(''); setRetour({ t: `Facture ${r.j.facture.numero} émise.` }); }
+    if (envoyer) { await envoyerFacture(false, via); } else { setOccupe(''); setRetour({ t: `Facture ${r.j.facture.numero} émise.` }); }
     relireFactures(deps);
   };
   const voirPdf = async (partager, quoi = 'facture') => {
@@ -893,8 +953,9 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             <button type="button" className="vrm-b vrm-b-secondaire" disabled={!!occupe} onClick={() => voirPdf(false)} data-fp-pdf="">Voir le PDF</button>
             <button type="button" className="vrm-b vrm-b-secondaire" disabled={!!occupe} onClick={() => voirPdf(true)}>Partager</button>
             {!bloque && !(avoir && avoir.emiseLe) ? <button type="button" className="vrm-b vrm-b-primaire" disabled={!!occupe} data-fp-envoyer="" onClick={() => envoyerFacture(dejaParti)}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer' : "Envoyer à l'acheteur"}</button> : null}
+            {bloque && bloque.vrm && !(avoir && avoir.emiseLe) ? <button type="button" className="vrm-b vrm-b-primaire" disabled={!!occupe} data-fp-envoyer-vrm="" onClick={() => envoyerFacture(dejaParti, 'vrm')}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer avec VRM' : 'Envoyer avec VRM'}</button> : null}
           </div>
-          {bloque && !(avoir && avoir.emiseLe) && etat !== undefined ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.texte} {bloque.champ ? <button type="button" className="vrm-lien-action" onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button> : null}</p> : null}
+          {bloque && !(avoir && avoir.emiseLe) && etat !== undefined ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.vrm ? 'Ta boîte n’est pas connectée.' : bloque.texte} {bloque.champ ? <button type="button" className="vrm-lien-action" onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button> : null}</p> : null}
           {envois.length ? <section className="vrm-fp-section" data-fp-journal={envois.length}>
             <h3>Journal des envois</h3>
             <ul className="vrm-fp-journal">{[...envois].reverse().map((x, i) => <li key={i} data-fp-journal-etat={x.etat}><b>{jourParis(x.at)} à {heureParis(x.at)}</b><span>{x.etat === 'envoyee' ? 'envoyée' : x.etat === 'incertaine' ? 'incertaine' : 'pas envoyée'} · à <span className="vrm-sensible" data-stream-type="acheteur">{x.a}</span>{x.via === 'vrm' ? ' · par VRM' : ' · depuis ta boîte'}</span></li>)}</ul>
@@ -923,10 +984,12 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             <h3>L'e-mail</h3>
             <div className="vrm-fp-mail"><small>De</small><span>{mail.nomExpediteur}{cfg.envoiPar === 'boite' ? '' : ` — réponses et copie à ${cfg.email || 'ton e-mail'}`}</span><small>Objet</small><b data-fp-objet="">{mail.sujet}</b><small>Message</small><pre className="vrm-sensible" data-stream-type="acheteur">{mail.texte}</pre><small>Pièce jointe</small><span>{nomFichier(apercu)}</span></div>
           </section> : null}
-          {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle={etat && Number.isInteger(etat.prochain) && !numero ? `N° ${apercu.numero} (donné à l’émission)` : ''}/></section> : null}
+          {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><MiniatureFacture ouvrir={() => ouvrirPdf(apercuEnGrand(apercu), deps)}><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle={etat && Number.isInteger(etat.prochain) && !numero ? `N° ${apercu.numero} (donné à l’émission)` : ''}/></MiniatureFacture></section> : null}
           {!mv.length && mvt.length ? <p className="vrm-fp-muet" data-fp-manque-vente="">Il manque {mvt.map((m) => m.l).join(', ')}.</p> : null}
           <div className="vrm-fp-gestes is-bas">
-            {bloque ? <>{bloque.texte ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.texte}</p> : null}{geste(bloque)}</>
+            {bloque && bloque.vrm ? <><p className="vrm-fp-muet" data-fp-bloque="">Ta boîte n’est pas connectée. <button type="button" className="vrm-lien-action" data-fp-geste-manque="boite" onClick={() => setFiche('boite')}>Connecter ma boîte</button></p>
+              <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fp-envoyer-vrm="" disabled={!!occupe || !!mv.length || !!mvt.length} onClick={() => emettre(true, 'vrm')}>{occupe ? 'Un instant…' : 'Envoyer avec VRM'}</button></>
+              : bloque ? <>{bloque.texte ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.texte}</p> : null}{geste(bloque)}</>
               : <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fp-emettre-envoyer="" disabled={!!occupe || !!mv.length || !!mvt.length} onClick={() => emettre(true)}>{occupe ? 'Un instant…' : 'Envoyer la facture'}</button>}
             <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-fp-emettre="" disabled={!!occupe || !!mv.length || !!manquantsVente(donnees).length} onClick={() => emettre(false)}>Émettre sans envoyer</button>
           </div>

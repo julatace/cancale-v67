@@ -49,3 +49,26 @@ export function texteSansBordereau(lignes) {
   const nom = (l) => [l.num ? `N°${l.num}` : '', l.titre || ''].filter(Boolean).join(' ');
   return `${L.length} sans bordereau : ${L.slice(0, 4).map(nom).join(', ')}${L.length > 4 ? '…' : ''}`;
 }
+
+// ── (12 nov.) UNE SEULE SOURCE POUR LE BOUTON ET LA FEUILLE ─────────────────
+// Julien : « Tout imprimer (15) » ouvrait « Imprimer (6) » sans dire pourquoi. Le
+// bouton comptait TOUTES les lignes du lot ; la feuille n'imprime que les cochées.
+// `resumeLot(L)` : ce qui part (cochées d'office) — le nombre du bouton ; avec
+// `coches` (la feuille), ce qui part de SA sélection. Les autres lignes, NOMMÉES
+// par leur raison (la première qui vaut, dans cet ordre) : eBay (étiquette dans
+// eBay), sans bordereau, déjà imprimé, vendue il y a longtemps, décochée par lui.
+export function resumeLot(L, coches) {
+  const lignes = (L || []).filter(Boolean);
+  const c = coches || cochesParDefaut(lignes);
+  const r = { total: lignes.length, partent: 0, ebay: 0, sansBordereau: 0, dejaImprimes: 0, anciennes: 0, decoches: 0 };
+  for (const l of lignes) {
+    if (l.cochable === false) { r.ebay++; continue; }
+    if (c.has(l.cle)) { r.partent++; continue; }
+    if (l.pdf === false) r.sansBordereau++;
+    else if (l.imprime || l.depotAVerifier) r.dejaImprimes++;
+    else if (l.ancienne) r.anciennes++;
+    else r.decoches++;   // décochée par lui
+  }
+  r.autres = r.total - r.partent;
+  return r;
+}

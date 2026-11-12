@@ -435,6 +435,8 @@ export default {
   "reglages.onglet.abonnement": "Abo",
   "reglages.onglet.compte": "Mein Konto",
   "reglages.onglet.reglages": "Einstellungen",
+  "reglages.paiements.desc": "Was fehlt, damit ein Kunde zahlen kann.",
+  "reglages.paiements.lib": "Zahlungen öffnen",
   "reglages.pilotage.desc": "Verkäufer, Abonnenten, Umsatz, Störungen und Zufriedenheit — als Summen.",
   "reglages.pilotage.lib": "Dein Unternehmen",
   "reglages.prixachat.desc": "Am Stück eingeben: Ohne sie ist der Gewinn nur ein Minimum.",

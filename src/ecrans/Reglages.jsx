@@ -114,11 +114,13 @@ import {conflitAdresseCompte} from '../receptionEmail.js';
 import EspaceEmails from '../EspaceEmails.jsx';
 // ⟦← App.jsx #9⟧
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportDonnees.js";
+import { toutesMesDonnees } from "../exportRgpd.js";   // (12 nov.) RGPD : toutes ses données
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
 import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
 import { SimulationCompte } from "../SimulationCompte.jsx";
+import { OuvrirPaiements } from "../composants/OuvrirPaiements.jsx";   // (12 nov.) propriétaire seul
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -1385,7 +1387,13 @@ async function exporterMesDonnees() {
   // « Sauvegarde complète » (restaurer VRM) reste, elle, fermée sans abonnement.
   try {
     const src = await sourcesExportDonnees();
-    const zip = zipStocke(fichiersExport(feuillesExport(src)));
+    // (12 nov., RGPD) + TOUTES ses données, générées par le serveur pour SA session
+    // (src/exportRgpd.js) ; une page ratée ⇒ le zip le DIT (INCOMPLET.txt).
+    toast('Export en préparation…');
+    const tout = await toutesMesDonnees({ entetes: enTeteSession });
+    const complet = tout.ok ? tout.fichiers : [{ nom: 'INCOMPLET.txt', texte: "Tes tableaux sont là, mais le reste de tes données n'a pas pu être lu.\r\nRelance « Exporter mes données » dans un instant.\r\n" }];
+    if (!tout.ok) toast('Export incomplet : relance-le dans un instant.');
+    const zip = zipStocke([...fichiersExport(feuillesExport(src)), ...complet]);
     telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
   } catch (e) { toast('Export pas créé : ' + (e && e.message || e)); }
 }
@@ -1778,7 +1786,7 @@ function StatutSauvegardeReglages() {
   if(!attente&&!stockage) return null;
   // (8 nov.) Abonnement terminé (aperçu) : la base refuse d'écrire, et
   // « Réessayer » n'y changerait rien — on dit pourquoi, sans geste trompeur.
-  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Abonnement terminé : rien n'est enregistré tant que tu ne l'as pas repris</span></div>;
+  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Sans abonnement : rien n'est enregistré pour l'instant</span></div>;
   return <div className="vrm-settings-status" role="status" data-statut-reglages={echec?'echec':'encours'} style={{color:echec?C.warn:C.muted}}>
     {!echec&&<span className="vrm-settings-status-pt" aria-hidden="true"/>}
     <span>{stockage?'Refusée par cet appareil':echec?'Pas encore synchronisé':'Enregistrement…'}</span>
@@ -2197,6 +2205,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
       // voit l'entrée, et la route refuse tout autre compte (403).
       proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:tr('reglages.pilotage.lib'), desc:tr('reglages.pilotage.desc'), data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
+      // (12 nov.) « Ouvrir les paiements » : chaque prérequis LU (src/ouverturePaiements.js), propriétaire seul.
+      proprioInst && { id:'paiements', type:'panneau', nu:true, ic:'cart', lib:tr('reglages.paiements.lib'), desc:tr('reglages.paiements.desc'), data:{ 'data-reglage-paiements':'' }, el:<OuvrirPaiements entetes={enTeteSession}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
       proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },

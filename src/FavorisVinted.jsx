@@ -47,6 +47,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[rythme,setRythme]=React.useState('fixe'),[intervalleMax,setIntervalleMax]=React.useState('12'),[reglages,setReglages]=React.useState({});
   const [historique,setHistorique]=React.useState(null),[filtre,setFiltre]=React.useState('tous'),[recherche,setRecherche]=React.useState(''),[maintenant,setMaintenant]=React.useState(Date.now()),[importation,setImportation]=React.useState(false);
   const [ouverture,setOuverture]=React.useState(''),[verifications,setVerifications]=React.useState({}),[controle,setControle]=React.useState(null),[controleEnvoi,setControleEnvoi]=React.useState(null),[erreurOuverture,setErreurOuverture]=React.useState(''),[revisionVerification,setRevisionVerification]=React.useState(0);
+  const [messageEnvoi,setMessageEnvoi]=React.useState('');   // (12 nov.) la phrase du refus de lancement
   const [preparation,setPreparation]=React.useState(false),[feuille,setFeuille]=React.useState(false),[etape,setEtape]=React.useState('choix');
   const ouvrirEnCours=React.useRef(false),retourVinted=React.useRef(false),moteur=React.useRef(null);
   const importEnCours=React.useRef(false),annulerImport=React.useRef(false);
@@ -251,7 +252,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
           {reglages.erreur&&<p role="alert">{reglages.erreur} {!reglagesLus.current&&'Actualise la liste pour relire les réglages.'}</p>}
           {reglages.prets&&!reglages.enregistres&&!fileActive&&<button type="button" data-favoris-enregistrer disabled={reglages.sauvegarde||preparation||!apercu.message||!!apercu.erreur||!!erreurRythme} onClick={async()=>{if(await enregistrer())setRetour('Message, réduction et rythme enregistrés pour ce compte. Rien n’est envoyé.');}}>{reglages.sauvegarde?'Enregistrement…':'Enregistrer sans envoyer'}</button>}
         </div>}
-        {uid&&owner&&executerFavori&&<div hidden={etape!=='envoi'}><AutomatisationFavoris ref={moteur} decrireJob={x=>{const l=ligneParId.get(String(x.notificationId));const id=l&&itemIdFavori(l);const a=id?lireArticle(id):null;return {num:a?.numero||'',titre:a?.titre||''};}} raisonSuivi={raisonSuivi} onPreparation={setPreparation} ecranActif={ecranActif} revisionVerification={revisionVerification} onErreur={setControleEnvoi} key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={configuration} preparerReglages={preparerReglages} executer={t=>executerFavoriDisponible(t,vendusActuels.current,executerFavori)} disponible={favorisDisponible&&(!exigePerso||favorisPerso)} raisonExtension={favorisDisponible&&exigePerso&&!favorisPerso?'Ces variables ou cette offre demandent l’extension 5.281. Mets-la à jour puis recharge-la (⟳).':favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/></div>}
+        {uid&&owner&&executerFavori&&<div hidden={etape!=='envoi'}><AutomatisationFavoris ref={moteur} decrireJob={x=>{const l=ligneParId.get(String(x.notificationId));const id=l&&itemIdFavori(l);const a=id?lireArticle(id):null;return {num:a?.numero||'',titre:a?.titre||''};}} raisonSuivi={raisonSuivi} onPreparation={setPreparation} ecranActif={ecranActif} revisionVerification={revisionVerification} onErreur={(c,m)=>{setControleEnvoi(c);setMessageEnvoi(c?String(m||''):'');}} key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={configuration} preparerReglages={preparerReglages} executer={t=>executerFavoriDisponible(t,vendusActuels.current,executerFavori)} disponible={favorisDisponible&&(!exigePerso||favorisPerso)} raisonExtension={favorisDisponible&&exigePerso&&!favorisPerso?'Ces variables ou cette offre demandent l’extension 5.281. Mets-la à jour puis recharge-la (⟳).':favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/></div>}
       </div>
       <div className="vrm-favoris-feuille-pied">
         <span/>
@@ -315,7 +316,10 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const marche=data?ceQuiMarche(jobsVue,ventesH):[];
   const groupes=data?offresGroupees(jobsVue):[];
   const [erreurLancer,setErreurLancer]=React.useState('');
-  React.useEffect(()=>{if(controleEnvoi)setErreurLancer(controleEnvoi.message||'');},[controleEnvoi]);
+  // (12 nov.) Le refus d'un lancement se DIT sur la page (la phrase du moteur, pas le contrôle copiable, qui
+  // ne porte que code et compteurs) ; il s'efface quand le moteur le retire (une nouvelle vérification).
+  // Avant : `controleEnvoi.message` n'existait pas ⇒ « Envoyer » refusé ne disait rien (test favoris-historique).
+  React.useEffect(()=>{setErreurLancer(controleEnvoi?messageEnvoi:'');},[controleEnvoi,messageEnvoi]);
   const envoyer=async()=>{if(bloquees.length&&!confirmeMarge)return;setErreurLancer('');await moteur.current?.lancer();};
   const ouvrirEnvoi=()=>{if(!data&&!etat.charge)charger();setEtape('envoi');setFeuille(true);};
   const ouvrirPersonne=id=>{const l=ligneParId.get(id);if(l)ouvrir(l);};

@@ -28,6 +28,24 @@ concurrency:
   group: sauvegarde-base
   cancel-in-progress: false
 jobs:
+  # (12 nov., agent2-fiabilite-prod) L'export quotidien CÔTÉ SERVEUR, qui ne dépend
+  # PAS des deux secrets ci-dessous : un fichier chiffré par vendeur, seau Supabase
+  # privé « sauvegardes », 14 jours (api/_lib/sauvegarde-quotidienne.js). Le cron du
+  # soir de Vercel le fait aussi ; relancé le même jour, il ne refait que ce qui manque.
+  export-serveur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Demander l'export du jour à vrm.center
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET absent : l'export part quand même avec le cron du soir de Vercel."; exit 0; fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 300 -H "Authorization: Bearer $CRON_SECRET" "https://vrm.center/api/ship-reminders?moment=sauvegarde")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,jour:r.jour,vendeurs:r.vendeurs,copies:r.copies,vides:r.vides,echecs:r.echecs,complet:r.complet,raison:r.raison}))" || true
+          test "$code" = "200"
+
   sauvegarde:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
