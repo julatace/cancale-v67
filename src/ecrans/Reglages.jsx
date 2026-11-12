@@ -2057,7 +2057,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
       { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
       // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
-      { id:'copieannonces', type:'panneau', ic:'box', lib:tr('reglages.copieannonces.lib'), desc:tr('reglages.copieannonces.desc'), data:{ 'data-reglage-copieannonces':'' }, el:<CopieAnnonces comptes={comptes||[]}/> },
+      { id:'copieannonces', type:'panneau', ic:'save', lib:tr('reglages.copieannonces.lib'), desc:tr('reglages.copieannonces.desc'), data:{ 'data-reglage-copieannonces':'' }, el:<CopieAnnonces comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
     ]},

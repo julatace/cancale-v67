@@ -40,6 +40,8 @@ function poserFetch({ expire = false, ecriture = 'ok', panne = false } = {}) {
       if (expire && String(h.Authorization || '').includes(BASE_ACCES)) return new Response('expired', { status: 401 });
       return J({ user: { id: 7, login: 'moncompte', account_id: 42 } });
     }
+    // (12 nov., intégration) la migration 042 (`vrm_vinted_relier`) n'est pas passée ici : 404 ⇒ le chemin d'avant.
+    if (/\/rest\/v1\/rpc\//.test(u)) return new Response('', { status: 404 });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) {
       if (method === 'GET') {
         if (/vinted_user_id=eq\.42/.test(u) || /owner=eq\./.test(u) && !/vinted_user_id=neq/.test(u)) return J([{ owner: VENDEUR, vinted_user_id: '42', access_token: BASE_ACCES, refresh_token: BASE_REF, anon_id: 'ANON_SECRET', csrf_token: 'CSRF_SECRET', domain: 'www.vinted.fr' }]);
@@ -93,7 +95,7 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
   const code = extraire('const fetchVintedAccounts =', '// Retire un compte de');
   let urls = [], liste = null;
   try {
-    const c = vm.createContext({ AUTH: { user: { id: VENDEUR }, session: { access_token: 't' } }, SUPABASE_URL: 'https://base.test', encodeURIComponent, sbAuth: () => ({}), memoriserComptesLies: () => {}, CLE_SUPPRIMES: 'k', localStorage: { setItem() {}, getItem() { return null; } },
+    const c = vm.createContext({ AUTH: { user: { id: VENDEUR }, session: { access_token: 't' } }, SUPABASE_URL: 'https://base.test', encodeURIComponent, sbAuth: () => ({}), memoriserComptesLies: () => {}, horsLigneMaintenant: () => false, comptesCopieHorsLigne: () => [], garderComptesCopie: () => {},   /* (12 nov.) hors ligne (lot hors-ligne) : en ligne ici */ CLE_SUPPRIMES: 'k', localStorage: { setItem() {}, getItem() { return null; } },
       fetch: async (u) => { urls.push(String(u)); return /vinted_accounts/.test(String(u)) ? Response.json([{ owner: VENDEUR, vinted_user_id: '42', login: 'moncompte', access_token: BASE_ACCES, refresh_token: BASE_REF, csrf_token: 'CSRF_SECRET', anon_id: 'ANON_SECRET' }]) : Response.json([]); } });
     vm.runInContext(code + ';globalThis.lire=fetchVintedAccounts;', c);
     liste = await c.lire();
