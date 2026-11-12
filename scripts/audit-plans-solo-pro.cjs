@@ -217,7 +217,7 @@ const MUTATIONS = [
     dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => (?:avecRemboursementsProuves\()?\(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
       'les ACHATS d’un compte d’achat restent (acctOff = le choix seul, sans l’offre)');
     dit(/exclu: \(o\) => compteEcarteChoix\(o && o\._uid/.test(compta), 'Compta → registre des achats : les achats des comptes d’achat comptent');
-    dit(/const isHidden = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) && /const venteOffOf = \(o\) => acctOffOf\(o\) \|\| horsPlanOf\(o\);/.test(app),
+    dit((/const isHidden = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) || (/const isHiddenCalcul = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) && /const isHidden = \(o\) => \{[^\n]*isHiddenCalcul\(o\)[^\n]*\};/.test(app))) && /const venteOffOf = \(o\) => acctOffOf\(o\) \|\| horsPlanOf\(o\);/.test(app),
       'listes de ventes, colis à envoyer, CA : hors offre écarté (`isHidden`)');
     dit(/exclu: venteOffOf, excluAutre, versements, declare: declUrssaf/.test(app), 'CA déclaré (URSSAF) : les ventes hors offre n’y entrent pas');
     dit(/<VentesHorsPlan /.test(app) && /<BandeauCompteVendeur /.test(app), 'Ventes : l’aperçu des ventes hors offre est rendu ; la coque porte la feuille « Quel compte vend ? »');
