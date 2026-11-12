@@ -279,7 +279,11 @@ export function lieuSousEnTete(txt) {
 export function nouveauPointDansTexte(txt) {
   const lines = String(txt || '').split('\n').map((l) => l.trim());
   const norm = (l) => String(l).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const nomme = (l) => { const n = norm(l); return /\b(?:nouveau|nouvel|nouvelle|suivant|suivante)\b/.test(n) && /\b(?:point|relais|lieu|adresse|locker|consigne|casier)\b/.test(n) && !/\b(?:ancien|initial|prevu|choisi)\b/.test(n); };
+  // (12 nov., mesuré : Mondial Relay « Votre colis a changé de plan 📍 », transféré par Vinted) La forme
+  // « Il sera finalement livré ici : » puis, une ligne vide entre chaque, « POINT RELAIS® / NOM / RUE ou
+  // lieu-dit / CP VILLE ». La phrase désigne le NOUVEAU point comme « nouveau / suivant ».
+  const nomme = (l) => { const n = norm(l); return (/\b(?:nouveau|nouvel|nouvelle|suivant|suivante)\b/.test(n) && /\b(?:point|relais|lieu|adresse|locker|consigne|casier)\b/.test(n) && !/\b(?:ancien|initial|prevu|choisi)\b/.test(n))
+    || /\bsera\s+(?:finalement\s+|desormais\s+)?livre\s+(?:ici|a\s+cette\s+adresse|dans\s+ce\s+point)\b/.test(n); };
   const enTete = (l) => EN_TETE_LIEU.test(l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
   for (let i = 0; i < lines.length; i++) {
     if (!nomme(lines[i])) continue;

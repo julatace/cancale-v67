@@ -45173,7 +45173,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* (10 nov.) « Votre colis a changé de plan » : POINT RELAIS CHANGÉ, en ambre, avec le
             nouveau point LU dans l'e-mail et son itinéraire (src/AlerteRelaisChange.jsx). */}
-        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>}
+        {(aFilter==='attente' || aFilter==='route') && <AlerteRelaisChange lignes={tracking} C={C} transp={transpMap} headers={sbAuth}/>}
         {/* (9 nov., lot AG) « Achats relus il y a N j sur compte_a — ouvre Vinted sur ce compte » n'est plus dit ici :
             des achats pas relus depuis plus de FRAICHEUR_ACHATS_J jours sont NOMMÉS, avec le geste, par la ligne de
             fraîcheur unique du haut de l'app (src/fraicheur.js, le même seuil) — une voix, pas deux (§7). */}

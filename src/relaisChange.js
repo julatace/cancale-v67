@@ -69,7 +69,22 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
     if (arriveApres(n, at)) continue;
     vus.add(n);
     const lieu = String(t.lieu || '').trim();
-    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at });
+    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at, emailRecu: t.emailRecu || null, lieuLuDansTexte: !!t.lieuLuDansTexte });
   }
   return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+
+// (12 nov., Julien sur capture : quatre cartes identiques empilées) LES COLIS REDIRIGÉS, PAR NOUVEAU POINT : une
+// carte par point (même nom + même adresse une fois casse, accents et espaces retirés — jamais par titre
+// d'article) ; ceux dont le point n'est pas encore lu forment leur propre groupe (`cle: ''`).
+const cleLieuRelais = (l) => String(l || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+export function groupesRelaisChange(liste) {
+  if (!Array.isArray(liste)) return liste;
+  const g = new Map();
+  for (const x of liste) {
+    const k = cleLieuRelais(x.lieu);
+    if (!g.has(k)) g.set(k, { cle: k, lieu: x.lieu || '', nom: x.nom || '', adresse: x.adresse || '', colis: [] });
+    g.get(k).colis.push(x);
+  }
+  return [...g.values()].sort((a, b) => (a.cle ? 0 : 1) - (b.cle ? 0 : 1) || b.colis.length - a.colis.length);
 }

@@ -94,13 +94,13 @@ export function relireLigneSuivi(d) {
 }
 // Les scalaires de `meta` lus par le cron et le widget (alias courts) sous les
 // noms de la ligne — les alias restent (les règles d'ici lisent les deux).
-export const SELECT_SUIVI_META = 'id,s:meta->>status,r:meta->>receivedAt,ea:meta->>emailAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier,lab:meta->>statusLabel,lieu:meta->>lieu,co:meta->>code,qt:meta->>qrType,qu:meta->>qrUrl,el:meta->>extraitLieu,ec:meta->>extraitCode';
+export const SELECT_SUIVI_META = 'id,s:meta->>status,r:meta->>receivedAt,ea:meta->>emailAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier,lab:meta->>statusLabel,lieu:meta->>lieu,co:meta->>code,qt:meta->>qrType,qu:meta->>qrUrl,el:meta->>extraitLieu,ec:meta->>extraitCode,rl:meta->>retireLe';
 export function ligneDeMeta(x) {
   if (!x || typeof x !== 'object') return x;
   const v = (a, b) => (x[a] != null ? x[a] : (x[b] != null ? x[b] : null));
   return { ...x, status: v('status', 's'), receivedAt: v('receivedAt', 'r'), emailAt: v('emailAt', 'ea'), limite: v('limite', 'l'), arriveLe: v('arriveLe', 'a'),
     suivi: v('suivi', 'su') || '', subject: v('subject', 'sj') || '', sens: v('sens', 'se'), carrier: v('carrier', 'c'), statusLabel: v('statusLabel', 'lab') || '',
-    code: v('code', 'co'), qrType: v('qrType', 'qt'), qrUrl: v('qrUrl', 'qu'), extraitLieu: v('extraitLieu', 'el'), extraitCode: v('extraitCode', 'ec') };
+    code: v('code', 'co'), qrType: v('qrType', 'qt'), qrUrl: v('qrUrl', 'qu'), extraitLieu: v('extraitLieu', 'el'), extraitCode: v('extraitCode', 'ec'), retireLe: v('retireLe', 'rl') };
 }
 // La ligne relue, depuis ses scalaires : une forme pour le cron et le widget.
 // Les alias courts suivent la relecture (statut, lieu, date limite).

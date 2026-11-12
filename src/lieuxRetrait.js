@@ -14,17 +14,22 @@
 //  complète ; deux lieux différents, rien de lu, une lecture ratée ⇒ la ligne
 //  reste telle quelle (jamais un lieu deviné, jamais un colis écarté).
 // ════════════════════════════════════════════════════════════════════════════
-import { lieuSousEnTete } from '../api/_lib/retrait-colis.js';
+import { lieuSousEnTete, nouveauPointDansTexte } from '../api/_lib/retrait-colis.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 // Un colis au point relais dont le lieu rangé n'a pas de code postal.
 export const lieuIncomplet = (t) => !!t && t.status === 'available' && !!String(t.suivi || '').trim() && !/\b\d{5}\b/.test(String(t.lieu || ''));
+// (12 nov.) Un colis REDIRIGÉ (« Votre colis a changé de plan », `relaisChange`, en route) dont le nouveau point
+// n'a pas été lu à la réception : son point est relu dans le texte gardé de l'e-mail (`nouveauPointDansTexte`, la
+// règle du serveur), par l'identité du n° de suivi. Rien de lu ⇒ rien de changé (l'écran dit « pas encore lu »).
+export const pointChangeIncomplet = (t) => !!t && !!t.relaisChange && t.status === 'transit' && !!String(t.suivi || '').trim() && !/\b\d{5}\b/.test(String(t.lieu || ''));
+const aRelire = (t) => lieuIncomplet(t) || pointChangeIncomplet(t);
 export const MAX_RELUS = 40;
 
 // lire(query) → tableau de lignes, ou lève (lecture ratée ⇒ rien de changé).
 export async function lieuxRelusDansTextes(lignes, lire) {
   if (!Array.isArray(lignes) || typeof lire !== 'function') return lignes;
-  const cibles = lignes.filter(lieuIncomplet).slice(0, MAX_RELUS);
+  const cibles = lignes.filter(aRelire).slice(0, MAX_RELUS);
   if (!cibles.length) return lignes;
   try {
     const sus = [...new Set(cibles.map((t) => String(t.suivi).trim()))];
@@ -43,13 +48,16 @@ export async function lieuxRelusDansTextes(lignes, lire) {
     const textes = await lire(`id=in.(${cles.map((c) => `email_texte_${c}`).join(',')})&select=id,texte:data->>texte&limit=${cles.length}`);
     if (!Array.isArray(textes)) return lignes;
     const texteDe = new Map(textes.map((x) => [String(x && x.id || '').replace(/^email_texte_/, ''), typeof (x && x.texte) === 'string' ? x.texte : '']));
-    const lus = new Map();
+    const lus = new Map(), nouveaux = new Map();
     for (const [s, cl] of parSuivi) {
       const l = [...new Set(cl.map((c) => lieuSousEnTete(texteDe.get(c) || '')).filter((x) => x && /\b\d{5}\b/.test(x)))];
       if (l.length === 1) lus.set(s, l[0]);
+      const n = [...new Set(cl.map((c) => nouveauPointDansTexte(texteDe.get(c) || '')).filter((x) => x && /\b\d{5}\b/.test(x)))];
+      if (n.length === 1) nouveaux.set(s, n[0]);   // deux nouveaux points différents ⇒ on ne choisit pas
     }
-    if (!lus.size) return lignes;
+    if (!lus.size && !nouveaux.size) return lignes;
     return lignes.map((t) => {
+      if (pointChangeIncomplet(t)) { const n = nouveaux.get(String(t.suivi).trim()); return n ? { ...t, lieu: n, lieuLuDansTexte: true } : t; }
       if (!lieuIncomplet(t)) return t;
       const l = lus.get(String(t.suivi).trim());
       if (!l) return t;

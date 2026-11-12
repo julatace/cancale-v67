@@ -263,7 +263,7 @@ const ligneFausseLivree = (suivi, o) => ({ type: 'suivi', carrier: 'mondialrelay
     const relais = sansCom(fs.readFileSync(path.join(R, 'src/ModeRelais.jsx'), 'utf8'));
     dit(/data-relais-desaccord/.test(relais) && /desaccord: x\.codesDesaccord \|\| null/.test(app) && /desaccord: x\.desaccord \|\| null/.test(app), 'le mode relais (en ligne et hors ligne) montre les deux codes, jamais un seul');
     dit(/verdictCode\(\{ lignes: codesDesLignes\(t, codeRetrait\), message: rV \? codeRetrait\(rV\.code\) : '' \}\)/.test(app) && /const code = desaccord \? '' : \(codeRetrait\(vC\.code\) \|\| codeRetrait\(t\.code\)\)/.test(app), 'les codes gardés hors ligne suivent le même verdict que la carte (désaccord ⇒ aucun code seul)');
-    dit(/<AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}\/>/.test(app), 'l’alerte « point changé » lit aussi le transporteur');
+    dit(/<AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}(?: headers=\{sbAuth\})?\/>/.test(app), 'l’alerte « point changé » lit aussi le transporteur');
   });
 
   console.log(`\n${ok} vérifications, ${ko} en échec`);
