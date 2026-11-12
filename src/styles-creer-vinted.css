@@ -58,3 +58,8 @@ p.vrm-cv-geste { margin: 0; font-size: 13px; line-height: 1.4; }
 .vrm-ao-neuve-coche input { width: 20px; height: 20px; }
 .vrm-ao-neuve-serie { display: flex; justify-content: flex-end; padding: 6px 12px 8px; }
 .vrm-ao-neuve-etat { font-size: 12px; font-weight: 600; color: var(--fu-gris, #6e6e73); }
+/* (intégration 11nov-g2) Les champs qu'une fiche n'a pas encore, tapés dans la feuille. */
+.vrm-cv-saisie { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.vrm-cv-champ { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--vrm-muted, inherit); min-width: 0; }
+.vrm-cv-champ input, .vrm-cv-champ textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--vrm-ink, inherit); background: var(--vrm-surface, transparent); border: 1px solid var(--vrm-line, rgba(0, 0, 0, .14)); border-radius: 10px; }
+.vrm-cv-champ textarea { resize: vertical; }

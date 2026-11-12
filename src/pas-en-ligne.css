@@ -32,3 +32,7 @@
 .vrm-pel-liste.is-doute { opacity: .78; }
 .vrm-pel-confirmer > .vrm-b { align-self: flex-start; }
 }
+/* (intégration 11nov-g2) « Créer sur Vinted » en série : une case par article à N° prouvé pas en ligne. */
+.vrm-pel-coche { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex: 0 0 auto; margin-left: -10px; }
+.vrm-pel-coche input { width: 20px; height: 20px; margin: 0; }
+.vrm-pel-creer { display: flex; justify-content: flex-end; padding-top: 10px; }

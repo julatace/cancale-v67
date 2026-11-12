@@ -3987,19 +3987,47 @@ function FichesNeuves({ annonces = null }) {
         );
       })}
       {coches.length > 1 && <div className="vrm-ao-neuve-serie"><button type="button" className="vrm-ao-second" data-fiche-neuve-serie={coches.length} onClick={() => setOuvert(coches)}>{tr('creerVinted.lancer', { n: coches.length })}</button></div>}
-      {ouvert && (() => {
-        // Promis seulement à une extension 5.367+ de CE navigateur, connectée à CE compte VRM
-        // (`raisonExtGlobale`, capacité `creervinted`) ; sinon la feuille dit pourquoi et rien ne part.
-        const vc = vintedDeChrome();
-        const rx = raisonExtGlobale(false, { cap: 'creervinted', role: 'prépare tes annonces sur Vinted' });
-        return <CreerSurVinted fiches={ouvert} compteOnglet={vc === undefined ? undefined : (vc ? { uid: String(vc.uid || ''), login: String(vc.login || '') } : null)}
-          extRaison={rx ? rx.texte : ''} reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }}
-          envoyer={(p) => vmrCmdSuivi(p, 480000)}
-          onCree={(f, r, uid) => noterVinted(f.id, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() })}
-          onFermer={() => { setOuvert(null); setSel(new Set()); }} Retour={FermeAuRetour}/>;
-      })()}
+      {ouvert && <FeuilleCreerVinted fiches={ouvert} saisie onFait={maj} onFermer={() => { setOuvert(null); setSel(new Set()); }}/>}
     </section>
   );
+}
+// (intégration 11nov-g2) LA feuille « Créer sur Vinted » (lot annonce-vinted), partagée par « À publier »
+// (fiches « Dupliquer », « Rangé à l'arrivée », gros lot : toutes dans `vrm_fiches_neuves`) et par « Achetés,
+// pas en ligne » (articles à N° prouvés). Promise seulement à une extension 5.367+ de CE navigateur, connectée
+// à CE compte VRM (`raisonExtGlobale`, capacité `creervinted`) ; sinon la feuille dit pourquoi et rien ne part.
+// Le brouillon rendu par Vinted est noté sur la fiche (`vinted.draftId`) : c'est l'IDENTITÉ qui relie le N° à
+// l'annonce (§5) ; une fiche qui n'existait pas encore (pas en ligne) n'est écrite qu'à ce moment-là.
+function noterFicheVinted(f, champs, saisis = null) {
+  const t = load('vrm_fiches_neuves', {}) || {};
+  const base = t[f.id] || (champs && champs.draftId ? { id: f.id, numero: f.numero, titre: f.titre || '', origine: f.origine || 'pas-en-ligne', creeAt: new Date().toISOString() } : null);
+  if (!base) return false;
+  const propres = saisis ? Object.fromEntries(['titre', 'prix', 'description'].filter((k) => saisis[k] != null && String(saisis[k]).trim() !== '').map((k) => [k, k === 'prix' ? Math.round(Number(String(saisis[k]).replace(',', '.')) * 100) / 100 : String(saisis[k])])) : {};
+  const fiche = { ...base, ...propres, ...(champs ? { vinted: { ...(base.vinted || {}), ...champs } } : {}) };
+  save('vrm_fiches_neuves', { ...t, [f.id]: fiche });
+  emettreClesRelues(['vrm_fiches_neuves']);
+  return true;
+}
+function FeuilleCreerVinted({ fiches, onFermer, onFait = null, saisie = false }) {
+  const vc = vintedDeChrome();
+  const rx = raisonExtGlobale(false, { cap: 'creervinted', role: 'prépare tes annonces sur Vinted' });
+  return <CreerSurVinted fiches={fiches} compteOnglet={vc === undefined ? undefined : (vc ? { uid: String(vc.uid || ''), login: String(vc.login || '') } : null)}
+    extRaison={rx ? rx.texte : ''} reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }}
+    envoyer={(p) => vmrCmdSuivi(p, 480000)} saisie={saisie}
+    onSaisie={(f, t) => { noterFicheVinted(f, null, t); if (onFait) onFait(); }}
+    onCree={(f, r, uid) => { noterFicheVinted(f, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() }, f); if (onFait) onFait(); }}
+    onFermer={onFermer} Retour={FermeAuRetour}/>;
+}
+// (intégration 11nov-g2) « Achetés, pas en ligne » → « Créer sur Vinted » : la fiche « À publier » de CE N°
+// (par `cleNum`, jamais par titre) si elle existe, sinon une fiche le temps de la feuille (écrite au brouillon).
+function fichesPourPasEnLigne(lignes) {
+  const t = load('vrm_fiches_neuves', {}) || {};
+  const vivantes = Object.values(t).filter((f) => f && f.numero && !f.retireeAt);
+  return (lignes || []).filter((c) => c && c.numero).map((c) => {
+    const k = cleNum(c.numero);
+    const deja = vivantes.filter((f) => cleNum(f.numero) === k);
+    if (deja.length === 1) return deja[0];
+    return { id: 'pel-' + k, numero: String(c.numero), titre: String(c.titre || ''), origine: 'pas-en-ligne' };
+  });
 }
 // (3 nov.) Mes modèles de description (src/modelesDescription.js), synchronisés.
 const lireModelesRanges = () => lireModeles(load(CLE_MODELES, []));
@@ -39318,8 +39346,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c.source === 'hors') setOffSecOpen(true);
     if (onNav) onNav('achats');
   };
+  // (intégration 11nov-g2) « Créer sur Vinted » en série depuis la liste (articles à N° prouvés).
+  const [creerPel, setCreerPel] = useState(null);
   const detailPasEnLigne = <PasEnLigneDetail r={pasEnLigne.r} seuil={pasEnLigne.seuil} onSeuil={pasEnLigne.setSeuil} onOuvrir={ouvrirPasEnLigne} onRelire={pasEnLigne.relire}
-    onAnnonces={() => { setFeuillePasEnLigne(false); if (onNav) onNav('vinted_annonces'); }} Bouton={Bouton} Segmente={Segmente} Pourquoi={Pourquoi} Photo={PhotoVinted} lirePhotos={lirePhotosHorsPasEnLigne}/>;
+    onAnnonces={() => { setFeuillePasEnLigne(false); if (onNav) onNav('vinted_annonces'); }} Bouton={Bouton} Segmente={Segmente} Pourquoi={Pourquoi} Photo={PhotoVinted} lirePhotos={lirePhotosHorsPasEnLigne}
+    onCreerVinted={(lignes) => { const f = fichesPourPasEnLigne(lignes); if (f.length) { setFeuillePasEnLigne(false); setCreerPel(f); } }}/>;
+  const feuilleCreerPel = creerPel ? <FeuilleCreerVinted fiches={creerPel} saisie onFermer={() => setCreerPel(null)}/> : null;
   const achatsLusEnEntier = Array.isArray(buys.items) && !buys.error && !(Array.isArray(buys.failed) && buys.failed.length);
   // Le nombre pour « À trancher », publié par CET écran (pas su ⇒ rien publié, jamais 0).
   useEffect(() => { if (curSub === 'achats' && achatsLusEnEntier) publierATrancher('achats-doubles', achatsDoubles.length); }, [curSub, achatsLusEnEntier, achatsDoubles]);
@@ -45248,6 +45280,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {detailPasEnLigne}
                     </SheetShell>
                   ) : null}
+                  {curSub !== 'achats' ? feuilleCreerPel : null}
                   {feuilleDeux && deuxFois.length ? (
                     <SheetShell titre="En ligne deux fois" sousTitre="Sur Vinted" onClose={() => setFeuilleDeux(false)} maxWidth={560} data-feuille-deux-fois="">
                       <EnLigneDeuxFoisDetail groupes={deuxFois} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted}/>
@@ -47508,6 +47541,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {detailPasEnLigne}
           </SheetShell>
         ) : null}
+        {curSub === 'achats' ? feuilleCreerPel : null}
         {!modeRetraits && <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen} facture={facturesAchat} importer={importAchats}
           onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
           paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}

@@ -1959,6 +1959,10 @@ export default {
   "creerVinted.champ.prix": "price",
   "creerVinted.champ.numero": "No.",
   "creerVinted.champ.description": "description (5 characters)",
+  // (intégration 11nov-g2) les champs tapés dans « Créer sur Vinted » quand la fiche ne les a pas
+  "creerVinted.saisie.titre": "Title",
+  "creerVinted.saisie.prix": "Selling price (€)",
+  "creerVinted.saisie.description": "Description",
   "creerVinted.pied": "One action per item, within the account’s 50 per hour.",
   "creerVinted.lancer": {one:  "Create on Vinted · {n}", other:  "Create on Vinted · {n}"},
   "creerVinted.confirmer": {one:  "Confirm: {n} draft on {login}", other:  "Confirm: {n} drafts on {login}"},

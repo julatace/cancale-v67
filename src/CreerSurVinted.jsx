@@ -72,15 +72,24 @@ export function demanderValeurVinted(q, fiche) {
   });
 }
 
-export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = '', reglages = {}, envoyer, onCree, onFermer, Retour = null, demander = demanderValeurVinted, entreMs = null }) {
+// (intégration 11nov-g2) `saisie` : les champs qu'une fiche n'a pas encore (titre, prix, description) se
+// TAPENT ici — une fiche née ailleurs (« Achetés, pas en ligne ») n'a souvent ni prix ni description.
+// Rien n'est deviné : ce qu'il tape part dans le brouillon, et `onSaisie` le garde sur sa fiche.
+const CHAMPS_SAISIS = ['titre', 'prix', 'description'];
+export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = '', reglages = {}, envoyer, onCree, onFermer, Retour = null, demander = demanderValeurVinted, entreMs = null, saisie = false, onSaisie = null }) {
   useLangue();
+  const [tape, setTape] = React.useState({});
+  const ficheDe = (f) => (saisie && tape[f.id] ? { ...f, ...Object.fromEntries(Object.entries(tape[f.id]).filter(([, v]) => String(v).trim() !== '')) } : f);
+  // Les champs à taper : ceux qui MANQUAIENT à la fiche d'origine (ils restent ouverts pendant la frappe).
+  const aTaper = (f) => (saisie ? CHAMPS_SAISIS.filter((k) => manquesFiche(f, ['x']).includes(k)) : []);
   const [photos, setPhotos] = React.useState(() => Object.fromEntries(fiches.map((f) => [f.id, (Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string').slice(0, PHOTOS_MAX)])));
   const [lecture, setLecture] = React.useState('');
   const [confirme, setConfirme] = React.useState(false);
   const [faits, setFaits] = React.useState({});
   const [enCours, setEnCours] = React.useState(false);
   const inputs = React.useRef({});
-  const lignes = fiches.map((f) => {
+  const lignes = fiches.map((f0) => {
+    const f = ficheDe(f0);
     const texte = texteAnnonceVinted(f, reglages);
     const manque = manquesFiche(f, photos[f.id]);
     return { f, texte, manque, prete: texte.ok && !manque.length };
@@ -102,6 +111,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
     if (!confirme) { setConfirme(true); return; }
     setConfirme(false); setEnCours(true);
     const file = pretes.map((l) => l.f);
+    if (saisie && typeof onSaisie === 'function') for (const f of file) { const t = tape[f.id]; if (t) { try { onSaisie(f, t); } catch (_) {} } }
     const pause = entreMs != null ? entreMs : 8000 + Math.floor(Math.random() * 12000);
     await lancerTravail({
       titre: tr('creerVinted.titre'), sorte: 'creer-vinted', uid: compte.uid, seuilMs: 0,   // des photos à envoyer : toujours long, VRM figé tout de suite
@@ -114,7 +124,8 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
         const reponses = {};
         for (let k = 0; k < 8; k++) {
           o.etape('envoi');
-          const r = await envoyer({ cmd: 'creerVintedFiche', uid: compte.uid, confirme: true, fiche: payloadFiche(f, l.texte, photos[f.id]), reponses: { ...reponses } });
+          // (intégration 11nov-g2) Plusieurs fiches d'un coup = une SÉRIE pour la sécurité des comptes (5.366).
+          const r = await envoyer({ cmd: 'creerVintedFiche', uid: compte.uid, confirme: true, fiche: payloadFiche(f, l.texte, photos[f.id]), reponses: { ...reponses }, ...(file.length > 1 ? { serie: true } : {}) });
           if (r && r.code === 'question' && questionOk(r.question) && !(r.question.champ in reponses)) {
             o.noter(`N°${f.numero} : ${r.question.nom} à choisir`);
             const v = await demander(r.question, f);
@@ -151,8 +162,9 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
           {bloque ? bloque : tr('creerVinted.compte.onglet', { login: compte.login || compte.uid })}
         </div>
         <ul className="vrm-cv-liste">
-          {lignes.map(({ f, texte, manque }) => {
+          {lignes.map(({ f, texte, manque }, iL) => {
             const ph = photos[f.id] || []; const fait = faits[f.id];
+            const champs = !fait ? aTaper(fiches[iL]) : [];
             return (
               <li key={f.id} className="vrm-cv-ligne" data-creer-vinted-fiche={f.numero} data-creer-vinted-etat={fait ? 'fait' : (texte.ok && !manque.length ? 'prete' : 'manque')}>
                 <div className="vrm-cv-ligne-tete">
@@ -164,6 +176,19 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
                   {!fait && <button type="button" className="vrm-cv-ajout" disabled={enCours || lecture === f.id || ph.length >= PHOTOS_MAX} onClick={() => inputs.current[f.id] && inputs.current[f.id].click()} data-creer-vinted-ajouter={f.numero}>{lecture === f.id ? tr('creerVinted.photo.lecture') : tr('creerVinted.photo.ajouter')}</button>}
                   <input ref={(el) => { inputs.current[f.id] = el; }} type="file" accept="image/*" multiple hidden onChange={(e) => { ajouter(f.id, e.target.files); e.target.value = ''; }}/>
                 </div>
+                {champs.length ? (
+                  <div className="vrm-cv-saisie" data-creer-vinted-saisie={champs.join(',')}>
+                    {champs.map((k) => (
+                      <label key={k} className="vrm-cv-champ">
+                        <span>{tr('creerVinted.saisie.' + k)}</span>
+                        {k === 'description'
+                          ? <textarea rows={3} value={(tape[f.id] && tape[f.id][k]) || ''} disabled={enCours} data-creer-vinted-taper={k} onChange={(e) => { const v = e.target.value; setTape((t) => ({ ...t, [f.id]: { ...(t[f.id] || {}), [k]: v } })); }}/>
+                          : <input type={k === 'prix' ? 'number' : 'text'} inputMode={k === 'prix' ? 'decimal' : undefined} min={k === 'prix' ? '1' : undefined} step={k === 'prix' ? '0.01' : undefined} maxLength={k === 'titre' ? 100 : undefined}
+                              value={(tape[f.id] && tape[f.id][k]) || ''} disabled={enCours} data-creer-vinted-taper={k} onChange={(e) => { const v = e.target.value; setTape((t) => ({ ...t, [f.id]: { ...(t[f.id] || {}), [k]: v } })); }}/>}
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
                 {fait ? <p className="vrm-cv-ok" data-creer-vinted-fait={fait.draftId}>{tr('creerVinted.fait')} <a href={lienBrouillon(fait.draftId)} target="_blank" rel="noopener noreferrer">{tr('creerVinted.ouvrir')}</a>{fait.aFinir.length ? <><br/><small>{tr('creerVinted.aFinir', { liste: fait.aFinir.join(', ') })}</small></> : null}</p>
                   : !texte.ok ? <p className="vrm-cv-geste" data-creer-vinted-refus="">{texte.raison}</p>
                   : manque.length ? <p className="vrm-cv-geste" data-creer-vinted-manque={manque.join(',')}>{tr('creerVinted.manque', { liste: manque.map((m) => tr('creerVinted.champ.' + m)).join(', ') })}</p> : null}

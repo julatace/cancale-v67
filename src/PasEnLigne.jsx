@@ -45,11 +45,12 @@ function Vignette({ c, Photo, photosHors }) {
   );
 }
 
-function Ligne({ c, Photo, photosHors, onOuvrir, Bouton }) {
+function Ligne({ c, Photo, photosHors, onOuvrir, Bouton, coche = null }) {
   const depuis = tr(c.depuisAuMoins ? 'pasEnLigne.depuisAuMoins' : 'pasEnLigne.depuis', { n: c.jours });
   const infos = [c.prix != null ? tr('pasEnLigne.achete', { prix: monnaie(c.prix) }) : null, depuis].filter(Boolean).join(' · ');
   return (
     <li className="vrm-pel-ligne" data-pel-ligne={c.id} data-pel-num={c.numero || ''} data-pel-tx={c.tx || ''} data-pel-jours={String(c.jours)}>
+      {coche ? <label className="vrm-pel-coche"><input type="checkbox" checked={coche.oui} onChange={coche.basculer} aria-label={tr('creerVinted.cocher', { num: c.numero })} data-pel-cocher={c.numero}/></label> : null}
       <Vignette c={c} Photo={Photo} photosHors={photosHors} />
       <span className="vrm-pel-textes">
         <span className="vrm-pel-titre">{c.numero ? `N°${c.numero} · ` : ''}{c.titre || '—'}</span>
@@ -65,8 +66,12 @@ function Ligne({ c, Photo, photosHors, onOuvrir, Bouton }) {
   );
 }
 
-export function PasEnLigneDetail({ r, seuil, onSeuil, onOuvrir, onRelire, onAnnonces, Bouton, Segmente, Pourquoi, Photo, lirePhotos }) {
+// (intégration 11nov-g2) `onCreerVinted(lignes)` : « Créer sur Vinted » EN SÉRIE pour les articles PROUVÉS
+// pas en ligne qui ont un N° (le N° est leur identité ; le brouillon rendu par Vinted le portera). Il coche,
+// puis lance ; rien n'est coché d'office. Sans N° : pas de case (rien ne relierait l'annonce à l'article).
+export function PasEnLigneDetail({ r, seuil, onSeuil, onOuvrir, onRelire, onAnnonces, Bouton, Segmente, Pourquoi, Photo, lirePhotos, onCreerVinted = null }) {
   const [photosHors, setPhotosHors] = React.useState(null);
+  const [coches, setCoches] = React.useState(() => new Set());
   const [repli, setRepli] = React.useState(false);
   const ids = r && r.su ? [...r.liste, ...r.aConfirmer].filter((c) => c.source === 'hors' && c.photo).map((c) => c.achatId).slice(0, 40) : [];
   const cleIds = ids.join(',');
@@ -87,14 +92,24 @@ export function PasEnLigneDetail({ r, seuil, onSeuil, onOuvrir, onRelire, onAnno
     </div>
   );
   const manques = manquesDe(r);
+  const creables = onCreerVinted ? r.liste.filter((c) => c.sorte === 'num' && c.numero) : [];
+  const cochees = creables.filter((c) => coches.has(c.id));
+  const cocheDe = (c) => (creables.includes(c) ? { oui: coches.has(c.id), basculer: () => setCoches((s) => { const n = new Set(s); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; }) } : null);
   return (
     <div className="vrm-pel" data-pel="lu" data-pel-n={String(r.liste.length)} data-pel-a-confirmer={String(r.aConfirmer.length)}>
       {seg}
       {r.liste.length ? (
         <ul className="vrm-pel-liste" data-pel-liste="">
-          {r.liste.map((c) => <Ligne key={c.id} c={c} Photo={Photo} photosHors={photosHors} onOuvrir={onOuvrir} Bouton={Bouton} />)}
+          {r.liste.map((c) => <Ligne key={c.id} c={c} Photo={Photo} photosHors={photosHors} onOuvrir={onOuvrir} Bouton={Bouton} coche={cocheDe(c)} />)}
         </ul>
       ) : <p className="vrm-pel-note" data-pel-vide="">{tr(r.aConfirmer.length ? 'pasEnLigne.videProuve' : 'pasEnLigne.vide', { n: r.seuil })}</p>}
+      {creables.length ? (
+        <div className="vrm-pel-creer" data-pel-creer={String(cochees.length)}>
+          <Bouton variante="secondaire" disabled={!cochees.length} data-pel-creer-vinted={String(cochees.length)} onClick={() => { onCreerVinted(cochees); setCoches(new Set()); }}>
+            {cochees.length ? tr('creerVinted.lancer', { n: cochees.length }) : tr('creerVinted.bouton')}
+          </Bouton>
+        </div>
+      ) : null}
       {r.aConfirmer.length ? (
         <section className="vrm-pel-confirmer" data-pel-confirmer="">
           <button type="button" className="vrm-pel-repli" aria-expanded={repli ? 'true' : 'false'} onClick={() => setRepli((x) => !x)}>
