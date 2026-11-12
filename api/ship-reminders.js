@@ -58,6 +58,7 @@ import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
+import { passageSauvegarde, stockageSupabase, sourceCle } from './_lib/sauvegarde-quotidienne.js';   // (12 nov., agent2-fiabilite-prod)
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
 import { passageClientsPartis } from './_lib/clients-partis.js';
@@ -1404,6 +1405,19 @@ async function alerterColis(r) {
   } catch (e) { return { fait: false, erreur: String((e && e.message) || e).slice(0, 120) }; }
 }
 
+// ── (12 nov., agent2-fiabilite-prod) L'EXPORT QUOTIDIEN DES LIGNES DE CHAQUE VENDEUR ──
+// api/_lib/sauvegarde-quotidienne.js : un fichier chiffré par vendeur et par jour,
+// seau Storage PRIVÉ `sauvegardes`, 14 jours. Au cron du SOIR (avant les vendeurs,
+// borné) et `?moment=sauvegarde` (GitHub, .github/workflows/sauvegarde.yml) ; une
+// relance le même jour ne refait que ce qui manque. Vendeurs pas sus ⇒ rien.
+async function sauvegardeDuJour(budgetMs) {
+  const cle = sourceCle(process.env);
+  const mains = await ownersActifs();
+  const comptes = mains ? await fetchPaginated('vinted_accounts?select=owner') : null;
+  const owners = mains && comptes ? [...new Set([...mains, ...comptes.map((c) => c && c.owner).filter(Boolean).map(String)])] : null;
+  return passageSauvegarde({ owners, lire: fetchPaginated, stockage: stockageSupabase({ url: SUPABASE_URL, entetes: HEADERS }), cle, budgetMs });
+}
+
 // ── LES LIGNES DU PROPRIÉTAIRE NEUTRE (le curseur du cron) ─────────────────
 // Trois états : objet · `null` (absente) · `undefined` (pas su).
 async function lireNeutre(id) {
@@ -1456,6 +1470,14 @@ export default async function handler(req, res) {
     let s = null;
     try { s = await sondesStatut(); } catch (e) { s = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     res.status(s && s.fait ? 200 : 503).json({ ok: !!(s && s.fait), moment: 'sondes', sondes: s });
+    return;
+  }
+  // (12 nov., agent2-fiabilite-prod) `?moment=sauvegarde` : l'export du jour, RIEN d'autre.
+  // La réponse ne porte que des NOMBRES ; pas fait ⇒ 503 (le workflow échoue, GitHub prévient).
+  if (moment === 'sauvegarde') {
+    let r = null;
+    try { r = await sauvegardeDuJour(200000); } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    res.status(r && r.fait && !r.echecs ? 200 : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'sauvegarde', ...r });
     return;
   }
   // (9 nov., retraits frais) `?moment=colis` : le statut des colis ACTIFS chez le transporteur, et RIEN
@@ -1552,6 +1574,9 @@ export default async function handler(req, res) {
     // (9 nov.) Les sondes de /statut, aussi au matin et au soir (si GitHub ne passe pas).
     let sondes = null;
     if (!reveil && !horaire) { try { sondes = await sondesStatut(debutCron); } catch (e) { sondes = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (12 nov., agent2-fiabilite-prod) L'export du jour, au cron du SOIR seulement (le matin est chargé), borné à 90 s.
+    let sauvegarde = null;
+    if (soir && !horaire) { try { sauvegarde = await sauvegardeDuJour(90000); } catch (e) { sauvegarde = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
@@ -1619,7 +1644,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
