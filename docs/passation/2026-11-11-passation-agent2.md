@@ -71,3 +71,18 @@ premier jour.
 - Avec 20 000 ventes, chaque écran met encore 7–19 s au démarrage (calculs de Comptabilite) : vitesse.
 - « délai dépassé » en rouge dans Colis ; `audit-benefice` rouge sur main (`MeilleuresSources` déclaré deux fois).
 - Revue robustesse complète (525 points) : `docs/passation/robustesse/` sur `claude/agent2-robustesse`.
+
+## 8. Mise à jour du 12 nov. (nuit) — ce qu'il faut intégrer, au plus court
+
+Plusieurs branches en contiennent d'autres. Pour tout avoir, l'agent principal n'intègre QUE :
+
+| branche | contient |
+|---|---|
+| `claude/agent2-revue-fin` | `agent2-serveur-migrations`, `agent2-familles-serveur`, `agent2-robustesse-serveur`, `agent2-familles-app`, `agent2-robustesse-metier` |
+| `claude/agent2-extension-moyennes` (ext. **5.362**) | `agent2-familles-extension` (5.361), `agent2-vinted-forme` (5.357), `agent2-robustesse-extension` (5.356) |
+| `claude/agent2-donnees-suite` | `agent2-robustesse-donnees` |
+| `claude/agent2-messages` · `claude/agent2-regroupe-comptes` · `claude/agent2-ventes-vestiaire` · `claude/agent2-temps-reel` · `claude/agent2-veille` · `claude/agent2-cloisonnement` · `claude/agent2-limites-client` · `claude/agent2-saisie-rapide` · `claude/agent2-argent-parrainage` | eux-mêmes |
+
+Migrations des branches agent2 : 037, 040, 041 **appliquées par Julien le 11 nov.** (vérifiées) ; **042** (écritures atomiques) écrite, pas appliquée (3 blocs : `scripts/serveur-migrations-sql/`).
+
+Décisions attendues de Julien : ordre de Messages (compte de l'onglet d'abord ou tout mélangé) ; pause sur tout 403 ou seulement 429/anti-robot (conseil : garder) ; relecture des ventes en mode prudence ; « X € conseillé » d'une paire qui dort.
