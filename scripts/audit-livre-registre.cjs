@@ -88,7 +88,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '
 
 // Une copie des modules (mutation appliquée dans la copie).
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'livre-registre-'));
-for (const f of ['src/registres.js', 'src/registresConformes.js', 'src/factureAchat.js', 'src/prixAchatPropose.js', 'src/xlsxSimple.js', 'src/exportDonnees.js', 'src/modePaiement.js', 'src/fournisseurs.js', 'src/achatsSourcing.js', 'src/profilVendeur.js']) {
+for (const f of ['src/registres.js', 'src/dateParis.js', 'src/registresConformes.js', 'src/factureAchat.js', 'src/prixAchatPropose.js', 'src/xlsxSimple.js', 'src/exportDonnees.js', 'src/modePaiement.js', 'src/fournisseurs.js', 'src/achatsSourcing.js', 'src/profilVendeur.js']) {
   let s = fs.readFileSync(path.join(R0, f), 'utf8');
   if (MUT && MUTATIONS[MUT] && MUTATIONS[MUT][0] === f) {
     if (!s.includes(MUTATIONS[MUT][1])) { console.log('❌ mutation impossible : motif absent — ' + MUTATIONS[MUT][1].slice(0, 90)); process.exit(2); }

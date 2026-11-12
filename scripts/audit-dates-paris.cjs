@@ -108,6 +108,7 @@ console.log('\n── B · Aucun jour UTC (`toISOString().slice(0, 10|7|4)`) dan
 // Liste blanche NOMMÉE : zone d'un autre lot (Colis, agent principal) — à reprendre là-bas.
 const BLANCHE = [
   ['src/colisEnvoi.js', 'secours sans Intl du jour d’envoi (zone Colis, agent principal)'],
+  ['src/securiteComptes.js', 'règle RECOPIÉE dans l’extension (audit-securite-comptes --recopie) : secours sans Intl et J+1 à midi UTC — à reprendre avec une version d’extension'],
   ['src/App.jsx', 'attribut de banc `data-sorti-at` des retraits (zone Colis, agent principal)'],
 ];
 const MOTIF_UTC = /toISOString\(\)\s*\.\s*slice\(\s*0\s*,\s*(10|7|4)\s*\)/g;

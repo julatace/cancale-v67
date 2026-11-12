@@ -197,7 +197,7 @@ export async function memeCarte(clientA, clientB) {
 }
 async function refuser(filleul, raison) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/parrainages?filleul=eq.${encodeURIComponent(filleul)}`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/parrainages?filleul=eq.${encodeURIComponent(filleul)}`, {
       method: 'PATCH', headers: { ...h(), Prefer: 'return=minimal' }, body: JSON.stringify({ refus: raison }),
     });
   } catch (_) { /* 037 pas passée : la comparaison sera refaite, rien n'est crédité */ }

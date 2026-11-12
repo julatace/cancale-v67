@@ -233,7 +233,9 @@ function course(base) {
     let v = null;
     try { const ctx = {}; vm.createContext(ctx); vm.runInContext(src.replace(/^const /, 'var ') + '\nthis.f = montantCommandeLu;', ctx); v = [ctx.f({ price: { amount: '12.5', currency_code: 'GBP' } }), ctx.f({ price: { amount: '12.5', currency_code: 'EUR' } })]; } catch (e) { v = ['erreur', e.message]; }
     dit(v[0] === null && v[1] === 12.5, 'une commande en GBP n\'est pas lue en euros (« dépensé », CA) ; en EUR, oui', JSON.stringify(v));
-    const tre = /const amt = montantCommandeLu\(o\);\s*if \(amt == null\) continue;/.test(APP);
+    const tre = /const amt = montantCommandeLu\(o\);\s*if \(amt == null\) continue;/.test(APP)
+      // (12 nov., intégration) ou la somme « au moins » de la revue fin : chaque achat passe par la même lecture.
+      || /sommeConnue\(\[\.\.\.achatsVinted\.map\(montantCommandeLu\)/.test(APP);
     dit(tre, 'Trésorerie « dépensé » passe par cette lecture (plus de `Number(o.price.amount)`)');
   }
   console.log(ko ? `\n❌ donnees-suite : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ donnees-suite : ${ok} contrôles verts`);

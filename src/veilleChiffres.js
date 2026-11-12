@@ -35,6 +35,7 @@
 //  (api/_lib/veille-chiffres.js) et scripts/audit-veille.cjs l'exécutent tels quels.
 // ══════════════════════════════════════════════════════════════════════════════
 
+import { jourParis, moisDecale } from './dateParis.js';   // (12 nov., intégration) famille « dates à l'heure de Paris »
 export const CLE_VEILLE = 'vrm_veille_chiffres';
 export const MEMO_VEILLE = 'veille_chiffres_dit';     // le mémo des notifications (écrit par le serveur seul)
 export const CAT_VEILLE = 'veille';
@@ -56,7 +57,7 @@ const pl = (n, s, p) => (n > 1 ? p : s);
 
 // Le jour de Paris (AAAA-MM-JJ) d'un instant.
 export function jourDe(ms) {
-  try { return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); } catch (_) { return new Date(ms).toISOString().slice(0, 10); }
+  return jourParis(ms);   // (12 nov., intégration) LA règle du jour de Paris (src/dateParis.js)
 }
 const ecartJours = (j0, j1) => Math.round((Date.parse(j1 + 'T12:00:00Z') - Date.parse(j0 + 'T12:00:00Z')) / 864e5);
 const deMois = (ym) => { const m = moisLisible(ym); return /^[aeiouyàâéèêëîïôûü]/i.test(m) ? `d’${m}` : `de ${m}`; };
@@ -93,7 +94,7 @@ export function pointDuJour({ maintenant = Date.now(), stock, comptes, ventes, s
   const u = objet(urssaf);
   if (u && Array.isArray(u.mois)) {
     const ymMax = j.slice(0, 7);
-    const ymMin = (() => { const d = new Date(Date.parse(j + 'T12:00:00Z')); d.setUTCMonth(d.getUTCMonth() - 13); return d.toISOString().slice(0, 7); })();
+    const ymMin = moisDecale(String(j).slice(0, 7), -13);
     const m = {};
     for (const x of u.mois) {
       if (!x || !/^\d{4}-\d{2}$/.test(String(x.ym || '')) || x.ym >= ymMax || x.ym < ymMin) continue;
@@ -137,7 +138,7 @@ export function ajouterPoint(donnee, point) {
     if (prec && JSON.stringify(prec.m) === JSON.stringify(nouveau.m) && prec.p === nouveau.p && prec.e === nouveau.e) { delete nouveau.m; delete nouveau.p; delete nouveau.e; }
   }
   const dernier = tous[tous.length - 1].j;
-  const limite = (() => { const t = Date.parse(dernier + 'T12:00:00Z') - JOURS_POINTS * 864e5; return new Date(t).toISOString().slice(0, 10); })();
+  const limite = jourParis(Date.parse(dernier + 'T12:00:00Z') - JOURS_POINTS * 864e5);   // midi UTC = le même jour à Paris
   // Le plus ancien `m` gardé doit rester lisible : on le recopie sur le premier point gardé.
   const gardes = tous.filter((x) => x.j > limite);
   if (gardes.length && !objet(gardes[0].m)) {

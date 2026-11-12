@@ -35844,7 +35844,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const nomUidGroupe = (u) => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : ''; };
   const groupeChoisi = !!compteSel && compteSel !== '*' && String(compteSel) === selEff;
   const teteGroupe = (e, k, unite) => <TeteGroupeCompte key={'gc-' + k + '-' + (e.compte || e.tete || e.suite || '')} e={e} unite={unite}
-    libelle={groupeChoisi ? 'Compte choisi' : 'Compte ouvert dans Chrome'} nomOuvert={nomUidGroupe(selEff)} nomDe={nomUidGroupe}
+    libelle={groupeChoisi ? 'Compte choisi' : `Compte ouvert ${NAV.dansNu}`} nomOuvert={nomUidGroupe(selEff)} nomDe={nomUidGroupe}
     onBasculer={depComptes.basculer} onSuite={depComptes.plus}
     geste={e.tete === 'ouvert' && groupeChoisi && compteConnecte && String(compteConnecte) !== selEff && typeof setCompteSel === 'function'
       ? <button type="button" className="vrm-gc-geste" data-groupe-chrome={String(compteConnecte)} onClick={() => setCompteSel(String(compteConnecte))}>Chrome : {nomUidGroupe(compteConnecte) || '—'} ›</button> : null}/>;
