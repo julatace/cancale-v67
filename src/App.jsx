@@ -414,6 +414,8 @@ import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEma
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
+import { casesEnSerie, caseHabitude, numerosEnSerie, opsRanger, achatsARanger, numerosAReserver, CLE_FICHES as CLE_FICHES_RANGEES } from './rangementArrivee.js';   // (11 nov., lot rangement-guide)
+import { RangerAchat } from './RangerAchat.jsx';
 import './comptes-lies.css';
 import './centre-notifs.css';
 import './comptes-securite.css';
@@ -12013,6 +12015,8 @@ const ajouterNumerosHorsEcran = (taken, takenK) => {
   try { (load('vinted_used_numeros', []) || []).forEach(add); } catch (_) {}
   // (11 nov.) Le stock importé (Paramètres → Importer) : ses N° sont écrits sur des cartons.
   try { lireStockImporte().forEach((x) => add(x && x.numero)); } catch (_) {}
+  // (11 nov., lot rangement-guide) Les fiches à publier (dupliquées, rangées à l'arrivée) : leurs N° sont servis.
+  try { Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((x) => add(x && x.numero)); } catch (_) {}
 };
 const CLES_ECRITURE_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_vc_numeros'];
 let _numVcEnVol = null, _numVcRelance = null;
@@ -16808,11 +16812,26 @@ async function dupliquerNumero(rn, extra) {
   emettreClesRelues(['vinted_used_numeros', 'vrm_fiches_neuves']);
   return { ok: true, numero: r.fiche.numero, id: r.id, fiche: r.fiche };
 }
+
+// ── (11 nov., lot rangement-guide) RANGER UN ACHAT À SON ARRIVÉE ──────────────
+// La règle : src/rangementArrivee.js ; la feuille : src/RangerAchat.jsx. Ici, la
+// lecture (les N° servis — `panel_num_reserves` RELU, comme `dupliquerNumero` —,
+// le plan du Stock, ses fiches) et l'écriture de « Rangé ».
+// ⚠️ Le pool d'abord (append-only) : le N° montré à « Rangé » est servi pour de
+//    bon, même après « Annuler » (il a pu être écrit sur le carton). « Annuler »
+//    défait la fiche, la case et le coût — jamais le pool (le garde-fou de la base
+//    `vrm_pool_retreci` refuserait d'ailleurs un pool qui rétrécit).
+// (intégration g1) gros-lot et rangement-guide lisent la MÊME liste des N° servis : une seule fonction
+// (`numerosServisLus`), toutes les sources des deux lots (fiches neuves, achats hors plateforme, cases du Stock).
+async function numerosServisRangement() { return numerosServisLus(); }
 // (11 nov., lot gros-lot) TOUS les N° déjà servis (pool, fiches, ventes corrigées, Leboncoin, fiches
 // neuves, hors écran, réservés relus en base) — la même liste que « Dupliquer ». null = pas su.
 async function numerosServisRelus() {
   if (!numerotationPermise() || !isCloudReady()) return null;
   if (!(await assurerVersionNumerotation())) return null;
+  return numerosServisLus();
+}
+async function numerosServisLus() {
   let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
   if (!Array.isArray(jr)) return null;
   const pris = new Set(), prisK = new Set();
@@ -16823,6 +16842,7 @@ async function numerosServisRelus() {
   Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
   Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
   (load('vinted_offvinted_buys', []) || []).forEach((b) => add(b && b.numero));
+  Object.keys(load('vrm_slots', {}) || {}).forEach(add);   // un N° noté dans une case est sur un carton
   ajouterNumerosHorsEcran(pris, prisK);
   numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
   return { int: pris, cles: prisK };
@@ -16838,6 +16858,7 @@ function apercuNumerosLot(n) {
   Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
   Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
   (load('vinted_offvinted_buys', []) || []).forEach((b) => add(b && b.numero));
+  Object.keys(load('vrm_slots', {}) || {}).forEach(add);   // (intégration g1) la même liste que `numerosServisLus`
   ajouterNumerosHorsEcran(pris, prisK);
   try { return numerosDuLot(n, { pris: { int: pris, cles: prisK }, pref: prefixeNumeros(), prochainLibre, cleNum }); } catch (_) { return null; }
 }
@@ -16890,6 +16911,108 @@ async function creerGrosLot(d, setters = {}) {
     if (sens === 'avant') ids.forEach((id, i) => { if (photosOk[i]) ecrirePhotoLot(id, null); });
   });
   return { ok: true, id: lotId, numeros };
+}
+async function preparerRangement(entree, n) {
+  if (!isCloudReady()) return { ok: false, raison: 'lecture' };
+  const ecrit = numeroEcritActif();
+  if (!numerotationPermise() && !(await assurerVersionNumerotation())) return { ok: false, raison: 'numeros' };
+  const pris = await numerosServisRangement();
+  if (!pris) return { ok: false, raison: 'numeros' };
+  const numeros = ecrit ? null : numerosEnSerie({ pris, pref: prefixeNumeros(), n, prochainLibre, cleNum });
+  if (!ecrit && !numeros) return { ok: false, raison: 'numeros' };
+  const m0 = load('vrm_meubles', []), meubles = Array.isArray(m0) ? m0 : [];
+  const s0 = load('vrm_slots', {}), slots = s0 && typeof s0 === 'object' && !Array.isArray(s0) ? s0 : {};
+  const fiches = load(CLE_FICHES_RANGEES, {}) || {};
+  const cs = casesEnSerie({ meubles, slots, n, habitude: caseHabitude({ fiches, meubles }) });
+  return { ok: true, numeros, numeroEcrit: ecrit, pris: pris.cles, archive: archiveNumeros(), cleNum, meubles, slots, cases: cs.cases || [], aucunMeuble: !!cs.aucunMeuble, marqueDe: (t) => extractBrand(t) || '', clavier: clavierNum() };
+}
+async function ecrireRangement(entree, lignes) {
+  if (!isCloudReady()) return { ok: false, raison: 'lecture' };
+  if (!numerotationPermise() && !(await assurerVersionNumerotation())) return { ok: false, raison: 'lecture' };
+  const pris = await numerosServisRangement();
+  if (!pris) return { ok: false, raison: 'lecture' };
+  const base = 'ra' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const r = opsRanger({ lignes, achat: entree, fiches: load(CLE_FICHES_RANGEES, {}) || {}, slots: load('vrm_slots', {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {},
+    meubles: load('vrm_meubles', []) || [], pris: pris.cles, cleNum, ids: lignes.map((_, k) => base + '_' + k) });
+  if (!r.ok) return r;
+  // Le pool d'abord (append-only), puis le geste annulable (fiche, case, coût).
+  const pool = (load('vinted_used_numeros', []) || []).slice(); const dans = new Set(pool.map(cleNum));
+  for (const num of r.numeros) { const ep = entreePool(num); if (ep != null && !dans.has(cleNum(ep))) { pool.push(ep); dans.add(cleNum(ep)); } }
+  save('vinted_used_numeros', pool.sort(triPool));
+  emettreClesRelues(['vinted_used_numeros']);
+  const texte = r.numeros.length > 1 ? tr('ranger.gesteN', { n: r.numeros.length, num: r.numeros[0], fin: r.numeros[r.numeros.length - 1] }) : tr('ranger.geste1', { num: r.numeros[0] });
+  gesteVrm(texte, r.ops, {}, () => {
+    // Après l'écriture locale : le Stock relit ses cases, les écrans leurs fiches et coûts.
+    setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues([CLE_FICHES_RANGEES, 'vrm_slots', 'vinted_buyprice_by_num']); try { window.dispatchEvent(new Event('vrm:a-ranger')); } catch (_) {} }, 300);
+  });
+  return { ok: true, numeros: r.numeros };
+}
+// Rattrapage : un N° rangé dont l'écriture du pool n'a pas abouti y entre (append-only).
+function reserverNumerosRanges() {
+  if (!isCloudReady() || !numerotationPermise()) return;
+  const pool = load('vinted_used_numeros', []) || [];
+  const manquent = numerosAReserver({ fiches: load(CLE_FICHES_RANGEES, {}) || {}, pool: Array.isArray(pool) ? pool : [], cleNum });
+  if (!manquent.length) return;
+  const u = pool.slice(); for (const n of manquent) { const ep = entreePool(n); if (ep != null) u.push(ep); }
+  save('vinted_used_numeros', u.sort(triPool)); emettreClesRelues(['vinted_used_numeros']);
+}
+// Les achats qui attendent (les propositions de la cloche « Où ranger », `vrm_ranger_proposes`).
+const lirePropositionsRanger = () => { try { const v = JSON.parse(localStorage.getItem('vrm_ranger_proposes') || 'null'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } };
+const achatsARangerIci = () => achatsARanger({ proposes: lirePropositionsRanger(), fiches: load(CLE_FICHES_RANGEES, {}) || {} });
+// Un achat retiré (ou reçu) devient une proposition : il attend jusqu'à « Rangé » ou « Pas à ranger ».
+function proposerRangement(entrees) {
+  const p = lirePropositionsRanger(); const t = Date.now(); let change = false;
+  for (const e of entrees || []) { const tx = String((e && e.tx) || ''); if (!tx) continue; p[tx] = { ...(p[tx] || {}), ...e, tx, at: (p[tx] && p[tx].at) || t, fait: undefined }; change = true; }
+  if (!change) return;
+  try { localStorage.setItem('vrm_ranger_proposes', JSON.stringify(p)); } catch (_) {}
+  try { window.dispatchEvent(new Event('vrm:a-ranger')); } catch (_) {}
+}
+function pasARanger(e) {
+  const tx = String((e && e.tx) || ''); if (!tx) return;
+  const p = lirePropositionsRanger(); if (!p[tx]) return;
+  p[tx] = { ...p[tx], fait: Date.now() };
+  try { localStorage.setItem('vrm_ranger_proposes', JSON.stringify(p)); } catch (_) {}
+  try { window.dispatchEvent(new Event('vrm:a-ranger')); } catch (_) {}
+}
+// Ouvre la feuille (la coque l'écoute). Rend true si une feuille l'a prise.
+function ouvrirRangement(entrees) {
+  const l = (entrees || []).filter(Boolean); if (!l.length) return false;
+  let pris = false;
+  try { const ev = new CustomEvent('vrm:ranger-achat', { detail: { entrees: l, prendre: () => { pris = true; } } }); window.dispatchEvent(ev); } catch (_) {}
+  return pris;
+}
+// L'achat Vinted (sa commande) ⇒ l'entrée de la feuille : ce qui est LU, rien de deviné.
+function entreeRangementVinted(o, extra = {}) {
+  if (!o || o.transaction_id == null) return null;
+  const pr = o.price && typeof o.price === 'object' ? o.price.amount : o.price;
+  const l = lotDe(o); const nb = Number(o.items_count || (o.transaction && o.transaction.items_count));
+  return { tx: String(o.transaction_id), titre: String(o.title || '').slice(0, 160), photo: orderPhoto(o) || null, prix: pr != null && pr !== '' ? Number(pr) : null,
+    taille: String(o.size_title || o.size || '').slice(0, 40), site: 'vinted', ...(l.lot || nb > 1 ? { lot: true, n: nb > 1 ? nb : l.n || null } : {}), ...extra };
+}
+// Les propositions qui attendent, pour Ma journée (relues quand elles changent).
+function useARanger(actif = true) {
+  const [l, setL] = React.useState(() => (actif ? achatsARangerIci() : []));
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    const f = () => setL(achatsARangerIci());
+    f(); window.addEventListener('vrm:a-ranger', f); const off = onCleRelue(CLE_FICHES_RANGEES, f);
+    return () => { window.removeEventListener('vrm:a-ranger', f); if (typeof off === 'function') off(); };
+  }, [actif]);
+  return l;
+}
+// La feuille, montée par la coque (AppCoeur) : ouverte par `ouvrirRangement`.
+function RangerAchatCoque() {
+  const [entrees, setEntrees] = React.useState(null);
+  React.useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (!d || !Array.isArray(d.entrees) || !d.entrees.length) return; if (typeof d.prendre === 'function') d.prendre(); setEntrees(d.entrees); };
+    window.addEventListener('vrm:ranger-achat', f);
+    const t = setTimeout(reserverNumerosRanges, 6000);
+    return () => { window.removeEventListener('vrm:ranger-achat', f); clearTimeout(t); };
+  }, []);
+  if (!entrees) return null;
+  return <GardeEcran nom="ranger-achat" feuille onFermer={() => setEntrees(null)}>
+    <RangerAchat entrees={entrees} preparer={preparerRangement} ranger={ecrireRangement} onPasARanger={pasARanger} onFermer={() => setEntrees(null)} Feuille={SheetShell} Bouton={Bouton} Photo={PhotoVinted}/>
+  </GardeEcran>;
 }
 // ⟦→ ecrans/Loupe.jsx #1⟧
 // (26 oct.) Le titre de la barre du haut (téléphone), posé par la coque à chaque
@@ -30897,6 +31020,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { const f = () => setTrancherOuvert(true); window.addEventListener('vrm:trancher-ouvrir', f); return () => window.removeEventListener('vrm:trancher-ouvrir', f); }, []);
   // (6 nov.) Un inventaire du Stock EN COURS (src/inventaire.js) : une carte de Ma journée.
   const inventaireJournee = useInventaireEnCours(only === 'journee');
+  const aRangerJournee = useARanger(only === 'journee');   // (11 nov., lot rangement-guide) les achats retirés ou reçus, pas encore rangés
   const atelierJournee = useAtelierJournee(only === 'journee');
   // (3 nov.) « Supprimer de Leboncoin » depuis la carte « à retirer de Leboncoin » :
   // une confirmation qui nomme chaque N°, puis une annonce à la fois ; le premier
@@ -31671,7 +31795,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (9 nov., lot AD) L'identifiant du geste est rendu : le mode relais offre son « Annuler » dans sa feuille.
     return gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt });
   };
-  const markCollected = (t) => gesteCollecte(t, true);
+  // (11 nov., lot rangement-guide) « J'ai retiré » ⇒ « Ranger cet achat » : l'achat de CE colis par
+  // identité seulement (`achatDuColis` : son n° de suivi ou de transaction, jamais le titre) ; sans achat
+  // relié, la feuille part du colis lui-même (son n° de suivi, ce que son e-mail dit). Au comptoir (scanner,
+  // mode relais), la feuille attend leur fermeture : les achats retirés y passent alors en série.
+  const retraitsARanger = React.useRef([]);
+  const entreeRangementColis = (t) => {
+    let a = null; try { a = achatDuColis(t, buysBase, indexSuivisAchats); } catch (_) { a = null; }
+    const su = (() => { try { return suiviDeLigne(t) || ''; } catch (_) { return ''; } })();
+    if (a) return entreeRangementVinted(a, su ? { suivi: su } : {});
+    return { tx: '', suivi: su, titre: String((t && t.artTitle) || '').slice(0, 160), photo: (t && t.photo) || null, prix: null, taille: '', site: 'vinted' };
+  };
+  const apresRetrait = (e) => {
+    if (!e) return;
+    proposerRangement([e]);
+    try { if (scanOuvert || relaisOuvert) { retraitsARanger.current.push(e); return; } } catch (_) {}
+    ouvrirRangement([e]);
+  };
+  const markCollected = (t) => { const id = gesteCollecte(t, true); try { apresRetrait(entreeRangementColis(t)); } catch (_) {} return id; };
   const unmarkCollected = (t) => gesteCollecte(t, false);
   // Tout marquer retiré en un tap (les transporteurs n'envoient pas d'email « récupéré »).
   // (9 nov., lot B) « Tout marquer retiré » : réversible dans VRM ⇒ plus de confirmation, un seul geste
@@ -31682,6 +31823,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const t of (list || [])) { const k = colisKey(t); if (!k || vus.has(k) || collected.has(k)) continue; vus.add(k);
       ops.push({ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: true, avant: false }); }
     if (!ops.length) return;
+    // (11 nov., lot rangement-guide) Leurs achats (par identité) attendent dans Ma journée.
+    try { proposerRangement((list || []).map((t) => entreeRangementColis(t)).filter((e) => e && e.tx)); } catch (_) {}
     gesteVrm(vus.size > 1 ? `${vus.size} colis retirés` : 'Colis retiré', ops, { vrm_colis_collected: setCollected });
   };
   const isCollected = (t) => collected.has(colisKey(t));
@@ -32716,7 +32859,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted, pas un rapprochement (§24). On ouvre donc toujours SA conversation,
   // même quand l'extension n'est pas encore passée.
   const lienConv = (o) => { const c = o && o.conversation_id; return c ? `https://www.vinted.fr/inbox/${c}` : ''; };
-  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; return gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }); };
+  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; try { apresRetrait(entreeRangementVinted(o)); } catch (_) {} return gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
@@ -37963,6 +38106,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const L = (liste || []).filter(o => o && o.transaction_id != null);
     if (!L.length) return 0;
     const t = new Date().toISOString();
+    // (11 nov., lot rangement-guide) Plusieurs à la fois : ils attendent dans Ma journée (« N achats à ranger »).
+    try { proposerRangement(L.map((o) => entreeRangementVinted(o)).filter(Boolean)); } catch (_) {}
     gesteVrm(L.length > 1 ? `${L.length} colis retirés` : 'Colis retiré', L.map(o => ({ k: 'vinted_pickup_done', type: 'cle', id: String(o.transaction_id), apres: t, avant: pickupDone[String(o.transaction_id)] })), { vinted_pickup_done: setPickupDone });
     return L.length;
   };
@@ -42023,6 +42168,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const retirerRelais = (x) => { const t = (x && x.src && x.src.t) || null, o = (x && x.src && x.src.o) || null; if (t) return markCollected(t); if (o) return markPickupDone(o); return null; };
   const [preparerOuvert, setPreparerOuvert] = useState(false);
   const [relaisOuvert, setRelaisOuvert] = useState(false);
+  // (11 nov., lot rangement-guide) Scanner ou mode relais refermé : les achats retirés au comptoir, en série.
+  useEffect(() => { if (scanOuvert || relaisOuvert || !retraitsARanger.current.length) return; const l = retraitsARanger.current; retraitsARanger.current = []; ouvrirRangement(l); }, [scanOuvert, relaisOuvert]);
   // Le scanner ouvert DEPUIS « Préparer » : la clé du colis montré (le scan dit si c'est le bon bordereau).
   const [scanAttendu, setScanAttendu] = useState('');
   // Achats : « Scanner » et, quand un colis attend, « Mode relais » (même place, en tête).
@@ -43712,6 +43859,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (inventaireJournee) {
           const nI = inventaireJournee.n;
           jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: 'Inventaire en cours', detail: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, title: 'Inventaire en cours', sub: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
+        }
+        // (11 nov., lot rangement-guide) « N achats à ranger » : les achats retirés ou reçus, pas encore
+        // rangés ; « Ranger » ouvre la feuille sur eux, en série (N° et cases à la suite). Neutre.
+        if (aRangerJournee.length) {
+          const nR = aRangerJournee.length, court = tr('ranger.carte.court', { n: nR });
+          jobs.push({ id: 'achats-a-ranger', n: nR, icon: 'box', color: C.text, court, detail: tr('ranger.carte.detail'), title: court, photos: aRangerJournee.map((x) => x.photo).filter(Boolean).slice(0, 4), tab: 'journee', prio: 2.35, action: tr('ranger.carte.action'), avant: () => ouvrirRangement(aRangerJournee) });
         }
         // (11 nov.) « CLÔTURER L'ANNÉE » : en décembre et janvier, UNE fois (src/clotureAnnee.js) —
         // « Voir » ouvre Argent → Déclarer sur la liste, et note l'année vue (SON clic). Neutre.
@@ -53513,12 +53666,15 @@ async function calculerOuRanger() {
   if (vus) ecrireRangerLocal(CLE_RANGER_VUS, vus);
   const proposes = { ...(lireRangerLocal(CLE_RANGER_PROPOSES) || {}) };
   const t = Date.now();
-  for (const a of arrives) { const tx = String(a.transaction_id); if (!proposes[tx]) proposes[tx] = { tx, titre: String(a.title || '').slice(0, 80), at: t }; }
+  // (11 nov., lot rangement-guide) La proposition garde ce que l'achat dit (photo, prix lu, taille, lot) : la feuille « Ranger cet achat » part de là.
+  for (const a of arrives) { const tx = String(a.transaction_id); if (!proposes[tx]) { const e = entreeRangementVinted(a) || {}; proposes[tx] = { ...e, tx, titre: String(a.title || '').slice(0, 80), at: t }; } }
   // On n'en garde que 30, et 14 jours : une proposition oubliée s'éteint seule.
   const garde = Object.values(proposes).filter((p) => p && t - (Number(p.at) || 0) < 14 * 86400000).sort((a, b) => b.at - a.at).slice(0, 30);
   const out = Object.fromEntries(garde.map((p) => [p.tx, p]));
   ecrireRangerLocal(CLE_RANGER_PROPOSES, out);
-  return notifsOuRanger({ proposes: out, caseLibre });
+  // (11 nov., lot rangement-guide) Un achat déjà rangé (une fiche porte SON n° de transaction) ne se propose plus.
+  const vivants = new Set(achatsARanger({ proposes: out, fiches: load(CLE_FICHES_RANGEES, {}) || {} }).map((p) => String(p.tx)));
+  return notifsOuRanger({ proposes: Object.fromEntries(Object.entries(out).filter(([k]) => vivants.has(k))), caseLibre });
 }
 function CentreNotifsCoque({ onReglages }) {
   const [nonLues, setNonLues] = useState(null);
@@ -53541,7 +53697,9 @@ function CentreNotifsCoque({ onReglages }) {
   }, []);
   // (6 nov., vague 3) « Ranger » mène à LA case proposée (cible `case`, src/cibleNotif.js) : le Stock
   // la sélectionne, la défile et l'éclaire — avant, il ouvrait le Stock sans la viser.
-  const ranger = React.useCallback((r) => { rangeFait(r); const c = r && r.case; const q = c && c.meubleId != null && Number.isInteger(Number(c.i)) ? `?tab=garage&cible=case&meuble=${encodeURIComponent(c.meubleId)}&i=${Number(c.i)}` : '?tab=garage'; try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, [rangeFait]);
+  // (11 nov., lot rangement-guide) « Ranger » ouvre la feuille « Ranger cet achat » sur CET achat (son n° de
+  // transaction) ; la proposition reste jusqu'à « Rangé ». Sans feuille montée : la case proposée, comme avant.
+  const ranger = React.useCallback((r) => { const p = lirePropositionsRanger()[String((r && r.tx) || '')]; if (p && ouvrirRangement([p])) { setOuvert(false); return; } rangeFait(r); const c = r && r.case; const q = c && c.meubleId != null && Number.isInteger(Number(c.i)) ? `?tab=garage&cible=case&meuble=${encodeURIComponent(c.meubleId)}&i=${Number(c.i)}` : '?tab=garage'; try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, [rangeFait]);
   useEffect(() => {
     let vivant = true;
     const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
@@ -58682,6 +58840,7 @@ function AppCoeur() {
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
+      {AUTH.user && <RangerAchatCoque/>}
       {/* (11 nov.) « Me le rappeler » : la feuille et le bandeau ouvert par la notification (api/_lib/rappels-perso.js). */}
       <HoteRappels/>
       {/* (10 nov., lot P) Raccourcis clavier : « g » + lettre, « n », « ? » (src/RaccourcisClavier.jsx) — naviguer ou ouvrir, jamais écrire. */}
