@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.370.0';
+const CODE_VERSION = '5.371.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2104,7 +2104,16 @@ function clesDeBoost(obj) {
   try { marche(obj, '', 0); } catch (_) {}
   return out;
 }
+// 5.371 : les 30 dernières ÉTIQUETTES notées, datées (`vrmDiagRecents`, ce navigateur)
+// — ce que « Envoyer un rapport » joint (étiquettes techniques, jamais une donnée).
+let _diagRecents = Promise.resolve();
 async function noterDiag(cle) {
+  _diagRecents = _diagRecents.then(async () => {
+    let l = []; try { l = (await chrome.storage.local.get('vrmDiagRecents')).vrmDiagRecents; } catch (_) {}
+    l = Array.isArray(l) ? l : [];
+    l.push({ k: String(cle).slice(0, 60), at: Date.now() });
+    try { await chrome.storage.local.set({ vrmDiagRecents: l.slice(-30) }); } catch (_) {}
+  }).catch(() => {});
   return majTampon((buf) => { buf.n[cle] = (buf.n[cle] || 0) + 1; });
 }
 
@@ -3761,6 +3770,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 5.344 : « Tout récupérer » depuis la carte du logo — le compte de l'onglet seulement.
     // 5.354 : « Masquer / Afficher le résumé du mois » — un réglage de CE navigateur.
     // 5.370 : « Tout arrêter » / « Reprendre » depuis la carte du logo (sa main, sur la page).
+    // 5.371 : « Réparer » (l'onglet qui demande seulement) et « Envoyer un rapport »,
+    //    depuis la carte du logo ou la fenêtre ; « Nouvelle version » pour la fenêtre.
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'reparer') {
+      const tid = msg.from === 'vrm-badge' && sender && sender.tab && typeof sender.tab.id === 'number' ? sender.tab.id : null;
+      reparerExtension(tid).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'La réparation n’a pas pu se faire. Réessaie.' }));
+      return true;
+    }
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'rapport') {
+      envoyerRapport().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'Rapport pas envoyé. Réessaie.' }));
+      return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'miseAJour') {
+      etatMiseAJour({ attendre: true }).then((m) => sendResponse(Object.assign({ ok: true }, m)), () => sendResponse({ ok: false }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'toutArreter') {
       poserToutArrete(msg.on === true).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
@@ -10498,6 +10522,7 @@ function surAlarme(a) {
   if (a.name === 'cancale-sync') lance('sync', () => captureAllAccounts());
   else if (a.name === 'cancale-active') lance('active', () => runActive());
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
+  else if (a.name === 'vrm-reseau') lance('reseau', () => viderFileReseau());   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === 'vrm-relais') lance('relais', () => relaisTick('alarme'));
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
@@ -15734,6 +15759,15 @@ async function executerPourApp(msg, sender) {
   //    relais du téléphone. N'importe quel message `exec` de l'app acceptait
   //    donc une offre sans elle. Exigé ici, pour toutes les voies.
   if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti` };
+  // 5.371 : HORS LIGNE au départ (rien n'est parti, c'est sûr) ⇒ le geste attend le
+  //    réseau (file bornée, 24 h) ; il repartira par CETTE porte, gardes comprises.
+  //    Un geste qui vend la paire ne part jamais plus tard.
+  const ecriture = methode !== 'GET' && !permis.lecture && !permis.favorisListe && !permis.favorisOuvrir;
+  if (ecriture && horsLigne()) {
+    if (msg.__fileReseau) return { ok: false, enAttente: true, code: 'en-attente-reseau', error: 'toujours pas de réseau' };
+    if (permis.confirmer) return { ok: false, code: 'hors-ligne', error: `pas de réseau : ce geste vend ${motsExt().le}, il ne part pas plus tard — réessaie quand le réseau revient` };
+    return mettreEnFileReseau(Object.assign({}, msg, { method: methode }));
+  }
   const accts = await getStoredAccounts({ ouNull: true });
   if (accts === null) return { ok: false, code: 'pas-su', error: 'tes comptes n’ont pas pu être relus — rien n’est parti, réessaie' };
   const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
@@ -16535,6 +16569,341 @@ async function poserMoisMasque(masque) {
     return { ok: true, masque: !!masque };
   } catch (_) { return { ok: false }; }
 }
+// ════════════════════════════════════════════════════════════════════════════
+// 5.371 (12 nov., lot agent2-ext-boutique, validé par Julien) — CINQ CHOSES :
+//   1. « Nouvelle version disponible » : la version SERVIE par vrm.center
+//      (`/extension-version.json`, la même que `EXT_ATTENDUE` de l'app) comparée à
+//      celle installée. Installée depuis une BOUTIQUE (Chrome/Edge posent
+//      `update_url` dans le manifeste installé) ⇒ rien à faire : la boutique la
+//      pose seule (on lui demande de vérifier, `requestUpdateCheck`).
+//   2. La jauge et l'état pour la carte du logo en 4 lignes.
+//   3. « Réparer » en un clic : session renouvelée, pont réinjecté, commandes
+//      bloquées purgées, alarmes reposées — JAMAIS pendant une republication.
+//   4. « Envoyer un rapport » : l'état TECHNIQUE seulement (versions, navigateur,
+//      étiquettes d'erreur, dernières lectures, files, pauses) ; ni texte, ni
+//      pseudo, ni adresse, ni e-mail, ni montant.
+//   5. La file « en attente de réseau » : un geste lancé par lui hors ligne attend
+//      (24 h au plus, 20 au plus) et repart au retour du réseau par la MÊME porte
+//      (`executerPourApp` : compte de l'onglet revérifié AU DÉPART, plafonds, pause).
+// ════════════════════════════════════════════════════════════════════════════
+const URL_VERSION_SERVIE = 'https://vrm.center/extension-version.json';
+const VERSION_SERVIE_MS = 6 * 3600000;      // relue au plus toutes les 6 h
+const VERSION_SERVIE_ESSAI_MS = 15 * 60000; // après un échec, pas avant 15 min
+const VERSION_RE = /^\d{1,4}\.\d{1,5}\.\d{1,6}$/;
+function versionPlusRecente(a, b) {
+  const x = String(a || '').split('.').map((n) => parseInt(n, 10) || 0), y = String(b || '').split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
+  return false;
+}
+let _versionServieEnVol = null;
+// La version servie CONNUE (rangée), sans attendre le réseau ; relit en fond si elle
+// a plus de 6 h. `null` = pas su (jamais lue) — la carte ne dit alors rien.
+async function versionServieConnue({ attendre = false } = {}) {
+  let g = null; try { g = (await chrome.storage.local.get('vrmVersionServie')).vrmVersionServie || null; } catch (_) { g = null; }
+  const t = Date.now();
+  const connue = g && VERSION_RE.test(String(g.v || '')) ? String(g.v) : null;
+  const fraiche = connue && t - Number(g.at || 0) < VERSION_SERVIE_MS && Number(g.at) <= t + 60000;
+  const essaiRecent = g && Number(g.essai) > 0 && t - Number(g.essai) < VERSION_SERVIE_ESSAI_MS;
+  if (!fraiche && !essaiRecent && !_versionServieEnVol) {
+    _versionServieEnVol = (async () => {
+      try { await chrome.storage.local.set({ vrmVersionServie: Object.assign({}, g || {}, { essai: Date.now() }) }); } catch (_) {}
+      try {
+        const r = await avecDelai(fetch(URL_VERSION_SERVIE, { cache: 'no-store', credentials: 'omit' }), 5000, null);
+        if (!r || !r.ok) { noterDiag('version_servie_pas_lue'); return null; }
+        let j = null; try { j = await r.json(); } catch (_) { j = null; }
+        const v = j && typeof j.version === 'string' ? j.version : '';
+        if (!VERSION_RE.test(v)) { noterDiag('version_servie_forme'); return null; }
+        try { await chrome.storage.local.set({ vrmVersionServie: { v, at: Date.now() } }); } catch (_) {}
+        return v;
+      } catch (_) { return null; }
+    })().finally(() => { _versionServieEnVol = null; });
+  }
+  if (attendre && _versionServieEnVol) { const v = await avecDelai(_versionServieEnVol, 5500, null).catch(() => null); if (v) return v; }
+  return connue;
+}
+// D'où vient l'extension installée : 'boutique' (Chrome Web Store, Edge Add-ons :
+// le navigateur pose `update_url` dans le manifeste installé ; un dossier chargé à la
+// main n'en a pas) · 'main' (le zip, le fichier Orion). Firefox/Orion : aucune fiche
+// n'est encore publiée (LIENS_BOUTIQUES.firefox vide) ⇒ 'main'.
+function origineInstallation() {
+  try { const m = chrome.runtime.getManifest(); if (m && typeof m.update_url === 'string' && /^https:\/\//.test(m.update_url)) return 'boutique'; } catch (_) {}
+  return 'main';
+}
+const MOTEUR_FIREFOX = (() => { try { return typeof browser !== 'undefined' && !!(browser && browser.runtime); } catch (_) { return false; } })();
+let _verifBoutiqueAt = 0;
+async function etatMiseAJour({ attendre = false } = {}) {
+  let installee = ''; try { installee = String(chrome.runtime.getManifest().version || ''); } catch (_) {}
+  const origine = origineInstallation();
+  const servie = await versionServieConnue({ attendre }).catch(() => null);
+  const nouvelle = servie && VERSION_RE.test(installee) ? versionPlusRecente(servie, installee) : null;
+  // Boutique : la mise à jour est la sienne ; on lui demande seulement de vérifier
+  // (au plus toutes les 6 h). Rien à télécharger, rien à dire.
+  if (origine === 'boutique' && nouvelle && Date.now() - _verifBoutiqueAt > VERSION_SERVIE_MS) {
+    _verifBoutiqueAt = Date.now();
+    try { if (chrome.runtime.requestUpdateCheck) { const p = chrome.runtime.requestUpdateCheck(() => { try { void chrome.runtime.lastError; } catch (_) {} }); if (p && p.catch) p.catch(() => {}); } } catch (_) {}
+  }
+  return {
+    installee, servie: servie || null, nouvelle, origine,
+    // Le paquet servi de CE moteur (jamais une adresse reçue) : le zip Chromium, ou le fichier Orion.
+    lien: MOTEUR_FIREFOX ? 'https://vrm.center/VRM-Orion.xpi' : 'https://vrm.center/VRM-extension.zip',
+    moteur: MOTEUR_FIREFOX ? 'firefox' : 'chromium',
+  };
+}
+
+// ── 2. LA JAUGE ET L'ÉTAT POUR LA CARTE (compte Vinted de l'onglet) ─────────────
+// h/maxH : les actions de l'heure, TOUS les Chrome du compte (la ligne partagée,
+// lue au plus une fois par minute) ; j/maxJ : le jour. Ligne partagée pas lue ⇒
+// `complet: false` : la carte écrit « au moins » (jamais un faux total).
+const _jaugeAutres = new Map();
+async function jaugePourCarte(uid) {
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return null;
+  const t = Date.now();
+  let local;
+  try { local = (((await chrome.storage.local.get('vrmActions')).vrmActions || {})[uid] || []).filter((x) => typeof x === 'number' && t - x < 3600000 && x <= t + 60000); } catch (_) { return null; }
+  let jour = []; try { jour = await actionsDuJour(String(uid), t); } catch (_) { jour = []; }
+  const c = _jaugeAutres.get(String(uid));
+  let autres = c && t - c.at < 60000 ? c.v : undefined;
+  if (autres === undefined) {
+    autres = await avecDelai(actionsAutresNavigateurs(String(uid)), 1500, null).catch(() => null);
+    _jaugeAutres.set(String(uid), { at: t, v: autres });
+  }
+  let maxH = ACTIONS_MAX_HEURE;
+  let pr = null; try { pr = await prudenceDe(String(uid)); } catch (_) {}
+  if (pr) maxH = Math.min(maxH, PRUDENCE_ACTIONS_HEURE);
+  try { const m = plafondMontee(await avecDelai(debutMontee(String(uid), t), 800, NaN), t); if (m) maxH = Math.min(maxH, m); } catch (_) {}
+  let maxJ = null; try { maxJ = await plafondJourDe(String(uid), (await reglagesDiscretion()).parJour, t); } catch (_) { maxJ = null; }
+  return {
+    h: local.length + (autres ? Number(autres.n) || 0 : 0), maxH,
+    j: jour.length + (autres ? Number(autres.nJour) || 0 : 0), maxJ,
+    complet: !!autres,
+    prudence: pr ? Number(pr.jusqua) || 0 : 0,
+  };
+}
+async function arretCompteCarte(uid) {
+  try { const e = (await lireLocal('vrmCaptcha'))[String(uid)] || {}; const c = Number(e.depuis); return c > 0 ? { depuis: c, quoi: ARRETS.includes(e.quoi) ? e.quoi : 'captcha' } : null; } catch (_) { return null; }
+}
+
+// ── 3. RÉPARER EN UN CLIC ────────────────────────────────────────────────────
+// Une republication (coffre → suppression → brouillon → mise en ligne) ne doit
+// JAMAIS être coupée au milieu : elle pose un témoin daté (mémoire + stockage,
+// relevé à la fin). Témoin de moins de 10 min ⇒ « Réparer » ne touche à rien et le dit.
+const REPUB_TEMOIN = 'vrmRepubVivante';
+const REPUB_TEMOIN_MS = 10 * 60000;
+let _repubVivantes = 0;
+async function avecTemoinRepub(fn) {
+  _repubVivantes++;
+  try { await chrome.storage.local.set({ [REPUB_TEMOIN]: Date.now() }); } catch (_) {}
+  try { return await fn(); }
+  finally {
+    _repubVivantes = Math.max(0, _repubVivantes - 1);
+    if (!_repubVivantes) { try { await chrome.storage.local.remove(REPUB_TEMOIN); } catch (_) {} }
+  }
+}
+async function republicationEnCours() {
+  if (_repubVivantes > 0 || _miseEnLigneEnCours) return true;   // une mise en ligne planifiée qui part compte aussi
+  try { const t = Number((await chrome.storage.local.get(REPUB_TEMOIN))[REPUB_TEMOIN]); return t > 0 && Date.now() - t < REPUB_TEMOIN_MS; } catch (_) { return true; }   // pas su ⇒ on ne touche à rien
+}
+const CMD_BLOQUEE_MS = 15 * 60000;
+// Ce qui est CASSÉ, mesuré (jamais deviné) : `session` (VRM pas connectée ou morte
+// alors qu'une session existe), `file` (une commande « en cours » sans nouvelle
+// depuis 15 min et plus vivante), `canal` (la page Vinted de l'onglet n'a pas son
+// canal privé, ou il est douteux). Rien ⇒ [].
+async function problemesAReparer(tabId) {
+  const p = [];
+  const e = await authEtatRapide(1500).catch(() => null);
+  let s = null; try { s = await loadSession(); } catch (_) {}
+  if (s && s.refresh_token && (!e || e.connecte !== true)) p.push('session');
+  const cmds = await lireCmds();
+  const t = Date.now();
+  if (Object.keys(cmds).some((k) => { const c = cmds[k]; return c && CMD_EN_COURS.includes(c.etape) && t - Number(c.at || 0) > CMD_BLOQUEE_MS && !avecVivant(k).vivant; })) p.push('file');
+  if (typeof tabId === 'number') {
+    let canal = null; try { canal = await avecDelai(canalPageDe(tabId), 800, null); } catch (_) { canal = null; }
+    if (canal === 'douteux' || canal === 'absent') p.push('canal');
+  }
+  return p;
+}
+// Le canal de page de l'onglet : 'ok' · 'douteux' (Orion, inject.js posé après la page) ·
+// 'absent' (aucun signe de content.js) · null (pas su, pas un onglet Vinted).
+async function canalPageDe(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab || !/^https:\/\/([\w-]+\.)*vinted\.(fr|com|it|de)\//.test(String(tab.url || ''))) return null;
+    const r = await new Promise((res) => {
+      try { chrome.tabs.sendMessage(tabId, { vrm: 'canalEtat' }, (x) => { let err = null; try { err = chrome.runtime.lastError; } catch (_) {} res(err ? undefined : x); }); } catch (_) { res(undefined); }
+    });
+    if (r === undefined || !r || r.canal !== true) return 'absent';
+    if (r.douteux) return 'douteux';
+    return 'ok';
+  } catch (_) { return null; }
+}
+async function reparerExtension(tabId) {
+  if (await republicationEnCours()) return { ok: false, code: 'republication', raison: 'Une republication est en cours : rien n’est touché. Réessaie après.' };
+  const avant = await problemesAReparer(tabId);
+  const fait = [];
+  // a. La session VRM : renouvelée (une seule fois pour toute l'extension, verrou de `renouvelerSession`).
+  if (avant.includes('session')) {
+    const r = await avecDelai(renouvelerSession({ force: true }), 8000, null).catch(() => null);
+    fait.push({ quoi: 'session', ok: !!(r && r.access_token) });
+  }
+  // b. Les commandes « en cours » sans nouvelle depuis 15 min et plus vivantes : arrêtées et dites.
+  if (avant.includes('file')) {
+    const cmds = await lireCmds(); const t = Date.now(); let n = 0;
+    for (const k of Object.keys(cmds)) {
+      const c = cmds[k];
+      if (c && CMD_EN_COURS.includes(c.etape) && t - Number(c.at || 0) > CMD_BLOQUEE_MS && !avecVivant(k).vivant) {
+        await majCmd(k, { etape: 'echec', code: 'repare', raison: 'arrêtée par « Réparer » : elle ne répondait plus — relance-la' });
+        n++;
+      }
+    }
+    fait.push({ quoi: 'file', ok: true, n });
+  }
+  // c. Le canal privé de la page (inject.js ⇄ content.js) ne se donne qu'UNE fois, au
+  //    chargement (5.356) : le reposer, c'est RECHARGER l'onglet (jamais un second canal
+  //    accepté). Seulement l'onglet Vinted d'où vient le clic. Le pont de VRM, lui, est
+  //    reposé dans les onglets de l'app.
+  if (avant.includes('canal') && typeof tabId === 'number') {
+    let ok = false;
+    try { await chrome.tabs.reload(tabId); ok = true; } catch (_) { ok = false; }
+    fait.push({ quoi: 'canal', ok });
+  }
+  try { await reinjecterPont(); } catch (_) {}
+  // d. Les tâches périodiques reposées (celles qui manquent seulement).
+  try { if (chrome.alarms) for (const [nom, min] of Object.entries(PERIODES)) alarmeSiAbsente(nom, { periodInMinutes: min }); } catch (_) {}
+  const apres = await problemesAReparer(fait.some((f) => f.quoi === 'canal' && f.ok) ? null : tabId);   // l'onglet rechargé n'est pas encore relu
+  noterDiag('reparer_' + (apres.length ? 'reste' : 'ok'));
+  return { ok: true, avant, fait, reste: apres };
+}
+
+// ── 4. LE RAPPORT DE PROBLÈME, SANS DONNÉE PERSONNELLE ─────────────────────────
+// UNE liste blanche : chaque champ est un nombre, une heure, un booléen ou une
+// ÉTIQUETTE technique passée par `etiquetteRapport` (lettres, chiffres courts,
+// « _ - . : » ; toute suite de 4 chiffres ou plus devient « # »). Jamais un texte
+// lu sur un site, un pseudo, une adresse, un e-mail, un montant. Le serveur rejoue
+// sa propre liste blanche (api/_lib/rapport-extension.js) : ce qui n'y est pas ne passe pas.
+const RAPPORT_API = 'https://vrm.center/api/compte?mode=rapport-extension';
+function etiquetteRapport(s) { return String(s == null ? '' : s).replace(/[^\w.:-]/g, '_').replace(/\d{4,}/g, '#').slice(0, 60); }
+async function construireRapport() {
+  const t = Date.now();
+  let local = {};
+  try { local = await chrome.storage.local.get([DIAG_BUF, 'vrmFlux', 'vrmDiagRecents', 'vrmFileReseau', REPUB_TEMOIN, 'vrmToutArrete']); } catch (_) { local = {}; }
+  const heure = (x) => { const n = Number(x); return n > 0 && n <= t + 60000 ? n : null; };
+  const flux = {};
+  for (const [pf, f] of Object.entries(local.vrmFlux || {})) {
+    if (!/^(vinted|leboncoin|vestiaire|ebay)$/.test(pf) || !f || typeof f !== 'object') continue;
+    flux[pf] = { okAt: heure(f.okAt), koAt: heure(f.koAt), koStatut: f.koStatut == null ? null : etiquetteRapport(f.koStatut),
+      refus: (Array.isArray(f.refus) ? f.refus : []).slice(-5).map((r) => ({ at: heure(r && r.at), statut: etiquetteRapport(r && r.statut), famille: etiquetteRapport(r && r.famille) })) };
+  }
+  const compteurs = {};
+  const n = (local[DIAG_BUF] && local[DIAG_BUF].n) || {};
+  for (const k of Object.keys(n).slice(0, 80)) compteurs[etiquetteRapport(k)] = Math.max(0, Math.min(1e6, Math.floor(Number(n[k]) || 0)));
+  const erreurs = (Array.isArray(local.vrmDiagRecents) ? local.vrmDiagRecents : []).slice(-30).map((x) => ({ k: etiquetteRapport(x && x.k), at: heure(x && x.at) }));
+  const cmds = await lireCmds();
+  const parEtape = {};
+  for (const k of Object.keys(cmds)) { const e = etiquetteRapport((cmds[k] && cmds[k].etape) || 'inconnue'); parEtape[e] = (parEtape[e] || 0) + 1; }
+  const fileReseau = (await lireFileReseau()).length;
+  let pause = null; try { const p = await pauseVinted(); pause = p ? heure(p.jusqua) : null; } catch (_) {}
+  const e = await authEtatRapide(1500).catch(() => null);
+  const nav = await avecDelai(etatNavigateur(), 600, null).catch(() => null);
+  const maj = await etatMiseAJour().catch(() => null);
+  const comptes = await getStoredAccounts({ ouNull: true }).catch(() => null);
+  let ua = ''; try { ua = String(navigator.userAgent || ''); } catch (_) {}
+  const navigateur = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Vivaldi\//.test(ua) ? 'Vivaldi' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Orion' : 'inconnu';
+  return {
+    v: 1, at: t, version: CODE_VERSION, navigateur,
+    origine: maj ? maj.origine : null, servie: maj ? maj.servie : null,
+    session: e ? (e.connecte === true ? 'connectee' : e.expiree ? 'expiree' : e.mort ? 'morte' : 'absente') : 'pas-su',
+    comptes: Array.isArray(comptes) ? comptes.length : null,
+    remplace: nav && Array.isArray(nav.remplace) ? nav.remplace.map(etiquetteRapport).slice(0, 10) : [],
+    indispo: nav && Array.isArray(nav.indispo) ? nav.indispo.map(etiquetteRapport).slice(0, 10) : [],
+    flux, compteurs, erreurs,
+    files: { commandes: parEtape, reseau: fileReseau },
+    pauses: { vinted: pause, toutArrete: !!(local.vrmToutArrete && local.vrmToutArrete.on === true), republication: heure(local[REPUB_TEMOIN]) },
+  };
+}
+async function envoyerRapport() {
+  const corps = await construireRapport();
+  const session = await authToken().catch(() => null);
+  if (!session || !session.access_token) return { ok: false, code: 'sans-session', raison: 'Connecte d’abord l’extension à VRM.' };
+  try {
+    const r = await fetch(RAPPORT_API, { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(corps), signal: signalDelai(12000) });
+    if (r && r.ok) return { ok: true, at: corps.at };
+    if (r && r.status === 429) return { ok: false, code: 'trop', raison: 'Déjà plusieurs rapports cette heure. Réessaie plus tard.' };
+    return { ok: false, code: 'refus', raison: 'vrm.center n’a pas pris le rapport. Réessaie.' };
+  } catch (_) { return { ok: false, code: 'reseau', raison: 'Pas de réseau : rapport pas envoyé.' }; }
+}
+
+// ── 5. LA FILE « EN ATTENTE DE RÉSEAU » ──────────────────────────────────────
+// Seulement : un geste d'ÉCRITURE demandé par l'app (`executerPourApp`) alors que
+// ce navigateur est HORS LIGNE au départ — rien n'est parti, c'est sûr. Jamais un
+// geste qui vend la paire (accepter une offre : `confirmer`) — il ne part pas plus
+// tard, il est refusé et dit. Bornée : 20 gestes, 24 h ; un geste échu sort et c'est
+// noté. Au retour du réseau (événement `online`, ou la minute suivante), chacun
+// repart par `executerPourApp` : compte de l'onglet revérifié AU DÉPART, plafonds,
+// pause, Tout arrêter. Refus pour une raison qui passe (pause, plafond, autre compte
+// dans l'onglet) ⇒ il reste en file ; refus net ⇒ il sort, avec sa raison.
+const FILE_RESEAU = 'vrmFileReseau';
+const FILE_RESEAU_MAX = 20;
+const FILE_RESEAU_MS = 24 * 3600000;
+const horsLigne = () => { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (_) { return false; } };
+let _chaineFileReseau = Promise.resolve();
+function surFileReseau(fn) { const p = _chaineFileReseau.then(fn, fn); _chaineFileReseau = p.then(() => {}, () => {}); return p; }
+async function lireFileReseau() {
+  try { const l = (await chrome.storage.local.get(FILE_RESEAU))[FILE_RESEAU]; return Array.isArray(l) ? l.filter((x) => x && typeof x === 'object' && x.id) : []; } catch (_) { return []; }
+}
+async function ecrireFileReseau(l) { try { await chrome.storage.local.set({ [FILE_RESEAU]: l.slice(-FILE_RESEAU_MAX) }); return true; } catch (_) { return false; } }
+// Ce que l'app peut montrer : sorte, compte, heures — jamais le corps (texte d'un message).
+function vueFileReseau(l) { return l.map((x) => ({ id: x.id, uid: x.uid, sorte: x.sorte, at: x.at, exp: x.exp, essais: x.essais || 0, raison: x.raison || '' })); }
+async function mettreEnFileReseau(msg) {
+  return surFileReseau(async () => {
+    const l = await lireFileReseau();
+    if (l.length >= FILE_RESEAU_MAX) return { ok: false, code: 'file-pleine', error: 'pas de réseau, et déjà 20 gestes en attente — rien n’est parti' };
+    const t = Date.now();
+    const id = 'r' + t.toString(36) + Math.random().toString(36).slice(2, 6);
+    const e = { id, uid: String(msg.uid || ''), method: String(msg.method || 'POST').toUpperCase(), endpoint: String(msg.endpoint || ''), body: msg.body == null ? null : msg.body, sorte: sorteExec(String(msg.method || 'POST').toUpperCase(), msg.endpoint) || 'geste', at: t, exp: t + FILE_RESEAU_MS, essais: 0 };
+    l.push(e);
+    if (!(await ecrireFileReseau(l))) return { ok: false, code: 'stockage', error: 'pas de réseau, et le geste n’a pas pu être gardé — rien n’est parti' };
+    noterDiag('file_reseau_garde');
+    notifierApp({ type: 'maj', quoi: 'fileReseau' });
+    try { chrome.alarms && alarmeSiAbsente('vrm-reseau', { periodInMinutes: 1 }); } catch (_) {}
+    return { ok: false, enAttente: true, code: 'en-attente-reseau', id, exp: e.exp, error: 'pas de réseau : ton geste attend et repartira tout seul (24 h au plus)' };
+  });
+}
+async function annulerFileReseau(id) {
+  return surFileReseau(async () => {
+    const l = await lireFileReseau();
+    const reste = l.filter((x) => x.id !== String(id || ''));
+    if (reste.length === l.length) return { ok: false, code: 'inconnu' };
+    if (!(await ecrireFileReseau(reste))) return { ok: false, code: 'stockage' };
+    notifierApp({ type: 'maj', quoi: 'fileReseau' });
+    return { ok: true };
+  });
+}
+// Les refus qui PASSENT (le geste reste en file) : pas de réseau, pause, plafond, autre compte, Tout arrêter.
+const REFUS_PASSAGERS = /^(en-attente-reseau|vinted-pause|vinted-absent|vinted-autre|plafond|plafond-jour|prudence|discretion|tout-arrete|verification|pas-su)$/;
+async function viderFileReseau() {
+  if (horsLigne()) return { ok: true, parti: 0 };
+  return surFileReseau(async () => {
+    const t = Date.now();
+    let l = await lireFileReseau();
+    const echus = l.filter((x) => !(Number(x.exp) > t));
+    if (echus.length) { noterDiag('file_reseau_echu'); for (const x of echus) logActivity(`⌛ Geste en attente de réseau abandonné après 24 h (${x.sorte})`); }
+    l = l.filter((x) => Number(x.exp) > t);
+    const garde = []; let parti = 0;
+    for (const x of l) {
+      if (horsLigne()) { garde.push(x); continue; }
+      const r = await executerPourApp({ uid: x.uid, method: x.method, endpoint: x.endpoint, body: x.body, __fileReseau: x.id }, { origin: 'https://vrm.center' }).catch(() => ({ ok: false, code: 'erreur' }));
+      if (r && r.ok) { parti++; logActivity(`📶 Réseau revenu : geste parti (${x.sorte})`); continue; }
+      if (r && (r.enAttente || REFUS_PASSAGERS.test(String(r.code || '')))) { garde.push(Object.assign({}, x, { essais: (x.essais || 0) + 1, raison: String((r && r.error) || '').slice(0, 140) })); continue; }
+      logActivity(`⚠️ Geste en attente refusé au départ (${x.sorte}) : ${String((r && (r.error || r.code)) || 'refus').slice(0, 120)}`);
+    }
+    await ecrireFileReseau(garde);
+    if (!garde.length) { try { chrome.alarms && chrome.alarms.clear('vrm-reseau'); } catch (_) {} }
+    notifierApp({ type: 'maj', quoi: 'fileReseau' });
+    return { ok: true, parti, reste: garde.length };
+  });
+}
+try { self.addEventListener('online', () => { sansRejet(viderFileReseau(), 'file_reseau'); }); } catch (_) {}
+
 async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
@@ -16595,7 +16964,15 @@ async function etatSite(url,tabId) {
   const mois = vrm && vrm.connecte === true ? await moisPourCarte(plateforme, site, tabId).catch(() => null) : null;
   // 5.370 : « Tout arrêter » (les gestes automatiques de TOUS les comptes) — l'état pour la carte.
   let toutArrete = false; try { toutArrete = (await toutArreteDepuis(null)) > 0; } catch (_) {}
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete };
+  // 5.371 : la jauge, l'arrêt du compte, la nouvelle version, ce qui est à réparer, la file réseau.
+  if (plateforme === 'vinted' && site && site.id) {
+    site.jauge = await jaugePourCarte(String(site.id)).catch(() => null);
+    site.arret = await arretCompteCarte(String(site.id));
+  }
+  const maj = await etatMiseAJour().catch(() => null);
+  const aReparer = vrm ? await avecDelai(problemesAReparer(plateforme === 'vinted' ? tabId : null), 1500, []).catch(() => []) : [];
+  const enAttenteReseau = (await lireFileReseau()).length;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -16660,7 +17037,11 @@ async function etatPourApp() {
   return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
-    nav ? { nav } : {});
+    nav ? { nav } : {},
+    // 5.371 : les gestes en attente de réseau (sorte, compte, heures — jamais le texte),
+    //    que l'app montre « en attente de réseau » avec « Annuler » ; et d'où vient
+    //    l'extension (boutique ⇒ l'app ne propose plus le zip pour la mettre à jour).
+    { fileReseau: vueFileReseau(await avecDelai(lireFileReseau(), 300, []).catch(() => [])), rapport: true, origine: origineInstallation() });
 }
 // `remplace` : l'API manque, un autre chemin garde la fonction (rien à faire).
 // `indispo` : rien ne la remplace ICI, aujourd'hui — l'app le dit, une fois.
@@ -16996,7 +17377,11 @@ async function executerCommande(msg) {
     const r = await demanderImportSiteTout(String(msg.site || ''), String(msg.compte || ''));
     return r.ok ? { accepte: true, etape: 'file', etat: r.etat } : { accepte: false, code: r.code || 'refus', raison: r.raison };
   }
-  if (msg && msg.cmd === 'republierVinted') { const r = await republierVinted(msg); await journalCommande(msg, r); return r; }
+  // 5.371 : « Envoyer un rapport » depuis « Tout va bien ? » de l'app, et la file
+  //    « en attente de réseau » (annuler un geste).
+  if (msg && msg.cmd === 'rapportExtension') { const r = await envoyerRapport(); return r.ok ? { accepte: true, etape: 'fait', at: r.at } : { accepte: false, code: r.code, raison: r.raison }; }
+  if (msg && msg.cmd === 'fileReseauAnnuler') { const r = await annulerFileReseau(String(msg.id || '')); return r.ok ? { accepte: true, etape: 'fait' } : { accepte: false, code: r.code || 'inconnu', raison: 'ce geste n’est plus en attente' }; }
+  if (msg && msg.cmd === 'republierVinted') { const r = await avecTemoinRepub(() => republierVinted(msg)); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted({ ...msg, programme: false }); await journalCommande(msg, r); return r; }
   // 12 nov. (5.370) : les baisses ÉTALÉES dans la journée, sur son clic (voir `planifierBaisses`).
@@ -17008,9 +17393,9 @@ async function executerCommande(msg) {
   // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).
   // 11 nov. (5.340) : posé / retiré au journal SEULEMENT quand Vinted l'a accepté ET relu (« fait » ; « déjà », « écart », « incertain » : rien).
   if (msg && msg.cmd === 'vacancesVinted') { const r = await mettreVacancesVinted(msg); await journalVacances(msg, r); return r; }
-  if (msg && msg.cmd === 'recreerVinted') { const r = await recreerVinted(msg); await journalCommande(msg, r); return r; }
-  if (msg && msg.cmd === 'publierBrouillon') { const r = await publierBrouillon(msg); await journalCommande(msg, r); return r; }
-  if (msg && msg.cmd === 'refaireBrouillon') { const r = await refaireBrouillon(msg); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'recreerVinted') { const r = await avecTemoinRepub(() => recreerVinted(msg)); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'publierBrouillon') { const r = await avecTemoinRepub(() => publierBrouillon(msg)); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'refaireBrouillon') { const r = await avecTemoinRepub(() => refaireBrouillon(msg)); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   // 29 oct. : supprimer UNE annonce Leboncoin, sur son clic confirmé (voir `supprimeLbcDepuisApp`).
   if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);

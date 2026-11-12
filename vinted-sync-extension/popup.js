@@ -22,6 +22,7 @@
 // service worker (`authLogin`), jamais gardé, jamais dans une adresse.
 const CARTE = /[?&]mode=carte\b/.test(location.search);
 const REPARER = /[?&]mode=reparer\b/.test(location.search);
+const FORCE = REPARER && /[?&]force=1\b/.test(location.search);   // 5.371 : « Réparer » sur une extension muette
 if (CARTE) { document.body.classList.add('carte'); document.documentElement.classList.add('carte'); }
 // 5.351 (lot extension-visuel) : la teinte CHOISIE dans VRM (Réglages → Apparence,
 // recopiée par le pont de vrm.center dans `vrmApparence`) passe avant celle du
@@ -79,6 +80,20 @@ async function reparerSiPerime() {
     } catch (_) { clearTimeout(t); res(null); }
   });
   if (code === manif) return 'a-jour';
+  // 5.371 : « Réparer » touché sur la carte alors que le service worker NE RÉPOND
+  //    PLUS (6 s sans rien) : on le relance — jamais si une republication a posé son
+  //    témoin il y a moins de 10 min (elle serait coupée au milieu), une fois par
+  //    10 min au plus (garde dans le stockage : aucune boucle possible).
+  if (code === undefined && FORCE) {
+    let g = {};
+    try { g = await chrome.storage.local.get(['vrmRepubVivante', 'vrmReparationForcee']); } catch (_) { return 'stockage'; }
+    const t = Date.now();
+    if (Number(g.vrmRepubVivante) > 0 && t - Number(g.vrmRepubVivante) < 10 * 60000) return 'republication';
+    if (Number(g.vrmReparationForcee) > 0 && t - Number(g.vrmReparationForcee) < 10 * 60000) return 'deja';
+    try { await chrome.storage.local.set({ vrmReparationForcee: t }); } catch (_) { return 'stockage'; }
+    try { chrome.runtime.reload(); } catch (_) { return 'echec'; }
+    return 'recharge';
+  }
   // ⚠️ 5.356 (revue de robustesse, haute 19) : un service worker LENT (réveil,
   //    en pleine republication : coffre → suppression → brouillon) ne répondait
   //    pas en 6 s ⇒ `undefined` ≠ manifeste ⇒ rechargement : l'opération était
@@ -528,4 +543,33 @@ function cadreAutorise() {
 if ((REPARER || CARTE) && !cadreAutorise()) { try { document.body.setAttribute('data-cadre', 'refuse'); document.body.replaceChildren(); } catch (_) {} }
 else if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
 else if (CARTE) lancerCadre();
-else chargerAuth();
+else { chargerAuth(); montrerMiseAJour(); }
+
+// ── 5.371 : « NOUVELLE VERSION DISPONIBLE » DANS LA FENÊTRE ───────────────────
+// La même règle que la carte du logo (le service worker compare la version
+// installée à celle que vrm.center sert) : installée À LA MAIN et plus ancienne ⇒
+// « Télécharger » + 3 étapes ; venue d'une BOUTIQUE ⇒ rien (elle se met à jour seule).
+const LIENS_PAQUET_FENETRE = ['https://vrm.center/VRM-extension.zip', 'https://vrm.center/VRM-Orion.xpi'];
+function montrerMiseAJour() {
+  try {
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'miseAJour' }, (m) => {
+      try { void chrome.runtime.lastError; } catch (_) {}
+      if (!m || !m.ok || m.nouvelle !== true || m.origine === 'boutique' || !LIENS_PAQUET_FENETRE.includes(String(m.lien || ''))) return;
+      const orion = m.moteur === 'firefox';
+      const bloc = document.createElement('section');
+      bloc.className = 'maj';
+      bloc.setAttribute('data-maj', String(m.servie || ''));
+      bloc.style.cssText = 'margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--remplir)';
+      const t = document.createElement('div'); t.style.fontWeight = '600'; t.textContent = 'Nouvelle version disponible · ' + String(m.servie || '');
+      const a = document.createElement('a');
+      a.href = m.lien; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('download', ''); a.setAttribute('data-maj-telecharger', '');
+      a.textContent = 'Télécharger';
+      a.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;text-decoration:none';
+      const ol = document.createElement('ol'); ol.style.cssText = 'margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--doux)';
+      for (const x of (orion ? ['Touche « Télécharger ».', 'Orion → Extensions → + → ce fichier.', 'Rouvre cette fenêtre.'] : ['Ouvre le fichier téléchargé : il se dézippe.', 'Remplace l’ancien dossier VRM par le nouveau.', 'chrome://extensions → ⟳ sur VRM.'])) { const li = document.createElement('li'); li.textContent = x; ol.appendChild(li); }
+      bloc.append(t, a, ol);
+      const tete = document.querySelector('.head');
+      if (tete && tete.parentNode) tete.parentNode.insertBefore(bloc, tete.nextSibling); else document.body.prepend(bloc);
+    });
+  } catch (_) {}
+}

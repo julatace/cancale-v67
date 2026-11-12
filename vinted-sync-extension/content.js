@@ -152,6 +152,8 @@
   });
   try {
     chrome.runtime.onMessage.addListener((m, sender, sendResponse) => {
+      // 5.371 : « Réparer » demande si le canal privé de la page est là, et s'il est sûr.
+      if (m && m.vrm === 'canalEtat') { try { sendResponse({ canal: !!canal, douteux: !canalSur() }); } catch (_) {} return false; }
       if(m?.vrm==='parcours')return traiterCommandeParcours(m,sender,sendResponse);
       if(m?.vrm==='favoriPage')return traiterFavoriPage(m,sender,sendResponse);
       if (!m || m.vrm !== 'fetchPage') return false;
