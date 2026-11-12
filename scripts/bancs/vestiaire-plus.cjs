@@ -51,7 +51,7 @@ const lignes = (appris) => [
     n170000002: offre('170000002', '71000002', dansH(2), 12000),
     n170000003: offre('170000003', '71000001', '', 17000),
   } } },
-  ...(appris ? [{ id: 'vc_prix_recette', data: { appris: true, raison: '', at: ilYaH(1), ver: '5.364.0' } }] : []),
+  ...(appris ? [{ id: 'vc_prix_recette', data: { appris: true, raison: '', at: ilYaH(1), ver: '5.368.0' } }] : []),
 ];
 let LIGNES = lignes(false);
 
@@ -102,7 +102,7 @@ async function preparer(b, vp, sombre) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_langue', 'fr'); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_visite_vue', 'true'); } catch (_) {} }, sombre);
-  await pg.addInitScript(PONT, { version: '5.364.0' });
+  await pg.addInitScript(PONT, { version: '5.368.0' });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     if (/images\.vestiairecollective\.com|img\.test|vinted\.net/.test(r.request().url())) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#c8b08a"/></svg>' });
     return r.fulfill({ status: 404, body: '' });
