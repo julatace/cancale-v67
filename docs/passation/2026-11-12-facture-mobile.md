@@ -33,8 +33,8 @@ par texte sur la facture bilingue inventée, rien ne sort des marges, rien ne se
 ## Ce qui a changé
 
 1. **Le gabarit pose ses largeurs** (`ApercuFacture`, `src/facture-pro.css`) : `table-layout: fixed`, un
-   `<colgroup>` — Qté 3,4 em, Prix et Total 7,6 em — « Désignation » prend le reste (54 % du tableau dans la
-   miniature, 67 % sur ordinateur) ; les en-têtes passent à la ligne (français, puis anglais dessous, comme le
+   `<colgroup>` — Qté 2,8 em, Prix et Total 6,4 em — « Désignation » prend le reste (62 % du tableau dans la
+   miniature, 72 % sur ordinateur, 37 % si la facture est posée seule dans 330 px) ; les en-têtes passent à la ligne (français, puis anglais dessous, comme le
    PDF) ; les montants (cellules et totaux) ne passent jamais à la ligne (« 1 / 234,50 € » vu au banc, corrigé).
 2. **L'aperçu d'une feuille est une MINIATURE** (`MiniatureFacture`, `LARGEUR_PAGE_FP` = 520 px) : la
    facture rendue à sa vraie largeur, puis réduite par `transform: scale` pour tenir (0,63 au téléphone ;
@@ -61,15 +61,15 @@ par texte sur la facture bilingue inventée, rien ne sort des marges, rien ne se
 
 | contrôle | origin/main (git archive) | cette branche |
 |---|---|---|
-| banc `scripts/bancs/facture-mobile.cjs` (390 tactile + 1512, clair + sombre) | **37 rouges** (colonne à 5 %, 80 lignes, titre coupé, pas de miniature, pas de bouton, « laisse VRM envoyer ») | **vert** (≈ 110 contrôles) |
+| banc `scripts/bancs/facture-mobile.cjs` (390 tactile + 1512, clair + sombre) | **37 rouges** (colonne à 5 %, 80 lignes, titre coupé, pas de miniature, pas de bouton, « laisse VRM envoyer ») | **113 ✅ · 0 ❌** |
 | `audit-facture-mobile.cjs` (PDF relevé texte par texte + gabarit + phrase) | **7 rouges** (G1-G5, E1-E2 ; la partie PDF P est verte : le PDF n'était pas cassé) | 40 ✅ |
 | `audit-facture-pro.cjs` V14 (« Envoyer avec VRM » côté serveur, auto ignore `via`, réglage respecté) | **1 rouge** (V14) | 102 ✅ |
 
-Mutations : décaler la colonne « Qté » du PDF (`W - M - 130`) ⇒ P2/P3 rouges (chevauchements, désignation
+Mutations : le CSS du tableau d'avant (`table-layout: auto`, en-têtes `nowrap`) ⇒ le banc rouge (« le gabarit seul, dans 330 px » : 24 %, 14 lignes, déborde) et G1-G2 rouges ; décaler la colonne « Qté » du PDF (`W - M - 130`) ⇒ P2/P3 rouges (chevauchements, désignation
 sous « Qté ») ; le CSS d'avant ⇒ G1-G4 et le banc rouges ; retirer `corps.via` ⇒ V14 rouge.
 Audits facture verts : `facture-pro`, `factures-pro-2`, `facture-en-tva`, `factures-autres`,
 `facture-siret`, `xss-facture`, `config-facture` ; et `variables`, `tdz`, `coherence`, `identite`, `icones`.
-Bancs facture relancés un à un (BANC_PORT aléatoire) : voir le rapport de l'intégrateur.
+Bancs facture relancés un à un (BANC_PORT aléatoire) : `factures-autres` 60/0, `factures-pro-2` 102/0 ; rouges DÉJÀ sur origin/main (relancés sur l'arbre d'origin/main, mêmes rouges) : `facture-en-tva` partie 3 (écran Factures, attente 20 s), `facture-vente-pro` V4 (bon de retour), `facture-pro` « Ma facture » (attente 20 s), `config-facture` (1 défaut).
 
 Planche avant/après (regardée) : `docs/passation/planches-facture-mobile/`.
 
