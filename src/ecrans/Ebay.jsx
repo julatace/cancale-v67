@@ -2,6 +2,7 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { ordreRecent, quandEbay } from '../ordreRecent.js';
 import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la publication
+import { modifierLigneCas } from '../ligneCas.js';
 import BilanSynchronisation from '../BilanSynchronisation.jsx';
 import { problemesAnnonce } from '../verifAnnonce.js';
 import FiabiliteVentes from '../FiabiliteVentes.jsx';
@@ -354,22 +355,27 @@ async function lireBrouillonsEbay() {
     return out;
   } catch (_) { return null; }
 }
+// (12 nov., revue de robustesse, point 20) Par COMPARER-ET-ÉCHANGER sur `data.rev`
+// (src/ligneCas.js), relue PROJETÉE (`items`, `rev` : jamais `select=data`) : deux
+// onglets, ou l'agent eBay, qui touchent deux brouillons différents en même temps
+// gardent les deux — devancé ⇒ relu, `changer` rejoué sur la ligne fraîche.
 async function modifierBrouillonsEbay(changer) {
-  const cur = await lireBrouillonsEbay();
-  if (cur === null) return { ok: false, raison: 'lecture' };
-  let items;
-  try { items = changer({ ...cur }); } catch (_) { return { ok: false, raison: 'erreur' }; }
-  // (6 octobre) `false` : rien à changer (la relecture a montré qu'il ne fallait
-  // pas écrire) — on n'écrit RIEN, pas même la ligne telle qu'on l'a lue.
-  if (items === false) return { ok: true, items: cur, inchange: true };
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-      method: 'POST',
-      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify([withOwner({ id: 'ebay_brouillons', data: { items, majAt: Date.now() } })]),
-    });
-    return r.ok ? { ok: true, items } : { ok: false, raison: 'ecriture' };
-  } catch (_) { return { ok: false, raison: 'ecriture' }; }
+  let items = null, inchange = false, erreur = false;
+  const res = await modifierLigneCas({ base: SUPABASE_URL, id: 'ebay_brouillons', entetes: (x) => sbAuth(x), estampille: withOwner,
+    select: 'items:data->items,rev:data->rev', deLigne: (row) => ({ items: row.items, rev: row.rev }),
+    modifier: (actuel) => {
+      const it = actuel && actuel.items;
+      const cur = (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
+      try { items = changer({ ...cur }); } catch (_) { erreur = true; return undefined; }
+      // (6 octobre) `false` : rien à changer (la relecture a montré qu'il ne fallait
+      // pas écrire) — on n'écrit RIEN, pas même la ligne telle qu'on l'a lue.
+      if (items === false) { items = cur; inchange = true; return undefined; }
+      inchange = false;
+      return { items, majAt: Date.now() };
+    } });
+  if (erreur) return { ok: false, raison: 'erreur' };
+  if (!res.ok) return { ok: false, raison: res.raison === 'lecture' ? 'lecture' : 'ecriture' };
+  return inchange ? { ok: true, items, inchange: true } : { ok: true, items };
 }
 const idBrouillonEbay = () => { try { if (crypto && crypto.randomUUID) return 'b-' + crypto.randomUUID().slice(0, 13); } catch (_) {} return 'b-' + Date.now().toString(36); };
 // L'identifiant d'ENVOI (32 hex) : eBay refuse un second ajout portant le même

@@ -72,8 +72,27 @@ export const fusion3 = (b, l, n, profondeur = 4) => {
     }
     return out;
   }
-  if (Array.isArray(l) && Array.isArray(n) && (b === undefined || b === null || Array.isArray(b))) return fusionListe(b, l, n);
+  if (Array.isArray(l) && Array.isArray(n) && (b === undefined || b === null || Array.isArray(b))) {
+    const bl = Array.isArray(b) ? b : [];
+    if (profondeur > 0 && listeParId(l) && listeParId(n) && listeParId(bl)) return fusionParId(bl, l, n, profondeur);
+    return fusionListe(b, l, n);
+  }
   return l;
+};
+// (11 nov., robustesse des données) Une liste d'OBJETS À `id` (dépenses, meubles
+// de la pièce, pièces…) se fusionne par `id` : un élément corrigé des deux côtés
+// n'apparaît plus deux fois (l'identité « contenu entier » gardait l'ancienne
+// version du nuage ET la nouvelle de l'appareil), et chaque élément se fusionne
+// lui-même champ par champ. Ordre : celui du nuage, puis les nouveaux de l'appareil.
+const idDe = (x) => (estObjet(x) && (typeof x.id === 'string' || typeof x.id === 'number') && String(x.id) !== '' ? String(x.id) : null);
+const listeParId = (a) => { const vus = new Set(); for (const x of a) { const k = idDe(x); if (k == null || vus.has(k)) return false; vus.add(k); } return true; };
+const fusionParId = (b, l, n, profondeur) => {
+  const carte = (a) => { const m = new Map(); for (const x of a) m.set(idDe(x), x); return m; };
+  const bm = carte(b), lm = carte(l), nm = carte(n);
+  const ordre = [...n.map(idDe), ...l.map(idDe).filter((k) => !nm.has(k))];
+  const out = [];
+  for (const k of ordre) { const v = fusion3(bm.get(k), lm.get(k), nm.get(k), profondeur - 1); if (v !== undefined) out.push(v); }
+  return out;
 };
 
 // ── Les numéros ──────────────────────────────────────────────────────────────
