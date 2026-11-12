@@ -72,5 +72,20 @@ pas dans l'arbre. 50/h, réserve 5, 20 lectures/h inchangés (E9).
 
 **c) `--vrm-card`** : `grep -rn -- '--vrm-card[^2]' src` ne rend rien.
 
-## Vérifications
-(chiffres ci-dessous, mis à jour à la fin)
+## Vérifications (intégrateur — second agent, 12 nov. matin)
+L'agent principal s'est arrêté (100 % d'utilisation) avant cette section ; la mise en ligne a été faite par le second
+agent (PR #1138), après #1137 (F).
+- `origin/main` (184f46c2f, F en ligne) fusionné ; `integration-11nov-f` (budget Annonces relevé) et g1 refusionnées.
+- Build ; audits variables, tdz, coherence, identite, icones, fonctions-api, extension-zip, politique-hotes verts.
+- **Rouges de la CI nés de g1/g2, corrigés** :
+  - **Une annonce numérotée DEUX fois** (banc `achats-sourcing` : N°7 puis N°8, et le N°7 perdu du pool) : Ventes monte
+    deux écrans depuis revue-colis (« À expédier » en tête + la liste), chacun numérotait avec son état. Bissection :
+    vert sur main, rouge dès la fusion de `revue-colis` dans g1. Le numéroteur reprend d'abord les N° et le pool déjà
+    rangés sur l'appareil (App.jsx). Rouge avant, vert après (4 variantes).
+  - `audit-coherence` : `vcprix`/`lbcprix` promises à 5.364/5.363 alors que la 5.365 publiée par main ne les a pas
+    ⇒ 5.368.0 (App.jsx, §8, audit-vc-prix P9, faux ponts des bancs vestiaire-plus et lbc-plus).
+  - banc `nouveau-vendeur` : « · vendue aujourd’hui » en début de ligne à 390 px ⇒ espace insécable avant « · ».
+- **Restent (notés, non bloquants pour Julien)** : `comptes-et-reception` (test d'interface de l'ANCIEN écran Favoris,
+  refait par favoris-clair — dictionnaire et bouton portés, le reste à réécrire) ; `colis-retirer-propre` (zone Colis :
+  « Phone Cash » rogné de 6 px à 390 px, 41 px au lieu de 40 avant « Argent à vérifier ») ; `ecrans (parcours-quotidien)`
+  et `audit-colis-envoi` B, déjà rouges sur main.
