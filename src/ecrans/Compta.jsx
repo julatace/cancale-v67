@@ -684,7 +684,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
               ))}
             </tr></thead>
             <tbody>
-              {filtered.length===0&&<tr><td colSpan={9} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune vente</td></tr>}
+              {/* (12 nov., finitions) À gauche : centré dans ce tableau large, « Aucune vente » sortait de l'écran du téléphone. */}
+              {filtered.length===0&&<tr><td colSpan={9} data-ventes-vide="" style={{padding:20,textAlign:'left',color:C.muted}}>Aucune vente</td></tr>}
               {filtered.map(v=>{
                 const b=+(+v.sellPrice-+v.buyPrice);
                 const isSelected=selectedIds.has(v.id);
