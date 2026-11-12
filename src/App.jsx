@@ -502,6 +502,8 @@ import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
 import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
+import VeilleTempsReel from "./VeilleTempsReel.jsx";   // (11 nov., temps réel) ce que l'extension capte arrive sans recharger
+import { SEL_VEILLE } from "./tempsReel.js";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
@@ -6331,6 +6333,16 @@ const lireFamilleCopiee = async (famille, filtre, select) => {
     lireDepuis: (x) => lireTout(`${filtre}&or=(updated_at.gte.${q(x)},meta->>capturedAt.gte.${q(x)},meta->>purgedAt.gte.${q(x)})&select=${select}`, { voirSupprimes: true }),
     lireComplet: () => lireTout(`${filtre}&select=${select}`, { voirSupprimes: true }) });
   return r.ok ? sansComptesSupprimes(r.rows) : null;
+};
+
+// ── (11 nov., temps réel) LES VERSIONS DES LIGNES DU VENDEUR ÉCRITES DEPUIS X (src/tempsReel.js) ──
+// Scalaires seulement (§4.4), SES lignes (`owner=eq.`), toutes les pages (§4.5) ; ratée ⇒ `null`.
+// Realtime n'est tenté que si la migration 040 est posée (`vrm_temps_reel()` répond `true`).
+const realtimeTempsReelPret = () => fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_temps_reel`, { headers: sbAuth(), cache: 'no-store' })
+  .then((r) => (r.ok ? r.json() : null)).then((v) => v === true).catch(() => false);
+const lireVeilleTempsReel = (uid) => (x) => {
+  const q = `%22${encodeURIComponent(x)}%22`;
+  return lireTout(`owner=eq.${uid}&or=(updated_at.gt.${q},meta->>capturedAt.gt.${q},meta->>purgedAt.gt.${q})&select=${SEL_VEILLE}`).catch(() => null);
 };
 
 // ── UNE LIGNE MOISSONNÉE N'EST TÉLÉCHARGÉE QU'UNE FOIS ────────────────────
@@ -38371,6 +38383,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     const signalAnnonces = regrouperSignaux((uids) => loadListings(false, true, uids));
     window.addEventListener('vrm:ext', ecoute);
+    // (11 nov., temps réel) La veille (src/tempsReel.js) a vu des lignes changer chez le serveur
+    // — écrites par l'extension de N'IMPORTE quel navigateur. Même chemin que le signal de
+    // l'extension, sans vider toute la mémoire : seules les lectures de CES lignes. Les comptes
+    // que la veille n'a pas vus bouger sont confirmés à l'instant : leur lecture reste servie,
+    // seule la ligne changée repart (pas toute la famille).
+    const neuf = (e) => {
+      const d = e && e.detail; if (!d || !Array.isArray(d.quoi) || cache()) return;
+      try { viderMemoLignes(Array.isArray(d.ids) ? d.ids : []); } catch (_) {}
+      const bouges = new Set(d.quoi.filter((q) => q.quoi === 'ventes' || q.quoi === 'achats').map((q) => String(q.uid)));
+      const at = Date.now();
+      for (const a of accounts) { const u = String(a && a.vinted_user_id); const c = _rowCache.get(`o:${u}`); if (c && !bouges.has(u)) c.at = at; }
+      for (const u of bouges) _rowCache.delete(`o:${u}`);
+      const deja = new Set();
+      for (const q of d.quoi) {
+        if (!['ventes', 'achats', 'annonces', 'suivi', 'transp'].includes(q.quoi)) continue;
+        // Une relecture des ventes couvre tous les comptes touchés (leurs lignes viennent d'être oubliées).
+        if ((q.quoi === 'ventes' || q.quoi === 'achats') && deja.has(q.quoi)) continue;
+        deja.add(q.quoi);
+        ecoute({ detail: { type: 'maj', quoi: q.quoi, uid: q.uid || undefined } });
+      }
+    };
+    window.addEventListener('vrm:neuf', neuf);
     // (24 oct.) La relecture chez les transporteurs (`useRelectureTransporteurs`)
     // a changé un état : on relit les lignes `transp_*`.
     const transpMaj = () => { if (!cache()) lireTransp(); };
@@ -38409,7 +38443,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // touche l'écran, tout de suite quand la main revient.
     const t = setInterval(() => { if (rythme().doitLire('sonde-ventes', 60000)) sonde(); }, 60000);
     const reveil = rythme().surReveil(() => { rythme().noter('sonde-ventes'); sonde(); });
-    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); window.removeEventListener('vrm:transp-lu', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); reveil(); signalAnnonces.arreter(); if (offRetour) offRetour(); };
+    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:neuf', neuf); window.removeEventListener('vrm:transp-maj', transpMaj); window.removeEventListener('vrm:transp-lu', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); reveil(); signalAnnonces.arreter(); if (offRetour) offRetour(); };
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
@@ -59762,6 +59796,9 @@ function AppCoeur() {
         {horsLigne && tab === 'garage' ? <div data-hors-ligne="stock-inventaire"><BlocInventaireHorsLigne uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/></div> : null}
         {baseKO && !horsLigne && <BaseInjoignable/>}
         {!baseKO && !horsLigne && <MentionCopie/>}   {/* (11 nov.) hors ligne, la pastille dit déjà « vu à hh:mm » */}
+        {/* (11 nov., temps réel) La veille des lignes écrites par l'extension (src/tempsReel.js) : ce qui
+            change chez le serveur est relu par l'écran qui le montre, sans recharger ; pastille flottante. */}
+        {MULTI_USER && authState.user && authState.user.id && <VeilleTempsReel uid={String(authState.user.id)} lireDepuis={lireVeilleTempsReel(String(authState.user.id))} urlBase={SUPABASE_URL} cleApi={SUPABASE_KEY} jeton={() => (AUTH.session && AUTH.session.access_token) || null} realtimePret={realtimeTempsReelPret}/>}
         {/* (9 nov., lot AG) UNE ligne de fraîcheur en haut de l'app : « Tout est à jour · vérifié il y a N min »,
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
