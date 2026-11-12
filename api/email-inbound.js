@@ -1,6 +1,6 @@
 import './_lib/sans-bruit.js';
 import {etatColisDepuisTexte,conserverRetrait,retraitTenu,annonceArriveeFuture,changementDeRelais} from './_lib/etat-colis-email.js';
-import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
+import { accuseEmail, empreinteEmail, idReceptionDeLigne, ID_RECEPTION_RE } from "./_lib/accuse-email.js";
 import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 import { listePieces } from "./_lib/boite-email.js";
 import { ligneHtml, idHtml } from "./_lib/email-html.js";
@@ -2608,6 +2608,11 @@ export async function traiterEmail(req, res) {
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
         ...(track.extraitCode && !track.code ? { extraitCode: track.extraitCode } : {}),
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
+        // (12 nov.) L'E-MAIL SOURCE (« Voir l'e-mail » dans Colis) : l'id de SA ligne `email_reception_*`
+        // (api/_lib/accuse-email.js). Pas su pour cet e-mail ⇒ celui de la ligne d'avant, sinon rien.
+        ...((() => { const id = idReceptionDeLigne(contexteVendeur.getStore(), proprietaireCourant());
+          if (id) return { emailRecu: id };
+          return (prevLigne && ID_RECEPTION_RE.test(String(prevLigne.emailRecu || ''))) ? { emailRecu: prevLigne.emailRecu } : {}; })()),
         account: acc.login || '',
         // (23 oct.) L'ADRESSE DE RÉCEPTION quand aucun compte n'est reconnu :
         // mesuré, le Mondial Relay du 21 octobre est arrivé le 21 sur une adresse

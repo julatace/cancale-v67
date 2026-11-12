@@ -151,10 +151,17 @@ const PAS_UN_NOM = /\b(?:mondial\s*relay|chronopost|vinted|pickup\s+services?|ex
 // perdu et le colis restait « point pas connu ». Deux points DIFFÉRENTS dans le
 // même extrait (le relais et l'adresse de quelqu'un, par exemple) ⇒ rien :
 // on ne choisit pas.
+// (12 nov.) MESURÉ (lecture seule, Chronopost 08448881184010) : le Relais Pickup écrit
+// « NOM | RUE DE LA … | CP VILLE » — une rue SANS numéro. Elle était refusée (la règle
+// exigeait un numéro en tête) : `lieu` restait vide, l'extrait (55 car.) était là. Une rue
+// sans numéro est acceptée seulement si elle COMMENCE par un type de voie écrit en toutes
+// lettres (rue, avenue, place…) : c'est le texte de l'e-mail, rien n'est complété.
+const VOIE_SANS_NUMERO = /^(?:rue|avenue|av\.?|boulevard|bd|place|chemin|route|impasse|all[ée]e|quai|cours|square|passage|sentier|voie|esplanade|promenade|parvis|rond[\s-]point|lieu[\s-]dit|hameau|lotissement|r[ée]sidence|zac|za|zi|zone|centre\s+commercial|parc|faubourg|mail|cit[ée]|galerie)\s+[A-Za-zÀ-ÿ'’]/i;
 const tripletLieu = (nom, rue, ville) => {
   if (!nom || nom.length < 2 || nom.length > 60 || /\d{5}/.test(nom) || PAS_UN_NOM.test(nom)) return null;
   if (nom.replace(/[^a-zà-ÿ]/gi, '').length < 3) return null;
-  if (!/^\d{1,4}(?:\s*(?:bis|ter))?[\s,]+[A-Za-zÀ-ÿ]/.test(rue) || rue.length > 80 || /\d{5}/.test(rue)) return null;
+  const rueNumerotee = /^\d{1,4}(?:\s*(?:bis|ter))?[\s,]+[A-Za-zÀ-ÿ]/.test(rue);
+  if (!(rueNumerotee || (VOIE_SANS_NUMERO.test(rue) && !PAS_UN_NOM.test(rue))) || rue.length > 80 || /\d{5}/.test(rue)) return null;
   if (!/^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(ville)) return null;
   return `${nom}, ${rue}, ${ville}`;
 };

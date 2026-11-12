@@ -204,6 +204,12 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     dit(M.lieuDepuisExtrait("MONDIAL RELAY | 1 avenue de l'horizon | 59650 VILLENEUVE D'ASCQ | TABA'TEST | 12 Rue Exemple | 56000 Vannes") === "TABA'TEST, 12 Rue Exemple, 56000 Vannes", 'le point relais APRÈS le pied de l\'e-mail est lu (tous les triplets, pas seulement le premier)', M.lieuDepuisExtrait("MONDIAL RELAY | 1 avenue de l'horizon | 59650 VILLENEUVE D'ASCQ | TABA'TEST | 12 Rue Exemple | 56000 Vannes"));
     dit(M.lieuDepuisExtrait("TABA'TEST | 12 Rue Exemple | 56000 Vannes | TERRA TEST | 11 Rue Hoche | 56000 Vannes") === null, 'deux points DIFFÉRENTS dans le même extrait ⇒ rien (on ne choisit pas)');
     dit(M.lieuDepuisExtrait("TABA'TEST | 12 Rue Exemple | 56000 Vannes | Taba'test | 12 rue exemple | 56000 VANNES") === "TABA'TEST, 12 Rue Exemple, 56000 Vannes", 'le même point écrit deux fois reste UN point');
+    // (12 nov.) Forme MESURÉE d'un Relais Pickup Chronopost (fixture SYNTHÉTIQUE, jamais l'adresse réelle) :
+    // « NOM | RUE DE LA … | CP VILLE », la rue sans numéro. Avant : `lieu` vide alors que l'extrait était là.
+    dit(M.lieuDepuisExtrait('EPICERIE DU TEST | RUE DE LA FONTAINE | 35000 RENNES') === 'EPICERIE DU TEST, RUE DE LA FONTAINE, 35000 RENNES', 'Chronopost : une rue SANS numéro qui commence par un type de voie est lue', String(M.lieuDepuisExtrait('EPICERIE DU TEST | RUE DE LA FONTAINE | 35000 RENNES')));
+    dit(M.lieuDepuisExtrait('EPICERIE DU TEST | Votre colis est arrivé | 35000 RENNES') === null, 'une phrase sans numéro ni type de voie n\'est jamais une rue (rien deviné)');
+    dit(M.lieuDepuisExtrait('EPICERIE DU TEST | Rue retrait jusqu\'au soir | 35000 RENNES') === null, 'une « rue » qui parle du retrait n\'est pas une adresse');
+    dit(M.lieuDepuisExtrait('CHRONOPOST | RUE DE LA FONTAINE | 35000 RENNES') === null, 'sans numéro non plus, le transporteur n\'est jamais le point');
   });
 
   await essaie('parseCarrierEmail', async () => {
