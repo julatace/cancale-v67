@@ -242,6 +242,7 @@ test("un accusé de réponse confirmé empêche une lecture antérieure de masqu
     setReplyText: () => {},
     conversationRequest: { current: 1 },
     setReponsesIncertaines: () => {},
+    setEnvoiReponse: () => {},   // (12 nov., agent2-messages-sites) l'envoi vu dans le fil
   };
   const envoyer = new Function(
     ...Object.keys(d),

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { sessionAAdopter, VERROU_RENOUVELLEMENT } from "../../src/sessionOnglets.js"; // (12 nov.) un seul onglet renouvelle (agent2-donnees-suite)
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const s = fs.readFileSync(
@@ -34,6 +35,13 @@ function banc(reponse, { session = ancienne() } = {}) {
       return typeof reponse === "function" ? reponse() : reponse;
     },
     sessionFrom: (j) => j,
+    // (12 nov.) Le verrou partagé et la session des autres onglets : un seul onglet ici, rien de rangé ailleurs.
+    sousVerrou: (_nom, fn) => fn(),
+    VERROU_RENOUVELLEMENT,
+    sessionAAdopter,
+    readSession: () => null,
+    lireSessionOnglets: async () => null,
+    rangerSessionOnglets: async () => {},
     writeSession: (j) => {
       ecritures++;
       c.AUTH.session = j;
@@ -98,7 +106,7 @@ test("renouvellement : une réponse tardive, même refusée, ne déconnecte pas 
         }),
     );
     const p = b.renouveler();
-    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0)); // (12 nov.) la requête part après la lecture de la session des autres onglets
     b.changer({
       access_token: "autre",
       refresh_token: "refresh-b",
@@ -119,7 +127,7 @@ test("renouvellement : un jeton changé par une autre action reste prioritaire",
       }),
   );
   const p = b.renouveler();
-  await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0)); // (12 nov.) la requête part après la lecture de la session des autres onglets
   b.changer({ ...ancienne(), access_token: "mfa-prioritaire" });
   liberer({ ok: true, json: valide() });
   assert.equal(await p, null);
@@ -136,7 +144,7 @@ test("renouvellement : demande partagée et reprise après une session sans jeto
   );
   const p = b.renouveler();
   assert.equal(p, b.renouveler());
-  await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0)); // (12 nov.) la requête part après la lecture de la session des autres onglets
   assert.equal(b.appels, 1);
   liberer({ ok: true, json: valide() });
   assert.equal(await p, true);
