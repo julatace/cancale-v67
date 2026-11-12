@@ -47,6 +47,31 @@ capteur/relais Leboncoin, `EXT_ATTENDUE` alignés ; zips Chrome + Orion refaits 
   styles-avis-bas.css. audit-suivi-travail B7 : la feuille n'utilise que des jetons posés (mutation ⇒ rouge).
   Capture 390 sombre de la feuille regardée.
 
+## CI de la PR 1137 (12 nov.) — rouges vus seulement sur GitHub, causes et corrections
+- **reprise-chantiers / regles** : `lot-preparation-reprise.cjs` exécute la tranche `batchBordereaux` dans une vm ;
+  depuis suivi-travail elle pilote `suiviTravail` (importé dans App.jsx, absent du contexte du test) ⇒
+  `ReferenceError`, puis `liberer is not a function` (conséquence). Le test charge le VRAI `src/suiviTravail.js`.
+- **controle-prod-quotidien S1** : en **mode exemple**, l'effet de la carte des relais géocodait les adresses
+  FICTIVES (api-adresse.data.gouv.fr puis Nominatim) — 24 requêtes réelles mesurées ; sur GitHub, Nominatim
+  répondait sans en-tête CORS ⇒ erreur de console « … has been blocked by CORS policy ». En local la requête
+  ne sortait pas (aucun réseau pour le Chromium du contrôle), d'où rien vu. Correctif app : `exempleActif()` ⇒
+  rien géocodé, rien rangé (relevé après : 0 requête). Nominatim/API Adresse restent pour les vrais points :
+  services gratuits, sans clé (§2.9 respecté), pas une fonction payante.
+- **Garde réseau des bancs** : statut-colis, colis-retirer-propre, retraits-suivi servaient l'API Adresse vide
+  ⇒ l'app retombe sur Nominatim (géocodage des points relais, `geocode`) qui partait sur Internet : servi vide
+  aussi. budget-vitesse (`vitesse.cjs`) et annonces-actions : une photo Vinted coupée déclenche la SONDE
+  (`essaiSonde`, fetch no-cors, src/photosVinted.js — voulue) qui passait par `continue()` : coupée comme
+  l'image. Preuve : traceur de sorties (requête ni coupée ni servie) : 0 sur les 6 bancs ; mutation (ligne
+  Nominatim retirée de retraits-suivi) ⇒ 6 sorties vers nominatim.openstreetmap.org.
+- **nouveau-vendeur** : la note de Statistiques passait à la ligne devant « · » : espaces insécables avant
+  chaque « · » (`&nbsp;·`).
+- **parcours-critiques / comptes-et-reception** (sur main il tombait avant, garde absente) : atelier-brouillon
+  (VoileAtelier hors tranche), favoris-historique (JaugeActions importe App.jsx : lecture muette servie),
+  connexion-actions (`tr`, `ChoixLangue`, dictionnaire fr), bordereau-zone-protegee et bordereau-qr-lecture
+  (texte retenu « Créé par vrm.center ») : tests remis à la forme actuelle du code, préexistants sur main.
+- **ecrans (parcours-quotidien)** : rouge identique sur main (`vueSynchronisee is not defined` : useVueSession
+  synchronisé par reprise-ecrans, le banc ne sert pas ce chemin) — préexistant, laissé.
+
 ## Ce qui reste rouge
 - `audit-colis-envoi` B (attendu, réglé par revue-colis).
 - Banc `ebay-complet` : 11 KO **identiques sur la branche publier-partout seule** (préexistant, pas du croisement).
