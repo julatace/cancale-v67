@@ -53,9 +53,9 @@ export function OuvrirPaiements({ entetes = () => ({}), proAccueil = PRO_OUVERT,
                 <span className="vrm-ios-icone vrm-tnum" aria-hidden="true" style={{ fontSize: 13, color: 'var(--vrm-muted)' }}>{i + 1}</span>
                 <span className="vrm-ios-texte">
                   <span className="vrm-ios-titre">{x.titre}</span>
-                  {x.etat !== 'ok' && <span className="vrm-ios-detail">{x.geste}</span>}
+                  {x.etat !== 'ok' && <span className="vrm-ios-detail" style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}>{x.geste}</span>}
                   {x.etat === 'ok' && x.detail && <span className="vrm-ios-detail">{x.detail}</span>}
-                  {deplie && <span className="vrm-ios-detail" data-ou-cliquer="" style={{ marginTop: 4 }}>Où : {x.ou}</span>}
+                  {deplie && <span className="vrm-ios-detail" data-ou-cliquer="" style={{ marginTop: 4, whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}>Où : {x.ou}</span>}
                 </span>
                 <span className="vrm-ios-valeur" data-ton={x.etat === 'manque' ? 'warn' : undefined}
                   style={{ color: x.etat === 'ok' ? 'var(--vrm-accent)' : x.etat === 'manque' ? 'var(--vrm-warn, #B25E00)' : 'var(--vrm-muted)', fontWeight: 600 }}>{MARQUE[x.etat]}</span>
@@ -66,7 +66,7 @@ export function OuvrirPaiements({ entetes = () => ({}), proAccueil = PRO_OUVERT,
       </GroupeIos>
       <div className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>
         Touche une ligne pour savoir où cliquer.{' '}
-        <button type="button" className="vrm-lien-action" onClick={charger} data-paiements-relire="" style={{ minHeight: 44 }}>Revérifier</button>
+        <button type="button" className="vrm-lien-action" onClick={charger} data-paiements-relire="" style={{ minHeight: 44, border: 0, background: 'none', padding: '0 4px', font: 'inherit', color: 'var(--vrm-accent)', cursor: 'pointer' }}>Revérifier</button>
       </div>
     </div>
   );
