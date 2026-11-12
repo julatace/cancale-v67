@@ -216,7 +216,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
           {blocDestinataires}
           <label>Ton message<textarea ref={champMessage} data-favoris-message disabled={preparation} maxLength={2000} rows={4} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Bonjour {username}, merci pour ton favori !"/></label>
           <div className="vrm-favoris-variables" role="group" aria-label="Variables du message"><button type="button" data-favoris-variable="pseudo" disabled={preparation} onClick={()=>inserer('{pseudo}')}>{'{pseudo}'}</button><button type="button" data-favoris-variable="article" disabled={preparation} onClick={()=>inserer('{article}')}>{'{article}'}</button><button type="button" data-favoris-variable="prix" disabled={preparation} onClick={()=>inserer('{prix}')}>{'{prix}'}</button><button type="button" data-favoris-variable="variante" disabled={preparation} onClick={()=>inserer('{Bonjour|Salut}')}>{'{a|b}'} variante</button></div>
-          <small>{'{pseudo}'} = son pseudo · {'{article}'} = le titre · {'{prix}'} = le prix (ton offre) · {'{Bonjour|Salut}'} = un choix au hasard.</small>
+          <small>{'{pseudo}'} pseudo · {'{article}'} titre · {'{prix}'} prix · {'{Bonjour|Salut}'} au hasard.</small>
           <AutresVersions nom="favoris" premier={message} variantes={variantes} desactive={preparation} extOk={favorisVariantes} placeholder="Une autre façon de le dire" onChange={l=>{setVariantes(l);change();}}/>
           {!message.trim()&&offreChoix!=='aucune'&&<small data-favoris-message-defaut>Message vide : VRM enverra « {MESSAGE_PAR_DEFAUT} » avec ton offre.</small>}
           <div className="vrm-favoris-offre" data-favoris-offre={offreChoix}>

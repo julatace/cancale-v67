@@ -36,6 +36,7 @@ Relier les propres comptes de revente de l'utilisateur (Vinted, Leboncoin, eBay,
 | `scripting` | Exécuter, dans l'onglet Vinted, Leboncoin ou Vestiaire Collective déjà ouvert par l'utilisateur, les lectures et les actions qu'il commande, depuis la page elle-même (même origine, mêmes cookies). |
 | `tabs` | Retrouver l'onglet du site ou de VRM déjà ouvert et ouvrir la page utile (VRM, dépôt d'annonce) quand l'utilisateur le demande ; l'adresse des onglets n'est ni gardée ni envoyée. |
 | `downloads` | Reconnaître le PDF d'un bordereau d'expédition que l'utilisateur télécharge depuis Vinted, pour le ranger avec la vente ; tout autre téléchargement est ignoré et l'extension n'en déclenche aucun. |
+| `contextMenus` | Ajouter au clic droit sur l'icône de l'extension deux entrées, « Connexion à VRM » et « État de l'extension », qui ouvrent la page de connexion de l'extension dans un onglet. Aucun autre menu, aucune lecture de page. |
 
 **Autorisations d'hôte** (le formulaire les regroupe en une case « Host permission » : coller le tableau
 en texte, une ligne par hôte) :
