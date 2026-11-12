@@ -536,8 +536,8 @@ sans la fonction.
 | `resumemois` | `moisPourCarte` | **5.354.0** (11 nov.) | « Ce mois : … vendus · … ventes · … à expédier » dans la carte du logo : lu dans `widget_stats`, compte de l'onglet prouvé, « — » si pas su, masquable |
 | `empreintes` | `tickEmpreintes` | **5.358.0** (11 nov.) | « photos en double entre tes comptes » : une image par tour (45 s), budget de LECTURE, empreinte seule rangée (`photo_emprunte_{uid}`) |
 | `importsites` | `importerSite` | **5.365.0** (11 nov.) | « Ton historique Leboncoin / Vestiaire » : pages que le SITE a paginées (modèle vu, jamais deviné), compte de l'onglet, 12 des 20 lectures/h, reprise, fusion par n° ; `import_{site}_{compte}` |
-| `formevinted` | `formeDouteuse` | **5.357.0** (11 nov.) | une réponse Vinted d'une forme inattendue sur un champ dont dépend une règle n'est PAS rangée ; sa forme (sans valeur) va dans `harvest_{uid}_forme_inconnue` ⇒ « Vinted a changé sa page des ventes : VRM ne la lit plus, on corrige » (Tout va bien ?, Ma journée une fois) |
-| `prudence` | `poserPrudence` | **5.357.0** (11 nov.) | un refus de Vinted (429, 403, captcha) ⇒ ce compte 24 h en prudence : 20 actions/h (le plafond normal reste 50), délais doublés, lectures de fond suspendues sauf codes de retrait ; jauge « Prudence jusqu'à … » |
+| `formevinted` | `formeDouteuse` | **5.370.0** (le code fait foi ; écrite en 5.357 le 11 nov., la 5.365 publiée ne l’a pas) | une réponse Vinted d'une forme inattendue sur un champ dont dépend une règle n'est PAS rangée ; sa forme (sans valeur) va dans `harvest_{uid}_forme_inconnue` ⇒ « Vinted a changé sa page des ventes : VRM ne la lit plus, on corrige » (Tout va bien ?, Ma journée une fois) |
+| `prudence` | `poserPrudence` | **5.370.0** (le code fait foi ; écrite en 5.357 le 11 nov., la 5.365 publiée ne l’a pas) | un refus de Vinted (429, 403, captcha) ⇒ ce compte 24 h en prudence : 20 actions/h (le plafond normal reste 50), délais doublés, lectures de fond suspendues sauf codes de retrait ; jauge « Prudence jusqu'à … » |
 
 ---
 
