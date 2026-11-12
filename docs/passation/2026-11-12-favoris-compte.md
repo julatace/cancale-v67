@@ -95,7 +95,14 @@ la leur sur un 403/429) ; ici les deux coexistent, rien n'est perdu, mais ce n'e
 - `audit-suivi-vinted` remis à la règle 5.372 (un livré AVEC son n° n'est plus relu ; sans n°, il l'est ; ordre).
 - `audit-ext-boutique` : la version lue dans le code (plus de « 5.371.0 » en dur). `audit-traduction` vert
   (clés `favoris.liste.*`, `favoris.quoi.autreVersion`, `oa.histo.version` en 5 langues).
-- Comparaison des audits de l'extension avec la branche de départ : voir la fin de ce récit.
+- **Les 163 audits qui touchent l'extension** (ceux qui lisent background.js / l'extension / `_fond-vm`) : 163 verts.
+  La passe a trouvé deux défauts de la FUSION, corrigés : « Créer sur Vinted » (5.367, main) appelait `ecrireResa`,
+  retiré par la 5.356 (⇒ relié par comparer-et-échanger, `audit-annonce-vinted` vert) ; `audit-lbc-plus` parlait
+  au capteur par `window.postMessage` (⇒ le canal privé, comme lbc-relay). `audit-controle-prod-quotidien` exige
+  `dist/` (vert après `npm run build`).
+- Bancs : favoris-compte 52 ×2 thèmes, favoris-clair 56 (adapté), baisse-prix 51/54 — ses 3 rouges (ABC390 sombre,
+  ABC1512, D : un clic qui attend 30 s) sont AUSSI sur la branche de départ (4 rouges là-bas : G2 en plus, réglé ici
+  par la fusion de la feuille Leboncoin).
 
 ## Geste de Julien
 
