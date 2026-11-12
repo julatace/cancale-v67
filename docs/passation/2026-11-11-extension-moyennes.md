@@ -45,7 +45,7 @@ de départ** (`--ext <git archive origin/claude/agent2-familles-extension>/vinte
 | 60, 63 | ordres, résultats et recette Leboncoin par `postMessage('*')` | canal privé `MessageChannel` lbc-inject ⇄ lbc-relay (posé à document_start) ; sans canal rien ne part (`code:'canal'`, place rendue) |
 | 68 | `popup.html` encadrable par n'importe quel cadre des sites | `cadreAutorise` : seulement la page principale d'un site permis (`ancestorOrigins`, sinon référent) |
 | 69 | mot de passe saisi dans la carte DESSINÉE (DOM de la page) | mot de passe seulement dans l'iframe de l'extension ; dessinée : code par e-mail |
-| 71 | `seen_urls`, statuts d'offres, diagnostic : lire-fusionner-réécrire sans CAS | `modifierLigneCas` |
+| 71 | `seen_urls`, statuts d'offres, diagnostic : lire-fusionner-réécrire sans CAS | `modifierLigneCas` pour `seen_urls` et les statuts ; diagnostic laissé (voir plus bas) |
 | 72 | chaque rafraîchissement du jeton relançait une moisson | seulement si le compte du cookie a changé (`vrmCompteCookie`) |
 | 74 | `CAP_MAIN_REFUSE` sur tout texte « MAIN » / « is not a function » | `estRefusMondeMain` : seulement « Unexpected property world » / « world … not supported » |
 | 75 | `www.vinted.fr` en dur (visite, moisson, offres, import…) | `domaineVintedOuvert()` (onglet ouvert) pour les 7 lectures du compte actif |
@@ -66,8 +66,17 @@ de départ** (`--ext <git archive origin/claude/agent2-familles-extension>/vinte
 ## Vérifié
 
 `audit-extension-moyennes` (ci-dessus). Les 112 audits qui lisent l'extension, joués ici ET sur la
-branche de départ : voir la ligne « Fini, à intégrer » (aucun nouveau rouge hors ceux remis à la règle).
-Remis à la règle : `audit-lbc-plus-vue-pause`, `audit-lbc-supprimer` (port de banc pour le canal
+branche de départ : **110 verts ici** ; aucun nouveau rouge ; 3 rouges de départ passés au vert
+(`coherence`, `extension-zip`, `preuve-vente`) ; rouges des deux côtés, hors de ce lot : `exec`,
+`lbc-plus-vue-pause` (`numerosLbcSortis` : `MeilleuresSources` déclaré deux fois dans l'app).
+Aussi verts : `variables`, `tdz`, `identite`, `icones`, `regles-achat-extension`, `npm run build`.
+⚠️ 71 en partie : `seen_urls` et les statuts d'offres en comparer-et-échanger ; la ligne de
+DIAGNOSTIC (`panel_diag_capture`) reste en lire-fusionner-réécrire (une dizaine d'audits servent
+une base sans PATCH conditionnel ; deux Chrome peuvent encore y perdre quelques compteurs). La
+file Vinted n'est bornée que par `AbortSignal.timeout` (sans lui : aucune limite, comme avant).
+Remis à la règle : `audit-fusion` (PATCH conditionnel), `audit-jauge-journal` (`lec`,
+`maxLectures`), `audit-endpoints-vus` (une session pour la liste noire), `audit-diagnostic`
+(échantillon gardé sans `tete`), `audit-lbc-plus-vue-pause`, `audit-lbc-supprimer` (port de banc pour le canal
 privé, le compte attendu dans l'ordre, un ordre posté par la page ne part plus), `audit-lbc-repondre`
 (le banc prend le port du canal, 31 verts). ⚠️ Bancs non relancés : `scripts/bancs/lbc-repondre.cjs`
 (ordres par `window`) et `scripts/bancs/carte-orion-sans-onglet.cjs` (la carte dessinée ne propose
