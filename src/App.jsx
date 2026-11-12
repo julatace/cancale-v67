@@ -48632,7 +48632,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <span className="vrm-ann-compte-nom" title={nomG || undefined}>{nomG || 'Compte Vinted'}</span>
             <span className="vrm-ann-compte-n">{g.tous} annonce{g.tous>1?'s':''}</span>
           </div>,
-          ...g.montres.map(it=>{
+          ...g.items.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
             //    reconstruit avec 5 champs, la pastille « prête » valait
             //    « à capter » sur toutes les cartes, par construction.
