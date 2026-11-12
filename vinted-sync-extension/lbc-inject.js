@@ -1191,15 +1191,24 @@
     const adresse = 'https://' + r.hote + r.modele.replace('{ad}', encodeURIComponent(ad)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
     prixEnCours = true;
     try {
-      let statut = 0, rep = '', erreur = '';
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
       try {
         const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
         statut = Number(res.status) || 0;
         try { rep = String(await res.text()).slice(0, 20000); } catch (_) {}
+        // (intégration 11nov-g2, sécurité des comptes 5.366) Un CONTRÔLE ANTI-ROBOT (DataDome, captcha,
+        // défi Cloudflare) se reconnaît à ses en-têtes ou au début du texte, sur un refus seulement :
+        // seul le OUI/NON sort (et le Retry-After), jamais le texte. La règle de vc-inject.js (`defiDe`).
+        try {
+          const hd = (k) => String((res.headers && res.headers.get(k)) || '');
+          defi = (statut >= 400 && (/protected|blocked/i.test(hd('x-datadome')) || /^\d+$/.test(hd('x-dd-b').trim()))) || /^challenge$/i.test(hd('cf-mitigated').trim())
+            || (statut >= 400 && /captcha-delivery\.com|geo\.captcha|\bdatadome\b|\bcaptcha\b|cf-chl|challenge-platform|hcaptcha|recaptcha|turnstile|just a moment/i.test(rep.slice(0, 6000)));
+          ra = hd('retry-after').slice(0, 40);
+        } catch (_) {}
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       let cles = [], prixVu = null;
       try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map((c) => sansUuid(c)).slice(0, 60); prixVu = prixDansReponseLbc(j, ad); } catch (_) {}
-      fin({ statut, cles, prixVu, erreur });
+      fin({ statut, cles, prixVu, erreur, defi, ra });
     } finally { prixEnCours = false; }
   }); } catch (_) {}
 })();

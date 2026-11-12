@@ -12,6 +12,18 @@
 //     bas à gauche dit, pendant ce temps, ce qui est fait.
 (function () {
   if (window.__vrmLbcLoaded) return; window.__vrmLbcLoaded = true;
+  // (intégration 11nov-g2, sécurité des comptes 5.366) « n'agir que si tu es là » — le bloc de vc.js :
+  // un VRAI geste (isTrusted) dans la page du haut de leboncoin.fr est signalé au fond, au plus une
+  // fois par 30 s, sans rien d'autre (la plateforme est lue par le fond dans l'ADRESSE de l'onglet).
+  try {
+    let vuPresence = 0;
+    const presence = (e) => {
+      if (!e || e.isTrusted !== true || document.visibilityState !== 'visible' || window.top !== window) return;
+      const t = Date.now(); if (t - vuPresence < 30000) return; vuPresence = t;
+      try { chrome.runtime.sendMessage({ from: 'vrm-presence', action: 'la' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+    };
+    for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(ev, presence, { capture: true, passive: true });
+  } catch (_) {}
   // ⚠️⚠️ ET SI LE FORMULAIRE DE DÉPÔT VIT DANS UN CADRE (iframe) ? Le script ne
   //    tournait que dans la page du haut (`all_frames: false`) : l'enregistreur
   //    n'aurait alors **jamais rien vu**, et le dépôt fait à la main aurait été

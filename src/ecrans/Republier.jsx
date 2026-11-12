@@ -1583,7 +1583,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
-      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
       setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: questionRepubOk(r && r.question) ? r.question : null } }));
@@ -1661,7 +1661,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     const reponses = { ...(s0.reponses || {}), [s0.question.champ]: v };
     setSt((p) => ({ ...p, [a.id]: { etat: 'encours' } }));
     const x = apercu(a);
-    let r; try { r = await publier(a, { prix: x.prix != null ? x.prix : a.prix, titre: x.titre || a.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[a.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, reponses }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+    let r; try { r = await publier(a, { prix: x.prix != null ? x.prix : a.prix, titre: x.titre || a.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[a.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, reponses, ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
     const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
     const q2 = questionRepubOk(r && r.question) && !(r.question.champ in reponses) ? r.question : null;
     setSt((p) => ({ ...p, [a.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: q2, reponses } }));

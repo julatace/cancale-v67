@@ -52599,7 +52599,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const noterRepubJournal = (a, nouvelId, act) => { ecrireRepublication({ ancienId:a.id, nouvelId:String(nouvelId), favoris:a.favoris, vues:a.vues, action:act }, ctxLigne()).then((j)=>{ if (j) { try { window.dispatchEvent(new CustomEvent('vrm:repub-journal')); } catch(_) {} } }); };
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, num:a.numero||undefined, reponses:v.reponses||undefined, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, differer:v.viaBrouillon===true&&extSait('republierfile')==='ok', confirme:true }, 480000);
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, ...(v&&v.programme===true?{ programme:true }:{}), num:a.numero||undefined, reponses:v.reponses||undefined, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, differer:v.viaBrouillon===true&&extSait('republierfile')==='ok', confirme:true }, 480000);
           if (r.sansReponse) { brRefaire.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) { reporterNumero(a.id, String(r.nouvelId)); noterRepubJournal(a, r.nouvelId, 'recreer'); }
           // (29 oct., « à la suite comme Vintex ») Mise en ligne PLANIFIÉE par l'extension :
@@ -52618,7 +52618,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const publierModif = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
           const ownerPrix=AUTH.user?.id;
-          const r=await vmrCmdSuivi({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000);
+          const r=await vmrCmdSuivi({ cmd:'republierVinted', uid:a.uid, id:a.id, ...(v&&v.programme===true?{ programme:true }:{}), prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000);
           if (r.sansReponse) return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE };
           if (r && r.accepte && r.etape==='fait') { if(ownerPrix&&AUTH.user?.id===ownerPrix)noterPrix(a,r); return { etat:'fait', nouveau:r.nouveau }; }
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
@@ -52628,7 +52628,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // créé (sa décision du 28 oct. au soir). Le N° reste sur l'ancienne fiche.
         const publierVersB = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, num:a.numero||undefined, reponses:v.reponses||undefined, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 480000);
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, ...(v&&v.programme===true?{ programme:true }:{}), num:a.numero||undefined, reponses:v.reponses||undefined, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 480000);
           if (r.sansReponse) { brRefaire.relire(); brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' }; }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) { if (r.etape==='fait') { brVinted.relire(); if (r.draftId) noterRepubJournal(a, r.draftId, 'versBrouillon'); } return { etat:r.etape, raison:r.raison||'' }; }
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'', question:r.question||null }; }

@@ -1596,11 +1596,13 @@
     const adresse = 'https://' + r.hote + r.modele.split('{produit}').join(encodeURIComponent(produit)) + (/^\?[\w=&.%:-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
     prixVcEnCours = true;
     try {
-      let statut = 0, rep = '', erreur = '';
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
       try {
         const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
         statut = Number(res.status) || 0;
         try { rep = String(await res.text()).slice(0, 400000); } catch (_) {}
+        // (intégration 11nov-g2) La sécurité des comptes (5.366) voit aussi la baisse de prix : défi anti-robot (oui/non) et Retry-After.
+        defi = defiDe(res, rep); ra = raDe(res);
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       // RELIRE APRÈS : la réponse si elle porte l'article, sinon « Mes articles » relu (la même adresse que la page).
       let prixVuCents = null, relu = '';
@@ -1620,7 +1622,7 @@
         }
         if (prixVuCents != null) annoncesVuesPrix.set(produit, { cents: prixVuCents, url: vu.url });
       }
-      fin({ statut, prixVuCents, relu, erreur });
+      fin({ statut, prixVuCents, relu, erreur, defi, ra });
     } finally { prixVcEnCours = false; }
   }); } catch (_) {}
 

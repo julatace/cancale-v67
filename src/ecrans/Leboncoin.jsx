@@ -1036,7 +1036,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
       if (t) t.etape(id, 'suppression');
       // 1. Supprimer.
       poser(id, 'encours', 'Suppression sur Leboncoin…');
-      let r = null; try { r = await vmrCmd({ cmd: 'lbcSupprime', id, confirme: true }, 70000); } catch (_) { r = null; }
+      let r = null; try { r = await vmrCmd({ cmd: 'lbcSupprime', id, confirme: true, repub: true }, 70000); } catch (_) { r = null; }
       if (!r) { poserS(id, 'incertain', "je ne sais pas si elle est supprimée — l'extension n'a pas répondu. Regarde l'annonce sur Leboncoin. Arrêt."); break; }
       if (r.accepte === false) { poserS(id, 'refuse', `pas touchée — ${r.raison || 'refusé par l’extension'}. Arrêt.`); break; }
       if (r.etape !== 'fait') { poserS(id, r.etape === 'refuse' ? 'refuse' : 'incertain', r.etape === 'refuse' ? `pas touchée — Leboncoin a répondu ${r.statut}. Arrêt.` : `je ne sais pas si elle est supprimée — ${r.raison || 'pas de réponse de Leboncoin'}. Arrêt.`); break; }

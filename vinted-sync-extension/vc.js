@@ -180,7 +180,7 @@
       if (d.kind === 'vcprixresultat' && typeof d.jeton === 'string') {
         const f = envoisEnAttente.get(d.jeton);
         const c = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 1e9 ? Math.round(x) : null);
-        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, prixVuCents: c(d.prixVuCents), relu: /^(reponse|liste)$/.test(String(d.relu || '')) ? String(d.relu) : '', erreur: String(d.erreur || '').slice(0, 80) }); }
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, prixVuCents: c(d.prixVuCents), relu: /^(reponse|liste)$/.test(String(d.relu || '')) ? String(d.relu) : '', erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); }
         return;
       }
       // 5.239 : tes ACHATS Vestiaire — scalaires seulement, jamais le vendeur ni ton adresse.

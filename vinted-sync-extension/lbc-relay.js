@@ -113,7 +113,7 @@
     // 5.363 (11 nov.) : la RECETTE d'un changement de prix fait par lui sur la page, et la réponse
     // de Leboncoin à un changement demandé par le fond (statut, forme, prix montré — jamais autre chose).
     else if (d.kind === 'lbcprixappris' && d.recette && typeof d.recette === 'object') { try { transmettre({ from: 'cancale-lbc', action: 'lbcPrixAppris', recette: d.recette }); } catch (_) {} }
-    else if (d.kind === 'lbcprixresultat' && typeof d.jeton === 'string') { const r = prixEnAttente.get(d.jeton); if (r) { prixEnAttente.delete(d.jeton); const pv = Number(d.prixVu); r({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), prixVu: d.prixVu != null && Number.isFinite(pv) && pv > 0 ? pv : null, erreur: String(d.erreur || '').slice(0, 80) }); } }
+    else if (d.kind === 'lbcprixresultat' && typeof d.jeton === 'string') { const r = prixEnAttente.get(d.jeton); if (r) { prixEnAttente.delete(d.jeton); const pv = Number(d.prixVu); r({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), prixVu: d.prixVu != null && Number.isFinite(pv) && pv > 0 ? pv : null, erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); } }
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
   }, false);
   // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre) ───────────────────────────

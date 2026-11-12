@@ -4094,6 +4094,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const rl = await noterListeLbcComplete(owner, ids, total);
             // 5.335 : la carte de l'onglet dit « 37 annonces lues en entier il y a 2 min ».
             if (rl && rl.ok) await noterLectureCompleteLbc(owner, ids, total, sender);
+            // (intégration 11nov-g2, sécurité 5.366) SA page « Mes annonces » lue en entier : une lecture normale lève l'arrêt anti-robot.
+            if (rl && rl.ok) secuLectureNormale('leboncoin', idCompteLbc(owner)).catch(() => {});
             sendResponse({ ok: !!(rl && rl.ok) }); return;
           }
           // 29 oct. : une suppression / mise en pause faite par Julien SUR LA PAGE
@@ -12081,7 +12083,9 @@ async function republierVinted(msg) {
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
   { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   const recuP = {};
-  const stop = await gardeStricte(uid, acc, { recu: recuP, secu: { sorte: 'republication', mode: 'serie' } });
+  // (intégration 11nov-g2) Un départ PROGRAMMÉ par lui (lot republier-programme) part en mode `programme`
+  // de la sécurité des comptes (repos de nuit, journée calme, réveil progressif) ; lancé à l'écran ⇒ `serie`.
+  const stop = await gardeStricte(uid, acc, { recu: recuP, secu: { sorte: 'republication', mode: msg.programme === true ? 'programme' : 'serie' } });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   // 1. SAUVEGARDE COFFRE vérifiée (filet : de quoi tout refaire si besoin).
   let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
@@ -13310,7 +13314,7 @@ async function recreerVinted(msg) {
     let n0 = 0; try { const l = ((await chrome.storage.local.get('vrmActions')).vrmActions || {})[uid]; n0 = Array.isArray(l) ? l.filter((t) => Date.now() - Number(t) < 3600000).length : 0; } catch (_) {}
     if (n0 + nA0 > ACTIONS_MAX_HEURE - RESERVE_GESTES) {
       const recu0 = {};
-      const stopP = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA0, recu: recu0, secu: { sorte: 'republication', mode: 'serie' } });
+      const stopP = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA0, recu: recu0, secu: { sorte: 'republication', mode: msg.programme === true ? 'programme' : 'serie' } });
       if (stopP) return { accepte: false, code: stopP.code, raison: stopP.error };
       if (recu0.at) await rendreActions(uid, Number(recu0.at), nA0);   // passé entre-temps : on rend, la vraie réservation est plus bas
     } }
@@ -13383,7 +13387,9 @@ async function recreerVinted(msg) {
   const nA = msg.versBrouillon === true ? 2 : 3;
   const recu = {};
   const tAvant = Date.now();
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA, recu });
+  // (intégration 11nov-g2) La réservation de la paire passe par la sécurité des comptes comme republication
+  // (`serie`, ou `programme` pour un départ qu'il a programmé) — elle passait en `clic` (sorte « autre »).
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA, recu, secu: { sorte: 'republication', mode: msg.programme === true ? 'programme' : 'serie' } });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   const tRes = Number(recu.at) || tAvant;     // l'horodatage EXACT de SES places (X8)
   let envoyes = 0, confie = false;
@@ -13736,7 +13742,10 @@ async function creerVintedFiche(msg) {
   if (dv) return { accepte: false, code: 'refus-deja-vu', raison: `Vinted a déjà refusé exactement cette annonce${dv.raison ? ` (${dv.raison})` : ''} — VRM ne la renvoie pas telle quelle : corrige la fiche, puis relance. Rien n’a été envoyé.` };
   // UNE action (le brouillon), réservée avant le premier envoi.
   const recu = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: 1, recu });
+  // (intégration 11nov-g2) La sécurité du compte (5.366) : créer une annonce est une `publication` ;
+  // SON clic (`clic`), ou une série qu'il lance depuis « Achetés mais pas en ligne » (`serie` : repos,
+  // plafonds du jour et par type, pas de rafale, prudence, Tout arrêter). 50/h et réserve 5 inchangés.
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: 1, recu, secu: { sorte: 'publication', mode: msg.serie === true ? 'serie' : 'clic' } });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   const tRes = Number(recu.at) || Date.now();
   let envoye = false;
@@ -20816,6 +20825,11 @@ async function baisserPrixVestiaire(msg) {
     if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette annonce — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
     const ot = await ongletVestiaire(compte);
     if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
+    // (intégration 11nov-g2) La sécurité du compte Vestiaire (5.366) AVANT le plafond de 50/h (inchangé, réserve 5) :
+    // une baisse en série est un geste `serie` (repos, plafond du jour et par type, pas de rafale, prudence, Tout arrêter).
+    { const rbVc = await secuRobotDit('vestiaire', ot.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
+    const secuBp = await secuGeste('vestiaire', ot.compte, 'baisse', 'serie');
+    if (secuBp) return { accepte: false, code: secuBp.code, raison: secuBp.error };
     const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
@@ -20839,7 +20853,9 @@ async function baisserPrixVestiaire(msg) {
       return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde l'annonce sur Vestiaire avant de recommencer" };
     }
     noterDiag('vc_prix_' + statut);
-    if (statut === 429 || statut === 403) { await poserPauseVc(statut); return { accepte: true, etape: 'echec', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
+    // (intégration 11nov-g2) Contrôle anti-robot vu par la page ⇒ ce compte s'arrête ; refus ⇒ prudence (5.366).
+    if (await secuObserver('vestiaire', ot.compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') { await poserPauseVc(statut || 403, rep.ra); return { accepte: true, etape: 'refuse', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire')) }; }
+    if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); return { accepte: true, etape: 'echec', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
     if (statut >= 200 && statut < 300) {
       const vu = rep.prixVuCents;
       if (vu == null) return { accepte: true, etape: 'incertain', statut, ancien: avant / 100, raison: "Vestiaire a répondu sans que VRM puisse relire le prix — regarde l'annonce sur Vestiaire" };
@@ -21911,6 +21927,13 @@ async function supprimeLbcDepuisApp(msg) {
       if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
       o = { ok: true, tabId: ouvert.id };
     }
+    // (intégration 11nov-g2) La sécurité du compte Leboncoin (5.366) : contrôle anti-robot ⇒ rien ne part ;
+    // dans « Republier sur Leboncoin » (`repub`), la suppression est le premier geste d'une republication
+    // en série (`serie` : repos, plafonds du jour et par type, pas de rafale, prudence, Tout arrêter) ;
+    // une suppression seule reste SON clic (`clic`).
+    { const rbS = await secuRobotDit('leboncoin', compte); if (rbS) return { accepte: false, code: rbS.code, raison: rbS.error }; }
+    const secuS = await secuGeste('leboncoin', compte, msg.repub === true ? 'republication' : 'autre', msg.repub === true ? 'serie' : 'clic');
+    if (secuS) return { accepte: false, code: secuS.code, raison: secuS.error };
     // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
     try { await chrome.storage.local.set({ vrmLbcSuppressions: [...journal, Date.now()] }); } catch (_) {}
     let rep = null;
@@ -21924,6 +21947,7 @@ async function supprimeLbcDepuisApp(msg) {
       return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si l'annonce est supprimée : regarde-la sur Leboncoin avant de recliquer" };
     }
     noterDiag('lbc_supprime_' + statut);
+    await secuObserver('leboncoin', compte, { status: statut });   // (intégration 11nov-g2) 403/429 ⇒ prudence sur ce compte
     if (statut >= 200 && statut < 300) {
       const note = await noterSuppressionLbc(id, statut);
       try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
@@ -22046,6 +22070,11 @@ async function baisserPrixLbc(msg) {
     if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
     if (!o.ok && o.autres && o.autres.length) return { accepte: false, code: 'autre-compte', raison: "Leboncoin est connecté sur un autre compte que celui de cette annonce dans ce Chrome — connecte-toi sur le bon compte, puis réessaie" };
     if (!o.ok) return { accepte: false, code: 'lbc-absent', raison: "ouvre leboncoin.fr dans ce Chrome, connecté sur le compte de cette annonce — le changement part de cet onglet" };
+    // (intégration 11nov-g2) La sécurité du compte Leboncoin (5.366) AVANT le plafond de 50/h (inchangé, réserve 5) :
+    // une baisse en série est un geste `serie` (repos, plafonds du jour et par type, pas de rafale, prudence, Tout arrêter).
+    { const rbL = await secuRobotDit('leboncoin', compte); if (rbL) return { accepte: false, code: rbL.code, raison: rbL.error }; }
+    const secuBl = await secuGeste('leboncoin', compte, 'baisse', 'serie');
+    if (secuBl) return { accepte: false, code: secuBl.code, raison: secuBl.error };
     const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
@@ -22067,6 +22096,11 @@ async function baisserPrixLbc(msg) {
       return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde l'annonce sur Leboncoin avant de relancer" };
     }
     noterDiag('lbc_prix_' + statut);
+    // (intégration 11nov-g2) Contrôle anti-robot vu par la page ⇒ ce compte s'arrête net ; refus ⇒ prudence (5.366).
+    if (await secuObserver('leboncoin', compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') {
+      try { await chrome.storage.local.set({ [LBC_PRIX_PAUSE]: { jusqua: Date.now() + Math.max(LBC_PRIX_PAUSE_MS, secuRetryAfterMs(rep.ra, Date.now())), statut: statut || 403, depuis: Date.now() } }); } catch (_) {}
+      return { accepte: true, etape: 'echec', code: 'lbc-pause', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('leboncoin')) };
+    }
     try { await storeLbcRecon({ envoiOne: { cle: `VRM ${recette.methode} ${recette.hote}${recette.chemin}`, val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: recette.methode, reponse: { statut, cles: Array.isArray(rep.cles) ? rep.cles.slice(0, 60) : [] } } } }); } catch (_) {}
     if (statut === 429 || statut === 403) {
       try { await chrome.storage.local.set({ [LBC_PRIX_PAUSE]: { jusqua: Date.now() + LBC_PRIX_PAUSE_MS, statut, depuis: Date.now() } }); } catch (_) {}
