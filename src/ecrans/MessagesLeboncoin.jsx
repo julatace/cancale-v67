@@ -89,7 +89,7 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
     <div className="vrm-chat-foot" data-lbc-repondre="pret" style={{ borderTop: `1px solid ${C.border}`, background: C.card }}>
       {resultat}
       <RapidesConv liste={reponsesRapidesPartagees()} onChoisir={(t) => setTexte(String(t).slice(0, 2000))} desactive={enCours}/>
-      <ComposeConv valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Leboncoin" libelleEnvoyer="Envoyer"
+      <ComposeConv site="leboncoin" valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Leboncoin" libelleEnvoyer="Envoyer"
         envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-lbc-envoyer': '' }}/>
     </div>
   );

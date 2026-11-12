@@ -488,6 +488,8 @@ export default {
   "reglages.toutvabien.lib": "All good?",
   "reglages.vacances.desc": "Pause your accounts while you’re away, then reopen.",
   "reglages.vacances.lib": "Holiday mode",
+  "reglages.copieannonces.desc": "Download one zip per account: titles, prices, numbers, photos.",
+  "reglages.copieannonces.lib": "Copy of my listings",
   "reglages.verifier.desc": "Extension, accounts, inbox: what’s missing, and what to do.",
   "reglages.verifier.lib": "Check my setup",
   "reglages.visite.desc": "VRM’s tabs presented one by one.",

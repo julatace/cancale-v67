@@ -15,7 +15,8 @@
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
 import { motsVendeur } from '../profilVendeur.js';
-import { C, Icon, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm } from '../App.jsx';
+import { C, Icon, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi } from '../App.jsx';
+import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
 import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
@@ -161,6 +162,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   const question = /^AskSellerQuestion$/i.test(String(m.type || '')) && /^\d{6,19}$/.test(String(m.itemId || ''));
   const envoyer = async () => {
     const body = t.trim(); if (!body) return;
+    if (!(await verifierMessageAvantEnvoi(body, 'ebay'))) return;   // (12 nov.) un mot qui fait bannir : SON « Envoyer quand même »
     const ok = await askConfirm({ title: tr('ebay.fil.conf.titre'), desc: body, ok: tr('ebay.fil.conf.ok'), cancel: tr('ebay.conf.annuler') });
     if (!ok) return;
     setOccupe(true);
@@ -177,6 +179,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
       <div data-fil-ebay-question style={{ alignSelf: 'flex-start', maxWidth: '85%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{m.body || m.subject}</div>
       {rep.map((r, i) => <div key={i} data-fil-ebay-reponse style={{ alignSelf: 'flex-end', maxWidth: '85%', background: `${C.accent}14`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{r}</div>)}
       {question ? (<>
+        {risquesMessage(t, 'ebay').length > 0 && <p role="status" data-message-risque={risquesMessage(t, 'ebay').map((r) => r.code).join(' ')} style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.warn }}>{risquesMessage(t, 'ebay')[0].texte} · {phraseRisqueMessage('ebay')}</p>}
         <textarea data-fil-ebay-saisie value={t} onChange={(e) => setT(e.target.value.slice(0, 2000))} rows={3} aria-label={tr('ebay.fil.repondre')} placeholder={tr('ebay.fil.repondre')} style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, fontSize: 17, fontFamily: 'inherit', background: C.card, color: C.text }}/>
         <div><Bouton variante="primaire" occupe={occupe} disabled={!t.trim()} data-fil-ebay-envoyer="" onClick={envoyer}>{tr('ebay.fil.envoyer')}</Bouton></div>
       </>) : <p data-fil-ebay-sans-reponse style={{ fontSize: 13, color: C.muted }}>{tr('ebay.fil.surEbay')}</p>}

@@ -185,7 +185,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
     {selected.itemId && estQuestion(selected) ? <div className="vrm-chat-foot" style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
      <Erreur message={message}/>{body && <small style={{display:'block',color:C.muted,marginBottom:6}}>{draftOK?'Brouillon conservé dans cet onglet.':'Brouillon non sauvegardé : garde cet échange ouvert.'}</small>}
      <RapidesConv liste={rapides()} onChoisir={modifierBody} desactive={busy}/>
-     <ComposeConv valeur={body} onChange={v=>modifierBody(String(v).slice(0,2000))} onEnvoyer={envoyer} etiquette="Réponse au message eBay" libelleEnvoyer="Envoyer la réponse" placeholder="Écris ta réponse…"
+     <ComposeConv site="ebay" valeur={body} onChange={v=>modifierBody(String(v).slice(0,2000))} onEnvoyer={envoyer} etiquette="Réponse au message eBay" libelleEnvoyer="Envoyer la réponse" placeholder="Écris ta réponse…"
       envoiBloque={busy || resultatIncertain.value || !body.trim() || !selected.itemId || !estQuestion(selected)} enCours={busy} attrsChamp={{maxLength:2000}}/>
      {resultatIncertain.value && <div style={{fontSize:12,color:C.muted}}><p>Dernier envoi pas confirmé : relis l’échange avant de répondre.</p><button type="button" style={S.button} disabled={busy || !selected.itemId} onClick={relireEchange}>Relire l’échange</button></div>}
     </div> : selected.itemId ? <PiedSansEnvoi attrs={{'data-ebay-pas-question':selected.type || 'inconnu'}} lien={`https://www.ebay.fr/itm/${encodeURIComponent(selected.itemId)}`} texteLien="Ouvrir sur eBay ↗" raison="Pas une question d’acheteur : la réponse se fait sur eBay."><Erreur message={message}/></PiedSansEnvoi>

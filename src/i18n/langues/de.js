@@ -488,6 +488,8 @@ export default {
   "reglages.toutvabien.lib": "Alles okay?",
   "reglages.vacances.desc": "Konten während deiner Abwesenheit pausieren, dann wieder öffnen.",
   "reglages.vacances.lib": "Urlaubsmodus",
+  "reglages.copieannonces.desc": "Ein Zip pro Konto: Titel, Preise, Nummern, Fotos.",
+  "reglages.copieannonces.lib": "Kopie meiner Anzeigen",
   "reglages.verifier.desc": "Erweiterung, Konten, Postfach: was fehlt und was zu tun ist.",
   "reglages.verifier.lib": "Einrichtung prüfen",
   "reglages.visite.desc": "Die Reiter von VRM, einer nach dem anderen.",

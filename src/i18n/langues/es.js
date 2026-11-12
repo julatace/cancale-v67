@@ -488,6 +488,8 @@ export default {
   "reglages.toutvabien.lib": "¿Todo bien?",
   "reglages.vacances.desc": "Pausar tus cuentas durante tu ausencia y luego reabrirlas.",
   "reglages.vacances.lib": "Modo vacaciones",
+  "reglages.copieannonces.desc": "Descarga un zip por cuenta: títulos, precios, números, fotos.",
+  "reglages.copieannonces.lib": "Copia de mis anuncios",
   "reglages.verifier.desc": "Extensión, cuentas, buzón: lo que falta y qué hacer.",
   "reglages.verifier.lib": "Comprobar mi instalación",
   "reglages.visite.desc": "Las pestañas de VRM presentadas una a una.",

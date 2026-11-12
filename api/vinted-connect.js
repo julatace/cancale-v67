@@ -320,15 +320,12 @@ export default async function handler(req, res) {
     if (ecrit !== 'ok') { res.status(502).json({ ok: false, raison: 'ecriture', error: 'Compte vérifié mais enregistrement Supabase impossible.' }); return; }
 
     const account = { vinted_user_id: vintedUserId, login, photo: profile?.photo?.url || null, domain: host };
-    // L'extension a déjà ses jetons : on ne les renvoie pas.
-    if (depuisExtension) { res.status(200).json({ ok: true, account }); return; }
-    res.status(200).json({
-      ok: true,
-      account,
-      // Le client persiste ces tokens en state (déjà fait côté Supabase ci-dessus).
-      tokens: { access_token: tokens.access_token, refresh_token: tokens.refresh_token || refreshToken || '' },
-    });
+    // ⚠️⚠️ (12 nov., sécurité des comptes) AUCUN JETON VINTED NE REPART VERS LE
+    //    NAVIGATEUR, extension ou page (revue de robustesse, H2) : ils sont rangés
+    //    en base ci-dessus, la page n'a besoin que du compte (pseudo, photo, domaine).
+    //    `scripts/audit-jetons-vinted.cjs` exécute la route et cherche les jetons.
+    res.status(200).json({ ok: true, account });
   } catch (err) {
-    res.status(500).json({ error: 'Échec de la connexion à Vinted', detail: String(err) });
+    res.status(500).json({ error: 'Échec de la connexion à Vinted' });
   }
 }
