@@ -53,6 +53,7 @@ function trouver(t, re, avecNegation = true) {
 const RE_TEL = /(?:\+33|0033|\b0)\s*[1-9](?:[\s.-]?\d{2}){4}\b/g;
 // En toutes lettres (« zéro six… ») ou l'invitation à écrire/appeler en dehors.
 const RE_TEL_MOTS = /\bzero (?:six|sept)\b|\b(?:envoie|envoyez|ecris|ecrivez|appelle|appelez)[- ]?(?:moi|nous)? (?:un |par )?(?:sms|texto)\b|\bpar (?:sms|texto)\b|\bmon (?:portable|tel|06|07)\b/g;
+const RE_EMAIL_ADR = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/g;
 const RE_EMAIL = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+|\b(?:gmail|hotmail|outlook|yahoo|icloud|laposte\.net|orange\.fr)\b|\barobase\b/g;
 // Un lien : http(s)://, www., ou nom.domaine connu — sauf vers le site lui-même.
 const RE_LIEN = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[a-z0-9-]{2,}\.(?:com|fr|net|org|io|me|ly|co|be|shop|store|link)\b(?:\/\S*)?/g;
@@ -60,7 +61,7 @@ const LIEN_DU_SITE = /(?:^|[/.])(?:vinted|leboncoin|vestiairecollective|ebay)\.[
 const RE_PAIEMENT = /\bpay ?pal\b|\bvirement\b|\blydia\b|\bpaylib\b|\bwero\b|\biban\b|\brib\b|\bwestern union\b|\bmandat cash\b|\bpaysafecard\b|\bcrypto\b|\bbitcoin\b/g;
 const RE_ESPECES = /\ben (?:especes|liquide|cash)\b|\bpaiement (?:en )?(?:especes|cash)\b/g;
 const RE_MESSAGERIE = /\bwhats ?app\b|\bwa\.me\b|\btelegram\b|\bsnap(?:chat)?\b|\binsta(?:gram)?\b|\bmessenger\b|\bfacebook\b/g;
-const RE_HORS = /\b(?:en dehors|hors|sans passer par|a cote) (?:de |du |d')?(?:la |l')?(?:vinted|leboncoin|le bon coin|vestiaire|ebay|plateforme|appli(?:cation)?|site)\b|\bhors plateforme\b|\b(?:payer|paie|paye|paies|payes|payez|regler|reglez) (?:moi )?(?:directement|en direct)\b|\beviter les frais\b|\bsans (?:les )?frais (?:de )?(?:protection|vinted|plateforme)\b|\ben direct sans (?:vinted|leboncoin|vestiaire|ebay)\b/g;
+const RE_HORS = /\b(?:en dehors|hors|sans passer par|a cote) (?:de |du |d')?(?:la |l')?(?:vinted|leboncoin|le bon coin|vestiaire|ebay|plateforme|appli(?:cation)?|site)\b|\bhors plateforme\b|\b(?:payer|paie|paye|paies|payes|payez|regler|reglez)(?:[- ]moi)? (?:directement|en direct)\b|\bevit(?:er|e|es|ons|ez) les frais\b|\bsans (?:les )?frais (?:de )?(?:protection|vinted|plateforme)\b|\ben direct sans (?:vinted|leboncoin|vestiaire|ebay)\b/g;
 const RE_MAIN_PROPRE = /\b(?:en |remise en |remise |rdv en |rendez-vous en )?mains? propres?\b|\bje peux (?:passer|venir) (?:te |vous )?(?:la |le |les )?(?:deposer|donner|apporter)\b|\bon (?:se voit|peut se voir|se retrouve)\b/g;
 
 // Contrefaçon (annonces).
@@ -96,8 +97,10 @@ function chercher(texte, site, famille) {
   const pose = (code, mot) => { if (mot && !out.some((x) => x.code === code)) out.push({ code, mot, texte: `${ETIQUETTES[code]} : « ${mot.slice(0, 32)} »` }); };
   pose('telephone', trouver(t, RE_TEL, false) || trouver(t, RE_TEL_MOTS));
   pose('email', trouver(t, RE_EMAIL, false));
+  // (une adresse e-mail n'est pas AUSSI un lien : « gmail.com » d'une adresse est retiré avant)
+  const tl = t.replace(RE_EMAIL_ADR, ' ');
   RE_LIEN.lastIndex = 0; let m; let lien = '';
-  while ((m = RE_LIEN.exec(t))) { if (!LIEN_DU_SITE.test(m[0])) { lien = m[0]; break; } }
+  while ((m = RE_LIEN.exec(tl))) { if (!LIEN_DU_SITE.test(m[0])) { lien = m[0]; break; } }
   pose('lien', lien);
   pose('paiement', trouver(t, RE_PAIEMENT) || (estLbc(site) ? '' : trouver(t, RE_ESPECES)));
   pose('messagerie', trouver(t, RE_MESSAGERIE));
