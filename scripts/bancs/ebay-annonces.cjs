@@ -155,6 +155,11 @@ const remettre = () => {
     ...BORDEREAUX,
     { id: 'ebay_listings', data: { items: EBAY_ANNONCES(), capturedAt: Date.now() } },
     { id: 'ebay_orders', data: { orders: EBAY_COMMANDES, capturedAt: Date.now() } },
+    // (11 nov., ebay-rouges) Le registre des comptes eBay (forme réelle, lu par
+    // `select=comptes:data->comptes`) : un vendeur qui publie sur eBay a SON compte relié.
+    // Depuis le 8 nov., c'est lui qui PROUVE eBay aux filtres de site ; sans lui, la panne
+    // « pas su » (qui casse aussi la sonde `id=in.(…ebay_orders…)`) cachait eBay.
+    { id: 'ebay_comptes', data: { comptes: [{ principal: true, pseudo: 'vendeur_banc', type: 'particulier', site: 'FR' }] } },
     // (5 octobre) Deux annonces PROGRAMMÉES : la N°22, prouvée vendue sur
     // Vinted ⇒ « programmée sur eBay — à annuler » ; la N°25 (une simple
     // conversation, pas une vente) ⇒ rien.
@@ -214,14 +219,14 @@ const projette = (row, sel) => {
 // `opts` sert aussi à relever chaque état pris par l'interrupteur du retrait
 // automatique pendant le chargement (`window.__etatsAuto`).
 async function ouvrir(b, vp, panne, opts = {}) {
-  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const envois = [];
   // `opts.session` : une vraie session VRM (le compte de l'app est alors CONNU —
   // sans elle, « l'extension écrit dans un autre compte » ne peut pas se juger).
   if (opts.session) await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); } catch (_) {} }, SESSION);
-  else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); } catch (_) {} });
   if (opts.pont) await pg.addInitScript(PONT, Object.assign({}, opts.pont, { etatCode: opts.pont.etatCode !== undefined ? opts.pont.etatCode : codeEtat(opts.pont.version) }));
   if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
   // (9 nov.) Vendeur déjà configuré : l'écran plein « Ma configuration » ne couvre pas la page.

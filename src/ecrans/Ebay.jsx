@@ -38,7 +38,7 @@ import FeuilleParametresEbay from '../ebay/FeuilleParametresEbay.jsx';
 import { FenetreGuideeEbay, QuestionsEbay, BoutonGuideEbay } from '../ebay/FenetresEbay.jsx';
 import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay/ConnexionEbayGuidee.jsx';
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
-import { DEPS_FACTURE, MicDictee } from '../App.jsx';
+import { DEPS_FACTURE, MicDictee, DEMANDE_RETOUR_EBAY, lireComptesEbay, montantRecuEbay } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 const FactureEbayParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureEbayVente = (props) => <React.Suspense fallback={null}><FactureEbayParesseuse {...props}/></React.Suspense>;
@@ -1596,7 +1596,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ebay.param.titre')}</div>
                   <div data-ebay-reglages-resume={resumeReglagesEbay(reglagesPub, { type: typeComptePub }).length} style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>{resumeReglagesEbay(reglagesPub, { type: typeComptePub }).map((x) => tr(x.cle, x.vars)).join(' · ') || tr('ebay.param.commeAvant')}</div>
                 </div>
-                <Bouton variante="secondaire" data-ebay-reglages-ouvrir="" onClick={ouvrirReglages}>{tr('ebay.param.regler')}</Bouton>
+                <Bouton variante="secondaire" data-ebay-tous-reglages="" onClick={ouvrirReglages}>{tr('ebay.param.regler')}</Bouton>
               </div>
             </BlocEbay>
 
@@ -1710,6 +1710,8 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const [deconnexion, setDeconnexion] = React.useState({});   // ref → '…' | message
   React.useEffect(() => {
     try {
+      // (11 nov.) Le retour gardé par la coque (adresse sans onglet), servi une fois.
+      if (DEMANDE_RETOUR_EBAY.v) { const v = DEMANDE_RETOUR_EBAY.v; DEMANDE_RETOUR_EBAY.v = null; setRetourCx(v); if (v.statut === 'connecte') signalerComptesEbay(); return; }
       const p = new URLSearchParams(window.location.search);
       const e = p.get('ebay');
       if (e) {
@@ -1993,13 +1995,17 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             {(() => {
               const ords = data.orders || [];
               const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
-              const val = (o) => Number((o && o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || 0) || 0;
+              // (11 nov., revue eBay) L'ARGENT REÇU, pas ce que l'acheteur a payé : `pricingSummary.total`
+              // comprend le PORT (payé à eBay par l'acheteur, §2.8) — il gonflait « total des ventes ».
+              // UNE règle, `montantRecuEbay` (dû au vendeur − frais eBay), celle du CA et du bénéfice ;
+              // un montant inconnu n'est pas compté et le manque est dit (« sur N »).
+              const recu = (o) => montantRecuEbay(o).eur;
               const paye = (o) => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID';
               const livre = (o) => String((o && o.orderFulfillmentStatus) || '').toUpperCase() === 'FULFILLED';
-              const euros=ords.every(o=>o.pricingSummary?.total?.currency==='EUR' && o.pricingSummary.total.value!=null && String(o.pricingSummary.total.value).trim()!=='' && Number.isFinite(Number(o.pricingSummary.total.value)));
-              const total=euros?ords.reduce((s,o)=>s+val(o),0):null;
-              const enAttente=euros?ords.filter(o=>!paye(o)).reduce((s,o)=>s+val(o),0):null;
-              const payees=ords.some(paye)?caEbayPayees(ords):0;   // même règle que le Collectif (§11)
+              const payeesL = ords.filter(paye);
+              const connus = payeesL.filter((o) => recu(o) != null);
+              const total = connus.length ? connus.reduce((s, o) => s + recu(o), 0) : null;
+              const nAttente = ords.filter((o) => !paye(o)).length;
               const aExpedier = ords.filter(o => paye(o) && !livre(o)).length;
               if (ords.length === 0) return <div style={{ fontSize: 13, color: C.muted, marginBottom: 10 }}>Aucune vente eBay pour l'instant.</div>;
               const bloc = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: col || C.text }}>{v}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
@@ -2007,10 +2013,9 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
                   <div style={{ ...eti, marginBottom: 8 }}>Argent eBay · {ords.length} vente{ords.length > 1 ? 's' : ''}</div>
                   <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-                    {bloc(eur(total), 'total des ventes')}
-                    {bloc(eur(payees), 'payées')}
-                    {enAttente > 0 && bloc(eur(enAttente), 'en attente de paiement', C.warn)}
-                    {aExpedier > 0 && bloc(String(aExpedier), 'à envoyer', C.accent)}
+                    <div data-ebay-argent-recu={total == null ? 'passu' : total.toFixed(2)} data-ebay-argent-sur={`${connus.length}/${payeesL.length}`}>{bloc(total == null ? '—' : eur(total), connus.length < payeesL.length ? `reçu au moins · ${connus.length} sur ${payeesL.length} ventes payées` : 'reçu (après frais eBay)')}</div>
+                    {nAttente > 0 && bloc(String(nAttente), 'en attente de paiement', C.muted)}
+                    {aExpedier > 0 && bloc(String(aExpedier), 'à envoyer', C.warn)}
                   </div>
                   {/* Liste des ventes : acheteur, montant, état de paiement/expédition. */}
                   <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -2018,14 +2023,14 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                       const li = (o.lineItems && o.lineItems[0]) || {};
                       const titre = li.title || 'Vente eBay';
                       const acheteur = (o.buyer && o.buyer.username) || '';
-                      const etat = !paye(o) ? { t: 'en attente de paiement', c: C.warn } : !livre(o) ? { t: 'à envoyer', c: C.accent } : { t: 'envoyée', c: C.muted };
+                      const etat = !paye(o) ? { t: 'en attente de paiement', c: C.muted } : !livre(o) ? { t: 'à envoyer', c: C.warn } : { t: 'envoyée', c: C.muted };
                       return (
                         <div key={(o._compte || '') + (o.orderId || i)} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
                           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titre}</div>
                             <div style={{ fontSize: 11, color: C.muted }}>{acheteur ? acheteur + ' · ' : ''}<span style={{ color: etat.c, fontWeight: 600 }}>{etat.t}</span> · <CompteVente compte={compteVenteEbay(o, comptesEbay)} plateforme="ebay" ou="ebay-reglage"/></div>
                           </div>
-                          <div style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, color: C.text }}>{val(o).toFixed(2).replace('.',',')} {o.pricingSummary?.total?.currency==='EUR'?'€':o.pricingSummary?.total?.currency || ''}</div>
+                          <div data-ebay-ligne-recu={recu(o) == null ? 'passu' : recu(o).toFixed(2)} style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, color: C.text }}>{recu(o) == null ? '—' : eur(recu(o))}</div>
                         </div>
                       );
                     })}
@@ -2151,7 +2156,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
           compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}</>}
-          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>} suite={<FactureEbayVente plateforme="ebay" vente={o} deps={DEPS_FACTURE}/>}/></div>;
+          montant={(() => { const r = montantRecuEbay(o); return r.eur == null ? '—' : euro(r.eur.toFixed(2), 'EUR'); })()} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>} suite={<FactureEbayVente plateforme="ebay" vente={o} deps={DEPS_FACTURE}/>}/></div>;
 
       })}
     </div>
@@ -5357,8 +5362,10 @@ function EbayRemises({ compte = 'principal' }) {
   }, [compte]);
   React.useEffect(() => { relire(); }, [relire]);
   React.useEffect(() => { let stop = false; (async () => {
-    const r = await lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', [{ ref: compte, principal: compte === 'principal' }]);
-    if (!stop) setAnnonces(r ? r.items.filter((x) => x && x.itemId) : null);
+    const cs = await lireComptesEbay().catch(() => null);
+    const c = Array.isArray(cs) ? cs.find((x) => x.ref === compte) : null;
+    const r = c ? await lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', [c]) : null;
+    if (!stop) setAnnonces(r && !r.illisibles.length ? r.items.filter((x) => x && x.itemId) : null);
   })(); return () => { stop = true; }; }, [compte]);
   const ids = Object.keys(choisies).filter((k) => choisies[k]);
   const fin = Date.now() + Math.max(1, Math.min(30, Number(jours) || 0)) * 86400000;
