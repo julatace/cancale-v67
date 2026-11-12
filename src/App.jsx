@@ -44214,7 +44214,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         }
         // (11 nov.) « CLÔTURER L'ANNÉE » : en décembre et janvier, UNE fois (src/clotureAnnee.js) —
         // « Voir » ouvre Argent → Déclarer sur la liste, et note l'année vue (SON clic). Neutre.
-        { const cj = carteJourneeCloture({ maintenant: Date.now(), cloture: load(CLE_CLOTURE, {}), vue: load(CLE_CLOTURE_VUE, {}), regime: isCloudReady() ? regimeFiscal() : undefined });
+        // (12 nov.) Pas à la première visite : un vendeur qui arrive n'a pas d'année à clôturer, et cette
+        // carte cachait son guide de démarrage plein écran en décembre et janvier (navigation-plateformes).
+        if (!premierJour) { const cj = carteJourneeCloture({ maintenant: Date.now(), cloture: load(CLE_CLOTURE, {}), vue: load(CLE_CLOTURE_VUE, {}), regime: isCloudReady() ? regimeFiscal() : undefined });
           if (cj) { const court = `Clôturer ${cj.annee}`;
             jobs.push({ id: 'cloture-annee', icon: 'doc', color: C.text, court, detail: 'Une liste guidée : ventes à dater, inventaire, chiffre d’affaires, URSSAF, impôts, export', title: court, tab: 'argent_declarer', prio: 3.4, action: 'Voir',
               avant: () => { DEMANDE_CLOTURE.at = Date.now(); const v = load(CLE_CLOTURE_VUE, {}); save(CLE_CLOTURE_VUE, { ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}), [String(cj.annee)]: Date.now() }); } }); } }
