@@ -6532,10 +6532,17 @@ const pdfVusParTx = () => _pdfVus;
 // (`email_bordretour_{tx}`) et remboursements d'achat prouvés (`email_rembachat_{tx}`), rangés par
 // api/email-inbound.js (api/_lib/retour-email.js). PROJECTION seulement (`meta->>`, jamais le PDF :
 // il est lu à l'impression par `lirePdfLigne`). Trois états : `undefined` en cours · `null` pas su.
-const RETOURS_ACHAT_CACHE = { v: undefined, at: 0 };
-const fetchRetoursAchat = async () => {
+const RETOURS_ACHAT_CACHE = { v: undefined, at: 0, vol: null };
+// (intégration g1, budget Messages) Deux écrans qui la demandent en même temps partagent la lecture EN VOL
+// (mesuré : `email_bordretour_*` lu deux fois à l'ouverture de Messages). Un « pas su » n'est jamais gardé.
+const fetchRetoursAchat = () => {
   const c = RETOURS_ACHAT_CACHE;
-  if (c.v && Date.now() - c.at < 5 * 60 * 1000) return c.v;
+  if (c.v && Date.now() - c.at < 5 * 60 * 1000) return Promise.resolve(c.v);
+  if (c.vol) return c.vol;
+  c.vol = lireRetoursAchat(c).finally(() => { c.vol = null; });
+  return c.vol;
+};
+const lireRetoursAchat = async (c) => {
   const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt'].map((k) => `${k}:meta->>${k}`).join(',');
   const [b, r] = await Promise.all([
     lireTout(`id=like.email_bordretour_*&select=id,${champs},pdf:meta->>_pdf`, { strict: true }).catch(() => null),
@@ -23246,7 +23253,10 @@ async function appelEbay(corps) {
     // (Seulement pour ces deux gestes : les autres corps restent exactement ce
     // qu'ils étaient — ils ne posent aucun numéro.)
     const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer' || corps.action === 'relancer');
-    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(avecVersion ? { ...corps, numerotation: versionNumerotation() } : corps) });
+    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(avecVersion ? { ...corps, numerotation: versionNumerotation() } : corps),
+      // (intégration g1, budget Messages) Lire ses messages eBay n'écrit que le résumé `ebay_messages{suffixe}`
+      // (et le jeton `ebay_tokens*`, jamais lu par l'app) : seules ces lectures sont oubliées, pas toutes.
+      ...(corps && corps.action === 'messages' ? { vrmEcritLignes: ['ebay_messages', 'ebay_tokens'] } : {}) });
     let j = null; try { j = await r.json(); } catch (_) {}
     return { code: r.status, j };
   } catch (_) { return { code: 0, j: null }; }

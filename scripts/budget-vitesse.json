@@ -386,11 +386,7 @@
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
-     "app_data?id=eq.ebay_orders&select=orders:data->orders,capturedAt:data->>capturedAt|": 3,
-     "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
-     "app_data?id=eq.lbc_ventes&select=data|": 2,
-     "app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt|": 2
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -426,11 +422,7 @@
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
-     "app_data?id=eq.ebay_orders&select=orders:data->orders,capturedAt:data->>capturedAt|": 3,
-     "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
-     "app_data?id=eq.lbc_ventes&select=data|": 2,
-     "app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt|": 2
+     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
