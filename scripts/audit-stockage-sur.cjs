@@ -53,21 +53,43 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log(`${c ? '✅' : '�
 
   const textes = fichiers(path.join(R, 'src')).map((f) => [path.relative(R, f).split(path.sep).join('/'), sansCommentaires(fs.readFileSync(f, 'utf8'))]);
 
+  // (12 nov., revue fin) Juger la RÈGLE : un appel DANS un bloc `try { … }` (même plus de 3 lignes
+  // plus haut) est protégé — on remonte les accolades jusqu'à une accolade ouvrante précédée de `try`.
+  // On s'arrête à la première frontière de fonction (`=>` ou `function … (…) {`) : un rappel déclaré
+  // dans un try n'est PAS protégé quand il s'exécute plus tard (sauf rappel synchrone, non jugé ici).
+  function dansUnTry(t, pos) {
+    let prof = 0;
+    for (let i = pos - 1; i >= 0; i--) {
+      const c = t[i];
+      if (c === '}') prof++;
+      else if (c === '{') {
+        if (prof > 0) { prof--; continue; }
+        const avant = t.slice(Math.max(0, i - 120), i);
+        if (/\btry\s*$/.test(avant)) return true;
+        // un rappel d'une méthode de tableau SYNCHRONE (forEach, map…) s'exécute dans le try qui l'entoure
+        if (/\.(?:forEach|map|filter|some|every|reduce|find|findIndex|flatMap)\(\s*(?:\([^()]*\)|[\w$]+)\s*=>\s*$/.test(avant)) continue;
+        if (/=>\s*$/.test(avant) || /\bfunction\b[^{};]*\)\s*$/.test(avant) || /^\s*(?:async\s+)?\w+\s*\([^)]*\)\s*$/.test(avant.split('\n').pop())) return false;
+      }
+    }
+    return false;
+  }
   console.log('\n── B · Cliquet : stockage et JSON.parse sans `try`');
   {
-    // Plafonds au 11 nov. App.jsx : dont lireLocalSync et poserFusionLocale (EXPRÈS : la synchro s'arrête).
-    const PLAFOND = { 'src/App.jsx': 15, 'src/categoriesLecture.js': 1, 'src/inventaireHorsLigne.js': 1, 'src/journeeHorsLigne.js': 1, 'src/porteHorsLigne.js': 1,
-      'src/meilleuresSources.js': 1, 'src/navigationTache.js': 1, 'src/sourceAchats.js': 1, 'src/vitesseEnvoi.js': 1 };
+    // Plafonds au 12 nov. (revue fin : 15 → 4 dans App.jsx, une fois le try ENGLOBANT reconnu — les 11 autres
+    // étaient protégés plus de 3 lignes plus haut). App.jsx : lireLocalSync et poserFusionLocale (EXPRÈS : la
+    // synchro s'arrête) + deux lectures de « Restaurer une sauvegarde » (l'appelant les attrape et le dit).
+    const PLAFOND = { 'src/App.jsx': 4, 'src/meilleuresSources.js': 1, 'src/sourceAchats.js': 1, 'src/vitesseEnvoi.js': 1 };
     const trop = [];
     for (const [rel, t] of textes) {
       if (rel === 'src/stockageSur.js') continue;
-      const L = t.split('\n'); let n = 0;
+      const L = t.split('\n'); let n = 0, debutLigne = 0;
       L.forEach((l, i) => {
         const re = /localStorage\.(getItem|setItem|removeItem)\(|JSON\.parse\((?!\s*JSON\.stringify\()/g; let m;
         while ((m = re.exec(l))) {
           const avant = L.slice(Math.max(0, i - 3), i).join('\n') + '\n' + l.slice(0, m.index);
-          if (!/\btry\b|catch\s*\(|\.catch\(|catch\s*\{/.test(avant)) n++;
+          if (!/\btry\b|catch\s*\(|\.catch\(|catch\s*\{/.test(avant) && !dansUnTry(t, debutLigne + m.index)) n++;
         }
+        debutLigne += l.length + 1;
       });
       if (n > (PLAFOND[rel] || 0)) trop.push(`${rel} ${n} > ${PLAFOND[rel] || 0}`);
     }
@@ -96,7 +118,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log(`${c ? '✅' : '�
   console.log('\n── D · Cliquet : clés React d’index');
   {
     // Plafonds au 11 nov. (après corrections ; Stats : la liste des ventes d'un mois a sa clé).
-    const PLAFOND = {'src/ATrancher.jsx':1, 'src/Accueil.jsx':1, 'src/AccueilFilm.jsx':4, 'src/AdresseReception.jsx':3, 'src/AnnoncesACompleter.jsx':1, 'src/AnnoncesInstantanee.jsx':2, 'src/App.jsx':57, 'src/AvisVente.jsx':1, 'src/AvisVinted.jsx':1, 'src/Bienvenue.jsx':2, 'src/BoiteEmails.jsx':9, 'src/CarteRelais.jsx':1, 'src/Chargement.jsx':1, 'src/ChoixPeriode.jsx':5, 'src/ColisVentesInstantanes.jsx':3, 'src/ConfigurationDepart.jsx':1, 'src/ConfigurerTransfert.jsx':1, 'src/EnLigneDeuxFois.jsx':1, 'src/FacturePro.jsx':9, 'src/FavorisVinted.jsx':4, 'src/FichePaire.jsx':4, 'src/InventaireStock.jsx':3, 'src/JourneeInstantanee.jsx':1, 'src/LigneGlissable.jsx':2, 'src/LivrePoliceCarte.jsx':1, 'src/MeilleuresSources.jsx':1, 'src/ModeAutoFavoris.jsx':2, 'src/ModeEmballage.jsx':1, 'src/ModeRelais.jsx':1, 'src/OutilsArticlesVinted.jsx':1, 'src/OutilsParcours.jsx':1, 'src/ParcoursArrivee.jsx':2, 'src/PreparerColis.jsx':2, 'src/RelierBoite.jsx':2, 'src/RepartitionAnneau.jsx':1, 'src/Room3D.jsx':1, 'src/Squelette.jsx':8, 'src/Tournee.jsx':3, 'src/ToutVaBien.jsx':3, 'src/Visionneuse.jsx':1, 'src/VisiteBulles.jsx':1, 'src/accueil-carte.jsx':1, 'src/accueil-scenes.jsx':3, 'src/communaute/Accompagnement.jsx':4, 'src/communaute/Communaute.jsx':3, 'src/communaute/Formateur.jsx':1, 'src/composants/AideEcran.jsx':3, 'src/composants/ImportAchats.jsx':1, 'src/composants/ImportStock.jsx':2, 'src/composants/InfoPop.jsx':1, 'src/composants/MesuresTerrain.jsx':1, 'src/composants/NoteSatisfaction.jsx':1, 'src/composants/SignalerProbleme.jsx':5, 'src/composants/TableauProprietaire.jsx':1, 'src/design/CarteMois.jsx':1, 'src/design/CarteStats.jsx':2, 'src/ebayGestion.jsx':4, 'src/ecrans/Achats.jsx':1, 'src/ecrans/Compta.jsx':9, 'src/ecrans/Ebay.jsx':4, 'src/ecrans/Leboncoin.jsx':9, 'src/ecrans/PrixMarche.jsx':1, 'src/ecrans/Reglages.jsx':8, 'src/ecrans/Republier.jsx':6, 'src/ecrans/Stats.jsx':10, 'src/ecrans/Stock.jsx':5, 'src/operations/Operations.jsx':1, 'src/operations/Syntheses.jsx':1};
+    const PLAFOND = {'src/ATrancher.jsx':1, 'src/Accueil.jsx':1, 'src/AccueilFilm.jsx':4, 'src/AdresseReception.jsx':3, 'src/AnnoncesACompleter.jsx':1, 'src/AnnoncesInstantanee.jsx':2, 'src/App.jsx':55, 'src/AvisVente.jsx':1, 'src/AvisVinted.jsx':1, 'src/Bienvenue.jsx':2, 'src/BoiteEmails.jsx':9, 'src/CarteRelais.jsx':1, 'src/Chargement.jsx':1, 'src/ChoixPeriode.jsx':5, 'src/ColisVentesInstantanes.jsx':3, 'src/ConfigurationDepart.jsx':1, 'src/ConfigurerTransfert.jsx':1, 'src/EnLigneDeuxFois.jsx':1, 'src/FacturePro.jsx':9, 'src/FavorisVinted.jsx':4, 'src/FichePaire.jsx':4, 'src/InventaireStock.jsx':3, 'src/JourneeInstantanee.jsx':1, 'src/LigneGlissable.jsx':2, 'src/LivrePoliceCarte.jsx':1, 'src/MeilleuresSources.jsx':1, 'src/ModeAutoFavoris.jsx':2, 'src/ModeEmballage.jsx':1, 'src/ModeRelais.jsx':1, 'src/OutilsArticlesVinted.jsx':1, 'src/OutilsParcours.jsx':1, 'src/ParcoursArrivee.jsx':2, 'src/PreparerColis.jsx':2, 'src/RelierBoite.jsx':2, 'src/RepartitionAnneau.jsx':1, 'src/Room3D.jsx':1, 'src/Squelette.jsx':8, 'src/Tournee.jsx':3, 'src/ToutVaBien.jsx':3, 'src/Visionneuse.jsx':1, 'src/VisiteBulles.jsx':1, 'src/accueil-carte.jsx':1, 'src/accueil-scenes.jsx':3, 'src/communaute/Accompagnement.jsx':4, 'src/communaute/Communaute.jsx':3, 'src/communaute/Formateur.jsx':1, 'src/composants/AideEcran.jsx':3, 'src/composants/ImportAchats.jsx':1, 'src/composants/ImportStock.jsx':2, 'src/composants/InfoPop.jsx':1, 'src/composants/MesuresTerrain.jsx':1, 'src/composants/NoteSatisfaction.jsx':1, 'src/composants/SignalerProbleme.jsx':5, 'src/composants/TableauProprietaire.jsx':1, 'src/design/CarteMois.jsx':1, 'src/design/CarteStats.jsx':2, 'src/ebayGestion.jsx':4, 'src/ecrans/Achats.jsx':1, 'src/ecrans/Compta.jsx':9, 'src/ecrans/Ebay.jsx':4, 'src/ecrans/Leboncoin.jsx':9, 'src/ecrans/PrixMarche.jsx':1, 'src/ecrans/Reglages.jsx':8, 'src/ecrans/Republier.jsx':6, 'src/ecrans/Stats.jsx':10, 'src/ecrans/Stock.jsx':5, 'src/operations/Operations.jsx':1, 'src/operations/Syntheses.jsx':1};
     const trop = [];
     let total = 0;
     for (const [rel, t] of textes) {
