@@ -165,7 +165,7 @@ export async function routeFavoris(req,res){
     if(req.method==='GET')decision=d=>({valeur:vueFile(initialiserFile(d),owner)});
     else{
       const c=req.body;
-      if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>5000)throw new RefusFavoris('Commande invalide.',400);
+      if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>(c&&c.action==='lancer'?100000:5000))throw new RefusFavoris('Commande invalide.',400);
       if(c.action==='lancer'){
         const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`];
         const archiveId=`harvest_${uid}_favoris_archive`;
