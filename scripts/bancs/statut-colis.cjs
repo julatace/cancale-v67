@@ -228,10 +228,10 @@ const detail = async (pg, sousCle) => {
       console.log(`\n— Colis → À retirer, statut colis par colis · ${nom}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'cat_bord');
       await essaie('retirer', async () => {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 40000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 40000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
         await pg.waitForTimeout(1500);
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForTimeout(2500);
         const m = await lireEcran(pg);
         const L = (s) => m.lignes.filter((l) => l.cle.includes(s));

@@ -16,6 +16,7 @@ import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
 
 export const JOURS_RELAIS_CHANGE = 21;   // au-delà, l'alerte n'a plus de sens (le colis est arrivé ou reparti)
 
+const codeOk = (c) => /^[A-Z0-9]{4,10}$/i.test(String(c || '').trim()) && /\d/.test(String(c || ''));
 const msDe = (v) => { const t = Date.parse(String(v || '')); return Number.isFinite(t) ? t : null; };
 
 // « INTERMARCHE, 4 AVENUE …, 35350 VILLE » ⇒ { nom, adresse } (le nom = la 1re partie lue).
@@ -69,7 +70,19 @@ export function colisRelaisChange(lignes, { maintenant = Date.now(), jours = JOU
     if (arriveApres(n, at)) continue;
     vus.add(n);
     const lieu = String(t.lieu || '').trim();
-    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at });
+    // (11 nov., retraits fiables — Julien : « ceux qui ont changé de point relais… tu ne donnes pas les
+    // codes ») LE CODE DE CE COLIS, PAR SON N° : celui de l'e-mail du changement, sinon le plus récent des
+    // autres e-mails / SMS du MÊME n° (une identité) ; aucun ⇒ '' (« code pas encore reçu »).
+    // (11 nov., intégration colis — arbitrage d) Le code d'un AUTRE e-mail ne vaut que s'il est daté APRÈS le changement de
+    // point (un code d'avant pouvait être celui de l'ancien point) ; un code plus ancien, ou sans date, ⇒ « à confirmer »,
+    // jamais montré comme le bon.
+    const dateDe = (x) => msDe(x.emailAt) || msDe(x.receivedAt);
+    const avecCode = lignes.filter((x) => x && x !== t && normaliserSuivi(x.suivi) === n && codeOk(x.code))
+      .sort((a, b) => (dateDe(b) || 0) - (dateDe(a) || 0));
+    const apres = avecCode.filter((x) => at != null && dateDe(x) != null && dateDe(x) > at);
+    const code = codeOk(t.code) ? String(t.code).trim() : (apres[0] ? String(apres[0].code).trim() : '');
+    const codeDe = codeOk(t.code) ? 'changement' : code ? 'autre-email' : avecCode.length ? 'a-confirmer' : '';
+    out.push({ suivi: n, carrier: t.carrier || '', lieu, ancienLieu: String(t.ancienLieu || '').trim(), ...nomEtAdresse(lieu), at, code, codeDe });
   }
   return out.sort((a, b) => (b.at || 0) - (a.at || 0));
 }

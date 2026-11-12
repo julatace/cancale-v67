@@ -133,6 +133,34 @@ export function lecturePeutPorter(chemin, ids) {
   });
 }
 
+// (intégration g1, budget Messages) Une lecture `GET {chemin}` peut-elle porter une ligne dont l'id
+// COMMENCE par l'un de ces préfixes ? Même prudence que `lecturePeutPorter` (dans le doute : oui) ;
+// sert aux routes de l'app qui DÉCLARENT les seules lignes qu'elles écrivent (`vrmEcritLignes`).
+export function lecturePeutPorterPrefixes(chemin, prefixes) {
+  const P = (prefixes || []).map(String).filter(Boolean);
+  if (!P.length) return true;
+  const c = String(chemin || '');
+  const q = c.indexOf('?');
+  const table = q < 0 ? c : c.slice(0, q);
+  if (table !== 'app_data') return table.startsWith('rpc/');
+  const f = filtresId(q < 0 ? '' : c.slice(q + 1));
+  if (!f || !f.length) return true;
+  const commence = (x) => P.some((p) => String(x).startsWith(p));
+  return f.every((v) => {
+    if (v.startsWith('eq.')) return commence(v.slice(3));
+    if (/^in\.\(.*\)$/.test(v)) return v.slice(4, -1).split(',').map((x) => x.replace(/^"|"$/g, '')).some(commence);
+    if (v.startsWith('like.')) {
+      // La partie fixe du motif (avant le premier joker) : elle et un préfixe se recouvrent ⇒ oui.
+      let fixe = ''; const m = v.slice(5);
+      for (let i = 0; i < m.length; i++) { const ch = m[i]; if (ch === '\\' && i + 1 < m.length) { fixe += m[++i]; continue; } if (ch === '*' || ch === '%' || ch === '_') break; fixe += ch; }
+      return P.some((p) => fixe.startsWith(p) || p.startsWith(fixe));
+    }
+    return true;
+  });
+}
+// Les préfixes déclarés par l'appelant d'une route (`init.vrmEcritLignes`), ou null.
+export const prefixesDeclares = (init) => (init && Array.isArray(init.vrmEcritLignes) && init.vrmEcritLignes.length && init.vrmEcritLignes.every((x) => typeof x === 'string' && x.length >= 4) ? init.vrmEcritLignes : null);
+
 // `fetchOrig` : la vraie fonction (injectable pour l'audit). Rend la fonction
 // qui la remplace, et `invalider`.
 export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
@@ -178,6 +206,19 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       // (+8 lectures par écran, les ventes au 3ᵉ aller-retour). Une écriture
       // vers la BASE vide toujours, drapeau ou pas.
       if (versRoute && init && init.vrmInvalideSiChange === true) return fetchOrig(input, init);
+      // (intégration g1, budget Messages) Une route qui DÉCLARE les seules lignes qu'elle écrit
+      // (`vrmEcritLignes` : des préfixes d'id, ex. « Lire mes messages eBay » ⇒ `ebay_messages`) ne
+      // vide que les lectures qui peuvent les porter, au départ et au retour. Mesuré : la page 1 des
+      // messages eBay (Messages · Tous) vidait TOUT et ebay_orders, ebay_listings, lbc_ventes,
+      // harvest_*_orders_sold repartaient une seconde après.
+      const pref = versRoute ? prefixesDeclares(init) : null;
+      if (pref) {
+        const viderP = () => { for (const k of [...cache.keys()]) if (lecturePeutPorterPrefixes(k.slice(0, k.indexOf('\n')).slice(prefixe.length), pref)) cache.delete(k); };
+        viderP();
+        const p = fetchOrig(input, init);
+        Promise.resolve(p).then(viderP, viderP);
+        return p;
+      }
       // (31 oct., banc vitesse) Une écriture de LIGNES NOMMÉES de `app_data`
       // (upsert dont le corps porte les `id`, ou PATCH/DELETE `id=eq.`/`in.`)
       // ne vide que les lectures qui peuvent porter ces lignes — elle seule.

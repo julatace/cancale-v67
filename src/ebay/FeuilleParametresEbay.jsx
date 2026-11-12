@@ -37,9 +37,12 @@ function Ligne({ cle, C, children, aide = true, payant = false, attr = {} }) {
   );
 }
 const Interrupteur = ({ on, onChange, label, C, disabled, attr = {} }) => (
+  // La cible au doigt fait 44 px (§7) ; le dessin de l'interrupteur, 32.
   <button type="button" role="switch" aria-checked={!!on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} {...attr}
-    style={{ width: 52, height: 32, borderRadius: 16, border: 'none', background: on ? C.accent : (C.card2 || C.border), position: 'relative', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1, padding: 0, margin: '6px 0' }}>
-    <span aria-hidden="true" style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 26, height: 26, borderRadius: 13, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .2s' }}/>
+    style={{ width: 56, height: 44, border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1, padding: 0, display: 'block' }}>
+    <span aria-hidden="true" style={{ display: 'block', position: 'relative', width: 52, height: 32, margin: '0 auto', borderRadius: 16, background: on ? C.accent : (C.card2 || C.border) }}>
+      <span style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 26, height: 26, borderRadius: 13, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .2s' }}/>
+    </span>
   </button>
 );
 function Choix({ valeur, options, onChange, C, label, attr = {} }) {
@@ -112,7 +115,7 @@ export default function FeuilleParametresEbay({ Feuille, C, mode = 'annonce', va
         <Ligne cle="lieu" C={C}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <input aria-label={tr('ebay.param.lieu.ville')} value={v.lieu || ''} onChange={(e) => set({ lieu: e.target.value.slice(0, 45) })} placeholder={tr('ebay.param.lieu.ville')} style={{ ...inp, width: 150 }}/>
-            <input aria-label={tr('ebay.param.lieu.cp')} value={v.codePostal || ''} onChange={(e) => set({ codePostal: e.target.value.slice(0, 12) })} placeholder={tr('ebay.param.lieu.cp')} inputMode="numeric" style={{ ...inp, width: 100 }}/>
+            <input aria-label={tr('ebay.param.lieu.cp')} value={v.codePostal || ''} onChange={(e) => set({ codePostal: e.target.value.slice(0, 12) })} placeholder={tr('ebay.param.lieu.cp')} inputMode="numeric" style={{ ...inp, width: 130 }}/>
           </div>
         </Ligne>
       </Groupe>

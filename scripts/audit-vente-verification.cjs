@@ -140,7 +140,8 @@ const TEXTE = (acheteur, titre) => [
     dit(recapAvant || recapProuve, 'V4 le récapitulatif porte l’étape');
     dit(/phraseVente\(\{[^}]*verification: preuvesFrise\.verification \}\)/.test(APP), 'V4 la phrase d’état le dit');
     const FR = fs.readFileSync(path.join(R, 'src/design/Frise.jsx'), 'utf8');
-    dit(/e\.court \?/.test(FR) && /vrm-fu-sr">\{e\.label\}/.test(FR), 'V4 la frise écrit le mot court sous le trait et garde le nom entier pour la lecture d’écran');
+    // (intégration g1) Frise fine (lot ventes-achats-visuel) : le mot court dans la légende, le nom entier lu (vrm-fu-sr).
+    dit(/const nom = e\.court \|\| e\.label/.test(FR) && /vrm-fu-sr"[^>]*>\{e\.label\}/.test(FR), 'V4 la frise écrit le mot court sous le trait et garde le nom entier pour la lecture d’écran');
   });
 
   console.log(ko ? `\n❌ audit-vente-verification : ${ko} rouge(s)` : '\n✅ audit-vente-verification : tout est vert');

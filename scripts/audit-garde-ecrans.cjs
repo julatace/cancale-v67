@@ -35,7 +35,8 @@ dit(ecrans.length >= 25, 'aucun écran n’a disparu de la coque (25 au 6 nov., 
 dit(!sansGarde.length, 'chaque écran monté passe par GardeEcran', sansGarde.map(({ l, i }) => `l.${i} ${l.trim().slice(0, 70)}`).join(' | '));
 // L'écran Annonces/Ventes/Colis de l'ancienne table (`map[tab]`) et « À retirer ».
 dit(/return map\[tab\] \? <GardeEcran nom=\{tab\} resetKey=\{platSub\}><Comptabilite key=\{tab\}/.test(src), 'les écrans Annonces · Ventes · Colis de la table `map` passent par GardeEcran');
-dit(/<GardeEcran nom="cat_bord:retirer"><section id="colis-a-retirer"/.test(src), 'Colis · « À retirer » passe par GardeEcran');
+// (11 nov., lot DJ3) « À retirer » vit en tête d'Achats, « À expédier » en tête de Ventes : chaque section et les outils de retrait ont leur garde-fou.
+dit(/<GardeEcran nom="achats:retirer"><div data-colis-retraits="outils">/.test(src) && /<GardeEcran nom="achats:colis">/.test(src) && /<GardeEcran nom="ventes:colis">/.test(src), 'Colis · « À retirer » (Achats) et « À expédier » (Ventes) passent par GardeEcran');
 // Les sections de site des tâches (Ventes · Vinted, Annonces · Leboncoin…) : la section tombe seule.
 dit(/<GardeEcran nom=\{t\+':'\+site\} resetKey=\{platSub\}>/.test(src), 'la section d’un site (rendreTache) a son garde-fou : le filtre des sites reste');
 // Les feuilles hors de la zone des écrans.

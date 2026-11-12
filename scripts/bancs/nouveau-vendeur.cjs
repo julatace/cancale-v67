@@ -268,7 +268,7 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
   return { mauvais, regles, pointsSeuls, colles, debord, dehors, petits, coupes, titre: (document.querySelector('.vrm-main h1, .vrm-main h2') || {}).innerText || '' };
 }, tel);
 
-const ECRANS = [['journee', 'Ma journée'], ['annonces', 'Annonces'], ['ventes', 'Ventes'], ['cat_bord', 'Colis'], ['cat_bord:retirer', 'Colis · À retirer'], ['messages', 'Messages'], ['garage', 'Stock'], ['achats', 'Achats'], ['dashboard', 'Statistiques'], ['compta', 'Comptabilité'], ['settings', 'Paramètres']];
+const ECRANS = [['journee', 'Ma journée'], ['annonces', 'Annonces'], ['ventes', 'Ventes'], ['cat_bord', 'Colis (lien ancien ⇒ Ventes · À expédier)'], ['retraits', 'Colis à retirer (lien ancien ⇒ Achats · À retirer)'], /* (intégration g1) DJ3 : plus d'onglet « À retirer » dans un écran Colis */ ['messages', 'Messages'], ['garage', 'Stock'], ['achats', 'Achats'], ['dashboard', 'Statistiques'], ['compta', 'Comptabilité'], ['settings', 'Paramètres']];
 
 async function capture(pg, nom) {
   if (!SHOTS) return;

@@ -139,6 +139,11 @@ async function ouvrir(b, vp, pont) {
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => projette(r, sel)));
+    // (11 nov., lbc-rouges) `id=in.(…)` : la coque lit ainsi quels sites ont des lignes
+    // (`sitesLus`). Servi vide, Leboncoin passait « pas relié » et `?tab=leboncoin`
+    // retombait sur Annonces · Vinted (§6.3 : servir la vraie forme).
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map((r) => projette(r, sel))); }
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, sel))); }
     return j([]);

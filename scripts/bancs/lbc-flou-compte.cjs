@@ -123,8 +123,26 @@ async function ouvrir(b, vp, { ext = true, sessionA = 10 / 60 } = {}, url = '?ta
   return { ctx, pg, errs };
 }
 // Le flou d'une ligne : son `data-flou` ET son style calculé (le flou se voit).
-const etatLigne = (pg, sel) => pg.evaluate((s) => {
-  const e = document.querySelector(s);
+// (11 nov., lbc-rouges) Le style se lit À LA FIN de ses transitions et animations (entrée
+// de la liste, passage net ⇄ estompé) : lu au milieu, l'opacité valait 0,56 ou 0,99 et le
+// banc jugeait un instant de l'animation, pas la règle. Les animations sans fin ne sont pas
+// attendues ; au plus 3 s.
+const etatLigne = (pg, sel) => pg.evaluate(async (s) => {
+  // La ligne peut être RE-MONTÉE pendant l'attente (les données arrivent) : elle est relue
+  // à chaque tour — un nœud détaché rend une opacité vide (« 0 »).
+  let e = document.querySelector(s);
+  if (!e) return null;
+  const finies = () => (e = document.querySelector(s) || e).getAnimations().filter((a) => { const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null; return a.playState !== 'finished' && t && isFinite(t.endTime); });
+  const fin = Date.now() + 4000; let avant = null, stables = 0;
+  while (Date.now() < fin && stables < 3) {
+    const f = finies();
+    if (f.length) { stables = 0; await Promise.race([Promise.all(f.map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, fin - Date.now()))]); continue; }
+    await new Promise((r) => setTimeout(r, 120));
+    e = document.querySelector(s) || e;
+    const op = getComputedStyle(e).opacity + '|' + getComputedStyle(e).filter;
+    stables = op === avant ? stables + 1 : 0; avant = op;
+  }
+  e = document.querySelector(s);
   if (!e) return null;
   const cs = getComputedStyle(e);
   return { attr: e.getAttribute('data-flou'), flou: /blur/.test(cs.filter), op: Number(cs.opacity) };

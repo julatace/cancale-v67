@@ -142,18 +142,23 @@ async function signaux(pg) {
     const { ctx, pg, erreurs, lectures } = await page(b);
     await pg.goto(`http://localhost:${PORT}/?tab=settings`); await ecranPret(pg, 'settings'); await calme(lectures, 3000);
     await signaux(pg); await calme(lectures, 2500);                 // un premier passage : ce que la coque relit une fois
-    const n0 = lectures.length; await signaux(pg); await calme(lectures, 2500);
+    // (11 nov., revue colis) Le passage « caché » plus bas rejoue aussi un `visibilitychange` : la coque (la
+    // cloche `CentreNotifsCoque`, le relais `demarrerRelais`) relit alors ses lignes. La référence rejoue le
+    // MÊME geste, sinon ces lectures de la COQUE passaient pour celles d'un écran caché (rouge selon l'instant).
+    await pg.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); }); await calme(lectures, 2500);
+    const n0 = lectures.length; await signaux(pg); await pg.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); }); await calme(lectures, 2500);
     const lecturesReference = lectures.slice(n0).sort();
     await pg.evaluate(() => { window.__suivre = true; });
     // Premier passage sur chaque écran (calculé), puis retour sur chacun (gardé).
     const premier = {};
-    for (const t of ['journee', 'cat_bord', 'ventes', 'annonces', 'journee']) { premier[t] = await toucher(pg, t); await calme(lectures, 1500); }
+    // (11 nov., lot DJ3) Colis n'est plus dans la barre : Achats (« À retirer » en tête) est gardé à sa place.
+    for (const t of ['journee', 'achats', 'ventes', 'annonces', 'journee']) { premier[t] = await toucher(pg, t); await calme(lectures, 1500); }
     // Un repère sur chaque écran (seul l'écran montré est dans la page : on repasse sur chacun).
-    for (const t of ['cat_bord', 'ventes', 'annonces', 'journee']) { await toucher(pg, t); await marquer(pg, t, 'vu-' + t); await calme(lectures, 800); }
+    for (const t of ['achats', 'ventes', 'annonces', 'journee']) { await toucher(pg, t); await marquer(pg, t, 'vu-' + t); await calme(lectures, 800); }
     // Annonces n'est PAS gardée (sa grille rattachée d'un bloc s'affichait plus tard) : remontée à chaque visite.
     await toucher(pg, 'annonces'); await calme(lectures, 800);
     dit((await repere(pg, 'annonces')) !== 'vu-annonces', '1. annonces : remontée à chaque visite (pas gardée, comme avant)');
-    for (const t of ['cat_bord', 'ventes', 'journee']) {
+    for (const t of ['achats', 'ventes', 'journee']) {
       const l0 = lectures.length;
       await pg.evaluate(() => { window.__rendusCompta = []; window.__releve = true; window.__vrmGardeEcarts = []; });
       const r = await toucher(pg, t);
@@ -188,7 +193,7 @@ async function signaux(pg) {
     // ── 2. Caché : rien ne rend, ne publie, ne lit.
     await versReglages(pg); await calme(lectures, 2500);
     const gardes = await pg.evaluate(() => (document.querySelector('[data-ecrans-gardes]') || {}).getAttribute ? document.querySelector('[data-ecrans-gardes]').getAttribute('data-ecrans-gardes') : '');
-    dit(/journee/.test(gardes) && /cat_bord/.test(gardes) && !/annonces/.test(gardes), '2. Ma journée et Colis sont gardés pendant Réglages (pas Annonces)', gardes);
+    dit(/journee/.test(gardes) && /achats/.test(gardes) && !/annonces/.test(gardes), '2. Ma journée et Achats (à la place de Colis) sont gardés pendant Réglages (pas Annonces)', gardes);
     await pg.evaluate(() => { window.__rendusCaches = []; window.__saves = []; window.__releve = true; });
     await signaux(pg); await calme(lectures, 2500);                 // le même premier passage que la référence
     const l1 = lectures.length;
@@ -207,18 +212,19 @@ async function signaux(pg) {
     dit((await repere(pg, 'journee')) !== 'vu-journee', '3. après un signal de données, Ma journée est remontée (jamais périmée)');
     await calme(lectures, 2000);
     // ── 4. Un lien (pas la barre) remonte l'écran : il lit sa demande au montage.
-    await toucher(pg, 'cat_bord'); await calme(lectures, 1500); await marquer(pg, 'cat_bord', 'lien');
+    // (11 nov., lot DJ3) Le lien des colis à retirer (`?tab=retraits`) mène à Achats : il le remonte, comme avant celui de Colis.
+    await toucher(pg, 'achats'); await calme(lectures, 1500); await marquer(pg, 'achats', 'lien');
     await toucher(pg, 'journee'); await calme(lectures, 800);
-    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' })));
-    await ecranPret(pg, 'cat_bord');
-    dit((await repere(pg, 'cat_bord')) !== 'lien', '4. un lien vers Colis remonte l’écran (comme avant)');
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' })));
+    await ecranPret(pg, 'achats');
+    dit((await repere(pg, 'achats')) !== 'lien', '4. un lien vers les colis à retirer remonte Achats (comme avant Colis)');
     dit(erreurs.length === 0, 'aucune erreur JS', erreurs.slice(0, 2).join(' | '));
     await ctx.close();
     // ── 6. Mouvement réduit : ni fondu enchaîné, ni glissé, aucune animation sur <main>.
     {
       const { ctx: c2, pg: p2, lectures: l2 } = await page(b, { reduit: true });
       await p2.goto(`http://localhost:${PORT}/?tab=journee`); await ecranPret(p2, 'journee'); await calme(l2, 2000);
-      await toucher(p2, 'cat_bord'); await calme(l2, 1200); await toucher(p2, 'journee');
+      await toucher(p2, 'achats'); await calme(l2, 1200); await toucher(p2, 'journee');
       const anim = await p2.evaluate(() => (document.querySelector('.vrm-main').getAnimations ? document.querySelector('.vrm-main').getAnimations().length : 0));
       const trans = await p2.evaluate(() => { const p = document.querySelector('.vrm-tab-pastille'); return p ? getComputedStyle(p).transitionDuration : 'absente'; });
       dit(await p2.evaluate(() => window.__fondus) === 0, '6. mouvement réduit : aucun fondu');

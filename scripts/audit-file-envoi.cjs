@@ -290,7 +290,7 @@ function texteApp() {
   dit(!/planifierReprise\(\);[^\n]*acquitterFile\(\)/.test(push) && !/catch \(_\) \{[^\n]*acquitterFile/.test(push), 'App.jsx : jamais d\'acquittement sur un échec');
   dit(/nuageGagne: nuagePlusRecent\(/.test(push), 'App.jsx : `cloudPush` laisse gagner un nuage plus récent');
   dit(/fusionAuChargement\(\{ file: fileUtile/.test(app) && /repriseFile\.vals\[k\]/.test(app), 'App.jsx : le chargement rejoue la file au lieu de recopier le nuage');
-  dit(/<EnAttenteEnvoi\/>\s*\{horsLigne \?/.test(app), 'App.jsx : la mention est sur la coque, au-dessus de l\'écran hors ligne aussi');
+  dit(/<EnAttenteEnvoi\/>(?:\s*\{\/\*[\s\S]*?\*\/\})?\s*(?:<GestesHorsLigneCoque[^>]*\/>\s*)?\{horsLigne(?: &&[^?]*)? \?/.test(app), 'App.jsx : la mention est sur la coque, au-dessus de l\'écran hors ligne aussi');
   dit(/addEventListener\('online'[^\n]*fileNonVide\(\)/.test(app), 'App.jsx : le retour du réseau renvoie la file');
   return ko;
 }

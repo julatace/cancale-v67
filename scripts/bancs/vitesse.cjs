@@ -74,7 +74,11 @@ const srv = http.createServer((q, r) => {
   if (/^\.(js|css|html|json|webmanifest|svg)$/.test(ext) && /gzip/.test(q.headers['accept-encoding'] || '')) {
     if (!_gz.has(p)) _gz.set(p, zlib.gzipSync(fs.readFileSync(p), { level: 9 }));
     const b = _gz.get(p);
-    servis.push({ f, octets: b.length });
+    // (intégration g1) Le service worker qui RANGE les morceaux pour le hors-ligne (public/sw.js,
+    // `rechaufferMorceaux`, lot hors-ligne : un par un, après l'ouverture) n'est pas le chargement
+    // de l'écran : `Sec-Fetch-Dest: empty` (un `fetch()`, pas un <script>, un import ou un <link>).
+    // Noté à part (`rechauffe`), jamais compté dans le JS de l'ouverture.
+    servis.push({ f, octets: b.length, ...(q.headers['sec-fetch-dest'] === 'empty' && /\.(js|css)$/.test(f) ? { rechauffe: true } : {}) });
     r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream', 'content-encoding': 'gzip', 'content-length': b.length, 'cache-control': 'no-store' }); return r.end(b);
   }
   servis.push({ f, octets: fs.statSync(p).size });
@@ -313,7 +317,9 @@ function bilan(nom, r) {
   const entieres = gets.filter((x) => x.entier), octHors = gets.reduce((a, x) => a + (x.hors || 0), 0);
   const dressings = gets.filter((x) => x.poids === 'dressings'), octDressings = dressings.reduce((a, x) => a + x.octets, 0);
   const octAchatsHors = gets.reduce((a, x) => a + (x.achatsHors || 0), 0);
-  const js = (r.fichiers || []).filter((x) => /\.(js|css)$/.test(x.f)), octJs = js.reduce((a, x) => a + x.octets, 0);
+  const js = (r.fichiers || []).filter((x) => /\.(js|css)$/.test(x.f) && !x.rechauffe), octJs = js.reduce((a, x) => a + x.octets, 0);
+  const octRechauffe = (r.fichiers || []).filter((x) => x.rechauffe).reduce((a, x) => a + x.octets, 0);
+  if (octRechauffe) console.log(`     (hors-ligne) ${Math.round(octRechauffe / 1024)} Ko rangés en fond par le service worker — pas comptés dans l'ouverture`);
   // Les lignes jamais montrées que rapporte la lecture des COMMANDES de l'écran
   // (le préchargement, puis la lecture par compte) — celle que ce chantier juge.
   const octHorsCommandes = gets.filter(estVentes).reduce((a, x) => a + (x.hors || 0), 0);

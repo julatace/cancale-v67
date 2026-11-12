@@ -214,7 +214,7 @@ const MUTATIONS = [
     // la règle courante de l'app. Exécutée app = serveur : audit-bilan-semaine, audit-suites-serveur.
     dit(/const compteEcarteRegle = \(uid, masques, panneau, regle\) => compteEcarteChoix\(uid, masques, panneau\) \|\| venteHorsPlan\(regle, uid\);/.test(app)
       && /const compteEcarte = \(uid, masques, panneau\) => compteEcarteRegle\(uid, masques, panneau, reglePlanCourante\(\)\);/.test(app), 'les totaux des ventes (`compteEcarte`) écartent les comptes hors offre');
-    dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => \(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
+    dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => (?:avecRemboursementsProuves\()?\(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
       'les ACHATS d’un compte d’achat restent (acctOff = le choix seul, sans l’offre)');
     dit(/exclu: \(o\) => compteEcarteChoix\(o && o\._uid/.test(compta), 'Compta → registre des achats : les achats des comptes d’achat comptent');
     dit(/const isHidden = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) && /const venteOffOf = \(o\) => acctOffOf\(o\) \|\| horsPlanOf\(o\);/.test(app),

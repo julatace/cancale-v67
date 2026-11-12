@@ -56,6 +56,8 @@ import './styles-compta-claire.css';
 import './design/fusion.css';
 import './design/favoris.css';
 import './design/outils-stats.css';
+// (11 nov., lot quoi-republier) « Quelles annonces republier ? » (src/design/QuoiRepublier.jsx).
+import './design/quoi-republier.css';
 import './design/argent-offres.css';
 import './design/dac7.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.

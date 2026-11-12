@@ -1,7 +1,14 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris,traduireResultatFavori} from './favorisProgression.js';
 import {requeteJsonBornee} from './requeteJsonBornee.js';
-export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,onPreparation,masquerSansSelection=false,onErreur,revisionVerification=0,ecranActif=true}){
+// (11 nov., lot favoris-clair) Le suivi en direct passe par la feuille commune
+// « VRM travaille » (src/suiviTravail.js) : une ligne par message, désignée par
+// l'annonce (N°, titre), JAMAIS par la personne. Le miroir lit la vue de la file
+// serveur ; il ne décide rien de l'envoi.
+import {suivi} from './suiviTravail.js';
+import {issueSuivi} from './favorisParcours.js';
+import {tr} from './i18n/index.js';
+function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,onPreparation,masquerSansSelection=false,onErreur,revisionVerification=0,ecranActif=true,decrireJob=null,raisonSuivi=null},ref){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[controleErreur,setControleErreur]=React.useState(null),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
   const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
   React.useEffect(()=>{if(onErreur)onErreur(erreur?controleErreur||{code:'non_precise'}:null);},[erreur,controleErreur]);
@@ -13,7 +20,41 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   const ecran=React.useRef(ecranActif);ecran.current=ecranActif;
   const contexte=React.useRef('');contexte.current=JSON.stringify([owner,uid,selection,reglages?.message,reglages?.pourcentage,reglages?.intervalleMinutes,reglages?.intervalleMaxMinutes]);
   const courant=()=>vivant.current&&ownerActuel()===owner;
-  const adopter=j=>{if(!j.vue||!Array.isArray(j.vue.jobs)||typeof j.vue.active!=='boolean')throw Error('L’état de la file n’a pas été confirmé.');if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(onEtat)onEtat(j.vue);};
+  const adopter=j=>{if(!j.vue||!Array.isArray(j.vue.jobs)||typeof j.vue.active!=='boolean')throw Error('L’état de la file n’a pas été confirmé.');if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(onEtat)onEtat(j.vue);miroir(j.vue);};
+  // ── Le miroir vers SuiviTravail ─────────────────────────────────────────
+  const pilote=React.useRef(null),pauseDemandee=React.useRef(false),agirRef=React.useRef(null);
+  const ETAPES_SUIVI=()=>Object.keys(ETAPES_FAVORIS).map(k=>[k,tr('favoris.suivi.etape.'+k)]);
+  const surGeste=quoi=>{
+    if(quoi==='pause'){pauseLocale.current=true;pauseDemandee.current=true;if(!busy.current)finirPause();}
+    else if(quoi==='reprendre'){pauseDemandee.current=false;pauseLocale.current=false;}
+    else if(quoi==='arret'){pauseLocale.current=true;pauseDemandee.current=false;agirRef.current?.('arreter');}
+  };
+  const finirPause=()=>{const p=pilote.current;if(p&&pauseDemandee.current){pauseDemandee.current=false;p.t.terminer('','pause');}};
+  const demarrerSuivi=v=>{
+    if(!v?.lot)return;
+    const jobs=(v.jobs||[]).filter(x=>x.lot===v.lot&&x.notificationId!=null);
+    if(!jobs.length)return;
+    const desc=x=>{try{return decrireJob?.(x)||{};}catch{return {};}};
+    const t=suivi.demarrer({sorte:'favoris',titre:tr('favoris.suivi.titre'),etapes:ETAPES_SUIVI(),uid,
+      articles:jobs.map(x=>{const d=desc(x);return {id:String(x.notificationId),num:d.num||'',titre:d.titre||tr('favoris.suivi.message')};}),surGeste});
+    if(t)pilote.current={t,lot:v.lot};
+  };
+  const miroir=v=>{
+    const p=pilote.current;if(!p||!v)return;
+    const etat=p.t.etat();if(!etat){pilote.current=null;return;}
+    const jobs=(v.jobs||[]).filter(x=>x.lot===p.lot&&x.notificationId!=null);
+    for(const x of jobs){
+      const id=String(x.notificationId);
+      if(x.etat==='reserve')p.t.etape(id,'autorisation');
+      const iss=issueSuivi(x,code=>raisonSuivi?raisonSuivi(code):{});
+      if(iss)p.t.fin(id,iss);
+    }
+    const ecart=Number(v.prochain)-(Date.now()+decalage.current);
+    if(v.active&&ecart>1000&&!jobs.some(x=>x.etat==='reserve'))p.t.pause({ms:ecart,raison:tr('favoris.suivi.attente')});
+    else p.t.finPause();
+    if(!v.active&&!jobs.some(x=>x.etat==='reserve')){p.t.terminer(v.raison||'');pilote.current=null;}
+  };
+  React.useImperativeHandle(ref,()=>({lancer:()=>agirRef.current?.('lancer'),arreter:()=>agirRef.current?.('arreter'),clore:()=>agirRef.current?.('clore'),lire:()=>lire()}));
   const api=async(action,donnees={},h=headers())=>{
     const r=await requeteJsonBornee(`/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:action?'POST':'GET',headers:{...h,'Content-Type':'application/json'},cache:'no-store',...(action?{body:JSON.stringify({action,...donnees})}:{})});
     const j=r.json;if(!r.ok||!j?.ok){const e=Error(j?.message||'La file n’a pas été confirmée.');e.code=j?.code;e.diagnostic=j?.diagnostic;throw e;}return j;
@@ -26,7 +67,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   React.useEffect(()=>{vivant.current=true;return()=>{vivant.current=false;lecture.current++;};},[]);
   React.useEffect(()=>{if(uid&&owner&&ecranActif)lire();},[uid,owner,ecranActif]);
   React.useEffect(()=>{
-    const suivre=e=>{const d=e.detail;if(courant()&&d?.type==='favoris'&&String(d.uid)===String(uid)&&d.suivi&&d.suivi===travail.current?.suivi&&ETAPES_FAVORIS[d.etape])setPhase(ETAPES_FAVORIS[d.etape]);};
+    const suivre=e=>{const d=e.detail;if(courant()&&d?.type==='favoris'&&String(d.uid)===String(uid)&&d.suivi&&d.suivi===travail.current?.suivi&&ETAPES_FAVORIS[d.etape]){setPhase(ETAPES_FAVORIS[d.etape]);const p=pilote.current,n=travail.current?.notificationId;if(p&&n!=null)p.t.etape(String(n),d.etape);}};
     window.addEventListener('vrm:ext',suivre);return()=>window.removeEventListener('vrm:ext',suivre);
   },[uid,owner]);
   React.useEffect(()=>{if(!vue?.active||!ecranActif)return;setHorloge(Date.now());const t=setInterval(()=>setHorloge(Date.now()),1000);return()=>clearInterval(t);},[vue?.active,ecranActif]);
@@ -49,7 +90,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
         const fini=await api('terminer',{jeton:t.jeton,resultat,raison,...(Number.isInteger(ecrits)?{ecrits}:{})},h);if(courant())adopter(fini);
       }
     }catch(e){if(courant()){setErreur(e.message+' Aucun renvoi automatique.');pauseLocale.current=true;}}
-    finally{busy.current=false;travail.current=null;if(courant())setPhase('');}
+    finally{busy.current=false;travail.current=null;if(courant())setPhase('');finirPause();}
   };
   React.useEffect(()=>{if(!vue?.active||!ecranActif)return;avancer();const t=setInterval(avancer,vue?.intervalleMinutes===0?3000:15000);return()=>clearInterval(t);},[vue?.active,disponible,ecranActif,vue?.intervalleMinutes===0]);
   const agir=async action=>{
@@ -74,10 +115,11 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
       }
       setPhase(action==='lancer'?'Préparation de la sélection':'Mise à jour de la file');
       const j=await api(action,action==='lancer'?{selection,reglages:configuration}:{});
-      if(courant()){adopter(j);pauseLocale.current=false;}
+      if(courant()){if(action==='lancer'){pauseDemandee.current=false;demarrerSuivi(j.vue);}adopter(j);pauseLocale.current=false;}
     }catch(e){if(courant()){setErreur(e.message);const diagnostic={};for(const k of ['notifications','tracesNatives','pairesNatives','formesUserId','liensExacts','parametresConfirmes','selection'])if(Number.isSafeInteger(e.diagnostic?.[k])&&e.diagnostic[k]>=0&&e.diagnostic[k]<=10000)diagnostic[k]=e.diagnostic[k];setControleErreur({code:['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?e.code:'non_precise',diagnostic});}}
     finally{mutation.current=false;if(courant()){if(action==='lancer')onPreparation?.(false);setOccupe(false);setPhase('');}}
   };
+  agirRef.current=agir;
   const p=progressionFavoris(vue,horloge+decalage.current);
   const rangPhase=phase==='Enregistrement du résultat'?Object.keys(ETAPES_FAVORIS).length:Object.values(ETAPES_FAVORIS).indexOf(phase);
   const avancement=Math.min(p.total,p.termines+(p.encours&&rangPhase>=0?(rangPhase+1)/(Object.keys(ETAPES_FAVORIS).length+2):0));
@@ -100,3 +142,4 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     <button type="button" disabled={occupe||busy.current} onClick={lire}>Actualiser la file</button>
   </div>;
 }
+export default React.forwardRef(AutomatisationFavoris);

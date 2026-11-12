@@ -7,6 +7,17 @@
 (function () {
   'use strict';
   if (window.__vrmVcRelais) return; window.__vrmVcRelais = true;
+  // 5.366 (sécurité des comptes) : « n'agir que si tu es là » — un VRAI geste (isTrusted)
+  // dans cet onglet est signalé au fond, au plus une fois par 30 s, sans rien d'autre.
+  try {
+    let vuPresence = 0;
+    const presence = (e) => {
+      if (!e || e.isTrusted !== true || document.visibilityState !== 'visible' || window.top !== window) return;
+      const t = Date.now(); if (t - vuPresence < 30000) return; vuPresence = t;
+      try { chrome.runtime.sendMessage({ from: 'vrm-presence', action: 'la' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+    };
+    for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(ev, presence, { capture: true, passive: true });
+  } catch (_) {}
   // 5.295 : les envois en attente de leur réponse (jeton → réponse au fond).
   const envoisEnAttente = new Map();
   const vivant = () => { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
@@ -25,6 +36,9 @@
           id: String((x && x.id) || '').slice(0, 40), productId: String((x && x.productId) || '').slice(0, 40), ref: String((x && x.ref) || '').slice(0, 12),
           etat: String((x && x.etat) || '').slice(0, 40), date: String((x && x.date) || '').slice(0, 30),
           montant: x && x.montant && isFinite(Number(x.montant.valeur)) ? { valeur: Number(x.montant.valeur), devise: String(x.montant.devise || '').slice(0, 3), cle: String(x.montant.cle || '').slice(0, 60) } : null,
+          // 5.364 (11 nov.) — le PRIX DE VENTE (`sellerPrice`, 5.340) n'était pas relayé : le fond ne le
+          // recevait jamais, la facture Pro Vestiaire non plus. Relayé tel quel ; le fond le rebâtit (`prixVenteVc`).
+          ...(x && x.prixVente && isFinite(Number(x.prixVente.valeur)) ? { prixVente: { valeur: Number(x.prixVente.valeur), devise: String(x.prixVente.devise || '').slice(0, 3), cle: String(x.prixVente.cle || '').slice(0, 20) } } : {}),
           limite: String((x && x.limite) || '').slice(0, 30), etiquette: x && (x.etiquette === true || x.etiquette === false) ? x.etiquette : null,
           suivi: String((x && x.suivi) || '').slice(0, 40), transporteur: String((x && x.transporteur) || '').slice(0, 30),
           // 5.316 : le titre affiché (marque + nom) et la photo de Vestiaire.
@@ -124,7 +138,7 @@
       // 5.295 : la réponse de Vestiaire à un envoi demandé par le fond.
       if (d.kind === 'vcenvoiresultat' && typeof d.jeton === 'string') {
         const f = envoisEnAttente.get(d.jeton);
-        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), idMsg: /^[\w-]{1,40}$/.test(String(d.idMsg || '')) ? String(d.idMsg) : '', erreur: String(d.erreur || '').slice(0, 80) }); }
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), idMsg: /^[\w-]{1,40}$/.test(String(d.idMsg || '')) ? String(d.idMsg) : '', erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); }
         return;
       }
       // 5.319 : tes OFFRES Vestiaire (« négociations ») — l'article, les prix, les gestes ;
@@ -153,7 +167,20 @@
       }
       if (d.kind === 'vcoffreresultat' && typeof d.jeton === 'string') {
         const f = envoisEnAttente.get(d.jeton);
-        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, confirme: d.confirme === true ? true : d.confirme === false ? false : null, erreur: String(d.erreur || '').slice(0, 80) }); }
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, confirme: d.confirme === true ? true : d.confirme === false ? false : null, erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); }
+        return;
+      }
+      // 5.364 : la recette d'un changement de PRIX fait par toi, et le résultat d'une baisse demandée par VRM.
+      if (d.kind === 'vcprixappris') {
+        const r = d.recette;
+        if (!r || typeof r !== 'object') return;
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcPrixAppris', recette: r }, () => { void chrome.runtime.lastError; });
+        return;
+      }
+      if (d.kind === 'vcprixresultat' && typeof d.jeton === 'string') {
+        const f = envoisEnAttente.get(d.jeton);
+        const c = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 1e9 ? Math.round(x) : null);
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, prixVuCents: c(d.prixVuCents), relu: /^(reponse|liste)$/.test(String(d.relu || '')) ? String(d.relu) : '', erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); }
         return;
       }
       // 5.239 : tes ACHATS Vestiaire — scalaires seulement, jamais le vendeur ni ton adresse.
@@ -229,6 +256,20 @@
       const t = setTimeout(() => { if (importsEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 25000);
       importsEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
       window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'importpage', jeton, quoi: msg.quoi, url: msg.url.slice(0, 600), compte: String(msg.compte) }, location.origin);
+      return true;
+    });
+  } catch (_) {}
+  // ── 5.364 : BAISSER UN PRIX, SUR SON CLIC — même chemin que `vcOffre`.
+  try {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg || msg.from !== 'vrm-fond' || msg.action !== 'vcPrix') return;
+      if (!sender || sender.id !== chrome.runtime.id || window.top !== window) return;
+      const produit = String(msg.produit || ''), avant = Number(msg.avantCents), apres = Number(msg.apresCents);
+      if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(apres) || !(apres < avant)) { sendResponse({ ok: false, code: 'invalide' }); return; }
+      const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+      const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 25000);
+      envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
+      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'prix', jeton, produit, avantCents: avant, apresCents: apres, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
       return true;
     });
   } catch (_) {}

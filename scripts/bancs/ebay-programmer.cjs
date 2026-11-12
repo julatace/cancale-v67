@@ -199,7 +199,7 @@ async function ouvrir(b, vp, opts = {}) {
   // le tic de 30 s du planificateur avec `runFor`) ; sinon l'heure est figée.
   if (opts.horloge) await pg.clock.install({ time: new Date(opts.horloge) });
   else await pg.clock.setFixedTime(new Date(MAINTENANT));
-  await pg.addInitScript(([fiches]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches)); } catch (_) {} }, [(SC && SC.fiches) || FICHES]);
+  await pg.addInitScript(([fiches]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches)); } catch (_) {} }, [(SC && SC.fiches) || FICHES]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -282,6 +282,15 @@ const photo = async (pg, sel, nom) => {
     await pg.screenshot({ path: path.join(os.tmpdir(), nom + '.png') });
   } catch (_) {}
 };
+// (11 nov., ebay-rouges) ANNONCES · eBAY PAR SON LIEN. Depuis la navigation par tâche (31 oct.),
+// `?tab=plat_ebay` ouvre Ventes · eBay, et « Annonces » de la barre rouvre Annonces sur SON
+// dernier filtre (Vinted par défaut, src/navigationTache.js) : le banc touchait la barre et
+// attendait les brouillons eBay dans Annonces · Vinted (21 rouges). Le lien d'Annonces · eBay
+// est `?tab=annonces&site=ebay` ; l'écran doit être MONTÉ sur eBay (data-*), sinon le banc lève.
+const ouvrirAnnoncesEbay = async (pg) => {
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForSelector('[data-tache="annonces"][data-tache-site="ebay"]', { timeout: 15000 });
+};
 const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
 const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e) => ({ id: e.getAttribute('data-planif-ligne'), paris: e.getAttribute('data-heure-paris'), utc: e.getAttribute('data-utc') })));
 
@@ -294,9 +303,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
       remettre();
       const { ctx, pg, errs } = await ouvrir(b, vp);
       await essaie('écran', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForTimeout(1500);
-        await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
+        await ouvrirAnnoncesEbay(pg);
         await pg.waitForSelector('[data-ebay-brouillons="lu"]', { timeout: 15000 });
         await pg.waitForSelector('[data-ebay-programmees="lu"]', { timeout: 10000 }).catch(() => {});
         const nb = await pg.$eval('[data-ebay-brouillons]', (e) => e.getAttribute('data-nb'));
@@ -473,9 +480,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
     }
     // ══ (6 octobre) LA REVUE CONTRADICTOIRE ══════════════════════════════════
     const versAnnonces = async (pg) => {
-      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForTimeout(1500);
-      await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
+      await ouvrirAnnoncesEbay(pg);
       await pg.waitForSelector('[data-ebay-brouillons="lu"]', { timeout: 15000 });
       await pg.waitForSelector('[data-ebay-programmees="lu"]', { timeout: 10000 }).catch(() => {});
     };
@@ -604,8 +609,14 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         const g = await pg.$eval('[data-publier-garde]', (e) => ({ k: e.getAttribute('data-publier-garde'), t: e.textContent })).catch(() => ({ k: null, t: '' }));
         const dis = await pg.$eval('button:has-text("Publier sur eBay")', (e) => e.disabled).catch(() => null);
         await pg.locator('button:has-text("Publier sur eBay")').click({ force: true, timeout: 3000 }).catch(() => {});
+        // (11 nov., ebay-rouges) Depuis le 3 nov., une annonce qui a un point à revoir (ici « 2 photos
+        //  seulement ») passe par la feuille de vérification avant toute publication : le banc répond
+        //  comme Julien, « Publier quand même » (`data-verif-publier`). Les paires bloquées doivent
+        //  RESTER bloquées même après ce oui — le contrôle n'en est que plus dur.
+        let verif = null;
+        try { await pg.waitForSelector('[data-verif-publier]', { timeout: 3000 }); verif = await pg.$$eval('[data-verif-probleme]', (els) => els.map((e) => e.getAttribute('data-verif-probleme'))); await pg.click('[data-verif-publier]'); } catch (_) {}
         await pg.waitForTimeout(500);
-        return { g, dis };
+        return { g, dis, verif };
       };
       await essaie('D', async () => {
         await versAnnonces(pg);
@@ -713,9 +724,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
       remettre(); panneBrouillons = true;
       const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 });
       await essaie('pas su', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForTimeout(1500);
-        await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
+        await ouvrirAnnoncesEbay(pg);
         // ⚠️ On attend que la lecture soit FINIE (« charge » est l'état d'avant la
         //    réponse) : juger pendant le chargement mesurait la vitesse de la
         //    machine, pas la règle — rouge sur une app intacte quand le CPU traîne.

@@ -5,6 +5,7 @@ import { useEssentiel } from '../AttenteEcran.jsx';
 import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import React, { useState, useMemo, useEffect } from 'react';
+import { tr } from '../i18n/index.js';   // (11 nov., lot rangement-guide)
 import { ChiffreConseil } from '../Conseils.jsx';
 import { premiereCaseLibre as premiereCaseMeubles, caseEnMots } from '../ouRanger.js';
 import { attrCible } from '../cibleNotif.js';
@@ -164,7 +165,7 @@ async function lireVcStock() {
   const ventes = Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object' ? rv[0].ventes : null;
   return { lst: { items: r.items && typeof r.items === 'object' ? r.items : null, liens: r.liens && typeof r.liens === 'object' ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true }, ventes };
 }
-async function lireAnnoncesStock(accounts) {
+export async function lireAnnoncesStock(accounts) {
   const horsCompte = comptesStockEcartes();
   const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
   const [vinted, ebay, lbc, vc] = await Promise.all([
@@ -348,7 +349,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const cs = (fichesParCle[k] || []).map((f) => String(f.accountId || '')).filter(Boolean);
     return cs.length ? cs.every((u) => lusOk.has(u)) : lecture.vinted.every((c) => c.ok);
   };
-  const etatsRangees = classerRangees({ slots, actuelles: actuellesCles, vendus, garder, jugeable, cle: cleNum });
+  // (11 nov., lot rangement-guide) Les achats rangés à leur arrivée (fiche à publier, son achat par n° de transaction).
+  const neuvesArrivee = {};
+  for (const f of Object.values(load('vrm_fiches_neuves', {}) || {})) { if (f && f.origine === 'arrivee' && !f.retireeAt) { const k = cleNum(f.numero); if (k && !neuvesArrivee[k]) neuvesArrivee[k] = f; } }
+  const etatsRangees = classerRangees({ slots, actuelles: actuellesCles, vendus, garder, jugeable, arrivees: new Set(Object.keys(neuvesArrivee)), cle: cleNum });
   const correspondFiltre = (f) => (!filtrePlat || (f.plateformes || []).includes(filtrePlat)) && (!filtreCompte || (f.comptes || []).includes(filtreCompte));
   const filtreActif = !!(filtrePlat || filtreCompte);
   // Les articles montrés : les annonces actuelles (avec un N°), puis les paires
@@ -369,7 +373,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     if (tout.length && tout.every((f) => horsCompte(f))) continue;   // compte écarté : pas montrée (comme avant)
     const f = tout.find((x) => !horsCompte(x)) || null; const j = (journal || {})[k];
     vus.add(k);
-    fiches.push({ id: f ? f.id : 'n:' + k, numero: f ? f.numero : (j && j.num) || k, title: (f && f.title) || (j && j.titre) || '', photo: (f && f.photo) || null, plateformes: [], comptes: f && f.accountId ? [String(f.accountId)] : [], aussi: [], actuelle: false, rangee: etatsRangees[k] });
+    const na = neuvesArrivee[k] || null;
+    fiches.push({ id: f ? f.id : (na ? 'neuve:' + na.id : 'n:' + k), numero: f ? f.numero : (na && na.numero) || (j && j.num) || k, title: (f && f.title) || (na && na.titre) || (j && j.titre) || '', photo: (f && f.photo) || (na && na.photoAchat) || null, plateformes: [], comptes: f && f.accountId ? [String(f.accountId)] : [], aussi: [], actuelle: false, rangee: etatsRangees[k] });
   }
   // Une paire REMISE à la main (« Remettre », sa case prise) attend dans « À
   // ranger », même hors des annonces actuelles : il a dit qu'elle est chez lui.
@@ -642,7 +647,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       corps = (<>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
           <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} hors={hors} /></span>
-          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : 'autre'))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? 'Vendu — à sortir du stock' : (hors ? 'Plus en ligne — plus une annonce actuelle' : (f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : 'En stock'))} · N°{f.numero}</div></div>
+          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : 'autre')))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? 'Vendu — à sortir du stock' : (hors ? 'Plus en ligne — plus une annonce actuelle' : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : 'En stock'))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? 'Va le chercher' : 'Rangé dans'}</div>

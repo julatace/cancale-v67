@@ -24,6 +24,7 @@ import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif, instantCalme } from './_lib/push.js';
 import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRappel, texteRappels, lienRappel, TAG_RAPPEL } from './_lib/rappels-perso.js';
+import { CLE_REMISES, MEMO_REMISES, lireRemises, remisesDues, memoRemisesApres, texteRappelRemise, texteRappelsRemise, TAG_REMISE, instantRemise } from './_lib/remises-main-propre.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme, reglageSoir, soirALHeure, reglageJours, dansHeuresCalmes } from './_lib/notif-textes.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
@@ -44,7 +45,8 @@ import { MAIN_MOTS, motsServeur } from './_lib/mots-vendeur.js';
 import { sbCle } from './_lib/cle.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
-import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+import { comptesActifs, normaliserRegistre, lireDonnee as lireDonneeEbay, modifierDonnee as modifierDonneeEbay, jetonApplication, oublierJetonApplication } from './_lib/ebay.js';
+import { passageAlertesEbay, notifAlertes } from './_lib/ebay-alertes.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
 // Vestiaire du bilan : les règles de l'app (un propriétaire, importé).
@@ -326,7 +328,7 @@ function txsAExpedier(d) {
   // l'extension. Une preuve illisible (`null`) manque, rien d'autre : le colis reste compté.
   const pr = d.preuves || {};
   const partisVinted = ventesPartiesParPreuve({ bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone, bordsShipped,
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
   const pasPartie = (t) => !masquees.has(t) && !partisVinted.has(String(t));
   const resume = new Set(); let resumeTrouve = false;
   const parTx = {};
@@ -365,7 +367,7 @@ function ventesEmailColis(d) {
   const pr = d.preuves || {};
   return colisVentesEmailServeur({ mails: d.mailsVentes, comptes: [...vivants], masques: d.main.vinted_accounts_hidden, panneau: d.panneau, connues, lectures,
     bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone: objet(d.main.vinted_ship_done), bordsShipped: objet(d.main.vinted_bords_shipped),
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
 }
 
 // `soir` : le bilan du DIMANCHE SOIR (26 oct.). Il porte la semaine EN COURS
@@ -1309,6 +1311,49 @@ async function passageGroupe(maintenant = Date.now()) {
   }
   return { fait: true, fenetres: aVider.length, resumes: envoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
 }
+// (11 nov., lot lbc-plus) LES REMISES EN MAIN PROPRE (api/_lib/remises-main-propre.js) :
+// UNE notification une heure avant le rendez-vous qu'IL a posé (jamais proposé par VRM).
+// Seuls les vendeurs dont `main.data->>vrm_remise_fin` est à venir sont visités (une
+// projection filtrée par la base, §4.4) ; `main` lu PROJETÉ sur `vrm_remises` seule ; le
+// mémo `remises_rappel_dedup` lu en trois états (illisible ⇒ rien) et écrit AVANT l'envoi,
+// confirmé (sinon rien ne part, et rien ne part deux fois). Famille « Rappels » coupée ⇒
+// rien. L'échéance (l'heure du rendez-vous) accompagne la notification : la porte commune
+// la laisse passer tout de suite (< 24 h), heures calmes selon sa règle. La réponse ne
+// porte que des nombres : jamais un lieu, un N° ou un titre.
+async function rappelsRemisesSur(maintenant = instantNotif()) {
+  try {
+    const main = await getRowProjete('main', [CLE_REMISES]);
+    if (main === undefined) return { etat: 'pas-su' };
+    const remises = lireRemises(main && main[CLE_REMISES]);
+    if (!remises.some((r) => r.etat === 'prevue')) return { etat: 'aucune' };
+    const memo = await getRow(MEMO_REMISES);
+    if (memo === undefined) return { etat: 'memo-illisible' };
+    const envoyes = memo && memo.envoyes;
+    const dus = remisesDues(remises, envoyes, maintenant);
+    if (!dus.length) return { etat: 'rien-de-du' };
+    if (!(await pushCategorieActive('rappel'))) return { etat: 'coupe', n: dus.length };
+    if (!(await ecrireDedup(MEMO_REMISES, { envoyes: memoRemisesApres(envoyes, dus, maintenant), at: new Date(maintenant).toISOString() }))) return { etat: 'memo-non-ecrit', n: dus.length };
+    const t = dus.length === 1 ? texteRappelRemise(dus[0]) : texteRappelsRemise(dus);
+    const premier = dus.slice().sort((a, b) => instantRemise(a.jour, a.heure) - instantRemise(b.jour, b.heure))[0];
+    const envoi = await sendPushToAll({ cat: 'rappel', title: t.title, body: t.body, tag: TAG_REMISE(dus.length === 1 ? dus[0].id : 'lot-' + premier.id), cle: 'remise-' + dus.map((r) => r.id).sort().join('-'),
+      echeance: instantRemise(premier.jour, premier.heure), url: lienNotif('ventes', { site: 'leboncoin', cible: 'vente', tx: premier.tx }) });
+    return { etat: 'envoye', n: dus.length, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  } catch (e) { return { etat: 'echec' }; }
+}
+async function passageRemises(maintenant = instantNotif()) {
+  const debut = Date.now();
+  const iso = new Date(maintenant).toISOString();
+  const lignes = await fetchPaginated(`app_data?id=eq.main&data->>vrm_remise_fin=gte.${encodeURIComponent(iso)}&select=owner`);
+  if (!lignes) return { fait: false, raison: 'pas su' };
+  const owners = [...new Set(lignes.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
+  let envoyees = 0, echecs = 0, budgetAtteint = false;
+  for (let i = 0; i < owners.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 120000) { budgetAtteint = true; break; }
+    const out = await Promise.all(owners.slice(i, i + VENDEURS_EN_PARALLELE).map((o) => contexteVendeur.run({ owner: o }, () => rappelsRemisesSur(maintenant)).catch(() => ({ etat: 'echec' }))));
+    out.forEach((r) => { if (r && r.etat === 'envoye') envoyees += 1; if (r && r.etat === 'echec') echecs += 1; });
+  }
+  return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
+}
 // (11 nov., décision C8) Le passage horaire : le résumé seul (ni eBay relu, ni bilan de la semaine).
 async function traiterVendeurSoirHeure() {
   const out = await rappelDuSoir(Date.now(), { horaire: true });
@@ -1519,7 +1564,30 @@ export default async function handler(req, res) {
       if (!cl) { res.status(503).json({ ok: false, moment: 'groupe', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
       r = await passageGroupe(instantNotif());
     } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
-    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r });
+    // (11 nov., lot lbc-plus) Le même passage de 15 min sert le rappel « une heure avant »
+    // des remises en main propre. Un échec de l'un n'empêche pas l'autre.
+    let remises = null;
+    try { remises = await passageRemises(instantNotif()); } catch (e) { remises = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises });
+    return;
+  }
+  // (11 nov., lot alertes-ebay) `?moment=alertes` : les ALERTES D'ACHAT eBAY, et RIEN d'autre —
+  // GitHub chaque heure (.github/workflows/alertes-ebay.yml). Seuls les vendeurs qui ont allumé
+  // l'alerte d'une recherche sont visités (api/_lib/ebay-alertes.js) ; sélection pas lue ⇒ 503.
+  // La réponse ne porte que des NOMBRES (aucun vendeur, aucune annonce).
+  if (moment === 'alertes') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'alertes', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageAlertesEbay({
+        lire: fetchPaginated, lireDonnee: lireDonneeEbay, modifierDonnee: modifierDonneeEbay, jetonApplication, oublierJetonApplication,
+        notifier: (o, nv) => contexteVendeur.run({ owner: o }, () => sendPushToAll(notifAlertes(nv))),
+        exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000,
+      });
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    const { fait, ...nombres } = r || {};
+    res.status(fait ? (r.echecs || r.panne ? 500 : 200) : 503).json({ ok: !!fait && !r.echecs && !r.panne, moment: 'alertes', ...nombres });
     return;
   }
   const soir = moment === 'soir';
