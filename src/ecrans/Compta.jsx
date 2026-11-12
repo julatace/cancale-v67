@@ -1418,7 +1418,7 @@ async function generateFacturXPdf(inv, ent){
     a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
+  }catch(e){ try{toast('Facture électronique impossible : '+e.message);}catch(_){} }
 }
 // ⟦← App.jsx #24⟧
 const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
@@ -2381,7 +2381,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
-            ['Ce que VRM prépare', 'Une facture Factur-X par vente, le récap mensuel aux particuliers (e-reporting).'],
+            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récapitulatif du mois de tes ventes aux particuliers.'],
             ["Où l'envoyer", "Super PDP : connecte TON compte ci-dessous. Ailleurs : dépose-les toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
@@ -2427,7 +2427,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── RÉCAP E-REPORTING ── */}
         <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Déclaration des ventes à l’administration · {libelleYm(ym)}</div>
           {!recap ? (
             <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
               {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total plutôt qu'un faux zéro."}
@@ -2447,8 +2447,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             </div>}
             <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Toutes tes ventes du mois y sont : retire celles faites à une entreprise. <Pourquoi>VRM ne sait pas si un acheteur est une entreprise. Une vente à une entreprise demande une facture, pas ce récapitulatif.</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récap en tableur</button>
-              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, au format JSON (pour un logiciel de compta)"><Icon name="save" size={14} />Récap JSON</button>
+              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récapitulatif (tableur)</button>
+              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, en fichier pour un logiciel de compta"><Icon name="save" size={14} />Récapitulatif (fichier)</button>
             </div>
             {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas tout seul : dépose-le toi-même sur Super PDP. <Pourquoi>La forme de son envoi par l'API n'a pas pu être vérifiée dans la documentation officielle de Super PDP.</Pourquoi></div>}
           </div>)}
@@ -2456,7 +2456,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── FACTURES FACTUR-X ── */}
         <div style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures Factur-X · ventes de {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures électroniques · ventes de {libelleYm(ym)}</div>
           {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 13, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 12, padding: '10px 12px' }}>
             {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }}> {etat.geste}</span> : null}
           </div>}
