@@ -39597,7 +39597,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     lbcAnnoncesSession().then((it) => { if (!mort) setLbcItemsLus(it == null ? null : it); });
     return () => { mort = true; };
   }, [lbcBesoinAnnonces, lbcVentes]);
-  const lbcItemsBenef = lbcLu === undefined ? undefined : lbcLu === null ? null : !lbcBesoinAnnonces ? {} : lbcItemsLus;
+  // (13 nov., moteur-compta) Le `{}` « aucune annonce à lire » est UN objet pour la vie du module (lu seulement :
+  // `numeroLbcIdentite` ne fait que `items[iid]`) : neuf à chaque rendu, il relançait `autresBenefice` et tout ce
+  // qui en dépend (bénéfice par jour, relevé des ventes, sources, meilleures) à CHAQUE rendu — mesuré à 20 000
+  // ventes : ~0,3 à 0,6 s de calcul (×4) refait à chacun des ~25 rendus du chargement de Ma journée.
+  const lbcItemsBenef = lbcLu === undefined ? undefined : lbcLu === null ? null : !lbcBesoinAnnonces ? LBC_AUCUNE_ANNONCE : lbcItemsLus;
   // `null` tant qu'une source n'est pas lue (ou a raté) : jamais un bénéfice
   // partiel présenté comme complet. Une liste sinon.
   const autresBenefice = useMemo(() => {
@@ -42688,10 +42692,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (Array.isArray(sales.items)) {
       const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
       const TXT = { 'Retournée': 'Retour à vérifier', 'Retour en cours': 'Retour en cours', 'Au relais': 'Au relais de l’acheteur', 'En transit': 'En transit', 'Livrée': 'Livré' };
+      // (13 nov., moteur-compta) La fenêtre des 45 jours est jugée AVANT `aExpedier` et `venteStage` (la même règle,
+      // dans un autre ordre : trois filtres purs) — à 20 000 ventes, l'étape n'est plus calculée pour les vieilles.
       sales.items
-        .filter(o => o && !hiddenSales.has(String(o.transaction_id)) && !aExpedier(o))
-        .map(o => ({ o, st: venteStage(o), j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
-        .filter(x => ordre[x.st.label] != null && (x.j == null || x.j <= 45))
+        .filter(o => o && !hiddenSales.has(String(o.transaction_id)))
+        .map(o => ({ o, j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
+        .filter(x => (x.j == null || x.j <= 45) && !aExpedier(x.o))
+        .map(x => ({ o: x.o, st: venteStage(x.o), j: x.j }))
+        .filter(x => ordre[x.st.label] != null)
         .sort((a, b) => (ordre[a.st.label] - ordre[b.st.label]) || ((b.j ?? 0) - (a.j ?? 0)))
         .forEach(({ o, st }) => L.push({ cle: 'p:' + o.transaction_id, groupe: 'parti', site: 'vinted', nom: nomAvecTaille(o.title || 'Vente', o), photo: orderPhoto(o), num: effEntry(o)?.numero || '', etat: TXT[st.label] || st.label, ambre: ordre[st.label] === 0, ouvrir: false }));
     }
@@ -43358,10 +43366,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             lues: { imprime: !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b))), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue) } });
         }
         for (const o of sales.items) {
-          if (!o || hiddenSales.has(String(o.transaction_id)) || aExpedier(o)) continue;
-          const st = venteStage(o); if (ordre[st.label] == null) continue;
+          // (13 nov., moteur-compta) La fenêtre des 45 jours d'abord (même règle, autre ordre) : à 20 000 ventes,
+          // `aExpedier` et `venteStage` ne tournent plus sur les vieilles.
+          if (!o || hiddenSales.has(String(o.transaction_id))) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
           if (j != null && j > LIMITE_ENVOYES_J) continue;
+          if (aExpedier(o)) continue;
+          const st = venteStage(o); if (ordre[st.label] == null) continue;
           const b = bordsParTxn[String(o.transaction_id)] || null;
           const pv = preuvesFriseDe(o);
           out.push({ cle: 'v:' + o.transaction_id, site: 'vinted', type: 'parti', o, b, st, j, rang: ordre[st.label],
@@ -53462,6 +53473,8 @@ function clesAnnonceLbc(ad, liens) {
 // Le lien posé à la main gagne (c'est sa correction) ; sinon la référence VRM
 // (CustomRef, réf lue sur l'annonce), traduite par la remise à zéro 013. Deux
 // références qui se contredisent ⇒ personne. `items` absent ⇒ seul le lien.
+// (13 nov., moteur-compta) « Aucune annonce Leboncoin à lire » : un seul objet vide, stable d'un rendu à l'autre (jamais modifié).
+const LBC_AUCUNE_ANNONCE = {};
 const numeroLbcIdentite = (v, items, liens) => {
   if (!v || v.itemId == null) return '';
   const iid = String(v.itemId);
