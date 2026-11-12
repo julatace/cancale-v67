@@ -54578,7 +54578,8 @@ function AppCoeur() {
       if(t==='settings'&&section==='supprimer'){ DEMANDE_REGLAGE_SOUS.id='fermer'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='toutvabien'){ DEMANDE_REGLAGE_SOUS.id='toutvabien'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(t==='settings'&&section==='sante'){ DEMANDE_REGLAGE_SOUS.id='sante'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
-      if(t==='settings'&&section==='santecomptes'){ DEMANDE_REGLAGE_SOUS.id='santecomptes'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
+      if(t==='settings'&&(section==='santecomptes'||section==='discretion')){ DEMANDE_REGLAGE_SOUS.id=section;   // (12 nov., 5.370) « Discrétion » aussi
+      try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris'); else if(vue==='republier') demanderVue('republier');
