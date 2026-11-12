@@ -68,6 +68,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee, lireCommeVendeur } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
+import { etatOuverture, lireWebhooksStripe } from './_lib/ouverture-paiements.js';   // (12 nov.) « Ouvrir les paiements »
 import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
@@ -89,6 +90,7 @@ import { traiterAgenda } from './_lib/agenda-ics.js';                 // (10 nov
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
 import { effacerCompte } from './_lib/effacer-compte.js';
+import { pageExport } from './_lib/export-rgpd.js';   // (12 nov.) RGPD : toutes ses données
 import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov., lot DJ6)
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
@@ -651,8 +653,23 @@ async function abonnement(req, res) {
   const essaiDispo = (!acc.proprietaire && !dejaAbo && stripePret())
     ? (await essaiDejaUtilise(u.email, await lireVintedIds(u.id))) === false
     : false;
+  // (12 nov.) « OUVRIR LES PAIEMENTS » : au PROPRIÉTAIRE seul, chaque prérequis
+  // LU (api/_lib/ouverture-paiements.js) — jamais à un vendeur.
+  let ouverture;
+  if (acc.proprietaire) {
+    const webhookLu = stripePret() ? await lireWebhooksStripe(stripeApi) : null;
+    ouverture = etatOuverture({
+      cle: stripePret(), modeTest: stripePret() ? stripeModeTest() : null,
+      secret: /^whsec_/.test(String(process.env.STRIPE_WEBHOOK_SECRET || '').trim()),
+      webhook: webhookLu, soloConforme: conforme, soloTexte: prix && conforme === false ? prixTexte(prix) : null,
+      pro, manque, contact: contactEmail(),
+      editeurEmail: lues && lues.editeur ? (typeof lues.editeur.email === 'string' ? lues.editeur.email : '') : null,
+      cleSolo: PRIX_CLE,
+    });
+  }
   return repondre(res, 200, {
     ok: true,
+    ouverture,
     essaiDispo,
     essaiJours: 7,
     mentionsCompletes: manque === null ? null : manque.length === 0,
@@ -1430,6 +1447,21 @@ async function apercuSuppression(req, res) {
     fenetreMinutes: FENETRE_RECENTE_MS / 60000, mot: MOT_CONFIRMATION });
 }
 
+// ── (12 nov.) « TÉLÉCHARGER TOUTES MES DONNÉES » (RGPD art. 15 et 20) ────────
+// Une page à la fois (`suite`), pour le compte de SA session seulement : la règle
+// et ce qui part sont dans api/_lib/export-rgpd.js. Ouvert avec ou sans
+// abonnement (ce n'est pas utiliser VRM, c'est repartir avec ses données).
+async function mesDonnees(req, res) {
+  const u = await utilisateurDe(req);
+  if (u === undefined) return repondre(res, 503, { ok: false, erreur: 'pas-su', message: 'Connexion pas vérifiée. Réessaie dans un instant.' });
+  if (!u) return repondre(res, 401, { ok: false, erreur: 'session' });
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  const proprio = SERVICE ? await lireProprietaire({ url: SUPABASE_URL, service: SERVICE }) : '';
+  if (proprio === undefined) return repondre(res, 503, { ok: false, erreur: 'pas-su', message: "Je n'ai pas pu tout lire. Relance l'export dans un instant." });
+  const r = await pageExport({ utilisateur: u, curseur: String((req.query && req.query.suite) || ''), url: SUPABASE_URL, service: SERVICE, proprio: proprio === u.id ? '' : proprio });
+  return repondre(res, r.code, r.corps);
+}
+
 async function supprimerCompte(req, res) {
   const g = await gardesSuppression(req, res);
   if (!g) return;
@@ -1778,21 +1810,31 @@ async function mesures(req, res) {
 // et l'heure de la vérification, pour public/etat.html — aucune donnée d'un
 // vendeur (api/_lib/etat-public.js). LÉGER : une requête de deux scalaires,
 // gardée 30 s en mémoire, et 30 s au cache de Vercel (`s-maxage`).
+// (12 nov., agent2-fiabilite-prod) Ce que la surveillance lit (ok, serviceKey, owner,
+// `etat.base`) reste PUBLIC ; les oui/non de CONFIGURATION (IA, détourage, Stripe,
+// webhook Stripe, e-mails de l'essai) ne disent plus à n'importe qui quelles portes
+// sont posées : ils ne partent (`config`) qu'au PROPRIÉTAIRE de l'installation, avec
+// SA session, et jamais par le cache partagé. Tenu par scripts/audit-sante-publique.cjs.
+async function configPourProprietaire(req) {
+  if (!String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '')) return undefined;
+  const u = await utilisateurDe(req).catch(() => null);
+  const proprio = u && u.id ? await proprioAlertes().catch(() => null) : null;
+  if (!proprio || String(u.id).toLowerCase() !== proprio) return undefined;
+  return { ia: !!process.env.AI_API_KEY, detourage: !!process.env.PHOTOROOM_API_KEY, stripe: stripePret(), stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET, relancesEssai: configurationRelances().pret };
+}
 async function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30');
+  const config = await configPourProprietaire(req);
+  res.setHeader('Cache-Control', config ? 'private, no-store' : 'public, max-age=0, s-maxage=30');
+  if (config) res.setHeader('Vary', 'Authorization');
   const [etat, statut] = await Promise.all([etatPublic({ pushPret: pushConfigure(), anon: ANON }), statutPourSante().catch(() => null)]);
   return repondre(res, 200, {
     ok: true,
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
     owner: !!process.env.VRM_OWNER_UID,
-    ia: !!process.env.AI_API_KEY,
-    detourage: !!process.env.PHOTOROOM_API_KEY,
-    stripe: stripePret(),
-    stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
-    relancesEssai: configurationRelances().pret,
     etat,
     statut,
+    config,
   });
 }
 
@@ -1863,6 +1905,7 @@ export default async function handler(req, res) {
   if (mode === 'oauth-sans-compte') return m === 'POST' ? annulerCompteOAuthNeuf(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'supprimer' || mode === 'fermer') return m === 'POST' ? supprimerCompte(req, res) : (m === 'GET' && mode === 'supprimer') ? apercuSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
+  if (mode === 'mes-donnees') return m === 'GET' ? mesDonnees(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
   // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :
