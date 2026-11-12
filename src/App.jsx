@@ -32922,8 +32922,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [periode, setPeriode] = useVueSession('commandes-periode', null); // filtre de période (ventes + achats)
   // (11 nov., saisie rapide) « Vendues en octobre » (la loupe, à la voix ou tapé) : la période
   // demandée par la coque (`DEMANDE_PERIODE_VENTES`), prise UNE fois, au montage ou à l'appel.
+  const periodePrise = useRef(0);
   useEffect(() => {
-    const prendre = () => { const d = DEMANDE_PERIODE_VENTES; if (d.p && Date.now() - d.at < 60000) { setPeriode({ ...d.p }); d.p = null; } };
+    // (12 nov., intégration) Ventes monte cet écran plus d'une fois (« À expédier » en tête, puis la liste) :
+    // chaque instance prend la demande UNE fois (par son heure), la première ne la vide plus pour les autres.
+    const prendre = () => { const d = DEMANDE_PERIODE_VENTES; if (d.p && Date.now() - d.at < 60000 && periodePrise.current !== d.at) { periodePrise.current = d.at; setPeriode({ ...d.p }); } };
     prendre(); window.addEventListener('vrm:ventes-periode', prendre);
     return () => window.removeEventListener('vrm:ventes-periode', prendre);
   // eslint-disable-next-line react-hooks/exhaustive-deps
