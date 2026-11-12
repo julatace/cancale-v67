@@ -1662,7 +1662,7 @@ function StatutSauvegardeReglages() {
   if(!attente&&!stockage) return null;
   // (8 nov.) Abonnement terminé (aperçu) : la base refuse d'écrire, et
   // « Réessayer » n'y changerait rien — on dit pourquoi, sans geste trompeur.
-  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Abonnement terminé : rien n'est enregistré tant que tu ne l'as pas repris</span></div>;
+  if(lectureSeuleActive()) return <div className="vrm-settings-status" role="status" data-statut-reglages="lecture-seule" style={{color:C.muted}}><span>Sans abonnement : rien n'est enregistré pour l'instant</span></div>;
   return <div className="vrm-settings-status" role="status" data-statut-reglages={echec?'echec':'encours'} style={{color:echec?C.warn:C.muted}}>
     {!echec&&<span className="vrm-settings-status-pt" aria-hidden="true"/>}
     <span>{stockage?'Refusée par cet appareil':echec?'Pas encore synchronisé':'Enregistrement…'}</span>

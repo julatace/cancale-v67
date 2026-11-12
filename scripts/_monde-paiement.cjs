@@ -186,7 +186,7 @@ function creerMonde({ proprio = uuid(9), parrainageOuvert = true, obligatoire = 
   M.finPeriode = (id) => { const s = sub(id); s.status = 'canceled'; return [['customer.subscription.deleted', s]]; };
 
   let horloge = Math.floor(Date.now() / 1000);
-  M.evenement = (type, objet) => JSON.stringify({ id: M.id('evt'), type, created: ++horloge, livemode: false, data: { object: objet } });
+  M.evenement = (type, objet) => JSON.stringify({ id: M.id('evt'), type, created: (horloge = Math.max(horloge + 1, Math.floor(Date.now() / 1000) + 1)), livemode: false, data: { object: objet } });
   M.signer = (corps, secret = SECRET_WEBHOOK, t = Math.floor(Date.now() / 1000)) => `t=${t},v1=${crypto.createHmac('sha256', secret).update(`${t}.${corps}`).digest('hex')}`;
   return M;
 }

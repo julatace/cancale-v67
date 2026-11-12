@@ -21,6 +21,7 @@ import React from 'react';
 import { SheetShell as SheetShellBase } from './SheetShell.jsx';
 import { BoutonBase, SegmenteBase } from './Bouton.jsx';
 import { normaliserSignalement, lignesApercu, posterSignalement, phraseRefus, TEXTE_MAX } from '../../api/_lib/signalement.js';
+import { contactEmail } from '../contact.js';
 
 const S = {
   muet: { color: 'var(--vrm-muted)', fontSize: 13, lineHeight: 1.45 },
@@ -89,6 +90,9 @@ export function DetailsTechniques({ s }) {
 export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Feuille = SheetShellBase, Bouton = BoutonBase, envoyer = posterSignalement, z = 10500 }) {
   const ctx = React.useMemo(() => { try { return { ...contexteVide(), ...(contexte ? contexte() : {}) }; } catch (_) { return contexteVide(); } }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const [texte, setTexte] = React.useState('');
+  // (12 nov., « J'ai un problème ») Une réponse par e-mail : seulement s'il le coche.
+  const [repondreA, setRepondreA] = React.useState(false);
+  const contact = contactEmail();
   const [etat, setEtat] = React.useState({ phase: 'ecrire' });      // ecrire · envoi · envoye · refus
   const opts = masque ? { masque } : {};
   const apercu = normaliserSignalement({ ...ctx, texte }, opts);
@@ -99,7 +103,7 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
     if (!apercu || etat.phase === 'envoi') return;
     setEtat({ phase: 'envoi' });
     let r;
-    try { r = await envoyer(apercu, { entetes: entetes ? entetes() : {} }); } catch (_) { r = { envoye: false, raison: 'reseau' }; }
+    try { r = await envoyer(apercu, { entetes: entetes ? entetes() : {}, repondreA }); } catch (_) { r = { envoye: false, raison: 'reseau' }; }
     if (!vivant.current) return;
     if (r && r.envoye === true) setEtat({ phase: 'envoye', id: r.id });
     else setEtat({ phase: 'refus', phrase: phraseRefus(r) });
@@ -112,7 +116,7 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
       {etat.phase === 'envoye' ? (
         <div data-signalement-etat="envoye" role="status">
           <p style={{ fontSize: 17, fontWeight: 600, margin: '4px 0 6px', color: 'var(--vrm-ink)' }}>Envoyé. Merci.</p>
-          <p style={{ ...S.muet, margin: '0 0 16px' }}>Signalement reçu, avec l’écran, la version et les plantages.</p>
+          <p style={{ ...S.muet, margin: '0 0 16px' }}>Signalement reçu, avec l’écran, la version et les plantages.{repondreA ? ' Réponse par e-mail.' : ''}</p>
           <Bouton variante="primaire" plein onClick={onClose}>Fermer</Bouton>
         </div>
       ) : (
@@ -122,7 +126,11 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
             placeholder="Ex. : l’écran Colis reste vide depuis ce matin."
             onChange={(e) => { setTexte(e.target.value); if (etat.phase === 'refus') setEtat({ phase: 'ecrire' }); }}
             style={{ width: '100%', boxSizing: 'border-box', minHeight: 112, resize: 'vertical', fontSize: 17, lineHeight: 1.4, padding: '12px 14px', borderRadius: 12, border: '1px solid var(--vrm-line)', background: 'var(--vrm-surface)', color: 'var(--vrm-ink)', fontFamily: 'inherit', outline: 'none' }}/>
-          <p style={{ ...S.muet, margin: '6px 2px 16px' }}>Ni mot de passe ni code. Montants, e-mails, pseudos et longs numéros sont masqués.</p>
+          <p style={{ ...S.muet, margin: '6px 2px 12px' }}>Ni mot de passe ni code. Montants, e-mails, pseudos et longs numéros sont masqués.</p>
+          <label data-signaler-repondre={repondreA ? 'oui' : 'non'} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, margin: '0 0 12px', fontSize: 15, color: 'var(--vrm-ink)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={repondreA} onChange={(e) => setRepondreA(e.target.checked)} style={{ width: 22, height: 22, accentColor: 'var(--vrm-accent)', flex: '0 0 auto' }}/>
+            <span>Réponds-moi par e-mail</span>
+          </label>
 
           <section data-signaler-apercu="" aria-label="Ce qui part avec ton message">
             <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--vrm-muted)', margin: '0 0 8px' }}>Ce qui part, exactement</h3>
@@ -142,8 +150,11 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
                 <pre data-apercu-json="" style={{ ...S.carte, margin: '4px 0 0', padding: 12, fontSize: 12, lineHeight: 1.45, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: 'var(--vrm-ink)', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace' }}>{JSON.stringify(apercu, null, 2)}</pre>
               </details>
             )}
-            <p style={{ ...S.muet, margin: '10px 2px 0' }}>S’y ajoutent l’identifiant de ton compte VRM (pour savoir à qui répondre) et l’heure. Rien d’autre : ni ventes, ni pseudos, ni adresse e-mail, ni montant, ni le contenu de l’écran.</p>
+            <p style={{ ...S.muet, margin: '10px 2px 0' }} data-signaler-ajouts={repondreA ? 'email' : 'id'}>{repondreA
+              ? 'S’y ajoutent l’identifiant de ton compte VRM, l’heure, et ton e-mail de connexion pour te répondre. Rien d’autre : ni ventes, ni pseudos, ni montant, ni le contenu de l’écran.'
+              : 'S’y ajoutent l’identifiant de ton compte VRM (pour savoir à qui répondre) et l’heure. Rien d’autre : ni ventes, ni pseudos, ni adresse e-mail, ni montant, ni le contenu de l’écran.'}</p>
           </section>
+          {contact ? <p style={{ ...S.muet, margin: '12px 2px 0' }} data-signaler-contact="">Ou écris à <a href={'mailto:' + contact} style={{ color: 'var(--vrm-accent)' }}>{contact}</a>.</p> : null}
 
           {etat.phase === 'refus' && <p role="alert" data-signalement-refus="" style={{ margin: '14px 0 0', padding: '10px 12px', borderRadius: 12, background: 'var(--vrm-warn-soft)', color: 'var(--vrm-ink)', fontSize: 15, lineHeight: 1.4 }}><b style={{ color: 'var(--vrm-warn)' }}>Pas envoyé.</b> {(() => { const r = etat.phrase.replace(/^Pas envoyé : /, ''); return r.charAt(0).toUpperCase() + r.slice(1); })()}</p>}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
@@ -237,6 +248,7 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
               {detail[s.id] === 'ko' ? <p role="alert" style={{ ...S.muet, color: 'var(--vrm-warn)' }}>Le détail n’a pas pu être lu. Réessaie.</p> : null}
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {!detail[s.id] || detail[s.id] === 'ko' ? <Bouton variante="discret" taille="petit" onClick={() => ouvrirDetail(s)} data-signalement-ouvrir={s.id}>Voir le détail</Bouton> : null}
+                {s.repondre ? <a className="vrm-lien-action" href={'mailto:' + s.repondre + '?subject=' + encodeURIComponent('Ton signalement VRM')} data-signalement-repondre={s.id} style={{ display: 'inline-block', padding: '12px 0' }}>Répondre par e-mail</a> : null}
                 <Bouton variante={s.traite ? 'discret' : 'secondaire'} taille="petit" occupe={occupe === s.id} onClick={() => marquer(s, !s.traite)} data-signalement-traiter={s.id}>
                   {s.traite ? 'Rouvrir' : 'Traité'}
                 </Bouton>
