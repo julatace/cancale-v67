@@ -11,6 +11,8 @@ test('une bascule de compte VRM entre lecture et écriture ne réattribue pas le
  for(const famille of ['compte','annonces','transactions']){
  const e=faire();e.ctx.noterDiag=()=>{};let owner='a';const session=async()=>({access_token:'jeton-test',user_id:owner,expires_at:Date.now()+3600e3});e.ctx.authToken=session;e.ctx.loadSession=session;
  const lire=e.ctx.sbGet;e.ctx.sbGet=async q=>{const r=await lire(q);owner='b';return r;};
+ // (intégration g1) les comptes Leboncoin se lisent par `sbGetLbc` (filtre owner) : la bascule s'y joue aussi.
+ if(typeof e.ctx.sbGetLbc==='function'){const lireL=e.ctx.sbGetLbc;e.ctx.sbGetLbc=async q=>{const r=await lireL(q);owner='b';return r;};}
  const r=famille==='compte'?await e.ctx.storeLbcAccount({id:'secret',name:'Nom privé',courant:true,source:'session:messagerie'}):famille==='annonces'?await e.ctx.storeLbcListings('https://www.leboncoin.fr',[{id:1,subject:'Article privé'}]):await e.ctx.rangerLbcVentes([{txId:'42',isSeller:true,price:2500}]);
  assert.equal(typeof r==='object'?r.ok:r,false,famille);assert.equal(e.ecrits.length,0,famille);assert.equal(e.local.vrmLbcCompte,undefined,famille);
  }
