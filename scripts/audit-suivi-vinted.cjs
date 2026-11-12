@@ -502,8 +502,8 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
         harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: achats } },
         harvest_111_orders_sold: { type: 'orders_sold', payload: { my_orders: [commande('31000000099', 'Colis expédié', 'waiting', 5)] } },
         // livrée : sa dernière étape rangée a 10 jours (rien à dire) / 1 jour (encore relue)
-        harvest_111_suivi_31000000011: { v: 1, tx: '31000000011', source: 'journey', capturedAt: H(240), etapes: [], dernier: { t: 'Colis livré', at: H(240), code: 'delivered' }, transporteur: null, suivi: null, forme: {} },
-        harvest_111_suivi_31000000012: { v: 1, tx: '31000000012', source: 'journey', capturedAt: H(24), etapes: [], dernier: { t: 'Colis livré', at: H(24), code: 'delivered' }, transporteur: null, suivi: null, forme: {} },
+        harvest_111_suivi_31000000011: { v: 1, tx: '31000000011', source: 'journey', capturedAt: H(240), etapes: [], dernier: { t: 'Colis livré', at: H(240), code: 'delivered' }, transporteur: 'Relais Banc', suivi: 'AB12345678', forme: {} },   // (5.372) livré AVEC son n°
+        harvest_111_suivi_31000000012: { v: 1, tx: '31000000012', source: 'journey', capturedAt: H(24), etapes: [], dernier: { t: 'Colis livré', at: H(24), code: 'delivered' }, transporteur: 'Relais Banc', suivi: 'AB12345679', forme: {} },
       };
     };
     const vintedSuivi = (statut = () => 200) => (req) => {
@@ -528,15 +528,18 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       dit(!dues, 'le suivi n’entre pas dans la réserve des lectures prioritaires (il revient sans cesse : ce n’est pas un rattrapage)', JSON.stringify(dues));
       await f.ctx.capterSuivisAchats('111');
       const l2 = lusJ(f);
-      dit(l2.length === 5 && !l2.slice(3).some((v) => l1.map((x) => x.chemin).includes(v.chemin)), 'la visite suivante lit les suivants (pas les mêmes avant 3 h)', l2.length);
+      // (5.372) Chaque achat sans n° coûte aussi le détail de sa transaction : la visite 2 lit
+      // d'AUTRES achats que la 1re ; puis les 6 lectures de l'heure sont prises (plus rien).
+      dit(l2.length > l1.length && !l2.slice(l1.length).some((v) => l1.map((x) => x.chemin).includes(v.chemin)), 'la visite suivante lit les suivants (pas les mêmes avant 3 h)', l2.length);
+      const nAvant3 = f.j.vinted.length;
       await f.ctx.capterSuivisAchats('111');
-      dit(lusJ(f).length === 5, 'tout est dans le mémo de 3 h : plus aucune lecture', lusJ(f).length);
+      dit(f.j.vinted.length === nAvant3, 'tout est dans le mémo de 3 h ou les 6 lectures de l’heure : plus aucune lecture', f.j.vinted.length - nAvant3);
       // trois heures passent (le mémo ET les compteurs de l'heure)
       for (const k of Object.keys(f.store.vrmSuiviFaits || {})) f.store.vrmSuiviFaits[k] = Date.now() - 3 * 3600000 - 60000;
       for (const c of ['vrmSuiviLus', 'vrmLectures']) for (const k of Object.keys(f.store[c] || {})) f.store[c][k] = f.store[c][k].map((t) => t - 3 * 3600000 - 60000);
       const avant = f.j.posts.length;
       await f.ctx.capterSuivisAchats('111');
-      dit(lusJ(f).length === 8 && f.j.posts.slice(avant).every((ids) => !ids.some((id) => /_suivi_/.test(id))), 'après 3 h : relus, et rien de neuf n’est réécrit', `${lusJ(f).length} ${JSON.stringify(f.j.posts.slice(avant))}`);
+      dit(lusJ(f).length > l2.length && f.j.posts.slice(avant).every((ids) => !ids.some((id) => /_suivi_/.test(id))), 'après 3 h : relus, et rien de neuf n’est réécrit', `${lusJ(f).length} ${JSON.stringify(f.j.posts.slice(avant))}`);
       // 6 par heure au plus, sur un compte (10 achats en route, trois visites)
       const ach = []; for (let i = 0; i < 10; i++) ach.push(commande(String(33000000000 + i), 'Colis expédié', 'waiting', 10 + i));
       const fh = faireFond({ src: BG, lignes: { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: ach } } }, vinted: vintedSuivi() });
@@ -922,7 +925,7 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       dit(parPeriode.reduce((a, b) => a + b, 0) <= 1 && ((fi.lignes.panel_formes_suivi || {}).journey || {}).etat === 'inconnue', 'une forme jamais reconnue : une seule lecture de mesure (pas une par achat toutes les 3 h)', JSON.stringify(parPeriode));
       // c. un achat dont la dernière étape rangée est déjà une ARRIVÉE n'est plus relu
       const lr = { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: [{ transaction_id: 35000000001, title: 'Arrivé', status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action', date: H(30) }, { transaction_id: 35000000002, title: 'En route', status: 'Colis expédié', transaction_user_status: 'waiting', date: H(30) }] } },
-        harvest_111_suivi_35000000001: { v: 1, tx: '35000000001', source: 'journey', capturedAt: H(2), etapes: [{ t: 'Colis disponible au point relais', at: H(3), code: 'at_pickup' }], dernier: { t: 'Colis disponible au point relais', at: H(3), code: 'at_pickup' }, transporteur: null, suivi: null, forme: {} } };
+        harvest_111_suivi_35000000001: { v: 1, tx: '35000000001', source: 'journey', capturedAt: H(2), etapes: [{ t: 'Colis disponible au point relais', at: H(3), code: 'at_pickup' }], dernier: { t: 'Colis disponible au point relais', at: H(3), code: 'at_pickup' }, transporteur: 'Relais Banc', suivi: 'AB1234567', forme: {} } };   // (5.372) arrivé AVEC son n° : plus relu ; sans n°, il l'est
       const fr = faireFond({ src: BG, lignes: lr, vinted: vintedSuivi() });
       await fr.ctx.capterSuivisAchats('111');
       const chemins = lusJ(fr).map((v) => v.chemin.split('/')[4]);
@@ -952,7 +955,7 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       const fl = faireFond({ src: BG, lignes: ll, vinted: vintedSuivi() });
       await fl.ctx.capterSuivisAchats('111');
       const v1 = lusJ(fl).map((v) => v.chemin.split('/')[4]);
-      dit(JSON.stringify(v1) === JSON.stringify(['36000000001', '36000000007', '36000000002']), 'première visite : d’abord les achats au point relais (jamais lus, puis déjà lus), avant ceux en route', JSON.stringify(v1));
+      dit(JSON.stringify(v1) === JSON.stringify(['36000000007', '36000000001', '36000000002']), 'première visite : d’abord les achats au point relais sans n° (jamais lus — le plus ancien d’abord —, puis déjà lus), avant ceux en route (5.372)', JSON.stringify(v1));
       await fl.ctx.capterSuivisAchats('111');
       const v2 = lusJ(fl).map((v) => v.chemin.split('/')[4]).slice(3);
       dit(v2[0] === '36000000003', 'ensuite l’achat en route jamais lu, avant ceux en route déjà lus', JSON.stringify(v2));

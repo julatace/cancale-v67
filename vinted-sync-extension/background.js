@@ -9208,7 +9208,7 @@ function nettoyerRelaisSuivi(r) {
 }
 // </suivi-regle>
 
-const SUIVI_QUOI = ['journey', 'escrow', 'code'];
+const SUIVI_QUOI = ['journey', 'escrow', 'code', 'transaction'];   // 5.372 : le détail de la transaction (n° de suivi)
 const FORMES_SUIVI = 'panel_formes_suivi';
 const FORMES_SUIVI_MEMO = 'vrmFormesSuivi';
 const FORMES_SUIVI_MAX = 300;
@@ -9390,10 +9390,14 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
       arriveeEstimee: est || (r0 && r0.ae) || null,
     };
     const lieuChange = !!r0 && ['relaisNom', 'relaisRue', 'relaisCp', 'relaisVille', 'arriveeEstimee'].some((k) => (lieu[k] || null) !== ((r0 && r0[{ relaisNom: 'rn', relaisRue: 'rr', relaisCp: 'rc', relaisVille: 'rv', arriveeEstimee: 'ae' }[k]]) || null));
-    if (!dec.ecrire && !(lieuChange && avant && (avant.etapes.length || avant.dernier))) { noterDiag(`suivi_${dec.raison}`); return false; }
+    // 5.372 : un n° de suivi (ou un transporteur) NOUVEAU suffit à réécrire la ligne — avant, un n°
+    //    lu sur des étapes inchangées était jeté (achats « en route » sans n°, mesuré le 12 nov.).
+    //    Un n° lu AVANT toute étape (vendeur qui vient de télécharger le bordereau) ouvre la ligne.
+    const numeroNeuf = !!((contrat.suivi && (!r0 || contrat.suivi !== r0.nu)) || (r0 && contrat.transporteur && !r0.tr));
+    if (!dec.ecrire && !(numeroNeuf || (lieuChange && avant && (avant.etapes.length || avant.dernier)))) { noterDiag(`suivi_${dec.raison}`); return false; }
     const garde = !dec.ecrire;
-    const etapesE = garde ? avant.etapes : dec.etapes, dernierE = garde ? avant.dernier : dec.dernier;
-    const data = { v: 1, tx: String(tx), source: garde ? (avant.source || source) : dec.source, capturedAt: garde ? ((r0 && r0.cap) || new Date().toISOString()) : new Date().toISOString(),
+    const etapesE = garde ? (avant ? avant.etapes : []) : dec.etapes, dernierE = garde ? (avant ? avant.dernier : null) : dec.dernier;
+    const data = { v: 1, tx: String(tx), source: garde ? ((avant && avant.source) || source) : dec.source, capturedAt: garde ? ((r0 && r0.cap) || new Date().toISOString()) : new Date().toISOString(),
       etapes: etapesE, dernier: dernierE, n: etapesE.length,
       transporteur: contrat.transporteur || (r0 && r0.tr) || null, suivi: contrat.suivi || (r0 && r0.nu) || null,
       ...lieu, lieuLuAt: rel || est ? new Date().toISOString() : undefined,
@@ -19505,16 +19509,30 @@ const SUIVI_EN_ROUTE = /exp[ée]di[ée]|achemin|en\s+transit|en\s+route|en\s+cou
 // La dernière étape rangée dit déjà que le colis est ARRIVÉ (à retirer) ou LIVRÉ
 // (remis, retiré). « Livraison » (en cours de) n'en est pas une : seul « livré ».
 const SUIVI_ARRIVE = /disponible|t['’]attend|vous\s+attend|[àa]\s+(?:retirer|r[ée]cup[ée]rer)|\blivr[ée]e?s?\b|\bretir[ée]e?s?\b|\bremis(?:e|es)?\s+[àa]\s+(?:toi|vous|l['’]acheteur|son\s+destinataire)/i;
+// ⚠️⚠️ 5.372 (12 nov., Julien : « tous les achats doivent avoir leur numéro de suivi ») —
+//    MESURÉ : 25 achats expédiés ou au point SANS n° (22 sur 64 en avaient un). Trois
+//    trous : (1) seuls les achats dont le STATUT disait « expédié / en route / au point »
+//    étaient relus — « En attente de livraison », « bordereau envoyé au vendeur »,
+//    « payé » n'y étaient pas, alors que Vinted donne déjà le n° dès que le vendeur a
+//    téléchargé le bordereau ; (2) un achat arrivé ou livré n'était plus JAMAIS relu,
+//    même sans n° ; (3) un n° lu sur des étapes inchangées n'était pas écrit
+//    (`rangerSuiviUn`). Désormais : TOUT achat en cours (pas fini) des 45 derniers
+//    jours est suivi ; arrivé ou livré, il ne l'est plus seulement s'il A son n°.
 function achatASuivre(o, derniers, maintenant) {
   if (!o || !/^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))) return false;
   const st = String(o.status || ''), tus = String(o.transaction_user_status || '');
   if (SUIVI_FINI.test(st) || tus === 'completed' || tus === 'failed') return false;
   const d = Date.parse(o.date || '');
   if (Number.isFinite(d) && d < maintenant - SUIVI_ACHAT_MAX_J * 86400000) return false;
-  if (/livr[ée]e/i.test(st) && !/pas\s+encore/i.test(st)) return false;
   const da = derniers.get(String(o.transaction_id));
-  if (da && SUIVI_ARRIVE.test(da.t || '')) return false;
-  return tus === 'needs_action' || AT_RELAY(st) || SUIVI_EN_ROUTE.test(st);
+  const aSonNumero = !!(da && da.nu);
+  if (/livr[ée]e/i.test(st) && !/pas\s+encore/i.test(st) && aSonNumero) return false;
+  if (da && SUIVI_ARRIVE.test(da.t || '') && aSonNumero) return false;
+  return true;
+}
+function achatExpedie(o) {
+  const st = String(o.status || '');
+  return String(o.transaction_user_status || '') === 'needs_action' || AT_RELAY(st) || SUIVI_EN_ROUTE.test(st) || (/livr[ée]e/i.test(st) && !/pas\s+encore/i.test(st));
 }
 // L'ordre de lecture (29 octobre). Trié par date seule, un achat au point
 // relais (Vinted : « à retirer », `needs_action`) passait APRÈS les achats en
@@ -19524,10 +19542,62 @@ function achatASuivre(o, derniers, maintenant) {
 // route jamais lu · en route déjà lu ; à rang égal, le plus récent d'abord.
 // « Déjà lu » = une ligne `harvest_{uid}_suivi_{tx}` existe (lecture active ou
 // passive). Les bornes (3 par visite, 6 par heure, mémo de 3 h) ne bougent pas.
+// 5.372 : d'abord les achats EXPÉDIÉS SANS n° (au point relais avant ceux en route),
+// puis les autres sans n°, puis ceux qui ont leur n° ; à rang égal, le moins
+// récemment relu (jamais relu en premier), puis le plus ANCIEN achat.
 function rangSuivi(o, derniers) {
+  const da = derniers.get(String(o.transaction_id));
+  const sansNumero = !(da && da.nu);
   const relais = String(o.transaction_user_status || '') === 'needs_action' || AT_RELAY(String(o.status || ''));
-  const lu = derniers.has(String(o.transaction_id));
-  return (relais ? 0 : 2) + (lu ? 1 : 0);
+  if (sansNumero && achatExpedie(o)) return relais ? 0 : 1;
+  return sansNumero ? 2 : 3;
+}
+function ordreSuivi(a, b, derniers) {
+  const r = rangSuivi(a, derniers) - rangSuivi(b, derniers);
+  if (r) return r;
+  const la = derniers.get(String(a.transaction_id)), lb = derniers.get(String(b.transaction_id));
+  const ma = la && Number.isFinite(la.ms) ? la.ms : 0, mb = lb && Number.isFinite(lb.ms) ? lb.ms : 0;
+  if (ma !== mb) return ma - mb;
+  return (Date.parse(a.date || '') || 0) - (Date.parse(b.date || '') || 0);
+}
+// 5.372 — LE N° DE SUIVI DANS LE DÉTAIL DE LA TRANSACTION (le panneau « Détails » de
+// la conversation sur vinted.fr : étape, transporteur, point de destination, « Informations
+// de suivi »). Le suivi (`journey_summary`) ne porte pas toujours le n° ; le détail de la
+// transaction, si : on n'y garde QUE le n°, le transporteur, le point de destination et
+// l'arrivée estimée, lus sous l'objet d'EXPÉDITION (`shipment`, `shipping`, `parcel`…),
+// jamais un nom ni l'adresse d'une personne. Rien d'expédition reconnu ⇒ `null`.
+const SUIVI_PARENT_EXPEDITION = /(?:shipment|shipping|parcel|delivery|colis|expedition|package)/i;
+function suiviDeTransaction(racine) {
+  if (!racine || typeof racine !== 'object') return null;
+  const tr = racine.transaction && typeof racine.transaction === 'object' ? racine.transaction : racine;
+  const objets = [];
+  const marche = (v, cle, prof) => {
+    if (prof > 6 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v) marche(x, cle, prof + 1); return; }
+    if (SUIVI_PARENT_EXPEDITION.test(String(cle || '')) && !SUIVI_PARENT_PERSONNE.test(String(cle || ''))) objets.push(v);
+    for (const k of Object.keys(v)) if (v[k] && typeof v[k] === 'object') marche(v[k], k, prof + 1);
+  };
+  marche(tr, '', 0);
+  if (!objets.length) return null;
+  let suivi = null, transporteur = null;
+  for (const o of objets) {
+    const c = contratSuivi({ x: o }) || null;
+    if (!suivi) {
+      for (const k of Object.keys(o)) if (SUIVI_NUMERO.test(k)) { const n = suiviNumero(o[k]); if (n) { suivi = n; break; } }
+      if (!suivi && c && c.suivi) suivi = c.suivi;
+    }
+    if (!transporteur) {
+      for (const k of Object.keys(o)) {
+        const x = o[k];
+        if (SUIVI_TRANSP.test(k) && typeof x === 'string' && x.trim() && !/^\d+$/.test(x.trim())) { transporteur = x.trim().slice(0, 80); break; }
+        if (/^(?:carrier|courier|transporteur|shipping_provider)$/i.test(k) && x && typeof x === 'object' && !Array.isArray(x)) {
+          for (const kk of ['name', 'title', 'label', 'code']) if (typeof x[kk] === 'string' && x[kk].trim() && !/^\d+$/.test(x[kk].trim())) { transporteur = x[kk].trim().slice(0, 80); break; }
+          if (transporteur) break;
+        }
+      }
+    }
+  }
+  return { suivi, transporteur, relais: relaisDestination(racine), estimee: arriveeEstimeeSuivi(racine), expedition: true };
 }
 // Les lectures du suivi dans l'heure, par compte (`chrome.storage.local`, §4.9) ;
 // dans la chaîne des compteurs (deux visites ne comptent pas la même place).
@@ -19560,16 +19630,16 @@ async function capterSuivisAchats(uid) {
     if (!acc) return 0;
     const achats = await achatsDuCompte(uid);
     if (achats === null) return 0;                                         // pas su
-    const suivis = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,da:data->dernier->>at,dt:data->dernier->>t`);
+    const suivis = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,da:data->dernier->>at,dt:data->dernier->>t,nu:data->>suivi,lu:data->>capturedAt`);
     if (suivis === null) return 0;                                         // pas su
     const derniers = new Map();
     for (const r of suivis) {
       const tx = (/_suivi_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
-      if (tx) derniers.set(tx, { ms: Date.parse((r && r.da) || ''), t: String((r && r.dt) || '') });
+      if (tx) derniers.set(tx, { ms: Date.parse((r && (r.lu || r.da)) || ''), t: String((r && r.dt) || ''), nu: (r && r.nu) || null });
     }
     const maintenant = Date.now();
     const cibles = [...achats.values()].filter((o) => achatASuivre(o, derniers, maintenant))
-      .sort((a, b) => (rangSuivi(a, derniers) - rangSuivi(b, derniers)) || ((Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0)));
+      .sort((a, b) => ordreSuivi(a, b, derniers));
     if (!cibles.length) return 0;
     // Une forme jamais reconnue : une seule lecture de mesure par jour et par compte.
     let max = SUIVI_MAX_PAR_VISITE;
@@ -19593,6 +19663,22 @@ async function capterSuivisAchats(uid) {
       if (!(await compterLectureSuivi(uid))) { noterDiag('suivi_plafond_heure'); break; }
       memo[tx] = Date.now();
       n++;
+      // 5.372 : pas encore expédié (payé, bordereau pas encore déposé) : le suivi n'a pas
+      //    d'étape — seul le détail de la transaction peut déjà porter le n° (bordereau
+      //    téléchargé par le vendeur). Aucune forme de suivi n'est jugée sur lui.
+      if (!achatExpedie(o) && !((derniers.get(tx) || {}).nu)) {   // un n° déjà lu ⇒ il est parti : le suivi complet
+        const rt = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
+        if (!rt || !rt.ok || !rt.json) { noterDiag(`suivi_transaction_refuse_${(rt && rt.status) || 0}`); if (memoApresEchec(memo, tx, rt, SUIVI_RETRY_MS)) break; continue; }
+        if (estErreurVinted(rt.json)) { noterDiag('suivi_erreur_vinted'); continue; }
+        const st = suiviDeTransaction(rt.json);
+        await rangerFormeSuivi('transaction', formeSuivi(rt.json), st ? 'reconnue' : 'inconnue');
+        if (!st) { noterDiag('suivi_transaction_forme_inconnue'); continue; }
+        if (!st.suivi) { noterDiag('suivi_transaction_sans_numero'); continue; }
+        const r = await rangerSuivi(uid, tx, { etapes: [], dernier: null, transporteur: st.transporteur || null, suivi: st.suivi, relais: st.relais, estimee: st.estimee }, 'transaction', formeSuivi(rt.json));
+        if (r === null) { delete memo[tx]; break; }
+        if (r) ecrits++;
+        continue;
+      }
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}/shipment/journey_summary`);
       if (!rep || !rep.ok || !rep.json) { noterDiag(`suivi_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(memo, tx, rep, SUIVI_RETRY_MS)) break; continue; }
       // La lecture de mesure (forme jamais reconnue) a eu sa réponse : la suivante demain.
@@ -19603,6 +19689,26 @@ async function capterSuivisAchats(uid) {
       // (31 oct., 5.295) le point relais où il arrive et l'arrivée estimée, sur la réponse brute.
       if (contrat) { contrat.relais = relaisDestination(rep.json); contrat.estimee = arriveeEstimeeSuivi(rep.json); }
       await rangerFormeSuivi('journey', forme, contrat ? 'reconnue' : 'inconnue');
+      // 5.372 : le suivi ne porte pas le n° ⇒ le détail de la transaction (une lecture de
+      // plus, dans les MÊMES bornes : 6/h pour le suivi, sous la réserve de l'argent et des colis).
+      if (contrat && !contrat.suivi && n < max) {
+        const refus2 = await gardeLecture(uid, acc, 'suivi');
+        if (!refus2 && (await compterLectureSuivi(uid))) {
+          n++;
+          const rt = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
+          if (rt && rt.ok && rt.json && !estErreurVinted(rt.json)) {
+            const st = suiviDeTransaction(rt.json);
+            await rangerFormeSuivi('transaction', formeSuivi(rt.json), st ? 'reconnue' : 'inconnue');
+            if (st) {
+              if (st.suivi) { contrat.suivi = st.suivi; if (st.transporteur) contrat.transporteur = st.transporteur; }
+              else if (!contrat.transporteur && st.transporteur) contrat.transporteur = st.transporteur;
+              if (!contrat.relais && st.relais) contrat.relais = st.relais;
+              if (!contrat.estimee && st.estimee) contrat.estimee = st.estimee;
+              noterDiag(st.suivi ? 'suivi_numero_transaction' : 'suivi_transaction_sans_numero');
+            } else noterDiag('suivi_transaction_forme_inconnue');
+          } else { noterDiag(`suivi_transaction_refuse_${(rt && rt.status) || 0}`); if (memoApresEchec(memo, tx, rt, SUIVI_RETRY_MS)) break; }
+        }
+      }
       if (!contrat) {
         // La forme est gardée, le contenu non (pas su) : cette réponse n'est pas
         // relue avant 24 h, et on n'en lit pas d'autre (elles auraient la même
