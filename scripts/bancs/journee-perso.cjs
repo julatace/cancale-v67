@@ -7,7 +7,7 @@
 //  D  Sans réglage : Ma journée d'avant. « Modifier ma journée » (44 px) ouvre l'éditeur ;
 //     une carte cachée quitte l'écran, son compteur reste publié (bloc caché `data-tuile`),
 //     « N gestes » ne la compte plus, la tête suit SON ordre ; aucun débordement.
-//  E  L'éditeur : 19 cartes (avec « Avis négatif reçu » et « Commandes à vérifier », intégrations), trois zones, cibles 44 px ; l'interrupteur ; « Revenir au
+//  E  L'éditeur : toutes les cartes de CARTES_JOURNEE (lues de src/journeePerso.js), chacune dans sa zone, trois zones, cibles 44 px ; l'interrupteur ; « Revenir au
 //     réglage d'origine » remet tout.
 //  K  Au clavier : flèche haut, Début, Fin ; le focus reste sur la poignée ; c'est annoncé.
 //  G  Au doigt (390, vrais événements tactiles) et à la souris (1512) : glisser une poignée.
@@ -169,6 +169,12 @@ async function glisser(pg, tactile, id, versId) {
 }
 
 async function main() {
+  // (intégration g1) Les cartes attendues à l'éditeur sont LUES de la vraie liste (src/journeePerso.js,
+  // `CARTES_JOURNEE`) : chaque lot qui ajoute une carte n'a plus à recompter ce banc.
+  const JP = await import(require('url').pathToFileURL(path.join(__dirname, '..', '..', 'src', 'journeePerso.js')).href);
+  const CARTES = JP.CARTES_JOURNEE.filter((c) => c && c.id);
+  const parZone = (z) => CARTES.filter((c) => c.zone === z).map((c) => c.id);
+  const memes = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) for (const theme of ['light', 'dark']) {
@@ -190,7 +196,7 @@ async function main() {
         await pg.waitForTimeout(400);
         let ed = await editeur(pg);
         await shot(pg, `jp-editeur-${vp.width}-${theme}`);
-        dit(ed && ed.n === 19 && ed.zones.afaire.includes('avis-bas') && ed.zones.tete.join() === 'phrase,prochain,frise,chiffres' && ed.zones.afaire.includes('suivi') && ed.origine === '1', `E ${T} l'éditeur : 19 cartes en trois zones (+ « Avis négatif reçu », « Commandes à vérifier », intégrations), au réglage d'origine`, JSON.stringify(ed && ed.zones));
+        dit(ed && ed.n === CARTES.length && Object.keys(ed.zones).every((z) => memes(ed.zones[z], parZone(z))) && ed.zones.tete.join() === 'phrase,prochain,frise,chiffres' && ed.origine === '1', `E ${T} l'éditeur : les ${CARTES.length} cartes de CARTES_JOURNEE, chacune dans SA zone, au réglage d'origine`, JSON.stringify(ed && ed.zones));
         dit(ed && ed.petit >= 44, `E ${T} poignées et interrupteurs : 44 px au moins`, String(ed && ed.petit));
         // Cacher « Colis à envoyer » (rien d'urgent dans ces données) ⇒ la carte part, son compteur reste publié.
         await pg.locator('[data-jp-interrupteur="envoyer"]').click(); await pg.waitForTimeout(300);
