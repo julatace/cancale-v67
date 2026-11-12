@@ -20,7 +20,17 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const PREFIXE_ACTIONS = 'actions_compte_';
-export const SELECT_ACTIONS = 'id,ts:data->ts,max:data->>max,reserve:data->>reserve,prudence:data->>prudence,maxp:data->>maxPrudence';
+export const SELECT_ACTIONS = 'id,ts:data->ts,max:data->>max,reserve:data->>reserve,prudence:data->>prudence,maxp:data->>maxPrudence,jour:data->jour,maxj:data->>maxJour,pj:data->>parJour,montee:data->>montee,captcha:data->>captcha,ev:data->ev';
+// (12 nov., ext. 5.370 — la discrétion) LE JOUR : chaque Chrome publie `jour: { d, n }` (jour de
+// Paris, ses actions du jour) et le plafond du jour TIRÉ (`maxJour`, 70-100 % du réglage
+// `parJour`). La somme des `n` du jour de Paris fait le compte ; le plus petit `maxJour` du jour,
+// le plafond (le plus prudent). Ni `jour` ni `maxJour` ⇒ `nJour: null` (« pas su »).
+// `montee` : le plafond horaire d'un compte NEUF (10 → 20 → 35) ; `captcha` : l'heure où Vinted a
+// demandé une vérification (levée par SA reprise, voir src/discretion.js).
+export function jourParisDe(ms) {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); }
+  catch (_) { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+}
 // (11 nov., ext. 5.357) LA PRUDENCE : après un refus de Vinted, le compte passe 24 h à
 // `PLAFOND_PRUDENCE` actions/heure (le plafond normal ne bouge pas). Chaque Chrome publie
 // l'heure de fin (`prudence`) ; la plus lointaine encore à venir fait foi, échue = levée.
@@ -41,7 +51,15 @@ export function jaugeDuCompte(rows, uid, maintenant = Date.now()) {
   if (!miennes.length) return null;
   const heures = [];
   let max = null, reserve = null, prudence = null, maxp = null;
+  const aujourdhui = jourParisDe(maintenant);
+  let nJour = null, maxJour = null, parJour = null, montee = null, captcha = null;
   for (const r of miennes) {
+    if (r.jour && typeof r.jour === 'object' && r.jour.d === aujourdhui) { const k = Math.floor(Number(r.jour.n)); if (Number.isFinite(k) && k >= 0 && k < 100000) nJour = (nJour || 0) + k; }
+    else if (r.jour && typeof r.jour === 'object' && typeof r.jour.d === 'string') nJour = nJour || 0;   // un jour d'avant : 0 aujourd'hui pour ce Chrome
+    const mj = Number(r.maxj); if (r.maxj != null && Number.isFinite(mj) && mj > 0 && (maxJour == null || mj < maxJour)) maxJour = mj;
+    const pj = Number(r.pj); if (r.pj != null && Number.isFinite(pj) && pj > 0 && parJour == null) parJour = pj;
+    const mo = Number(r.montee); if (r.montee != null && Number.isFinite(mo) && mo > 0 && (montee == null || mo < montee)) montee = mo;
+    const cp = Number(r.captcha); if (r.captcha != null && Number.isFinite(cp) && cp > 0 && cp <= maintenant + 60000 && (captcha == null || cp > captcha)) captcha = cp;
     for (const x of (Array.isArray(r.ts) ? r.ts : [])) {
       const v = Number(x);
       if (Number.isFinite(v) && maintenant - v < HEURE && v <= maintenant + 60000) heures.push(v);
@@ -54,7 +72,8 @@ export function jaugeDuCompte(rows, uid, maintenant = Date.now()) {
   }
   heures.sort((a, b) => a - b);
   // En prudence, le plafond de la prudence vaut pour tout (l'extension ne garde pas de réserve).
-  const plafond = prudence != null ? Math.min(maxp, max == null ? PLAFOND_HEURE : max) : (max == null ? PLAFOND_HEURE : max);
+  let plafond = prudence != null ? Math.min(maxp, max == null ? PLAFOND_HEURE : max) : (max == null ? PLAFOND_HEURE : max);
+  if (montee != null && montee < plafond) plafond = montee;   // (5.370) compte neuf : son plafond de la semaine
   const res = prudence != null ? 0 : (reserve == null ? RESERVE_GESTES : reserve);
   const n = heures.length;
   return {
@@ -65,6 +84,8 @@ export function jaugeDuCompte(rows, uid, maintenant = Date.now()) {
     prudence,
     // La plus ancienne action de l'heure sort du compte à cette heure-là : une place se libère.
     repartA: n ? heures[0] + HEURE : null,
+    // (5.370) Le jour (null = pas su), le compte neuf, la vérification demandée.
+    nJour: maxJour == null ? null : nJour, maxJour, parJour, montee, captcha,
   };
 }
 
@@ -83,6 +104,13 @@ export function heureFr(ms) {
 export function texteJauge(j) {
   if (!j) return { valeur: '—', suite: 'pas encore dit par l’extension', ton: 'passu' };
   const valeur = `${j.n}/${j.max} cette heure`;
+  // (5.370) « 112/200 aujourd'hui » : la même ligne, à part (`jour`). Pas su ⇒ rien d'écrit.
+  const jour = j.nJour != null && j.maxJour ? `${j.nJour}/${j.maxJour} aujourd’hui` : '';
+  const plein = !!(jour && j.nJour >= j.maxJour - (j.prudence ? 0 : RESERVE_GESTES));
+  const r = plein && !j.prudence ? { valeur, suite: 'VRM reprend demain', ton: 'geste' } : texteJaugeHeure(j, valeur);
+  return { ...r, jour, jourPlein: plein, montee: j.montee || null };
+}
+function texteJaugeHeure(j, valeur) {
   // (5.357) Prudence : un geste de Vinted à respecter ⇒ ambre, l'heure de fin dite.
   if (j.prudence) return { valeur, suite: `Prudence jusqu’à ${heureFr(j.prudence)}`, ton: 'geste', prudence: true };
   if (!j.n) return { valeur, suite: '', ton: '' };

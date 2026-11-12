@@ -5733,6 +5733,7 @@ function poserPrudence(qui, statut, quoi) {
     m[String(uid)] = { depuis: avant ? Number(avant.depuis) || t : t, jusqua: t + PRUDENCE_MS, statut: Number(statut) || 0, quoi: String(quoi || 'api').replace(/[^a-z]/gi, '').slice(0, 20) || 'api' };
     try { await chrome.storage.local.set({ [PRUDENCE]: m }); } catch (_) { return; }
     noterDiag(avant ? 'prudence_prolongee' : 'prudence_posee');
+    if (!avant) noterCarnet(String(uid), 'prudence');   // 5.370 : le carnet des 7 jours
     if (!avant) logActivity(`🐢 Vinted a refusé (${Number(statut) || 0}) : ce compte passe 24 h en prudence (${PRUDENCE_ACTIONS_HEURE} actions/heure, lectures de fond suspendues)`);
     // La jauge de l'app le dit tout de suite (hors de la file Vinted : rien n'attend).
     Promise.resolve().then(() => publierJaugeMaintenant(String(uid))).catch(() => {});
@@ -5776,7 +5777,12 @@ function requeteVinted(quoi, fn, qui) {
     if (r && freinVinted(r.status)) await poserPauseVinted(r.status, quoi);
     // (Un 403 sur le dressing PUBLIC d'un autre membre parle de CE membre — profil fermé —, pas de la
     //  session qui lit : il a sa propre règle, `vrmEnLigneFreins`. Un 429 ou un captcha, si.)
-    if (r && refusDeVinted(r) && !(quoi === 'public' && Number(r.status) === 403)) await poserPrudence(qui, Number(r.status) || 0, quoi);
+    const surAutreMembre = quoi === 'public' && Number(r && r.status) === 403;
+    if (r && refusDeVinted(r) && !surAutreMembre) await poserPrudence(qui, Number(r.status) || 0, quoi);
+    // 5.370 (discrétion) : le carnet des 7 jours (403/429 + la pause), et l'ARRÊT NET sur une
+    //    vérification demandée (captcha) — jusqu'à SA reprise.
+    if (r && freinVinted(r.status) && !surAutreMembre) { const u = await uidDeQui(qui).catch(() => null); if (u) { noterCarnet(u, String(Number(r.status))); noterCarnet(u, 'pause'); } }
+    if (r && !surAutreMembre && estCaptchaVinted(r)) await poserCaptcha(qui, Number(r.status) || 0);
     return r;
   };
   const suite = _fileRequetes.then(tour, tour);
@@ -9519,7 +9525,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === 'vrm-relais') lance('relais', () => relaisTick('alarme'));
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
-  else if (a.name === 'vrm-offres') lance('offres', () => offresTick());
+  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); }   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
@@ -10401,7 +10407,16 @@ const ESPACE_ACCEPT_MAX_MS = 45000;       // …le rate-limit réel reste le pla
 // Vinted refuse le geste, rien d'autre.
 const DELAI_OFFRE_MIN_MS = 3 * 60000;
 const DELAI_OFFRE_MAX_MS = 20 * 60000;
-function delaiOffreMs() { return DELAI_OFFRE_MIN_MS + Math.floor(Math.random() * (DELAI_OFFRE_MAX_MS - DELAI_OFFRE_MIN_MS + 1)); }
+// 5.370 (discrétion, point 9 — validé par Julien) : LA NUIT (0 h-7 h, heure de Paris), la
+//    fourchette s'allonge à 30-120 min. Toujours tirée au hasard, JAMAIS un délai fixe
+//    (décision du 27 oct.) ; aucun blocage de nuit (refusé par Julien).
+const DELAI_OFFRE_NUIT_MIN_MS = 30 * 60000;
+const DELAI_OFFRE_NUIT_MAX_MS = 120 * 60000;
+function delaiOffreMs(t = Date.now()) {
+  const nuit = heureParis(t) < 7;
+  const a = nuit ? DELAI_OFFRE_NUIT_MIN_MS : DELAI_OFFRE_MIN_MS, b = nuit ? DELAI_OFFRE_NUIT_MAX_MS : DELAI_OFFRE_MAX_MS;
+  return a + Math.floor(Math.random() * (b - a + 1));
+}
 async function offresTick() {
   try {
     const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
@@ -10500,7 +10515,7 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   if (accts === null) return { ok: false, code: 'pas-su', error: 'tes comptes n’ont pas pu être relus — rien n’est parti, réessaie' };
   const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
-  const stop = await garde(uid, acc); if (stop) return stop;          // anti-blocage : compte de l'onglet + plafond horaire + pause
+  const stop = await garde(uid, acc, { sorte: 'offre', rythme: true }); if (stop) return stop;          // anti-blocage : compte de l'onglet + plafond horaire + pause
   if (quoi !== 'accept' && quoi !== 'reject') return { ok: false, error: 'action inconnue' };
   // ⚠️⚠️ 5.342 (étude « ne jamais être banni », P1) : la réponse part de l'ONGLET
   //    vinted.fr (cookies du site, jeton csrf de la page, aucun `Authorization`),
@@ -10588,7 +10603,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
     if (accts === null) { noterDiag('offres_auto_comptes_pas_lus'); return 0; }
     const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
-    if (await garde(uid, acc, { compter: false })) return 0;   // compte de l'onglet, pause (5.362 : la place est prise au geste seulement)
+    if (await garde(uid, acc, { compter: false, sorte: 'offre', rythme: true })) return 0;   // compte de l'onglet, pause (5.362 : la place est prise au geste seulement)
     // (5.342) Vinted a freiné CE compte (refus, « restreint ») : aucun geste automatique.
     if (await lireFreinRepub(uid)) { noterDiag('offre_auto_frein'); return 0; }
     const fPrud = await facteurPrudence(uid);           // 5.357 : délais doublés en prudence
@@ -10694,6 +10709,9 @@ async function visiteVintedUnPassage() {
   try {
     const uid = await activeUidForDomain(await domaineVintedOuvert());
     if (!uid) return;                                   // pas connecté : rien à capter
+    // 5.370 (discrétion, point 4) : vinted.fr ouvert sur ce compte après 30 min d'absence ⇒
+    //    les gestes AUTOMATIQUES attendent 2 à 6 min (au hasard). Noté avant tout le reste.
+    await noterOuvertureVinted(uid);
     // 5.183 : une commande du téléphone attend peut-être — relevée à chaque
     // visite aussi (NOTRE base, pas Vinted ; ses propres gardes s'appliquent).
     relaisTick('visite').catch(() => {});
@@ -12017,8 +12035,8 @@ async function baisserPrixVinted(msg) {
   { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu_baisse'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   // Le compte de l'onglet ET le plafond : UNE place réservée (le changement de prix).
   const recu = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu });
-  if (stop) return { accepte: false, code: stop.code, actif: stop.actif, raison: stop.error };
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu, sorte: 'baisse_prix', rythme: msg.programme === true });
+  if (stop) return { accepte: false, code: stop.code, actif: stop.actif, raison: stop.error, ...(stop.attendreMs != null ? { attendreMs: stop.attendreMs, jusqua: stop.jusqua } : {}) };
   const rendre = async () => { if (recu.at) await rendreActions(uid, recu.at, 1); };
   // Filet : la sauvegarde coffre de l'annonce (la règle de `republierVinted`).
   let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=n:data->photos`); } catch (_) { coffre = null; }
@@ -12066,6 +12084,103 @@ async function baisserPrixVinted(msg) {
   });
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LES BAISSES DE PRIX ÉTALÉES DANS LA JOURNÉE (12 nov., 5.370 — point 12, validé)
+// ══════════════════════════════════════════════════════════════════════════════
+// SON clic « Programmer » dans l'app (feuille « Baisser le prix », confirmée) range
+// ici, pour UN compte, la liste qu'il a vue : chaque annonce, son prix d'avant, son
+// nouveau prix (déjà varié et arrondi par l'app, jamais sous son plancher) et son
+// heure. Chaque minute (`vrm-offres`), UNE baisse due au plus part — par
+// `baisserPrixVinted`, avec TOUS ses garde-fous (compte de l'onglet, prix d'avant
+// RELU inchangé, relu après, 45/h, plafond du jour, pause, frein) — et elle suit le
+// rythme (une période calme la retarde). Rien n'est inventé ni répété : une baisse
+// refusée ne repart pas toute seule (sauf une attente de la discrétion, qui la
+// décale), une baisse pas partie 24 h après son heure est abandonnée et dite.
+// Rangée dans `chrome.storage.local` (`vrmBaissesPrevues`, §4.9).
+const BAISSES_MAX = 60, BAISSES_PERIME_MS = 24 * 3600000, BAISSES_HORIZON_MS = 36 * 3600000;
+let _chaineBaisses = Promise.resolve();
+function surBaisses(fn) { const p = _chaineBaisses.then(fn, fn); _chaineBaisses = p.then(() => {}, () => {}); return p; }
+async function lireBaisses() { try { const v = (await chrome.storage.local.get('vrmBaissesPrevues')).vrmBaissesPrevues; return Array.isArray(v) ? v : []; } catch (_) { return null; } }
+async function planifierBaisses(msg) {
+  const uid = String((msg && msg.uid) || '');
+  if (!/^\d{1,20}$/.test(uid)) return { accepte: false, code: 'invalide', raison: 'compte inconnu' };
+  if (msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'programmer des baisses demande ton clic — rien n’est rangé' };
+  const t = Date.now();
+  const items = Array.isArray(msg.items) ? msg.items.slice(0, BAISSES_MAX) : [];
+  const propres = [];
+  for (const x of items) {
+    const id = String((x && x.id) || ''), voulu = centimesBaisse(x && x.prix), avant = centimesBaisse(x && x.prixAvant), at = Number(x && x.at);
+    if (!/^\d{4,15}$/.test(id) || !(voulu >= 100 && voulu < avant) || !(Number.isFinite(at) && at > t - 60000 && at < t + BAISSES_HORIZON_MS)) return { accepte: false, code: 'invalide', raison: 'une baisse est incomplète — rien n’est rangé' };
+    propres.push({ uid, id, prix: voulu / 100, prixAvant: avant / 100, at: Math.round(at), etat: 'prevue', pose: t });
+  }
+  if (!propres.length) return { accepte: false, code: 'invalide', raison: 'aucune baisse à programmer' };
+  return surBaisses(async () => {
+    const cur = await lireBaisses();
+    if (cur === null) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    const ids = new Set(propres.map((x) => x.id));
+    const garde = cur.filter((x) => x && !(String(x.uid) === uid && ids.has(String(x.id)) && x.etat === 'prevue') && t - Number(x.at) < 3 * 864e5);
+    const l = garde.concat(propres).slice(-200);
+    try { await chrome.storage.local.set({ vrmBaissesPrevues: l }); } catch (_) { return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+    noterDiag('baisses_programmees');
+    logActivity(`💶 ${propres.length} baisse${propres.length > 1 ? 's' : ''} de prix programmée${propres.length > 1 ? 's' : ''} dans la journée`);
+    return { accepte: true, etape: 'programme', n: propres.length };
+  });
+}
+async function annulerBaisses(msg) {
+  const uid = String((msg && msg.uid) || '');
+  if (!/^\d{1,20}$/.test(uid)) return { accepte: false, code: 'invalide', raison: 'compte inconnu' };
+  return surBaisses(async () => {
+    const cur = await lireBaisses();
+    if (cur === null) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    let n = 0;
+    const l = cur.map((x) => { if (x && String(x.uid) === uid && x.etat === 'prevue') { n++; return { ...x, etat: 'annulee', fin: Date.now() }; } return x; });
+    try { await chrome.storage.local.set({ vrmBaissesPrevues: l }); } catch (_) { return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+    return { accepte: true, etape: 'annule', n };
+  });
+}
+async function etatBaisses(msg) {
+  const uid = String((msg && msg.uid) || '');
+  const cur = await lireBaisses();
+  if (cur === null) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+  return { accepte: true, etape: 'etat', baisses: cur.filter((x) => x && (!uid || String(x.uid) === uid)).map((x) => ({ id: String(x.id), uid: String(x.uid), prix: x.prix, prixAvant: x.prixAvant, at: x.at, etat: x.etat, prixVu: x.prixVu == null ? null : x.prixVu, raison: x.raison || '' })) };
+}
+let _baissesEnCours = false;
+async function baissesTick() {
+  if (_baissesEnCours) return 0;
+  _baissesEnCours = true;
+  try {
+    const t = Date.now();
+    const cur = await lireBaisses();
+    if (!cur || !cur.length) return 0;
+    // Les baisses pas parties 24 h après leur heure : abandonnées, et dites.
+    const perimees = cur.filter((x) => x && x.etat === 'prevue' && t - Number(x.at) > BAISSES_PERIME_MS);
+    if (perimees.length) await surBaisses(async () => { const l = await lireBaisses(); if (!l) return; for (const x of l) if (x && x.etat === 'prevue' && t - Number(x.at) > BAISSES_PERIME_MS) { x.etat = 'perimee'; x.raison = 'pas partie dans les 24 h (vinted.fr fermé ?) : rien n’a changé'; x.fin = t; } try { await chrome.storage.local.set({ vrmBaissesPrevues: l }); } catch (_) {} });
+    const dues = cur.filter((x) => x && x.etat === 'prevue' && Number(x.at) <= t && t - Number(x.at) <= BAISSES_PERIME_MS).sort((a, b) => a.at - b.at);
+    if (!dues.length) return 0;
+    const uid = await compteConnecte('www.vinted.fr');
+    const x = dues.find((d) => String(d.uid) === String(uid || ''));
+    if (!x) return 0;                                   // le compte de la baisse n'est pas dans l'onglet : elle attend
+    if (await pauseVinted()) return 0;
+    const r = await baisserPrixVinted({ cmd: 'baisserPrixVinted', uid: String(x.uid), id: String(x.id), prix: x.prix, prixAvant: x.prixAvant, confirme: true, programme: true });
+    await journalCommande({ cmd: 'baisserPrixVinted', uid: String(x.uid), id: String(x.id) }, r);
+    await surBaisses(async () => {
+      const l = await lireBaisses(); if (!l) return;
+      const y = l.find((z) => z && String(z.uid) === String(x.uid) && String(z.id) === String(x.id) && z.etat === 'prevue' && z.at === x.at);
+      if (!y) return;                                   // annulée pendant ce temps
+      // La discrétion a dit « attends » (rythme, ouverture, autre compte, série, plafond) : décalée.
+      if (r && r.accepte === false && ['discretion', 'verification', 'plafond', 'plafond-bordereaux', 'plafond-jour', 'onglet-vinted', 'vinted-pause', 'vinted-autre', 'vinted-absent'].includes(String(r.code || ''))) {
+        const ms = Number(r.attendreMs) > 0 ? Number(r.attendreMs) : (r.code === 'plafond-jour' ? 6 * 3600000 : 10 * 60000);
+        y.at = Date.now() + ms + tirerEntre(30000, 180000); y.reportee = (Number(y.reportee) || 0) + 1;
+      } else {
+        y.etat = r && r.accepte && (r.etape === 'fait' || r.etape === 'ecart') ? 'faite' : (r && r.accepte && r.etape === 'incertain' ? 'incertaine' : 'refusee');
+        y.prixVu = r && r.prixVu != null ? r.prixVu : null; y.raison = (r && (r.raison || '')) || ''; y.fin = Date.now();
+      }
+      try { await chrome.storage.local.set({ vrmBaissesPrevues: l }); } catch (_) {}
+    });
+    if (r && r.accepte && r.etape === 'fait') notifierApp({ type: 'maj', quoi: 'baisses', uid: String(x.uid) });
+    return 1;
+  } catch (_) { return 0; } finally { _baissesEnCours = false; }
+}
 // ══════════════════════════════════════════════════════════════════════════════
 // LE MODE VACANCES (10 nov., 5.338, lot O — proposition 16, validée par Julien)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -12729,8 +12844,8 @@ async function publierBrouillon(msg) {
   const jour = await gardeJourRepub(uid);
   if (jour) return { accepte: false, code: jour.code, raison: jour.raison };
   const recuB = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu: recuB });
-  if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu: recuB, sorte: 'republier' });
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error, ...(stop.attendreMs != null ? { attendreMs: stop.attendreMs, jusqua: stop.jusqua } : {}) };
   return await avecVinted(async () => {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuB.at) await rendreActions(uid, recuB.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     // Revérifié À SON TOUR dans la file : une mise en ligne planifiée a pu passer avant.
@@ -12882,8 +12997,8 @@ async function refaireBrouillon(msg) {
   const jour = await gardeJourRepub(uid);
   if (jour) return { accepte: false, code: jour.code, raison: jour.raison };
   const recuR = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu: recuR });
-  if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu: recuR, sorte: 'republier' });
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error, ...(stop.attendreMs != null ? { attendreMs: stop.attendreMs, jusqua: stop.jusqua } : {}) };
   return await avecVinted(async () => {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuR.at) await rendreActions(uid, recuR.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     suiviRepub(id);
@@ -13164,8 +13279,8 @@ async function recreerVinted(msg) {
     let n0 = 0; try { const l = ((await chrome.storage.local.get('vrmActions')).vrmActions || {})[uid]; n0 = Array.isArray(l) ? l.filter((t) => Date.now() - Number(t) < 3600000).length : 0; } catch (_) {}
     if (n0 + nA0 > ACTIONS_MAX_HEURE - RESERVE_GESTES) {
       const recu0 = {};
-      const stopP = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA0, recu: recu0 });
-      if (stopP) return { accepte: false, code: stopP.code, raison: stopP.error };
+      const stopP = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA0, recu: recu0, sorte: 'republier' });
+      if (stopP) return { accepte: false, code: stopP.code, raison: stopP.error, ...(stopP.attendreMs != null ? { attendreMs: stopP.attendreMs, jusqua: stopP.jusqua } : {}) };
       if (recu0.at) await rendreActions(uid, Number(recu0.at), nA0);   // passé entre-temps : on rend, la vraie réservation est plus bas
     } }
   // (2 nov., 5.311) TOUJOURS lire l'annonce chez Vinted avant de la refaire (une
@@ -13237,8 +13352,8 @@ async function recreerVinted(msg) {
   const nA = msg.versBrouillon === true ? 2 : 3;
   const recu = {};
   const tAvant = Date.now();
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA, recu });
-  if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA, recu, sorte: 'republier' });
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error, ...(stop.attendreMs != null ? { attendreMs: stop.attendreMs, jusqua: stop.jusqua } : {}) };
   const tRes = Number(recu.at) || tAvant;     // l'horodatage EXACT de SES places (X8)
   let envoyes = 0, confie = false;
   return await avecVinted(async () => { try {
@@ -13620,6 +13735,7 @@ function rendreActions(uid, depuis, n) {
       for (let i = 0; i < l.length && k > 0;) { if (l[i] === d) { l.splice(i, 1); k--; } else i++; }
       for (let i = 0; i < l.length && k > 0;) { if (l[i] >= d) { l.splice(i, 1); k--; } else i++; }
       cur[uid] = l; await chrome.storage.local.set({ [cle]: cur });
+      if (/^\d{1,20}$/.test(String(uid))) await rendreActionsJour(String(uid), depuis, n);   // 5.370 : le jour aussi
       if (!/^vc:/.test(String(uid))) await publierActions(uid, l);
     } catch (_) {}
   });
@@ -13658,9 +13774,11 @@ function idNavigateur() {
 }
 async function actionsAutresNavigateurs(uid) {
   const moi = await idNavigateur();
-  let rows; try { rows = await sbGet(`app_data?id=like.${ACTIONS_PARTAGEES}${uid}_*&select=id,ts:data->ts,lec:data->lec,pr:data->>prudence`); } catch (_) { rows = null; }
+  // 5.370 (discrétion) : aussi les actions du JOUR (`jour`) et la vérification demandée (`captcha`).
+  let rows; try { rows = await sbGet(`app_data?id=like.${ACTIONS_PARTAGEES}${uid}_*&select=id,ts:data->ts,lec:data->lec,pr:data->>prudence,jour:data->jour,cap:data->>captcha`); } catch (_) { rows = null; }
   if (!Array.isArray(rows)) return null;
   const t = Date.now(); let n = 0; const toutes = [];
+  const aujourdhui = jourParis(t); let nJour = 0, captcha = 0;
   // 5.362 (revue, moyenne 33) : les LECTURES des autres Chrome de ce compte (`lec`).
   const lectures = [];
   // 5.357 : la prudence posée par un AUTRE Chrome de ce compte s'applique ici aussi.
@@ -13673,11 +13791,13 @@ async function actionsAutresNavigateurs(uid) {
     // (2 nov., revue) Dans LIKE, « _ » vaut n'importe quel caractère : « …_123_* »
     // ramenait aussi le compte 1234. Seules les lignes EXACTEMENT de ce compte comptent.
     if (!r || !new RegExp(`^${ACTIONS_PARTAGEES}${uid}_[0-9a-f]{16}$`).test(String(r.id || ''))) continue;
+    { const c = Number(r.cap); if (Number.isFinite(c) && c > 0 && c <= t + 60000 && c > captcha) captcha = c; }
     if (String(r.id) === `${ACTIONS_PARTAGEES}${uid}_${moi}`) continue;
+    if (r.jour && typeof r.jour === 'object' && r.jour.d === aujourdhui) { const k = Math.floor(Number(r.jour.n)); if (Number.isFinite(k) && k > 0 && k < 100000) nJour += k; }
     for (const x of (Array.isArray(r.ts) ? r.ts : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) { n++; toutes.push(v); } }
     for (const x of (Array.isArray(r.lec) ? r.lec : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) lectures.push(v); }
   }
-  return { n, toutes, prudence, lectures };
+  return { n, toutes, prudence, lectures, nJour, captcha };
 }
 async function publierActions(uid, list) {
   const moi = await idNavigateur(); if (!moi) return;
@@ -13692,8 +13812,20 @@ async function publierActions(uid, list) {
   let lec = []; try { lec = ((((await chrome.storage.local.get('vrmLectures')).vrmLectures) || {})[uid] || []).filter((x) => t - x < 3600000); } catch (_) {}
   // ⚠️ 5.362 (revue, moyenne 39) : une écriture ratée n'est plus avalée en silence —
   //    les autres Chrome ne voient pas ces actions : c'est NOTÉ.
+  // 5.370 (discrétion) : le JOUR de ce Chrome (`jour` : jour de Paris + nombre), le plafond
+  //    du jour tiré (`maxJour`, et le réglage `parJour`), la montée d'un compte neuf
+  //    (`montee`), la vérification demandée par Vinted (`captcha`) et le carnet des 7 j
+  //    (`ev` : heure + sorte seulement). Rien de personnel.
+  const disc = {};
+  if (/^\d{1,20}$/.test(String(uid))) {
+    try { disc.jour = { d: jourParis(t), n: (await actionsDuJour(String(uid), t)).length }; } catch (_) {}
+    try { const reg = await reglagesDiscretion(); disc.parJour = reg.parJour; disc.maxJour = await plafondJourDe(String(uid), reg.parJour, t); } catch (_) {}
+    try { const m = plafondMontee(await debutMontee(String(uid), t), t); if (m) disc.montee = m; } catch (_) {}
+    try { const c = Number(((await lireLocal('vrmCaptcha'))[String(uid)] || {}).depuis); if (c > 0) disc.captcha = c; } catch (_) {}
+    try { disc.ev = await carnetDe(String(uid)); } catch (_) {}
+  }
   let ok = false;
-  try { ok = (await supabaseUpsert('app_data', [{ id: `${ACTIONS_PARTAGEES}${uid}_${moi}`, data: { uid: String(uid), nav: moi, ts: (list || []).filter((x) => t - x < 3600000), lec, at: new Date(t).toISOString(), max: ACTIONS_MAX_HEURE, reserve: RESERVE_GESTES, maxLectures: LECTURES_MAX_HEURE, ...(pr ? { prudence: Number(pr.jusqua), maxPrudence: PRUDENCE_ACTIONS_HEURE } : {}), v: CODE_VERSION } }], 'id')) === true; } catch (_) { ok = false; }
+  try { ok = (await supabaseUpsert('app_data', [{ id: `${ACTIONS_PARTAGEES}${uid}_${moi}`, data: { uid: String(uid), nav: moi, ts: (list || []).filter((x) => t - x < 3600000), lec, at: new Date(t).toISOString(), max: ACTIONS_MAX_HEURE, reserve: RESERVE_GESTES, maxLectures: LECTURES_MAX_HEURE, ...(pr ? { prudence: Number(pr.jusqua), maxPrudence: PRUDENCE_ACTIONS_HEURE } : {}), ...disc, v: CODE_VERSION } }], 'id')) === true; } catch (_) { ok = false; }
   if (!ok) noterDiag('actions_partagees_pas_ecrites');
   return ok;
 }
@@ -13841,17 +13973,41 @@ async function compterActionUn(uid, plafond, n = 1) {
     //    ⇒ ce Chrome ne prend que SA moitié (`ACTIONS_SANS_AUTRES`) : deux Chrome en
     //    panne de base ne font plus 50 + 50 sur le compte. Le plafond (50) ne bouge pas.
     const maxBase = autres === null ? Math.min(max, ACTIONS_SANS_AUTRES) : max;
+    // 5.370 (discrétion, point 13) : Vinted a demandé une vérification (ce Chrome ou un
+    //    autre du compte) ⇒ AUCUN geste automatique tant qu'il n'a pas touché « Reprendre ».
+    //    Ses clics (plafond entier) passent.
+    if (max < ACTIONS_MAX_HEURE && /^\d{1,20}$/.test(String(uid))) {
+      const cap = await captchaEnCours(String(uid), autres);
+      if (cap) return { ok: false, code: 'verification', depuis: cap, n: list.length };
+    }
     // 5.357 : en PRUDENCE (refus de Vinted il y a moins de 24 h, ce Chrome ou un
     //    autre du compte), le plafond descend à `PRUDENCE_ACTIONS_HEURE`. Le
     //    plafond normal (`ACTIONS_MAX_HEURE`, 50) n'est jamais modifié.
     const prLocale = await prudenceDe(uid);
     const prJusqua = Math.max(prLocale ? Number(prLocale.jusqua) : 0, (autres && Number(autres.prudence)) || 0);
     const enPrudence = prJusqua > t;
-    const maxP = enPrudence ? Math.min(maxBase, PRUDENCE_ACTIONS_HEURE) : maxBase;
+    let maxP = enPrudence ? Math.min(maxBase, PRUDENCE_ACTIONS_HEURE) : maxBase;
+    // 5.370 (discrétion, point 7) : un compte NEUF monte en douceur (10 → 20 → 35 → 50 /h) ;
+    //    la réserve de ses clics reste prise sur ce plafond-là (5 de moins pour l'automatique).
+    const vinted = /^\d{1,20}$/.test(String(uid));
+    let montee = null;
+    if (vinted) { try { montee = plafondMontee(await debutMontee(String(uid), t), t); } catch (_) { montee = null; } }
+    if (montee && montee < maxP + (ACTIONS_MAX_HEURE - max)) maxP = Math.min(maxP, Math.max(1, montee - (ACTIONS_MAX_HEURE - max)));
     const tous = list.concat(autres ? autres.toutes : []).sort((a, b) => a - b);
-    if (tous.length + k > maxP) return { ok: false, n: tous.length, resteMs: Math.max(0, tous[Math.max(0, tous.length + k - 1 - maxP)] + 3600000 - t), ...(enPrudence ? { prudence: prJusqua } : {}) };
+    if (tous.length + k > maxP) return { ok: false, n: tous.length, resteMs: Math.max(0, tous[Math.max(0, tous.length + k - 1 - maxP)] + 3600000 - t), ...(enPrudence ? { prudence: prJusqua } : {}), ...(montee && maxP < maxBase ? { montee } : {}) };
+    // 5.370 (discrétion, point 2) : LE PLAFOND DU JOUR, tous Chrome du compte confondus.
+    //    L'automatique s'arrête `RESERVE_GESTES` avant (comme l'heure). Les autres Chrome
+    //    pas lus ⇒ ce Chrome n'en prend que la moitié (la règle de l'heure).
+    if (vinted) {
+      let capJour = DISCRETION_JOUR_DEFAUT;
+      try { capJour = await plafondJourDe(String(uid), (await reglagesDiscretion()).parJour, t); } catch (_) {}
+      const capEff = Math.max(1, (autres === null ? Math.floor(capJour / 2) : capJour) - (max < ACTIONS_MAX_HEURE ? ACTIONS_MAX_HEURE - max : 0));
+      const nJour = (await actionsDuJour(String(uid), t)).length + (autres ? Number(autres.nJour) || 0 : 0);
+      if (nJour + k > capEff) return { ok: false, code: 'plafond-jour', n: tous.length, nJour, maxJour: capJour, resteMs: Math.max(60000, finJourParis(t) - t) };
+    }
     for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: bornerRegistre(cur, 3600000, 200) });
+    if (vinted) await noterActionsJour(String(uid), t, k);
     if (!/^vc:/.test(String(uid))) await publierActions(uid, list);
     return { ok: true, n: tous.length + k, at: t };
   } catch (_) {
@@ -13879,6 +14035,325 @@ const RESERVE_GESTES = 5;
 // du compte ⇒ CE Chrome n'en prend que la moitié (jamais plus que le plafond).
 const ACTIONS_SANS_AUTRES = 25;
 const LECTURES_SANS_AUTRES = 10;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LA DISCRÉTION (12 nov., 5.370 — validée par Julien point par point)
+// ══════════════════════════════════════════════════════════════════════════════
+// Pour ressembler moins à un robot, en plus des garde-fous de toujours (50/h par
+// compte, une requête à la fois, pause sur 429/403, compte de l'onglet — JAMAIS
+// affaiblis : tout ce qui suit ne fait que RETENIR davantage) :
+//   2. PLAFOND PAR JOUR (réglable, 200 par défaut, `vinted_discretion.parJour` dans
+//      `main`, écrit par l'app) compté sur TOUS les Chrome du compte, comme
+//      l'heure : chaque Chrome publie `jour: { d, n }` dans sa ligne
+//      `actions_compte_…` ; les gestes automatiques s'arrêtent 5 avant (la réserve
+//      de ses clics, comme l'heure). Jour = jour de Paris.
+//   3. RYTHME IRRÉGULIER : des périodes actives (25-60 min) et calmes (10-35 min)
+//      tirées au hasard par compte ; un geste qui suit le rythme (offres
+//      automatiques, baisses programmées) attend la fin d'une période calme. Et
+//      certains jours sont plus calmes : le plafond du jour est tiré entre 70 et
+//      100 % du réglage (une fois par jour et par compte).
+//   4. DÉMARRAGE APRÈS OUVERTURE : vinted.fr ouvert sur un compte après 30 min
+//      d'absence ⇒ aucun geste automatique pendant 2 à 6 min (au hasard). Ses
+//      clics passent (ils ne passent pas par cette porte).
+//   5. UN SEUL COMPTE AGIT À LA FOIS depuis ce navigateur : un geste automatique
+//      d'un compte pose un verrou de 10 min (chrome.storage.local) ; l'autre
+//      compte attend.
+//   6. PAS LA MÊME SÉRIE SUR DEUX COMPTES EN MÊME TEMPS : republication, baisse
+//      de prix, messages aux favoris — un 2e compte attend 20 à 60 min (au
+//      hasard) après le dernier geste de la même sorte sur le 1er.
+//   7. MONTÉE EN DOUCEUR D'UN COMPTE NEUF : compte relié à VRM depuis moins de
+//      4 semaines (`vinted_accounts.created_at`), ou compte Vinted de moins de
+//      30 j (`created_at` du profil, s'il est lu) ⇒ plafond horaire 10, 20, 35
+//      puis 50 (une semaine chacun, depuis la date la plus récente). Date pas
+//      lue ⇒ le plafond normal (rien n'est inventé).
+//   13. ARRÊT NET AU CAPTCHA : une réponse de Vinted qui parle de captcha /
+//      DataDome / « robot » ⇒ PLUS AUCUN geste automatique de ce compte, sur
+//      aucun Chrome (publié dans la ligne `actions_compte_`), jusqu'à SON
+//      « Reprendre » dans l'app (`vinted_discretion.reprises[uid]`, une heure
+//      plus récente que la vérification). Jamais levé par le temps.
+//   14. LE CARNET DES 7 JOURS : refus 403/429, pauses, captchas, prudences,
+//      notés par compte (`ev`, 7 j, 120 au plus) et publiés dans la même ligne :
+//      Paramètres → Mes comptes → Santé des comptes les montre.
+// REFUSÉ par Julien (ne pas faire) : un blocage automatique la nuit ; l'étalement
+// des messages aux favoris sur la journée (⇒ les favoris ne suivent PAS le rythme).
+// Tout l'état vit dans `chrome.storage.local` (§4.9). Une lecture ratée de la
+// base ne lève JAMAIS une retenue (captcha « pas su repris » ⇒ toujours arrêté).
+const DISCRETION_JOUR_DEFAUT = 200;
+const DISCRETION_JOUR_MIN = 20, DISCRETION_JOUR_MAX = 1000;
+const JOUR_FACTEUR_MIN = 0.7;                      // jour calme : 70 à 100 % du réglage
+const OUVERTURE_ABSENCE_MS = 30 * 60000;           // au-delà, une visite est une « ouverture »
+const OUVERTURE_MIN_MS = 2 * 60000, OUVERTURE_MAX_MS = 6 * 60000;
+const VERROU_COMPTE_MS = 10 * 60000;
+const SERIE_ECART_MIN_MS = 20 * 60000, SERIE_ECART_MAX_MS = 60 * 60000;
+const SORTES_SERIE = ['republier', 'baisse_prix', 'favori'];
+const RYTHME_ACTIF_MIN = [25, 60], RYTHME_CALME_MIN = [10, 35];
+const MONTEE_PALIERS = [10, 20, 35];               // semaines 1, 2, 3 ; puis le plafond normal
+const MONTEE_VRM_JOURS = 28, MONTEE_VINTED_JOURS = 30;
+const CARNET_JOURS = 7, CARNET_MAX = 120;
+const DISCRETION_CACHE_MS = 60000;
+const tirerEntre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+// Le jour de Paris (« 2026-11-12 ») et l'heure de Paris (0-23), quel que soit le fuseau.
+function jourParis(t) {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t)); }
+  catch (_) { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+}
+function heureParis(t) {
+  try { const h = Number(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).format(new Date(t)).replace(/\D/g, '')); if (Number.isFinite(h)) return h % 24; } catch (_) {}
+  return new Date(t).getHours();
+}
+// Le début du jour de Paris SUIVANT (pour dire « demain » au lieu de « plus tard »).
+function finJourParis(t) {
+  const d = jourParis(t); let x = t;
+  for (let i = 0; i < 26 * 4 && jourParis(x) === d; i++) x += 15 * 60000;
+  let a = x - 15 * 60000;                         // affine à la minute
+  while (jourParis(a) === d && a < x) a += 60000;
+  return a;
+}
+let _chaineDiscretion = Promise.resolve();
+function surDiscretion(fn) { const p = _chaineDiscretion.then(fn, fn); _chaineDiscretion = p.then(() => {}, () => {}); return p; }
+async function lireLocal(cle) { try { const v = (await chrome.storage.local.get(cle))[cle]; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } }
+// Les réglages posés par l'app dans `main` (`vinted_discretion`), relus au plus une
+// fois par minute. Lecture ratée ⇒ la dernière relue, sinon le défaut — et AUCUNE
+// reprise de captcha (« pas su » ne lève rien).
+async function reglagesDiscretion() {
+  const t = Date.now();
+  const c = await lireLocal('vrmDiscretionReglages');
+  if (c.at && t - Number(c.at) < DISCRETION_CACHE_MS && c.v) return c.v;
+  let m = null; try { m = await lireMain(['vinted_discretion']); } catch (_) { m = null; }
+  if (m === null) return c.v || { parJour: DISCRETION_JOUR_DEFAUT, reprises: {}, passu: true };
+  const brut = m.vinted_discretion && typeof m.vinted_discretion === 'object' ? m.vinted_discretion : {};
+  const pj = Math.round(Number(brut.parJour));
+  const reprises = {};
+  if (brut.reprises && typeof brut.reprises === 'object') for (const k of Object.keys(brut.reprises)) { const v = Number(brut.reprises[k]); if (/^\d{1,20}$/.test(k) && Number.isFinite(v) && v > 0) reprises[k] = v; }
+  const v = { parJour: Number.isFinite(pj) && pj >= DISCRETION_JOUR_MIN && pj <= DISCRETION_JOUR_MAX ? pj : DISCRETION_JOUR_DEFAUT, reprises };
+  try { await chrome.storage.local.set({ vrmDiscretionReglages: { at: t, v } }); } catch (_) {}
+  return v;
+}
+// Le plafond du JOUR de ce compte : le réglage × un facteur tiré une fois par jour (70-100 %).
+async function plafondJourDe(uid, reglage, t) {
+  return surDiscretion(async () => {
+    const d = jourParis(t);
+    const m = await lireLocal('vrmJourTire');
+    let f = m[uid] && m[uid].d === d ? Number(m[uid].f) : NaN;
+    if (!(f >= JOUR_FACTEUR_MIN && f <= 1)) {
+      f = Math.round((JOUR_FACTEUR_MIN + Math.random() * (1 - JOUR_FACTEUR_MIN)) * 100) / 100;
+      m[uid] = { d, f, at: t };
+      try { await chrome.storage.local.set({ vrmJourTire: bornerRegistre(m, 2 * 864e5, 100) }); } catch (_) {}
+    }
+    return Math.max(RESERVE_GESTES + 1, Math.floor(reglage * f));
+  });
+}
+// Les actions de ce compte AUJOURD'HUI dans CE Chrome (liste d'horodatages, 26 h).
+async function actionsDuJour(uid, t) {
+  const m = await lireLocal('vrmActionsJour');
+  const d = jourParis(t);
+  return (Array.isArray(m[uid]) ? m[uid] : []).filter((x) => typeof x === 'number' && jourParis(x) === d);
+}
+async function noterActionsJour(uid, at, k) {
+  try {
+    const m = await lireLocal('vrmActionsJour');
+    const l = (Array.isArray(m[uid]) ? m[uid] : []).filter((x) => typeof x === 'number' && at - x < 26 * 3600000);
+    for (let i = 0; i < k; i++) l.push(at);
+    m[uid] = l.slice(-2000);
+    await chrome.storage.local.set({ vrmActionsJour: bornerRegistre(m, 26 * 3600000, 100) });
+  } catch (_) {}
+}
+async function rendreActionsJour(uid, depuis, n) {
+  try {
+    const m = await lireLocal('vrmActionsJour');
+    const l = (Array.isArray(m[uid]) ? m[uid] : []).slice().sort((a, b) => a - b);
+    let k = Math.max(0, Math.floor(Number(n) || 0)); const d = Number(depuis) || 0;
+    for (let i = 0; i < l.length && k > 0;) { if (l[i] === d) { l.splice(i, 1); k--; } else i++; }
+    for (let i = 0; i < l.length && k > 0;) { if (l[i] >= d) { l.splice(i, 1); k--; } else i++; }
+    m[uid] = l; await chrome.storage.local.set({ vrmActionsJour: bornerRegistre(m, 26 * 3600000, 100) });
+  } catch (_) {}
+}
+// 7. La montée en douceur : le plafond horaire d'un compte neuf, ou `null` (pas neuf / pas su).
+//    Les dates sont relues au plus toutes les 6 h (une ligne projetée, un compte).
+function plafondMontee(debut, t) {
+  if (!Number.isFinite(debut) || debut <= 0 || debut > t + 864e5) return null;
+  const semaine = Math.floor(Math.max(0, t - debut) / (7 * 864e5));
+  return semaine < MONTEE_PALIERS.length ? MONTEE_PALIERS[semaine] : null;
+}
+async function debutMontee(uid, t) {
+  const m = await lireLocal('vrmMontee');
+  if (m[uid] && t - Number(m[uid].at) < 6 * 3600000) return m[uid].debut == null ? null : Number(m[uid].debut);
+  let relie = NaN, vinted = NaN, lu = false;
+  try {
+    const accts = await getStoredAccounts({ ouNull: true });
+    if (Array.isArray(accts)) { lu = true; const a = accts.find((x) => String(x.vinted_user_id) === String(uid)); if (a) relie = Date.parse(a.created_at || ''); }
+  } catch (_) {}
+  try {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_profile&select=c:data->payload->user->>created_at`);
+    if (Array.isArray(rows) && rows[0] && rows[0].c) vinted = Date.parse(rows[0].c);
+  } catch (_) {}
+  const dates = [];
+  if (Number.isFinite(relie) && t - relie < MONTEE_VRM_JOURS * 864e5) dates.push(relie);
+  if (Number.isFinite(vinted) && t - vinted < MONTEE_VINTED_JOURS * 864e5) dates.push(vinted);
+  const debut = dates.length ? Math.max(...dates) : null;
+  if (lu) { m[uid] = { at: t, debut }; try { await chrome.storage.local.set({ vrmMontee: bornerRegistre(m, 6 * 3600000, 100) }); } catch (_) {} }
+  return debut;
+}
+// 14. Le carnet : un événement daté (refus 403/429, pause, captcha, prudence) par compte.
+const CARNET_SORTES = ['403', '429', 'pause', 'captcha', 'prudence', 'reprise'];
+function noterCarnet(uid, sorte) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u) || !CARNET_SORTES.includes(sorte)) return Promise.resolve(false);
+  return surDiscretion(async () => {
+    try {
+      const t = Date.now();
+      const m = await lireLocal('vrmCarnet');
+      const l = (Array.isArray(m[u]) ? m[u] : []).filter((e) => e && t - Number(e.t) < CARNET_JOURS * 864e5);
+      // Un même événement noté deux fois dans la minute (deux réponses de la même rafale) : une fois.
+      if (!l.some((e) => e.s === sorte && t - Number(e.t) < 60000)) l.push({ t, s: sorte });
+      m[u] = l.slice(-CARNET_MAX);
+      await chrome.storage.local.set({ vrmCarnet: m });
+      return true;
+    } catch (_) { return false; }
+  });
+}
+async function carnetDe(uid) {
+  const t = Date.now();
+  const m = await lireLocal('vrmCarnet');
+  return (Array.isArray(m[uid]) ? m[uid] : []).filter((e) => e && CARNET_SORTES.includes(e.s) && t - Number(e.t) < CARNET_JOURS * 864e5).map((e) => ({ t: Number(e.t), s: e.s }));
+}
+// 13. La vérification demandée par Vinted (captcha) : posée sur une réponse qui en parle.
+function estCaptchaVinted(r) {
+  if (!r || typeof r !== 'object' || r.pause) return false;
+  const st = Number(r.status) || 0;
+  if (r.ok && st < 400) return false;
+  let t = '';
+  try { t = typeof r.text === 'string' && r.text ? r.text.slice(0, 6000) : (r.json == null ? '' : JSON.stringify(r.json).slice(0, 6000)); } catch (_) {}
+  return /captcha|datadome|je ne suis pas un robot|not a robot|are you a robot|\brobot\b/i.test(t);
+}
+function poserCaptcha(qui, statut) {
+  return surDiscretion(async () => {
+    const uid = await uidDeQui(qui);
+    if (!uid || !/^\d{1,20}$/.test(String(uid))) { noterDiag('captcha_compte_pas_su'); return; }
+    const m = await lireLocal('vrmCaptcha');
+    if (m[uid] && Number(m[uid].depuis) > 0) return;          // déjà arrêté : la première heure fait foi
+    m[uid] = { depuis: Date.now(), statut: Number(statut) || 0 };
+    try { await chrome.storage.local.set({ vrmCaptcha: m }); } catch (_) {}
+    noterDiag('captcha_vinted');
+    logActivity('🛑 Vinted demande une vérification : VRM arrête tous les gestes automatiques de ce compte. Fais-la sur vinted.fr, puis touche « Reprendre » dans VRM.');
+    Promise.resolve().then(() => publierJaugeMaintenant(String(uid))).catch(() => {});
+    Promise.resolve().then(() => signalerVerification(String(uid))).catch(() => {});
+    try { notifierApp({ type: 'maj', quoi: 'discretion', uid: String(uid), captcha: true }); } catch (_) {}
+    Promise.resolve().then(() => noterCarnet(String(uid), 'captcha')).catch(() => {});
+  });
+}
+// La notification « Vinted demande une vérification » : le serveur relit la ligne
+// au nom du vendeur (aucun texte, aucun pseudo dans le corps), une fois par vérification.
+async function signalerVerification(uid) {
+  try {
+    const session = await authToken();
+    if (!session || !session.access_token) return false;
+    const r = await fetch('https://vrm.center/api/push', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'verification', uid: String(uid) }), signal: signalDelai(SB_DELAI_ECRITURE_MS) });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+}
+// La vérification EN COURS de ce compte (ce Chrome ou un autre), levée seulement par SA
+// reprise plus récente. `autres` : la lecture des autres Chrome (null = pas lue).
+async function captchaEnCours(uid, autres) {
+  const m = await lireLocal('vrmCaptcha');
+  const local = m[uid] && Number(m[uid].depuis) > 0 ? Number(m[uid].depuis) : 0;
+  const ailleurs = autres && Number(autres.captcha) > 0 ? Number(autres.captcha) : 0;
+  const depuis = Math.max(local, ailleurs);
+  if (!depuis) return 0;
+  const reg = await reglagesDiscretion();
+  const reprise = Number((reg.reprises || {})[uid]) || 0;
+  if (reprise > depuis) {
+    if (local) await surDiscretion(async () => { const m2 = await lireLocal('vrmCaptcha'); if (m2[uid] && Number(m2[uid].depuis) <= reprise) { delete m2[uid]; try { await chrome.storage.local.set({ vrmCaptcha: m2 }); } catch (_) {} } });
+    if (local) { noterCarnet(uid, 'reprise'); Promise.resolve().then(() => publierJaugeMaintenant(String(uid))).catch(() => {}); }
+    return 0;
+  }
+  return depuis;
+}
+const PHRASE_CAPTCHA = 'Vinted demande une vérification : fais-la sur vinted.fr, puis touche « Reprendre » dans VRM. Rien n’est parti.';
+// Le refus du compteur dû à la discrétion (jour, vérification, compte neuf), ou `null`.
+function phraseRefusDiscretion(c) {
+  if (!c || c.ok) return null;
+  if (c.code === 'verification') return { ok: false, code: 'verification', depuis: c.depuis, attendreMs: 0, error: PHRASE_CAPTCHA };
+  if (c.code === 'plafond-jour') return { ok: false, code: 'plafond-jour', attendreMs: Number(c.resteMs) || 0, error: `${c.nJour}/${c.maxJour} actions aujourd’hui sur ce compte : VRM reprend demain.` };
+  if (c.montee && !c.prudence) { const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000)); return { ok: false, code: 'plafond', montee: c.montee, error: `Compte neuf : ${c.montee} actions/heure cette semaine. La suite dans ${min} min.` }; }
+  return null;
+}
+// 4. L'ouverture de vinted.fr sur un compte (appelée à chaque visite) : après 30 min
+//    d'absence, une attente de 2 à 6 min est tirée.
+function noterOuvertureVinted(uid) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  return surDiscretion(async () => {
+    const t = Date.now();
+    const m = await lireLocal('vrmOuverture');
+    const o = m[u];
+    if (!o || t - Number(o.vu || 0) > OUVERTURE_ABSENCE_MS) m[u] = { depuis: t, attente: tirerEntre(OUVERTURE_MIN_MS, OUVERTURE_MAX_MS), vu: t };
+    else m[u] = { ...o, vu: t };
+    try { await chrome.storage.local.set({ vrmOuverture: bornerRegistre(Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { ...v, at: v.vu }])), 864e5, 100) }); } catch (_) {}
+    return m[u];
+  });
+}
+// 3. La période en cours du compte (active / calme), tirée au hasard quand elle finit.
+async function phaseRythme(uid, t) {
+  return surDiscretion(async () => {
+    const m = await lireLocal('vrmRythme');
+    let p = m[uid];
+    let n = 0;
+    while ((!p || !(Number(p.jusqua) > t)) && n++ < 50) {
+      const suivante = !p ? 'active' : (p.phase === 'active' ? 'calme' : 'active');
+      const debut = p && Number(p.jusqua) > t - 6 * 3600000 ? Number(p.jusqua) : t;
+      const [a, b] = suivante === 'active' ? RYTHME_ACTIF_MIN : RYTHME_CALME_MIN;
+      p = { phase: suivante, jusqua: debut + tirerEntre(a, b) * 60000, at: t };
+    }
+    m[uid] = p;
+    try { await chrome.storage.local.set({ vrmRythme: bornerRegistre(m, 864e5, 100) }); } catch (_) {}
+    return p;
+  });
+}
+// LA PORTE DES GESTES AUTOMATIQUES (points 3, 4, 5, 6, 13). `sorte` : 'offre' ·
+// 'republier' · 'baisse_prix' · 'favori' · 'bordereau' · 'auto'. Rend `null` (passe)
+// ou un refus `{ ok:false, code, error, attendreMs }` — `attendreMs` dit quand
+// réessayer (0 = jamais tout seul : la vérification attend SA reprise).
+// Un bordereau (une obligation d'envoi) n'attend que la vérification.
+async function porteDiscretion(uid, sorte, opts = {}) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return null;                 // Vestiaire / Leboncoin : pas cette porte
+  const t = Date.now();
+  const cap = await captchaEnCours(u, opts.autres || null);
+  if (cap) return { ok: false, code: 'verification', depuis: cap, attendreMs: 0, error: PHRASE_CAPTCHA };
+  if (sorte === 'bordereau') return null;
+  const att = (ms, quoi, error) => ({ ok: false, code: 'discretion', quoi, attendreMs: Math.max(1000, ms), jusqua: t + Math.max(1000, ms), error });
+  const minutes = (ms) => Math.max(1, Math.ceil(ms / 60000));
+  const ouv = (await lireLocal('vrmOuverture'))[u];
+  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `Vinted vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
+  const v = await lireLocal('vrmVerrouCompte');
+  if (v.uid && String(v.uid) !== u && Number(v.jusqua) > t) { const ms = Number(v.jusqua) - t; return att(ms, 'autre-compte', `Un autre compte vient d’agir dans ce navigateur : VRM attend ${minutes(ms)} min.`); }
+  if (SORTES_SERIE.includes(sorte)) {
+    const s = (await lireLocal('vrmSeries'))[sorte];
+    if (s && String(s.uid) !== u && Number(s.dernier) + Number(s.ecart) > t) { const ms = Number(s.dernier) + Number(s.ecart) - t; return att(ms, 'serie', `La même série vient de passer sur un autre compte : VRM attend ${minutes(ms)} min.`); }
+  }
+  if (opts.rythme) {
+    const p = await phaseRythme(u, t);
+    if (p && p.phase === 'calme' && Number(p.jusqua) > t) { const ms = Number(p.jusqua) - t; return att(ms, 'calme', `Moment calme : VRM reprend dans ${minutes(ms)} min.`); }
+  }
+  return null;
+}
+// Un geste automatique est PARTI (sa place est prise) : le verrou du navigateur et la série.
+function noterGesteAuto(uid, sorte) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u) || sorte === 'bordereau') return Promise.resolve();
+  return surDiscretion(async () => {
+    const t = Date.now();
+    const maj = { vrmVerrouCompte: { uid: u, jusqua: t + VERROU_COMPTE_MS, at: t } };
+    if (SORTES_SERIE.includes(sorte)) {
+      const s = await lireLocal('vrmSeries');
+      const c = s[sorte];
+      s[sorte] = { uid: u, dernier: t, ecart: c && String(c.uid) === u && Number(c.ecart) > 0 ? Number(c.ecart) : tirerEntre(SERIE_ECART_MIN_MS, SERIE_ECART_MAX_MS), at: t };
+      maj.vrmSeries = s;
+    }
+    try { await chrome.storage.local.set(maj); } catch (_) {}
+  });
+}
 
 // ⚠️ BUDGET DE *LECTURE*, SÉPARÉ DU BUDGET D'ACTIONS (Julien, 3 octobre :
 // « capte toutes mes photos »). Lire la PAGE de ses propres annonces (photos,
@@ -14110,12 +14585,18 @@ async function gardeStricte(uid, acc, opts = {}) {
   if (opts.lecture) return null;            // lire n'engage rien : pas de plafond
   const reserve = Math.max(0, Number(opts.reserve) || 0);
   const nA = Math.max(1, Math.floor(Number(opts.actions) || 1));
+  // 5.370 (discrétion) : un geste AUTOMATIQUE d'une série (`sorte`) passe d'abord la porte
+  //    (vérification, ouverture, autre compte, même série ailleurs, rythme).
+  if (opts.sorte) { const p = await porteDiscretion(uid, opts.sorte, { rythme: !!opts.rythme }); if (p) return p; }
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);
   // `recu` : l'horodatage EXACT des places prises, pour les rendre (X8).
   if (c.ok && opts.recu && typeof opts.recu === 'object') opts.recu.at = c.at || null;
+  if (c.ok && opts.sorte) await noterGesteAuto(uid, opts.sorte);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) {
     const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
+    const refusDiscretion = phraseRefusDiscretion(c);
+    if (refusDiscretion) return refusDiscretion;
     if (c.prudence) return { ok: false, code: 'prudence', prudence: c.prudence, error: phrasePrudence({ jusqua: c.prudence }) };   // 5.357
     if (reserve && c.n < ACTIONS_MAX_HEURE) {
       return { ok: false, code: 'plafond-bordereaux',
@@ -14253,8 +14734,8 @@ async function executerMessageFavori(uid,acc,body){
   // qui ne servent pas (arrêt avant l'écriture) sont RENDUES, les siennes (X8).
   const nA=offre?3:2;
   const recu={};
-  const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu});
-  if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux'].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
+  const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori'});
+  if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux','plafond-jour','discretion'].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='verification'?'vinted_robot':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
   const tRes=Number(recu.at)||0;
   // Chaque réponse de Vinted passe par `freinFavoriAuto` : 429/403, captcha ou
   // « activité automatisée » ⇒ la raison dite au serveur (pause 24 h du mode auto).
@@ -15168,7 +15649,11 @@ async function executerCommande(msg) {
   }
   if (msg && msg.cmd === 'republierVinted') { const r = await republierVinted(msg); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
-  if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted(msg); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted({ ...msg, programme: false }); await journalCommande(msg, r); return r; }
+  // 12 nov. (5.370) : les baisses ÉTALÉES dans la journée, sur son clic (voir `planifierBaisses`).
+  if (msg && msg.cmd === 'planifierBaisses') return await planifierBaisses(msg);
+  if (msg && msg.cmd === 'annulerBaisses') return await annulerBaisses(msg);
+  if (msg && msg.cmd === 'etatBaisses') return await etatBaisses(msg);
   // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).
   // 11 nov. (5.340) : posé / retiré au journal SEULEMENT quand Vinted l'a accepté ET relu (« fait » ; « déjà », « écart », « incertain » : rien).
   if (msg && msg.cmd === 'vacancesVinted') { const r = await mettreVacancesVinted(msg); await journalVacances(msg, r); return r; }
@@ -15243,7 +15728,7 @@ async function executerCommande(msg) {
         return { accepte: false, code: 'lot',
                  raison: `${BORD_MAX_PAR_VISITE} bordereaux demandés ces ${Math.round(BORD_CMD_FENETRE_MS / 60000)} dernières minutes sur ce compte — jamais plus d'affilée chez Vinted. La suite dans ${min} min.` };
       }
-      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
+      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, sorte: 'bordereau' });
       if (stop) return await refusDe(stop);
       await noterBordereauCommande(uid);
       return null;
@@ -15621,10 +16106,15 @@ async function garde(uid, acc, opts = {}) {
   //    passage (moteur des offres) — compte, pause, frein, mais AUCUNE place prise :
   //    c'est le geste (`repondreOffre`) qui compte la sienne. Avant : chaque passage
   //    du moteur prenait une action, même sans offre, et chaque acceptation deux.
+  // 5.370 (discrétion) : la porte des gestes automatiques (`sorte`, et le rythme si demandé).
+  if (opts && opts.sorte) { const p = await porteDiscretion(uid, opts.sorte, { rythme: !!opts.rythme }); if (p) return { ...p, code: p.code === 'verification' ? 'verification' : 'discretion' }; }
   if (opts && opts.compter === false) return null;
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
+  if (c.ok && opts && opts.sorte) await noterGesteAuto(uid, opts.sorte);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) {
+    const refusDiscretion = phraseRefusDiscretion(c);
+    if (refusDiscretion) return refusDiscretion;
     if (c.prudence) return { ok: false, code: 'trop-d-actions', prudence: c.prudence, error: phrasePrudence({ jusqua: c.prudence }) };   // 5.357 : le plafond de la prudence
     return { ok: false, code: 'trop-d-actions',
              error: `${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions automatiques sur ce compte dans l'heure — les ${RESERVE_GESTES} dernières sont gardées pour tes gestes. Réessaie plus tard.` };
@@ -15985,7 +16475,7 @@ async function genererBordereau(uid, tx, opts = {}) {
   if (!acc) return { ok: false, error: 'compte introuvable' };
   // `gardeFaite` : une commande de l'app est déjà passée par `gardeStricte`
   // (et a déjà consommé son créneau du plafond) — la refaire en brûlerait deux.
-  if (!opts.gardeFaite) { const stop = await garde(uid, acc); if (stop) return stop; }   // anti-blocage
+  if (!opts.gardeFaite) { const stop = await garde(uid, acc, { sorte: 'bordereau' }); if (stop) return stop; }   // anti-blocage
   // ⚠️ Le garde-fou passe AVANT la lecture d'adresse : celle-ci est une requête
   // Vinted comme une autre, elle n'a pas à partir depuis la session d'un autre
   // compte ni à dépasser le plafond horaire (§48).
