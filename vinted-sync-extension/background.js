@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.362.0';
+const CODE_VERSION = '5.369.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -10458,7 +10458,7 @@ function seuilOffreLu(v) {
   return isFinite(n) && n > 0 ? n : null;
 }
 async function offreAutoReglages() {
-  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offres_garde']);
+  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_garde']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
   const actif = m.vinted_offres_auto === true;
   const nums = m.vinted_annonce_numeros || {};
@@ -10470,8 +10470,11 @@ async function offreAutoReglages() {
   }
   // Le message de refus est SON texte (jamais inventé) ; vide ⇒ on refuse sans écrire.
   const msgRefus = String(m.vinted_offre_refus_msg || '').trim();
+  // (5.369) Ses autres versions (2 à 5), rangées à côté : VRM en tire une au hasard,
+  // jamais celle du refus précédent. Sans 1re version, rien n'est écrit (comme avant).
+  const refusVersions = msgRefus ? versionsMessage(msgRefus, Array.isArray(m.vinted_offre_refus_variantes) ? m.vinted_offre_refus_variantes : []) : [];
   const garde = m.vinted_offres_garde && typeof m.vinted_offres_garde === 'object' ? m.vinted_offres_garde : null;
-  return { actif, mins, refuses, msgRefus, garde };
+  return { actif, mins, refuses, msgRefus, refusVersions, garde };
 }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
 // conversations DÉJÀ captées (aucun appel Vinted ajouté). Copie fidèle de
@@ -10535,9 +10538,13 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   // ⚠️ 2 nov. (audit « plateformes » P11) : le message est une SECONDE requête chez
   // Vinted — elle prend sa place dans le plafond (sous la réserve des gestes, comme
   // `garde`). Plus de place (ou stockage muet) ⇒ le message ne part pas, c'est noté.
-  if (quoi === 'reject' && r && r.ok && conv && msg) {
+  // (5.369) `msg` : ses versions [{n, texte}] (ou l'ancien texte seul). Une version
+  // tirée au hasard, jamais celle du refus précédent ; puis le temps d'écriture.
+  const versionsRefus = Array.isArray(msg) ? msg : (typeof msg === 'string' ? versionsMessage(msg, []) : []);
+  if (quoi === 'reject' && r && r.ok && conv && versionsRefus.length) {
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
+    const version = choisirVariante(versionsRefus, await varianteDerniere(uid, 'refus'));
     // ⚠️ 5.361 (revue de robustesse, haute 21) : le corps est la forme RELEVÉE sur
     //    ses vraies requêtes (`docs/automatisation-vinted.md` §3, la même que
     //    `executerMessageFavori` et l'app) — `corpsReponseVinted`. Avant : `{ message }`,
@@ -10545,11 +10552,19 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
     //    Refus (ou rien parti) ⇒ la place est RENDUE et c'est dit.
     let parti = false;
     try {
-      const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, corpsReponseVinted(msg), { timeoutMs: 12000 });
-      parti = !!(rm && rm.ok);
-      noterDiag(parti ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
+      // (5.369) Le temps d'écriture DANS la file une-à-la-fois, puis l'envoi d'un coup ;
+      // une pause de Vinted ou un autre compte pendant l'attente ⇒ rien ne part.
+      parti = await avecVinted(async () => {
+        const ec = await attendreEcriture(uid, acc, version.texte, 'serie');
+        if (!ec.ok) return false;
+        const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, corpsReponseVinted(version.texte), { timeoutMs: 12000 });
+        noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
+        return !!(rm && rm.ok);
+      });
     } catch (_) {}
     if (!parti) { if (c2.at) await rendreActions(String(uid), c2.at, 1); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
+    await noterVarianteDerniere(uid, 'refus', version.n);
+    return { ok: true, status: r.status, code: r.code, error: '', variante: version.n };
   }
   return { ok: !!r.ok, status: r.status, code: r.code, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
@@ -10656,7 +10671,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       const stFrais = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
       if (stFrais[o.oid]) { st[o.oid] = stFrais[o.oid]; continue; }
       for (const k in stFrais) if (!st[k]) st[k] = stFrais[k];
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? reg.msgRefus : null });
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
         const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
@@ -10672,9 +10687,9 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv });   // écrit AVANT de boucler : un worker tué ne retraite pas
       if (r && r.ok) {
         faites += 1;
-        await noterJournal(uid, quoi === 'accept' ? 'offre_acceptee' : 'offre_refusee', { a: o.item, x: o.tx, p: o.prix, auto: true });
+        await noterJournal(uid, quoi === 'accept' ? 'offre_acceptee' : 'offre_refusee', { a: o.item, x: o.tx, p: o.prix, auto: true, v: r.variante });
         if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
-        else logActivity(`↩️ Offre de ${o.prix.toFixed(2)} € refusée automatiquement (ton seuil : ${refuse} €)${reg.msgRefus ? ' + ton message' : ''}`);
+        else logActivity(`↩️ Offre de ${o.prix.toFixed(2)} € refusée automatiquement (ton seuil : ${refuse} €)${r.variante ? ` + ton message (version ${r.variante})` : (reg.msgRefus && r.messagePasParti ? " — ton message n'est pas parti" : '')}`);
         notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
       } else { break; }                                 // garde-fou atteint ou refus de Vinted : on arrête le lot (pas de refus en série)
     }
@@ -13894,6 +13909,8 @@ function entreeJournal(sorte, extra, t) {
   if (prix(x.de) !== undefined) e.de = prix(x.de);
   if (prix(x.vers) !== undefined) e.vers = prix(x.vers);
   if (x.auto === true) e.auto = true;
+  // (5.369) Le n° de la version du message envoyée (1 à 5) — jamais le texte.
+  if (Number.isInteger(x.v) && x.v >= 1 && x.v <= VARIANTES_MAX) e.v = x.v;
   return e;
 }
 let _chaineJournal = Promise.resolve();
@@ -14660,6 +14677,15 @@ async function executerPourApp(msg, sender) {
     if(permis.favorisListe)return lirePageFavoris(msg.uid,acc,msg.body);
     if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body);
     if (methode === 'GET') return vintedGet(acc, msg.endpoint);
+    // (5.369) SA réponse, sur SON clic « Envoyer » : il a déjà tapé le texte lui-même
+    // dans l'app (le vrai temps d'écriture est déjà passé) ⇒ seulement 2 à 6 s, le
+    // temps de relire, dans la file. Pause de Vinted ou autre compte pendant
+    // l'attente ⇒ rien ne part, sa place est rendue.
+    if (methode === 'POST' && /^\/api\/v2\/conversations\/\d+\/replies$/.test(String(msg.endpoint || ''))) {
+      const txt = msg.body && msg.body.reply && typeof msg.body.reply.body === 'string' ? msg.body.reply.body : '';
+      const ec = await attendreEcriture(msg.uid, acc, txt, 'clic');
+      if (!ec.ok) { arret = { ok: false, code: ec.code, error: ec.error }; return null; }
+    }
     // (5.342, P1) Son geste part de l'onglet vinted.fr quand il est ouvert (comme le
     // site). Sans onglet (téléphone, autre navigateur) : son clic part comme avant —
     // c'est un geste humain, un à la fois. Un onglet qui a quitté Vinted : rien ne part.
@@ -14676,7 +14702,7 @@ async function executerPourApp(msg, sender) {
   // (5.337) Le journal « ce que VRM a fait » : seulement un geste ACCEPTÉ par Vinted ;
   // la sorte vient du chemin, le n° de transaction aussi — jamais le texte envoyé.
   if (r && r.ok && !permis.lecture) {
-    if (permis.favori) { if (r.json && r.json.resultat === 'envoye') await noterJournal(msg.uid, 'favori', { auto: !!(msg.body && msg.body.auto === true) }); }
+    if (permis.favori) { if (r.json && r.json.resultat === 'envoye') await noterJournal(msg.uid, 'favori', { auto: !!(msg.body && msg.body.auto === true), v: r.json.variante }); }
     else { const s = sorteExec(methode, msg.endpoint); const m = /\/transactions\/(\d+)\//.exec(String(msg.endpoint || '')); if (s) await noterJournal(msg.uid, s, { x: m ? m[1] : undefined }); }
   }
   if(permis.favori&&r.json?.resultat==='ignore')logActivity('Favori ignoré : conversation déjà commencée, aucun message envoyé.');
@@ -14688,8 +14714,9 @@ async function executerMessageFavori(uid,acc,body){
   const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
   // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
-  let ecrits=0,frein='';
-  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,ecrits}});
+  // (5.369) `variante` = le n° de la version envoyée (1 à 5), rendu au serveur pour le journal (jamais le texte).
+  let ecrits=0,frein='',variante=null;
+  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,ecrits,...(resultat==='envoye'&&Number.isInteger(variante)?{variante}:{})}});
   if(typeof body?.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(body.jeton))return rep('refuse',400);
   const jeton=body.jeton;
   const session=await authToken();if(!session?.access_token)return rep('refuse',401,'session_extension');
@@ -14704,7 +14731,7 @@ async function executerMessageFavori(uid,acc,body){
   const etape=nom=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom});};
   body=grant.travail;
   etape('autorisation');
-  if(!body||!id(body.itemId)||!id(body.recipientId)||String(uid)===body.recipientId||typeof body.initiator!=='string'||!body.initiator||body.initiator.length>80||typeof body.message!=='string'||!body.message.trim()||body.message.length>2000)return rep('refuse',400);
+  if(!body||!id(body.itemId)||!id(body.recipientId)||String(uid)===body.recipientId||typeof body.initiator!=='string'||!body.initiator||body.initiator.length>80||typeof body.message!=='string'||!body.message.trim()||body.message.length>2000||body.variantes!=null&&(!Array.isArray(body.variantes)||body.variantes.length>VARIANTES_MAX-1||body.variantes.some(v=>typeof v!=='string'||v.length>2000)))return rep('refuse',400);
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   // 5.280 (29 oct., « copie ce que fait Vintex comme pour les repu ») — MESURÉ
   // avec VRM Observateur sur 9 favoris envoyés par Vintex (aucun refusé) : tout
@@ -14807,11 +14834,20 @@ async function executerMessageFavori(uid,acc,body){
     noterDiag(offreFaite?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
     if(!offreFaite)return (o.status>=400&&o.status<500)||(o.ok&&!offreFaite)?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
   }
+  // (5.369) La VERSION du message : tirée au hasard parmi celles qu'il a écrites,
+  // jamais celle du message précédent de ce compte ; une seule ⇒ le texte d'avant.
+  const version=choisirVariante(versionsMessage(body.message,body.variantes),await varianteDerniere(uid,'favori'));
+  if(!version)return rep('refuse',400);
   // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
   // {a|b} = une variante tirée au hasard pour ce message.
-  const texteFinal=personnaliserMessageFavori(body.message,String(c?.opposite_user?.login||'')).slice(0,2000);
+  const texteFinal=personnaliserMessageFavori(version.texte,String(c?.opposite_user?.login||'')).slice(0,2000);
   if(!texteFinal.trim())return rep('refuse',400);
   await pauseFavori('reponse', uid);
+  // (5.369) Le temps qu'un humain mettrait à taper CE texte, puis l'envoi d'un coup.
+  // Pause de Vinted ou autre compte pendant l'attente ⇒ rien ne part (places rendues).
+  etape('ecriture');
+  const ec=await attendreEcriture(uid,acc,texteFinal,'serie');
+  if(!ec.ok)return rep('refuse',0,ec.code==='vinted-pause'?'pause_vinted':ec.code==='vinted-autre'?'compte_vinted_different':'compte_vinted_absent');
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
   const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,corpsReponseVinted(texteFinal),{timeoutMs:12000});
@@ -14821,7 +14857,7 @@ async function executerMessageFavori(uid,acc,body){
   // (qui arrêtait toutes les files).
   if(r.sansPage)return rep('refuse',0,'onglet_vinted');
   if(r.pause)return rep('refuse',0,'pause_vinted');
-  if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
+  if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);}
 }
@@ -14909,6 +14945,81 @@ function prixOffreFavori(montant, offre) {
   return (c / 100).toFixed(2);
 }
 // </favoris-message-regle>
+// ══════════════════════════════════════════════════════════════════════════
+// 5.369 (12 nov., validé par Julien) — TEMPS D'ÉCRITURE ET MESSAGES VARIÉS
+// ══════════════════════════════════════════════════════════════════════════
+// « Un temps d'écriture avant chaque envoi […] puis l'envoie d'un coup » et
+// « Personne ne reçoit exactement la même phrase que le précédent. » Le bloc
+// bloc « variantes-regle » ci-dessous est la COPIE EXACTE de src/variantesMessage.js
+// (`audit-ecriture-humaine.cjs` compare les deux).
+// ⚠️ AUCUNE touche simulée, aucun clic (CLAUDE.md §3) : on ATTEND, rien d'autre,
+//    puis la requête part d'un coup comme avant. L'attente se fait DANS la file
+//    une-à-la-fois (`avecVinted`) : rien d'autre ne part pendant qu'« il tape ».
+//    Elle ne réserve AUCUNE action de plus (le plafond 50/h ne bouge pas).
+//    Revérifié par tranches de 4 s : une pause de Vinted (429/403) ou un AUTRE
+//    compte dans l'onglet pendant l'attente ⇒ rien ne part (`arret`).
+// <variantes-regle>
+const VARIANTES_MAX = 5;
+const ECRITURE_HUMAINE = { cps: 4.5, jitter: 0.25, minMs: 5000, maxMs: 45000, clicMinMs: 2000, clicMaxMs: 6000 };
+function versionsMessage(premier, autres) {
+  const liste = [premier].concat(Array.isArray(autres) ? autres : []).slice(0, VARIANTES_MAX);
+  const out = [];
+  for (let i = 0; i < liste.length; i++) {
+    const t = typeof liste[i] === 'string' ? liste[i].trim() : '';
+    if (t) out.push({ n: i + 1, texte: t });
+  }
+  return out;
+}
+function choisirVariante(versions, precedente, hasard) {
+  const l = Array.isArray(versions) ? versions.filter((v) => v && typeof v.texte === 'string' && v.texte) : [];
+  if (!l.length) return null;
+  if (l.length === 1) return l[0];
+  const p = Number(precedente);
+  const cand = l.filter((v) => v.n !== p);
+  const tirer = typeof hasard === 'function' ? hasard : Math.random;
+  const h = Number(tirer());
+  const i = Math.min(cand.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * cand.length)));
+  return cand[i];
+}
+function tempsEcritureMs(texte, mode, hasard) {
+  const tirer = typeof hasard === 'function' ? hasard : Math.random;
+  let h = Number(tirer()); if (!Number.isFinite(h) || h < 0) h = 0; if (h > 1) h = 1;
+  const E = ECRITURE_HUMAINE;
+  if (mode === 'clic') return Math.round(E.clicMinMs + h * (E.clicMaxMs - E.clicMinMs));
+  const n = String(texte == null ? '' : texte).length;
+  const base = (n / E.cps) * 1000 * (1 - E.jitter + 2 * E.jitter * h);
+  return Math.round(Math.min(E.maxMs, Math.max(E.minMs, base)));
+}
+// </variantes-regle>
+const ECRITURE_TRANCHE_MS = 4000;
+async function attendreEcriture(uid, acc, texte, mode) {
+  const ms = tempsEcritureMs(texte, mode === 'clic' ? 'clic' : 'serie');
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['ecriture:' + (mode === 'clic' ? 'clic' : 'serie'), ms, String(texte == null ? '' : texte).length]); } catch (_) {}
+  noterDiag('ecriture_' + (mode === 'clic' ? 'clic' : 'serie'));
+  // Le temps se découpe en tranches (le worker MV3 s'endort après 30 s sans appel
+  // d'API : chaque tranche relit l'état, ce qui le tient éveillé — §4.9).
+  const tranches = Math.max(1, Math.ceil(ms / ECRITURE_TRANCHE_MS));
+  for (let i = 0; i <= tranches; i++) {
+    const p = await pauseVinted();
+    if (p) { noterDiag('ecriture_annulee_pause'); return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(p) }; }
+    const actif = await compteConnecte(acc && acc.domain);
+    if (!actif || String(actif) !== String(uid)) { noterDiag('ecriture_annulee_compte'); return { ok: false, code: actif ? 'vinted-autre' : 'vinted-absent', error: actif ? "ton navigateur est passé sur un autre compte Vinted pendant l'écriture — rien n'est parti" : "plus aucun compte Vinted connecté dans ce Chrome — rien n'est parti" }; }
+    if (i === tranches) break;
+    const t = i === tranches - 1 ? ms - ECRITURE_TRANCHE_MS * (tranches - 1) : ECRITURE_TRANCHE_MS;
+    await new Promise((ok) => setTimeout(ok, Math.max(0, t)));
+  }
+  return { ok: true, ms };
+}
+// La version du message PRÉCÉDENT, par compte et par sorte (`favori`, `refus`) :
+// `chrome.storage.local` (§4.9). Notée seulement quand le message est PARTI.
+const VARIANTE_MEMO = 'vrmVarianteDerniere';
+async function varianteDerniere(uid, sorte) {
+  try { const m = (await chrome.storage.local.get(VARIANTE_MEMO))[VARIANTE_MEMO] || {}; const v = Number(m[String(uid) + ':' + sorte]); return Number.isInteger(v) ? v : null; } catch (_) { return null; }
+}
+async function noterVarianteDerniere(uid, sorte, n) {
+  if (!Number.isInteger(n)) return;
+  try { const m = (await chrome.storage.local.get(VARIANTE_MEMO))[VARIANTE_MEMO] || {}; m[String(uid) + ':' + sorte] = n; await chrome.storage.local.set({ [VARIANTE_MEMO]: m }); } catch (_) {}
+}
 let _fileVinted = Promise.resolve();
 function avecVinted(fn) {
   const suite = _fileVinted.then(() => fn(), () => fn());

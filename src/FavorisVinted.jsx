@@ -5,6 +5,7 @@ import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris,offreFa
 import {personnaliserMessageFavori,prixOffreFavori,aDesVariablesFavori} from './favorisMessage.js';
 import {controleOuvertureFavori,echecVerificationFavori} from './favorisOuverture.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
+import AutresVersions from './AutresVersions.jsx';   // (12 nov., ext. 5.369) les autres versions du message
 import ModeAutoFavoris from './ModeAutoFavoris.jsx';
 import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import JaugeActions from './JaugeActions.jsx';   // (10 nov., lot G) les 50 actions/h de ce compte
@@ -30,9 +31,9 @@ function PhotoNotification({src, PhotoVinted}) {
 const ETAPES=[['choix','1. Choisir'],['message','2. Message'],['envoi','3. Envoi']];
 const ETAT_ENVOI={attente:'En attente',reserve:'En cours…',envoye:'Envoyé',ignore:'Conversation déjà commencée — rien envoyé',incertain:'À vérifier sur Vinted',annule:'Annulé — non envoyé',verifie:'Clôturé après vérification',refuse:'Interrompu'};
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU,extensionAuto=null,articleFavori=null}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,favorisVariantes=true,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU,extensionAuto=null,articleFavori=null}) {
   const [vueAuto,setVueAuto]=React.useState(null),[periode,setPeriode]=React.useState('30'),[filtreChoisi,setFiltreArticles]=React.useState(null),[maxArticles,setMaxArticles]=React.useState(20),[detail,setDetail]=React.useState(null);
-  const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
+  const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[variantes,setVariantes]=React.useState([]),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   // L'offre (29 oct., comme Vintex) : aucune · diminuer (% ou €) · fixer à un prix ; arrondi à l'euro.
   const [offreChoix,setOffreChoix]=React.useState('aucune'),[typeDim,setTypeDim]=React.useState('pct'),[montantOffre,setMontantOffre]=React.useState(''),[arrondi,setArrondi]=React.useState(false),champMessage=React.useRef(null);
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[rythme,setRythme]=React.useState('fixe'),[intervalleMax,setIntervalleMax]=React.useState('12'),[reglages,setReglages]=React.useState({});
@@ -46,18 +47,20 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const offreMode=offreChoix==='fixer'?'prix':offreChoix==='diminuer'?typeDim:null;
   const champsOffre={pourcentage:offreMode==='pct'?reduction:null,offreMode,offreValeur:offreMode==='euros'||offreMode==='prix'?montantOffre:null,arrondi:!!offreMode&&arrondi};
   let offre=null,erreurOffre='';try{offre=offreFavori(champsOffre);}catch(e){erreurOffre=e.message;}
-  const apercu0=preparerMessageFavori(message,null),apercu={...apercu0,erreur:apercu0.erreur||erreurOffre};
-  const configuration={message,...champsOffre,intervalleMinutes:rythme==='vintex'?'0':intervalle,intervalleMaxMinutes:rythme==='aleatoire'?intervalleMax:null};
-  let erreurRythme='';try{validerReglagesFavoris({...configuration,message:apercu.message?message:'x',...(erreurOffre?{pourcentage:null,offreMode:null,offreValeur:null,arrondi:false}:{})});}catch(e){erreurRythme=e.message;}
+  // (5.369) Chaque autre version suit les mêmes règles que la 1re (variables, longueur).
+  const erreurVariantes=variantes.map((t,i)=>String(t||'').trim()?preparerMessageFavori(t,null).erreur&&`Version ${i+2} : ${preparerMessageFavori(t,null).erreur}`:'').find(Boolean)||'';
+  const apercu0=preparerMessageFavori(message,null),apercu={...apercu0,erreur:apercu0.erreur||erreurOffre||erreurVariantes};
+  const configuration={message,variantes,...champsOffre,intervalleMinutes:rythme==='vintex'?'0':intervalle,intervalleMaxMinutes:rythme==='aleatoire'?intervalleMax:null};
+  let erreurRythme='';try{validerReglagesFavoris({...configuration,variantes:[],message:apercu.message?message:'x',...(erreurOffre?{pourcentage:null,offreMode:null,offreValeur:null,arrondi:false}:{})});}catch(e){erreurRythme=e.message;}
   // Variables ou offre en euros / arrondie : l'extension 5.281 seulement.
-  const exigePerso=aDesVariablesFavori(message)||!!offreMode&&(offreMode!=='pct'||arrondi);
+  const exigePerso=aDesVariablesFavori(message+variantes.join(''))||!!offreMode&&(offreMode!=='pct'||arrondi);
   const offreObjet=offre?.offreMode?{mode:offre.offreMode,valeur:offre.offreMode==='pct'?offre.pourcentage:offre.offreValeur,arrondi:offre.arrondi}:null;
   const exempleOffre=offreObjet?prixOffreFavori(50,offreObjet):null;
   const prixFixeTexte=offreObjet?.mode==='prix'?(offreObjet.arrondi?Math.floor(offreObjet.valeur):offreObjet.valeur).toFixed(2).replace('.',','):'';
   const inserer=t=>{const el=champMessage.current,a=el?.selectionStart??message.length,b=el?.selectionEnd??message.length;const suite=(message.slice(0,a)+t+message.slice(b)).slice(0,2000);setMessage(suite);change();requestAnimationFrame(()=>{try{el?.focus();el?.setSelectionRange(a+t.length,a+t.length);}catch{}});};
   const requete=React.useRef(0),occupe=React.useRef(false);
   const scope=owner+':'+uid, data=etat.scope===scope?etat.data:undefined;
-  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setHistorique(null);setPreparation(false);setImportation(false);setOuverture('');setVerifications({});setControle(null);setControleEnvoi(null);setErreurOuverture('');ouvrirEnCours.current=false;retourVinted.current=false;setFiltre('tous');setRecherche('');annulerImport.current=true;setSelection([]);setMessage('');setReduction('');setOffreChoix('aucune');setTypeDim('pct');setMontantOffre('');setArrondi(false);setIntervalle('6');setRythme('fixe');setIntervalleMax('12');setReglages({});setFeuille(false);setEtape('choix');reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);setVueAuto(null);setPeriode('30');setFiltreArticles(null);setMaxArticles(20);setDetail(null);return()=>{requete.current++;};},[uid,owner]);
+  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setHistorique(null);setPreparation(false);setImportation(false);setOuverture('');setVerifications({});setControle(null);setControleEnvoi(null);setErreurOuverture('');ouvrirEnCours.current=false;retourVinted.current=false;setFiltre('tous');setRecherche('');annulerImport.current=true;setSelection([]);setMessage('');setVariantes([]);setReduction('');setOffreChoix('aucune');setTypeDim('pct');setMontantOffre('');setArrondi(false);setIntervalle('6');setRythme('fixe');setIntervalleMax('12');setReglages({});setFeuille(false);setEtape('choix');reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);setVueAuto(null);setPeriode('30');setFiltreArticles(null);setMaxArticles(20);setDetail(null);return()=>{requete.current++;};},[uid,owner]);
   const charger=async()=>{
     if(occupe.current||sauvegarde.current)return;
     const n=++requete.current;occupe.current=true;setEtat({scope,charge:true});setSelection([]);setRetour('');
@@ -67,7 +70,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       if(n!==requete.current||ownerActuel()!==owner)return;
       if(prefs.status==='fulfilled'&&prefs.value){
         reglagesLus.current=true;setReglages({prets:true,enregistres:prefs.value.enregistres&&edition.current===0});
-        if(edition.current===0){const v=prefs.value;setMessage(v.message);setReduction(v.pourcentage==null?'':String(v.pourcentage));setOffreChoix(v.offreMode==='prix'?'fixer':v.offreMode?'diminuer':'aucune');setTypeDim(v.offreMode==='euros'?'euros':'pct');setMontantOffre(v.offreValeur==null?'':String(v.offreValeur).replace('.',','));setArrondi(v.arrondi===true);if(v.intervalleMinutes===0){setRythme('vintex');setIntervalle('6');setIntervalleMax('12');}else{setIntervalle(String(v.intervalleMinutes));if(v.intervalleMaxMinutes){setRythme('aleatoire');setIntervalleMax(String(v.intervalleMaxMinutes));}else{setRythme('fixe');setIntervalleMax(String(v.intervalleMinutes*2));}}}
+        if(edition.current===0){const v=prefs.value;setMessage(v.message);setVariantes(Array.isArray(v.variantes)?v.variantes:[]);setReduction(v.pourcentage==null?'':String(v.pourcentage));setOffreChoix(v.offreMode==='prix'?'fixer':v.offreMode?'diminuer':'aucune');setTypeDim(v.offreMode==='euros'?'euros':'pct');setMontantOffre(v.offreValeur==null?'':String(v.offreValeur).replace('.',','));setArrondi(v.arrondi===true);if(v.intervalleMinutes===0){setRythme('vintex');setIntervalle('6');setIntervalleMax('12');}else{setIntervalle(String(v.intervalleMinutes));if(v.intervalleMaxMinutes){setRythme('aleatoire');setIntervalleMax(String(v.intervalleMaxMinutes));}else{setRythme('fixe');setIntervalleMax(String(v.intervalleMinutes*2));}}}
       }else if(prefs.status==='rejected')setReglages({erreur:prefs.reason?.message||'Lecture des réglages impossible.'});
       if(favoris.status==='rejected')throw favoris.reason;
       setEtat({scope,data:favoris.value});
@@ -214,6 +217,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
           <label>Ton message<textarea ref={champMessage} data-favoris-message disabled={preparation} maxLength={2000} rows={4} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Bonjour {username}, merci pour ton favori !"/></label>
           <div className="vrm-favoris-variables" role="group" aria-label="Variables du message"><button type="button" data-favoris-variable="username" disabled={preparation} onClick={()=>inserer('{username}')}>{'{username}'}</button><button type="button" data-favoris-variable="variante" disabled={preparation} onClick={()=>inserer('{Bonjour|Salut}')}>{'{a|b}'} variante</button></div>
           <small>{'{username}'} = son pseudo · {'{Bonjour|Salut}'} = un choix au hasard par message.</small>
+          <AutresVersions nom="favoris" premier={message} variantes={variantes} desactive={preparation} extOk={favorisVariantes} placeholder="Une autre façon de le dire" onChange={l=>{setVariantes(l);change();}}/>
           {!message.trim()&&offreChoix!=='aucune'&&<small data-favoris-message-defaut>Message vide : VRM enverra « {MESSAGE_PAR_DEFAUT} » avec ton offre.</small>}
           <div className="vrm-favoris-offre" data-favoris-offre={offreChoix}>
             <strong>Offre de prix Vinted</strong>

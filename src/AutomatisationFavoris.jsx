@@ -39,14 +39,14 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
       if(j.travail){
         const t=j.travail;travail.current=t;
         if(!ecran.current||document.visibilityState==='hidden'){const arret=await api('terminer',{jeton:t.jeton,resultat:'refuse',raison:'ecran_inactif'},h);if(courant())adopter(arret);return;}
-        let resultat='incertain',raison='reponse_inconnue',ecrits;
+        let resultat='incertain',raison='reponse_inconnue',ecrits,variante;
         try{
           const r=await executer(t);
-          ({resultat,raison,ecrits}=traduireResultatFavori(r));
+          ({resultat,raison,ecrits,variante}=traduireResultatFavori(r));
           if(resultat!=='envoye'&&courant()&&r?.error)setErreur(String(r.error).slice(0,240));
         }catch{}
         if(courant())setPhase('Enregistrement du résultat');
-        const fini=await api('terminer',{jeton:t.jeton,resultat,raison,...(Number.isInteger(ecrits)?{ecrits}:{})},h);if(courant())adopter(fini);
+        const fini=await api('terminer',{jeton:t.jeton,resultat,raison,...(Number.isInteger(ecrits)?{ecrits}:{}),...(Number.isInteger(variante)?{variante}:{})},h);if(courant())adopter(fini);
       }
     }catch(e){if(courant()){setErreur(e.message+' Aucun renvoi automatique.');pauseLocale.current=true;}}
     finally{busy.current=false;travail.current=null;if(courant())setPhase('');}

@@ -145,7 +145,7 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
     // Aucun favori prêt, et au moins un sauté faute d'identité prouvée : un geste de
     // Julien (ouvrir un favori depuis la cloche) le réglera — VRM le demande.
     const demande=!choisi&&sauts.some(x=>x.raison==='destinataire_non_prouve')?'destinataire_non_prouve':null;
-    const r=await modifierNeutre(cle,d=>ajouterAuto(d,{owner,maintenant,choisi,sauts,message,offre,prochainFavori:tri.prochainFavori,extension,demande}));
+    const r=await modifierNeutre(cle,d=>ajouterAuto(d,{owner,maintenant,choisi,sauts,message,variantes:p.variantes||null,offre,prochainFavori:tri.prochainFavori,extension,demande}));
     if(!r)return await stop('lecture');
     return r.valeur;
   }catch(e){if(e?.auto)return await stop(e.auto);if(e instanceof RefusFavoris)throw e;return await stop('lecture');}
@@ -165,7 +165,8 @@ export async function routeFavoris(req,res){
     if(req.method==='GET')decision=d=>({valeur:vueFile(initialiserFile(d),owner)});
     else{
       const c=req.body;
-      if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>5000)throw new RefusFavoris('Commande invalide.',400);
+      // (5.369) 5 versions du message (2 000 caractères chacune) peuvent voyager dans les réglages.
+      if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>16000)throw new RefusFavoris('Commande invalide.',400);
       if(c.action==='lancer'){
         const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`];
         const archiveId=`harvest_${uid}_favoris_archive`;
@@ -198,7 +199,7 @@ export async function routeFavoris(req,res){
           }
         }
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
-        decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
+        decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
       }else if(c.action==='auto_regler'){
         decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
       }else if(c.action==='auto_stop'){
@@ -216,7 +217,7 @@ export async function routeFavoris(req,res){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant,ecrits:Number.isInteger(c.ecrits)?c.ecrits:null});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant,ecrits:Number.isInteger(c.ecrits)?c.ecrits:null,variante:Number.isInteger(c.variante)?c.variante:null});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');

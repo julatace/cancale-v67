@@ -149,7 +149,7 @@ export function journalOffres(rows, { uids = null, max = 30 } = {}) {
       if (vus.has(cle)) continue;
       vus.add(cle);
       const p = Number(e.p);
-      out.push({ t, uid: m[1], sorte: SORTES_OFFRE[e.s], item: e.a != null ? String(e.a) : null, tx: e.x != null ? String(e.x) : null, prix: Number.isFinite(p) && p > 0 ? p : null, auto: e.auto === true });
+      out.push({ t, uid: m[1], sorte: SORTES_OFFRE[e.s], item: e.a != null ? String(e.a) : null, tx: e.x != null ? String(e.x) : null, prix: Number.isFinite(p) && p > 0 ? p : null, auto: e.auto === true, ...(Number.isInteger(e.v) && e.v >= 1 && e.v <= 5 ? { variante: e.v } : {}) });
     }
   }
   out.sort((a, b) => b.t - a.t);

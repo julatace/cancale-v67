@@ -29,8 +29,8 @@ export async function tourPiloteFavoris({ api, executer, disponible }) {
   const s = await api('suivant');
   if (!s?.travail) return { etat: 'pret', vue: s?.vue || null };
   let r = null; try { r = await executer(s.travail); } catch (_) { r = null; }
-  const { resultat, raison, ecrits } = traduireResultatFavori(r);
-  const f = await api('terminer', { jeton: s.travail.jeton, resultat, raison, ...(Number.isInteger(ecrits) ? { ecrits } : {}) });
+  const { resultat, raison, ecrits, variante } = traduireResultatFavori(r);
+  const f = await api('terminer', { jeton: s.travail.jeton, resultat, raison, ...(Number.isInteger(ecrits) ? { ecrits } : {}), ...(Number.isInteger(variante) ? { variante } : {}) });
   return { etat: resultat, raison, vue: f?.vue || null };
 }
 

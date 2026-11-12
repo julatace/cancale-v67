@@ -1,5 +1,6 @@
 import {preparerMessageFavori} from './favorisVinted.js';
-const BASE={message:'',pourcentage:null,offreMode:null,offreValeur:null,arrondi:false,intervalleMinutes:6,intervalleMaxMinutes:null};
+import {VARIANTES_MAX,variantesARanger} from './variantesMessage.js';
+const BASE={message:'',variantes:[],pourcentage:null,offreMode:null,offreValeur:null,arrondi:false,intervalleMinutes:6,intervalleMaxMinutes:null};
 function identite({uid,owner,ownerActuel}) {
   if(!owner||ownerActuel()!==owner||!/^\d{1,20}$/.test(String(uid||'')))throw Error('Le compte et la session doivent être confirmés.');
   return `vrm_favoris_reglages_${uid}`;
@@ -29,8 +30,14 @@ export function offreFavori({pourcentage=null,offreMode=null,offreValeur=null,ar
   if(mode==='prix'&&!(v>=1&&v<=99999))throw Error('Le prix de l’offre doit être d’au moins 1\u00a0€.');
   return {pourcentage:null,offreMode:mode,offreValeur:v,arrondi:arrondi===true};
 }
-export function validerReglagesFavoris({message='',pourcentage=null,offreMode=null,offreValeur=null,arrondi=false,intervalleMinutes,intervalleMaxMinutes=null}) {
+export function validerReglagesFavoris({message='',variantes=[],pourcentage=null,offreMode=null,offreValeur=null,arrondi=false,intervalleMinutes,intervalleMaxMinutes=null}) {
   if(typeof message!=='string')throw Error('Le message doit être du texte.');
+  // (12 nov., ext. 5.369) Ses AUTRES versions du message (2 à 5) : VRM en tire une au
+  // hasard à chaque envoi, jamais celle du message précédent. Vides retirées.
+  if(variantes!=null&&(!Array.isArray(variantes)||variantes.some(v=>typeof v!=='string')))throw Error('Les autres versions doivent être du texte.');
+  if(Array.isArray(variantes)&&variantes.filter(v=>v.trim()).length>VARIANTES_MAX-1)throw Error(`${VARIANTES_MAX} versions au plus.`);
+  const autres=variantesARanger(variantes);
+  for(let i=0;i<autres.length;i++){const mv=preparerMessageFavori(autres[i],null);if(mv.erreur)throw Error(`Version ${i+2} : ${mv.erreur}`);}
   const intervalle=String(intervalleMinutes??'').trim();
   // 0 = « comme Vintex » (6 à 10 s, tiré par le serveur) ; sinon des minutes entières.
   if(!/^\d{1,6}$/.test(intervalle)||Number(intervalle)>1440)throw Error('Choisis un intervalle entier entre 0 et 1 440 minutes (0 = comme Vintex).');
@@ -49,7 +56,8 @@ export function validerReglagesFavoris({message='',pourcentage=null,offreMode=nu
   const m=preparerMessageFavori(texte,o.pourcentage);
   if(m.erreur)throw Error(m.erreur);
   if(!m.message)throw Error('Écris un message, ou choisis une offre : sans l’un ni l’autre, il n’y a rien à envoyer.');
-  return {version:1,message:texte.trim(),...o,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,envoisActifs:false};
+  if(autres.length&&!message.trim())throw Error('Écris d’abord la 1re version du message.');
+  return {version:1,message:texte.trim(),...(autres.length?{variantes:autres.map(v=>v.trim())}:{}),...o,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,envoisActifs:false};
 }
 export async function lireReglagesFavoris(opts) {
   const id=identite(opts),{owner,ownerActuel,base,headers,fetcher=fetch}=opts;
@@ -60,7 +68,7 @@ export async function lireReglagesFavoris(opts) {
   if(!Array.isArray(rows)||rows.length>1||rows.some(x=>x?.owner!==owner||x.id!==id))throw Error('Les réglages ne confirment pas le compte attendu.');
   if(!rows.length)return {...BASE,enregistres:false};
   const d=rows[0].data;
-  if(d?.version!==1||d.envoisActifs!==false||typeof d.message!=='string'||!(d.pourcentage===null||Number.isInteger(d.pourcentage))||!(d.offreMode==null||['pct','euros','prix'].includes(d.offreMode))||!(d.offreValeur==null||typeof d.offreValeur==='number')||!(d.arrondi==null||typeof d.arrondi==='boolean')||!Number.isInteger(d.intervalleMinutes)||!(d.intervalleMaxMinutes==null||Number.isInteger(d.intervalleMaxMinutes)))throw Error('Le format des réglages enregistrés doit être vérifié avant de les remplacer.');
+  if(d?.version!==1||d.envoisActifs!==false||typeof d.message!=='string'||!(d.pourcentage===null||Number.isInteger(d.pourcentage))||!(d.offreMode==null||['pct','euros','prix'].includes(d.offreMode))||!(d.offreValeur==null||typeof d.offreValeur==='number')||!(d.arrondi==null||typeof d.arrondi==='boolean')||!Number.isInteger(d.intervalleMinutes)||!(d.intervalleMaxMinutes==null||Number.isInteger(d.intervalleMaxMinutes))||!(d.variantes==null||Array.isArray(d.variantes)&&d.variantes.every(v=>typeof v==='string')))throw Error('Le format des réglages enregistrés doit être vérifié avant de les remplacer.');
   return {...validerReglagesFavoris(d),enregistres:true};
 }
 export async function sauverReglagesFavoris(opts,reglages) {
@@ -69,6 +77,6 @@ export async function sauverReglagesFavoris(opts,reglages) {
   if(!r.ok)throw Error('Enregistrement non confirmé. Relis les réglages avant de réessayer.');
   const rows=await r.json();
   if(ownerActuel()!==owner)throw Error('La session a changé. Relis les réglages.');
-  if(!Array.isArray(rows)||rows.length!==1||rows[0]?.owner!==owner||rows[0]?.id!==id||Object.keys(data).some(k=>rows[0].data?.[k]!==data[k]))throw Error('Enregistrement non confirmé. Relis les réglages avant de réessayer.');
+  if(!Array.isArray(rows)||rows.length!==1||rows[0]?.owner!==owner||rows[0]?.id!==id||Object.keys(data).some(k=>JSON.stringify(rows[0].data?.[k])!==JSON.stringify(data[k])))throw Error('Enregistrement non confirmé. Relis les réglages avant de réessayer.');
   return data;
 }

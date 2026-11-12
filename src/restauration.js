@@ -80,7 +80,7 @@ export const REGLAGES = {
   vinted_urssaf_freq: 'Fréquence URSSAF', vinted_urssaf_taux: 'Taux URSSAF',
   vinted_goal: 'Objectif', vrm_objectif_mois: 'Objectif du mois',
   vrm_imprimante: 'Imprimante', vinted_bordereau_formats: 'Formats de bordereau', vrm_tampon_positions: 'Position du tampon',
-  vinted_offre_refus_msg: 'Message de refus des offres', vrm_republier_reglages: 'Réglages de Republier',
+  vinted_offre_refus_msg: 'Message de refus des offres', vinted_offre_refus_variantes: 'Autres versions du message de refus', vrm_republier_reglages: 'Réglages de Republier',
   vrm_photo_presets: 'Réglages photo', vrm_ebay_rythme: 'Rythme eBay', vinted_invoice_settings: 'Ma facture',
   vrm_comptes_exclus: 'Comptes exclus des totaux', vinted_account_labels: 'Noms des comptes',
   vinted_quick_replies: 'Réponses rapides', vrm_modeles_desc: 'Modèles de description', vrm_emballages: 'Emballages',
