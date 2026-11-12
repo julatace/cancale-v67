@@ -72,6 +72,7 @@ import { lireMentions } from './_lib/mentions-legales.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';   // (11 nov.) le filet des avis négatifs
+import { demandesDuCron as demandesPrixAchat } from './_lib/prix-achat-demande.js';   // (11 nov., saisie rapide)
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
 import { passeTransporteursAnciens, passeTransporteursPdf, reqPdf, avecRelus, REQ_RELUS, MAX_PDF_MATIN, BUDGET_PDF_MATIN_MS } from './_lib/transporteur-anciens.js';
 import { pannesCapture, lireAppareils, decisionPannes, textePannes, CAT_CAPTURE, ID_MEMO_CAPTURE, SELECT_APPAREILS, PREFIXE_APPAREIL } from './_lib/garde-capture.js';
@@ -257,7 +258,7 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus'];
+const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_cycle_decisions'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -274,7 +275,7 @@ async function lireDonneesBilan() {
     getRowProjete('lbc_ventes', ['ventes']),
     lireCommandesEbay(),
     // Les dates de versement : trois scalaires par transaction (§4.4), paginé (§4.5).
-    fetchPaginated(scoped('app_data?id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at')),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at,it:meta->>item_id')),
     // (1er nov.) Les ventes Vestiaire et les liens de ses annonces (identité).
     getRowProjete('vc_ventes', ['ventes']),
     getRowProjete('vc_listings', ['liens']),
@@ -320,6 +321,9 @@ async function lireDonneesBilan() {
     mailsVentes: Array.isArray(mailsVentes) ? mailsVentes : null,
     ebay: ebayL,
     versements: versementsDeLignes(txn),
+    // (11 nov., saisie rapide) « Vendu ailleurs » et la table transaction → annonce (jamais un titre).
+    decisions: mm && Array.isArray(txn) ? objet(mm.vrm_cycle_decisions) : null,   // table illisible ⇒ pas de dédoublonnage sûr ⇒ rien
+    txItem: Array.isArray(txn) ? Object.fromEntries(txn.filter((r) => r && r.tx && r.it).map((r) => [String(r.tx), String(r.it)])) : {},
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
     vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens) }),
     main: mm,
@@ -934,6 +938,10 @@ async function traiterVendeurApresRelecture() {
     // (11 nov., lot avis-negatif) UN AVIS ≤ SEUIL, extension sans réseau au moment de sa lecture : le filet.
     let avisBas = null;
     try { const r = await notifierAvisBas(); avisBas = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { avisBas = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? », app fermée partout :
+    // le filet (l'app ouverte prévient tout de suite). Mêmes règles : vente relue, une fois, jamais la nuit.
+    let prixAchat = null;
+    try { const r = await demandesPrixAchat(); prixAchat = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { prixAchat = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
     let relecture = null;
     try { relecture = await rappelComptesARelire(Date.now(), enPanne); } catch (e) { relecture = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
@@ -973,7 +981,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -992,19 +1000,19 @@ async function traiterVendeurApresRelecture() {
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedupLu = await getRow('ship_reminder_dedup');
     // (11 nov., M81) un mémo illisible n'est pas « jamais notifié » : rien ne part.
-    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, skipped: 'mémo illisible — rien', total };
+    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
     const memeJour = (d) => !!d && d.date === today && d.total === total && (d.nePasPoster || 0) === nePasPoster;
-    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, skipped: 'déjà notifié', total };
+    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       // (11 nov., B130) réservé AVANT l'envoi : deux passages ⇒ une seule notification.
       const res = await reserverDedup('ship_reminder_dedup', memeJour, () => ({ date: today, total, nePasPoster }));
-      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
+      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
     } else await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }

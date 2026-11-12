@@ -124,7 +124,7 @@ export const indexDeclarations = (reg) => {
 
 export const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
 
-export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare, importees } = {}) => {
+export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, excluAutre, versements, declare, importees, main } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
@@ -261,10 +261,23 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     const l = { id, plateforme: pl, ts: t, ym: ymDeTs(t), eur, titre: v.titre || '', masquee: false, importee: true };
     if (garde(l)) lignes.push(place(l));
   }
+  // (11 nov., saisie rapide) VENDU AILLEURS (main propre, entre amis, autre site) : l'argent
+  // est reçu le jour de la vente ⇒ daté de la date SAISIE (src/venteAilleurs.js). Identité
+  // `main:<annonce>` ; une paire dont la vente Vinted est comptée n'arrive jamais ici.
+  for (const m of (main || [])) {
+    if (!m || !m.id) continue;
+    const id = 'main:' + m.id;
+    const eur = Number(m.eur);
+    if (vus.has(id) || !isFinite(eur) || eur <= 0) continue;
+    const t = Number(m.ts) || 0;
+    if (!t) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Ailleurs', eur, titre: m.titre || '', masquee: false }); continue; }
+    const l = { id, plateforme: 'Ailleurs', ts: t, ym: ymDeTs(t), eur, titre: m.titre || '', masquee: false };
+    if (garde(l)) lignes.push(place(l));
+  }
   return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
 };
 
-export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, importees } = {}) => {
+export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, importees, main } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
   // (1er nov., audits A2 et A10) Les ventes FAITES dont l'argent ne se lit pas
@@ -345,6 +358,14 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre,
     if (eur == null) { nonComptees.push({ plateforme: pl, raison: 'montant vide dans ton fichier', ts: t || null }); continue; }
     if (!t) { sansDate += 1; continue; }
     lignes.push({ plateforme: pl, ts: t, eur, compte: '', heureLue: false, importee: true });
+  }
+  // (11 nov., saisie rapide) VENDU AILLEURS, au jour SAISI (src/venteAilleurs.js).
+  for (const m of (main || [])) {
+    if (!m || !m.id || !garde('main:' + m.id)) continue;
+    const eur = Number(m.eur), t = Number(m.ts) || 0;
+    if (!isFinite(eur) || eur <= 0) continue;
+    if (!t) { sansDate += 1; continue; }
+    lignes.push({ plateforme: 'Ailleurs', ts: t, eur, compte: '', tx: 'main:' + m.id });
   }
   return { lignes, sansDate, ecartees, nonComptees };
 };

@@ -30,7 +30,7 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
@@ -1572,6 +1572,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   const ventesEmailCa = useVentesEmailFraiches(ventes, ko, accounts, (u) => compteEcarte(u, new Set(hAccCle ? hAccCle.split(',') : []), panelOff || {}), hAccCle + '|' + JSON.stringify(panelOff || {}));
   const ventesVendu = React.useMemo(() => avecVentesEmail(ventes, ventesEmailCa), [ventes, ventesEmailCa]);
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
+  const [decAilleurs] = useLigneSynchro('vrm_cycle_decisions', () => load('vrm_cycle_decisions', {}));   // (11 nov.) « Vendu ailleurs »
   const ventesVc = useVentesVestiaire();
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode'); return PERIODES_CA.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode', p); } catch (_) {} };
@@ -1591,8 +1592,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vestiaire = ventesVc || [];
-    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre, importees: lireVentesImportees() });
-    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees: lireVentesImportees() });
+    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre, importees: lireVentesImportees(), main: ventesAilleursDe(ventesVendu || ventes) });
+    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees: lireVentesImportees(), main: ventesAilleursDe(ventes) });
     let finSansDate = 0;
     const finalise = [];
     for (const l of [...decl.lignes, ...decl.aDater]) {
@@ -1612,7 +1613,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas : dites, jamais 0 €.
     return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente, venduNonComptees: vf.nonComptees || [], recuNonComptees: (decl.ecartees || []).filter((x) => x && x.manque) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ventesVendu, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre]);
+  }, [ventes, ventesVendu, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre, decAilleurs]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
   const cur = lignes ? lignes[0] : null;
   // Les périodes d'avant, sans les plus anciennes toutes vides (même règle qu'avant).
@@ -1837,10 +1838,10 @@ const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS
 // écartés (`compteEcarte`, `excluAutre`). Pure : `scripts/audit-registres.cjs`
 // l'EXÉCUTE. Les ventes Vinted ne passent que si les dates de versement sont
 // lues (sinon une vente serait datée à tort).
-const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u), importees = [] }) => {
+const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u), importees = [], main = [] }) => {
   const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
   const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees });
+  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees, main });
   // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
   // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
   const ncER = phraseNonComptees((decl.ecartees || []).filter((x) => x && x.manque));
@@ -1852,6 +1853,7 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   const { ventes, ko } = useVentesCoque();
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVcER = useVentesVestiaire();
+  const [decAilleurs] = useLigneSynchro('vrm_cycle_decisions', () => load('vrm_cycle_decisions', {}));   // (11 nov.) « Vendu ailleurs »
   const [versements, setVersements] = React.useState(undefined);
   React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
   const [tick, setTick] = React.useState(0);
@@ -1865,10 +1867,10 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const rates = [...(lbcCoqueLu === null ? ['Leboncoin'] : []), ...(ebayCommandes === null ? ['eBay'] : []), ...(ventesVcER === null ? ['Vestiaire'] : [])];
-    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe, importees: lireVentesImportees() });
+    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe, importees: lireVentesImportees(), main: ventesAilleursDe(ventes) });
     return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined || ventesVcER === undefined };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre, decAilleurs]);
   return { calc, versements };
 }
 // ── (3 nov.) LES REGISTRES : LIVRE DES RECETTES ET REGISTRE DES ACHATS ──────
