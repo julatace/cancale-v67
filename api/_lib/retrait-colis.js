@@ -185,10 +185,51 @@ export function lieuDepuisExtrait(extrait) {
 // plus qu'avant.
 // La date limite et le pied de l'e-mail (« Avec 19 000 points… », le siège) ne sont pas le lieu.
 const STOP_LIEU = /horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis|retrait|jusqu|avec\s+\d|mondial\s*relay|chronopost|villeneuve\s+d/i;
-export function lieuSousEnTete(txt) {
+// (11 nov., retraits fiables) Les en-têtes des autres réseaux, seuls sur leur ligne : « Relais
+// Pickup » (Chronopost, DPD, Shop2Shop), « Locker InPost », « UPS Access Point », « GLS ParcelShop »,
+// « Relais Colis », « Point de retrait », « Bureau de poste » (Colissimo, La Poste).
+const EN_TETE_LIEU = /^(?:(?:votre|ton)\s+)?(?:(?:nouveau\s+)?point\s+(?:relais|de\s+retrait)(?:\s+(?:mondial\s+relay|colissimo))?|locker(?:\s*24\s*\/?\s*7)?(?:\s+inpost)?|consigne(?:\s+(?:automatique|pick-?up|inpost))?|casier|adresse|relais\s+(?:pick-?up|colis|shop2shop)|ups\s+access\s+point|gls\s+parcel\s*shop|bureau\s+de\s+poste)\b[\s:–-]*$/i;
+// (11 nov., retraits fiables — LA CAUSE de « tout regroupé à Super U ») LES LISTES DE SUGGESTIONS NE SONT
+// PAS LE POINT DU COLIS. Les e-mails et bordereaux des transporteurs portent souvent un bloc « Points de
+// proximité », « Autres points près de chez vous », « Pour vos prochains envois, déposez… » : des relais près
+// de l'EXPÉDITEUR ou du destinataire, pas celui où CE colis attend. La lecture prenait le PREMIER en-tête
+// « Point relais » trouvé — souvent la première suggestion (le même supermarché pour tous ses colis), et
+// l'app rangeait tout sous ce point. Une zone de suggestions commence à sa ligne d'annonce et finit à une
+// ligne qui parle du colis (disponible, t'attend, livré, retrait, code…) ; ses lignes ne sont jamais lues
+// comme lieu.
+const SUGGESTIONS = /points?\s+(?:relais\s+)?(?:de\s+)?proximit|[àa]\s+proximit|pr[èe]s\s+de\s+chez\s+(?:vous|toi)|autres?\s+(?:points?|relais|lieux)|prochains?\s+envois?|d[ée]pos(?:er|ez|e)\s+(?:vos|votre|ton|tes|un)\s+colis|o[ùu]\s+d[ée]poser|points?\s+(?:relais\s+)?(?:conseill|sugg|disponibles\s+autour)|trouve[rz]?\s+un\s+(?:point|relais)/i;
+const PARLE_DU_COLIS = /disponible|vous\s+attend|t['’]attend|livr[ée]|arriv[ée]|[àa]\s+retirer|r[ée]cup[ée]r|retrait\b|point\s+de\s+retrait|\bcode\b|suivant\s*[:：]|nouveau/i;
+export function sansSuggestions(txt) {
+  const lines = String(txt || '').split('\n');
+  let dans = 0;
+  return lines.map((l) => {
+    const t = l.trim();
+    if (SUGGESTIONS.test(t) && !PARLE_DU_COLIS.test(t)) { dans = 25; return ''; }
+    if (dans > 0) { if (PARLE_DU_COLIS.test(t)) { dans = 0; return l; } dans--; return ''; }
+    return l;
+  }).join('\n');
+}
+// (11 nov., retraits fiables) Une ligne qui ANNONCE le point de CE colis, suivie du nom et de l'adresse :
+// « Votre point de retrait », « Votre colis est disponible dans votre Chrono Relais : », « …au Point Relais
+// suivant : », « Ton colis t'attend ici : ». Elle passe AVANT un en-tête nu.
+const ANNONCE_POINT = /^(?:(?:votre|ton)\s+(?:point\s+de\s+retrait|lieu\s+de\s+retrait|point\s+relais|relais|chrono\s*relais|consigne|locker)\s*[:：]?|.*\b(?:disponible|vous\s+attend|t['’]attend|livr[ée]e?|arriv[ée]e?|[àa]\s+retirer|r[ée]cup[ée]rer)\b.*\b(?:relais|point|consigne|locker|casier|bureau|ici|adresse)\b[^:：]*[:：])\s*$/i;
+export function lieuSousEnTete(txt0) {
+  const txt = sansSuggestions(txt0);
+  const lignes0 = String(txt || '').split('\n').map((l) => l.trim());
+  // L'annonce du point de CE colis d'abord : le lieu est lu sous elle, avec la même règle.
+  for (let i = 0; i < lignes0.length; i++) {
+    if (!ANNONCE_POINT.test(lignes0[i].replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim())) continue;
+    const reste = lignes0.slice(i + 1);
+    while (reste.length && (!reste[0] || EN_TETE_LIEU.test(reste[0].replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim()))) reste.shift();
+    const l = lieuSousEnTeteNu(['Point relais', ...reste].join('\n'));
+    if (l && /\d{5}/.test(l)) return l;
+  }
+  return lieuSousEnTeteNu(txt);
+}
+function lieuSousEnTeteNu(txt) {
   const lines = String(txt || '').split('\n').map((l) => l.trim());
   const enTete = (l) => l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
-  const idx = lines.findIndex((l) => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(enTete(l)));
+  const idx = lines.findIndex((l) => EN_TETE_LIEU.test(enTete(l)));
   if (idx < 0) return null;
   const parts = [];
   const cpVille = (l) => /^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(String(l || '').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
@@ -226,7 +267,6 @@ export function lieuSousEnTete(txt) {
 // « suivant » (« Votre nouveau Point Relais : », « livré dans le Point Relais
 // suivant : »), avec la règle des lieux (`lieuSousEnTete`). Rien de tel ⇒ `null` :
 // jamais l'ancien point ni un point deviné.
-const EN_TETE_LIEU = /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i;
 export function nouveauPointDansTexte(txt) {
   const lines = String(txt || '').split('\n').map((l) => l.trim());
   const norm = (l) => String(l).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -242,6 +282,20 @@ export function nouveauPointDansTexte(txt) {
     if (l && /\d{5}/.test(l)) return l;
   }
   return null;
+}
+
+// (11 nov., retraits fiables) UN LIEU QUI N'EST QUE LE TYPE DE LIEU (« votre Relais Pickup »,
+// « un UPS Access Point », « votre relais Shop2Shop », « la consigne Vinted Go », « Locker 24/7 »)
+// ne désigne AUCUN endroit : tous les mots sont des articles, des types de lieu ou des noms de
+// réseau. Pris pour un lieu, il rangeait sous UN faux point tous les colis de ce réseau, de toutes
+// les villes. Un nom d'enseigne (« Super U », « Tabac du Port ») n'en fait pas partie.
+const MOTS_GENERIQUES = new Set(['votre', 'vos', 'ton', 'ta', 'tes', 'un', 'une', 'le', 'la', 'les', 'l', 'au', 'aux', 'en', 'dans', 'du', 'de', 'des', 'd', 'notre', 'nos', 'ce', 'cet', 'cette',
+  'point', 'points', 'relais', 'retrait', 'pickup', 'pick', 'up', 'consigne', 'consignes', 'locker', 'lockers', 'casier', 'casiers', 'automatique', 'colis', 'bureau', 'poste', 'agence', 'commercant', 'commerce', 'magasin', 'proximite', 'choisi', 'habituel', 'station',
+  'mondial', 'relay', 'mondialrelay', 'inpost', 'chronopost', 'chrono', 'shop2shop', 'shop', '2', 'vinted', 'go', 'vintedgo', 'colissimo', 'laposte', 'dpd', 'ups', 'access', 'gls', 'parcelshop', 'parcel', 'dhl', 'servicepoint', 'service', 'fedex', '24', '7', '24/7']);
+export function lieuGenerique(lieu) {
+  const t = String(lieu || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/®|™|©/g, ' ').toLowerCase().replace(/[’']/g, ' ').replace(/[^a-z0-9/ ]+/g, ' ').trim();
+  if (!t) return true;
+  return t.split(/\s+/).every((w) => MOTS_GENERIQUES.has(w));
 }
 
 // Un « lieu » qui annonce le FUTUR (« … sera disponible dans les prochains jours

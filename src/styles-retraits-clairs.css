@@ -1,0 +1,28 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « À RETIRER » LISIBLE (11 nov., Julien : « des QR codes, des infos dans tous
+   les sens, on ne comprend rien » ; « le n° de suivi est une clé »).
+   La ligne d'un colis dit ce qu'il faut au comptoir, sans toucher : le CODE (gros,
+   chiffres alignés), le N° DE SUIVI, l'échéance. Le titre se lit en entier
+   (plus de « Chaussures s… »). « Itinéraire » sur chaque point (la carte est retirée).
+   Sélecteurs volontairement forts : plusieurs couches imposent `nowrap` au titre.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-titre {
+  /* (intégration revue-colis) Le titre se lit EN ENTIER (lot DJ3, « on ne voit pas tout le titre ») : ni « … » ni coupe à 2 lignes. */
+  white-space: normal !important; display: block !important; overflow: visible; text-overflow: clip;
+}
+.vrm-rpf-comptoir { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; margin-top: 4px; }
+.vrm-rpf-code-gros {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 20px; font-weight: 700; letter-spacing: .04em;
+  color: var(--p-encre, currentColor); font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.vrm-rpf-code-gros.is-ambre { color: var(--p-ambre-texte, #B25000); font-family: inherit; font-size: 15px; letter-spacing: 0; }
+.vrm-rpf-code-gros.is-qr { font-family: inherit; font-size: 15px; letter-spacing: 0; }
+.vrm-rpf-code2 { font-size: 15px; font-weight: 600; color: var(--p-gris, #6E6E73); }
+.vrm-rpf-code-venir { font-size: 14px; font-weight: 600; color: var(--p-gris, #6E6E73); }
+.vrm-rpf-suivi-ligne { font-size: 13px; color: var(--p-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-rpf-suivi-ligne.is-sans { font-style: normal; opacity: .85; }
+.vrm-rpf-itineraire {
+  position: relative; font-weight: 600; color: var(--p-encre, currentColor); text-decoration: underline; text-underline-offset: 2px;
+}
+/* 44 px au doigt sans grandir la ligne : la zone de toucher déborde autour du mot. */
+.vrm-rpf-itineraire::after { content: ''; position: absolute; inset: -12px -8px; }

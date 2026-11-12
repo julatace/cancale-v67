@@ -45,6 +45,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { centimesDe, partsEgales } from './achatsSourcing.js';
 import { motsVendeur } from './profilVendeur.js';
+import { modePaiementLu } from './modePaiement.js';   // (11 nov., lot livre-registre) « Payé en », facultatif
 
 export const CLE_FOURNISSEURS = 'vrm_fournisseurs';
 export const SOURCE_FOURNISSEUR = 'Fournisseur';
@@ -75,7 +76,7 @@ export function lireRegistre(v) {
     for (const [k, c] of Object.entries(objet(a.parts))) if (Number.isSafeInteger(c) && c >= 0) parts[k] = c;
     const gardes = {};
     for (const [k, c] of Object.entries(objet(a.gardes))) if (Number.isSafeInteger(c) && c >= 0) gardes[k] = c;
-    achats[id] = { fournisseur: a.fournisseur, date: jourOk(a.date) ? str(a.date) : '', paires, total, frais: frais != null && frais > 0 ? frais : 0,
+    achats[id] = { fournisseur: a.fournisseur, date: jourOk(a.date) ? str(a.date) : '', paires, total, frais: frais != null && frais > 0 ? frais : 0, paiement: modePaiementLu(a.paiement),
       repartition: { mode: r.mode === 'main' ? 'main' : 'egal', base: r.base === 'frais' || r.base === 'prix' ? r.base : '' }, parts, gardes, creeLe: str(a.creeLe) };
   }
   for (const [bid, h] of Object.entries(objet(o.hors))) {
@@ -119,7 +120,7 @@ export function sansFournisseur(registre, id) {
 // ── UN ACHAT EN GROS ────────────────────────────────────────────────────────
 // { fournisseur, date, paires, total (« 300 », « 300,50 »), frais (option) } —
 // rend { achat } ou { erreur }.
-export function champsAchatGros({ fournisseur, date, paires, total, frais } = {}, registre = null) {
+export function champsAchatGros({ fournisseur, date, paires, total, frais, paiement } = {}, registre = null) {
   const reg = lireRegistre(registre);
   if (!reg.personnes[fournisseur]) return { erreur: 'fournisseur' };
   if (!jourOk(date)) return { erreur: 'Choisis la date' };
@@ -129,7 +130,7 @@ export function champsAchatGros({ fournisseur, date, paires, total, frais } = {}
   if (t == null || t <= 0) return { erreur: 'Écris le montant total' };
   let f = 0;
   if (str(frais)) { const c = centimesDe(frais); if (c == null || c < 0) return { erreur: 'Les frais ne sont pas lisibles' }; f = c; }
-  return { achat: { fournisseur, date: str(date), paires: n, total: t, frais: f } };
+  return { achat: { fournisseur, date: str(date), paires: n, total: t, frais: f, paiement: modePaiementLu(paiement) } };
 }
 export function avecAchatGros(registre, id, champs, at = '') {
   const reg = lireRegistre(registre);

@@ -15,6 +15,7 @@ import React from 'react';
 import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import { phraseLimite, texteRetours, NOM_SITE } from './litigesEcran.js';
 import './styles-litiges.css';
+import { BoutonPasAPas } from './RetoursLitiges.jsx';
 
 const svg = (d, extra = {}) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...extra}>{d}</svg>
@@ -48,7 +49,7 @@ function Preuve({ type, p }) {
   );
 }
 
-function Carte({ c, Photo, onDossier = null }) {
+function Carte({ c, Photo, onDossier = null, onPasAPas = null }) {
   const P = Photo || (() => null);   // (11 nov.) sans la règle des photos (PhotoVinted), aucune <img> brute
   const ph = c.preuves && c.preuves.photo && c.preuves.photo.etat === 'ok' ? c.preuves.photo.src : '';
   const tuile = <span className="vrm-lit-tuile" aria-hidden="true">{ICONES.photo}</span>;
@@ -70,6 +71,7 @@ function Carte({ c, Photo, onDossier = null }) {
       {c.geste && c.geste.url ? (
         <a className="vrm-lit-geste" href={c.geste.url} target="_blank" rel="noreferrer" data-litige-geste={c.geste.url}>{c.geste.libelle} ↗</a>
       ) : null}
+      {onPasAPas ? <BoutonPasAPas c={c} onOuvrir={onPasAPas}/> : null}
       {onDossier ? <Dossier c={c} onDossier={onDossier}/> : null}
     </article>
   );
@@ -138,7 +140,7 @@ function RetoursParModele({ bi }) {
   );
 }
 
-export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onDossier = null }) {
+export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onDossier = null, onPasAPas = null }) {
   if (!r) return null;
   const n = r.cartes.length;
   const partiel = r.manques.length > 0;
@@ -152,7 +154,7 @@ export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onD
           {partiel ? <span>Au moins</span> : null}<b className="vrm-lit-total">{n}</b><span>en cours</span>
         </div>
       ) : null}
-      {r.etat === 'lu' && n > 0 ? <div className="vrm-lit-grille">{r.cartes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier}/>)}</div> : null}
+      {r.etat === 'lu' && n > 0 ? <div className="vrm-lit-grille">{r.cartes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier} onPasAPas={onPasAPas}/>)}</div> : null}
       {r.etat === 'lu' && n === 0 ? (
         <div className="vrm-lit-vide vrm-vide-dessin" data-litiges-vide={partiel ? 'partiel' : 'zero'}>
           <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="34" fill="currentColor" opacity=".10"/><path d="M22 37.5 31.5 47 50 26" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -162,7 +164,7 @@ export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onD
       {r.anciennes.length ? (
         <details className="vrm-lit-anciennes vrm-repli" data-litiges-anciennes={r.anciennes.length}>
           <summary>{r.anciennes.length} {r.anciennes.length > 1 ? 'plus anciens' : 'plus ancien'} (échéance passée)</summary>
-          <div className="vrm-lit-grille">{r.anciennes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier}/>)}</div>
+          <div className="vrm-lit-grille">{r.anciennes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier} onPasAPas={onPasAPas}/>)}</div>
         </details>
       ) : null}
       {r.plateformes.length > 1 || partiel ? (

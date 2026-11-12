@@ -30,6 +30,8 @@ const MUTATIONS = {
   'pas-de-drapeau': ['api/email-inbound.js', "const relaisChange = status === 'transit' && changementDeRelais(mail.subject, txt);", "const relaisChange = false;"],
   'relecture-oubliee': ['api/_lib/suivi-colis.js', "if (etat === 'transit' && changementDeRelais(d.subject || d.sujet || '') && d.status !== 'transit')", "if (false)"],
   'arrivee-ignoree': ['src/relaisChange.js', "if (!n || finis.has(n) || vus.has(n)) continue;", "if (!n || vus.has(n)) continue;"],
+  // (11 nov., intégration colis — arbitrage d) un code d'avant le changement montré comme le bon.
+  'code-ancien-montre': ['src/relaisChange.js', "const apres = avecCode.filter((x) => at != null && dateDe(x) != null && dateDe(x) > at);", "const apres = avecCode;"],
   'alerte-pas-rendue': ['src/App.jsx', "<AlerteRelaisChange lignes={tracking} C={C} transp={transpMap}/>", "null"],
 };
 if (process.argv.includes('--prouve')) {
@@ -127,12 +129,23 @@ const CORPS = [
     dit(g.startsWith('https://www.google.com/maps/dir/?api=1&destination=') && g.includes(encodeURIComponent('35350 ST MELOIR DES ONDES')), 'itinéraire Google Maps vers l’adresse lue', g);
     dit(a.startsWith('https://maps.apple.com/?daddr=') && a.includes(encodeURIComponent('INTERMARCHE EXEMPLE')), 'itinéraire Plans (Apple) vers l’adresse lue', a);
     dit(m.lienItineraire('', true) === '', 'sans adresse lue, aucun lien');
+    // (11 nov., arbitrage d) Le code d'un AUTRE e-mail du même n° : montré seulement s'il est daté APRÈS le changement.
+    const avant = { suivi: '87654321', carrier: 'mondialrelay', status: 'info', code: '700002', receivedAt: '2026-11-09T08:00:00.000Z' };
+    const apres = { suivi: '87654321', carrier: 'mondialrelay', status: 'info', code: '700003', receivedAt: '2026-11-10T10:00:00.000Z' };
+    const la = m.colisRelaisChange([ligne, avant], { maintenant })[0] || {};
+    dit(la.code === '' && la.codeDe === 'a-confirmer', 'un code reçu AVANT le changement de point n’est pas montré : « à confirmer »', JSON.stringify({ code: la.code, de: la.codeDe }));
+    const lb = m.colisRelaisChange([ligne, avant, apres], { maintenant })[0] || {};
+    dit(lb.code === '700003' && lb.codeDe === 'autre-email', 'un code reçu APRÈS le changement (même n°) est montré', JSON.stringify({ code: lb.code, de: lb.codeDe }));
+    const lc = m.colisRelaisChange([ligne], { maintenant })[0] || {};
+    dit(lc.code === '' && lc.codeDe === '', 'aucun code reçu ⇒ « code pas encore reçu »', JSON.stringify({ code: lc.code, de: lc.codeDe }));
   });
 
   console.log('§E le branchement');
   await essaie('E', async () => {
     const app = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    dit(/\(aFilter==='attente' \|\| aFilter==='route'\) && <AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}\/>/.test(app), 'l’alerte est rendue sur À retirer et En route, sur les lignes RELUES (`tracking`) et ce que dit le transporteur (10 nov.)');
+    // (11 nov., lot DJ3) « À retirer » est la section de tête d'Achats : sur Achats, l'alerte n'est rendue qu'une
+    // fois (par la section), plus dans « En route » de la liste du même écran.
+    dit(/\(aFilter==='attente' \|\| \(aFilter==='route' && !modeListeAchats\)\) && <AlerteRelaisChange lignes=\{tracking\} C=\{C\} transp=\{transpMap\}\/>/.test(app), 'l’alerte est rendue sur À retirer (une fois sur Achats), sur les lignes RELUES (`tracking`) et ce que dit le transporteur (10 nov.)');
     const comp = fs.readFileSync(path.join(R, 'src/AlerteRelaisChange.jsx'), 'utf8');
     dit(/C\.warn/.test(comp) && /Point relais changé/.test(comp) && /data-relais-change-itineraire/.test(comp), 'ambre (C.warn), « Point relais changé », bouton Itinéraire');
   });

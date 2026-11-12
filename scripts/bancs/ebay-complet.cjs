@@ -45,9 +45,10 @@ const remettre = (sc = {}) => {
     { id: 'main', data: { vinted_annonce_numeros: FICHES } },
     { id: 'harvest_111_listings', data: LISTINGS },
     { id: 'vinted_item_details', data: DETAILS },
-    { id: 'ebay_listings', data: { items: [{ itemId: '110000000044', title: 'Nike Air Max 90 taille 42', price: '95.0', sku: 'VRM-31' }], capturedAt: MAINTENANT } },
+    { id: 'ebay_listings', data: { items: [{ itemId: '110000000044', title: 'Nike Air Max 90 taille 42', price: '95.0', sku: 'VRM-99' }], capturedAt: MAINTENANT } },
     { id: 'ebay_comptes', data: { comptes: [{ principal: true, cle: 'aaaaaaaaaaaaaaaa', pseudo: 'vendeur_pro', type: 'pro', site: 'FR' }] } },
-    { id: 'ebay_orders', data: { orders: [], capturedAt: MAINTENANT } },
+    // Une vente payée : l'acheteur a payé 106,50 € (port compris) ; dû au vendeur 105, frais eBay 5 ⇒ REÇU 100 €.
+    { id: 'ebay_orders', data: { orders: [{ orderId: '07-11111-22222', creationDate: '2026-11-10T10:00:00.000Z', orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', lineItems: [{ sku: 'VRM-99', title: 'Nike Air Max 90 taille 42', quantity: 1 }], pricingSummary: { total: { value: '106.50', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '105.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '5.00', currency: 'EUR' } }], capturedAt: MAINTENANT } },
   ];
   envois = [];
 };
@@ -146,7 +147,12 @@ const ouvrirVendre = async (pg) => {
   await pg.click('[data-poster="ebay"]');
   await pg.waitForSelector('[data-choix-paire="31"]', { timeout: 15000 });
 };
-const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { name: nom }).last().click({ timeout: 8000 }); };
+const SEUL = (process.env.BANC_SEUL || '').split(',').filter(Boolean);
+let PGC = null, TAGC = '';
+const garde = (q, f) => (SEUL.length && !SEUL.includes(q) ? Promise.resolve() : essaie(q, async () => { try { return await f(); } catch (e) { if (PGC) await capt(PGC, `${q}-echec-${TAGC}`); throw e; } }));
+// « 1 point à vérifier » (src/verifAnnonce.js : une seule photo) : il publie quand même.
+const quandMeme = async (pg) => { try { await pg.getByRole('button', { name: /Publier quand même/ }).last().click({ timeout: 4000 }); } catch (_) {} };
+const ok = async (pg, nom = /Oui, publier/) => { if (/publier/i.test(String(nom))) await quandMeme(pg); await pg.getByRole('button', { name: nom }).last().click({ timeout: 8000 }); };
 
 (async () => {
   let b;
@@ -156,8 +162,8 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
       const mobile = vp.width < 600, tag = mobile ? '390' : '1512';
       console.log(`── ${vp.width} px${sombre ? ' (sombre)' : ''}`);
       remettre({ nonRelie: true });
-      const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
-      await essaie('A', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, vp, sombre); PGC = pg; TAGC = tag;
+      await garde('A', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=compte`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-ebay-connexion-guidee]', { timeout: 25000 });
         const n = await pg.$$eval('[data-ebay-cx-etape]', (l) => l.length);
@@ -168,18 +174,23 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         dit(action('authurl').length === 1, '   le bouton demande UNE adresse de connexion (`authurl`)', JSON.stringify(action('authurl')));
         await capt(pg, `A-${tag}`);
       });
-      await essaie('B', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=compte&ebay=erreur&raison=${encodeURIComponent('demande expirée ou faite dans un autre navigateur — relance la connexion eBay depuis VRM, dans ce navigateur')}`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-ebay-retour]', { timeout: 25000 });
+      await garde('B', async () => {
+        await pg.goto(`http://localhost:${PORT}/?ebay=erreur&raison=${encodeURIComponent('demande expirée ou faite dans un autre navigateur — relance la connexion eBay depuis VRM, dans ce navigateur')}`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('[data-ebay-retour]', { timeout: 25000 }).catch(async (e) => { await capt(pg, `B-echec-${tag}`); console.log('    (B) url=' + pg.url() + ' section=' + !!(await pg.$('[data-ebay-compte-section]')) + ' guidee=' + !!(await pg.$('[data-ebay-connexion-guidee]'))); throw e; });
         const code = await pg.$eval('[data-ebay-retour]', (e) => e.getAttribute('data-ebay-retour'));
         const t = await pg.$eval('[data-ebay-retour]', (e) => e.innerText);
         dit(code === 'navigateur' && /dans ce navigateur, en moins de 30 min/.test(t) && !/demande expirée ou faite/.test(t), 'B. retour raté : la phrase traduite et son geste, jamais le texte brut', t.replace(/\s+/g, ' '));
         await capt(pg, `B-${tag}`);
+        await pg.goto(`http://localhost:${PORT}/?ebay=connecte&compte=vendeur_pro&nouveau=1`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('[data-ebay-retour="connecte"]', { timeout: 25000 });
+        const t2 = await pg.$eval('[data-ebay-retour]', (e) => e.innerText);
+        dit(/Compte eBay « vendeur_pro » ajouté/.test(t2) && /Vérifié chez eBay/.test(t2), '   retour réussi (adresse SANS onglet, celle d’eBay) : Comptes eBay s’ouvre et dit le compte constaté', t2.replace(/\s+/g, ' '));
+        dit(!/ebay=/.test(pg.url()), '   l’adresse est nettoyée', pg.url());
       });
       await ctx.close();
       remettre({});
-      const o2 = await ouvrir(b, vp, sombre); const pg2 = o2.pg;
-      await essaie('C', async () => {
+      const o2 = await ouvrir(b, vp, sombre); const pg2 = o2.pg; PGC = pg2;
+      await garde('C', async () => {
         await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=compte`, { waitUntil: 'domcontentloaded' });
         await pg2.waitForSelector('[data-ebay-compte-ligne="principal"]', { timeout: 25000 });
         const bientot = await pg2.$('[data-ebay-compte-ligne="principal"] [data-ebay-jeton="bientot"]');
@@ -194,6 +205,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         await capt(pg2, `C-feuille-${tag}`);
         await pg2.click('[data-ebay-parametres="defauts"] [data-ebay-format] [data-ebay-choix="enchere"]');
         await pg2.selectOption('[data-ebay-parametres="defauts"] [data-ebay-delai]', '1');
+        await pg2.waitForFunction(() => { try { const v = JSON.parse(localStorage.getItem('vrm_ebay_publication_defaut') || 'null'); return v && v.delaiEnvoi === 1; } catch (_) { return false; } }, null, { timeout: 5000 }).catch(() => {});
         const ranges = await pg2.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_ebay_publication_defaut') || 'null'); } catch (_) { return null; } });
         dit(ranges && ranges.format === 'enchere' && ranges.delaiEnvoi === 1, '   enchères + délai 1 j rangés comme défauts (synchronisés)', JSON.stringify(ranges));
         if (mobile) {
@@ -209,7 +221,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         await capt(pg2, `C-${tag}`);
         await pg2.evaluate(() => { try { localStorage.removeItem('vrm_ebay_publication_defaut'); } catch (_) {} });
       });
-      await essaie('D', async () => {
+      await garde('D', async () => {
         envois = [];
         await ouvrirVendre(pg2);
         await pg2.click('[data-publier-un-clic="31"]');
@@ -232,12 +244,12 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         const vu = await pg2.evaluate(() => localStorage.getItem('vrm_ebay_guide_vu'));
         dit(vu === 'true', '   la fenêtre de 1re publication ne revient pas (rangée)', vu);
       });
-      await essaie('E', async () => {
+      await garde('E', async () => {
         envois = [];
         await ouvrirVendre(pg2);
         await pg2.click('[data-choix-paire="32"]');
-        await pg2.waitForSelector('[data-ebay-reglages-ouvrir]', { timeout: 15000 });
-        await pg2.click('[data-ebay-reglages-ouvrir]');
+        await pg2.waitForSelector('[data-ebay-tous-reglages]', { timeout: 15000 });
+        await pg2.click('[data-ebay-tous-reglages]');
         await pg2.waitForSelector('[data-ebay-parametres="annonce"]', { timeout: 10000 });
         await pg2.click('[data-ebay-param="offres"] [role="switch"]');
         await pg2.click('[data-ebay-param="retours.jours"] [data-ebay-choix="30"]');
@@ -250,7 +262,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         await pg2.fill('input[placeholder="ex. Nike"]', 'Adidas').catch(() => {});
         const marque = await pg2.$$('input');
         for (const m of marque) { const ph = await m.getAttribute('placeholder'); if (ph === 'ex. Nike') await m.fill('Adidas'); }
-        await pg2.click('[data-publier-ebay]');
+        await pg2.click('[data-publier-ebay]'); await quandMeme(pg2);
         const conf = pg2.locator('div[style*="z-index"]').filter({ hasText: /Publier (cette annonce sur eBay|sur ton compte eBay)/ }).last();
         await conf.waitFor({ timeout: 8000 });
         const tc = await conf.innerText();
@@ -264,7 +276,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         await pg2.waitForSelector('[data-publie-sponsor]', { timeout: 5000 });
         await capt(pg2, `E-publiee-${tag}`);
       });
-      await essaie('F', async () => {
+      await garde('F', async () => {
         envois = [];
         await ouvrirVendre(pg2);
         await pg2.click('[data-choix-paire="33"]');
@@ -279,7 +291,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         await pg2.waitForTimeout(1200);
         dit(action('pubinfo').some((e) => e.categoryId === '15709'), '   son choix ⇒ les caractéristiques de SA catégorie (pubinfo 15709)', JSON.stringify(action('pubinfo').map((e) => e.categoryId)));
       });
-      await essaie('G', async () => {
+      await garde('G', async () => {
         SC.refusCarac = true; envois = [];
         await ouvrirVendre(pg2);
         await pg2.click('[data-choix-paire="32"]');
@@ -292,7 +304,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         await capt(pg2, `G-${tag}`);
         SC.refusCarac = false;
       });
-      await essaie('H', async () => {
+      await garde('H', async () => {
         await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=ventes`, { waitUntil: 'domcontentloaded' });
         await pg2.waitForSelector('[data-ebay-guide-bouton="vente"]', { timeout: 25000 });
         await pg2.click('[data-ebay-guide-bouton="vente"]');
@@ -301,7 +313,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         dit(/tu ne paies rien/.test(t) && /étiquette prépayée/.test(t) && !!(await pg2.$('[data-ebay-guide-lien="vente"]')), 'H. « Comment faire ? » ⇒ la fenêtre « vendue » : l’acheteur a payé le port, l’étiquette prépayée dans eBay', t.replace(/\s+/g, ' ').slice(0, 200));
         await capt(pg2, `H-${tag}`);
       });
-      await essaie('J', async () => {
+      await garde('J', async () => {
         envois = [];
         await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=promo`, { waitUntil: 'domcontentloaded' });
         await pg2.waitForSelector('[data-ebay-remises="1"]', { timeout: 25000 });
@@ -324,7 +336,7 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         const p = action('poserremise')[0];
         dit(!!p && p.confirme === true && p.type === 'periode' && p.remise === 15 && p.listingIds.join() === '110000000044' && Math.abs(Date.parse(p.fin) - MAINTENANT - 7 * JOUR) < 5 * 60000, '   `poserremise` : −15 %, SON annonce, fin dans 7 j, confirmé', JSON.stringify(p));
       });
-      await essaie('K', async () => {
+      await garde('K', async () => {
         envois = [];
         await pg2.goto(`http://localhost:${PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' });
         await pg2.waitForSelector('[data-fil-sites="ebay"]', { timeout: 25000 });
@@ -340,6 +352,17 @@ const ok = async (pg, nom = /Oui, publier/) => { await pg.getByRole('button', { 
         const r = action('repondre')[0];
         dit(!!r && r.confirme === true && r.messageId === '5550001' && r.itemId === '110000000044' && r.body === 'Elle taille normalement.', '   « Envoyer » sur SON clic confirmé : `repondre` sur CETTE question', JSON.stringify(r));
         await capt(pg2, `K-${tag}`);
+      });
+      await garde('L', async () => {
+        await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=ventes`, { waitUntil: 'domcontentloaded' });
+        await pg2.waitForSelector('[data-ebay-vente="07-11111-22222"]', { timeout: 25000 });
+        const t = await pg2.$eval('[data-ebay-vente="07-11111-22222"]', (e) => e.innerText);
+        dit(/100,00/.test(t) && !/106,50/.test(t), 'L. Ventes eBay : la ligne dit l’argent REÇU (100,00 €), pas ce que l’acheteur a payé port compris (106,50 €)', t.replace(/\s+/g, ' ').slice(0, 160));
+        await capt(pg2, `L-${tag}`);
+        await pg2.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=compte`, { waitUntil: 'domcontentloaded' });
+        await pg2.waitForSelector('[data-ebay-argent-recu]', { state: 'attached', timeout: 25000 });
+        const v = await pg2.$eval('[data-ebay-argent-recu]', (e) => e.getAttribute('data-ebay-argent-recu'));
+        dit(v === '100.00', '   Comptes eBay → Argent : « reçu » = 100,00 (le port n’est pas une recette, §2.8)', v);
       });
       const tous = [...errs, ...o2.errs];
       dit(tous.length === 0, `aucune erreur de page (${tag})`, tous.join(' | '));

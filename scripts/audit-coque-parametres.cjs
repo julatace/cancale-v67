@@ -154,7 +154,9 @@ if (arg.includes('--prouve')) {
   const A = sansCommentaires(app);
   dit(/const SYNC_PROBLEME = new Set\(\['error', 'refus'\]\);/.test(A) && /if \(!SYNC_PROBLEME\.has\(syncStatus\) && !ouvert\) return null;/.test(A), 'le nuage ne s’affiche qu’en cas de problème (sauvegarde ratée ou refusée)');
   const bn = /const badgesNav=\{([^}]*)\}/.exec(A);
-  dit(bn && !/\bventes\s*:/.test(bn[1]) && /cat_bord\s*:\s*colisBadge/.test(bn[1]), 'le badge des colis à envoyer est sur Colis seulement (pas recopié sur Ventes)', bn && bn[1]);
+  // (intégration g1) Depuis DJ3 (revue-colis), Colis vit DANS Ventes (« À expédier ») et Achats (« À retirer ») :
+  // le badge des colis à envoyer est sur Ventes, celui des retraits sur Achats, chacun UNE fois (plus de cat_bord).
+  dit(bn && /\bventes\s*:\s*colisBadge/.test(bn[1]) && /\bachats\s*:\s*retraitsBadge/.test(bn[1]) && !/cat_bord\s*:/.test(bn[1]) && (bn[1].match(/colisBadge/g) || []).length === 1, 'le badge des colis à envoyer est sur Ventes seulement (Colis rangé dans Ventes), celui des retraits sur Achats', bn && bn[1]);
   // Les icônes de navigation.
   const icone = (re) => { const m = re.exec(A); return m ? m[1] : null; };
   const ic = { ventes: icone(/\{id:'ventes',\s*icon:'(\w+)'/), achats: icone(/\{id:'achats',\s*icon:'(\w+)'/), annonces: icone(/\{id:'annonces',\s*icon:'(\w+)'/) };

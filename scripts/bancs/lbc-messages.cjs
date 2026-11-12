@@ -60,7 +60,10 @@ srv.listen(PORT);
       await pg.goto(`http://localhost:${PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(2000);
       try { await pg.click('[data-filtre-site="messages"] [data-site="leboncoin"]', { timeout: 5000 }); } catch (e) { dit(false, 'Messages · Leboncoin est joignable par le filtre de site', String(e.message).slice(0, 80)); await ctx.close(); continue; }
-      await pg.waitForSelector('[data-messages-lbc]', { timeout: 8000 }).catch(() => {});
+      // (11 nov., lbc-rouges) Attendre la FIN de la lecture (`charge` est l'état « en cours ») :
+      // une panne se dit après une relecture (src/rafraichissementLeboncoin.js) — le banc lisait
+      // l'état transitoire et jugeait « Lecture en cours… » (§6.5 : jamais un instant pris au hasard).
+      await pg.waitForFunction(() => { const e = document.querySelector('[data-messages-lbc]'); return e && e.getAttribute('data-messages-lbc') !== 'charge'; }, null, { timeout: 20000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-messages-lbc]'); return e ? { etat: e.getAttribute('data-messages-lbc'), t: e.innerText, comptes: [...e.querySelectorAll('[data-compte-lbc]')].map((x) => ({ id: x.getAttribute('data-compte-lbc'), t: x.innerText })), lien: (e.querySelector('[data-ouvrir-messages-lbc]') || {}).href || '' } : null; });
       if (etat === 'lu') {
         dit(v && v.etat === '4', 'le total des non-lus RELEVÉS', v && v.etat);

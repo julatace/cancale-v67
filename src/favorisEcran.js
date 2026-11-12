@@ -316,7 +316,7 @@ export function articlesFavoris({lignes=[],statut=()=>null,journal=[],vendue=()=
     const e=etatFavori({job:statut(ligne),journal:parNotif.get(String(ligne.id))||[],vendue:estVendue});
     const pseudo=pseudoFavori(ligne);
     const dateEnvoi=e.code==='envoye'&&Number.isFinite(new Date(Number(e.date)||Date.parse(e.date)).getTime())?new Date(Number(e.date)||Date.parse(e.date)).toISOString():null;
-    c.personnes.push({id:ligne.id,pseudo,initiale:initialePseudo(pseudo),etat:e.code,raison:e.raison||null,offre:e.offre===true,
+    c.personnes.push({id:ligne.id,pseudo,initiale:initialePseudo(pseudo),date:Number.isFinite(t)?t:null,etat:e.code,raison:e.raison||null,offre:e.offre===true,
       detail:e.code==='envoye'?(e.date?heureParis(e.date):'date non lue'):ageFavori(ligne.date,maintenant),dateEnvoi,
       ouvrir:e.code==='pas_envoye'&&RAISONS_ECRAN[e.raison]?.ouvrir===true});
     if(!c.photo&&ligne.photo)c.photo=ligne.photo;

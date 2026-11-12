@@ -904,6 +904,98 @@
       if (r) versRelais({ kind: 'lbcenvoiappris', recette: r });   // 5.362 : canal privé seulement
     } catch (_) {}
   }
+  // ── 5.363 (11 nov., lot lbc-plus) : BAISSER UN PRIX, APPRIS SUR SON GESTE ─────
+  // Julien veut « baisser le prix en série sur Leboncoin ». La requête de
+  // Leboncoin qui change un prix n'a JAMAIS été vue (403 d'ici) : rien ne part à
+  // l'aveugle. Comme l'envoi d'un message (5.318), la forme s'APPREND quand IL
+  // change un prix lui-même sur leboncoin.fr (une écriture 2xx faite PAR LA
+  // PAGE) : méthode, hôte, chemin avec l'annonce en `{ad}`, la clé du prix et son
+  // unité (lue dans le NOM de la clé : « cent » ⇒ centimes, sinon euros), les
+  // mots fixes, les NOMS des en-têtes — jamais une valeur d'en-tête, jamais le
+  // prix qu'il a tapé. Une écriture qui porte AUTRE CHOSE que l'annonce et son
+  // prix (titre, description, photos…) n'est PAS rejouable : la refaire
+  // demanderait de renvoyer toute l'annonce (« corps-complet »).
+  // Les adresses d'argent (paiement, options, boost), de messagerie, de pause ou
+  // de suppression ne sont jamais apprises.
+  const PAS_PRIX_LBC = /messaging|\/manual\/|negotiat|offer|deal|pay|order|checkout|wallet|shipping|transaction|boost|bump|urgent|gallery|toplist|package|product|option|favorit|saved|search|finder|stats|realtime|credential|auth|login|report/i;
+  const CLE_PRIX_LBC = /^(price|prices|price_cents|prix|amount)$/i;
+  const CLE_ID_LBC = /^(list_?ids?|ad_?ids?|ids?|classified_?ids?)$/i;
+  const ID_AD_LBC = /^\d{6,12}$/;
+  function recettePrixLbc(url, methode, corps, entetes) {
+    let u; try { u = new URL(url, location.origin); } catch (_) { return null; }
+    if (!DE_LEBONCOIN(url) || !/^(POST|PUT|PATCH)$/i.test(String(methode || ''))) return null;
+    if (PAS_PRIX_LBC.test(u.pathname)) return null;
+    if (typeof corps !== 'string' || !/price|prix|amount/i.test(corps)) return null;
+    const base = { methode: String(methode).toUpperCase(), hote: u.hostname, chemin: sansUuid(u.pathname).replace(/\/\d{3,}/g, '/{id}').slice(0, 160), page: cheminPage() };
+    const non = (raison) => ({ ...base, rejouable: false, raison });
+    const moi = moiLbc();
+    if (!moi) return non('compte-pas-su');
+    let obj; try { obj = JSON.parse(corps); } catch (_) { return non('corps-pas-json'); }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return non('corps-pas-objet');
+    const prix = [], ids = [], fixes = [];
+    let trop = false, autre = '';
+    const marche = (v, ch) => {
+      if (trop || autre) return;
+      if (ch.length > 4) { autre = 'corps-profond'; return; }
+      const k = ch.length ? String(ch[ch.length - 1]) : '';
+      if (Array.isArray(v)) {
+        if (v.length === 1 && typeof v[0] === 'number' && CLE_PRIX_LBC.test(k)) { prix.push([ch, v[0], 'tableau']); return; }
+        if (v.length === 1 && (typeof v[0] === 'number' || typeof v[0] === 'string') && CLE_ID_LBC.test(k) && ID_AD_LBC.test(String(v[0]))) { ids.push([ch, String(v[0]), typeof v[0] === 'number' ? 'tableau-nombre' : 'tableau-texte']); return; }
+        autre = 'corps-tableau'; return;
+      }
+      if (v && typeof v === 'object') { const ks = Object.keys(v); if (ks.length > 12) { trop = true; return; } for (const c of ks) marche(v[c], ch.concat(c)); return; }
+      if (CLE_PRIX_LBC.test(k) && typeof v === 'number') { prix.push([ch, v, 'nombre']); return; }
+      if (CLE_ID_LBC.test(k) && (typeof v === 'number' || typeof v === 'string') && ID_AD_LBC.test(String(v))) { ids.push([ch, String(v), typeof v === 'number' ? 'nombre' : 'texte']); return; }
+      if (typeof v === 'boolean' || v === null) { fixes.push([ch, v, typeof v]); return; }
+      if (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)) { fixes.push([ch, v, 'string']); return; }
+      autre = 'corps-complet';
+    };
+    marche(obj, []);
+    if (trop || fixes.length > 8) return non('corps-complet');
+    if (autre) return non(autre);
+    if (prix.length !== 1) return non(prix.length ? 'plusieurs-prix' : 'prix-introuvable');
+    const cleOk = (c) => /^[A-Za-z_][\w-]{0,40}$/.test(String(c));
+    if (![...prix, ...ids, ...fixes].every(([ch]) => ch.every(cleOk))) return non('cle-illisible');
+    // L'annonce : UN identifiant, dans le chemin et/ou le corps (toujours le même).
+    const segs = u.pathname.split('/');
+    const dansChemin = segs.filter((s) => ID_AD_LBC.test(s));
+    const toutes = new Set([...dansChemin, ...ids.map((x) => x[1])]);
+    if (toutes.size !== 1) return non(toutes.size ? 'plusieurs-annonces' : 'annonce-introuvable');
+    const ad = [...toutes][0];
+    const modele = segs.map((s) => (s === ad ? '{ad}' : s)).join('/');
+    if (/\/\d{3,}(\/|$)/.test(modele)) return non('chemin-ambigu');
+    if (u.search && /\d{3,}|@/.test(u.search)) return non('adresse-a-parametres');
+    const [chPrix, , formePrix] = prix[0];
+    const unite = /cent/i.test(chPrix[chPrix.length - 1]) ? 'cts' : 'eur';
+    const noms = Object.keys(nomsEntetesLbc(entetes)).filter((k) => !ENTETES_INTERDITS_LBC.test(k)).slice(0, 20);
+    return { ...base, rejouable: true, raison: '', modele, recherche: u.search || '', clePrix: chPrix.map(String), formePrix, unite,
+      cleIds: ids.map(([ch, , f]) => [ch.map(String), f]), fixes: fixes.map(([ch, v, t]) => [ch.map(String), v, t]), entetes: noms };
+  }
+  function noteEnvoiPrixLbc(url, methode, statut, corps, entetes) {
+    try {
+      if (!(statut >= 200 && statut < 300)) return;
+      const r = recettePrixLbc(url, methode, corps, entetes);
+      if (r) versRelais({ kind: 'lbcprixappris', recette: r });   // 5.372 : canal privé
+    } catch (_) {}
+  }
+  // Le prix que la RÉPONSE de Leboncoin montre pour CETTE annonce (euros), ou null.
+  function prixDansReponseLbc(j, ad) {
+    let vu = null;
+    const lire = (o, prof) => {
+      if (vu != null || !o || typeof o !== 'object' || prof > 5) return;
+      if (Array.isArray(o)) { for (const x of o.slice(0, 50)) lire(x, prof + 1); return; }
+      const idO = o.list_id != null ? o.list_id : o.ad_id != null ? o.ad_id : o.id;
+      const sienne = idO == null || String(idO) === ad;
+      if (sienne) for (const k of Object.keys(o)) {
+        if (!CLE_PRIX_LBC.test(k)) continue;
+        const v = Array.isArray(o[k]) && o[k].length === 1 ? o[k][0] : o[k];
+        if (typeof v === 'number' && Number.isFinite(v) && v > 0) { vu = /cent/i.test(k) ? v / 100 : v; return; }
+      }
+      for (const k of Object.keys(o).slice(0, 40)) if (o[k] && typeof o[k] === 'object') lire(o[k], prof + 1);
+    };
+    lire(j, 0);
+    return vu;
+  }
   // Certaines pages contiennent déjà les données : aucun fetch n'aura lieu.
   // La source est le document privé exact, jamais un objet public du DOM.
   const cheminInitial=location.pathname;
@@ -954,6 +1046,7 @@
             noteSeen(url, meth, res.status, ct);
             if (corpsRetrait) noterRetraitPage(url, meth, corpsRetrait, res.status);
             if (MODIFIE.test(meth) && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, meth, res.status, init && typeof init.body === 'string' ? init.body : null, init && init.headers);
+            else if (MODIFIE.test(meth)) noteEnvoiPrixLbc(url, meth, res.status, init && typeof init.body === 'string' ? init.body : null, init && init.headers);
             res.clone().text().then((t) => handle(url, t, ct, res.status, corpsReq)).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
@@ -970,6 +1063,7 @@
     OX.prototype.send = function (corps) {
       try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
       try { this.__lbcCorpsMsg = (typeof corps === 'string' && /\/messaging\//i.test(this.__lbcUrl || '')) ? corps : null; } catch (_) {}
+      try { this.__lbcCorpsPrix = (typeof corps === 'string' && corps.length < 4000 && MODIFIE.test(this.__lbcMeth || '')) ? corps : null; } catch (_) {}
       try { this.__lbcCorps = (typeof corps === 'string' && LISTE_VENDEUR(this.__lbcUrl || '')) ? corps : null; this.__lbcRetrait = (typeof corps === 'string' && RETRAIT_PAGE.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
       try {
         this.addEventListener('load', function () {
@@ -980,6 +1074,7 @@
             noteSeen(url, this.__lbcMeth, this.status, ct);
             if (this.__lbcRetrait) noterRetraitPage(url, this.__lbcMeth, this.__lbcRetrait, this.status);
             if (MODIFIE.test(this.__lbcMeth || '') && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, this.__lbcMeth, this.status, this.__lbcCorpsMsg, this.__lbcH);
+            else if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoiPrixLbc(url, this.__lbcMeth, this.status, this.__lbcCorpsPrix, this.__lbcH);
             const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
             if (t) handle(url, t, ct, this.status, this.__lbcCorps || null);
           } catch (_) {}
@@ -1075,5 +1170,66 @@
       try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map((c) => sansUuid(c)).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); const idb = dd && (dd.id != null ? dd.id : dd.message_id); if ((typeof idb === 'string' || typeof idb === 'number') && /^[\w-]{1,64}$/.test(String(idb))) idMsg = String(idb); } catch (_) {}
       fin({ statut, cles, idMsg, erreur });
     } finally { envoiMsgEnCours = false; }
+  }); } catch (_) {}
+  // ── 5.363 : CHANGER UN PRIX, SUR SON CLIC (l'ordre vient du fond par lbc-relay.js) ──
+  // La recette APPRISE de son propre geste (ci-dessus), au nom du compte privé de
+  // CETTE page seulement, avec les en-têtes que la page vient d'envoyer à l'API de
+  // Leboncoin (jamais devinés). UNE à la fois. La réponse repart : statut, forme
+  // (clés), et le prix que Leboncoin montre pour CETTE annonce s'il le dit.
+  let prixEnCours = false;
+  try { surOrdre(async (d) => {   // 5.372 : l'ordre vient du canal privé seulement
+    if (!d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'prix') return;
+    const jeton = String(d.jeton || ''), ad = String(d.id || '');
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => versRelais(Object.assign({ kind: 'lbcprixresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-leboncoin' });
+    const euros = Number(d.prix);
+    if (!ID_AD_LBC.test(ad) || !Number.isFinite(euros) || euros < 1 || euros > 100000) return fin({ statut: 0, erreur: 'invalide' });
+    const r = d.recette;
+    if (!r || r.rejouable !== true || !/^(POST|PUT|PATCH)$/.test(String(r.methode)) || !/^api\.leboncoin\.fr$/i.test(String(r.hote || ''))
+      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || (r.modele.split('{ad}').length - 1) > 1 || PAS_PRIX_LBC.test(r.modele)
+      || !Array.isArray(r.clePrix) || !r.clePrix.length || !Array.isArray(r.fixes) || !Array.isArray(r.cleIds)
+      || (!r.modele.includes('{ad}') && !r.cleIds.length)) return fin({ statut: 0, erreur: 'recette' });
+    if (prixEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    const moi = moiLbc();
+    if (!moi || String(d.compte || '') !== moi) return fin({ statut: 0, erreur: moi ? 'autre-compte' : 'compte-pas-su' });
+    const h = {};
+    const src = entetesApi ? nomsEntetesLbc(entetesApi) : null;
+    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
+      const k = String(n).toLowerCase();
+      if (ENTETES_INTERDITS_LBC.test(k)) continue;
+      if (!src || src[k] == null) return fin({ statut: 0, erreur: 'entetes' });
+      h[k] = src[k];
+    }
+    h['content-type'] = 'application/json'; h.accept = h.accept || 'application/json';
+    const corps = {};
+    try {
+      for (const [ch, v] of r.fixes) poserLbc(corps, ch.map(String), v);
+      for (const [ch, f] of r.cleIds) poserLbc(corps, ch.map(String), f === 'nombre' ? Number(ad) : f === 'texte' ? ad : f === 'tableau-nombre' ? [Number(ad)] : [ad]);
+      const v = r.unite === 'cts' ? Math.round(euros * 100) : euros;
+      poserLbc(corps, r.clePrix.map(String), r.formePrix === 'tableau' ? [v] : v);
+    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
+    const adresse = 'https://' + r.hote + r.modele.replace('{ad}', encodeURIComponent(ad)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
+    prixEnCours = true;
+    try {
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
+      try {
+        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
+        statut = Number(res.status) || 0;
+        try { rep = String(await res.text()).slice(0, 20000); } catch (_) {}
+        // (intégration 11nov-g2, sécurité des comptes 5.366) Un CONTRÔLE ANTI-ROBOT (DataDome, captcha,
+        // défi Cloudflare) se reconnaît à ses en-têtes ou au début du texte, sur un refus seulement :
+        // seul le OUI/NON sort (et le Retry-After), jamais le texte. La règle de vc-inject.js (`defiDe`).
+        try {
+          const hd = (k) => String((res.headers && res.headers.get(k)) || '');
+          defi = (statut >= 400 && (/protected|blocked/i.test(hd('x-datadome')) || /^\d+$/.test(hd('x-dd-b').trim()))) || /^challenge$/i.test(hd('cf-mitigated').trim())
+            || (statut >= 400 && /captcha-delivery\.com|geo\.captcha|\bdatadome\b|\bcaptcha\b|cf-chl|challenge-platform|hcaptcha|recaptcha|turnstile|just a moment/i.test(rep.slice(0, 6000)));
+          ra = hd('retry-after').slice(0, 40);
+        } catch (_) {}
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      let cles = [], prixVu = null;
+      try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map((c) => sansUuid(c)).slice(0, 60); prixVu = prixDansReponseLbc(j, ad); } catch (_) {}
+      fin({ statut, cles, prixVu, erreur, defi, ra });
+    } finally { prixEnCours = false; }
   }); } catch (_) {}
 })();

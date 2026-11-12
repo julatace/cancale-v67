@@ -111,6 +111,9 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
 | **Bloc « offres à trancher » des emails dans Messages** | Retiré le 24 oct. sur sa demande (moyennes par modèle et liens génériques compris). Ne pas le rétablir. Les offres dans les conversations restent. |
 | **Offres** | ⚠️ 10 nov. (Julien) : **Solo 16,99 € = 1 compte vendeur par plateforme** (+ comptes d'achat illimités) · **Pro 19,99 € = comptes vendeurs ILLIMITÉS** — ne pas remettre la limite des 10 (lot BO annulé, `2026-11-10-pro-illimite.md`). |
+| **Messages, comptes** | 12 nov. (Julien) : comptes SÉPARÉS — compte de l'onglet d'abord, puis chaque autre compte ; du plus récent au plus ancien DANS chaque groupe. Ne pas mélanger. |
+| **403 de Vinted** | 12 nov. : l'extension garde la pause sur TOUT 403. |
+| **Discrétion** | 12 nov. VALIDÉ : temps d'écriture et messages variés, plafond par jour en plus des 50/h, rythme irrégulier, attente après l'ouverture de Vinted, jamais deux comptes à la fois sur un ordinateur ni la même action partout au même moment, compte neuf en douceur, offres selon l’heure, republication par petits groupes, baisses irrégulières, arrêt + alerte au 1er captcha, santé du compte. REFUSÉ : blocage auto la nuit, étalement des messages aux favoris sur la journée. « X € conseillé » gardé mais mesuré. Mode prudence : relecture des ventes en attente de sa décision, ne rien changer. |
 | **Organisation** | Retirée du menu le 29 oct. (inutilisée) ; l'écran reste joignable par Réglages → Stock et rangement → Organisation. |
 
 **Refusé par Julien le 11 octobre (son choix) — ne pas reproposer** : « imprimer la
@@ -542,20 +545,28 @@ sans la fonction.
 | `variantes` | `choisirVariante` | **5.369.0** (12 nov.) | ses versions 2 à 5 (favoris : `variantes` ; refus : `vinted_offre_refus_variantes`) : une au hasard, jamais celle du message précédent ; n° de version au journal |
 | `discretion` | `porteDiscretion` | **5.370.0** (12 nov.) | plafond du JOUR (200, réglable, tous Chrome), rythme actif/calme, 2–6 min après l'ouverture, un compte à la fois, séries décalées 20–60 min, compte neuf 10→50/h, offres la nuit 30–120 min, baisses programmées, arrêt sur captcha/modération/401 jusqu'à « Reprendre », « Tout arrêter », 15/h favoris et offres, relecture « seulement le nouveau », carnet 7 j (`actions_compte_…` : `jour`, `maxJour`, `captcha`, `arret`, `ev`, `so`, `ta`) ; l'icône ouvre VRM dans un onglet (clic droit : connexion / état) |
 | `majdispo` `carte4` `reparer` `rapportext` `fileReseau` `barresfixes` | `etatMiseAJour` · `quatreLignes` · `reparerExtension` · `envoyerRapport` · `mettreEnFileReseau` · `eviterBarres` | **5.371.0** (12 nov.) | nouvelle version, carte en 4 lignes, Réparer, rapport, file réseau, barres fixes |
+| `vcprix` | `baisserPrixVestiaire` | **5.368.0** (12 nov.) | « Baisser des prix » Vestiaire sur son clic : recette APPRISE de son propre changement de prix (relu) sur vestiairecollective.com (`vc_prix_recette`), compte de l'annonce = celui de l'onglet, prix lu avant (aperçu) et RELU après, 45/h, pause 429/403 |
+| `offresgarde` | `offreGardeDit` | **5.308.0** | (ajoutée à la table le 12 nov.) |
+| `offrespage` | `seuilOffreLu` | **5.342.0** | (ajoutée à la table le 12 nov.) |
+| `lbcprix` | `baisserPrixLbc` | **5.368.0** (12 nov.) | « Baisser le prix » Leboncoin en série sur son clic : recette APPRISE de son propre changement de prix, prix relu, 45/h, compte de l'onglet ; passe par la sécurité des comptes (12 nov.) |
+| `securite` | `secuGeste` | **5.366.0** (11 nov.) | « Sécurité des comptes » : repos de nuit, plafonds jour/type, prudence, arrêt anti-robot, « si tu es là », « Tout arrêter » — Vinted et Vestiaire, avant le 50/h inchangé |
+| `creervinted` | `creerVintedFiche` | **5.367.0** (11 nov.) | « Créer sur Vinted » depuis une fiche « À publier » : sur son clic, UN brouillon par fiche depuis l'onglet vinted.fr (compte de l'onglet, 1 action dans les 45/h) ; champ du catalogue pas au libellé exact ⇒ DEMANDÉ (valeurs de Vinted) ; N° lié à l'id rendu ; il publie |
+| `repubdepart` | `etatDepartRepub` | **5.368.0** (11 nov.) | « Programmer » Republier : l'état dit l'onglet vinted.fr ouvert et le frein de republication du compte (lecture seule, « pas su » ⇒ rien ne part) |
 
 ---
 
 ## 9. État actuel et décisions récentes
 - **12 nov. · Boutique + carte du logo (ext. 5.371, `claude/agent2-ext-boutique`, CONTIENT `agent2-discretion`)** : « Nouvelle version disponible » (zip ⇒ Télécharger + 3 étapes ; boutique ⇒ rien), carte en 4 lignes, Réparer, rapport sans donnée (`mode=rapport-extension`), gestes hors ligne en file 24 h, logo jamais sur une barre fixe. `docs/passation/2026-11-12-ext-boutique.md`. Geste : publier (`2026-11-12-chrome-web-store.md`).
+- **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.365.0** (11 nov.). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.368.0** (11 nov.). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.365.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.368.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la

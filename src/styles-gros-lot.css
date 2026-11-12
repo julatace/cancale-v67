@@ -1,0 +1,20 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — « NOUVEL ACHAT » : UN LOT DE N ARTICLES (11 nov., lot gros-lot)
+   docs/passation/2026-11-11-gros-lot.md — même couche que « Nouvel achat ».
+   Rien de métier ici (la règle : src/grosLot.js).
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+  .vrm-gl { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .vrm-gl-deux { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .vrm-gl-champ { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .vrm-gl-suite { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 32px; }
+  .vrm-gl-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .vrm-gl-art { border: 1px solid; border-radius: 14px; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .vrm-gl-art-haut, .vrm-gl-art-bas { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .vrm-gl-num { flex-shrink: 0; min-width: 64px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .vrm-gl-photo { flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 1px dashed; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .vrm-gl-photo[data-lot-photo-pleine="1"] { border-style: solid; }
+  .vrm-gl-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vrm-gl-part { flex-shrink: 0; min-width: 78px; text-align: right; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .vrm-gl-total { padding: 10px 2px 0; border-top: 1px solid var(--vrm-border, rgba(127, 127, 127, .25)); }
+}

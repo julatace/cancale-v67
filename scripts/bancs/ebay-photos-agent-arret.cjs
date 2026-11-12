@@ -95,7 +95,7 @@ async function ouvrir(b, vp, sombre) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.setFixedTime(new Date(MAINTENANT));
   await pg.addInitScript(([fiches, resume, regles, sombre]) => { try {
-    localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches));
+    localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches));
     localStorage.setItem('vrm_agent_ebay_resume', JSON.stringify(resume)); localStorage.setItem('vrm_agent_ebay_regles', JSON.stringify(regles));
     if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, [FICHES, RESUME, REGLES, !!sombre]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image'].includes(r.request().resourceType()) ? r.fulfill({ status: 200, contentType: 'image/png', body: PNG }) : ['media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));

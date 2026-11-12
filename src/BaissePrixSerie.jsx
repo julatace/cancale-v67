@@ -17,6 +17,7 @@ import JaugeActions from './JaugeActions.jsx';   // (10 nov., lot G) les 50 acti
 // une, à leur heure, onglet vinted.fr ouvert (`planifierBaisses`). Règles : src/discretion.js.
 import { facteursBaisse, heuresEtalees, ETALEMENT_H } from './discretion.js';
 import { heureFr } from './jaugeActions.js';
+import { tr } from './i18n/index.js';
 
 const ETAT = { prevue: 'Prévue', envoi: 'Envoi…', fait: 'Fait', ecart: 'Autre prix', incertain: 'Pas relu', echec: 'Refusé', refus: 'Pas envoyée', 'pas-envoye': 'Pas envoyée' };
 const pauseEntre = () => {
@@ -27,9 +28,15 @@ const pauseEntre = () => {
 
 // (11 nov. soir) `baisseInitiale` : { mode, texte } — la baisse PROPOSÉE par « Changer le prix »
 // (src/PrixPartout.jsx : un prix modifié dans VRM ⇒ sur Vinted, VRM propose, son clic ici envoie).
-export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onFermer, onFini, Photo, Retour, baisseInitiale = null, etaleOk = false, onProgrammer = null, onAnnulerProgramme = null }) {
-  const [mode, setMode] = React.useState(baisseInitiale && baisseInitiale.mode === 'pct' ? 'pct' : 'eur');
-  const [texte, setTexte] = React.useState(baisseInitiale && baisseInitiale.texte ? String(baisseInitiale.texte) : '5');
+// (11 nov., lot lbc-plus) La MÊME feuille pour Leboncoin : `site='leboncoin'` (les phrases du site),
+// `modeDefaut`/`texteDefaut` (−5 % proposé, il change s'il veut), `onRelire` : après la série, les
+// prix envoyés que Leboncoin a acceptés sans les montrer sont RELUS (« Mes annonces » relue par
+// l'extension) — relu égal ⇒ « Fait », autre ⇒ « Autre prix », rien de neuf ⇒ reste « Pas relu ».
+// `baisseInitiale` (proposée) l'emporte sur `modeDefaut`/`texteDefaut`.
+export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherDe, extRaison = '', onBaisser, onRelire = null, onFermer, onFini, Photo, Retour, site = 'vinted', modeDefaut = 'eur', texteDefaut = '5', baisseInitiale = null, etaleOk = false, onProgrammer = null, onAnnulerProgramme = null }) {
+  const nomSite = site === 'leboncoin' ? 'Leboncoin' : 'Vinted';
+  const [mode, setMode] = React.useState(baisseInitiale && baisseInitiale.mode ? (baisseInitiale.mode === 'pct' ? 'pct' : 'eur') : modeDefaut);
+  const [texte, setTexte] = React.useState(baisseInitiale && baisseInitiale.texte ? String(baisseInitiale.texte) : texteDefaut);
   const [coches, setCoches] = React.useState(null);        // null : les coches par défaut de l'aperçu
   const [phase, setPhase] = React.useState('choix');        // choix · confirmer · envoi · fini
   const [etats, setEtats] = React.useState({});
@@ -44,7 +51,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
   const etale = quand === 'etale' && etaleOk && typeof onProgrammer === 'function';
   const [programme, setProgramme] = React.useState(null);   // { n, de, a } une fois rangé par l'extension
   const [heures, setHeures] = React.useState({});           // id → heure prévue (montrée avant de confirmer)
-  const lignes = React.useMemo(() => lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facteurs: varier ? facteurs : null }),
+  const lignes = React.useMemo(() => lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facteurs: varier && site === 'vinted' ? facteurs : null, site }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [annonces, mode, texte, compteOnglet, plancherDe, varier, facteurs]);
   const coche = (l) => (coches && Object.prototype.hasOwnProperty.call(coches, l.id) ? coches[l.id] : l.coche) && !l.bloque && l.nouveau != null;
@@ -86,7 +93,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
     const res = {};
     // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL et une BARRE ») La feuille « VRM travaille ».
     const t = suivi.demarrer({ sorte: 'baisse-prix', titre: `Baisser le prix (${baisse.mode === 'pct' ? `−${baisse.valeur} %` : `−${baisse.valeur} €`})`,
-      etapes: [['envoi', 'Envoi du nouveau prix à Vinted'], ['relu', 'Prix relu sur Vinted']], uid: compteOnglet || '',
+      etapes: [['envoi', `Envoi du nouveau prix à ${nomSite}`], ['relu', `Prix relu sur ${nomSite}`]], uid: site === 'vinted' ? (compteOnglet || '') : '',
       articles: file.map((l) => ({ id: l.id, num: l.numero || '', titre: l.titre || '' })) });
     const poser = (id, e) => { res[id] = e; setEtats((x) => ({ ...x, [id]: e })); };
     let stopVinted = '';
@@ -106,12 +113,15 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
         if (!arret.current) { i--; continue; }
       }
       const iss = issueBaisse(r);
+      if (r && r.accepte === true && r.etape === 'envoye') iss.aRelire = true;   // accepté, prix pas montré : relu après la série
       poser(l.id, iss);
       if (t) {
         if (iss.etat === 'fait' || iss.etat === 'ecart') t.etape(l.id, 'relu', iss.prixVu != null ? eur(iss.prixVu) : '');
-        t.fin(l.id, iss.etat === 'fait' ? { etat: 'ok' }
-          : iss.etat === 'ecart' || iss.etat === 'incertain' ? { etat: 'main', raison: iss.raison || (iss.etat === 'ecart' ? 'Vinted montre un autre prix' : 'pas relu'), geste: 'Regarde l’annonce sur Vinted' }
-          : { etat: 'refus', raison: iss.raison, geste: iss.arret ? 'Attends la fin de la pause de Vinted, puis relance' : '' });
+        const finT = iss.etat === 'fait' ? { etat: 'ok' }
+          : iss.aRelire ? null
+          : iss.etat === 'ecart' || iss.etat === 'incertain' ? { etat: 'main', raison: iss.raison || (iss.etat === 'ecart' ? `${nomSite} montre un autre prix` : 'pas relu'), geste: `Regarde l’annonce sur ${nomSite}` }
+          : { etat: 'refus', raison: iss.raison, geste: iss.arret ? `Attends la fin de la pause de ${nomSite}, puis relance` : '' };
+        if (finT) t.fin(l.id, finT);
       }
       if (iss.arret) { stopVinted = iss.raison || 'refus'; for (const m of file.slice(i + 1)) { poser(m.id, { etat: 'pas-envoye', raison: iss.raison }); if (t) t.fin(m.id, { etat: 'saute', raison: iss.raison }); } break; }
       if (i < file.length - 1) {
@@ -122,6 +132,20 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
         if (t) t.finPause();
       }
     }
+    // (11 nov., lot lbc-plus) RELIRE ce que le site a accepté sans montrer le prix (Leboncoin).
+    const aRelire = file.filter((l) => res[l.id] && res[l.id].aRelire);
+    if (aRelire.length && onRelire) {
+      for (const l of aRelire) if (t) t.etape(l.id, 'relu', tr('lbcplus.baisse.relecture'));
+      let vus = null; try { vus = await onRelire(aRelire); } catch (_) { vus = null; }
+      for (const l of aRelire) {
+        const pv = vus && vus[l.id] != null && Number.isFinite(Number(vus[l.id])) ? Number(vus[l.id]) : null;
+        const e = pv == null ? { etat: 'incertain', prixVu: null, raison: tr('lbcplus.baisse.pasRelu', { site: nomSite }) }
+          : Math.round(pv * 100) === Math.round(Number(l.nouveau) * 100) ? { etat: 'fait', prixVu: pv, raison: '' }
+            : { etat: 'ecart', prixVu: pv, raison: tr('lbcplus.baisse.autrePrix', { site: nomSite }) };
+        poser(l.id, e);
+        if (t) t.fin(l.id, e.etat === 'fait' ? { etat: 'ok' } : { etat: 'main', raison: e.raison, geste: tr('lbcplus.baisse.regarder', { site: nomSite }) });
+      }
+    } else for (const l of aRelire) if (t) t.fin(l.id, { etat: 'main', raison: tr('lbcplus.baisse.pasRelu', { site: nomSite }), geste: tr('lbcplus.baisse.regarder', { site: nomSite }) });
     if (t) t.terminer(arret.current ? 'arrêté par toi' : stopVinted, stopVinted ? 'arrete' : undefined);
     setPhase('fini');
     if (onFini) onFini(file.map((l) => ({ ligne: l, issue: res[l.id] || null })));
@@ -151,8 +175,8 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
             <b>{unite}</b>
           </label>
         </div>
-        <p className="vrm-bp-note">Arrondi à l’euro. Le prix change sur Vinted, annonce par annonce, puis VRM le relit.</p>
-        <div className="vrm-bp-options" data-bp-options="">
+        <p className="vrm-bp-note">{site === 'leboncoin' ? tr('lbcplus.baisse.note') : 'Arrondi à l’euro. Le prix change sur Vinted, annonce par annonce, puis VRM le relit.'}</p>
+        {site === 'vinted' ? <div className="vrm-bp-options" data-bp-options="">
           <label className="vrm-bp-option"><input type="checkbox" checked={varier} disabled={fige} onChange={(e) => { setVarier(e.target.checked); setCoches(null); }} data-bp-varier={varier ? '1' : '0'}/><span>Varier un peu (± 20 %)</span></label>
           {etaleOk && onProgrammer ? (
             <div className="vrm-bp-modes vrm-bp-quand" role="group" aria-label="Quand">
@@ -161,8 +185,8 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
               ))}
             </div>
           ) : null}
-        </div>
-        {compteOnglet ? <div className="vrm-bp-plafond"><JaugeActions uid={compteOnglet} /></div> : null}
+        </div> : null}
+        {compteOnglet && site === 'vinted' ? <div className="vrm-bp-plafond"><JaugeActions uid={compteOnglet} /></div> : null}
         {!baisse.ok ? <p className="vrm-ao-mini" role="alert" data-bp-erreur="">{baisse.erreur}</p> : null}
         {extRaison ? <p className="vrm-ao-mini" role="status" data-bp-ext="">{extRaison}</p> : null}
         {ouvrir.map((o) => <p key={o.texte} className="vrm-bp-compte" data-bp-ouvrir={o.n}>{o.texte} pour baisser {o.n > 1 ? `ses ${o.n} annonces` : 'son annonce'}.</p>)}
@@ -184,7 +208,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
                     <span className="vrm-bp-nom">{l.numero ? <b className="vrm-bp-num">N°{l.numero}</b> : null}<span className="vrm-bp-titre">{l.titre || 'Sans titre'}</span></span>
                     <span className="vrm-bp-prix">
                       {/* Après l'envoi, seul le prix RELU s'écrit après la flèche ; pas relu ⇒ « — ». */}
-                      {fini && (e.etat === 'fait' || e.etat === 'ecart') ? <><s>{eur(l.prix)}</s> → <b data-bp-relu="">{eur(e.prixVu)}</b><small> relu sur Vinted</small></>
+                      {fini && (e.etat === 'fait' || e.etat === 'ecart') ? <><s>{eur(l.prix)}</s> → <b data-bp-relu="">{eur(e.prixVu)}</b><small> {site === 'leboncoin' ? tr('lbcplus.baisse.reluSur') : 'relu sur Vinted'}</small></>
                         : fini && e.etat === 'incertain' ? <><s>{eur(l.prix)}</s> → <b data-bp-relu="">—</b></>
                           : fini ? <b>{eur(e.prixVu != null ? e.prixVu : l.prix)}</b>
                             : l.prix == null ? '—' : <><s>{eur(l.prix)}</s> → <b>{l.nouveau == null ? '—' : eur(l.nouveau)}</b>{varier && l.baisseVue != null && l.nouveau != null ? <small className="vrm-bp-var" data-bp-baisse-vue={String(l.baisseVue)}> −{String(l.baisseVue).replace('.', ',')}{mode === 'pct' ? ' %' : ' €'}</small> : null}</>}
@@ -192,7 +216,8 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
                     {etale && heures[l.id] && c ? <small className="vrm-bp-raison" data-bp-heure={String(heures[l.id])}>Vers {heureFr(heures[l.id])}</small> : null}
                     {l.bloque ? <small className="vrm-bp-raison">{l.bloque}</small>
                       : l.sousPlancher ? <small className="vrm-bp-ambre">Sous ton plancher ({l.plancher.partiel ? 'au moins ' : ''}{eur(l.plancher.centimes / 100)})</small>
-                        : l.plancher ? <small className="vrm-bp-raison">Plancher {l.plancher.partiel ? 'au moins ' : ''}{eur(l.plancher.centimes / 100)}</small> : null}
+                        : l.plancher ? <small className="vrm-bp-raison">Plancher {l.plancher.partiel ? 'au moins ' : ''}{eur(l.plancher.centimes / 100)}</small>
+                          : l.raison ? <small className="vrm-bp-raison" data-bp-propose="">{l.raison}</small> : null}
                   </span>
                 </label>
                 {e ? (
@@ -226,7 +251,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
           </div>
         ) : phase === 'confirmer' ? (
           <div className="vrm-bp-bas is-confirmer" data-bp-confirmation={choisies.length}>
-            <p className="vrm-bp-progres">{etale ? `Baisser ${choisies.length} prix dans les ${ETALEMENT_H} h ? Une à la fois, à son heure. Garde vinted.fr ouvert.` : `Baisser ${choisies.length} prix sur Vinted ? Une annonce à la fois, depuis l’onglet Vinted ouvert.`}</p>
+            <p className="vrm-bp-progres">{etale ? `Baisser ${choisies.length} prix dans les ${ETALEMENT_H} h ? Une à la fois, à son heure. Garde vinted.fr ouvert.` : `Baisser ${choisies.length} prix sur ${nomSite} ? Une annonce à la fois, depuis l’onglet ${nomSite} ouvert.`}</p>
             <div className="vrm-bp-boutons">
               <button type="button" className="vrm-ao-second" data-bp-annuler="" onClick={() => setPhase('choix')}>Annuler</button>
               <button type="button" className="vrm-ao-principal" data-bp-confirmer="" onClick={lancer}>{etale ? 'Oui, programmer' : 'Oui, baisser'}</button>

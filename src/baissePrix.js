@@ -53,16 +53,20 @@ export function prixBaisse(prix, baisse) {
 // par annonce (src/discretion.js, `facteursBaisse`) ; la baisse VUE est dans `baisseVue`. Une
 // variation qui passerait sous le plancher est remontée AU plancher (si son choix, lui, ne
 // passait pas dessous) : jamais sous le plancher à cause du hasard.
-export function lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facteurs = null } = {}) {
+// (11 nov., lot lbc-plus) `site` : 'leboncoin' pour la même feuille sur Leboncoin (les
+// phrases du compte à ouvrir) ; une annonce portant `propose: false` n'est pas cochée
+// par défaut (la liste proposée vient des statistiques, src/lbcPlus.js) — il la coche s'il veut.
+export function lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facteurs = null, site = 'vinted' } = {}) {
+  const lbc = site === 'leboncoin';
   const L = Array.isArray(annonces) ? annonces : [];
   return L.filter((a) => a && a.id != null).map((a) => {
     const uid = String(a.uid || '');
     const nom = a.compte || (uid ? `le compte ${uid}` : 'son compte');
     let bloque = '';
     if (!uid) bloque = 'VRM ne sait pas à quel compte est cette annonce';
-    else if (compteOnglet === undefined) bloque = 'VRM ne sait pas encore quel compte Vinted est ouvert';
-    else if (!compteOnglet) bloque = `Ouvre vinted.fr sur ${nom}`;
-    else if (String(compteOnglet) !== uid) bloque = `Ouvre ${nom} sur Vinted`;
+    else if (compteOnglet === undefined) bloque = `VRM ne sait pas encore quel compte ${lbc ? 'Leboncoin' : 'Vinted'} est ouvert`;
+    else if (!compteOnglet) bloque = `Ouvre ${lbc ? 'leboncoin.fr' : 'vinted.fr'} sur ${nom}`;
+    else if (String(compteOnglet) !== uid) bloque = `Ouvre ${nom} sur ${lbc ? 'Leboncoin' : 'Vinted'}`;
     const prix = cts(a.prix) > 0 ? cts(a.prix) / 100 : null;
     const f = facteurs && Number.isFinite(Number(facteurs[String(a.id)])) ? Number(facteurs[String(a.id)]) : 1;
     const baisseL = baisse && baisse.ok && f !== 1 ? { ...baisse, valeur: Math.round(baisse.valeur * f * 100) / 100 } : baisse;
@@ -77,7 +81,7 @@ export function lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facte
     }
     const sousPlancher = !!(plancher && nouveau != null && nouveau * 100 < plancher.centimes);
     const achatPasSaisi = !!(p && p.etat === 'achat');
-    return { ...a, uid, prix, nouveau, plancher, sousPlancher, achatPasSaisi, bloque, coche: !bloque && nouveau != null && !sousPlancher, baisseVue: baisseL && baisseL.ok ? baisseL.valeur : null };
+    return { ...a, uid, prix, nouveau, plancher, sousPlancher, achatPasSaisi, bloque, coche: !bloque && nouveau != null && !sousPlancher && a.propose !== false, baisseVue: baisseL && baisseL.ok ? baisseL.valeur : null };
   });
 }
 
@@ -90,7 +94,9 @@ export function comptesAOuvrir(lignes) {
 
 // Ce qui arrête TOUTE la série (le suivant serait refusé pour la même raison, ou
 // on ne sait plus ce qui se passe) — jamais « on continue quand même ».
-const ARRET_SERIE = new Set(['plafond', 'plafond-bordereaux', 'plafond-jour', 'verification', 'vinted-pause', 'frein-refus', 'onglet-vinted', 'vinted-absent', 'vinted-autre', 'autre-compte', 'stockage', 'perime', 'confirmation', 'absente']);
+const ARRET_SERIE = new Set(['plafond', 'plafond-bordereaux', 'plafond-jour', 'verification', 'vinted-pause', 'frein-refus', 'onglet-vinted', 'vinted-absent', 'vinted-autre', 'autre-compte', 'stockage', 'perime', 'confirmation', 'absente',
+  // (11 nov., lot lbc-plus) Leboncoin : la suivante serait refusée pour la même raison.
+  'lbc-pause', 'lbc-absent', 'pas-appris', 'pas-rejouable', 'entetes', 'en-cours']);
 
 // La réponse de l'extension (ou de `vmrCmdSuivi`) → l'état d'UNE ligne.
 //   fait      : Vinted montre le nouveau prix (RELU) ;

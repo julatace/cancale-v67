@@ -74,6 +74,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
     // (11 nov., Julien : « inadmissible », 087bcf86) plus de confirmation « N sur M contrôlés » à chaque impression ;
     // reste la confirmation de tamponner un bordereau DÉJÀ téléchargé (un carton tamponné ne se défait pas).
     ['Tamponner un bordereau téléchargé', /askConfirm\(\{ title: `Tamponner le bordereau téléchargé il y a \$\{mins\} min \?`/.test(A)],
+    // (11 nov., Julien — « inadmissible » : plus de confirmation « N sur M contrôlés » à chaque impression) Ce qui reste GARDÉ :
+    // un lot dont un article a changé (compte, N°, état) est refusé au lancement (`verifierContexte`).
+    ['Lot changé refusé avant impression', /const verifierContexte\s*=/.test(A) && /avantOuverture:verifierContexte/.test(A) && !/askConfirm\(\{title:'Vérifier les articles avant impression'/.test(A)],
     ['Accepter une offre Vinted', /askConfirm\(\{ title: `Accepter \$\{fmtE\(off\.prix\)\} \?`/.test(A)],
     ['Acceptation auto des offres', /askConfirm\(\{ title: 'Accepter les offres tout seul sur Vinted \?'/.test(A)],
     ['Supprimer une annonce eBay', /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(ebay)],

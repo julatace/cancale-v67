@@ -19,7 +19,8 @@
 //   9. un POST vers nos routes `/api/` vaut une écriture ;
 //  10. une lecture PENDUE ne se partage plus au-delà de `VOL_MAX_MS` (22 oct.) ;
 //  11. une écriture de lignes NOMMÉES ne vide que ce qui peut les porter (31 oct.) ;
-//  12. un passage de FOND déclaré accepte une réponse de moins de 15 s (31 oct.).
+//  12. un passage de FOND déclaré accepte une réponse de moins de 15 s (31 oct.) ;
+//  13. une route qui DÉCLARE ses lignes (`vrmEcritLignes`) ne vide que ce qui peut les porter (intégration g1).
 //  `--prouve` réaffaiblit la règle (cinq mutations) et exige du ROUGE.
 //  Lancer : node scripts/audit-lectures-partagees.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
@@ -228,6 +229,27 @@ async function verifier(mod) {
     t += 100; const r = await lp.fetch(U, fond('A'));
     dit(r.ok && F.appels.length === 9, '12. un échec n’est jamais resservi au fond', `${F.appels.length} · ${r.status}`);
   });
+  // 13. (intégration g1, budget Messages) `vrmEcritLignes` : « Lire mes messages eBay » n'écrit que
+  //     `ebay_messages{suffixe}` — les commandes eBay lues juste avant restent partagées ; le résumé
+  //     des messages (et un `like.` qui peut le porter) est relu ; un préfixe trop court ⇒ tout vidé.
+  await essaie('13. route déclarée', async () => {
+    const F = faux(); const lp = mod.creerLecturesPartagees(F.f, BASE, { maintenant, origine: 'https://vrm.center' });
+    const O = BASE + '/rest/v1/app_data?id=eq.ebay_orders&select=orders:data->orders';
+    const M = BASE + '/rest/v1/app_data?id=eq.ebay_messages_2&select=n:data->>nonLus';
+    const L = BASE + '/rest/v1/app_data?id=like.ebay_*&select=id';
+    await Promise.all([lp.fetch(O, H('A')), lp.fetch(M, H('A')), lp.fetch(L, H('A'))]);
+    await lp.fetch('/api/ebay', { method: 'POST', body: '{"action":"messages"}', vrmEcritLignes: ['ebay_messages', 'ebay_tokens'] });
+    await Promise.all([lp.fetch(O, H('A')), lp.fetch(M, H('A')), lp.fetch(L, H('A'))]);
+    const n = (u) => F.appels.filter((x) => x.url === u).length;
+    dit(n(O) === 1, '13. une route qui déclare ses lignes : les commandes eBay restent partagées', n(O));
+    dit(n(M) === 2 && n(L) === 2, '13. … la ligne déclarée (et un `like.` qui peut la porter) est relue', `${n(M)} · ${n(L)}`);
+    await lp.fetch('/api/ebay', { method: 'POST', body: '{}', vrmEcritLignes: ['eb'] });
+    await lp.fetch(O, H('A'));
+    dit(n(O) === 2, '13. un préfixe trop court (pas une déclaration) : tout est vidé', n(O));
+    await lp.fetch(BASE + '/rest/v1/app_data?on_conflict=id', { method: 'POST', body: JSON.stringify({ id: 'ebay_orders', data: {} }), vrmEcritLignes: ['ebay_messages'] });
+    await lp.fetch(O, H('A'));
+    dit(n(O) === 3, '13. une écriture vers la BASE ne se déclare pas : sa ligne est relue', n(O));
+  });
   return { ko, echecs };
 }
 
@@ -247,6 +269,8 @@ async function verifier(mod) {
       'like-ignore': [/return ids\.some\(\(x\) => re\.test\(x\)\);/, 'return false;'],
       'fond-partout': [/const accepte = init && init\.vrmFond === true \? fenetreFond : fenetre;/, 'const accepte = fenetreFond;'],
       'fond-sans-fenetre': [/maintenant\(\) - e\.fin < accepte/, 'true'],
+      'declaree-ignoree': [/const pref = versRoute \? prefixesDeclares\(init\) : null;/, 'const pref = null;'],
+      'prefixe-partout': [/const commence = \(x\) => P\.some\(\(p\) => String\(x\)\.startsWith\(p\)\);/, 'const commence = () => false;'],
       'ecriture-ignoree': [/      vider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(vider, vider\);\n      return p;/, '      return fetchOrig(input, init);'],
     };
     for (const [nom, [re, rep]] of Object.entries(MUT)) {

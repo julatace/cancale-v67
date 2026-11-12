@@ -225,11 +225,14 @@ export function aUnTemoin(t, cmd, temoins, opts = {}) {
 export function apparierTemoins(cands, { temoinActif, commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J, attendEncore = () => false } = {}) {
   const items = (cands || []).map((c, i) => {
     let ws = temoinsDe(c.t, c.cmd, c.temoins, { commandeDe, fenetreJ });
-    if (c.cmd && attendEncore(c.cmd)) ws = ws.filter((w) => temoinActif(w));
-    return { ...c, i, ms: arriveeMs(c.t), ws };
+    const attend = !!(c.cmd && attendEncore(c.cmd));
+    if (attend) ws = ws.filter((w) => temoinActif(w));
+    return { ...c, i, ms: arriveeMs(c.t), ws, attend };
   });
   const pris = new Set();
-  const ordre = [...items].sort((a, b) => (Number.isFinite(a.ms) ? a.ms : Infinity) - (Number.isFinite(b.ms) ? b.ms : Infinity) || a.i - b.i);
+  // Les achats prouvés en attente d'abord (ils ne peuvent prendre qu'un témoin encore montré) : sinon une moitié
+  // sans commande, arrivée plus tôt, leur prend ce témoin et ils seraient comptés une seconde fois.
+  const ordre = [...items].sort((a, b) => (a.attend === b.attend ? 0 : a.attend ? -1 : 1) || (Number.isFinite(a.ms) ? a.ms : Infinity) - (Number.isFinite(b.ms) ? b.ms : Infinity) || a.i - b.i);
   const ecart = (x, w) => { const aw = arriveeMs(w); return Number.isFinite(x.ms) && Number.isFinite(aw) ? Math.abs(aw - x.ms) : Infinity; };
   const out = new Array(items.length);
   for (const x of ordre) {

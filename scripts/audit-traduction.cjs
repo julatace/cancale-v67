@@ -36,15 +36,29 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/accueil/TempsGagne.jsx', ['*']],
+  ['src/RetoursLitiges.jsx', ['*']],
   ['src/profil/MenuProfil.jsx', ['*']],
   ['src/composants/GardeEcran.jsx', ['*']],
   ['src/i18n/ChoixLangue.jsx', ['*']],
   ['src/PublierPartout.jsx', ['*']],
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
-  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes']],
+  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes', 'ImpressionBordereaux', 'nomPapier']],
+  // (11 nov., lot vestiaire-plus) Vestiaire : le parcours, les photos exigées, la baisse de prix, les offres.
+  ['src/ParcoursVestiaire.jsx', ['*']],
+  ['src/PhotosVestiaire.jsx', ['*']],
+  ['src/BaissePrixVestiaire.jsx', ['*']],
+  ['src/OffresVestiaire.jsx', ['*']],
   ['src/composants/SuiviTravail.jsx', ['*']],   // (11 nov., lot suivi-travail)
   ['src/TvaMargeCarte.jsx', ['*']],
+  ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
+  ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
+  // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
+  ['src/OffresAuto.jsx', ['*']],
+  ['src/PrixMiniManquants.jsx', ['*']],
+  ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
+  ['src/RepubProgramme.jsx', ['*']],   // (11 nov., lot republier-programme)
+  ['src/HistoriqueRepub.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;
@@ -124,7 +138,8 @@ async function principal() {
   const idsNav = [...app.matchAll(/entreeNav\(\{(?:\.\.\.\w+,\s*)?id:'(\w+)'/g)].map((m) => m[1]);
   const groupes = [...app.matchAll(/groupeNav\(\{ cle:'(\w+)'/g)].map((m) => m[1]);
   const navKo = [...idsNav.map((i) => `nav.${i}`), 'nav.journee.court', ...groupes.map((g) => `nav.groupe.${g}`)].filter((k) => !(k in fr));
-  dit(idsNav.length >= 10 && groupes.length >= 3 && !navKo.length, `C2 chaque entrée de navigation a sa clé (${idsNav.length} entrées, ${groupes.length} groupes)`, navKo);
+  // (11 nov., lot DJ3 intégré) l'entrée Colis a quitté la navigation (Ventes · À expédier, Achats · À retirer) : 9 entrées.
+  dit(idsNav.length >= 9 && groupes.length >= 3 && !navKo.length, `C2 chaque entrée de navigation a sa clé (${idsNav.length} entrées, ${groupes.length} groupes)`, navKo);
   const acc = lire('src/Accueil.jsx');
   const moments = [...acc.matchAll(/\{ id: '(\w+)', capture: '\w+' \}/g)].map((m) => m[1]);
   const momKo = moments.flatMap((id) => ['titre', 'texte', 'alt', 'point1', 'point2'].map((c) => `accueil.moment.${id}.${c}`)).filter((k) => !(k in fr));

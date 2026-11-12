@@ -180,7 +180,7 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
       console.log(`\n— Colis → À retirer · code et QR · ${tag}`);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       try {
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
+        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
         // « À envoyer » d'abord : le QR de dépôt Leboncoin.
         await pg.locator('[data-colis-onglet-choix="envoyer"]').first().click();
@@ -188,7 +188,7 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         const lbc = await pg.evaluate(() => { const c = document.querySelector('[data-lbc-colis="9001"]'); return c ? { qr: !!c.querySelector('[data-lbc-qr-depot]') } : null; });
         dit(lbc && lbc.qr, '« À envoyer » : la vente Leboncoin porte son QR de dépôt', JSON.stringify(lbc));
         if (SHOTS && lbc) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.locator('[data-lbc-colis="9001"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `qr-lbc-${tag}.png`) }); }
-        await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         await pg.waitForFunction((n) => document.querySelectorAll('.vrm-colis-retirer [data-cc-carte]').length >= n, TOTAL, { timeout: 10000 }).catch(() => {});
         await pg.waitForTimeout(400);
         const base = await pg.evaluate(() => ({

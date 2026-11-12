@@ -894,3 +894,11 @@ Julien a choisi « voir les offres reçues sur Vestiaire et y répondre (accepte
 ### Geste de Julien
 Installer la 5.319.0, ouvrir ses offres sur vestiairecollective.com (dans ce Chrome, connecté), puis répondre UNE
 fois à la main à une offre (accepter, refuser ou contre-offre) : VRM saura ensuite ce geste-là.
+
+## 11 novembre — Vestiaire « plus » : parcours d'une vente, photos exigées, baisse de prix, offres dans Ma journée (extension 5.364.0)
+
+Récit complet, mesures, tableau de la revue « irréprochable » (défaut · cause · correction ·
+preuve) et gestes : `docs/passation/2026-11-11-vestiaire-plus.md`. En bref : `src/parcoursVestiaire.js`
+(cinq étapes LUES dans `etapesVc`, « shipmentInProgress » ne prouve pas l'envoi), `src/photosVestiaire.js`
+(ce que VRM sait manquer ; le reste « à vérifier »), `baisserPrixVestiaire` (recette apprise de SON
+changement de prix, relu avant d'être « apprise »), `offresJourneeVc` (Ma journée → Messages · Vestiaire).

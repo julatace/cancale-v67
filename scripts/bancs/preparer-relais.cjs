@@ -292,7 +292,7 @@ async function vue(b, nom, vp, sombre) {
   });
   // ════════════ MODE RELAIS ════════════
   await essaie(`${nom} relais`, async () => {
-    await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
     await pg.waitForSelector('[data-relais-ouvrir]', { timeout: 10000 }).catch(() => {});
     await pg.waitForTimeout(800);
     const pub = await lire(pg, 'vrm_colis_retirer');

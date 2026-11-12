@@ -9,7 +9,7 @@ const auth=()=>({user:{id:A},session:{access_token:'token-a'}});
 test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étranger et réponse périmée',async()=>{
  const code=extraire(app,'const fetchVintedAccounts =','// Retire un compte de');
  for(const mode of ['bon','etranger','sans-owner','bascule']){
-  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),memoriserComptesLies:()=>{},CLE_SUPPRIMES:'k',localStorage:{setItem(){},getItem(){return null;}},fetch:async(url)=>{
+  const c=vm.createContext({AUTH:auth(),SUPABASE_URL:'https://base.test',encodeURIComponent,sbAuth:()=>({Authorization:'Bearer token-a'}),memoriserComptesLies:()=>{},horsLigneMaintenant:()=>false,comptesCopieHorsLigne:()=>null,garderComptesCopie:()=>{},CLE_SUPPRIMES:'k',localStorage:{setItem(){},getItem(){return null;}},fetch:async(url)=>{
    assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);
    if(url.includes('/vinted_accounts')){if(mode==='bascule')c.AUTH=authB();return Response.json([{owner:mode==='etranger'?B:mode==='sans-owner'?undefined:A,vinted_user_id:'42'}]);}return Response.json([]);
   }});vm.runInContext(code+';globalThis.lire=fetchVintedAccounts;',c);

@@ -46,6 +46,9 @@ const PERMIS = [
   ['src/ecrans/Reglages.jsx', /^'Sneakers'$/, 'Je vends : « Sneakers » est un des choix proposés'],
   ['src/ecrans/Ebay.jsx', /^'baskets mode'$/, 'clé de rapprochement des types d’article eBay (jamais affichée)'],
   ['src/statsCategories.js', /^'Chaussures'$/, 'nom d’une famille de catégories Vinted (Statistiques par catégorie), affichée seulement si le vendeur a des chaussures'],
+  // (intégration 11nov-g2, lot vestiaire-plus) les photos que Vestiaire EXIGE pour la catégorie chaussures (src/photosVestiaire.js) :
+  // montrées seulement pour un article de cette catégorie, le texte est celui de Vestiaire.
+  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}.js`, /^"vcPhotos\.vue\.(semelle|pointure)"/, 'photo exigée par Vestiaire pour la catégorie chaussures, montrée pour cette catégorie seulement', 'ligne']),
   ['src/aideFiches.js', /^'(la mauvaise chaussure)'$/, 'côté Sneakers de la table de mots (remplacé par « le mauvais article » hors Sneakers)'],
 ];
 const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/i;

@@ -47,13 +47,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { normaliserSuivi } from './etat-colis-email.js';
 import { carrierLisible, nomTransporteur, RECUL_MS, INTROUVABLE_MS, INTROUVABLE_MAX, RESULTATS, ETATS } from './transporteurs.js';
+import { etapeMotVc } from './vestiaire-regle.js';
 
 export const DEPART_CARRIERS = ['chronopost', 'vinted'];
 export const cleDepart = (carrier, suivi) => `depart_${carrier}_${normaliserSuivi(suivi)}`;
-export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini';
+// (11 nov., suivi des commandes) + le DERNIER évènement lu (libellé, lieu, date)
+// et le lieu du point : ce que Ventes affiche (« Pris en charge · Vannes · hier 18:02 »).
+export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini,clos:meta->>clos,derLib:meta->>derLib,derLieu:meta->>derLieu,derAt:meta->>derAt,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille';
 // Le rythme : une lecture toutes les 2 h tant que le colis n'est pas pris en
 // charge ; un échec recule (30 min → 6 h) ; « introuvable » 3 fois ⇒ on arrête.
 export const RYTHME_DEPART_MS = 2 * 3600000;
+// (11 nov., suivi des commandes) Julien : « intègre les numéros de suivi sur les
+// commandes en cours […] pour voir la cohérence ». Une fois PRIS EN CHARGE, le
+// colis vendu reste lu jusqu'à la fin (livré, retiré par l'acheteur, rendu) —
+// plus lentement : toutes les 6 h, APRÈS les colis pas encore pris en charge
+// (ceux qui ont une date limite d'envoi). La preuve de départ ne change pas.
+export const RYTHME_SUIVI_MS = 6 * 3600000;
+// La fin du suivi d'un colis vendu : il est arrivé (livré, retiré) ou rendu.
+export const etatFinalDepart = (t) => !!t && (t.etat === 'livre' || t.etat === 'retire' || (t.etat === 'retour_expediteur' && t.detail === 'rendu'));
 // Une vente n'est lue comme départ que dans les 21 jours après sa vente (ou son
 // bordereau) : au-delà, c'est un colis à regarder à la main, pas à relire.
 export const FENETRE_DEPART_J = 21;
@@ -112,10 +123,24 @@ export function ligneDepartApresEssai(avant, lu, { carrier, suivi, maintenant = 
     out.lu = iso;
     const p = priseEnCharge(lu, carrier);
     if (p != null && msDe(a.priseAt) == null) out.priseAt = isoDe(p);
+    // (11 nov.) Le DERNIER évènement lu (le plus récent) : libellé, lieu, date —
+    // recopiés tels quels, bornés. Le lieu du point quand l'analyseur le porte.
+    const evs = Array.isArray(lu.evenements) ? lu.evenements.filter((x) => x && msDe(x.at) != null) : [];
+    const der = evs.length ? evs.reduce((m, x) => (msDe(x.at) >= msDe(m.at) ? x : m), evs[0]) : null;
+    out.derLib = der ? String(der.libelle || '').slice(0, 120) : out.libelle;
+    out.derLieu = der ? String(der.lieu || '').slice(0, 80) : '';
+    out.derAt = der ? isoDe(msDe(der.at)) : out.etatAt;
+    out.lieuNom = String(lu.lieuNom || '').slice(0, 60);
+    out.lieuVille = String(lu.lieuVille || '').slice(0, 40);
   } else {
     out.essais = (Number(a.essais) || 0) + 1;
   }
-  out.fini = msDe(out.priseAt) != null || res === 'expire' || (res === 'introuvable' && (Number(out.essais) || 0) >= INTROUVABLE_MAX);
+  // `fini` (8 nov.) : la PREUVE de départ est acquise ou le n° est mort — gardé
+  // tel quel pour les lecteurs d'avant. `clos` (11 nov.) : le SUIVI est fini
+  // (arrivé, rendu, n° mort) — plus aucune lecture.
+  const mort = res === 'expire' || (res === 'introuvable' && (Number(out.essais) || 0) >= INTROUVABLE_MAX);
+  out.fini = msDe(out.priseAt) != null || mort;
+  out.clos = mort || (a.clos === true && msDe(out.priseAt) != null) || etatFinalDepart(out);
   return out;
 }
 
@@ -132,6 +157,10 @@ export function departDeMeta(x) {
     etatAt: msDe(x.etatAt) != null ? isoDe(msDe(x.etatAt)) : null, priseAt: msDe(x.priseAt) != null ? isoDe(msDe(x.priseAt)) : null,
     lu: x.lu || null, essai: x.essai || null, essaiRes: RESULTATS.includes(x.essaiRes) ? x.essaiRes : null, essais: Number(x.essais) || 0,
     fini: x.fini === true || x.fini === 'true',
+    clos: x.clos === true || x.clos === 'true',
+    derLib: x.derLib ? String(x.derLib).slice(0, 120) : '', derLieu: x.derLieu ? String(x.derLieu).slice(0, 80) : '',
+    derAt: msDe(x.derAt) != null ? isoDe(msDe(x.derAt)) : null,
+    lieuNom: x.lieuNom ? String(x.lieuNom).slice(0, 60) : '', lieuVille: x.lieuVille ? String(x.lieuVille).slice(0, 40) : '',
   };
 }
 // Map n° → ligne (une ligne par n° : deux transporteurs pour le même n° ⇒
@@ -189,14 +218,18 @@ export function suivisAmbigus(ventes, entrants = null) {
 // Rend [{ carrier, suivi }], `max` au plus, `parTransporteur` par transporteur.
 export function prochainEssaiDepart(t) {
   if (!t) return 0;
-  if (t.fini || msDe(t.priseAt) != null) return Infinity;
+  const pris = msDe(t.priseAt) != null;
+  // (11 nov.) Pris en charge : relu toutes les 6 h jusqu'à la fin (`clos`, ou un
+  // état final lu). Pas pris et `fini` (8 nov.) : le n° est mort (expiré,
+  // introuvable) — plus lu.
+  if (t.clos || etatFinalDepart(t) || (t.fini && !pris)) return Infinity;
   const e = msDe(t.essai);
   if (e == null) return 0;
   const r = t.essaiRes;
   if (r === 'expire') return Infinity;
   if (r === 'introuvable') return (Number(t.essais) || 0) >= INTROUVABLE_MAX ? Infinity : e + INTROUVABLE_MS;
   if (r === 'passu' || r === 'bloque' || r === 'forme' || r === 'cp-inconnu') return e + RECUL_MS[Math.min(Math.max((Number(t.essais) || 1) - 1, 0), RECUL_MS.length - 1)];
-  return e + RYTHME_DEPART_MS;
+  return e + (pris ? RYTHME_SUIVI_MS : RYTHME_DEPART_MS);
 }
 export function departsAInterroger({ sortants = [], departs = new Map(), entrants = new Set(), maintenant = Date.now(), max = 3, parTransporteur = 3 } = {}) {
   const ambigus = suivisAmbigus(sortants, entrants);
@@ -213,10 +246,12 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
     if (t && t.carrier && t.carrier !== carrier) continue;
     const quand = prochainEssaiDepart(t);
     if (!(quand <= maintenant)) continue;
-    items.push({ carrier, suivi: k, quand, v: v == null ? Infinity : v });
+    items.push({ carrier, suivi: k, quand, v: v == null ? Infinity : v, pris: !!(t && msDe(t.priseAt) != null) ? 1 : 0 });
   }
-  // Les plus anciens d'abord (la vente qui attend le plus), puis le moins relu.
-  items.sort((a, b) => (a.v - b.v) || (a.quand - b.quand) || a.suivi.localeCompare(b.suivi));
+  // (11 nov.) D'abord les colis PAS ENCORE pris en charge (ils ont une date
+  // limite d'envoi), les plus anciens d'abord (la limite la plus proche) ; puis
+  // le suivi des colis partis, le moins récemment relu d'abord.
+  items.sort((a, b) => (a.pris - b.pris) || (a.pris ? (a.quand - b.quand) || (a.v - b.v) : (a.v - b.v) || (a.quand - b.quand)) || a.suivi.localeCompare(b.suivi));
   const out = [], parC = {};
   for (const it of items) {
     if (out.length >= max) break;
@@ -237,7 +272,10 @@ export function sortantsDuVendeur({ vcVentes = null, bords = [] } = {}) {
   const out = [];
   const vv = vcVentes && typeof vcVentes === 'object' ? vcVentes : {};
   for (const [id, v] of Object.entries(vv)) {
-    if (!v || typeof v !== 'object' || v.aExpedier !== true || !v.suivi) continue;
+    // (11 nov.) + une vente ENVOYÉE (le mot de Vestiaire : envoyée, en contrôle)
+    // pas encore livrée : son suivi se lit jusqu'à la fin.
+    if (!v || typeof v !== 'object' || !v.suivi) continue;
+    if (v.aExpedier !== true && !['en-route', 'controle'].includes(etapeMotVc(v))) continue;
     out.push({ cle: 'vc:' + id, suivi: v.suivi, transporteur: v.transporteur || '', venteMs: msDe(v.date) });
   }
   for (const b of Array.isArray(bords) ? bords : []) {

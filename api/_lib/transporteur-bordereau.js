@@ -30,7 +30,9 @@ const NOMS = [
   ['relaiscolis', /\brelais[\s-]colis\b/],
   ['colissimo', /\bcolissimo\b/],
   ['vinted', /\bvinted[\s-]go\b/],
-  ['inpost', /\binpost\b/],
+  // (11 nov., lot DJ3 — Julien : « tu mets InPost mais InPost appartient à Mondial Relay ») « Mondial Relay by InPost » :
+  // en France, InPost est le réseau Mondial Relay ⇒ la MÊME clé (les deux noms ensemble = un seul transporteur).
+  ['mondialrelay', /\binpost\b/],
   ['ups', /\bups\b/],
   ['dpd', /\bdpd\b/],
   ['gls', /\bgls\b/],

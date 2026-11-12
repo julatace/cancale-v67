@@ -13,6 +13,13 @@ const clone=v=>structuredClone(v);
 // suivant. Plus de plafond de 10 messages par heure (29 oct., sa demande :
 // « enlève-le », comme Vintex) ; le plafond d'actions de l'extension reste.
 export const DELAI_VINTEX_MS=[6000,9600];
+// (11 nov., lot favoris-clair) Plus de nombre FIXE de messages par envoi (le plafond de 10/60 min est
+// RETIRÉ, décision de Julien, CLAUDE.md §3) : seul borne le plafond d'actions de l'extension (50/h,
+// réserve 5). Un message refusé par CE plafond AVANT toute écriture (`quota_extension`, 0 écrite) ne
+// coupe plus la file : il ATTEND qu'une place se libère (nouvel essai dans QUOTA_ATTENTE_MS), au plus
+// QUOTA_ATTENTES_MAX fois (jamais de boucle sans fin) ; c'est toujours l'extension qui compte et refuse.
+export const QUOTA_ATTENTE_MS=10*60000;
+export const QUOTA_ATTENTES_MAX=12;
 export function delaiFavori(min,max,jeton){
   const a=Number(min),b=Number.isInteger(max)&&max>a?max:a;
   let h=0x811c9dc5;for(const c of String(jeton||''))h=Math.imul(h^c.charCodeAt(0),0x01000193)>>>0;
@@ -36,7 +43,7 @@ function vueAuto(d,g){
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
   const auto=vueAuto(d,g);
-  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
+  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits,offre,pourcentage})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{}),...(offre&&offre.mode?{offre:{mode:offre.mode,valeur:offre.valeur}}:Number.isInteger(pourcentage)?{offre:{mode:'pct',valeur:pourcentage}}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
 }
 // L'offre jointe (29 oct.) : {mode:'pct'|'euros'|'prix', valeur, arrondi}, ou rien.
 const offreValide=o=>o==null||(o&&typeof o==='object'&&['pct','euros','prix'].includes(o.mode)&&typeof o.valeur==='number'&&o.valeur>0&&o.valeur<=99999&&(o.mode!=='pct'||Number.isInteger(o.valeur)&&o.valeur<=99)&&typeof o.arrondi==='boolean');
@@ -49,7 +56,7 @@ const variantesValides=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(x=
 export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null}){
   d=initialiserFile(d);
   if(!offreValide(offre))throw new RefusFavoris('Offre invalide.',400);
-  if(!Array.isArray(targets)||!targets.length||targets.length>10||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<0||(intervalleMinutes===0&&intervalleMax!=null)||intervalleMinutes>1440||intervalleMax!=null&&(!Number.isInteger(intervalleMax)||intervalleMax<intervalleMinutes||intervalleMax>1440))throw new RefusFavoris('Sélection ou réglages invalides.',400);
+  if(!Array.isArray(targets)||!targets.length||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<0||(intervalleMinutes===0&&intervalleMax!=null)||intervalleMinutes>1440||intervalleMax!=null&&(!Number.isInteger(intervalleMax)||intervalleMax<intervalleMinutes||intervalleMax>1440))throw new RefusFavoris('Sélection ou réglages invalides.',400);
   const max=intervalleMax>intervalleMinutes?intervalleMax:null;
   if(!Number.isSafeInteger(maintenant)||maintenant<0)throw new RefusFavoris('Horloge indisponible.',503);
   for(const t of targets)if(!t||!entier(t.itemId)||!entier(t.recipientId)||typeof t.notificationId!=='string'||!t.notificationId||t.notificationId.length>160||typeof t.initiator!=='string'||!t.initiator||t.initiator.length>80)throw new RefusFavoris('Le destinataire du favori n’est pas confirmé.');
@@ -142,7 +149,9 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
     if(code&&DEMANDES_AUTO[code]&&g.auto.demande?.code!==code){g.auto.demande={code,at:fin};nouvelleDemande=code;}
     if(resultat==='envoye'&&g.auto.demande&&RAISONS_DEMANDE.includes(g.auto.demande.code))delete g.auto.demande;
   }
-  if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
+  const attendQuota=!j.auto&&resultat==='refuse'&&j.raison==='quota_extension'&&j.ecrits===0&&(Number(j.attentesQuota)||0)<QUOTA_ATTENTES_MAX;
+  if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;g.prochain=Math.max(g.prochain||0,fin+QUOTA_ATTENTE_MS);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
+  else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,

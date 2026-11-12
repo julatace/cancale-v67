@@ -40,23 +40,23 @@ import { motsVendeur } from './profilVendeur.js';
 // le bouton ouvre (`tab`, `onglet` de Colis, `vue` d'Annonces, `cible` = le bloc
 // de l'écran propriétaire où il tranche, rejoint par défilement).
 export const SOURCES = [
-  { cle: 'numeros-double', ecran: 'Colis', quoi: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux ${motsVendeur().noms}`,
+  { cle: 'numeros-double', ecran: 'Ventes', quoi: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux ${motsVendeur().noms}`,
     get pourquoi() { return `au moment d’expédier, ${motsVendeur().la} mauvais${motsVendeur().e} ${motsVendeur().nom} part`; }, geste: { libelle: 'Corriger', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-numeros-double]' } },
-  { cle: 'colis-postes', ecran: 'Colis', quoi: (n) => `${n} colis ${pl(n, 'coché', 'cochés')} « posté » que Vinted n’a pas vu${pl(n, '', 's')} partir`,
+  { cle: 'colis-postes', ecran: 'Ventes', quoi: (n) => `${n} colis ${pl(n, 'coché', 'cochés')} « posté » que Vinted n’a pas vu${pl(n, '', 's')} partir`,
     pourquoi: 'vérifie le dépôt avant la date limite', geste: { libelle: 'Vérifier', tab: 'cat_bord', onglet: 'envoyes' } },
-  { cle: 'colis-retirer', ecran: 'Colis', quoi: (n) => `${n} colis à retirer à vérifier`,
+  { cle: 'colis-retirer', ecran: 'Achats', quoi: (n) => `${n} colis à retirer à vérifier`,
     pourquoi: 'délai dépassé, incident ou achat pas encore relié', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'retirer' } },
   // (10 nov., lot BB) Une vente en litige ou en retour : la réponse a une date limite.
   // Publié par l'écran « Litiges en cours » (et Ma journée, Ventes), règle src/litigesEcran.js.
   { cle: 'litiges-en-cours', ecran: 'Litiges', quoi: (n) => `${n} ${pl(n, 'litige ou retour', 'litiges ou retours')} en cours`,
     pourquoi: 'réponds avant la date limite', geste: { libelle: 'Voir', tab: 'litiges' } },
-  { cle: 'numeros-a-ecrire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'nouveau N°', 'nouveaux N°')} à écrire là où ${pl(n, 'l’article est rangé', 'les articles sont rangés')}`,
+  { cle: 'numeros-a-ecrire', ecran: 'Ventes', quoi: (n) => `${n} ${pl(n, 'nouveau N°', 'nouveaux N°')} à écrire là où ${pl(n, 'l’article est rangé', 'les articles sont rangés')}`,
     pourquoi: 'c’est encore l’ancien numéro qui y est écrit', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-numeros-a-ecrire]' } },
   { cle: 'numeros-a-verifier', ecran: 'Annonces', quoi: (n) => `${n} N° à vérifier là où ${pl(n, 'l’article est rangé', 'les articles sont rangés')}`,
     pourquoi: 'numéroté pendant une panne de synchro : il peut désigner un autre article', geste: { libelle: 'Vérifier', tab: 'cat_annonces', cible: '[data-numeros-a-verifier]' } },
-  { cle: 'sms-vestiaire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'vente Vestiaire reçue', 'ventes Vestiaire reçues')} par SMS, pas ${pl(n, 'reliée', 'reliées')}`,
+  { cle: 'sms-vestiaire', ecran: 'Ventes', quoi: (n) => `${n} ${pl(n, 'vente Vestiaire reçue', 'ventes Vestiaire reçues')} par SMS, pas ${pl(n, 'reliée', 'reliées')}`,
     pourquoi: 'sans n° de commande : rien n’est relié tout seul', geste: { libelle: 'Relier', tab: 'cat_bord', onglet: 'envoyer', cible: '[data-infos-sms="vestiaire"]' } },
-  { cle: 'sms-pickup', ecran: 'Colis', quoi: (n) => `${n} colis Pickup ${pl(n, 'reçu', 'reçus')} par SMS, sans n° ni code`,
+  { cle: 'sms-pickup', ecran: 'Achats', quoi: (n) => `${n} colis Pickup ${pl(n, 'reçu', 'reçus')} par SMS, sans n° ni code`,
     pourquoi: 'peut-être plusieurs fois le même colis', geste: { libelle: 'Voir', tab: 'cat_bord', onglet: 'retirer', cible: '[data-infos-sms="pickup"]' } },
   { cle: 'supprimes-vinted', ecran: 'Ma journée', quoi: (n) => `${n} ${pl(n, 'article supprimé', 'articles supprimés')} de Vinted : encore chez toi ?`,
     pourquoi: 'vendu ailleurs, remis en ligne ou toujours là', geste: { libelle: 'Répondre', tab: 'journee', cible: '[data-job="a-trancher"]' } },
@@ -71,7 +71,7 @@ export const SOURCES = [
     get pourquoi() { return `le bénéfice ne compte pas ces ${motsVendeur().noms}`; }, geste: { libelle: 'Saisir', tab: 'cat_annonces', vue: 'sansachat' } },
   { cle: 'adresses-sans-compte', ecran: 'E-mails', quoi: (n) => `${n} ${pl(n, 'adresse e-mail', 'adresses e-mail')} sans compte relié`,
     pourquoi: 'leurs ventes et bordereaux n’ont pas de compte', geste: { libelle: 'Relier', tab: 'emails', clic: '[data-boite-vue="relier"]', cible: '[data-adresses-sans-compte]' } },
-  { cle: 'comptes-a-relire', ecran: 'Colis', quoi: (n) => `${n} ${pl(n, 'compte', 'comptes')} à relire`,
+  { cle: 'comptes-a-relire', ecran: 'Ventes', quoi: (n) => `${n} ${pl(n, 'compte', 'comptes')} à relire`,
     pourquoi: 'leurs ventes datent de plus d’un jour', geste: { libelle: 'Mes comptes', tab: 'vintedaccounts' } },
   { cle: 'ventes-a-dater', ecran: 'Ventes', quoi: (n) => `${n} ${pl(n, 'vente', 'ventes')} à dater`,
     pourquoi: 'sans date de versement : dans aucun mois déclaré', geste: { libelle: 'Dater', tab: 'compta', clic: '[data-urssaf-dater]' } },

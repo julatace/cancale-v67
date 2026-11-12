@@ -53,6 +53,7 @@ test('l’âge est toujours dit', () => {
   assert.equal(ageTexte(2 * 3600e3 + 5), 'il y a 2 h');
   assert.equal(ageTexte(50 * 3600e3), 'il y a 2 j');
 });
+// (intégration g1) La phrase suit le lot objectifs-mois (b5ec42113) : « en N jours » plutôt que « d’ici le 30 ».
 test('objectif : le reste, le rythme arrondi VERS LE HAUT, aujourd’hui compris', () => {
   const p = { type: 'ca', objectif: 2000, valeur: 1240, pct: 62, partiel: false, atteint: false, manque: [] };
   const le9 = new Date(2026, 10, 9, 12).getTime();
@@ -60,14 +61,14 @@ test('objectif : le reste, le rythme arrondi VERS LE HAUT, aujourd’hui compris
   const r = resteObjectif(p, le9);
   assert.equal(r.reste, 760); assert.equal(r.parJour, 35);   // 760 / 22 = 34,5 ⇒ 35
   const montre = (v) => `${v.toLocaleString('fr-FR')} €`;
-  assert.equal(phraseResteObjectif(p, montre, le9).replace(/ /g, ' '), 'encore 760 € · ≈ 35 €/jour d’ici le 30');
+  assert.equal(phraseResteObjectif(p, montre, le9).replace(/ /g, ' '), 'encore 760 € en 22 jours · ≈ 35 €/jour');
   assert.equal(phraseResteObjectif(p, montre, new Date(2026, 10, 30, 12).getTime()), 'encore 760 € aujourd’hui');
-  assert.equal(phraseResteObjectif({ ...p, partiel: true }, montre, le9).replace(/ /g, ' '), 'encore au plus 760 € · ≈ au plus 35 €/jour d’ici le 30');
-  assert.equal(phraseResteObjectif({ ...p, valeur: 2100, atteint: true, pct: 100 }, montre, le9), 'Objectif atteint');
+  assert.equal(phraseResteObjectif({ ...p, partiel: true }, montre, le9).replace(/ /g, ' '), 'encore au plus 760 € en 22 jours · ≈ au plus 35 €/jour');
+  assert.equal(phraseResteObjectif({ ...p, valeur: 2100, atteint: true, pct: 100 }, montre, le9), 'Objectif atteint ✓');
   assert.equal(phraseResteObjectif({ ...p, valeur: null, pct: null }, montre, le9), 'Vendu du mois pas lu');
   assert.equal(resteObjectif({ ...p, valeur: null }, le9), null);
   // Exact : 660 / 22 = 30 ⇒ 30, jamais 31.
   assert.equal(resteObjectif({ ...p, valeur: 1340 }, le9).parJour, 30);
   const v = { type: 'ventes', objectif: 40, valeur: 12, pct: 30, partiel: false, atteint: false, manque: [] };
-  assert.equal(phraseResteObjectif(v, String, le9), 'encore 28 ventes · ≈ 2 ventes par jour d’ici le 30');
+  assert.equal(phraseResteObjectif(v, String, le9), 'encore 28 ventes en 22 jours · ≈ 2 ventes/jour');
 });

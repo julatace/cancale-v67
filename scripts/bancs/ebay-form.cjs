@@ -35,9 +35,10 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
 const envoisEbay = []; let avertir = false;
 (async()=>{
   const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium', args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
-  const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
+  // (11 nov., ebay-rouges) La langue de Julien, posée : depuis la traduction, l'app suit celle du navigateur.
+  const pg = await b.newPage({ viewport:{ width:390, height:1500 }, locale:'fr-FR' });
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
-  await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401','402'])); }catch(_){}}, [NUMS]);
+  await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401','402'])); }catch(_){}}, [NUMS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r)=>{ const t=r.request().resourceType(); if(t==='image') return r.fulfill({status:200,contentType:'image/png',body:PNG}); if(t==='media'||t==='font') return r.abort(); return r.continue(); });
   await pg.route('**/rest/v1/**', route=>{ const u=metaVersData(route.request().url()); const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
@@ -45,6 +46,12 @@ const envoisEbay = []; let avertir = false;
     if(/id=eq\.vinted_item_details/.test(u)) return j(fichesDePage(u, DETAILS));
     if(/id=eq\.harvest_u1_listings/.test(u)) return j([LISTINGS]);
     if(/id=like\.coffre_/.test(u)) return j(COFFRE);
+    // (11 nov., ebay-rouges) LE REGISTRE DES COMPTES eBAY, dans sa forme réelle
+    // (`select=comptes:data->comptes`) : depuis le 8 nov. (plateformes affichées), eBay
+    // n'est montré qu'à un vendeur dont le registre PROUVE un compte relié (le compte
+    // « implicite » ne prouve rien). Sans lui, le banc décrivait un eBay « connecté »
+    // que l'app ne pouvait pas croire : les liens `site=ebay` retombaient sur « Tous ».
+    if(/id=eq\.ebay_comptes/.test(u)) return j([{ comptes: [{ principal:true, pseudo:'vendeur_banc', type:'particulier', site:'FR' }] }]);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   // IA de rédaction (api/ai) : disponible, et renvoie un titre optimisé.
@@ -110,15 +117,18 @@ const envoisEbay = []; let avertir = false;
     parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre un article sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }
-  const total = Object.values(parOnglet).reduce((a, x) => a + x.vendre, 0);
+  // (11 nov., ebay-rouges) Le 6 nov., l'entrée est devenue UNE ligne « Vendre sur eBay » (elle remplace le
+  //  gros bouton « Vendre un article sur eBay » ET « Publier une annonce Vinted sur eBay ») : le banc
+  //  comptait un libellé disparu (0 partout). Il compte la RÈGLE, l'attribut `data-poster="ebay"` (§6.4).
+  const total = Object.values(parOnglet).reduce((a, x) => a + x.n, 0);
   dit(!introuvables.length, 'le banc trouve chaque sous-onglet eBay', introuvables.join(', '));
-  dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre un article en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
-  dit(parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
+  dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre un article en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.n]))));
+  dit(parOnglet['Compte'].n === 0 && parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
   try { await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-tache-site="ebay"]', { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
-  const openBtn = await pg.$('text=Vendre un article sur eBay');
-  dit(!!openBtn, 'le bouton d\'ouverture dit « Vendre un article sur eBay »');
+  const openBtn = await pg.$('[data-poster="ebay"]');
+  dit(!!openBtn && /Vendre sur eBay/.test(await openBtn.innerText()), 'l\'entrée unique (data-poster="ebay") dit « Vendre sur eBay »', openBtn ? (await openBtn.innerText()).replace(/\s+/g, ' ') : 'absente');
   if (openBtn) await openBtn.click();
   await pg.waitForTimeout(400);
   let txt = await T();
@@ -131,9 +141,12 @@ const envoisEbay = []; let avertir = false;
   // ⚠️ LE CLAVIER NE DOIT PLUS SE FERMER À CHAQUE LETTRE. Cause : un composant
   // défini dans le rendu → remonté à chaque frappe → focus perdu. On tape une
   // lettre et on vérifie que le champ garde le focus (sur iPhone = clavier ouvert).
-  await pg.focus('input[placeholder^="Nike Air Max"]');
+  // (11 nov., ebay-rouges) L'exemple du titre suit ce que le vendeur vend (« Je vends », lot vendeur-généraliste :
+  //  « Nike Air Max… » pour les sneakers seulement) : le champ titre se trouve par SA règle, `maxlength="80"` (eBay).
+  const TITRE = 'input[maxlength="80"]';
+  await pg.focus(TITRE);
   await pg.keyboard.type('Z');
-  const focusGarde = await pg.evaluate(()=>{ const el=document.activeElement; return !!(el && el.tagName==='INPUT' && /Nike Air Max/.test(el.getAttribute('placeholder')||'')); });
+  const focusGarde = await pg.evaluate(()=>{ const el=document.activeElement; return !!(el && el.tagName==='INPUT' && el.getAttribute('maxlength')==='80'); });
   dit(focusGarde, 'taper dans le titre GARDE le focus (le clavier ne se ferme plus)');
   // ⚠️ Pas de zoom iOS : les champs sont à ≥ 16px.
   const petits = await pg.evaluate(()=>{ const els=[...document.querySelectorAll('main input, main select, main textarea')]; return els.filter(e=>{ const fs=parseFloat(getComputedStyle(e).fontSize); return fs && fs < 16; }).length; });
@@ -147,7 +160,7 @@ const envoisEbay = []; let avertir = false;
   dit(!venduBtn, 'une paire déjà VENDUE (annonce fermée) n\'est PAS proposée');
   if (pairBtn) await pairBtn.click();
   await pg.waitForTimeout(400);
-  const titleVal = await pg.$eval('input[placeholder^="Nike Air Max"]', el=>el.value).catch(()=>'');
+  const titleVal = await pg.$eval(TITRE, el=>el.value).catch(()=>'');
   dit(/nike/i.test(titleVal), 'choisir la paire remplit le titre tout seul', 'titre=' + titleVal.slice(0,40));
   dit(/taille 44/i.test(titleVal) && !/\bT44\b/.test(titleVal), 'le titre écrit « taille 44 », pas « T44 » (demande de Julien)', 'titre=' + titleVal);
   const nImgs = await pg.evaluate(()=>document.querySelectorAll('img[src^="https://img.example/"]').length);

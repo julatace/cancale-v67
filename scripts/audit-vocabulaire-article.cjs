@@ -63,6 +63,10 @@ function recopier(racine) {
 // [fichier, motif sur le texte (ou null = tout le fichier), raison]
 const PERMIS = [
   ['src/profilVendeur.js', null, 'la source du vocabulaire : les formes de Sneakers y vivent'],
+  ['src/i18n/langues/fr.js', /^(Tes paires|Paires|Chercher une paire|Aucune paire réglée\.|Aucune paire\.|Allumées · \{n\} paires? réglées?|Le moteur tourne dans l’extension.*Une paire vendue ailleurs n’est jamais acceptée\.)$/, 'Offres auto (lot prix-mini) : la variante Sneakers d’une clé à deux formes (`oa.…` / `oa.….art`), choisie par `tv` (src/OffresAuto.jsx, intégration g1)'],
+  ['src/OffresAuto.jsx', /^oa\.paires\./, 'des CLÉS de traduction (`oa.paires.…`), pas des textes : le texte vient de `tv` (variante `.art` hors Sneakers)'],
+  ['src/i18n/langues/fr.js', /^(Vérifier la paire : \{n\} jours après réception|Le colis revient : vérifie la paire en l'ouvrant\.|Paire remise au stock avec son N°\.|Paire revenue|Paire revenue · N°\{n\}|Pas la bonne paire \/ abîmée)$/, 'Retours (lot retours-litiges) : la variante Sneakers d’une clé à deux formes (`pap.…` / `pap.….art`), choisie par `tv` (src/RetoursLitiges.jsx, intégration g1)'],
+  ['src/i18n/langues/fr.js', /^(La paire|La paire sort du stock \(son N° est gardé\).*|N° pas sûr \(aucune fiche ou plusieurs\) : sors la paire du stock à la main\.)$/, 'remise en main propre (lbc-plus) : variante Sneakers de `lbcplus.remise.*` ; hors Sneakers, `tv` prend la variante `.art` (intégration 11nov-g2)'],
   ['src/i18n/langues/fr.js', /^Comment s’écrivent les numéros de tes prochaines paires\.$/, 'la variante Sneakers d’une clé à deux formes (`reglages.numeros.desc.paires` / `.articles`), choisie par ce qu’il vend'],
   ['src/vocabulaireVendeur.js', null, 'les exemples de Sneakers (lot DJ2) et la liste des mots de chaussure de l’audit'],
   ['vinted-sync-extension/vrm-mots.js', null, 'la copie de la table (formes de Sneakers)'],
@@ -283,6 +287,7 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
     }
   }
   dit(!erreurs.length, 'S0 chaque fichier se lit', erreurs);
+  if (process.env.VOCAB_TOUT) console.log(hors.join("\n"));
   dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers »)`, hors);
 
   // ── B : le branchement ──

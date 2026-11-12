@@ -113,7 +113,8 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     // (11 nov., reprise-ecrans) Le départ vient d'ecranAOuvrir : le plus frais de l'appareil
     // (reprise locale) et du compte (synchronisée), liste blanche, adresse reçue au chargement.
     dit(/const \[reprise0\]=useState\(\(\)=>\{ try\{ [^\n]*return ecranAOuvrir\(\{ carte:carteReprise\(\), locale:st\?repriseLocale\(st,owner\):null, ongletsOk:ONGLETS_LIENS, search:search0 \}\)/.test(app) && /const \[search0\]=useState\(\(\)=>\{ try\{ return window\.location\.search/.test(app), 'l’écran de départ vient de la reprise (appareil + compte, liste blanche, adresse)');
-    dit(/useState\(\(\)=>reprise0\?reprise0\.tab:'journee'\)/.test(app), 'sans reprise : Ma journée');
+    // (11 nov., lot DJ3) La reprise sur l'ancien onglet Colis rouvre sa moitié (placeDesColis) ; sans reprise, toujours Ma journée.
+    dit(/useState\(\(\)=>\{ if\(!reprise0\) return 'journee'; const pl=placeDesColis\(/.test(app), 'sans reprise : Ma journée');
     dit(/garderReprise\(stockageParcours\(\),[^)]*\{ tab, sub:platSub, colis:ongletColis \}, ONGLETS_LIENS\);[\s\S]{0,200}?\},\[tab,platSub,ongletColis\]\)/.test(app), 'la reprise est rangée à chaque changement d’écran, de section, d’onglet de Colis');
     dit(/const TABS_OK=ONGLETS_LIENS;/.test(app), 'les liens ?tab= et la reprise partagent la même liste blanche');
     const vue = (app.match(/function useVueSession[\s\S]*?\n\}/) || [''])[0];
@@ -128,7 +129,8 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     // soit aucun balayage d'onglet n'est écouté (`swipeStart`, `slideTab(` au doigt), soit il laisse les bords.
     const balayageOnglet = /swipeStart\.current=\{x:t\.clientX/.test(app) || /onTouchEnd=\{[^\n]*\n?[\s\S]{0,400}slideTab\(/.test(app);
     dit(!balayageOnglet || /t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système (aucun balayage d’onglet au doigt depuis le 9 nov.)');
-    dit(/const badgesBarre=badges\?\{\.\.\.badges,ventes:undefined\}:badges;/.test(app) && /<BadgeNav t=\{t\} badges=\{badgesBarre\} place="barre"\/>/.test(app), 'dans la barre, Ventes ne répète pas le nombre de Colis (§7)');
+    // (11 nov., lot DJ3) Colis n'est plus dans la barre : le nombre « à poster » est porté par Ventes SEULE, « à retirer » par Achats seul.
+    dit(/const badgesNav=\{ ventes: colisBadge, achats: retraitsBadge,/.test(app) && !/cat_bord: colisBadge/.test(app) && !/retraits: retraitsBadge/.test(app) && /<BadgeNav t=\{t\} badges=\{badgesBarre\} place="barre"\/>/.test(app), 'dans la barre, le nombre de colis est dit une fois (Ventes à poster, Achats à retirer) (§7)');
     dit(/viderParcours\(sessionStorage,garder\); viderParcours\(localStorage,garder\);/.test(app), 'à la connexion d’un autre vendeur, ses reprises seules restent');
   });
   console.log(`\n${n - ko}/${n} contrôles verts.`);

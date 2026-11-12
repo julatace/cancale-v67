@@ -33,7 +33,7 @@
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT || 4397);
 const SHOTS = process.env.SHOTS || os.tmpdir();
 
@@ -190,7 +190,11 @@ const lire = (pg) => pg.evaluate((CODES) => {
   const compte = (s) => texte.split(s).length - 1;
   // (3 nov., nouvelle mise en page) Le code s'affiche au toucher (« Code ») : il est PORTÉ une fois par la ligne
   // de SON colis (`data-code-retrait`), et écrit en clair seulement dans le détail ouvert.
-  const codes = Object.fromEntries(CODES.map((c) => [c, main.querySelectorAll(`[data-code-retrait="${c}"]`).length + compte(c)]));
+  // (11 nov., Julien : « des infos dans tous les sens ») Le code est ÉCRIT sur la ligne de son colis (plus derrière
+  // « Code ») : une fois à l'écran = une fois dans le texte visible, plus un porteur `data-code-retrait` VISIBLE
+  // (le porteur caché de la ligne n'est pas une écriture). La règle est la même : jamais deux fois.
+  // Un code dans un repli fermé (« À vérifier ») n'est pas écrit : il est PORTÉ par sa ligne (une fois).
+  const codes = Object.fromEntries(CODES.map((c) => { const porteurs = main.querySelectorAll(`[data-code-retrait="${c}"]`).length; const ecrit = compte(c) + [...main.querySelectorAll(`[data-code-retrait="${c}"]`)].filter((x) => x.getClientRects().length && !(x.textContent || '').includes(c)).length; return [c, ecrit || Math.min(porteurs, porteurs > 1 ? porteurs : 1)]; }));
   const seg = [...document.querySelectorAll('[data-colis-onglet-choix]')].map((b) => ({ v: b.getAttribute('data-colis-onglet-choix'), n: b.getAttribute('data-colis-onglet-n'), urgent: b.getAttribute('data-urgent'), presse: b.getAttribute('aria-pressed'), txt: b.innerText.trim() }));
   const onglet = (document.querySelector('[data-colis-onglet]') || { getAttribute: () => null }).getAttribute('data-colis-onglet');
   // Texte écrasé : un bloc de texte réduit à une colonne étroite (une lettre par ligne).
@@ -238,7 +242,9 @@ async function main() {
       const T = vp.width + 'px', ordi = vp.width > 1000;
       await essaie(T, async () => {
         const { ctx, pg, errs } = await preparer(b, vp);
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+        // (11 nov., lot DJ3 intégré) Plus d'écran Colis : « À retirer » est la section de tête d'Achats (`?tab=retraits`),
+        // « À expédier » (À envoyer · Envoyés) celle de Ventes. Mêmes règles jugées, à leur nouvelle place.
+        await pg.goto(`http://localhost:${PORT}/?tab=retraits`, { waitUntil: 'domcontentloaded' });
         await pg.locator('[data-colis-onglet]').first().waitFor({ timeout: 25000 }).catch(() => {});
         // Attendre que les lectures se posent (ventes, bordereaux, achats, e-mails) et que Ma journée soit publiée.
         for (let i = 0; i < 40; i++) {
@@ -251,10 +257,11 @@ async function main() {
         dit(!L.ancien.colonnes && !L.ancien.detail && !L.ancien.boutonRetraits, `${T} plus de colonnes, plus de « Colis par colis », plus de « Codes, QR et points relais » (les redites)`, JSON.stringify(L.ancien));
         const sEnv = L.seg.find((x) => x.v === 'envoyer'), sRet = L.seg.find((x) => x.v === 'retirer');
         // (3 nov., nouvelle mise en page) Trois onglets : À envoyer · Envoyés (l'ancien « Partis ») · À retirer.
-        dit(!!sEnv && !!sRet && L.seg.length === 3 && L.seg.map((x) => x.v).join() === 'envoyer,envoyes,retirer', `${T} un sélecteur « À envoyer » / « Envoyés » / « À retirer »`, JSON.stringify(L.seg));
-        dit(!!sEnv && !!L.pubEnv && sEnv.n === String(L.pubEnv.total) && new RegExp(`À envoyer\\s*${L.pubEnv.total}\\b`).test(sEnv.txt), `${T} « À envoyer · N » = le nombre de Ma journée (vrm_colis_aposter)`, JSON.stringify([sEnv, L.pubEnv && L.pubEnv.total]));
-        dit(!!sRet && !!L.pubRet && sRet.n === String(L.pubRet.total) && new RegExp(`À retirer\\s*${L.pubRet.total}\\b`).test(sRet.txt), `${T} « À retirer · N » = le nombre de Ma journée (vrm_colis_retirer)`, JSON.stringify([sRet, L.pubRet && L.pubRet.total]));
-        dit(L.onglet === 'retirer' && sRet && sRet.urgent === '1' && sEnv && sEnv.urgent === '0', `${T} par défaut : l'onglet qui a de l'urgent (« À retirer », son nombre en ambre)`, JSON.stringify([L.onglet, sEnv && sEnv.urgent, sRet && sRet.urgent]));
+        // (lot DJ3) Le nombre « À retirer » est porté par l'entrée « Achats » de la navigation et par la liste (`data-cc-n`),
+        // tous deux = la publication de Ma journée ; Achats s'ouvre sur « À retirer » (sa section de tête).
+        const nRet = await pg.evaluate(() => ({ nav: (document.querySelector('[data-badge-nav="achats"]') || { getAttribute: () => null }).getAttribute('data-badge-n'), liste: (document.querySelector('[data-cc-colonne="retirer"]') || { getAttribute: () => null }).getAttribute('data-cc-n') }));
+        dit(!!L.pubRet && nRet.nav === String(L.pubRet.total) && nRet.liste === String(L.pubRet.total), `${T} « À retirer · N » (entrée Achats et liste) = le nombre de Ma journée (vrm_colis_retirer)`, JSON.stringify([nRet, L.pubRet && L.pubRet.total]));
+        dit(L.onglet === 'retirer' && !L.seg.length, `${T} Achats s'ouvre sur « À retirer », sans sélecteur d'onglets`, JSON.stringify([L.onglet, L.seg]));
         // ── « À RETIRER » ──
         if (process.env.PLAN) console.log(`\n──── PLAN ${T} · À retirer ────\n${L.texte}\n────`);
         await tranches(pg, `colis-clair-${vp.width}-retirer`);
@@ -286,7 +293,7 @@ async function main() {
         const premierPret = L.idents.find((x) => x.cle.startsWith('r:') && !x.verif);
         dit(!!mermoz && rowsMermoz.some((x) => x.echeanceAmbre && /dernier|demain/.test(x.echeance || '')) && premierPret && (premierPret.point === 'relaispressingmermoz|35000'), `${T} le point au dernier jour : en tête, « dernier jour » en ambre`, JSON.stringify([rowsMermoz.map((x) => [x.cle, x.echeance, x.section]), premierPret && premierPret.point]));
         // (3 nov.) Le code s'ouvre au toucher de « Code » : nommé (« Code de retrait 998877 »).
-        await pg.click('[data-cc-carte="r:v:9402"] [data-rp-code]').catch(() => {}); await pg.waitForTimeout(250);
+        await pg.click('[data-cc-carte="r:v:9402"] .vrm-rpf-ouvrir').catch(() => {}); await pg.waitForTimeout(250);   // (11 nov.) le détail s'ouvre en touchant la ligne
         const pumaTxt = await pg.evaluate(() => (document.querySelector('[data-cc-carte="r:v:9402"]') || {}).innerText || '');
         dit(/Puma Suede taille 42/.test(pumaTxt) && /Code de retrait\s*998877/.test(pumaTxt), `${T} une carte à retirer dit ce que c'est et SON code, nommé (« Code de retrait 998877 »)`, pumaTxt);
         await pg.click('[data-cc-carte="r:v:9402"] .vrm-rpf-ouvrir').catch(() => {}); await pg.waitForTimeout(200);
@@ -315,9 +322,14 @@ async function main() {
         dit(!L.ecrases.length, `${T} À retirer : aucun texte écrasé`, JSON.stringify(L.ecrases.slice(0, 5)));
         dit(L.sw <= L.cw + 1, `${T} À retirer : aucun débordement horizontal`, `${L.sw} > ${L.cw}`);
         // ── « À ENVOYER » ──
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=ventes' })));
+        await pg.locator('[data-colis-onglet-choix="envoyer"]').first().waitFor({ timeout: 25000 }).catch(() => {});
         if (await pg.$('[data-colis-onglet-choix="envoyer"]')) await pg.click('[data-colis-onglet-choix="envoyer"]');
         await pg.waitForTimeout(800);
         L = await lire(pg);
+        { const sE = L.seg.find((x) => x.v === 'envoyer');
+          dit(L.seg.map((x) => x.v).join() === 'envoyer,envoyes', `${T} Ventes : un sélecteur « À envoyer » / « Envoyés » (« À retirer » est dans Achats)`, JSON.stringify(L.seg));
+          dit(!!sE && !!L.pubEnv && sE.n === String(L.pubEnv.total) && new RegExp(`À envoyer\\s*${L.pubEnv.total}\\b`).test(sE.txt), `${T} « À envoyer · N » = le nombre de Ma journée (vrm_colis_aposter)`, JSON.stringify([sE, L.pubEnv && L.pubEnv.total])); }
         if (process.env.PLAN) console.log(`\n──── PLAN ${T} · À envoyer ────\n${L.texte}\n────`);
         await tranches(pg, `colis-clair-${vp.width}-envoyer`);
         dit(L.onglet === 'envoyer', `${T} toucher « À envoyer » montre les colis à envoyer`, L.onglet);

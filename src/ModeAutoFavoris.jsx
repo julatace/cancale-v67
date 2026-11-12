@@ -11,6 +11,8 @@ import { motsVendeur } from './profilVendeur.js';
 import {RAISONS_FAVORIS} from './favorisProgression.js';
 import {AUTO_DEFAUT,JOURS_AUTO,validerAutoFavoris,limiteJourAuto,AUTO_JOUR_MS,AUTO_HEURE_MS} from './favorisAuto.js';
 import {phraseModeAuto} from './favorisEcran.js';
+import {lancerTravail} from './suiviTravail.js';
+import {tr} from './i18n/index.js';
 // (2 nov., écran refait) L'état se dit en UNE phrase et UN geste
 // (`phraseModeAuto`, src/favorisEcran.js) ; le journal ne s'affiche plus ici :
 // chaque favori porte son état dans la liste de l'écran (`onVue` la lui passe).
@@ -39,12 +41,21 @@ export default function ModeAutoFavoris({uid,owner,ownerActuel,headers,nomCompte
   let erreurForm='';try{if(form)validerAutoFavoris(form);}catch(e){erreurForm=e.message;}
   const changer=(k,v)=>setForm(f=>({...f,[k]:v}));
   const signaler=a=>{try{window.dispatchEvent(new CustomEvent('vrm:favoris-auto-regle',{detail:{uid:String(uid),actif:a}}));}catch{}};
+  // (11 nov., lot favoris-clair) Allumer, régler ou arrêter le mode auto passe par la feuille commune
+  // « VRM travaille » (`lancerTravail`, une seule action) : rapide ⇒ rien ne se fige ; lent ou refusé ⇒
+  // VRM figé, l'étape, puis le récapitulatif. La règle (serveur, confirmation du risque) ne change pas.
   const enregistrer=async(allumer,confirme=false)=>{
     if(occupe)return;setOccupe(true);setErreur('');
-    try{const r=validerAutoFavoris({...form,actif:allumer});const j=await api('auto_regler',{reglages:r,confirme});if(ownerActuel()===owner){adopter(j.vue);signaler(allumer);setConfirmer(false);setOuvert(false);setFeuille(false);}}
+    try{const r=validerAutoFavoris({...form,actif:allumer});
+      const t=await lancerTravail({titre:allumer?tr('favoris.suivi.autoAllumer'):tr('favoris.suivi.autoRegler'),sorte:'favoris-auto',uid,etapes:[['envoi',tr('favoris.suivi.autoEnvoi')],['ok',tr('favoris.suivi.autoOk')]],
+        executer:async o=>{o.etape('envoi');const j=await api('auto_regler',{reglages:r,confirme});return {etat:'ok',vue:j.vue};}});
+      const j=t.valeur&&t.valeur.vue?t.valeur:null;if(!j)throw Error(t.resultats?.action?.raison||'Le serveur n’a pas confirmé. Rien n’a changé.');
+      if(ownerActuel()===owner){adopter(j.vue);signaler(allumer);setConfirmer(false);setOuvert(false);setFeuille(false);}}
     catch(e){setErreur(e.message);}finally{setOccupe(false);}
   };
-  const stop=async()=>{if(occupe)return;setOccupe(true);setErreur('');try{const j=await api('auto_stop');adopter(j.vue);signaler(false);}catch(e){setErreur(e.message+' Réessaie : le Stop doit être confirmé par le serveur.');}finally{setOccupe(false);}};
+  const stop=async()=>{if(occupe)return;setOccupe(true);setErreur('');try{
+      const t=await lancerTravail({titre:tr('favoris.suivi.autoStop'),sorte:'favoris-auto',uid,executer:async()=>{const j=await api('auto_stop');return {etat:'ok',vue:j.vue};}});
+      if(!t.valeur?.vue)throw Error(t.resultats?.action?.raison||'Le serveur n’a pas confirmé.');adopter(t.valeur.vue);signaler(false);}catch(e){setErreur(e.message+' Réessaie : le Stop doit être confirmé par le serveur.');}finally{setOccupe(false);}};
   if(!uid||!owner)return null;
   const reglagesForm=form?<div className="vrm-favoris-auto-reglages">
       <label>Attente après le favori, entre<input type="text" inputMode="numeric" maxLength={4} aria-label="Attente minimale en minutes" value={form.attenteMin} onChange={e=>changer('attenteMin',e.target.value)}/>et<input type="text" inputMode="numeric" maxLength={4} aria-label="Attente maximale en minutes" value={form.attenteMax} onChange={e=>changer('attenteMax',e.target.value)}/>min (tirée au hasard)</label>

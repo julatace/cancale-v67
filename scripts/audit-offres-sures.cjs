@@ -82,7 +82,7 @@ async function moteur({ prix, min, refuse, garde, onglets, frein, deux, refusVin
   const item = 444, tx = 9001, oid = 7001;
   const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: prix }) };
   const fiche = { num: '7' }; if (min !== undefined) fiche.min = min; if (refuse !== undefined) fiche.refuse = refuse;
-  lignes.main = { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: fiche }, vinted_offre_refus_msg: '' };
+  lignes.main = { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: fiche }, vinted_offre_refus_msg: '', vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (deux) lignes[`harvest_${UID}_conv_${oid + 1}`] = conv({ item, tx: tx + 1, oid: oid + 1, price: prix, user: 501 });
   lignes.main.vinted_offres_garde = garde === undefined ? GARDE_OK() : garde;
   const store = frein ? { vrmFreinRepub: { [UID]: { jusqua: Date.now() + 3600000, restreint: false, status: 422, at: Date.now() } } } : {};

@@ -539,7 +539,9 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
 //     lit ; aucune notification ne part d'ici ;
 //   · un n° d'ACHAT (ligne `transp_` déjà là, e-mail entrant, suivi saisi, suivi
 //     Vinted d'un achat) n'est jamais lu comme départ (ambigu) ;
-//   · la lecture s'arrête dès que la prise en charge est prouvée.
+//   · (11 nov.) une fois la prise en charge prouvée, le colis reste lu toutes
+//     les 6 h jusqu'à la fin (livré, retiré, rendu) — après les colis pas encore
+//     pris en charge : ce que Ventes affiche et compare (api/_lib/suivi-commandes.js).
 export const MAX_DEPARTS_APP = 3;
 export const MAX_DEPARTS_CRON = 6;
 async function lireBaseDeparts() {
@@ -607,7 +609,9 @@ export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now(
       apres = D.ligneDepartApresEssai(d, lu, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now() });
       return apres;
     });
-    lus.push({ carrier: it.carrier, suivi: it.suivi, res: lu.res, prisEnCharge: !!(ecrit === true && apres && apres.priseAt) });
+    // (11 nov.) `change` : l'état lu a bougé (en transit → livré…) — l'app relit les départs.
+    const avant = bd.departs.get(it.suivi);
+    lus.push({ carrier: it.carrier, suivi: it.suivi, res: lu.res, prisEnCharge: !!(ecrit === true && apres && apres.priseAt), change: !!(ecrit === true && apres && apres.etat && (!avant || avant.etat !== apres.etat || (avant.derAt || null) !== (apres.derAt || null))) });
   }
   return lus;
 }

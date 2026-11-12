@@ -32,6 +32,7 @@ import { texteComptesARelire } from './comptes-a-relire.js';
 import { texteCompteRelie } from '../../src/compteRelie.js';
 import { texteNotifModeration } from '../../src/moderationVinted.js';
 import { texteAvisBas } from '../../src/avisNegatif.js';
+import { notifAlertes } from './ebay-alertes-texte.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -203,6 +204,12 @@ export const APERCUS_NOTIF = {
     quoi: 'Un avis Vinted de 3★ ou moins (seuil réglable) vient d’arriver : une fois par avis.',
     exemples: [
       { ...texteAvisBas({ nom: EX.compte, avis: [{ note: 2 }] }), mene: 'Vinted · tes avis (pour répondre)' },
+    ],
+  },
+  alertesebay: {
+    quoi: 'Une nouvelle annonce eBay pour une recherche dont tu as allumé l’alerte. VRM n’achète rien.',
+    exemples: [
+      (() => { const n = notifAlertes([{ itemId: 'v1|1|0', recherche: 'Samba 42', titre: 'Adidas Samba OG 42', prix: 6500, port: 500, total: 7000 }]); return { title: n.title, body: n.body, mene: 'eBay · Achats' }; })(),
     ],
   },
 };

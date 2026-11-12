@@ -1,0 +1,35 @@
+/* Spécificité haute (:root:root:root body) : les règles « bouton 44 px » de l'app passaient devant.
+   (11 nov., soir, lot suivi-commandes) LA LIGNE DE SUIVI COMPACTE (src/SuiviCommande.jsx, `LigneSuivi`).
+   Une ligne de 24 px au plus, 13 px gris, un logo de 18 px — jamais une puce pleine largeur ni un logo
+   agrandi (capture de Julien, 11 nov.). Les gestes (copier, ↗, ›) gardent une CIBLE de 44 px au doigt
+   (bord invisible), le dessin reste fin (§7). */
+:root:root:root body .vrm-suivi-ligne { margin-top: 6px; min-width: 0; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-rang { display: flex; overflow-x: clip; overflow-y: visible; align-items: center; gap: 6px; min-width: 0; height: 24px; font-size: 13px; line-height: 18px; color: var(--sl-gris); white-space: nowrap; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-logo { flex: none; display: flex; width: 18px; height: 18px; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-logo > * { width: 18px !important; height: 18px !important; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-nom { flex: none; }
+:root:root:root body .vrm-suivi-ligne :is(.vrm-sl-n, .vrm-sl-lien, .vrm-sl-plus) { position: relative; flex: none; display: block; height: 22px !important; min-height: 0 !important; max-height: 22px !important; min-width: 0 !important; width: auto !important; padding: 0 2px !important; margin: 0; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sl-encre); font: inherit; font-weight: 500; font-variant-numeric: tabular-nums; text-decoration: none; cursor: pointer; line-height: 22px; border-radius: 6px; }
+:root:root:root body .vrm-suivi-ligne :is(.vrm-sl-n, .vrm-sl-lien, .vrm-sl-plus)::after { content: ''; position: absolute; inset: -11px -4px; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-lien, :root:root:root body .vrm-suivi-ligne .vrm-sl-plus { color: var(--sl-gris); }
+:root:root:root body .vrm-suivi-ligne :is(.vrm-sl-n, .vrm-sl-lien, .vrm-sl-plus):focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 1px; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-statut { flex: 0 1 auto; min-width: 2.5em; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-statut::before, :root:root:root body .vrm-suivi-ligne .vrm-sl-quand::before, :root:root:root body .vrm-suivi-ligne .vrm-sl-n::before { content: '·'; margin-right: 6px; color: var(--sl-gris); font-weight: 400; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-logo + .vrm-sl-n::before { content: none; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-quand { flex: none; }
+:root:root:root body .vrm-suivi-ligne .vrm-sl-detail { margin-top: 4px; font-size: 13px; line-height: 1.4; color: var(--sl-gris); white-space: normal; overflow-wrap: anywhere; }
+/* Au téléphone : le logo dit le transporteur ; l'heure passe avant le statut si la place manque. */
+@media (max-width: 600px) {
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-nom { display: none; }
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-logo + .vrm-sl-nom + .vrm-sl-n::before { content: none; }
+  /* Au téléphone, la colonne est étroite (≈ 230 px) : DEUX lignes fines de 22 px — le n° (et ↗, ›), puis le
+     statut (l'heure dans le détail). Le statut n'est plus coupé à « P… ». */
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-rang { flex-wrap: wrap; height: auto; row-gap: 0; }
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-rang > :is(span, button, a) { height: 22px !important; line-height: 22px; }
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-logo { margin: 2px 0; height: 18px !important; }
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-statut { order: 5; flex: 0 1 auto; max-width: 100%; }
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-statut::before { content: none; }
+  /* L'heure attend dans le détail (« › ») : le statut passe ENTIER d'abord. */
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-quand { display: none; }
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-plus { order: 7; margin-left: auto !important; }
+  :root:root:root body .vrm-suivi-ligne .vrm-sl-rang::after { content: ''; order: 3; flex: 0 0 100%; height: 0 !important; min-height: 0 !important; font-size: 0; line-height: 0; }
+}

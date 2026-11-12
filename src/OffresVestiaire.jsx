@@ -13,10 +13,12 @@
 import React from 'react';
 import { GESTES_OFFRE, etatGeste, prixContre, euros, resteAvant, etiquetteOffre, expireBientot } from './offresVestiaire.js';
 import { PhotoVide } from './composants/PhotoVide.jsx';
+import { tr } from './i18n/index.js';
 import { Numero } from './composants/Numero.jsx';
 
-const NOM = { accepter: 'Accepter', refuser: 'Refuser', contre: 'Contre-offre' };
-const CONFIRME = { accepter: 'Confirmer : vendre', refuser: 'Confirmer le refus' };
+// (11 nov., lot vestiaire-plus) Les textes passent par tr() (src/i18n/langues/*.js, le français mot pour mot).
+const NOM = { accepter: () => tr('vcOffres.accepter'), refuser: () => tr('vcOffres.refuser'), contre: () => tr('vcOffres.contre') };
+const CONFIRME = { accepter: () => tr('vcOffres.confirmerVendre'), refuser: () => tr('vcOffres.confirmerRefus') };
 
 function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
   const [enCours, setEnCours] = React.useState('');
@@ -41,35 +43,35 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
       <div className="vrm-of-tete">
         {o.photo && Photo ? <Photo src={o.photo} className="vrm-of-photo" alt=""/> : <PhotoVide className="vrm-of-photo" taille={52}/>}
         <span className="vrm-of-centre">
-          <span className="vrm-of-nom">{num ? <Numero n={num} taille="petit" className="vrm-of-num"/> : null}<span className="vrm-of-titre-article">{o.titre || 'Article Vestiaire'}</span></span>
+          <span className="vrm-of-nom">{num ? <Numero n={num} taille="petit" className="vrm-of-num"/> : null}<span className="vrm-of-titre-article">{o.titre || tr('journee.vcOffre.article')}</span></span>
           <span className="vrm-of-sous">
-            <span className="vrm-of-bloc">prix {euros(o.initial)}</span>
-            {o.net != null ? <> · <span className="vrm-of-bloc">tu touches {euros(o.net)}</span></> : null}
+            <span className="vrm-of-bloc">{tr('vcOffres.prix', { prix: euros(o.initial) })}</span>
+            {o.net != null ? <> · <span className="vrm-of-bloc">{tr('vcOffres.tuTouches', { prix: euros(o.net) })}</span></> : null}
           </span>
           {/* Le temps restant LU, sur sa ligne : en ambre (et dit « expire dans ») sous 6 h. */}
-          {o.expire != null ? <span className={'vrm-of-reste' + (bientot ? ' is-bientot' : '')} data-vc-offre-reste="">{bientot ? `expire dans ${resteAvant(o.expire, maintenant)}` : `reste ${resteAvant(o.expire, maintenant)}`}</span> : null}
+          {o.expire != null ? <span className={'vrm-of-reste' + (bientot ? ' is-bientot' : '')} data-vc-offre-reste="">{bientot ? tr('vcOffres.expireDans', { reste: resteAvant(o.expire, maintenant) }) : tr('vcOffres.resteT', { reste: resteAvant(o.expire, maintenant) })}</span> : null}
         </span>
         <span className="vrm-of-prix" data-vc-offre-cents={o.offre == null ? '' : String(o.offre)}>{euros(o.offre)}</span>
       </div>
       {prets.length > 0 && (
-        <div className="vrm-of-gestes" role="group" aria-label="Répondre à l’offre">
+        <div className="vrm-of-gestes" role="group" aria-label={tr('vcOffres.repondreOffre')}>
           {prets.filter((g) => g !== 'contre').map((g) => (
             <button key={g} type="button" className={'vrm-of-btn' + (confirme === g ? ' is-confirme' : '')} data-vc-offre-geste={g} data-vc-offre-confirme={confirme === g ? '1' : undefined}
-              disabled={!!enCours} onClick={() => (confirme === g ? faire(g) : setConfirme(g))}>{enCours === g ? '…' : (confirme === g ? CONFIRME[g] : NOM[g])}</button>
+              disabled={!!enCours} onClick={() => (confirme === g ? faire(g) : setConfirme(g))}>{enCours === g ? '…' : (confirme === g ? CONFIRME[g]() : NOM[g]())}</button>
           ))}
-          {prets.includes('contre') && contre == null && <button type="button" className="vrm-of-btn" data-vc-offre-geste="contre" disabled={!!enCours} onClick={() => { setConfirme(''); setContre(''); }}>{NOM.contre}</button>}
+          {prets.includes('contre') && contre == null && <button type="button" className="vrm-of-btn" data-vc-offre-geste="contre" disabled={!!enCours} onClick={() => { setConfirme(''); setContre(''); }}>{NOM.contre()}</button>}
         </div>
       )}
       {contre != null && (
         <div className="vrm-of-contre" data-vc-offre-contre="">
-          <input className="vrm-of-champ" inputMode="decimal" aria-label="Ta contre-offre en euros" placeholder="€" value={contre} onChange={(e) => setContre(e.target.value.slice(0, 12))}/>
-          <button type="button" className="vrm-of-btn is-plein" data-vc-offre-envoyer="" disabled={!!enCours || !pc || pc.cents == null} onClick={() => pc && pc.cents != null && faire('contre', pc.cents)}>{enCours === 'contre' ? '…' : 'Envoyer'}</button>
-          <button type="button" className="vrm-of-btn" aria-label="Annuler la contre-offre" onClick={() => setContre(null)}>✕</button>
+          <input className="vrm-of-champ" inputMode="decimal" aria-label={tr('vcOffres.contreOffreEuros')} placeholder="€" value={contre} onChange={(e) => setContre(e.target.value.slice(0, 12))}/>
+          <button type="button" className="vrm-of-btn is-plein" data-vc-offre-envoyer="" disabled={!!enCours || !pc || pc.cents == null} onClick={() => pc && pc.cents != null && faire('contre', pc.cents)}>{enCours === 'contre' ? '…' : tr('vcOffres.envoyer')}</button>
+          <button type="button" className="vrm-of-btn" aria-label={tr('vcOffres.annulerContreOffre')} onClick={() => setContre(null)}>✕</button>
           {pc && pc.erreur ? <span className="vrm-of-erreur" role="status">{pc.erreur}</span> : null}
         </div>
       )}
       {prets.length < GESTES_OFFRE.length && (
-        <a className="vrm-of-lien vrm-pied-lien" data-pied-lien="repondre-vc" data-vc-offre-ailleurs={GESTES_OFFRE.filter((g) => !prets.includes(g)).map((g) => g + ':' + etats[g].etat).join(',')} href={lien} target="_blank" rel="noreferrer">Répondre sur Vestiaire ↗</a>
+        <a className="vrm-of-lien vrm-pied-lien" data-pied-lien="repondre-vc" data-vc-offre-ailleurs={GESTES_OFFRE.filter((g) => !prets.includes(g)).map((g) => g + ':' + etats[g].etat).join(',')} href={lien} target="_blank" rel="noreferrer">{tr('vcOffres.repondreVestiaire')}</a>
       )}
       {res ? <div className="vrm-of-resultat" role="status" data-vc-offre-resultat={res.ton}>{res.texte}</div> : null}
     </li>
@@ -86,16 +88,16 @@ export default function OffresVestiaire({ etat, recettes, cap, numDe, envoyer, P
   return (
     <section className="vrm-of" data-vc-offres={A.length} data-vc-offres-attente={W.length}>
       {A.length > 0 && <>
-        <h3 className="vrm-of-titre">Offres reçues<span className="vrm-of-n">{A.length}</span></h3>
+        <h3 className="vrm-of-titre">{tr('vcOffres.offresRecues')}<span className="vrm-of-n">{A.length}</span></h3>
         <ul className="vrm-of-liste">{A.map((o) => <CarteOffre key={o.id} o={o} recettes={recettes} cap={cap} numDe={numDe} envoyer={envoyer} Photo={Photo} maintenant={maintenant}/>)}</ul>
       </>}
       {W.length > 0 && (<>
-        <h3 className="vrm-of-titre vrm-of-titre-second">Tes offres envoyées<span className="vrm-of-n">{W.length}</span></h3>
+        <h3 className="vrm-of-titre vrm-of-titre-second">{tr('vcOffres.offresEnvoyees')}<span className="vrm-of-n">{W.length}</span></h3>
         <ul className="vrm-of-attente" data-vc-offres-envoyees={W.length}>
           {W.slice(0, 6).map((o) => (
             <li key={o.id} className="vrm-of-ligne" data-vc-offre-envoyee={o.id}>
-              <span className="vrm-of-ligne-nom">{(numDe && numDe(o.produit)) ? `N°${numDe(o.produit)} · ` : ''}{o.titre || 'Article Vestiaire'}</span>
-              <span className="vrm-of-ligne-etat">{euros(o.dernierCents)}{o.expire != null ? ` · reste ${resteAvant(o.expire, maintenant)}` : ''}</span>
+              <span className="vrm-of-ligne-nom">{(numDe && numDe(o.produit)) ? `N°${numDe(o.produit)} · ` : ''}{o.titre || tr('journee.vcOffre.article')}</span>
+              <span className="vrm-of-ligne-etat">{euros(o.dernierCents)}{o.expire != null ? ' · ' + tr('vcOffres.resteT', { reste: resteAvant(o.expire, maintenant) }) : ''}</span>
             </li>
           ))}
         </ul>
