@@ -550,7 +550,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · Vert et vitesse** : CI au vert ; « Tout imprimer (N) » juste ; une vente relit son compte ; 20 000 ventes : −20 %, chiffres inchangés. `2026-11-12-vert-vitesse.md`, `-vitesse-volume.md`. Geste : aucun.
+- **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume en ligne** : 20 000 ventes −20 %. `2026-11-12-*.md`. Geste : migration 042 (facultative).
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
