@@ -9,6 +9,12 @@
 //   · ouvrir le fil ne fait rien partir ; un envoi = UNE commande
 //     `lbcRepondre { conv, texte }`, sur SON clic, résultat dit (fait · refusé) ;
 //   · 390 px tactile et 1512 px, clair ET sombre : rien ne déborde, 44 px au doigt.
+// 5.362 (revue extension, moyennes 60 et 63) : sur leboncoin.fr, l'ordre « répondre »
+// passe du relais à la page par un CANAL PRIVÉ (MessageChannel lbc-relay ⇄ lbc-inject),
+// plus jamais par `window` — jugé par `audit-lbc-repondre` (le relais qui prend le port).
+// CE banc juge l'autre bout : l'APP ⇄ le pont de l'extension sur vrm.center
+// (`__vmr`, bridge.js), que 5.362 n'a pas changé ; l'app n'envoie jamais rien à
+// leboncoin.fr elle-même. Relancé sur 5.362 : 31 verts (12 nov.).
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
