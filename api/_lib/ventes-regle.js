@@ -57,6 +57,8 @@ export const montantCommande = (o) => {
 export const montantCommandeLu = (o) => {
   const p = o && o.price;
   if (p == null) return null;
+  // (11 nov., famille « pas su ≠ 0 ») une commande dans une autre devise n'est pas sue EN EUROS : écartée, jamais convertie.
+  if (typeof p === 'object' && p.currency_code && String(p.currency_code).toUpperCase() !== 'EUR') return null;
   const v = (typeof p === 'object') ? (p.amount ?? p.value) : p;
   if (v == null || String(v).trim() === '') return null;
   const n = Number(String(v).replace(',', '.'));
@@ -105,7 +107,7 @@ export const montantRecuEbay = (o) => {
   return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
 };
 
-export const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+export const ymDeTs = (t) => { try { return (ymDeTs._f || (ymDeTs._f = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)).slice(0, 7); } catch (_) { return ''; } };
 
 export const indexDeclarations = (reg) => {
   if (!reg || typeof reg !== 'object' || Array.isArray(reg)) return null;

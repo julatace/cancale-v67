@@ -16,6 +16,7 @@
 // rafraîchit toutes les 60 s chez chaque visiteur, la base n'en voit qu'une par
 // 30 s et par instance. La route ajoute `Cache-Control: s-maxage=30`.
 import { sbCle } from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const MEMO_MS = 30 * 1000;
 export const SONDE_MS = 4000;
@@ -48,7 +49,7 @@ export function etatEmails({ secret, lignes, maintenant = Date.now() }) {
 }
 
 // L'état complet, sondé. `env` et `fetcher` sont injectés (audit).
-export async function sonderEtat({ env = process.env, fetcher = fetch, pushPret = false, anon: anonDefaut = '', maintenant = Date.now() } = {}) {
+export async function sonderEtat({ env = process.env, fetcher = fetchAvecDelai, pushPret = false, anon: anonDefaut = '', maintenant = Date.now() } = {}) {
   const url = env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
   const service = env.SUPABASE_SERVICE_KEY || '';
   const anon = env.SUPABASE_KEY || anonDefaut || '';

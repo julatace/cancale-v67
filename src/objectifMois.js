@@ -1,3 +1,4 @@
+import { moisParis } from './dateParis.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // L'OBJECTIF DU MOIS (4 novembre) — UNE notion, UN réglage, UNE règle
 // ═══════════════════════════════════════════════════════════════════════════
@@ -65,7 +66,7 @@ export const lireSaisieObjectif = (type, saisie) => {
 // passé sur l'objectif qu'il avait ALORS, jamais sur celui posé après. Un objectif
 // tient jusqu'à ce qu'il le change (la dernière entrée ≤ au mois). Six mois gardés.
 // `bilanVu` : le mois dont il a vu le bilan (« OK ») — dit une fois, plus après.
-export const ymDe = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+export const ymDe = (ts) => moisParis(ts);   // (11 nov.) mois de PARIS
 const histoire = (brut) => {
   const h = {};
   const src = brut && typeof brut === 'object' && brut.parMois && typeof brut.parMois === 'object' ? brut.parMois : {};

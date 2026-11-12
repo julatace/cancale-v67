@@ -1,5 +1,6 @@
 import {etatCommandeEbay} from './ebay-etat-commande.js';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const parser=new XMLParser({ignoreAttributes:false,attributeNamePrefix:'@_',textNodeName:'#text',parseTagValue:false,trimValues:false,removeNSPrefix:true});
 const liste=v=>v==null?[]:Array.isArray(v)?v:[v];
@@ -55,7 +56,7 @@ export function lignesRestantAExpedier(order,fulfillments) {
 
 // Toutes les fonctions agissent sur le jeton eBay du vendeur prouvé par la route.
 // Les intentions engageantes exigent confirme AVANT d'aller chercher ce jeton.
-export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fetcher=(...a)=>fetch(...a)}) {
+export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fetcher=(...a)=>fetchAvecDelai(...a)}) {
   const jeton=async owner=>{const r=await accessToken(owner);return r.ok && r.token?r:echec(r.error || 'Compte eBay indisponible.',r.status || 502,r.reason);};
   const lire=async(call,inner,token)=>{
     const r=await tradingCall(token,call,inner);

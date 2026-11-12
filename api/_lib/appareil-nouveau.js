@@ -27,6 +27,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { resumerAppareil } from './securite-compte.js';
 import { DESTINATIONS } from './lien-notif.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const LIGNE_APPAREILS_VUS = 'vrm_appareils_vus';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,7 +72,7 @@ export function nouveauxAppareils(sessions, registre, maintenant = Date.now()) {
 // `deps` : { base, cle, user:{id}, fetch, pousser(notif) }.
 export async function verifierNouvelAppareil(deps) {
   const { base, cle, user } = deps;
-  const f = deps.fetch || fetch;
+  const f = deps.fetch || fetchAvecDelai;
   if (!user || !UUID.test(String(user.id || ''))) return { status: 401, body: { erreur: 'session' } };
   if (!cle) return { status: 503, body: { erreur: 'non-configure' } };
   const H = { apikey: cle, Authorization: `Bearer ${cle}`, 'Content-Type': 'application/json' };

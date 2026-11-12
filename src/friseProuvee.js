@@ -47,6 +47,7 @@ import { departProuve, TOLERANCE_AVANT_VENTE_MS } from '../api/_lib/depart-colis
 import { LIBELLE_GENRE } from './litiges.js';
 import { LIBELLE_ETAPE } from './retoursStock.js';
 import { ETAPE_CENTRE } from './verificationArticle.js';
+import { jourParis } from './dateParis.js';
 
 export const ETAPES_FRISE = [
   ['vendue', 'Vendue'],
@@ -204,7 +205,7 @@ export function friseProuvee({ preuves = {}, bifurcation = null, geste = null, v
 const _jour = (() => { try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'short' }); } catch (_) { return null; } })();
 export const jourFrise = (t) => {
   if (!Number.isFinite(t)) return '';
-  try { return _jour ? _jour.format(new Date(t)).replace(/ | /g, ' ') : new Date(t).toISOString().slice(0, 10); } catch (_) { return ''; }
+  try { return _jour ? _jour.format(new Date(t)).replace(/ | /g, ' ') : jourParis(t); } catch (_) { return ''; }
 };
 // Ce qui s'écrit sous une étape : la date lue, « lu » (prouvée sans date lue),
 // le geste attendu, ou « pas lu ».

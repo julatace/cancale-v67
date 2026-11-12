@@ -33,3 +33,17 @@ export function ordreStable(chemin) {
   const ordre = ORDRE_PAR_TABLE[table] || ORDRE_PAR_TABLE.app_data;
   return s + (q >= 0 ? (requete ? '&' : '') : '?') + 'order=' + ordre;
 }
+
+// (11 nov., lot « limites-client ») LA FIN DE LISTE À UNE FRONTIÈRE EXACTE.
+// Une famille d'exactement 1 000 (2 000…) lignes : la page suivante peut être
+// refusée par un 416 « Requested range not satisfiable » qui porte
+// `Content-Range: */1000`. Ce n'est PAS une panne, c'est la fin de la liste
+// (l'app le sait déjà, `lireTout`). Mesuré au banc « gros client » : le widget
+// d'un vendeur à 1 000 e-mails de vente répondait « base injoignable ».
+// Vrai seulement si le total dit est EXACTEMENT le début de la page demandée.
+export function finALaFrontiere(r, debut) {
+  if (!r || r.status !== 416 || !(debut > 0)) return false;
+  const cr = r.headers && typeof r.headers.get === 'function' ? r.headers.get('content-range') : '';
+  const m = /^\*\/(\d+)$/.exec(String(cr || '').trim());
+  return !!m && Number(m[1]) === debut;
+}

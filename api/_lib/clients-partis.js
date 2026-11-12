@@ -29,6 +29,7 @@ import { lireMentions } from './mentions-legales.js';
 import { inventaire, lireProprietaire, noterJournal, mailSuppression } from './suppression-compte.js';
 import { effacerCompte, purgerFacturesGardees } from './effacer-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const URL_BASE = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -110,7 +111,7 @@ const jourFr = (ms) => new Date(ms).toLocaleDateString('fr-FR', { timeZone: 'Eur
 
 async function lire(url, service, chemin) {
   try {
-    const r = await fetch(`${url}/rest/v1/${chemin}`, { headers: sbCle(service) });
+    const r = await fetchAvecDelai(`${url}/rest/v1/${chemin}`, { headers: sbCle(service) });
     if (!r.ok) return null;
     const j = await r.json().catch(() => null);
     return Array.isArray(j) ? j : null;
@@ -118,7 +119,7 @@ async function lire(url, service, chemin) {
 }
 async function ecrireAvis(url, service, owner, data) {
   try {
-    const r = await fetch(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id: ID_AVIS, data, updated_at: new Date().toISOString() }]),
     });
@@ -128,11 +129,16 @@ async function ecrireAvis(url, service, owner, data) {
 
 export async function listerFinis(url, service) {
   const out = [];
-  for (let from = 0; from < 100000; from += 1000) {
-    const page = await lire(url, service, `abonnements?statut=in.(${STATUTS_FINIS.join(',')})&select=owner,statut,client_stripe,abonnement_stripe,mode_test&order=owner.asc&offset=${from}&limit=1000`);
+  // (11 nov., M88) pagination PAR CLÉ (`owner=gt.` le dernier lu), jamais par
+  // `offset=` sur une table que le passage modifie : aucune ligne ne saute.
+  let apres = '';
+  for (let n = 0; n < 100; n++) {
+    const page = await lire(url, service, `abonnements?statut=in.(${STATUTS_FINIS.join(',')})${apres ? `&owner=gt.${encodeURIComponent(apres)}` : ''}&select=owner,statut,client_stripe,abonnement_stripe,mode_test&order=owner.asc&limit=1000`);
     if (!page) return null;
     out.push(...page);
     if (page.length < 1000) break;
+    apres = String(page[page.length - 1].owner || '');
+    if (!apres) return null;
   }
   return out;
 }
@@ -151,7 +157,8 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
   const modeTest = env.VRM_DEPARTS_MODE_TEST === '1';
   const ignores = {}; const ign = (r) => { ignores[r] = (ignores[r] || 0) + 1; };
   let avis = 0, supprimes = 0, incomplets = 0;
-  let mentionsLues = false;
+  let mentionsLues = false, mentionsOk = false;
+  const mailsSuppression = { envoye: 0, refuse: 0, incertain: 0, sansAdresse: 0 };
   for (const a of finis) {
     const owner = String((a && a.owner) || '').toLowerCase();
     if (!UUID.test(owner) || owner === PROPRIETAIRE_NEUTRE) { ign('identifiant'); continue; }
@@ -171,7 +178,10 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
     const etape = etapeDepart({ fin, maintenant, avis: lignes[0] && lignes[0].data });
     if (!etape) { ign('rien aujourd’hui'); continue; }
     if (etape === 'avis-pas-prouve') { ign('avis pas prouve : rien efface'); continue; }
-    if (!mentionsLues) { mentionsLues = true; try { await lireMentions(); } catch (_) {} }
+    // (12 nov., B143) Le pied de l'e-mail (l'éditeur) : fichier illisible ⇒ AUCUN e-mail ne part
+    // (ni avis ni « compte supprimé ») — et sans avis prouvé, rien n'est effacé. Demain.
+    if (!mentionsLues) { mentionsLues = true; try { const m = await lireMentions(); mentionsOk = !!(m && !m.erreur); } catch (_) { mentionsOk = false; } }
+    if (!mentionsOk) { ign('mentions pas lues : rien envoye'); continue; }
 
     if (etape === 'avis') {
       if (avis >= maxAvis) { ign('plafond des avis'); continue; }
@@ -200,11 +210,16 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
     await noterJournal({ url, service, owner, ok: r.ok, nombres: { ...inv, donneesEffacees: r.etapes.donnees, depart: 1 }, maintenant });
     if (!r.ok) { incomplets++; continue; }
     supprimes++;
+    // (12 nov., M102) L'issue de l'e-mail « compte supprimé » est COMPTÉE dans la réponse du cron
+    // (envoyé · refusé · incertain · sans adresse) : un envoi raté ne passe plus en silence.
     if (adr && adr.etat === 'ok') {
       const m = mailSuppression({ fait: r.fait, motif: 'depart', maintenant });
-      try { await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); } catch (_) {}
-    }
+      let v;
+      try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); } catch (_) { v = { issue: 'incertain' }; }
+      const issue = ['envoye', 'refuse', 'incertain'].includes(v && v.issue) ? v.issue : 'incertain';
+      mailsSuppression[issue] += 1;
+    } else mailsSuppression.sansAdresse += 1;
   }
   const factures = await purgerFacturesGardees({ url, service, maintenant });
-  return { fait: true, finis: finis.length, avis, supprimes, incomplets, ignores, factures, smtp: cfg.pret };
+  return { fait: true, finis: finis.length, avis, supprimes, incomplets, ignores, factures, smtp: cfg.pret, mailsSuppression };
 }

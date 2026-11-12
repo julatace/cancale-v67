@@ -27,6 +27,7 @@
 import crypto from 'crypto';
 import { sbCle } from './cle.js';
 import { stripeApi, stripePret } from './stripe.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,7 +46,7 @@ export function nouveauCode(octets = crypto.randomBytes(8)) {
 
 async function lireJson(url) {
   try {
-    const r = await fetch(url, { headers: sbCle(service()) });
+    const r = await fetchAvecDelai(url, { headers: sbCle(service()) });
     if (!r.ok) return undefined;
     const j = await r.json();
     return Array.isArray(j) ? j : undefined;
@@ -69,7 +70,7 @@ export async function codeDe(owner) {
   for (let essai = 0; essai < 4; essai++) {
     const code = nouveauCode();
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/parrainage_codes?on_conflict=owner`, {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/parrainage_codes?on_conflict=owner`, {
         method: 'POST', headers: { ...h(), Prefer: 'resolution=ignore-duplicates,return=minimal' },
         body: JSON.stringify([{ owner, code }]),
       });
@@ -129,7 +130,7 @@ export async function rattacher(code, ctx, maintenant = Date.now()) {
   const communs = new Set(idsParrain.map((x) => String(x && x.vinted_user_id)));
   if ((ctx.idsVinted || []).some((v) => communs.has(String(v)))) return { ok: false, http: 400, raison: 'soi-meme', message: 'Tu ne peux pas être ton propre parrain.' };
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/parrainages?on_conflict=filleul`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/parrainages?on_conflict=filleul`, {
       method: 'POST', headers: { ...h(), Prefer: 'resolution=ignore-duplicates,return=representation' },
       body: JSON.stringify([{ filleul: u.id, parrain, code: c, inscrit: new Date(maintenant).toISOString() }]),
     });
@@ -156,7 +157,7 @@ async function crediter(client, cle, centimes) {
 }
 async function patch(filleul, champs) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/parrainages?filleul=eq.${encodeURIComponent(filleul)}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/parrainages?filleul=eq.${encodeURIComponent(filleul)}`, {
       method: 'PATCH', headers: { ...h(), Prefer: 'return=minimal' }, body: JSON.stringify(champs),
     });
     return r.ok;
@@ -180,8 +181,9 @@ async function crediterParrain(ligne, centimes, maintenant) {
   const an = recents.filter((x) => x.credit_parrain_le && Date.parse(x.credit_parrain_le) > maintenant - 365 * 86400000).length;
   if (an >= PARRAIN_MAX_AN) return true;                  // plafond : rien de plus, dit dans les CGV
   if (!(await crediter(client, `${ligne.filleul}:parrain`, centimes))) return false;
-  await patch(ligne.filleul, { credit_parrain_le: new Date(maintenant).toISOString() });
-  return true;
+  // (12 nov., B135) Crédit fait mais pas noté ⇒ « à réessayer » : Stripe rejoue, et le
+  // rejeu retrouve le crédit par sa marque (`crediter`) au lieu d'en refaire un.
+  return await patch(ligne.filleul, { credit_parrain_le: new Date(maintenant).toISOString() });
 }
 
 // Facture PAYÉE d'un vendeur (webhook `invoice.paid`). `owner` = le vendeur de
@@ -200,7 +202,7 @@ export async function factureFilleulPayee(owner, client, facture, centimes, main
   if (l && paye) {
     if (!l.paye_le) { l.paye_le = new Date(maintenant).toISOString(); if (!(await patch(owner, { paye_le: l.paye_le }))) return { ok: false }; }
     if (!l.credit_filleul_le) {
-      if (await crediter(client, `${owner}:filleul`, centimes)) await patch(owner, { credit_filleul_le: new Date(maintenant).toISOString() });
+      if (await crediter(client, `${owner}:filleul`, centimes)) { if (!(await patch(owner, { credit_filleul_le: new Date(maintenant).toISOString() }))) ok = false; }   // (12 nov., B135)
       else ok = false;
     }
     if (!(await crediterParrain(l, centimes, maintenant))) ok = false;

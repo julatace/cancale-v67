@@ -1,3 +1,4 @@
+import { jourParis, moisParis } from './dateParis.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // LE RÉCAP COMPTABLE DU MOIS — PDF et tableur (3 novembre)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -32,8 +33,8 @@ export const eurosTexte = (x) => {
   return (c < 0 ? '−' : '') + String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + String(n % 100).padStart(2, '0') + '\u00a0€';
 };
 const tableur = (x) => (x == null || !isFinite(Number(x)) ? '' : (Math.round(Number(x) * 100) / 100).toFixed(2).replace('.', ','));
-const jour = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
-const ymLocal = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const jour = (t) => { const j = jourParis(t); return j ? `${j.slice(8, 10)}/${j.slice(5, 7)}/${j.slice(0, 4)}` : ''; };
+const ymLocal = (t) => moisParis(t);   // (11 nov.) mois de PARIS
 
 // Les données du récap. Entrées (toutes déjà calculées par les règles de l'app) :
 //   ym, releve (lignes `vrm_stats_ventes` ou null), benefice ({ valeur, raison }),

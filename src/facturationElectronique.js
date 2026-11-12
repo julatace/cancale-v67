@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  FACTURATION ÉLECTRONIQUE — ce que VRM PRÉPARE, gratuitement (16 octobre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -40,9 +41,10 @@ export const eurDe = (c) => (c / 100).toFixed(2);
 
 const pad = (n) => String(n).padStart(2, '0');
 // Date locale de l'appareil (comme le reste de l'app) : AAAAMMJJ / AAAA-MM-JJ.
-export const ymd = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`; };
-export const isoJour = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
-export const frJour = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; };
+// (11 nov.) jour de PARIS (une facture du 1er à 0 h 30 est du 1er, partout)
+export const ymd = (t) => jourParis(t).replace(/-/g, '');
+export const isoJour = (t) => jourParis(t);
+export const frJour = (t) => { const j = jourParis(t); return j ? `${j.slice(8, 10)}/${j.slice(5, 7)}/${j.slice(0, 4)}` : ''; };
 
 // ── PEUT-ON FACTURER ? ──────────────────────────────────────────────────────
 // `cfg` = la ligne `vrm_pro_facture` en trois états (undefined en cours · null

@@ -2,6 +2,7 @@ import {sbCle} from './cle.js';
 import {PROPRIETAIRE_NEUTRE} from './proprietaire-email.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {initialiserFile} from './favoris-file.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 // Queue rows live under the protected neutral owner. Closing a VRM account
 // must erase its group there too, while preserving other owners and quota.
@@ -11,7 +12,7 @@ export async function effacerFavorisDe(owner){
   for(let page=0;page<50;page++){
     let rows;
     try{
-      const r=await fetch(`${base}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.favoris_file_*&data->proprietaires=cs.${encodeURIComponent(JSON.stringify([owner]))}&select=id&limit=100`,{headers:sbCle(process.env.SUPABASE_SERVICE_KEY),signal:AbortSignal.timeout(12000)});
+      const r=await fetchAvecDelai(`${base}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.favoris_file_*&data->proprietaires=cs.${encodeURIComponent(JSON.stringify([owner]))}&select=id&limit=100`,{headers:sbCle(process.env.SUPABASE_SERVICE_KEY),signal:AbortSignal.timeout(12000)});
       if(!r.ok)return null;rows=await r.json();
     }catch{return null;}
     if(!Array.isArray(rows)||rows.some(x=>!/^favoris_file_[a-f0-9]{64}$/.test(x.id||'')))return null;

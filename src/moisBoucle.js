@@ -1,3 +1,4 @@
+import { moisRecents } from './dateParis.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // « MOIS BOUCLÉ » (10 nov., lot BK) — Argent → Déclarer
 // ═══════════════════════════════════════════════════════════════════════════
@@ -131,9 +132,7 @@ export function moisBoucle({ ym, maintenant = Date.now(), ligne, declare, joursB
 
 // Les mois qu'on peut choisir : le mois en cours et les 12 d'avant (le plus récent d'abord).
 export const moisChoisissables = (maintenant = Date.now(), n = 13) => {
-  const out = []; const d = new Date(maintenant); d.setDate(1);
-  for (let i = 0; i < n; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); }
-  return out;
+  return moisRecents(n, maintenant);   // (11 nov.) à partir du mois de PARIS
 };
 // Le mois proposé d'abord : le dernier mois FINI (celui qu'on déclare).
 export const moisParDefaut = (maintenant = Date.now()) => moisChoisissables(maintenant, 2)[1];

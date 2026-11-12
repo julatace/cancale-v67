@@ -1,6 +1,7 @@
 // Test de lecture, sans clé de service et sans contenu métier.
 // La présence d’une colonne owner ne prouve pas que RLS filtre réellement.
-export async function verifierConfidentialite({url,anon,jeton,uid,fetcher=fetch}) {
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+export async function verifierConfidentialite({url,anon,jeton,uid,fetcher=fetchAvecDelai}) {
  if(!uid||!jeton)return {ok:false,raison:'session'};
  const verifier=async(table,token,filtre='')=>{
   try{

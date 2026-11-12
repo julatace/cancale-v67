@@ -21,6 +21,7 @@
 // `sell.marketing` (déjà demandé pour la promotion des annonces).
 // ════════════════════════════════════════════════════════════════════════════
 
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 const ID = /^\d{6,19}$/;
 const ID_PROMO = /^[0-9A-Za-z_-]{1,40}$/;
 export const DUREE_MAX_JOURS = 30;
@@ -77,7 +78,7 @@ export function lirePromotions(data) {
   })).filter((p) => ID_PROMO.test(p.id));
 }
 
-export function creerRemisesEbay({ accessToken, apiOrigin, marketplace, lireAnnonces, fetcher = (...a) => fetch(...a), maintenant = () => Date.now() }) {
+export function creerRemisesEbay({ accessToken, apiOrigin, marketplace, lireAnnonces, fetcher = (...a) => fetchAvecDelai(...a), maintenant = () => Date.now() }) {
   const MK = `${apiOrigin}/sell/marketing/v1`;
   const mk = () => (typeof marketplace === 'function' ? marketplace() : marketplace);
   const jeton = async (ctx) => { const r = await accessToken(ctx); return r.ok && r.token ? r : echec(r.error || 'Compte eBay indisponible.', r.status || 502, r.reason); };

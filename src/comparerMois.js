@@ -1,3 +1,4 @@
+import { moisParis } from './dateParis.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // COMPARER DEUX MOIS (4 novembre)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -20,7 +21,7 @@
 // Exécuté par scripts/audit-comparer-mois.cjs.
 
 import { motsVendeur } from './profilVendeur.js';
-export const ymDe = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+export const ymDe = (t) => moisParis(t);   // (11 nov.) mois de PARIS
 export const ymDecale = (ym, k) => {
   const [y, m] = String(ym).split('-').map(Number);
   const d = new Date(y, m - 1 + k, 1);

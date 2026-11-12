@@ -36,6 +36,9 @@ const MUTATIONS = {
   'écrit sur une lecture ratée': [[LIB, 'const peutEcrire = curseurJour !== undefined;', 'const peutEcrire = true;']],
   'tâches globales après les vendeurs': [[CRON, '    let relances = null;\n    if (!soir && !reveil) { try { relances = await passageRelances(', '    let relances = null;\n    await new Promise((ok) => setTimeout(ok, 0));\n    if (!soir && !reveil) await lotFini; if (!soir && !reveil) { try { relances = await passageRelances('], [CRON, '    const lot = await passerVendeurs({', '    let finir; const lotFini = new Promise((ok) => { finir = ok; });\n    const lot = await passerVendeurs({'], [CRON, '    const { bilans, echecs } = lot;', '    const { bilans, echecs } = lot; finir();']],
   'échec noté fait': [[LIB, 'if (reussi) faits.push(o); else enEchec.push(o);', 'faits.push(o);']],
+  'cron sans bail': [[CRON, "if (bail.pris === false) { res.status(200)", "if (false) { res.status(200)"]],
+  'bail jamais échu': [[LIB, "d.jeton !== jeton && Number(d.jusqua) > maintenant", "d.jeton !== jeton"]],
+  'bail jamais rendu': [[CRON, "finally { if (bail.pris === true) await rendreBail(", "finally { if (false) await rendreBail("]],
   'cron sans curseur': [[CRON, 'lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre,', 'lireCurseur: async () => null, ecrireCurseur: async () => true,']],
 };
 
@@ -124,6 +127,15 @@ const NEUTRE = '00000000-0000-0000-0000-000000000000';
     if (!/\/rest\/v1\//.test(u)) return J(200, []);
     if (/app_data\?select=owner&limit=1$/.test(u)) return J(200, [{ owner: OWNERS[0] }]);
     if (/id=eq\.main&select=owner(&|$)/.test(u) && !own) return J(206, OWNERS.map((x) => ({ owner: x })));
+    // (11 nov., H14) Le bail du passage : une ligne neutre écrite par comparer-et-échanger (modifierNeutre).
+    if ((own === NEUTRE && /id=eq\.cron_bail_/.test(u)) || (m === 'POST' && /"id":"cron_bail_/.test(String(o.body || '')))) {
+      if (m === 'POST') { const [r] = JSON.parse(o.body); if (lignes.has(`${NEUTRE}|${r.id}`)) return J(409, { code: '23505' }); lignes.set(`${NEUTRE}|${r.id}`, r.data); return J(201, null); }
+      const id = /id=eq\.([^&]+)/.exec(u)[1], k = `${NEUTRE}|${id}`;
+      if (m === 'GET') { await dormir(5); return J(200, lignes.has(k) ? [{ data: lignes.get(k) }] : []); }
+      const rev = (/data->>rev=([^&]+)/.exec(u) || [])[1], d = lignes.get(k);
+      if (!d || (rev === 'is.null' ? d.rev != null : `eq.${d.rev}` !== rev)) return J(200, []);
+      lignes.set(k, JSON.parse(o.body).data); return J(200, [{ id }]);
+    }
     if (own === NEUTRE && /id=eq\.cron_curseur_/.test(u)) {
       const id = /id=eq\.([^&]+)/.exec(u)[1];
       if (m === 'DELETE') { lignes.delete(`${NEUTRE}|${id}`); return J(204, null); }
@@ -164,6 +176,23 @@ const NEUTRE = '00000000-0000-0000-0000-000000000000';
   vrai(doublons.length === 0, `L3 la relance du même jour ne refait aucun vendeur déjà fait (${doublons.length} doublon)`);
   vrai(c2.lot && c2.lot.dejaFaits === cur1.faits.length && c2.lot.restants === 0 && new Set([...cur1.faits, ...p2.vendeurs]).size === 50, `L3 elle reprend les ${c2.lot && c2.lot.traites} autres : les 50 couverts`);
   vrai(!!cur2 && cur2.complet === true && cur2.faits.length === 50, 'L3 le curseur du jour devient « complet »');
+
+  // ── L4 (11 nov., H14) : deux passages SIMULTANÉS du même moment ─────────────
+  //    (cron Vercel + workflow du dépôt) : un seul travaille, l'autre le dit et ne
+  //    touche à aucun vendeur ; fini, le bail est rendu (un passage suivant travaille).
+  for (const k of [...lignes.keys()]) if (/cron_curseur_|cron_bail_/.test(k)) lignes.delete(k);
+  process.env.VRM_CRON_BUDGET_MS = '600000';
+  const [q1, q2] = await Promise.all([appel(), appel()]);
+  const travail = [q1, q2].filter((q) => q.res.corps && q.res.corps.lot), sautes = [q1, q2].filter((q) => q.res.corps && q.res.corps.saute === 'passage-en-cours');
+  vrai(travail.length === 1 && sautes.length === 1 && sautes[0].res.code === 200 && travail[0].res.corps.lot.traites === 50,
+    `L4 deux passages simultanés : un seul travaille, l’autre dit « passage en cours » sans toucher un vendeur (${travail.length} au travail, ${sautes.length} sauté)`);
+  const bail = lignes.get(`${NEUTRE}|cron_bail_matin`);
+  vrai(!!bail && bail.jeton === null && bail.jusqua === 0, 'L4 fini, le bail est RENDU (jeton effacé) ' + JSON.stringify(bail));
+  const q3 = await appel();
+  vrai(q3.res.corps && q3.res.corps.lot && !q3.res.corps.saute, 'L4 le passage suivant travaille (bail rendu)');
+  lignes.set(`${NEUTRE}|cron_bail_matin`, { jeton: 'un-autre', jusqua: Date.now() - 1000, rev: 9 });
+  const q4 = await appel();
+  vrai(q4.res.corps && q4.res.corps.lot, 'L4 un bail ÉCHU (passage coupé net) ne bloque pas : repris');
 
   console.log(`\n${ko ? '❌' : '✅'} ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

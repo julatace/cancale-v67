@@ -1,11 +1,12 @@
 // Petites lignes serveur sous le propriétaire neutre : jamais écrites avec
 // un jeton navigateur. CAS par révision, partagé entre instances Vercel.
 import crypto from 'node:crypto';import {sbCle} from './cle.js';import {PROPRIETAIRE_NEUTRE} from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 export const empreintePrivee=s=>crypto.createHash('sha256').update(Buffer.isBuffer(s)?s:String(s)).digest('hex');
 export async function requetePrivee(query,opt={}){
  const cle=process.env.SUPABASE_SERVICE_KEY;if(!cle)throw Error('stockage-indisponible');
  const base=process.env.SUPABASE_URL||'https://lgonxzrzjcqthjtbdpzo.supabase.co';
- const r=await fetch(`${base}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&${query}`,{...opt,headers:{...sbCle(cle),...opt.headers},signal:AbortSignal.timeout(10000)});
+ const r=await fetchAvecDelai(`${base}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&${query}`,{...opt,headers:{...sbCle(cle),...opt.headers},signal:AbortSignal.timeout(10000)});
  if(!r.ok)throw Error('stockage-indisponible');const j=await r.json();if(!Array.isArray(j))throw Error('stockage-illisible');return j;
 }
 export async function lirePrive(id){const rows=await requetePrivee(`id=eq.${encodeURIComponent(id)}&select=data`);if(rows.length>1)throw Error('stockage-ambigu');return rows[0]?.data||null;}

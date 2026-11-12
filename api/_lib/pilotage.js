@@ -34,12 +34,13 @@
 //     une lecture ratée n'écrit RIEN ; une valeur pas sue reste `null`.
 // ═══════════════════════════════════════════════════════════════════════════
 import { sbCle } from './cle.js';
-import { ordreStable } from './ordre-stable.js';   // (11 nov.) chaque page Range porte un tri total
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';   // (11 nov.) chaque page Range porte un tri total
 import { proprietaireInstallation } from './signalement.js';
 import { listerPlantagesTerrain } from './alertes-plantages.js';
 import { stripeApi as stripeApiReel, stripePret, stripeModeTest } from './stripe.js';
 import { agregerNotes, ID_SATISFACTION } from '../../src/satisfaction.js';
 import { jourParis } from '../../src/mesuresTerrain.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const NEUTRE = '00000000-0000-0000-0000-000000000000';
 export const ID_HISTORIQUE = 'pilotage_historique';
@@ -65,6 +66,7 @@ async function lireTout(env, fetcher, chemin) {
   for (let p = 0; p < PAGES_MAX; p++) {
     let r;
     try { r = await fetcher(`${url}/rest/v1/${ordreStable(chemin)}`, { headers: { ...sbCle(service), 'Range-Unit': 'items', Range: `${p * PAGE}-${p * PAGE + PAGE - 1}` } }); } catch (_) { return null; }
+    if (finALaFrontiere(r, p * PAGE)) return out;   // (11 nov.) 416 à une frontière exacte = fin de liste
     if (!r || !r.ok) return null;
     const j = await r.json().catch(() => null);
     if (!Array.isArray(j)) return null;
@@ -272,7 +274,7 @@ export function courbesHistorique(data, maintenant) {
 
 // ── LE CALCUL ──────────────────────────────────────────────────────────────
 // Tout ce que le tableau montre, pour un propriétaire déjà vérifié.
-export async function calculerPilotage({ proprio, env = process.env, fetcher = fetch, stripeApi = stripeApiReel, stripeBranche = stripePret(), modeTest = stripeModeTest(), maintenant = Date.now(), noter = true } = {}) {
+export async function calculerPilotage({ proprio, env = process.env, fetcher = fetchAvecDelai, stripeApi = stripeApiReel, stripeBranche = stripePret(), modeTest = stripeModeTest(), maintenant = Date.now(), noter = true } = {}) {
   const raisons = {};
   const exclus = (id) => !id || id === proprio || id === NEUTRE;
   const pasMoi = `owner=not.in.(${proprio},${NEUTRE})`;
@@ -390,7 +392,7 @@ export async function calculerPilotage({ proprio, env = process.env, fetcher = f
 
 // ── LA ROUTE ───────────────────────────────────────────────────────────────
 // `utilisateur` : déjà VÉRIFIÉ par Supabase (vendeurExige). Rend { code, corps }.
-export async function routePilotage({ utilisateur, env = process.env, fetcher = fetch, stripeApi, stripeBranche, modeTest, maintenant = Date.now() }) {
+export async function routePilotage({ utilisateur, env = process.env, fetcher = fetchAvecDelai, stripeApi, stripeBranche, modeTest, maintenant = Date.now() }) {
   if (!utilisateur || !UUID.test(String(utilisateur.id || ''))) return { code: 401, corps: { ok: false, raison: 'session' } };
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
@@ -406,7 +408,7 @@ export async function routePilotage({ utilisateur, env = process.env, fetcher = 
 }
 
 // ── LE CRON DU MATIN : un point d'historique par jour, même sans ouverture ──
-export async function noterPilotageDuJour({ env = process.env, fetcher = fetch, maintenant = Date.now() } = {}) {
+export async function noterPilotageDuJour({ env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() } = {}) {
   if (!cfg(env).service) return { fait: false, raison: 'non-configure' };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { fait: false, raison: 'proprietaire-inconnu' };

@@ -14,6 +14,7 @@ import ChoixPaiement from './composants/ChoixPaiement.jsx';   // (11 nov., lot l
 import { modePaiementLu } from './modePaiement.js';
 import './styles-annonces-outils.css';
 import './styles-achats-outils.css';
+import { jourParis } from './dateParis.js';
 
 const eurC = (c) => {
   if (c == null || !Number.isFinite(c)) return '—';
@@ -69,7 +70,7 @@ function Vignette({ src, Photo }) {
 // depuis la fiche du fournisseur ; ses paires se relient à leurs N° par SON tap ;
 // leur prix vient de SA répartition, et un prix saisi à la main n'est remplacé
 // que s'il dit oui (la question est posée par l'app).
-const jourLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const jourLocal = () => jourParis();   // (11 nov.) jour de Paris
 const dateCourte = (d) => { const t = Date.parse(String(d || '') + 'T12:00:00'); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'date inconnue'; };
 const enSaisie = (c) => (c == null ? '' : (c / 100).toFixed(2).replace('.', ','));
 

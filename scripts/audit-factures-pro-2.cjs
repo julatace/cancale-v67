@@ -268,7 +268,7 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.setHeader = () =>
     // Sélection muette ⇒ 503, personne visité.
     pannes.add('envoiAuto=eq.true');
     const n1 = requetes.length; const r4 = await passer();
-    dit(r4.code === 503 && requetes.slice(n1).every((x) => !x.owner), 'S11 sélection muette ⇒ 503, aucun vendeur visité', String(r4.code));
+    dit(r4.code === 503 && requetes.slice(n1).every((x) => !x.owner || x.owner === NEUTRE), 'S11 sélection muette ⇒ 503, aucun vendeur visité', String(r4.code));
     pannes.clear();
   });
 

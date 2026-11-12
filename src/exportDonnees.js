@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  « EXPORTER MES DONNÉES » (3 nov. 2026, Julien 14 h 09)
 // ════════════════════════════════════════════════════════════════════════════
@@ -22,7 +23,7 @@
 // passer pour « rien »).
 
 const nb = (x) => (x == null || x === '' || !Number.isFinite(Number(x)) ? '' : (Math.round(Number(x) * 100) / 100).toFixed(2).replace('.', ','));
-const jourIso = (t) => { const d = typeof t === 'number' ? new Date(t) : new Date(String(t || '')); return isNaN(d) ? '' : d.toISOString().slice(0, 10); };
+const jourIso = (t) => jourParis(typeof t === 'number' ? t : String(t || ''));   // (11 nov.) jour de PARIS, jamais UTC
 const PAS_SU = [['—']];
 
 // ── Les feuilles ────────────────────────────────────────────────────────────
@@ -129,5 +130,5 @@ export function lireZipStocke(octets) {
   }
   return out;
 }
-export const nomExport = (quand = new Date()) => `VRM-donnees-${quand.toISOString().slice(0, 10)}.zip`;
+export const nomExport = (quand = new Date()) => `VRM-donnees-${jourParis(quand)}.zip`;
 export const fichiersExport = (feuilles) => feuilles.map((f) => ({ nom: f.nom + '.csv', texte: csvDe(f.lignes) }));

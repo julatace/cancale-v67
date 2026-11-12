@@ -172,7 +172,7 @@ async function controles(racine, { bg = path.join(racine, F.bg) } = {}) {
     const l = f.lignes[`harvest_${UID}_feedbacks`];
     dit(l && l.capturedAt === '2026-11-01T00:00:00Z' && l.payload.historique.length === 1, 'A5 lecture de l’historique ratée ⇒ RIEN écrit (l’historique n’est pas effacé)', JSON.stringify(l)); }
   let N = null;
-  try { N = await importer(lireDans(racine, F.notes), 'notes'); } catch (e) { dit(false, 'A6 src/notesRecues.js se charge', e.message); }
+  try { N = await importerDans(racine, F.notes, lireDans(racine, F.notes)); /* (11 nov.) servie depuis SA racine : elle importe dateParis.js */ } catch (e) { dit(false, 'A6 src/notesRecues.js se charge', e.message); }
   if (N && N.evolutionHistorique) {
     const now = Date.parse('2026-11-11T12:00:00Z');
     const e = N.evolutionHistorique([{ at: '2026-10-12T09:00:00Z', total: 140, n: 20, c: [0, 0, 1, 3, 16] }, { at: '2026-11-11T09:00:00Z', total: 174, n: 20, c: [0, 0, 0, 2, 18] }, { at: '2026-07-01T09:00:00Z', total: 2, n: 1, c: [1, 0, 0, 0, 0] }], now);

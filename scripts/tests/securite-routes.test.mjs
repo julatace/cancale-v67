@@ -37,6 +37,7 @@ function fauxReseau({ vinted = () => new Response('{}', { status: 401 }) } = {})
     }
     if (u.includes('/rpc/vrm_acces_pour')) return new Response('true', { status: 200 });
     if (u.includes('vinted.')) return vinted(u, opts);
+    if (u.includes('/rest/v1/rpc/vrm_vinted_relier')) return new Response('{"code":"PGRST202"}', { status: 404 });   // 042 pas passée (la forme de PostgREST)
     if (u.includes('/rest/v1/')) return new Response('[]', { status: 200 });
     return new Response('{}', { status: 200 });
   };

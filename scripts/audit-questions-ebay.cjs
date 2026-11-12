@@ -28,7 +28,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; if (!c || process.env.BAVARD) console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
-let GESTION = lire('api/_lib/ebay-gestion.js');
+let GESTION = lire('api/_lib/ebay-gestion.js').replace("'./fetch-delai.js'", JSON.stringify(require('url').pathToFileURL(path.join(R, 'api/_lib/fetch-delai.js')).href));   // (11 nov.) la copie importe le vrai fetch à délai
 let Q = lire('src/questionsEbay.js');
 let ECRAN = lire('src/ebayGestion.jsx');
 const muter = (quoi, avant, apres) => {

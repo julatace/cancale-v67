@@ -1,3 +1,4 @@
+import { jourParis } from '../dateParis.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  LE BON DE RETOUR D'UNE VENTE PRO (11 nov., lot DJ1)
 // ════════════════════════════════════════════════════════════════════════════
@@ -20,7 +21,7 @@
 
 const txt = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
 const lignes = (v) => String(v == null ? '' : v).split(/\r?\n/).map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
-const jour = (t) => { const d = new Date(typeof t === 'number' ? t : Date.parse(t || '')); if (!Number.isFinite(d.getTime())) return ''; try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d); } catch (_) { return d.toISOString().slice(0, 10); } };
+const jour = (t) => { const d = new Date(typeof t === 'number' ? t : Date.parse(t || '')); if (!Number.isFinite(d.getTime())) return ''; try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d); } catch (_) { return jourParis(d); } };
 
 export const DELAI_RETRACTATION_J = 14;
 export const MENTION_RETRACTATION = `Droit de rétractation : ${DELAI_RETRACTATION_J} jours à compter de la réception de l’article (Code de la consommation, art. L221-18). Les frais de retour sont à la charge de l’acheteur, sauf accord contraire.`;

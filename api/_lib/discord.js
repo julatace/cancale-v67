@@ -16,6 +16,7 @@
 import crypto from 'node:crypto';
 import {PROPRIETAIRE_NEUTRE} from './proprietaire-email.js';
 import {signerIdentiteDiscord,lireIdentiteDiscord} from './avatar-discord.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const DISCORD_REDIRECT = 'https://vrm.center/api/compte?mode=discord';
 const ID = () => String(process.env.DISCORD_CLIENT_ID || '').trim();
@@ -112,7 +113,7 @@ const versApp = (res, frag, ou = 'carte') => {
   return res.end();
 };
 
-export async function retourDiscord(req, res, f = fetch) {
+export async function retourDiscord(req, res, f = fetchAvecDelai) {
   const nonce = lireCookie(req);
   res.setHeader('Set-Cookie', cookie('', 0));            // une seule fois, quoi qu'il arrive
   const q = req.query || {};
@@ -162,7 +163,7 @@ export const ESSAIS_CODE = 5;
 const CODE_RE = /^\d{6}$/;
 const enTetesService = () => { const k = SERVICE(); return k.startsWith('eyJ') ? { apikey: k, Authorization: 'Bearer ' + k } : { apikey: k }; };
 
-export async function rangerAttente(owner, ticket, pseudo, ou, f = fetch, code = '', identite = null) {
+export async function rangerAttente(owner, ticket, pseudo, ou, f = fetchAvecDelai, code = '', identite = null) {
   if (!SERVICE() || !UUID_RE.test(String(owner)) || !NONCE_RE.test(String(ticket)) || !CODE_RE.test(String(code))) return false;
   try {
     const r = await f(SB_URL() + '/rest/v1/app_data?on_conflict=owner,id', {
@@ -176,7 +177,7 @@ export async function rangerAttente(owner, ticket, pseudo, ou, f = fetch, code =
 
 // POST /api/compte?mode=discord-attente { ticket } (session) : l'app qui a lancé
 // le geste reprend la preuve. Trois états : prête · pas encore · pas su (503).
-export async function attenteDiscord(req, res, utilisateur, corps, f = fetch, maintenant = Date.now()) {
+export async function attenteDiscord(req, res, utilisateur, corps, f = fetchAvecDelai, maintenant = Date.now()) {
   const ticket = String((corps && corps.ticket) || '');
   if (!NONCE_RE.test(ticket)) return res.status(400).json({ ok: false, erreur: 'ticket' });
   if (!SERVICE()) return res.status(503).json({ ok: false, erreur: 'pas-su' });

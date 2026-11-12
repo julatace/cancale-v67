@@ -25,6 +25,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import crypto from 'crypto';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const CHAMP_JETON = { widget: 'vrm_widget_token', sms: 'vrm_sms_token', reception: 'jeton', agenda: 'jeton' };
 // La ligne du vendeur qui porte le jeton : `main` pour le widget et les SMS ;
@@ -55,14 +56,14 @@ async function jetonDuVendeur({ url, headers, fetcher, genre, owner }) {
   } catch (_) { return undefined; }
 }
 
-export async function retirerIndexJeton({ url, headers, fetcher = fetch, genre, jeton }) {
+export async function retirerIndexJeton({ url, headers, fetcher = fetchAvecDelai, genre, jeton }) {
   try {
     const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${idIndexJeton(genre, jeton)}`, { method: 'DELETE', headers: { ...headers, Prefer: 'return=minimal' } });
     return !!(r && r.ok);
   } catch (_) { return false; }
 }
 
-export async function ecrireIndexJeton({ url, headers, fetcher = fetch, genre, jeton, owner, maintenant = Date.now() }) {
+export async function ecrireIndexJeton({ url, headers, fetcher = fetchAvecDelai, genre, jeton, owner, maintenant = Date.now() }) {
   if (!RE_UUID.test(String(owner || '')) || !CHAMP_JETON[genre] || !jeton) return false;
   try {
     const r = await fetcher(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
@@ -79,7 +80,7 @@ export async function ecrireIndexJeton({ url, headers, fetcher = fetch, genre, j
 //   { etat: 'absent' }         aucune ligne d'index (transition : l'appelant fait l'ancienne recherche)
 //   { etat: 'perime' }         l'index désigne un vendeur dont le jeton a changé (index retiré, clé refusée)
 //   undefined                  pas su (une lecture a raté) ⇒ 503, rien d'écrit ni de retiré
-export async function vendeurParIndex({ url, headers, fetcher = fetch, genre, jeton }) {
+export async function vendeurParIndex({ url, headers, fetcher = fetchAvecDelai, genre, jeton }) {
   if (!CHAMP_JETON[genre] || !jeton) return { etat: 'absent' };
   let ligne;
   try {

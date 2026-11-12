@@ -47,6 +47,7 @@ import { routeAccompagnement, effacerAccompagnement } from './accompagnement.js'
 import { routeFormateur, effacerFormateur } from './formateur.js';
 import { discordConfigure, lirePreuve } from './discord.js';
 import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord} from './avatar-discord.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -128,7 +129,7 @@ function sansDoublons(villes) {
   const vus = new Set();
   return villes.filter(Boolean).filter((v) => { const k = v.nom.toLowerCase() + '|' + v.pays + '|' + v.lat + '|' + v.lon; if (vus.has(k)) return false; vus.add(k); return true; });
 }
-export async function geocoderVille({ q, lat, lon }, f = fetch) {
+export async function geocoderVille({ q, lat, lon }, f = fetchAvecDelai) {
   try {
     if (q != null && String(q).trim() !== '') {
       const t = String(q).trim().slice(0, 80);
@@ -173,7 +174,7 @@ export const DISCORD_COMPTE_ID = 'vrm_discord';
 const SB_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 async function lireDiscordCompte(owner, qui) {
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&select=discord:data->>discord,at:data->>at,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar`, { headers: qui });
+    const r = await fetchAvecDelai(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&select=discord:data->>discord,at:data->>at,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar`, { headers: qui });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -185,7 +186,7 @@ async function rangerDiscordCompte(owner, qui, d, preuve = null) {
   const identite=lireIdentiteDiscord(preuve,owner,d),avatar=urlAvatarDiscord(identite);
   const photo=avatar?{avatar,pid:"",signatureAvatar:signerAvatarPublic(owner,d,"",avatar)}:{};
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    const r = await fetchAvecDelai(`${SB_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...qui, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ owner, id: DISCORD_COMPTE_ID, data: { v: 2, discord: d, verifie: true, ...photo, at: new Date().toISOString() } }]),
     });
@@ -194,7 +195,7 @@ async function rangerDiscordCompte(owner, qui, d, preuve = null) {
 }
 async function effacerDiscordCompte(owner, qui) {
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}`, { method: 'DELETE', headers: { ...qui, Prefer: 'return=minimal' } });
+    const r = await fetchAvecDelai(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}`, { method: 'DELETE', headers: { ...qui, Prefer: 'return=minimal' } });
     return r.ok;
   } catch (_) { return false; }
 }
@@ -204,7 +205,7 @@ async function lierAvatarAuProfil(owner,qui,moi){
   const d=await lireDiscordCompte(owner,qui);
   if(!d||!avatarPublicVerifie(owner,d)||d.discord!==moi.discord||d.pid===moi.pid)return;
   const data={v:2,...d,verifie:true,pid:moi.pid,signatureAvatar:signerAvatarPublic(owner,d.discord,moi.pid,d.avatar)};
-  try{await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&data->>signatureAvatar=eq.${d.signatureAvatar}`,{method:'PATCH',headers:{...qui,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({data}),signal:AbortSignal.timeout(6000)});}catch(_){}
+  try{await fetchAvecDelai(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&data->>signatureAvatar=eq.${d.signatureAvatar}`,{method:'PATCH',headers:{...qui,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({data}),signal:AbortSignal.timeout(6000)});}catch(_){}
 }
 
 const objet = (v) => (v && typeof v === 'object' ? v : null);

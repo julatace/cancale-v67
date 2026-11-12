@@ -24,6 +24,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './push.js';
 import { DESTINATIONS } from './lien-notif.js';
 import {
@@ -40,7 +41,7 @@ async function lire(chemin) {
   const owner = proprietaireCourant();
   if (!owner || !cle()) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(cle()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(cle()) } });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j) ? j : null;
@@ -72,7 +73,7 @@ async function modifierLigne(modifier, essais = 5) {
     const data = { ...propre, rev: (rev0 || 0) + 1 };
     try {
       if (!present) {
-        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+        const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
           method: 'POST', headers: { ...tete, Prefer: 'resolution=ignore-duplicates,return=representation' },
           body: JSON.stringify([{ owner, id: LIGNE_AVIS_BAS, data, updated_at: new Date().toISOString() }]),
         });
@@ -83,7 +84,7 @@ async function modifierLigne(modifier, essais = 5) {
         continue;
       }
       const garde = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
-      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_AVIS_BAS}&owner=eq.${encodeURIComponent(owner)}&${garde}&select=id`, {
+      const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_AVIS_BAS}&owner=eq.${encodeURIComponent(owner)}&${garde}&select=id`, {
         method: 'PATCH', headers: { ...tete, Prefer: 'return=representation' }, body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
       });
       if (!w.ok) return null;

@@ -101,6 +101,7 @@ import { etatPublic } from './_lib/etat-public.js';
 import { statutPourSante } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
+import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
 import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
 import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
@@ -108,6 +109,8 @@ import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur } from './_lib/plan-regle.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { empreinte } from './_lib/empreinte.js';   // (11 nov.) clé d'idempotence avec les paramètres
 
 export const config = { api: { bodyParser: false } };
 
@@ -133,7 +136,7 @@ export const abonnementActif = (statut) => STATUTS_ACTIFS.has(String(statut || '
 // `undefined` = pas su (on ne devine pas une réponse sur l'accès).
 async function accesDe(req) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_acces`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/vrm_acces`, {
       method: 'POST',
       headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}`, 'Content-Type': 'application/json' },
       body: '{}',
@@ -154,7 +157,7 @@ const repondre = (res, code, corps) => { res.status(code).json(corps); };
 // su (lecture ratée), `null` = aucune ligne, sinon la ligne.
 async function ligneDe(req) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?select=statut,client_stripe,abonnement_stripe,fin_periode,annule_fin_periode,mode_test&limit=1`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?select=statut,client_stripe,abonnement_stripe,fin_periode,annule_fin_periode,mode_test&limit=1`, {
       headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` },
     });
     if (!r.ok) return undefined;
@@ -330,63 +333,96 @@ export function evenementDUnAncienAbonnement(avant, ligne) {
 }
 
 // ── Écrire le statut (clé de service — elle seule écrit cette table) ────────
-async function ecrireStatut(owner, ligne, evenementTs) {
+// ⚠️ (11 nov., H18 de la revue serveur) COMPARER-ET-ÉCHANGER. Avant : lire
+//    `evenement_ts`, décider, puis un upsert sans condition — deux webhooks
+//    simultanés lisaient la même ligne et le plus ANCIEN pouvait écrire en
+//    dernier. Désormais l'écriture ne passe que si la ligne porte ENCORE ce qui a
+//    été lu (`evenement_ts` et `maj`, que chaque écriture change) ; devancé ⇒ on
+//    relit et on redécide (l'événement plus récent de l'autre gagne alors).
+//    Ligne absente ⇒ une INSERTION simple : créée entre-temps ⇒ 409 (23505) ⇒ relu.
+//    Aucune migration : PATCH filtré de PostgREST.
+export const conditionStatut = (avant) => `evenement_ts=eq.${encodeURIComponent(String(avant.evenement_ts))}&${avant.maj == null ? 'maj=is.null' : `maj=eq.${encodeURIComponent(String(avant.maj))}`}`;
+export async function ecrireStatut(owner, ligne, evenementTs, { essais = 5 } = {}) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return { ok: false, code: 'sans-cle' };
   const h = { ...sbCle(SERVICE), 'Content-Type': 'application/json' };
-  // Les webhooks arrivent dans le désordre : un événement plus ANCIEN que celui
-  // déjà appliqué n'écrase rien (sinon un vieux « incomplete » effacerait un
-  // « active » arrivé avant lui).
-  let avant = null;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis,abonnement_stripe,statut`, { headers: h, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return { ok: false, code: 'lecture' };
-    const j = await r.json();
-    if (!Array.isArray(j)) return { ok: false, code: 'lecture' };
-    avant = j[0] || null;
-    if (avant && Number(avant.evenement_ts) > evenementTs) return { ok: true, ignore: 'plus-ancien' };
-    if (evenementDUnAncienAbonnement(avant, ligne)) return { ok: true, ignore: 'ancien-abonnement' };
-  } catch (_) { return { ok: false, code: 'lecture' }; }
-  // Depuis quand le prélèvement échoue : la base laisse 14 jours (Stripe
-  // réessaie pendant ce temps), puis coupe. On garde la PREMIÈRE date d'échec —
-  // chaque nouvel essai raté de Stripe ne doit pas relancer les 14 jours — et on
-  // l'efface dès que le statut n'est plus « impayé ».
-  const impaye_depuis = ligne.statut === 'past_due'
-    ? ((avant && avant.impaye_depuis) || new Date((evenementTs || Math.floor(Date.now() / 1000)) * 1000).toISOString())
-    : null;
-  try {
-    const ecrire = (l) => fetch(`${SUPABASE_URL}/rest/v1/abonnements?on_conflict=owner`, {
-      method: 'POST',
-      headers: { ...h, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ owner, ...l, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() }]),
-    });
-    let r = await ecrire(ligne);
-    if (r.ok) return { ok: true };
-    let t = await r.text().catch(() => '');
-    // (9 nov., Solo par plateforme) Migration 030 pas passée : la colonne
-    // `comptes_vendeurs` n'existe pas. Le statut, le plan et le compte Vinted
-    // passent sans elle (les autres plateformes : « pas su » côté serveur).
-    if (/comptes_vendeurs/.test(t) && 'comptes_vendeurs' in ligne) {
-      const { comptes_vendeurs: _cv, ...sans030 } = ligne;
-      ligne = sans030;
-      r = await ecrire(ligne);
-      if (r.ok) return { ok: true, sans030: true };
-      t = await r.text().catch(() => '');
-    }
-    // (9 nov.) Migration 028 pas passée : les colonnes `plan`/`compte_vendeur`
-    // n'existent pas. Le STATUT compte plus que le plan : on le range sans elles
-    // (le plan reste lu en direct chez Stripe par l'app ; « pas su » côté serveur).
-    if (/PGRST204|42703|'plan'|compte_vendeur/.test(t) && ('plan' in ligne || 'compte_vendeur' in ligne)) {
-      const { plan: _p, compte_vendeur: _c, comptes_vendeurs: _cv2, ...sans } = ligne;
-      r = await ecrire(sans);
-      if (r.ok) return { ok: true, sansPlan: true };
-      t = await r.text().catch(() => '');
-    }
-    // 23503 : ce vendeur n'existe pas (compte VRM supprimé) — réessayer n'y
-    // changera rien, on l'acquitte et on le dit dans les journaux.
-    if (/23503/.test(t)) return { ok: true, ignore: 'vendeur-inconnu' };
-    return { ok: false, code: 'ecriture-' + r.status };
-  } catch (_) { return { ok: false, code: 'ecriture' }; }
+  for (let n = 0; n < essais; n++) {
+    // Les webhooks arrivent dans le désordre : un événement plus ANCIEN que celui
+    // déjà appliqué n'écrase rien (sinon un vieux « incomplete » effacerait un
+    // « active » arrivé avant lui).
+    let avant = null;
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis,abonnement_stripe,statut,maj`, { headers: h, signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return { ok: false, code: 'lecture' };
+      const j = await r.json();
+      if (!Array.isArray(j)) return { ok: false, code: 'lecture' };
+      avant = j[0] || null;
+      if (avant && Number(avant.evenement_ts) > evenementTs) return { ok: true, ignore: 'plus-ancien' };
+      if (evenementDUnAncienAbonnement(avant, ligne)) return { ok: true, ignore: 'ancien-abonnement' };
+    } catch (_) { return { ok: false, code: 'lecture' }; }
+    // Depuis quand le prélèvement échoue : la base laisse 14 jours (Stripe
+    // réessaie pendant ce temps), puis coupe. On garde la PREMIÈRE date d'échec —
+    // chaque nouvel essai raté de Stripe ne doit pas relancer les 14 jours — et on
+    // l'efface dès que le statut n'est plus « impayé ».
+    const impaye_depuis = ligne.statut === 'past_due'
+      ? ((avant && avant.impaye_depuis) || new Date((evenementTs || Math.floor(Date.now() / 1000)) * 1000).toISOString())
+      : null;
+    let r;
+    try {
+      // Rend la réponse ; `rangee` : vrai si la base a écrit, faux si devancé.
+      const ecrire = async (l) => {
+        const corps = { ...l, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() };
+        if (avant) {
+          const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&${conditionStatut(avant)}&select=owner`, {
+            method: 'PATCH', headers: { ...h, Prefer: 'return=representation' }, body: JSON.stringify(corps),
+          });
+          if (!w.ok) return { w, rangee: false };
+          const out = await w.json().catch(() => null);
+          return { w, rangee: Array.isArray(out) && out.length >= 1, devance: Array.isArray(out) && out.length === 0, illisible: !Array.isArray(out) };
+        }
+        const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements`, {
+          method: 'POST', headers: { ...h, Prefer: 'return=minimal' }, body: JSON.stringify([{ owner, ...corps }]),
+        });
+        return { w, rangee: w.ok };
+      };
+      let e = await ecrire(ligne);
+      if (e.rangee) return { ok: true };
+      if (e.devance) continue;
+      if (e.illisible) return { ok: false, code: 'ecriture-illisible' };
+      r = e.w;
+      let t = await r.text().catch(() => '');
+      // (9 nov., Solo par plateforme) Migration 030 pas passée : la colonne
+      // `comptes_vendeurs` n'existe pas. Le statut, le plan et le compte Vinted
+      // passent sans elle (les autres plateformes : « pas su » côté serveur).
+      if (/comptes_vendeurs/.test(t) && 'comptes_vendeurs' in ligne) {
+        const { comptes_vendeurs: _cv, ...sans030 } = ligne;
+        ligne = sans030;
+        e = await ecrire(ligne);
+        if (e.rangee) return { ok: true, sans030: true };
+        if (e.devance) continue;
+        if (e.illisible) return { ok: false, code: 'ecriture-illisible' };
+        r = e.w; t = await r.text().catch(() => '');
+      }
+      // (9 nov.) Migration 028 pas passée : les colonnes `plan`/`compte_vendeur`
+      // n'existent pas. Le STATUT compte plus que le plan : on le range sans elles
+      // (le plan reste lu en direct chez Stripe par l'app ; « pas su » côté serveur).
+      if (/PGRST204|42703|'plan'|compte_vendeur/.test(t) && ('plan' in ligne || 'compte_vendeur' in ligne)) {
+        const { plan: _p, compte_vendeur: _c, comptes_vendeurs: _cv2, ...sans } = ligne;
+        e = await ecrire(sans);
+        if (e.rangee) return { ok: true, sansPlan: true };
+        if (e.devance) continue;
+        if (e.illisible) return { ok: false, code: 'ecriture-illisible' };
+        r = e.w; t = await r.text().catch(() => '');
+      }
+      // 23503 : ce vendeur n'existe pas (compte VRM supprimé) — réessayer n'y
+      // changera rien, on l'acquitte et on le dit dans les journaux.
+      if (/23503/.test(t)) return { ok: true, ignore: 'vendeur-inconnu' };
+      // 23505 : la ligne a été créée entre la lecture et l'insertion ⇒ relire.
+      if (r.status === 409 && /23505/.test(t)) continue;
+      return { ok: false, code: 'ecriture-' + r.status };
+    } catch (_) { return { ok: false, code: 'ecriture' }; }
+  }
+  return { ok: false, code: 'concurrence' };
 }
 
 // Le propriétaire VRM d'un abonnement Stripe : posé par NOUS dans `metadata`
@@ -404,7 +440,7 @@ async function proprietaireDe(sub, client) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?client_stripe=eq.${encodeURIComponent(client)}&select=owner&limit=1`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/abonnements?client_stripe=eq.${encodeURIComponent(client)}&select=owner&limit=1`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
     if (!r.ok) return undefined;
     const j = await r.json();
     if (!Array.isArray(j)) return undefined;
@@ -425,15 +461,18 @@ const clesEssai = (email, ids) => (normEmail(email) ? ['email:' + normEmail(emai
   .concat((ids || []).map((v) => 'vinted:' + String(v)));
 const enListe = (vals) => vals.map((v) => '%22' + encodeURIComponent(String(v)) + '%22').join(',');
 
+// (11 nov., M51) Trois états : la liste lue · `null` = pas su (lecture ratée).
+// `[]` sur une panne accordait l'essai sur le seul e-mail : un compte Vinted
+// déjà essayé l'obtenait à nouveau. Pas su ⇒ `essaiDejaUtilise` rend `null` ⇒ pas d'essai.
 async function lireVintedIds(owner) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-  if (!SERVICE || !owner) return [];
+  if (!SERVICE || !owner) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?owner=eq.${encodeURIComponent(owner)}&select=vinted_user_id`, { headers: sbCle(SERVICE) });
-    if (!r.ok) return [];
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?owner=eq.${encodeURIComponent(owner)}&select=vinted_user_id`, { headers: sbCle(SERVICE) });
+    if (!r.ok) return null;
     const j = await r.json();
-    return Array.isArray(j) ? j.map((x) => x && x.vinted_user_id).filter(Boolean).map(String) : [];
-  } catch (_) { return []; }
+    return Array.isArray(j) ? j.map((x) => x && x.vinted_user_id).filter(Boolean).map(String) : null;
+  } catch (_) { return null; }
 }
 
 // true = un essai a DÉJÀ été consommé (par cet e-mail OU un de ces comptes
@@ -442,10 +481,11 @@ async function lireVintedIds(owner) {
 async function essaiDejaUtilise(email, ids) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!SERVICE) return null;
+  if (ids === null) return null;   // (11 nov., M51) comptes Vinted pas sus ⇒ pas su
   const cles = clesEssai(email, ids);
   if (!cles.length) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/essais_gratuits?cle=in.(${enListe(cles)})&select=cle&limit=1`, { headers: sbCle(SERVICE) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/essais_gratuits?cle=in.(${enListe(cles)})&select=cle&limit=1`, { headers: sbCle(SERVICE) });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -461,7 +501,7 @@ async function enregistrerEssai(owner, email, ids, subId) {
   if (!cles.length) return true;   // rien à marquer (aucune clé) : ce n’est pas un échec
   const lignes = cles.map((cle) => ({ cle, owner: owner || null, abonnement_stripe: subId || null, cree: new Date().toISOString() }));
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/essais_gratuits?on_conflict=cle`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/essais_gratuits?on_conflict=cle`, {
       method: 'POST',
       headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
       body: JSON.stringify(lignes),
@@ -483,14 +523,18 @@ async function vintedPris(req, res) {
   const id = String((req.query && req.query.id) || '').trim();
   if (!/^[0-9]{1,20}$/.test(id)) return repondre(res, 400, { ok: false, raison: 'id' });
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-  if (!SERVICE) return repondre(res, 200, { ok: true, pris: false });
+  // (11 nov., M52) « pas su » n'est pas « libre » : une lecture ratée répond 503
+  // (`pris:null`) ; l'app ne dit alors rien, et la base bloque de toute façon.
+  const pasSu = () => repondre(res, 503, { ok: false, pris: null, raison: 'pas-su' });
+  if (!SERVICE) return pasSu();
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(id)}&select=owner`, { headers: sbCle(SERVICE) });
-    if (!r.ok) return repondre(res, 200, { ok: true, pris: false });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(id)}&select=owner`, { headers: sbCle(SERVICE) });
+    if (!r.ok) return pasSu();
     const j = await r.json();
-    const pris = Array.isArray(j) && j.some((row) => row && row.owner && String(row.owner) !== String(u.id));
+    if (!Array.isArray(j)) return pasSu();
+    const pris = j.some((row) => row && row.owner && String(row.owner) !== String(u.id));
     return repondre(res, 200, { ok: true, pris });
-  } catch (_) { return repondre(res, 200, { ok: true, pris: false }); }
+  } catch (_) { return pasSu(); }
 }
 
 const comptesVendeursLigne = (autres) => {
@@ -549,7 +593,7 @@ async function webhook(req, res) {
     const client = typeof obj.customer === 'string' ? obj.customer : (obj.customer && obj.customer.id) || '';
     const owner = await proprietaireDe(null, client);
     if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });
-    if (!owner) return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' });
+    if (!owner) { console.warn('[stripe] invoice.paid sans propriétaire VRM', String(obj.id || '').slice(0, 40)); return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' }); }   // (11 nov., B133) journalisé
     const p = await factureFilleulPayee(owner, client, obj, PRIX_CGV.centimes);
     if (!p.ok) return repondre(res, 503, { erreur: 'parrainage non crédité', reessayer: true });
     return repondre(res, 200, { recu: true });
@@ -770,7 +814,10 @@ async function checkout(req, res) {
   if (ligne && ligne.client_stripe) params.customer = ligne.client_stripe;
   else if (u.email) params.customer_email = u.email;
   // Un double clic ne crée pas deux sessions (même clé dans la même minute).
-  const cle = `vrm-co-${u.id}-${Math.floor(Date.now() / 60000)}`;
+  // (11 nov., M55) Les PARAMÈTRES dans la clé (Solo ou Pro, essai) : deux clics
+  // différents dans la même minute ne rejouent plus une clé avec d'autres
+  // paramètres (Stripe répondait 400, affiché « panne » 502).
+  const cle = `vrm-co-${u.id}-${Math.floor(Date.now() / 60000)}-${empreinte(JSON.stringify(params)).slice(0, 12)}`;
   let r = await stripeApi('POST', 'checkout/sessions', params, cle);
   // L'adresse des CGV n'est pas encore réglée chez Stripe : sa case ne peut pas
   // s'afficher. Les CGV ont DÉJÀ été acceptées dans VRM (ci-dessus, datées) :
@@ -824,7 +871,7 @@ async function comptesAutresDe(req, plateforme, owner) {
   try {
     // RLS ne lui montre que ses lignes ; base cloisonnée : on filtre AUSSI sur lui (ceinture et bretelles).
     const filtre = (await baseCloisonnee()) ? `&owner=eq.${encodeURIComponent(owner)}` : '';
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${d.ligne}${filtre}&select=${d.select}`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${d.ligne}${filtre}&select=${d.select}`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -883,7 +930,7 @@ async function compteVendeur(req, res) {
   // Le compte est-il à LUI ? Lu avec SON jeton (la base ne lui montre que les siens).
   let siens = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
     const j = r.ok ? await r.json() : null;
     siens = Array.isArray(j) ? new Set(j.map((x) => String(x && x.vinted_user_id))) : null;
   } catch (_) { siens = null; }
@@ -959,6 +1006,7 @@ async function parrainage(req, res) {
     const corps = await lireCorpsJson(req);
     if (!corps || corps.action !== 'rattacher') return repondre(res, 400, { ok: false, raison: 'action' });
     const [ligne, idsVinted] = await Promise.all([ligneDe(req), lireVintedIds(u.id)]);
+    if (idsVinted === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Parrainage pas vérifié. Réessaie dans un instant.' });   // (11 nov., M51)
     const essaiDeja = await essaiDejaUtilise(u.email, idsVinted);
     const r = await rattacher(corps.code, { u, ligne, idsVinted, essaiDeja });
     return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message });
@@ -1093,33 +1141,17 @@ async function resilier(req, res, reprendre) {
 //    invalide un lien de réinitialisation de mot de passe encore en attente pour
 //    ce compte (`otp_expired` : Supabase n'en garde qu'un). Sans conséquence pour
 //    quelqu'un déjà connecté — il n'a qu'à redemander le sien.
-const FORK_MAX = 6;                 // sessions fabriquées par vendeur…
-const FORK_FENETRE = 3600 * 1000;   // …par heure glissante
 const FORK_DELAI = 5000;            // chaque appel à Supabase, au plus 5 s
-// Frein PAR INSTANCE, en mémoire du module : Vercel peut en faire tourner
-// plusieurs, et une instance froide repart de zéro. C'est voulu — c'est un frein
-// doux contre une boucle de l'extension (qui ferait sinon tourner des sessions
-// à la chaîne), pas un état qui doit survivre ; il n'y a donc rien à ranger en
-// base. Le vrai verrou est la session de l'appelant.
-const forksRecents = new Map();     // id vendeur → horodatages des essais
-function freinFork(uid) {
-  const maintenant = Date.now();
-  if (forksRecents.size > 5000) {
-    for (const [k, v] of forksRecents) if (!v.some((t) => maintenant - t < FORK_FENETRE)) forksRecents.delete(k);
-  }
-  const recents = (forksRecents.get(uid) || []).filter((t) => maintenant - t < FORK_FENETRE);
-  if (recents.length >= FORK_MAX) { forksRecents.set(uid, recents); return Math.ceil((recents[0] + FORK_FENETRE - maintenant) / 1000); }
-  recents.push(maintenant);
-  forksRecents.set(uid, recents);
-  return 0;
-}
+// (12 nov., M54) Le frein (6 sessions par vendeur et par heure) vit EN BASE
+// (`ext_fork_frein`, comparer-et-échanger) : plusieurs instances Vercel ne le
+// multiplient plus. Base muette ⇒ le frein en mémoire d'avant (api/_lib/frein-fork.js).
 
 // Un appel à l'authentification de Supabase. Rend l'objet JSON, ou `null` si
 // Supabase a refusé, n'a pas répondu à temps ou a rendu autre chose que du JSON.
 // ⚠️ Le corps de la réponse n'est JAMAIS journalisé (il porte des secrets).
 async function appelAuth(chemin, entetes, corps) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/${chemin}`, {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/${chemin}`, {
       method: 'POST',
       headers: { ...entetes, 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
@@ -1136,7 +1168,7 @@ async function appelAuth(chemin, entetes, corps) {
 async function fermerSession(jeton) {
   if (typeof jeton !== 'string' || jeton.split('.').length !== 3) return;
   try {
-    await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
+    await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
       method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jeton}` }, signal: AbortSignal.timeout(FORK_DELAI),
     });
   } catch (_) {}
@@ -1189,7 +1221,7 @@ async function journalVrm(req, res) {
   if (!u) return;
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   const lireService = SERVICE ? async (chemin) => {
-    try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(12000) }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+    try { const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(12000) }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
   } : null;
   const j = await lireJournal({ userId: u.id, lireVendeur: (c) => lireCommeVendeur(req, c), lireService, neutre: PROPRIETAIRE_NEUTRE });
   return repondre(res, 200, { ok: true, ...j });
@@ -1206,7 +1238,7 @@ async function sessionExtension(req, res) {
   const email = String(u.email || '').trim();
   if (!email) return repondre(res, 409, { erreur: 'sans-email', message: "Ton compte VRM n'a pas d'adresse email : connecte l'extension depuis sa fenêtre." });
   if (!u.emailConfirme) return repondre(res, 409, { erreur: 'email-non-confirme', message: "Ton adresse email n'est pas encore confirmée : clique le lien reçu par email, puis réessaie." });
-  const attente = freinFork(u.id);
+  const attente = await freinFork({ uid: u.id, url: SUPABASE_URL, entetes: sbCle(SERVICE) });
   if (attente) {
     res.setHeader('Retry-After', String(attente));
     return repondre(res, 429, { erreur: 'trop-souvent', message: "L'extension a demandé sa connexion trop souvent. Réessaie dans un moment." });
@@ -1305,7 +1337,7 @@ async function lireCorpsJson(req) {
 // Ferme TOUTES ses sessions (app, extension, autres appareils).
 async function fermerSessions(req) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=global`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/logout?scope=global`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
     return r.ok;
   } catch (_) { return false; }
 }
@@ -1329,7 +1361,7 @@ async function discordDeja(req, res) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   if (!jeton || !SERVICE) return repondre(res, 200, { trouve: null });
   try {
-    const ru = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal: AbortSignal.timeout(8000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    const ru = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/user`, { signal: AbortSignal.timeout(8000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
     if (!ru.ok) return repondre(res, ru.status === 401 ? 401 : 200, { trouve: null });
     const u = await ru.json();
     const ident = (Array.isArray(u && u.identities) ? u.identities : []).find(i => i && i.provider === 'discord');
@@ -1337,7 +1369,7 @@ async function discordDeja(req, res) {
     const did = String((ident.identity_data && (ident.identity_data.provider_id || ident.identity_data.sub)) || ident.id || '');
     const pseudo = String((ident.identity_data && (ident.identity_data.name || ident.identity_data.full_name)) || '').replace(/#0$/, '').toLowerCase();
     const h = sbCle(SERVICE);
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_discord&data->>verifie=eq.true&select=owner,discord:data->>discord,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar&limit=1000`, { headers: h, signal: AbortSignal.timeout(8000) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_discord&data->>verifie=eq.true&select=owner,discord:data->>discord,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar&limit=1000`, { headers: h, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return repondre(res, 200, { trouve: null });
     const rows = await r.json();
     if (!Array.isArray(rows)) return repondre(res, 200, { trouve: null });
@@ -1347,7 +1379,7 @@ async function discordDeja(req, res) {
     // foi — sinon n'importe qui « portait » le Discord d'un autre.
     const meme = rows.find(x => x && x.owner !== u.id && avatarPublicVerifie(x.owner, x) && ((/^\d{5,25}$/.test(did) && String(x.avatar || '').includes(`/avatars/${did}/`)) || (pseudo && String(x.discord || '').toLowerCase() === pseudo)));
     if (!meme) return repondre(res, 200, { trouve: false });
-    const ra = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(meme.owner)}`, { headers: h, signal: AbortSignal.timeout(8000) });
+    const ra = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(meme.owner)}`, { headers: h, signal: AbortSignal.timeout(8000) });
     const a = ra.ok ? await ra.json() : null;
     const email = masquerEmail(a && a.email);
     if (!email) return repondre(res, 200, { trouve: null });
@@ -1481,7 +1513,7 @@ async function annulerCompteOAuthNeuf(req, res) {
   const REFUS = (raison) => repondre(res, 409, { ok: false, annule: false, raison, message: NON_TOUCHE });
   let fiche = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(8000) });
     if (!r.ok) return repondre(res, 503, { ok: false, annule: false, raison: 'fiche', message: NON_TOUCHE });
     fiche = await r.json();
   } catch (_) { return repondre(res, 503, { ok: false, annule: false, raison: 'fiche', message: NON_TOUCHE }); }
@@ -1789,7 +1821,7 @@ export default async function handler(req, res) {
     return routeCommandes(req, res);
   }
   if(mode==='favoris'){
-    if(m==='POST')req.body=await lireCorpsJson(req);
+    if(m==='POST'){req.body=await lireCorpsJson(req);if(req.body===null)return repondre(res,400,{ok:false,erreur:'json'});}   // (11 nov., B145) un JSON illisible est un 400 net
     return routeFavoris(req,res);
   }
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
