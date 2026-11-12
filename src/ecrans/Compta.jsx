@@ -29,6 +29,7 @@ import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarat
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 import { prochainNumeroFacture, noterNumeroPris } from '../factureNumero.js';   // (11 nov.) numérotation continue, jamais réutilisée
+import { reserverNumeroFacture, accesCompteurFactures } from '../factureNumeroCas.js';   // (12 nov.) réservé en base, deux appareils
 import { achatVenteManuelle, beneficeVenteManuelle, totauxVentesManuelles } from '../venteManuelle.js';   // (11 nov.) achat inconnu = pas su, jamais 0
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : le statut, l'activité du micro, la TVA d'une société.
 import { useProfilFiscal, vendActuel, exemplesActuels } from '../App.jsx';   // (11 nov., lot DJ2) l'exemple suit ce qu'il vend
@@ -956,12 +957,25 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     setInvoices(u); save('vinted_invoices',u);
   };
   
-  const addInvoice=(data)=>{
+  // (12 nov., revue fin) Le numéro est RÉSERVÉ en base (comparer-et-échanger, src/factureNumeroCas.js) :
+  // deux appareils qui créent une facture au même moment ne prennent plus le même n°. Pas su ⇒ aucune facture.
+  const [reserveEnCours,setReserveEnCours]=useState(false);
+  const addInvoice=async (data)=>{
+    if(reserveEnCours) return false;
+    setReserveEnCours(true);
+    const ent=activeEnt||firstEntId;
+    let r=null;
+    try{
+      const acces=accesCompteurFactures({ url: SUPABASE_URL, entetes: sbAuth, owner: AUTH.user && AUTH.user.id });
+      r=await reserverNumeroFacture({ factures: invoices, pris: load('vrm_factures_pris', {}), ent, annee: new Date().getFullYear(), appartient: invBelongsToActive, lire: acces.lire, ecrire: acces.ecrire });
+    }catch(_){ r=null; }
+    setReserveEnCours(false);
+    if(!r){ toast('⚠ Numéro de facture pas réservé (base injoignable) : aucune facture créée. Réessaie.'); return false; }
     const newInvoice={
       id:'inv_'+Date.now(),
-      entrepriseId:activeEnt||firstEntId, // à quelle micro-entreprise cette facture appartient
+      entrepriseId:ent, // à quelle micro-entreprise cette facture appartient
       ...data,
-      number:numeroSuivant(),
+      number:r.numero,
       createdAt:new Date().toISOString(),
     };
     save('vrm_factures_pris', noterNumeroPris(load('vrm_factures_pris', {}), newInvoice.number, newInvoice.entrepriseId));

@@ -37,6 +37,7 @@ const MUTATIONS = {
   'A pas su : facture à 0 €': [['src/App.jsx', "  if (v == null || !(v > 0)) throw new Error('prix de vente pas lu — aucune facture');", '  if (v == null) return 0;']],
   'A pas su : stock affiché à 0 €': [['src/App.jsx', '    if (a != null) { affiche += a; marcheAffiche += m; }', '    affiche += (a || 0); marcheAffiche += m;']],
   'A case partielle muette': [['src/design/carteChiffres.js', "x.partiel ? 'au moins' : '';", "'';"]],
+  'A5 écriture sans comparer-et-échanger': [['src/factureNumeroCas.js', "    if (w !== 'conflit') return null;", "    if (w !== 'conflit') return null; return { numero, pris: data.pris };"]],
   'B143 mentions avalées': [['api/_lib/clients-partis.js', "    if (!mentionsOk) { ign('mentions pas lues : rien envoye'); continue; }\n", '']],
 };
 
@@ -61,6 +62,7 @@ process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'cle-anon-de-ba
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('✅ ' + m); } else { ko++; console.log('❌ ' + m + (d !== undefined ? ' — ' + String(typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 300) : '')); } };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
+const lire0 = lire;
 const importer = (f, q = '') => import(pathToFileURL(path.join(R, f)).href + q);
 const { sansCommentaires } = require('./_mutations-audit.cjs');
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' (planté)', String((e && e.stack) || e).split('\n').slice(0, 2).join(' ')); } };
@@ -330,6 +332,26 @@ process.on('exit', (c) => { if (!fini) { console.log('❌ audit-revue-fin : arr�
     // A4 · audit-benefice relit App.jsx recollé (MeilleuresSources n'est plus « déclaré deux fois »)
     let lu = true; try { require(path.join(R, 'node_modules', '@babel', 'parser')).parse(APP, { sourceType: 'module', plugins: ['jsx'], errorRecovery: false }); } catch (e) { lu = String(e.message); }
     dit(lu === true, 'A4 App.jsx recollé se lit d’un bloc (Babel) — aucun nom déclaré deux fois', lu);
+    // A5 · deux appareils qui créent une facture au même moment : deux numéros (réservés en base)
+    const FN = await importer('src/factureNumeroCas.js').catch(() => null);
+    if (FN && typeof FN.reserverNumeroFacture === 'function') {
+      let ligne = null;   // la ligne `vrm_factures_compteur` partagée (comparer-et-échanger sur data.rev)
+      const lire = async () => { await new Promise((r) => setTimeout(r, 5)); return ligne ? { existe: true, data: JSON.parse(JSON.stringify(ligne)) } : { existe: false, data: null }; };
+      const ecrire = async ({ existe, data, rev }) => {
+        await new Promise((r) => setTimeout(r, 5));
+        if (!existe) { if (ligne) return 'conflit'; ligne = data; return 'ok'; }
+        const actuel = ligne && Number.isSafeInteger(ligne.rev) ? ligne.rev : null;
+        if (actuel !== rev) return 'conflit';
+        ligne = data; return 'ok';
+      };
+      const appareil = (factures) => FN.reserverNumeroFacture({ factures, pris: { 'ent_1|2026': 40 }, ent: 'ent_1', annee: 2026, lire, ecrire });
+      const [a, b] = await Promise.all([appareil([]), appareil([])]);
+      dit(a && b && a.numero !== b.numero && [a.numero, b.numero].sort().join() === '2026-000041,2026-000042', 'A5 deux appareils au même instant : 2026-000041 et 2026-000042, jamais deux fois le même', [a && a.numero, b && b.numero]);
+      const c = await FN.reserverNumeroFacture({ factures: [], pris: {}, ent: 'ent_1', annee: 2026, lire: async () => undefined, ecrire });
+      dit(c === null, 'A5 base injoignable ⇒ aucun numéro (aucune facture créée), jamais un numéro deviné', c);
+      const src = sansCommentaires(lire0('src/ecrans/Compta.jsx'));
+      dit(/await reserverNumeroFacture\(/.test(src) && /number:r\.numero/.test(src), 'A5 « + Nouvelle facture » prend le numéro réservé en base');
+    } else dit(false, 'A5 src/factureNumeroCas.js (numéro réservé en base) existe');
   });
 
   fini = true;
