@@ -40823,7 +40823,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const estLotPropose = (a) => estLotApp(a) || !!(a && a.lot === true);
   const achatsIdentite = fillBuyAchats.items || buys.items || null;
   const ventilationDeTx = (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; };
+  // (12 nov., vitesse-volume) Les propositions de prix d'achat ne servent qu'à la liste des Ventes et à la saisie
+  // en série (« Prix d'achat ») : ailleurs (Ma journée, Achats, Colis…) elles ne sont pas calculées — 1,5 s au
+  // téléphone à 20 000 ventes. Même règle là où elles s'affichent (chiffres-volume 35/35).
+  const besoinPropositions = curSub === 'ventes' || fillBuyOpen;
   const propositionsPrix = useMemo(() => {
+    if (!besoinPropositions) return { m: new Map(), numero: () => '' };
     const lignes = [];
     // (7 nov., vitesse) Les clés photo des achats sont calculées UNE fois et
     // rangées par clé : chaque vente ne regarde plus que les achats de SA photo
@@ -40861,7 +40866,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nums = new Map(lignes.map((l) => [l.cle, l.numero]));
     return { m, numero: (c) => nums.get(c) || '' };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds, nArticlesTx, lotsDeclares]);
+  }, [besoinPropositions, sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds, nArticlesTx, lotsDeclares]);
   const propositionVente = (tx) => propositionsPrix.m.get('v:' + tx) || null;
   // ── (6 nov., vague 2 · point 1) LES VENTES ANNULÉES AVANT L'ENVOI, PAIRE CHEZ LUI ──
   // src/annuleesChezToi.js : annulée PROUVÉE par la transaction (`txnAnnuleeAvantEnvoi`,
