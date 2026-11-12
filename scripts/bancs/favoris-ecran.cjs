@@ -168,6 +168,8 @@ createRoot(document.getElementById('r')).render(<Banc/>);
 `);
   const mutant = MUTANT && MUTATIONS[MUTANT];
   const plugins = mutant ? [{ name: 'mutant', setup(b) { b.onLoad({ filter: new RegExp(mutant[0].replace('.', '\\.') + '$') }, (a) => { const t = fs.readFileSync(a.path, 'utf8'); if (!t.includes(mutant[1])) throw Error('mutation introuvable : ' + MUTANT); return { contents: t.replace(mutant[1], mutant[2]), loader: 'jsx' }; }); } }] : [];
+  // (12 nov.) JaugeActions.jsx importe App.jsx, qui importe un `.sql?raw` (Vite) : lu en texte.
+  plugins.push({ name: 'brut', setup(b) { b.onResolve({ filter: /\?raw$/ }, (a) => ({ path: path.resolve(a.resolveDir, a.path.replace(/\?raw$/, '')), namespace: 'brut' })); b.onLoad({ filter: /.*/, namespace: 'brut' }, (a) => ({ contents: fs.readFileSync(a.path, 'utf8'), loader: 'text' })); } });
   await esbuild.build({ entryPoints: [path.join(dir, 'entree.jsx')], bundle: true, outdir: path.join(dir, 'out'), format: 'esm', jsx: 'automatic', plugins, loader: { '.js': 'jsx', '.woff2': 'empty', '.woff': 'empty', '.png': 'empty', '.svg': 'empty', '.jpg': 'empty' }, nodePaths: [NM], logLevel: 'error', define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{"MODE":"production","PROD":true,"DEV":false}' }, external: ['/fonts/*', '/images/*', '/textures/*'] });
   fs.writeFileSync(path.join(dir, 'out', 'index.html'), '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/entree.css"></head><body><div id="r"></div><script type="module" src="/entree.js"></script></body></html>');
   return path.join(dir, 'out');
@@ -306,7 +308,7 @@ createRoot(document.getElementById('r')).render(<Banc/>);
       await pg.click('.vrm-fa-feuille .vrm-fa-fermer').catch(() => {});
     }
     // 7. Modifier le message ⇒ Enregistrer, sans rien envoyer
-    if (JEU === 'base' && theme === 'clair') {
+    if (JEU === 'base') {   // (12 nov.) clair ET sombre : l'écran des versions se regarde dans les deux
       await pg.click('[data-fav-message-modifier]');
       const champ = pg.locator('[data-favoris-message]');
       await champ.waitFor({ timeout: 5000 }).catch(() => {});
@@ -314,10 +316,23 @@ createRoot(document.getElementById('r')).render(<Banc/>);
       dit(vu === MESSAGE, `${T} « Modifier » ouvre le message enregistré`, String(vu));
       if (vu != null) {
         await champ.fill('Bonjour {username}, merci !');
+        // (12 nov., ext. 5.369) « + Ajouter une variante » : un champ VIDE sous le message,
+        // qu'il écrit lui-même ; enregistré avec le message (une source), rien n'est lancé.
+        const ajouter = pg.locator('[data-versions="favoris"] [data-version-ajouter]');
+        if (await ajouter.count()) {
+          await ajouter.click();
+          const v2 = pg.locator('[data-versions="favoris"] [data-version="2"]');
+          dit((await v2.inputValue().catch(() => null)) === '', `${T} « + Ajouter une variante » : un champ vide (aucun texte inventé)`);
+          await v2.fill('Coucou {username}, tu l’as toujours en favori ?');
+          await pg.locator('[data-versions="favoris"]').scrollIntoViewIfNeeded().catch(() => {});
+          await pg.waitForTimeout(300);
+          await pg.screenshot({ path: path.join(SHOTS, `favoris-${F}-versions.png`) });
+        } else dit(false, `${T} « + Ajouter une variante » sous le message`);
         const bouton = pg.locator('[data-favoris-enregistrer-message]');
         if (await bouton.count()) {
           await bouton.click();
           await pg.waitForFunction(() => /^Bonjour .*merci !$/.test(document.querySelector('[data-fav-message-texte]')?.innerText || ''), null, { timeout: 5000 }).catch(() => {});
+          dit(sauves.length >= 1 && JSON.stringify(sauves[sauves.length - 1].data.variantes) === JSON.stringify(['Coucou {username}, tu l’as toujours en favori ?']), `${T} la version 2 est enregistrée avec le message (variantes)`, JSON.stringify(sauves.length && sauves[sauves.length - 1].data.variantes));
           dit(sauves.length >= 1 && sauves[sauves.length - 1].data.message === 'Bonjour {username}, merci !' && sauves[sauves.length - 1].data.envoisActifs === false, `${T} le message est enregistré (rien n'est lancé)`);
           dit(await pg.evaluate(() => !window.envois) && !postes.some((x) => x.action === 'lancer'), `${T} enregistrer n'envoie aucun message`);
           sauves.length = 0;

@@ -3893,6 +3893,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // 5.357 (revue, haute 18) : seulement une annonce À LUI (son dressing ou ses fiches) — l'annonce
           // d'un autre vendeur qu'il regarde n'entre plus dans `vinted_item_details`.
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { if (await detailEstASoi(sender, msg.id)) await saveItemDetail(msg.id, msg.detail); else noterDiag('detail_pas_a_soi'); sendResponse({ ok: true }); return; }
+          if (msg.action === 'verifDepot') { sendResponse(await verifDepotPage(sender, msg)); return; }
           // 5.362 (revue, moyenne 52) : le compte est celui de L'ONGLET qui publie (son hôte),
           // jamais un domaine dicté par le message.
           if (msg.action === 'numeroPourPublier') { const h = hoteVintedDeLOnglet(sender); sendResponse(h ? await reserverNumeroPourOnglet(sender.tab.id, h) : { ok: false, raison: 'onglet' }); return; }
