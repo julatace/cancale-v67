@@ -52,6 +52,8 @@ const exemple = {
   lbcenvoiappris: { recette: { methode: 'POST', hote: 'api.leboncoin.fr', rejouable: false, raison: 'x' } },
   // 5.365 (11 nov., import-historique-sites) : le modèle d'une liste « Mes transactions ».
   lbcimportmodele: { url: 'https://api.leboncoin.fr/api/transactions/v1/list?page=2', moi: 'abc' },
+  // 5.363 (11 nov., lot lbc-plus) : la recette d'un changement de prix fait par lui.
+  lbcprixappris: { recette: { methode: 'PUT', hote: 'api.leboncoin.fr', rejouable: false, raison: 'corps-complet' } },
 };
 
 let ecoute = null; const envois = [];

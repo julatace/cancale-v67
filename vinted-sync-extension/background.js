@@ -3934,6 +3934,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const ok = msg.action === 'lbcFil' ? await rangerLbcFil(msg, await compteLbcCapture(tabId, msg.moi)) : await noterRecetteLbc(msg.recette);
             sendResponse({ ok: ok === true }); return;
           }
+          // 5.363 (11 nov.) : la RECETTE d'un changement de prix fait par lui sur la page.
+          if (msg.action === 'lbcPrixAppris') {
+            const tabId = sender?.tab?.id;
+            if (tabId == null || sender?.frameId > 0 || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
+            sendResponse({ ok: (await noterRecettePrixLbc(msg.recette)) === true }); return;
+          }
           if(msg.action==='lbcSessionPrivee'){
             const ownerReception=(await loadSession())?.user_id;
             if(!ownerReception||await lbcSansSessionVrm()){_lbcRejeuAttendu=true;sendResponse({ok:false,sansSession:true});return;}
@@ -14901,7 +14907,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, lbcPrix: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
@@ -15260,6 +15266,9 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'vcOffre') return await repondreOffreVestiaire(msg);
   // 3 nov. (5.318) : répondre dans UNE conversation Leboncoin, sur son clic (voir `repondreLeboncoin`).
   if (msg && msg.cmd === 'lbcRepondre') return await repondreLeboncoin(msg);
+  // 11 nov. (5.363, lot lbc-plus) : baisser UN prix Leboncoin, sur son clic (voir `baisserPrixLbc`) ; relire « Mes annonces » après coup.
+  if (msg && msg.cmd === 'lbcPrix') return await baisserPrixLbc(msg);
+  if (msg && msg.cmd === 'lbcRelire') return await relireLbcPourApp(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
   if (!/^\d+$/.test(uid) || !/^\d+$/.test(tx)) return { accepte: false, code: 'invalide', raison: 'vente incomplète' };
@@ -20887,6 +20896,175 @@ async function supprimeLbcDepuisApp(msg) {
     if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
   }
 }
+// ══════════════════════════════════════════════════════════════════════════
+// BAISSER UN PRIX LEBONCOIN, SUR SON CLIC (11 nov., lot lbc-plus, 5.363)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « baisser le prix en série sur Leboncoin », sur SON clic, une
+// commande par annonce, prix lu avant et RELU après, compte de l'onglet seul.
+// ⚠️ La requête de Leboncoin qui change un prix n'a JAMAIS été vue : elle
+//    s'APPREND de son propre geste sur leboncoin.fr (`recettePrixLbc` dans
+//    lbc-inject.js), comme l'envoi d'un message (5.318). Sans recette rejouable,
+//    rien ne part, et l'app le dit avec le geste (« change UN prix à la main »).
+// Garde-fous (jamais retirés) : compte connecté dans l'onglet (identité privée
+// de la page, aucun onglet ouvert à sa place) · 50 actions/h par compte, l'app
+// s'arrête à 45 (`RESERVE_GESTES`) · UNE action Leboncoin à la fois (verrou de
+// la pause/suppression) · 429/403 ⇒ pause 30 min, rien ne repart avant · le
+// prix EN BASE doit être celui que l'aperçu montrait (sinon rien ne part) ·
+// une baisse seulement (jamais une hausse, jamais sous 1 €).
+const LBC_PRIX_RECETTE = 'vrmLbcPrixRecette';
+const LBC_PRIX_PAUSE = 'vrmPauseLbcPrix';
+const LBC_PRIX_PAUSE_MS = 30 * 60000;
+function nettoyerRecettePrixLbc(r) {
+  if (!r || typeof r !== 'object') return null;
+  const base = { methode: /^(POST|PUT|PATCH)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^api\.leboncoin\.fr$/i.test(String(r.hote || '')) ? String(r.hote).toLowerCase() : '', chemin: String(r.chemin || '').slice(0, 160), page: /^\/[\w/.-]{0,160}$/.test(String(r.page || '')) ? String(r.page) : '' };
+  if (!base.methode || !base.hote) return null;
+  if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').replace(/[^\w-]/g, '').slice(0, 40) };
+  const cleOk = (k) => /^[A-Za-z_][\w-]{0,40}$/.test(String(k));
+  const modele = String(r.modele || '');
+  const sansTrou = modele.replace('{ad}', '');
+  if (!/^\/[\w\-/{}.]*$/.test(modele) || (modele.split('{ad}').length - 1) > 1 || /[{}]/.test(sansTrou) || /\d{3,}/.test(sansTrou)) return { ...base, rejouable: false, raison: 'modele' };
+  const clePrix = Array.isArray(r.clePrix) ? r.clePrix.map(String) : [];
+  if (!clePrix.length || clePrix.length > 5 || !clePrix.every(cleOk) || !/^(price|prices|price_cents|prix|amount)$/i.test(clePrix[clePrix.length - 1])) return { ...base, rejouable: false, raison: 'cle-prix' };
+  const cleIds = [];
+  for (const c of (Array.isArray(r.cleIds) ? r.cleIds.slice(0, 4) : [])) {
+    if (!Array.isArray(c) || !Array.isArray(c[0]) || !c[0].length || !c[0].every(cleOk) || !['nombre', 'texte', 'tableau-nombre', 'tableau-texte'].includes(c[1])) return { ...base, rejouable: false, raison: 'cle-id' };
+    cleIds.push([c[0].map(String), c[1]]);
+  }
+  if (!modele.includes('{ad}') && !cleIds.length) return { ...base, rejouable: false, raison: 'sans-annonce' };
+  const fixes = [];
+  for (const f of (Array.isArray(r.fixes) ? r.fixes.slice(0, 8) : [])) {
+    if (!Array.isArray(f) || !Array.isArray(f[0]) || !f[0].length || !f[0].every(cleOk)) return { ...base, rejouable: false, raison: 'fixes' };
+    const v = f[1];
+    if (!(v === null || typeof v === 'boolean' || (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)))) return { ...base, rejouable: false, raison: 'fixes' };
+    fixes.push([f[0].map(String), v, typeof v === 'boolean' ? 'boolean' : v === null ? 'object' : 'string']);
+  }
+  const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
+  const recherche = /^\?[\w=&.%-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
+  return { ...base, rejouable: true, raison: '', modele, recherche, clePrix, formePrix: r.formePrix === 'tableau' ? 'tableau' : 'nombre', unite: r.unite === 'cts' ? 'cts' : 'eur', cleIds, fixes, entetes };
+}
+async function noterRecettePrixLbc(brute) {
+  const r = nettoyerRecettePrixLbc(brute);
+  if (!r) return false;
+  const at = new Date().toISOString();
+  let avant = null;
+  try { avant = (await chrome.storage.local.get(LBC_PRIX_RECETTE))[LBC_PRIX_RECETTE] || null; } catch (_) { return false; }
+  // Une recette rejouable n'est jamais remplacée par un essai qui ne l'est pas.
+  const garde = r.rejouable ? r : (avant && avant.recette && avant.recette.rejouable ? avant.recette : r);
+  const data = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '', chemin: r.chemin }, ver: CODE_VERSION };
+  try { await chrome.storage.local.set({ [LBC_PRIX_RECETTE]: data }); } catch (_) { return false; }
+  // Pour l'app : appris ou non, et pourquoi — jamais un prix, jamais un en-tête.
+  const ok = await supabaseUpsert('app_data', [{ id: 'lbc_prix_recette', data: { appris: !!garde.rejouable, raison: garde.rejouable ? '' : garde.raison, chemin: garde.chemin, methode: garde.methode, unite: garde.unite || '', at: data.at, dernierEssai: data.dernierEssai, ver: CODE_VERSION } }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
+  return ok === true;
+}
+async function pauseLbcPrix() {
+  try { const p = (await chrome.storage.local.get(LBC_PRIX_PAUSE))[LBC_PRIX_PAUSE]; return p && Number(p.jusqua) > Date.now() ? p : null; } catch (_) { return null; }
+}
+// Après un changement que Leboncoin a ACCEPTÉ (2xx) : la demande, datée, sur l'annonce.
+// Le PRIX de l'annonce, lui, ne change qu'à une capture (la donnée lue gagne).
+async function noterPrixDemandeLbc(id, de, a, statut, vu) {
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) return false;
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      if (!items[id]) return false;
+      const nowIso = new Date().toISOString();
+      items[id] = Object.assign({}, items[id], { prixDemande: { de, a, at: nowIso, statut, ...(vu != null ? { vu } : {}) } });
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: nowIso }) }], 'id');
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+}
+async function baisserPrixLbc(msg) {
+  const id = String((msg && msg.id) || '');
+  const avant = Number(msg && msg.prixAvant), nouveau = Number(msg && msg.prix);
+  if (!/^\d{6,12}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: "la baisse n'a pas été confirmée — rien n'est parti" };
+  if (!Number.isFinite(avant) || !Number.isFinite(nouveau) || nouveau < 1 || nouveau >= avant || Math.round(nouveau * 100) !== nouveau * 100) return { accepte: false, code: 'invalide', raison: 'une baisse seulement, jamais sous 1 €' };
+  if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action sur Leboncoin est en cours — une à la fois' };
+  PAUSE_LBC_EN_VOL = true;
+  try {
+    const pause = await pauseLbcPrix();
+    if (pause) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let rec;
+    try { rec = (await chrome.storage.local.get(LBC_PRIX_RECETTE))[LBC_PRIX_RECETTE] || null; } catch (_) { return { accepte: false, code: 'stockage', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = rec && rec.recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Leboncoin change un prix — change UN prix toi-même sur leboncoin.fr, dans ce Chrome : elle apprend la forme" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Leboncoin change un prix n'est pas sûre à refaire (${recette.raison || 'forme inconnue'}) — change-le sur Leboncoin, rien n'est parti` };
+    // L'annonce, relue EN BASE (l'app n'envoie qu'un identifiant et les deux prix de l'aperçu).
+    const rows = await sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->"${id}"`);   // clé ENTRE GUILLEMETS (X4)
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };
+    const ad = rows[0] && rows[0].a;
+    if (!ad || typeof ad !== 'object') return { accepte: false, code: 'inconnue', raison: "cette annonce n'est pas parmi tes annonces Leboncoin captées — rien n'est parti" };
+    if (ad.status === 'deleted' || ad.supprimeeAt) return { accepte: false, code: 'supprimee', raison: "elle est notée supprimée de Leboncoin — rien n'est parti" };
+    const prixBase = Number(ad.price);
+    if (!Number.isFinite(prixBase) || Math.round(prixBase * 100) !== Math.round(avant * 100)) return { accepte: false, code: 'perime', prixVu: Number.isFinite(prixBase) ? prixBase : null, raison: `le prix a changé depuis l'aperçu (${Number.isFinite(prixBase) ? prixBase + ' €' : 'pas lu'}) — rien n'est parti, rouvre la liste` };
+    const compte = idCompteLbc(ad.account || ad.lbcUser);
+    if (!/^[0-9a-z_-]{1,64}$/i.test(compte)) return { accepte: false, code: 'compte', raison: "je ne sais pas sur quel compte Leboncoin est cette annonce — rien n'est parti" };
+    const o = await ongletLbcDuCompte(compte);
+    if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
+    if (!o.ok && o.autres && o.autres.length) return { accepte: false, code: 'autre-compte', raison: "Leboncoin est connecté sur un autre compte que celui de cette annonce dans ce Chrome — connecte-toi sur le bon compte, puis réessaie" };
+    if (!o.ok) return { accepte: false, code: 'lbc-absent', raison: "ouvre leboncoin.fr dans ce Chrome, connecté sur le compte de cette annonce — le changement part de cet onglet" };
+    const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+    if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    const depuis = Number(cpt.at) || (Date.now() - 5);
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcPrixAnnonce', id, prix: nouveau, recette, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    if (!rep || rep.ok !== true) {
+      if (rep && rep.code === 'invalide') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'refusé par la page — rien n’est parti' }; }
+      noterDiag('lbc_prix_muet');
+      return { accepte: true, etape: 'incertain', raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si le prix a changé : regarde l'annonce sur Leboncoin" };
+    }
+    if (!statut) {
+      await rendreActions('lbc:' + compte, depuis, 1);
+      const e = String(rep.erreur || '');
+      if (e === 'autre-compte' || e === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Leboncoin n'est plus (ou pas encore) sur le compte de cette annonce — recharge leboncoin.fr sur le bon compte (rien n'est parti)" };
+      if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Leboncoin n'a pas encore parlé à son API depuis son ouverture — recharge « Mes annonces », puis réessaie (rien n'est parti)" };
+      if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
+      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde l'annonce sur Leboncoin avant de relancer" };
+    }
+    noterDiag('lbc_prix_' + statut);
+    try { await storeLbcRecon({ envoiOne: { cle: `VRM ${recette.methode} ${recette.hote}${recette.chemin}`, val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: recette.methode, reponse: { statut, cles: Array.isArray(rep.cles) ? rep.cles.slice(0, 60) : [] } } } }); } catch (_) {}
+    if (statut === 429 || statut === 403) {
+      try { await chrome.storage.local.set({ [LBC_PRIX_PAUSE]: { jusqua: Date.now() + LBC_PRIX_PAUSE_MS, statut, depuis: Date.now() } }); } catch (_) {}
+      return { accepte: true, etape: 'echec', code: 'lbc-pause', statut, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur les prix Leboncoin` };
+    }
+    if (statut >= 200 && statut < 300) {
+      const vu = rep.prixVu != null && Number.isFinite(Number(rep.prixVu)) ? Number(rep.prixVu) : null;
+      const note = await noterPrixDemandeLbc(id, avant, nouveau, statut, vu);
+      try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
+      // Le prix RELU : seulement celui que Leboncoin a montré. Sinon « envoyé, à relire ».
+      if (vu != null) return { accepte: true, etape: Math.round(vu * 100) === Math.round(nouveau * 100) ? 'fait' : 'ecart', statut, prixVu: vu, note };
+      return { accepte: true, etape: 'envoye', statut, note, raison: 'Leboncoin a accepté ; le prix sera relu sur « Mes annonces »' };
+    }
+    return { accepte: true, etape: 'echec', statut, raison: `Leboncoin a répondu ${statut} — le prix n'a pas changé` };
+  } finally { PAUSE_LBC_EN_VOL = false; }
+}
+// RELIRE après coup (le prix d'une série, une republication) : « Mes annonces »
+// relue en arrière-plan TOUT DE SUITE (la page fait ses propres lectures, que le
+// capteur range), puis les annonces demandées relues EN BASE. Une lecture, jamais
+// une action. Rien de neuf vu ⇒ `null` pour cette annonce (« pas relu »).
+async function relireLbcPourApp(msg) {
+  const ids = (Array.isArray(msg && msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{6,12}$/.test(x)).slice(0, 40);
+  const refs = (Array.isArray(msg && msg.refs) ? msg.refs : []).map(String).filter((x) => /^[A-Z]{0,3}\d{1,6}$/i.test(x)).slice(0, 40);
+  const r = await relireLbcEnFond(Date.now(), true);
+  const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
+  if (rows === null) return { accepte: true, relu: r, annonces: null, raison: "la base VRM n'a pas répondu" };
+  const items = ((rows[0] && rows[0].data) || {}).items || {};
+  const annonces = {};
+  for (const id of ids) { const a = items[id]; annonces[id] = a ? { prix: a.price != null ? Number(a.price) : null, seenAt: a.seenAt || '', status: a.status || '' } : null; }
+  // Une republication : la NOUVELLE annonce se reconnaît à sa référence VRM (une identité, §5).
+  const parRef = {};
+  for (const ref of refs) {
+    const k = cleNum(ref);
+    parRef[ref] = Object.entries(items).filter(([, a]) => a && a.status !== 'deleted' && a.ref != null && cleNum(String(a.ref)) === k).map(([id, a]) => ({ id, seenAt: a.seenAt || '', createdAt: a.createdAt || '' })).slice(0, 5);
+  }
+  return { accepte: true, relu: r, annonces, parRef };
+}
 // ── LEBONCOIN RELU SANS QU'IL OUVRE « MES ANNONCES » (26 octobre, 5.231) ────
 // Julien : « je veux que la capture leboncoin se fasse sans que j'ai à ouvrir
 // annonce ». Les annonces Leboncoin (et leur état : active, désactivée, expirée)
@@ -20903,7 +21081,7 @@ const LBC_RELECTURE_MS = 6 * 3600e3;
 const LBC_RELECTURE_RECUL_MS = 24 * 3600e3;
 const LBC_RELECTURE_ATTENTE_MS = 30000;
 let RELECTURE_LBC_EN_VOL = false;
-async function relireLbcEnFond(maintenant = Date.now()) {
+async function relireLbcEnFond(maintenant = Date.now(), force = false) {   // (5.363) `force` : sur une commande de l'app (relire après une série), sans attendre 6 h
   if (RELECTURE_LBC_EN_VOL || PAUSE_LBC_EN_VOL) return { fait: false, raison: 'en-cours' };
   RELECTURE_LBC_EN_VOL = true;
   let ouvert = null;
@@ -20916,9 +21094,9 @@ async function relireLbcEnFond(maintenant = Date.now()) {
     const compte = local.vrmLbcCompte;
     if (!compte || compte.v !== 2 || !compte.id) return { fait: false, raison: 'jamais-vu' };
     const rel = local.vrmLbcRelecture || {};
-    if (Number(rel.prochaine) > maintenant) return { fait: false, raison: 'trop-tot' };
+    if (!force && Number(rel.prochaine) > maintenant) return { fait: false, raison: 'trop-tot' };
     // Déjà lue par lui (un onglet qu'il a ouvert) : rien à refaire.
-    for (const c of Object.values(local.vrmLbcTransport || {})) {
+    if (!force) for (const c of Object.values(local.vrmLbcTransport || {})) {
       const r = c && c.receptions && c.receptions.annonces;
       if (r && maintenant - Number(r.at) < LBC_RELECTURE_MS) return { fait: false, raison: 'deja-lue' };
     }

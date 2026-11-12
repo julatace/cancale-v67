@@ -1511,6 +1511,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Robustesse serveur (second agent)** : quarantaine qui garde les PDF (lignes `email_qpj_*`, rendus au rejeu) ; un 2e e-mail sans PJ n'efface plus un bordereau ; versements jamais fondus ; l'enveloppe décide avant To/Cc ; webhook Stripe 503 si pas su, ancien abonnement sans effet ; effacement à 12 mois seulement après l'avis PROUVÉ ; cron : échec retenté ; délais Stripe/eBay/IA. `docs/passation/2026-11-11-robustesse-serveur.md`. Geste : aucun.
 
 
+## Déplacé de CLAUDE.md §9 (11 nov., lot suivi-travail)
+- **11 nov. · Rouges d'intégration + garde réseau** : contrôles GitHub de `main` remis au vert — défauts de l'app corrigés (barre d'objectif qui débordait, photos du mode relais/scanner hors `PhotoVinted`, rouge du doublon en dur, « · » en tête de ligne, hook mort) ; contrôles portés sur les formes voulues (Ma journée v2, Ma configuration, Argent dans Gérer, alerte nouvel appareil…), chacun rougi par mutation ; **garde réseau** : aucun banc ne joint la production ni Internet (`scripts/bancs/_garde-reseau.cjs`, sinon rouge). `docs/passation/2026-11-11-rouges-integration.md`. Geste : aucun.
+
 ### Déplacé de CLAUDE.md §9 (11 nov., ci-vert — fichier au-delà de 59 000 octets), tel quel
 
 ## Déplacé tel quel de CLAUDE.md §9 (11 nov., pour rester sous 59 000 octets)
@@ -1655,3 +1658,4 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Alertes d'achat eBay (lot `alertes-ebay`, eBay SEULEMENT)** : « Me prévenir » sur une recherche du fil (`veille.alerte`, son prix de revente facultatif) ; le serveur relit chaque heure (`ship-reminders?moment=alertes`, GitHub ; Browse, jeton d'APPLICATION ; 4/h/vendeur, part auto fil + alertes ≤ 150, mêmes critères = 1 appel) ; nouvelle annonce = `itemId` jamais signalé, 1re lecture muette ; une notification « Alertes d'achat eBay » (heures calmes) + liste dans eBay → Achats avec la marge POSSIBLE (calculette : son prix sinon médiane de ses ventes du modèle), jamais un verdict, aucun achat. État `ebay_tokens_alertes` (serveur seul). `docs/passation/2026-11-11-alertes-ebay.md`. Geste : aucun.
 
 - **11 nov. · Revue adverse + intégration du paquet colis** (`claude/revue-colis`) : 3 défauts corrigés (« Tout imprimer » avalé par Achats caché, Achats · eBay montrait les colis Vinted, écran blanc Leboncoin) ; fusions e2, ventes-achats-visuel, e3, `main`, `journee-perso` (À retirer : plus de carte, code + n° écrits, Itinéraire vers l'adresse LUE seulement) ; Ventes : logo du transporteur connu au même endroit sur chaque ligne, plus de vide sous la frise, envoi prouvé ⇒ plus de bordereau (banc `ventes-achats-visuel` L/V/P). `docs/passation/2026-11-11-revue-colis.md`. Geste : aucun.
+## Lignes de CLAUDE.md §9 déplacées telles quelles (11 nov., lbc-rouges)
