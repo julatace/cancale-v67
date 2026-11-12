@@ -4,6 +4,11 @@ const {build}=require('esbuild'),{chromium}=require('playwright'),fs=require('fs
 const root=path.resolve(__dirname,'../..'),source=fs.readFileSync(path.join(root,'src/App.jsx'),'utf8');
 const debutScroll=source.indexOf('function MemoireDefilement('),scroll=source.slice(debutScroll,source.indexOf('\n}',debutScroll)+2);
 const vue=source.slice(source.indexOf('function useVueSession('),source.indexOf('// Une ligne de la liste des ventes',source.indexOf('function useVueSession(')));
+// (12 nov.) Depuis la reprise synchronisée (11 nov., afbf9ec27), `useVueSession` range la recherche
+// dans la carte du COMPTE (`vrm_reprise_ecrans`, écrite après DELAI_ECRITURE) : le banc prend le VRAI
+// écrivain d'App.jsx (sans copie), servi par un stockage local, pour juger la même règle qu'en production.
+const debutReprise=source.indexOf('let _repriseAttente = null'),reprise=source.slice(debutReprise,source.indexOf('// Quitter un écran (ou l\'app)',debutReprise));
+if(debutReprise<0||!reprise.includes('const noterReprise')||!reprise.includes('_vuesMontees'))throw new Error('écrivain de la reprise introuvable dans App.jsx');
 (async()=>{
  const bundle=await build({stdin:{resolveDir:root,loader:'jsx',contents:`
  import{MINERAL,MINERAL_DARK,variablesTheme}from'./src/themeMineral.js';
@@ -13,8 +18,10 @@ const vue=source.slice(source.indexOf('function useVueSession('),source.indexOf(
  import{RecapSelection,HistoriqueModifications}from'./src/OutilsParcours.jsx';import Periode from'./src/ChoixPeriode.jsx';
  import{lireParcours,garderParcours,noterChangements,restaurerVue}from'./src/parcoursQuotidien.js';
  import{stockageParcours}from'./src/repriseEcran.js';
+ import{CLE_REPRISE_ECRANS,DELAI_ECRITURE as DELAI_REPRISE,DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE,lireCarte as lireCarteReprise,poserCarte as poserCarteReprise,cumulerPatch as cumulerPatchReprise,vueReprise,vueSynchronisee,estRecherche as estRechercheVue}from'./src/repriseSynchro.js';
+ const load=(k,d)=>{try{const v=localStorage.getItem('banc:'+k);return v==null?d:JSON.parse(v);}catch(_){return d;}};const save=(k,v)=>localStorage.setItem('banc:'+k,JSON.stringify(v));const ONGLETS_LIENS=['ventes'];const onCloudReady=fn=>{try{fn();}catch(_){}return()=>{};};
  const AUTH={get user(){return{id:window.owner}}};${scroll}
- const vuesSession=new Map();window.viderVues=()=>vuesSession.clear();window.owner='A';const readSession=()=>({user:{id:window.owner}});${vue}
+ const vuesSession=new Map();window.viderVues=()=>vuesSession.clear();window.owner='A';const readSession=()=>({user:{id:window.owner}});${reprise}${vue}
  const r=createRoot(document.getElementById('root'));window.changes=[];
  function App(){const[q,setQ]=useVueSession('commandes-recherche','');return <main><div className="vrm-main" style={{height:100,overflowY:'auto'}}><div style={{height:1500}}>Liste longue</div></div><MemoireDefilement ecran="ventes"/><input aria-label="Recherche conservée" value={q} onChange={e=>setQ(e.target.value)}/><RecapSelection lignes={[{cle:'1',site:'vinted',compte:'a',pdf:true},{cle:'2',site:'vestiaire',compte:'b',pdf:false,imprime:'hier'},{cle:'3',site:'ebay',cochable:false}]} coches={new Set(['1','2','3'])}/><HistoriqueModifications owner={window.owner} numero="7"/><Periode owner={window.owner} onChange={v=>window.changes.push(v)}/></main>}
  window.render=()=>r.render(<App key={window.owner+':'+(window.rev||0)}/>);
@@ -26,7 +33,7 @@ const vue=source.slice(source.indexOf('function useVueSession('),source.indexOf(
  assert.equal(await p.locator('[data-recap-selection]').getAttribute('data-recap-selection'),'2');
  await p.locator('.vrm-parcours-historique > summary').click();assert.match(await p.locator('.vrm-parcours-historique').innerText(),/10\s€ → 15\s€/);await p.evaluate(()=>window.finMasque=window.masquer());assert.ok(!(await p.locator('.vrm-parcours-historique').innerText()).replace(/[\u00a0\u202f]/g,' ').includes('15 €'),'les prix du journal sont masqués');await p.evaluate(()=>window.finMasque());
  await p.locator('.vrm-main').evaluate(e=>{e.scrollTop=360;e.dispatchEvent(new Event('scroll'));});await p.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
- await p.getByLabel('Recherche conservée').fill('N°7');await p.evaluate(()=>{window.viderVues();window.rev=1;window.render()});assert.equal(await p.getByLabel('Recherche conservée').inputValue(),'N°7');await p.waitForFunction(()=>document.querySelector('.vrm-main').scrollTop>=350);
+ await p.getByLabel('Recherche conservée').fill('N°7');await p.waitForFunction(()=>Object.keys(localStorage).some(k=>k.startsWith('banc:')&&(localStorage.getItem(k)||'').includes('N°7')));await p.evaluate(()=>{window.viderVues();window.rev=1;window.render()});assert.equal(await p.getByLabel('Recherche conservée').inputValue(),'N°7');await p.waitForFunction(()=>document.querySelector('.vrm-main').scrollTop>=350);
  await p.evaluate(()=>{window.owner='B';window.render()});await p.getByLabel('Recherche conservée').waitFor();assert.equal(await p.getByLabel('Recherche conservée').inputValue(),'');assert.equal(await p.locator('.vrm-main').evaluate(e=>e.scrollTop),0);await p.locator('.vrm-parcours-historique > summary').click();assert.ok(!(await p.locator('.vrm-parcours-historique').innerText()).replace(/[\u00a0\u202f]/g,' ').includes('10 € → 15 €'));
  await p.evaluate(()=>{window.owner='A';window.render()});await p.locator('[data-periode-ouvrir]').click();await p.locator('[data-periode-raccourci="mois"]').click();
  await p.locator('[data-periode-ouvrir]').click();assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'le calendrier ouvert ne déborde pas');
