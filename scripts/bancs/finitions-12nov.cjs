@@ -12,6 +12,9 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 //   E. Ventes · Leboncoin : « À expédier » à la marge, pas de 2e grand titre.
 //   F. Réglages → Numéros : « Ouvrir mes annonces » ne chevauche pas la phrase.
 //   G. Ventes · À expédier : « N à imprimer » n'est pas redit sous « Tout imprimer (N) ».
+//   H. Facturation électronique : ni « e-reporting », ni « JSON », ni « Factur-X » à l'écran (fichiers inchangés).
+//   I. « Republier » choisi à l'instant : le bandeau « Affiché avec » ne le redit pas.
+//   J. À expédier : le « … » de chaque carte se touche (il passait sous « Imprimer » / « Générer »).
 //  (Le lien « Favoris » est jugé par navigation-fusion.cjs, partie L.)
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -133,6 +136,8 @@ const COUPE = `(e) => { let a = e.parentElement; while (a) { const o = getComput
 (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  // Sonde (mise au point) : `SONDE=fichier.js SONDE_URL=/?tab=… [SONDE_W=390]` — affiche l'évaluation, ne juge rien.
+  if (process.env.SONDE) { for (const W of String(process.env.SONDE_W || '390,1512').split(',').map(Number)) { const o = await ouvrir(nav, { W, sombre: false, b: base(), url: process.env.SONDE_URL || '/?tab=journee' }); await pret(o.pg); console.log(W, JSON.stringify(await o.pg.evaluate(fs.readFileSync(process.env.SONDE, 'utf8')).catch((e) => String(e)))); if (SORTIE) await capture(o.pg, 'sonde-' + W); await o.ctx.close(); } await nav.close(); srv.close(); return; }
   for (const W of [390, 1512]) for (const sombre of [false, true]) {
     const T = `${W} ${sombre ? 'sombre' : 'clair'}`, s = `${W}-${sombre ? 's' : 'c'}`;
     console.log('── ' + T);
@@ -175,6 +180,25 @@ const COUPE = `(e) => { let a = e.parentElement; while (a) { const o = getComput
     await essai('/?tab=cat_bord', async (pg) => {
       const r = await attendre(pg, () => { const b = document.querySelector('[data-colis-barre-btn="imprimer"][data-imprimer-prets]'); if (!b || b.getAttribute('data-imprimer-prets') === '0') return null; const c = document.querySelector('[data-colis-resume="ventes"] [data-colis-resume-case="imprimer"]'); return { bouton: b.getAttribute('data-imprimer-prets'), caseN: c ? c.getAttribute('data-n') : null }; }, null, 25000);
       dit(r && r.caseN !== r.bouton, `G ${T} À expédier : le nombre de « Tout imprimer » n'est pas redit dessous`, JSON.stringify(r));
+    });
+    // H
+    await essai('/?tab=invoices', async (pg) => {
+      const r = await attendre(pg, () => { const b = document.querySelector('[data-fe-recap-json]'); if (!b) return null; const c = b.closest('.vrm-surface') || b.closest('section') || b.parentElement.parentElement.parentElement; return { texte: c.innerText.slice(0, 3000) }; }, null, 20000);
+      const mots = r ? (r.texte.match(/e-reporting|JSON|Factur-X/gi) || []) : null;
+      dit(mots && !mots.length, `H ${T} Facturation électronique en mots du quotidien (ni « e-reporting », ni « JSON », ni « Factur-X »)`, r ? mots.join(',') : 'carte absente');
+    });
+    // I
+    await essai('/?tab=republier', async (pg) => {
+      const r = await attendre(pg, () => { const v = document.querySelector('[data-selection-vue="republier"], [data-qr-carte], .vrm-ann-geste'); return v ? { bandeau: (document.querySelector('[data-reprise-retenue]') || { innerText: '' }).innerText } : null; }, null, 20000);
+      await pg.waitForTimeout(1200);
+      const b = await pg.evaluate(() => (document.querySelector('[data-reprise-retenue]') || { innerText: '' }).innerText);
+      dit(r && !/Republier/.test(b) && !/Tri\s*:\s*Republier/.test(b), `I ${T} « Republier » choisi à l'instant : pas redit par le bandeau « Affiché avec »`, b);
+    });
+    // J
+    await essai('/?tab=cat_bord', async (pg) => {
+      const r = await attendre(pg, () => { const cs = [...document.querySelectorAll('.vrm-colis-carte[data-bord-card]')].filter((c) => c.getBoundingClientRect().height > 0 && c.querySelector('[data-colis-plus]')); if (!cs.length) return null; let ko = []; for (const c of cs.slice(0, 12)) { c.scrollIntoView({ block: 'center' }); const p = c.querySelector('[data-colis-plus]'); const r = p.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); const bord = c.querySelector('.vrm-rangee-bord > :is(button, a):not([data-colis-plus]), .vrm-rangee-bord [data-bouton-bord] button'); const rb = bord ? bord.getBoundingClientRect() : null; const ligne = !rb || Math.abs((rb.top + rb.height / 2) - (r.top + r.height / 2)) <= 4; const apart = !rb || r.right <= rb.left + 1 || r.left >= rb.right - 1; if (!(h && p.contains(h)) || r.width < 43.5 || r.height < 43.5 || !ligne || !apart) ko.push(c.getAttribute('data-colis-ident') || c.getAttribute('data-tx-colis') || '?'); } return { n: Math.min(cs.length, 12), ko }; }, null, 25000);
+      dit(r && r.n > 0 && !r.ko.length, `J ${T} À expédier : le « … » de chaque carte se touche (44 px, rien dessus, sur la ligne du bouton du bordereau, à côté)`, JSON.stringify(r));
+      await pg.evaluate(() => { const c = document.querySelector('.vrm-colis-carte[data-bord-card]'); if (c) c.scrollIntoView({ block: 'center' }); }); await capture(pg, `J-cartes-${s}`);
     });
   }
   await nav.close(); srv.close();

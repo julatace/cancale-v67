@@ -20310,11 +20310,15 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const repliVinted = !sansRepli && ((grise && glob && glob.code !== 'verif') || !!refusVu);
   return (
     <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-relais={etat && etat.relais ? (job && /^relais-/.test(job.etape) ? job.etape : 'oui') : undefined} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
-      <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
+      <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined} aria-label={libelle}
         title={raison || (enCours ? "L'extension travaille sur Vinted" : etat && etat.relais ? `Générer le bordereau ${viaOrdinateur(etat.vinted)}` : "L'extension génère le bordereau sur Vinted et l'envoie ici")}
         style={{ ...base, border: `1px solid ${grise ? C.border : C.accent}`, background: grise ? 'transparent' : `${C.accent}14`,
           color: grise ? C.muted : C.accent, opacity: grise ? 0.55 : 1, cursor: grise || enCours ? 'not-allowed' : 'pointer', filter: grise ? 'grayscale(1)' : 'none' }}>
-        <Icon name="doc" size={grand ? 16 : 14}/>{libelle}
+        {/* (12 nov., finitions) Le libellé dans `vrm-lib-long` ET `vrm-lib-court` (la règle d'« Imprimer » : le long par
+            défaut, le court dans une rangée étroite ou sur la carte d'un colis à l'ordinateur) : sur la carte au
+            téléphone, la rangée ne garde que l'icône — « Générer le bordereau » y était coupé dans un rond de 44 px
+            (« rer le b »). Son nom reste lu (`aria-label`). */}
+        <Icon name="doc" size={grand ? 16 : 14}/><span className="vrm-lib-long">{libelle}</span><span className="vrm-lib-court">{libelle}</span>
       </button>
       {(distingue || refusVu || (ko && job.raison)) && (
         <span style={{ fontSize: 11, color: refusVu || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
@@ -24892,8 +24896,6 @@ function CarteColisVc({ v, imprime, fait }) {
           {v.suivi ? <div data-vc-colis-transport="" style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>suivi {v.suivi}</div> : null}
         </div>
         {/* (3 nov.) « … » comme la carte Vinted : « Imprimé », « Colis fait » derrière. */}
-        <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={'vc:' + v.id} aria-label="Plus d’actions pour ce colis" aria-expanded="false"
-          onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button>
       </div>
       {/* (3 nov.) LA FRISE D'UN COLIS, comme Vinted : « imprimé » = sa coche (`vrm_vc_imprimes`), « déposé » =
           « Colis fait » ; « en route » / « livré » ne sont pas lus pour Vestiaire ⇒ jamais cochés. */}
@@ -24901,6 +24903,9 @@ function CarteColisVc({ v, imprime, fait }) {
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
+          {/* (12 nov., finitions) « … » DANS la rangée du bordereau, à sa gauche : posé à part (absolu), il passait sous « Imprimer » / « Générer le bordereau » et ne se touchait plus. */}
+          <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={'vc:' + v.id} aria-label="Plus d’actions pour ce colis" aria-expanded="false"
+          onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button>
         <PastilleTransporteur t={transporteurDuColis({ declare: v.transporteur, suivi: v.suivi })} C={C} data-colis-transporteur={'vc:' + v.id}/>
         {v.bordereau ? <BoutonImprimerVc v={v} carte/> : (() => { const t = v.etiquette === true ? 'Bordereau sur Vestiaire' : v.etiquette === false ? 'Pas encore de bordereau sur Vestiaire' : 'Bordereau : pas su';
           return <span data-vc-colis-bordereau={v.etiquette === true ? 'vestiaire' : v.etiquette === false ? 'pas-encore' : 'pas-su'} className="vrm-colis-sans-bord" title={t} role="note" aria-label={t} style={{ flex: '1 1 160px', fontSize: 13, color: C.muted }}><Icon name="printer" size={16} className="vrm-sans-bord-ic"/><span className="vrm-lib-long">{t}</span></span>; })()}
@@ -24936,12 +24941,13 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
           </div>
           {detail}
         </div>
-        {gestes ? <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={ident} aria-label="Plus d’actions pour ce colis" aria-expanded="false"
-          onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button> : null}
       </div>
       {Array.isArray(frise) && frise.some((x) => x.fait) ? <Frise etapes={frise} cle={ident} className="vrm-colis-frise" label="Où en est le colis"/> : null}
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         <div className="vrm-rangee-bord" data-rangee-bord="">
+          {/* (12 nov., finitions) « … » DANS la rangée du bordereau, à sa gauche : posé à part (absolu), il passait sous « Imprimer » / « Générer le bordereau » et ne se touchait plus. */}
+          {gestes ? <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={ident} aria-label="Plus d’actions pour ce colis" aria-expanded="false"
+          onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button> : null}
           <PastilleTransporteur t={transporteur} C={C} data-colis-transporteur={ident}/>
           {primaire}
         </div>
@@ -50582,8 +50588,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         hideBord(b);
                       }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:12,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>}
                       {/* (2 nov., 22 h) « … » : « Colis fait », « Marquer imprimé », « Suivre » (maquette : rien sous la frise). */}
-                      <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={e.txn||e.key} aria-label="Plus d’actions pour ce colis" title="Colis fait, marquer imprimé, suivre le colis" aria-expanded="false"
-                        onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button>
                     </div>
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
@@ -50602,6 +50606,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           transporteur, e-mail du même n° ; sinon « pas lu ») à GAUCHE du geste principal,
                           sur la même ligne, même hauteur. Les autres gestes passent dessous. */}
                       <div className="vrm-rangee-bord" data-rangee-bord="">
+                        {/* (12 nov., finitions) « … » DANS la rangée du bordereau, à sa gauche : posé à part (absolu), il passait sous « Imprimer » / « Générer le bordereau » et ne se touchait plus. */}
+                        <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={e.txn||e.key} aria-label="Plus d’actions pour ce colis" title="Colis fait, marquer imprimé, suivre le colis" aria-expanded="false"
+                        onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button>
                       <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
                       {pdf ? (
                         <button type="button" data-imprime="1" onClick={async ()=>{
