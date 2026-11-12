@@ -36,6 +36,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'vinted-pro-comptes', date: '2026-11-11', titre: 'Tes comptes Vinted Pro reconnus', phrase: 'Pro seulement si Vinted le dit, et leur argent compté juste.', tab: 'vintedaccounts', pour: 'pro', mode: 'tous' },
   { id: 'ebay-tous-reglages', date: '2026-11-11', titre: 'eBay : tous les réglages de publication', phrase: 'Enchères, offres, retours, politiques : VRM demande ce qui manque.', tab: 'ebay_annonces', pour: 'tous', mode: 'tous' },
   { id: 'visuels-reseaux', date: '2026-11-11', titre: 'Un visuel pour tes réseaux', phrase: 'Carré ou story, depuis une annonce : partage ou télécharge.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'retours-bordereaux', date: '2026-11-11', titre: 'Tes bordereaux de retour, prêts à imprimer', phrase: 'Tamponnés « RETOUR », avec la date limite et le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'retour-pas-a-pas', date: '2026-11-11', titre: 'Un retour, pas à pas', phrase: 'Délais, preuves, dossier PDF, puis la paire au stock.', tab: 'litiges', pour: 'tous', mode: 'tous' },
   { id: 'colis-a-leur-place', date: '2026-11-11', titre: 'Tes colis rangés dans Ventes et Achats', phrase: 'À expédier en tête de Ventes, à retirer en tête d’Achats.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'retirer-lisible', date: '2026-11-11', titre: 'À retirer : le code sur chaque ligne', phrase: 'Code, n° de suivi et itinéraire, sans carte.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'ventes-logo-transporteur', date: '2026-11-11', titre: 'Le logo du transporteur sur chaque vente', phrase: 'Au même endroit, dès que son transporteur est connu.', tab: 'ventes', pour: 'tous', mode: 'tous' },

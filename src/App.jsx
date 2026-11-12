@@ -146,6 +146,9 @@ import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
 import MaSemaine from "./MaSemaine.jsx";
 import { maSemaine } from "./maSemaine.js";
 import LitigesEnCours, { EntreeLitiges } from "./LitigesEnCours.jsx";
+import { RetoursAchatBloc, RetoursAImprimer, PasAPasRetour } from "./RetoursLitiges.jsx";
+import { retoursAchat, avecRemboursementsProuves, remboursementsParTx } from "./retoursAchat.js";
+import { pasAPasVente } from "./retourPasAPas.js";
 import { litigesDesVentes, retoursParModele, preuvesVente, nombreLitigesPublie } from "./litigesEcran.js";
 import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
@@ -6321,6 +6324,26 @@ function lireEtiquetteIci(tx, octets) {
 // illisible, sans PDF) — pour COMPTER et DIRE pourquoi un transporteur reste inconnu (jamais pour deviner).
 let _pdfVus = null;
 const pdfVusParTx = () => _pdfVus;
+// (11 nov., lot retours-litiges) LES RETOURS D'ACHAT REÇUS PAR E-MAIL : bordereaux de retour
+// (`email_bordretour_{tx}`) et remboursements d'achat prouvés (`email_rembachat_{tx}`), rangés par
+// api/email-inbound.js (api/_lib/retour-email.js). PROJECTION seulement (`meta->>`, jamais le PDF :
+// il est lu à l'impression par `lirePdfLigne`). Trois états : `undefined` en cours · `null` pas su.
+const RETOURS_ACHAT_CACHE = { v: undefined, at: 0 };
+const fetchRetoursAchat = async () => {
+  const c = RETOURS_ACHAT_CACHE;
+  if (c.v && Date.now() - c.at < 5 * 60 * 1000) return c.v;
+  const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt'].map((k) => `${k}:meta->>${k}`).join(',');
+  const [b, r] = await Promise.all([
+    lireTout(`id=like.email_bordretour_*&select=id,${champs},pdf:meta->>_pdf`, { strict: true }).catch(() => null),
+    lireTout('id=like.email_rembachat_*&select=id,tx:meta->>transaction,montant:meta->>montant,estime:meta->>estime,at:meta->>receivedAt', { strict: true }).catch(() => null),
+  ]);
+  const v = {
+    bords: Array.isArray(b) ? b.map((x) => ({ ...x, tx: x.transaction, at: x.receivedAt, pdf: x.pdf != null && x.pdf !== '' && x.pdf !== false && x.pdf !== 'false' })) : null,
+    remb: Array.isArray(r) ? r : null,
+  };
+  if (v.bords && v.remb) { c.v = v; c.at = Date.now(); }
+  return v;
+};
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
 const fetchEmailBordereaux = async () => {
@@ -32352,9 +32375,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un compte masqué ou bloqué ne compte plus nulle part (avant, ses achats
   // continuaient d'alimenter « à retirer », la trésorerie et le registre alors
   // que ses ventes, elles, avaient disparu → chiffres qui ne se recoupaient pas).
-  const buysBase = useMemo(() => (buys.items || []).filter(o => !acctOffOf(o)),
+  // (11 nov., lot retours-litiges) Les retours d'achat reçus par e-mail ({ bords, remb }) : lus une
+  // fois (5 min de cache), en projection. AVANT `buysBase` (il les lit, §4.6).
+  const [retoursAchatLus, setRetoursAchatLus] = useState(RETOURS_ACHAT_CACHE.v);
+  useEffect(() => { let vivant = true; fetchRetoursAchat().then((v) => { if (vivant) setRetoursAchatLus(v); }, () => { if (vivant) setRetoursAchatLus({ bords: null, remb: null }); }); return () => { vivant = false; }; }, [curSub]);
+  const rembAchatsParTx = useMemo(() => (retoursAchatLus ? remboursementsParTx(retoursAchatLus.remb) : undefined), [retoursAchatLus]);
+  // Un achat REMBOURSÉ prouvé par e-mail (même n° de transaction, montant ≥ ce qu'il a payé) sort
+  // des coûts tout de suite (`achatAnnule` le voit), sans attendre la relecture de ses achats.
+  const buysBase = useMemo(() => avecRemboursementsProuves((buys.items || []).filter(o => !acctOffOf(o)), rembAchatsParTx, montantCommandeLu),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [buys.items, hiddenAccts, blockedAccts]);
+  [buys.items, hiddenAccts, blockedAccts, rembAchatsParTx]);
   // (5 nov.) LES ACHATS, PUBLIÉS JOUR PAR JOUR (`vrm_achats_jours`, synchronisé) et
   // achat par achat (`vrm_achats_releve`, cet appareil) — la règle de « Dépensé »
   // (hors annulés, `achatAnnule`, `montantCommande`, date de l'achat), son
@@ -38559,6 +38589,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && e.numero!=null && String(e.numero).trim()) m[String(e.buyFromId)] = e.numero; }
     return m;
   }, [numeros]);
+  // (11 nov., lot retours-litiges) UNE CARTE PAR BORDEREAU DE RETOUR (src/retoursAchat.js) : l'achat
+  // par SON n° de transaction, le N° de la paire reliée à CET achat (son clic), la limite lue, le
+  // suivi (trois états), le remboursement prouvé. Achats → « Retours » et « Tout imprimer ».
+  const retoursAchatRes = useMemo(() => {
+    if (!retoursAchatLus) return retoursAchat({ bords: undefined });
+    const achatsLus = buys.items === null ? undefined : (buys.error ? null : buysBase);
+    const bords = Array.isArray(retoursAchatLus.bords) ? retoursAchatLus.bords.map((b) => ({ ...b, suivi: normaliserSuivi(b.suivi || '') })) : retoursAchatLus.bords;
+    const res = retoursAchat({ bords, achats: achatsLus, remb: retoursAchatLus.remb, transp: transp === undefined ? undefined : transpMap,
+      numeroDe: (tx) => (buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : ''), montantDe: montantCommandeLu });
+    for (const c of [...res.cartes, ...res.anciennes]) { try { c.photo = c.achat ? orderPhoto(c.achat) || '' : ''; } catch (_) { c.photo = ''; } }
+    return res;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retoursAchatLus, buys.items, buys.error, buysBase, transp, transpMap, buyNumByTxn]);
+  // Imprimer le bordereau de retour : SON PDF (par son n°), tamponné « RETOUR · N°… » (src/tamponRetour.js),
+  // ouvert dans la visionneuse (téléchargé sur iPhone). Rend 'ok' · 'passu' (dit sous le bouton).
+  const imprimerRetourAchat = async (c) => {
+    const lu = await lirePdfLigne(`email_bordretour_${c.tx}`);
+    if (!lu || !lu.octets) { libererOngletPdf(); return 'passu'; }
+    try {
+      const { tamponnerRetour } = await import('./tamponRetour.js');
+      const { octets } = await tamponnerRetour(lu.octets, { num: c.num, titre: c.titre });
+      const nom = `retour-${c.num ? 'N' + c.num + '-' : ''}${c.tx}.pdf`;
+      const url = URL.createObjectURL(new Blob([octets], { type: 'application/pdf' }));
+      if (!ouvrirPdfOnglet(url, nom, tr('retours.imprimer'))) _telechargerPdf(octets, nom);
+      return 'ok';
+    } catch (_) { libererOngletPdf(); return 'passu'; }
+  };
   // (10 nov., lot N) Les achats proposés à l'Atelier (Organisation), publiés par CET écran
   // (src/operations/atelier.js) : lus EN ENTIER seulement, sinon rien (la publication d'avant reste).
   useEffect(() => {
@@ -40897,6 +40954,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // de SON annonce, la photo du carton (`photoCartonDe`), son bordereau (n°, date ; la page elle-
   // même seulement s'il la joint : elle porte l'adresse de l'acheteur). Rien de l'acheteur.
   // Rend 'ok' · 'passu' (une lecture a raté : rien téléchargé, dit sur la carte).
+  // (11 nov., lot retours-litiges) « Pas à pas » : la carte ouverte, et le retour suivi de CETTE transaction
+  // (en cours OU déjà remis au stock — `retoursEnCours` les range à part).
+  const [papCle, setPapCle] = useState(null);
+  const retourDeTxPap = (tx) => {
+    if (!tx || !retoursSuivis || retoursSuivis.etat !== 'lu') return null;
+    return retoursSuivis.lignes.find((x) => x.tx === tx) || (retoursSuivis.remises || []).find((x) => x.tx === tx) || null;
+  };
   const fabriquerDossierLitige = async (c, { avecBordereau = false } = {}) => {
     try {
       const l = litigesSuivis && Array.isArray(litigesSuivis.lignes) ? litigesSuivis.lignes.find((x) => x && x.cle === c.cle) : null;
@@ -44487,7 +44551,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
 
-      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
+      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} onPasAPas={(c) => setPapCle(c.cle)} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
+      {/* (11 nov., lot retours-litiges) La feuille « Pas à pas » d'une carte (src/retourPasAPas.js) : recalculée à
+          chaque rendu — « Paire revenue » passe par `remettreDepuisCarte` (SON N°, conflit DEMANDÉ). */}
+      {curSub==='litiges' && papCle && (() => {
+        const toutes = litigesVentesEcran && litigesVentesEcran.etat === 'lu' ? [...litigesVentesEcran.cartes, ...litigesVentesEcran.anciennes] : [];
+        const c = toutes.find((x) => x.cle === papCle);
+        if (!c) return null;
+        const retour = retourDeTxPap(c.tx);
+        return <PasAPasRetour c={c} p={pasAPasVente(c, { retour })} Feuille={SheetShell} Bouton={Bouton} onClose={() => setPapCle(null)} onDossier={fabriquerDossierLitige}
+          onRevenue={async () => { if (retour && !retour.remis) await remettreDepuisCarte(retour); return false; }}/>;
+      })()}
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
         {/* (11 nov., anti double vente) EN TÊTE : vendu ici, encore en ligne ailleurs — un toucher. */}
@@ -45454,7 +45528,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             chercher : sur « Achats », en tête de chaque étape (Tous compris : c'est
             désormais l'écran par défaut), jamais sur « Colis à retirer ». */}
         {!modeRetraits && (aFilter!=='all' || modeListeAchats) && (()=>{
-          const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
+          // (11 nov., lot retours-litiges) Un achat dont le bordereau de retour est DÉJÀ arrivé par e-mail (même n°) est
+          // dans « Retours » juste dessous, avec « Imprimer » : pas deux fois (§7).
+          const avecBordRetour = new Set(retoursAchatRes && retoursAchatRes.etat === 'lu' ? [...retoursAchatRes.cartes, ...retoursAchatRes.anciennes].map((c) => c.tx) : []);
+          const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')) && !avecBordRetour.has(String(o.transaction_id)));
           if (!l.length) return null;
           const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
           const unSeul = comptes.length===1;
@@ -45474,6 +45551,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* (11 nov., lot retours-litiges) LES BORDEREAUX DE RETOUR reçus par e-mail : une carte par n° de
+            transaction, « Imprimer le bordereau » tamponné « RETOUR · N°… », limite, suivi, remboursement. */}
+        {!modeRetraits && <RetoursAchatBloc r={retoursAchatRes} onImprimer={imprimerRetourAchat} Photo={PhotoVinted} Bouton={Bouton}/>}
         {/* ⚠️ SUR « À RETIRER », CES TROIS COMMANDES N'AGISSENT SUR RIEN.
             Cet onglet n'affiche AUCUNE liste de commandes (`aFilter==='attente'`
             renvoie faux dans le filtre plus bas) : il montre les colis groupés
@@ -48902,6 +48982,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <h3>Étiquette dans eBay <span>{ebayL.length}</span></h3>
                           {ebayL.map((l) => <div key={l.cle} className="vrm-tip-ligne is-off" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-cochable="0" data-coche="0"><input type="checkbox" className="vrm-tip-case" disabled checked={false} readOnly aria-label={`${l.titre||'Commande'} : eBay`}/><PhotoVente src={l.photo||null} size={44} portrait/><span className="vrm-tip-corps"><span className="vrm-titre-entier vrm-tip-titre">{l.titre}</span><span className="vrm-tip-sous"><span data-lot-ebay="1">eBay</span></span></span></div>)}
                         </section>}
+                        {/* (11 nov., lot retours-litiges) Les bordereaux de RETOUR d'achat : imprimés un par un, tamponnés « RETOUR · N°… ». */}
+                        <RetoursAImprimer r={retoursAchatRes} onImprimer={imprimerRetourAchat} Bouton={Bouton}/>
                         {/* 2 · L'APERÇU : une page A4 par colis coché — l'étiquette du transporteur, le tampon N° + titre en bas. */}
                         {/* (11 nov., lot thermique) Le papier et le tampon CHOISIS (Paramètres → Impression des bordereaux,
                             `vrm_impression`) : l'aperçu dit ce qui sortira, et « Changer » y mène. */}

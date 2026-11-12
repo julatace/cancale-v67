@@ -36,6 +36,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/accueil/TempsGagne.jsx', ['*']],
+  ['src/RetoursLitiges.jsx', ['*']],
   ['src/profil/MenuProfil.jsx', ['*']],
   ['src/composants/GardeEcran.jsx', ['*']],
   ['src/i18n/ChoixLangue.jsx', ['*']],
