@@ -139,6 +139,7 @@ import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actio
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
+import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
 import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
@@ -42791,7 +42792,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
       if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
-      if(only==='messages' && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
+      // (11 nov., lot prix-mini) Le fil « Tous » (FilsTous, `filTous`) ne PREND pas la demande : il n'a pas
+      // d'Offres auto ; elle est pour Messages · Vinted, monté juste après (`cat_msg`).
+      if(only==='messages' && !filTous && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
@@ -43887,6 +43890,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               avant: () => { DEMANDE_CLOTURE.at = Date.now(); const v = load(CLE_CLOTURE_VUE, {}); save(CLE_CLOTURE_VUE, { ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}), [String(cj.annee)]: Date.now() }); } }); } }
         // (10 nov., lot N) L'ATELIER (Organisation) : des paires qui attendent > 7 j à une étape — ambre.
         if (atelierJournee) jobs.push({ id: 'atelier-attente', n: atelierJournee.n, icon: 'box', color: C.warn, court: atelierJournee.court, detail: atelierJournee.detail || null, title: atelierJournee.court, tab: 'organisation', prio: 2.45 });
+        // (11 nov., lot prix-mini) « N annonces sans prix mini » : SEULEMENT quand l'acceptation
+        // automatique est ALLUMÉE et que les annonces en ligne ont été LUES (pas su ⇒ rien). La
+        // même règle que l'écran (src/prixMiniManquants.js) ; « Saisir » ouvre Offres auto, où
+        // la saisie en série est juste sous l'interrupteur (`cat_msg` : Messages filtré sur Vinted,
+        // là où vit Offres auto — « Tous » montre le fil unique). Neutre : rien n'est perdu, une offre
+        // sans prix mini attend sa réponse. Jamais un prix proposé.
+        { const lPM = offresAuto === true && Array.isArray(listings.items) && !listings.error ? lignesPrixMiniManquants({ annonces: annSelectionnables.filter(a=>a.etat==='en-ligne'), numeros, virgule: extSait('offrespage')==='ok' }) : null;
+          const cPM = carteJourneePrixMini({ actif: offresAuto === true, lignes: lPM });
+          if (cPM) { const court = tr('prixMini.journee', { n: cPM.n });
+            jobs.push({ id: 'prix-mini-manquants', n: cPM.n, icon: 'tag', color: C.text, court, detail: tr('prixMini.journeeDetail'), title: court, photos: cPM.photos.length ? cPM.photos : null, tab: 'cat_msg', prio: 3.3, action: tr('prixMini.journeeAction'),
+              avant: () => { demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} } }); } }
         // (9 nov., lot AC) « À TRANCHER » : UNE ligne, seulement s'il y a quelque chose
         // (la somme SUE des sources, src/aTrancher.js — « au moins » s'il en manque une).
         if (aTrancher && aTrancher.total > 0) {
@@ -47478,7 +47492,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
             {/* (11 nov., lot DJ8) L'écran complet : seuils par paire, aperçu, historique (Messages → Favoris & offres → Offres auto). */}
-            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('messages'); }}>Régler par {motsVendeur().nom}, voir l’historique ›</button>
+            <button type="button" className="vrm-lien-action vrm-offres-auto-regler" data-offres-auto-regler="" onClick={()=>{ setAnnToolsOpen(false); demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} onNav && onNav('cat_msg'); }}>Régler par {motsVendeur().nom}, voir l’historique ›</button>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
                 <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
@@ -48579,7 +48593,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           offres={offresConv} lireGarde={lireGardeOffres} comptes={(accounts||[]).filter(a=>/^\d{1,20}$/.test(String(a.vinted_user_id||''))&&!acctOffOf({_acc:a})).map(a=>({ uid:String(a.vinted_user_id), nom:accNameOf(a) }))}
           uidOnglet={(vintedDeChrome()||{}).uid||''} pause={__vmrEtat && __vmrEtat.pause ? __vmrEtat.pause : null} freinsVus={lireFreinsVus()}
           poserSeuils={(liste)=>{ const idx=new Map((listings.items||[]).map(it=>[String(it.id),it])); let n=0; for (const w of liste||[]) { const it=idx.get(String(w.id)); if (!it) continue; const patch={}; if (w.min!==undefined) patch.min=montantSeuil(w.min); if (w.refuse!==undefined) patch.refuse=montantSeuil(w.refuse); updatePair(it, patch); n++; } if ((liste||[]).length>1) toast(`${n} seuil${n>1?'s':''} posé${n>1?'s':''}`); }}
-          ouvrirSerie={(ids)=>{ const set=new Set(ids.map(String)); setMiniSel(annSelectionnables.filter(a=>a.etat==='en-ligne'&&set.has(String(a.id)))); }}/>}
+          ouvrirSerie={(ids)=>{ const set=new Set(ids.map(String)); setMiniSel(annSelectionnables.filter(a=>a.etat==='en-ligne'&&set.has(String(a.id)))); }} PhotoVinted={PhotoVinted}/>}
         <div hidden={zoneFav==='offres'} style={{display:zoneFav==='offres'?'none':undefined}}>
         <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;const px=Number(it?.price&&typeof it.price==='object'?it.price.amount:it?.price);const fiche=numeros[String(id)]||null;return it||n||fiche?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null,prix:Number.isFinite(px)&&px>0?px:null,fiche}:null;}} ventesFavoris={ventesFavorisHisto} ecranActif={zoneMessages==='favoris'&&zoneFav!=='offres'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         </div>

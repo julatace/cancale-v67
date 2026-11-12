@@ -48,6 +48,9 @@ const MIGRES = [
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
   ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
+  // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
+  ['src/OffresAuto.jsx', ['*']],
+  ['src/PrixMiniManquants.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;

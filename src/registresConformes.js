@@ -38,6 +38,7 @@
 import { libellePeriode, jourFr, eurosTexte, moisDePeriode } from './registres.js';
 import { cleFactureLigne } from './factureAchat.js';
 import { especesDe } from './modePaiement.js';
+import { motsVendeur } from './profilVendeur.js';   // (intégration g1) « paire » seulement pour un vendeur Sneakers
 
 // ── LES SOURCES OFFICIELLES ─────────────────────────────────────────────────
 // ⚠️ Le 11 nov. 2026, AUCUNE de ces pages n'a pu être ouverte depuis la session
@@ -184,7 +185,7 @@ export function completerAchats(A, { pseudos = null, recuDe = () => false, factu
     const fournisseur = vinted ? (ps && ps.fournisseur ? ps.fournisseur : 'Particulier (Vinted)') : String(l.fournisseur || '').trim();
     const fournisseurSource = vinted ? (ps && ps.fournisseur ? 'pseudo' : 'defaut') : (fournisseur ? 'saisi' : '');
     const titre = String(l.titre || '').trim();
-    const nature = l.gros ? `Achat de marchandise · ${l.paires} paire${Number(l.paires) > 1 ? 's' : ''} en gros` : titre ? `Achat · ${titre}` : 'Achat de marchandise';
+    const nature = l.gros ? `Achat de marchandise · ${l.paires} ${Number(l.paires) > 1 ? motsVendeur().noms : motsVendeur().nom} en gros` : titre ? `Achat · ${titre}` : 'Achat de marchandise';
     // Hors plateforme et en gros : ce qu'IL a choisi (« Payé en »), sinon vide et nommé — jamais deviné.
     const reglement = vinted ? 'Paiement via Vinted' : String(l.reglement || '');
     const cf = cleFactureLigne(l);
@@ -280,7 +281,8 @@ export const titreConforme = (R) => `${R.type === 'recettes' ? 'Livre des recett
 const DATEE_TXT = { versement: 'versement', vente: 'vente', commande: 'commande' };
 export const COLONNES_CONFORMES = Object.freeze({
   recettes: [['date', 'Date', 52], ['datee', 'Datée au', 50], ['client', 'Client', 92], ['nature', 'Nature', 0], ['montant', 'Montant', 62, 1], ['reglement', 'Règlement', 92], ['especes', 'Espèces', 40], ['piece', 'Pièce justificative', 128], ['num', 'N°', 36], ['compte', 'Compte', 70]],
-  achats: [['date', 'Date', 52], ['fournisseur', 'Fournisseur', 96], ['nature', 'Nature', 0], ['paires', 'Paires', 34, 1], ['montant', 'Montant', 62, 1], ['frais', 'Dont frais', 50, 1], ['source', 'Montant lu', 58], ['reglement', 'Règlement', 88], ['especes', 'Espèces', 40], ['piece', 'Pièce justificative', 128], ['num', 'N°', 40]],
+  // (intégration g1) l'en-tête suit le vocabulaire du vendeur (« Paires » pour Sneakers, sinon « Articles »).
+  get achats() { return [['date', 'Date', 52], ['fournisseur', 'Fournisseur', 96], ['nature', 'Nature', 0], ['paires', motsVendeur().Noms, 34, 1], ['montant', 'Montant', 62, 1], ['frais', 'Dont frais', 50, 1], ['source', 'Montant lu', 58], ['reglement', 'Règlement', 88], ['especes', 'Espèces', 40], ['piece', 'Pièce justificative', 128], ['num', 'N°', 40]]; },
 });
 const SOURCE_MONTANT = { recu: 'Reçu', saisi: 'Saisi', article: 'Article seul' };
 const MANQUE_TXT = { montant: 'montant', reglement: 'mode de règlement', piece: 'pièce', fournisseur: 'fournisseur', date: 'date', article: 'article' };

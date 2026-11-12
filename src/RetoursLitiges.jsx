@@ -15,6 +15,11 @@ import React from 'react';
 import { tr, monnaie } from './i18n/index.js';
 import { BoutonBase } from './composants/Bouton.jsx';
 import './styles-retours.css';
+import { motsVendeur } from './profilVendeur.js';
+// (intégration g1) retours-litiges × vocabulaire-article : les textes qui nomment l'article ont une variante
+// `.art` (« l’article ») hors Sneakers ; un vendeur Sneakers garde « la paire » mot pour mot.
+const AVEC_ART = new Set(['pap.verifier', 'pap.etape.recevoir', 'pap.etape.fait', 'pap.revenue', 'pap.revenueN', 'pap.contester']);
+const tv = (k, p) => tr(AVEC_ART.has(k) && motsVendeur().nom !== 'paire' ? k + '.art' : k, p);
 
 const ICONE_RETOUR = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
@@ -150,7 +155,7 @@ export function PasAPasRetour({ c, p, Feuille, onClose, onRevenue, onDossier, Bo
         <h3>{tr('pap.delais')}</h3>
         {p.delais.map((d) => (
           <div key={d.quoi} className="vrm-pap-ligne" data-pap-delai={d.quoi} data-pap-source={d.source} data-pap-quand={d.quand || ''}>
-            <span>{d.quoi === 'repondre' ? (d.quand ? tr('pap.repondreAvant', { date: d.quand }) : tr('pap.repondreNonEcrite')) : tr('pap.verifier', { n: d.jours })}</span>
+            <span>{d.quoi === 'repondre' ? (d.quand ? tr('pap.repondreAvant', { date: d.quand }) : tr('pap.repondreNonEcrite')) : tv('pap.verifier', { n: d.jours })}</span>
             <small>{tr(MOT_SOURCE[d.source])}</small>
           </div>
         ))}
@@ -159,7 +164,7 @@ export function PasAPasRetour({ c, p, Feuille, onClose, onRevenue, onDossier, Bo
         <h3>{tr('pap.ceQueTuFais')}</h3>
         <ol className="vrm-pap-etapes">
           {ETAPES.filter((e) => e !== 'repondre' || p.etape === 'repondre').map((e) => (
-            <li key={e} className={e === p.etape ? 'is-la' : ETAPES.indexOf(e) < ETAPES.indexOf(p.etape) ? 'is-fait' : ''} data-pap-etape-li={e}>{tr('pap.etape.' + e)}</li>
+            <li key={e} className={e === p.etape ? 'is-la' : ETAPES.indexOf(e) < ETAPES.indexOf(p.etape) ? 'is-fait' : ''} data-pap-etape-li={e}>{tv('pap.etape.' + e)}</li>
           ))}
         </ol>
       </section>
@@ -179,8 +184,8 @@ export function PasAPasRetour({ c, p, Feuille, onClose, onRevenue, onDossier, Bo
         <div className="vrm-pap-gestes">
           {revenue === 'ok' || p.revenue.raison === 'deja-remise'
             ? <span className="vrm-ret-note is-ok" data-pap-remise="">{tr('pap.dejaRemise')}</span>
-            : <Bouton variante="primaire" icone="check" disabled={!p.revenue.possible} data-pap-revenue={p.revenue.possible ? p.revenue.num : ''} onClick={faireRevenue}>{p.revenue.possible ? tr('pap.revenueN', { n: p.revenue.num }) : tr('pap.revenue')}</Bouton>}
-          {p.contester ? <Bouton variante="secondaire" href={p.contester.url} target="_blank" rel="noreferrer" data-pap-contester={p.contester.url}>{tr('pap.contester')} ↗</Bouton> : null}
+            : <Bouton variante="primaire" icone="check" disabled={!p.revenue.possible} data-pap-revenue={p.revenue.possible ? p.revenue.num : ''} onClick={faireRevenue}>{p.revenue.possible ? tv('pap.revenueN', { n: p.revenue.num }) : tv('pap.revenue')}</Bouton>}
+          {p.contester ? <Bouton variante="secondaire" href={p.contester.url} target="_blank" rel="noreferrer" data-pap-contester={p.contester.url}>{tv('pap.contester')} ↗</Bouton> : null}
         </div>
         {!p.revenue.possible && p.revenue.raison !== 'deja-remise' && revenue !== 'ok' ? <p className="vrm-ret-note" data-pap-revenue-raison={p.revenue.raison}>{tr(p.revenue.raison === 'sans-numero' ? 'pap.sansNumero' : 'pap.pasDeColis')}</p> : null}
         {p.contester ? <p className="vrm-ret-note">{tr('pap.contesterAide')}</p> : null}
