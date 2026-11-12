@@ -158,6 +158,7 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
   const ignores = {}; const ign = (r) => { ignores[r] = (ignores[r] || 0) + 1; };
   let avis = 0, supprimes = 0, incomplets = 0;
   let mentionsLues = false, mentionsOk = false;
+  const mailsSuppression = { envoye: 0, refuse: 0, incertain: 0, sansAdresse: 0 };
   for (const a of finis) {
     const owner = String((a && a.owner) || '').toLowerCase();
     if (!UUID.test(owner) || owner === PROPRIETAIRE_NEUTRE) { ign('identifiant'); continue; }
@@ -209,11 +210,16 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
     await noterJournal({ url, service, owner, ok: r.ok, nombres: { ...inv, donneesEffacees: r.etapes.donnees, depart: 1 }, maintenant });
     if (!r.ok) { incomplets++; continue; }
     supprimes++;
+    // (12 nov., M102) L'issue de l'e-mail « compte supprimé » est COMPTÉE dans la réponse du cron
+    // (envoyé · refusé · incertain · sans adresse) : un envoi raté ne passe plus en silence.
     if (adr && adr.etat === 'ok') {
       const m = mailSuppression({ fait: r.fait, motif: 'depart', maintenant });
-      try { await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); } catch (_) {}
-    }
+      let v;
+      try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); } catch (_) { v = { issue: 'incertain' }; }
+      const issue = ['envoye', 'refuse', 'incertain'].includes(v && v.issue) ? v.issue : 'incertain';
+      mailsSuppression[issue] += 1;
+    } else mailsSuppression.sansAdresse += 1;
   }
   const factures = await purgerFacturesGardees({ url, service, maintenant });
-  return { fait: true, finis: finis.length, avis, supprimes, incomplets, ignores, factures, smtp: cfg.pret };
+  return { fait: true, finis: finis.length, avis, supprimes, incomplets, ignores, factures, smtp: cfg.pret, mailsSuppression };
 }

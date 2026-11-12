@@ -284,6 +284,7 @@ process.on('exit', (c) => { if (!fini) { console.log('❌ audit-revue-fin : arr�
     dit(!/fetchPaginated\([^;]*\)\.catch\(/.test(wi), 'B138 widget : plus de `.catch` mort sur une lecture qui ne lève jamais');
     const cpa = sansCommentaires(lire('api/_lib/clients-partis.js'));
     dit(/mentionsOk = !!\(m && !m\.erreur\)/.test(cpa) && /if \(!mentionsOk\) \{ ign\(/.test(cpa), 'B143 mentions légales illisibles ⇒ aucun e-mail de départ');
+    dit(/mailsSuppression\[issue\] \+= 1/.test(cpa) && /smtp: cfg\.pret, mailsSuppression \}/.test(cpa), 'M102 l’issue de l’e-mail « compte supprimé » est comptée dans la réponse du cron');
   }
 
   // ── A · L'APP (règles EXÉCUTÉES, extraites d'App.jsx recollé) ──────────
