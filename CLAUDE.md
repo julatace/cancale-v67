@@ -111,6 +111,9 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
 | **Bloc « offres à trancher » des emails dans Messages** | Retiré le 24 oct. sur sa demande (moyennes par modèle et liens génériques compris). Ne pas le rétablir. Les offres dans les conversations restent. |
 | **Offres** | ⚠️ 10 nov. (Julien) : **Solo 16,99 € = 1 compte vendeur par plateforme** (+ comptes d'achat illimités) · **Pro 19,99 € = comptes vendeurs ILLIMITÉS** — ne pas remettre la limite des 10 (lot BO annulé, `2026-11-10-pro-illimite.md`). |
+| **Messages, comptes** | 12 nov. (Julien) : comptes SÉPARÉS — compte de l'onglet d'abord, puis chaque autre compte ; du plus récent au plus ancien DANS chaque groupe. Ne pas mélanger. |
+| **403 de Vinted** | 12 nov. : l'extension garde la pause sur TOUT 403. |
+| **Discrétion** | 12 nov. VALIDÉ : temps d'écriture et messages variés, plafond par jour en plus des 50/h, rythme irrégulier, attente après l'ouverture de Vinted, jamais deux comptes à la fois sur un ordinateur ni la même action partout au même moment, compte neuf en douceur, offres selon l’heure, republication par petits groupes, baisses irrégulières, arrêt + alerte au 1er captcha, santé du compte. REFUSÉ : blocage auto la nuit, étalement des messages aux favoris sur la journée. « X € conseillé » gardé mais mesuré. Mode prudence : relecture des ventes en attente de sa décision, ne rien changer. |
 | **Organisation** | Retirée du menu le 29 oct. (inutilisée) ; l'écran reste joignable par Réglages → Stock et rangement → Organisation. |
 
 **Refusé par Julien le 11 octobre (son choix) — ne pas reproposer** : « imprimer la
@@ -547,7 +550,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : sur 11nov-g1, réunis lbc-rouges (+ lbc-plus 5.363), vestiaire-plus (5.364), securite-vinted (5.366), annonce-vinted (5.367), republier-programme (5.368) ; sécurité des comptes branchée sur les gestes neufs (baisse Vestiaire et Leboncoin, republication Leboncoin, présence leboncoin.fr, Créer sur Vinted, départ programmé = mode `programme`) ; « Créer sur Vinted » depuis À publier (fiches rangées, gros lot) et en série depuis « Achetés, pas en ligne » (champs manquants tapés). Les lignes de ces lots : `historique-divers.md`. `docs/passation/2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
+- **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
