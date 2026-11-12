@@ -28,6 +28,8 @@ const RECENTS = 'vrm_plantages_recents';
 export const RECENTS_MAX = 5;
 const MAX_ATTENTE = 10;
 const UNE_HEURE = 3600e3;
+const HEURE = 'vrm_plantages_heure';
+export const PLAFOND_HEURE = 20;
 let notesCetteOuverture = 0;
 
 // Ce qui n'est PAS un défaut de l'app. (5 nov.) `kagi.executeCallback` : le pont d'Orion lui-même
@@ -146,6 +148,12 @@ export function noterPlantage(err, contexte = {}) {
     const envoyes = lire(ENVOYES, {});
     const maintenant = Date.now();
     if (envoyes[id] && maintenant - envoyes[id].at < UNE_HEURE) return null;
+    // (11 nov., lot agent2-veille) Au plus `PLAFOND_HEURE` plantages notés par heure et par
+    // appareil, toutes ouvertures confondues (une page qui se recharge en boucle ne noie rien).
+    const h = lire(HEURE, null);
+    const fen = h && Number.isFinite(Number(h.debut)) && maintenant - Number(h.debut) < UNE_HEURE ? { debut: Number(h.debut), n: Number(h.n) || 0 } : { debut: maintenant, n: 0 };
+    if (fen.n >= PLAFOND_HEURE) return null;
+    ecrire(HEURE, { debut: fen.debut, n: fen.n + 1 });
     notesCetteOuverture++;
     const nAppareil = ((envoyes[id] && envoyes[id].n) || 0) + 1;
     envoyes[id] = { at: maintenant, n: nAppareil };

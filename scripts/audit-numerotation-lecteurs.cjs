@@ -147,7 +147,8 @@ if (MUTATION && !M) { console.log('❌ mutation inconnue : ' + MUTATION); proces
 
 // ── LES SOURCES (éventuellement mutées) ─────────────────────────────────────
 let APP = require("./_source-app.cjs").sourceAppDe(path.join(RACINE, 'src/App.jsx'));
-let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8');
+let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8')
+  .replace("'./fetch-delai.js'", JSON.stringify(require('url').pathToFileURL(path.join(RACINE, 'api/_lib/fetch-delai.js')).href));   // (11 nov.) la copie importe le vrai fetch à délai
 let ROUTE = fs.readFileSync(path.join(RACINE, 'api/email-inbound.js'), 'utf8');
 let EXT = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');
 try { if (M && M.app) APP = M.app(APP); if (M && M.lib) LIB = M.lib(LIB); if (M && M.route) ROUTE = M.route(ROUTE); if (M && M.ext) EXT = M.ext(EXT); }
@@ -394,7 +395,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/repriseDe: String\(r\.orphan\.key\)/.test(A) && /repriseDe: String\(autres\[0\]\)/.test(A), 'une reprise dit QUELLE fiche elle remplace (`repriseDe`) : la base ne la prend pas pour une fiche perdue');
     dit(/if \(code\) \{ _pushBloque = true; _emitSync\('refus'(?:, '[^']*')?\); signalerNumerosPerimes\(code\);/.test(A), 'un refus nommé de la base (numéros périmés) arrête les envois et ouvre le bloc « recharger »');
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
-    dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
+    dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');
     const reglage = corps('function NumerosSetting(', '\n}\n');
     dit(/if \(n && arch && n === arch\) \{ setRefusee\(n\);[^}]*return; \}/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');

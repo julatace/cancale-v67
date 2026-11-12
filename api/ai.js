@@ -18,10 +18,14 @@ import './_lib/sans-bruit.js';
 import { utilisateurDe } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { handleDetourage } from './_lib/detourage.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
+// (11 nov., B117) le prix part dans le prompt : un nombre ou rien, jamais un objet ou 10 000 caractères.
+export const prixBorne = (v) => { if (v == null || v === '') return undefined; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 && n < 1e6 ? n : undefined; };
 const MODEL = process.env.AI_MODEL || 'claude-haiku-4-5-20251001';
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');   // (11 nov., B116) la réponse dépend de la session
   // ⚠️ LE DÉTOURAGE PHOTOROOM EST UN MODE DE CETTE ROUTE (/api/detourage par
   //    réécriture) : le plan Hobby plafonne à 12 fonctions, et le projet y est.
   //    Il passe AVANT tout le reste — en particulier avant le « no-key » de l'IA,
@@ -86,7 +90,7 @@ export default async function handler(req, res) {
     brand: String(b.brand || '').slice(0, 80),
     size: String(b.size || '').slice(0, 40),
     condition: String(b.condition || '').slice(0, 60),
-    price: b.price,
+    price: prixBorne(b.price),   // (11 nov., B117) un nombre, borné
     desc: String(b.desc || '').slice(0, 1500),
   };
 
@@ -105,7 +109,7 @@ Réponds par un JSON de la forme :
 Contraintes : le titre fait au plus 70 caractères ; la description fait 2 à 4 lignes ; n'ajoute jamais une info non fournie ci-dessus.`;
 
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetchAvecDelai('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 600, system: sys, messages: [{ role: 'user', content: user }] }),
@@ -126,7 +130,8 @@ Contraintes : le titre fait au plus 70 caractères ; la description fait 2 à 4 
       why: String(parsed.why || '').slice(0, 200),
     });
   } catch (err) {
-    res.status(200).json({ ok: false, reason: 'network', detail: String(err) });
+    // (11 nov., B115) une panne réseau est un 502, et le détail est borné (jamais une pile).
+    res.status(502).json({ ok: false, reason: 'network', detail: String((err && err.name) || 'erreur').slice(0, 60) });
   }
 }
 
@@ -134,7 +139,7 @@ Contraintes : le titre fait au plus 70 caractères ; la description fait 2 à 4 
 // choisit, adapte et envoie lui-même sur Vinted). RIEN n'est envoyé d'ici.
 async function handleReply(res, key, b) {
   const article = String(b.article || '').slice(0, 160);
-  const price = b.price;
+  const price = prixBorne(b.price);
   const msg = String(b.message || '').slice(0, 1000);
   if (!msg.trim()) { res.status(200).json({ ok: false, reason: 'no-message' }); return; }
 
@@ -148,7 +153,7 @@ Réponds par un JSON de la forme :
 Donne 3 à 5 suggestions, chacune dans un ton DIFFÉRENT, prêtes à copier. Adapte-les au message : négociation → propose un petit geste sans brader ; question → réponds clairement ; offre trop basse → refuse poliment en gardant la porte ouverte ; simple intérêt → confirme la dispo chaleureusement.`;
 
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetchAvecDelai('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 700, system: sys, messages: [{ role: 'user', content: user }] }),
@@ -177,6 +182,7 @@ Donne 3 à 5 suggestions, chacune dans un ton DIFFÉRENT, prêtes à copier. Ada
       suggestions,
     });
   } catch (err) {
-    res.status(200).json({ ok: false, reason: 'network', detail: String(err) });
+    // (11 nov., B115) une panne réseau est un 502, et le détail est borné (jamais une pile).
+    res.status(502).json({ ok: false, reason: 'network', detail: String((err && err.name) || 'erreur').slice(0, 60) });
   }
 }

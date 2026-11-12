@@ -121,18 +121,31 @@ export function periodesRegistre(lignes) {
 // donné, sans trou. Un brouillon numéroté avant le 2 nov. (jamais émis) n'est pas un
 // trou : il est dit à part. Un n° pris sans pièce écrite (coupure) EST un trou : dit.
 const suffixe = (n) => { const m = /-(\d{1,9})$/.exec(txt(n)); return m ? Number(m[1]) : null; };
+// (11 nov.) Une SÉRIE = le préfixe du numéro (« FA-2026 », « AV-2025 »…) : FA-2025-0040 ne masque plus
+//    les trous de 2026 et n'en invente pas. `facture` / `avoir` disent la série la plus récente ;
+//    `series` les dit toutes (préfixe → { max, manquants, brouillons }).
+const prefixe = (n) => txt(n).replace(/-?\d{1,9}$/, '');
+const etatSerie = (m) => {
+  const max = m.size ? Math.max(...m.keys()) : 0;
+  const manquants = []; for (let i = 1; i <= max && manquants.length < 50; i++) if (!m.has(i)) manquants.push(i);
+  return { max, manquants, brouillons: [...m].filter(([, e]) => e === 'brouillon').map(([n]) => n).sort((a, b) => a - b) };
+};
 export function trousNumerotation(rows) {
-  const series = { facture: new Map(), avoir: new Map() };
+  const series = { facture: new Map(), avoir: new Map() };   // type → préfixe → (n → état)
   for (const x of Array.isArray(rows) ? rows : []) {
     if (!estPiece(x) || !txt(x.numero)) continue;
     const n = suffixe(x.numero); if (!n) continue;
-    (estAvoir(x) ? series.avoir : series.facture).set(n, x.emiseLe ? 'emise' : 'brouillon');
+    const parType = estAvoir(x) ? series.avoir : series.facture;
+    const p = prefixe(x.numero);
+    if (!parType.has(p)) parType.set(p, new Map());
+    parType.get(p).set(n, x.emiseLe ? 'emise' : 'brouillon');
   }
   const out = {};
-  for (const [s, m] of Object.entries(series)) {
-    const max = m.size ? Math.max(...m.keys()) : 0;
-    const manquants = []; for (let i = 1; i <= max && manquants.length < 50; i++) if (!m.has(i)) manquants.push(i);
-    out[s] = { max, manquants, brouillons: [...m].filter(([, e]) => e === 'brouillon').map(([n]) => n).sort((a, b) => a - b) };
+  for (const [s, parPrefixe] of Object.entries(series)) {
+    const prefixes = [...parPrefixe.keys()].sort();
+    const toutes = {}; for (const p of prefixes) toutes[p] = etatSerie(parPrefixe.get(p));
+    const recente = prefixes.length ? toutes[prefixes[prefixes.length - 1]] : etatSerie(new Map());
+    out[s] = { ...recente, prefixe: prefixes.length ? prefixes[prefixes.length - 1] : '', series: toutes };
   }
   return out;
 }

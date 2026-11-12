@@ -80,6 +80,13 @@ global.fetch = async (url, o = {}) => {
   if (methode === 'GET') {
     if (q.get('select') === 'owner' && q.get('limit') === '1') return rep([{ owner: JULIEN }]);
     if (id === 'main' && !owner) return rep([]);                         // aucun vendeur à rappeler
+    // (12 nov., M92) la lecture EN LOT : owner=in.(…)&id=in.(…), select=owner,id,data — la vraie forme.
+    const dans = (n) => { const m = /^in\.\((.*)\)$/.exec(q.get(n) || ''); return m ? m[1].split(',') : null; };
+    if (dans('owner')) {
+      const out = [];
+      for (const o2 of dans('owner')) for (const i2 of (dans('id') || [id])) { const d2 = base.get(k(o2, i2)); if (d2 !== undefined) out.push({ owner: o2, id: i2, data: d2 }); }
+      return rep(out);
+    }
     const d = base.get(k(owner, id));
     if (d === undefined) return rep([]);
     const sel = q.get('select') || 'data';
@@ -92,6 +99,17 @@ global.fetch = async (url, o = {}) => {
     const lignes = JSON.parse(o.body || '[]');
     for (const l of lignes) base.set(k(l.owner, l.id), JSON.parse(JSON.stringify(l.data)));
     return rep(lignes.map((l) => ({ id: l.id })), 201);
+  }
+  // (11 nov.) PATCH conditionnel sur `data->>rev` (comparer-et-échanger, _lib/cas.js) : la vraie forme.
+  if (methode === 'PATCH') {
+    if (panneEcriture) return rep('<html>522</html>', 522);
+    const d = base.get(k(owner, id));
+    if (d === undefined) return rep([]);
+    const cond = q.get('data->>rev');
+    const lu = d && d.rev != null ? String(d.rev) : null;
+    if (cond === 'is.null' ? lu !== null : cond != null && cond !== 'eq.' + lu) return rep([]);
+    base.set(k(owner, id), JSON.parse(o.body).data);
+    return rep([{ id }]);
   }
   return rep([]);
 };

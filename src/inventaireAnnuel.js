@@ -30,6 +30,7 @@ import { valeurStock, texteValeurStock, eurosStock } from './coutVente.js';
 import { beneficePaire } from './beneficePaire.js';
 import { saisiesVivantes, NUM_OK } from './inventaire.js';
 import { cleNum as cleNumServeur } from '../api/_lib/numerotation.js';
+import { jourParis } from './dateParis.js';
 
 const plur = (n, m) => `${n} ${m}${n > 1 ? 's' : ''}`;
 const objet = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -138,7 +139,7 @@ export function numeroDuScan(brut, cle = cleNumServeur) {
 
 // ── 5. LA DATE ──────────────────────────────────────────────────────────────
 const deux = (n) => String(n).padStart(2, '0');
-export const isoJour = (t) => { const d = new Date(t); return `${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}`; };
+export const isoJour = (t) => jourParis(t);   // (11 nov.) jour de PARIS
 // Par défaut le 31 décembre de l'année ; du 1er au 15 janvier, celui qui vient de passer.
 export function dateParDefaut(maintenant = Date.now()) {
   const d = new Date(maintenant);

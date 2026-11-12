@@ -37,8 +37,7 @@ export const ordreQuestions = (questions) => (questions || []).slice().sort((a, 
 });
 
 // → [{ itemId, titre, questions (anciennes → récentes), aTraiter, nSans, derniere }]
-// Les groupes : d'abord ceux qui attendent une réponse (la plus ancienne
-// attente en tête), puis les autres, du plus récent au plus ancien.
+// Les groupes : du plus récent (dernière question) au plus ancien (11 nov.).
 export const questionsParAnnonce = (messages) => {
   const par = new Map();
   for (const m of (Array.isArray(messages) ? messages : [])) {
@@ -55,9 +54,8 @@ export const questionsParAnnonce = (messages) => {
     const derniere = questions[questions.length - 1];
     groupes.push({ itemId, titre: (derniere && derniere.titre) || '', questions, nSans: sans.length, aTraiter: sans[0] || derniere, derniere, tsAttente: sans.length ? tsDe(sans[0]) : null, tsDerniere: tsDe(derniere) });
   }
-  return groupes.sort((a, b) => {
-    if (!!a.nSans !== !!b.nSans) return a.nSans ? -1 : 1;
-    if (a.nSans) return (a.tsAttente == null) - (b.tsAttente == null) || (a.tsAttente || 0) - (b.tsAttente || 0);
-    return (b.tsDerniere || 0) - (a.tsDerniere || 0);
-  });
+  // (11 nov., Julien : « du plus récent au plus vieux ») Le plus récent en haut, comme
+  // toutes les vues de Messages (src/ordreConversations.js) ; sans date, en bas. Une
+  // question sans réponse ne passe plus devant : son point « non lu » la signale.
+  return groupes.sort((a, b) => (a.tsDerniere == null) - (b.tsDerniere == null) || (b.tsDerniere || 0) - (a.tsDerniere || 0) || (a.itemId < b.itemId ? -1 : a.itemId > b.itemId ? 1 : 0));
 };

@@ -49,6 +49,7 @@
 import { sbCle } from './cle.js';
 import { jourParis } from '../../src/mesuresTerrain.js';
 import { etatEmails } from './etat-public.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const ID_STATUT = 'statut_sondes';
 export const NEUTRE = '00000000-0000-0000-0000-000000000000';
@@ -137,7 +138,7 @@ async function demander(fetcher, url, opts = {}) {
 
 // ── LES SONDES (entrées injectées : `env`, `fetcher`, `pushPret`, `smtp`) ────
 // Chaque sonde rend { etat, raison, … } ; `hist` (silences) pour e-mails/extension.
-export async function sonder({ env = process.env, fetcher = fetch, pushPret = false, smtp = null, configSmtp = null, etat = {}, maintenant = Date.now() } = {}) {
+export async function sonder({ env = process.env, fetcher = fetchAvecDelai, pushPret = false, smtp = null, configSmtp = null, etat = {}, maintenant = Date.now() } = {}) {
   const url = env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
   const service = env.SUPABASE_SERVICE_KEY || '';
   const H = service ? sbCle(service) : {};
@@ -320,7 +321,7 @@ export function statutPublic(data, maintenant = Date.now()) {
 }
 
 // ── LA LIGNE D'ÉTAT : lecture (trois états) et écriture comparée sur `rev` ───
-export async function lireEtat({ url, headers, fetcher = fetch }) {
+export async function lireEtat({ url, headers, fetcher = fetchAvecDelai }) {
   try {
     const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${ID_STATUT}&select=data&limit=1`, { headers, signal: AbortSignal.timeout(SONDE_MS) });
     if (!r.ok) return undefined;
@@ -329,7 +330,7 @@ export async function lireEtat({ url, headers, fetcher = fetch }) {
     return (j[0] && j[0].data) || null;
   } catch (_) { return undefined; }
 }
-export async function ecrireEtat({ url, headers, fetcher = fetch, precedent, etat }) {
+export async function ecrireEtat({ url, headers, fetcher = fetchAvecDelai, precedent, etat }) {
   try {
     if (precedent) {
       // Comparer-et-échanger : seulement si `rev` n'a pas bougé depuis la lecture.
@@ -357,7 +358,7 @@ export async function ecrireEtat({ url, headers, fetcher = fetch, precedent, eta
 // Ligne absente ⇒ null (pas encore sondé) ; illisible ⇒ null aussi : la page dit
 // « pas su », jamais « tout va bien ».
 let memoPublic = null;
-export async function statutPourSante({ env = process.env, fetcher = fetch, maintenant = Date.now() } = {}) {
+export async function statutPourSante({ env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() } = {}) {
   if (memoPublic && maintenant - memoPublic.t < 30e3) return memoPublic.v;
   const service = env.SUPABASE_SERVICE_KEY || '';
   let v = null;
@@ -384,7 +385,7 @@ export function signauxSondes({ aNotifier = [], muettes = [] }, etat) {
   for (const c of muettes) if (NOMS[c]) out.push({ type: c === 'emails' ? 'emails' : 'sante', cle: 'muette:' + c, nature: 'muette', titre: `Pas de réponse : ${NOMS[c]}`.slice(0, 60), corps: `${MUETTES_POUR_ALERTE} vérifications de suite sans réponse. Pas su : ce n’est pas une panne prouvée.` });
   return out;
 }
-export async function passageSondes({ env = process.env, fetcher = fetch, pushPret = false, smtp = null, configSmtp = null, envoyer = null, alerter = null, proprietaire = '', maintenant = Date.now() } = {}) {
+export async function passageSondes({ env = process.env, fetcher = fetchAvecDelai, pushPret = false, smtp = null, configSmtp = null, envoyer = null, alerter = null, proprietaire = '', maintenant = Date.now() } = {}) {
   const url = env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
   const service = env.SUPABASE_SERVICE_KEY || '';
   if (!service) return { fait: false, raison: 'clé de service absente : rien sondé, rien écrit' };

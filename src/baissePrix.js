@@ -29,7 +29,8 @@ export function baisseTapee(mode, texte) {
   const v = Number(brut.replace(',', '.').replace(/\s/g, ''));
   if (!Number.isFinite(v) || v <= 0) return { ok: false, mode: m, erreur: 'Tape un nombre plus grand que 0.' };
   if (m === 'pct' && v > PCT_MAX) return { ok: false, mode: m, erreur: `Au plus −${PCT_MAX} %.` };
-  if (m === 'eur' && Math.round(v * 100) !== v * 100) return { ok: false, mode: m, erreur: 'Au centime près, au plus.' };
+  // (11 nov., revue robustesse) Le TEXTE dit les centimes (`v * 100` en flottant refusait 1,10 · 0,29 · 4,35…).
+  if (m === 'eur' && !/^\d+(?:[.,]\d{1,2})?$/.test(brut.replace(/\s/g, ''))) return { ok: false, mode: m, erreur: 'Au centime près, au plus.' };
   return { ok: true, mode: m, valeur: v };
 }
 

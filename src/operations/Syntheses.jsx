@@ -1,5 +1,6 @@
 import React from 'react';
 import {passationMissions,reapprovisionnement,csvReappro} from './syntheses.js';
+import { jourParis } from '../dateParis.js';
 export function PassationMissions({missions,maintenant,mode,onMode}) {
  const resume=passationMissions(missions,maintenant);
  return <details className="ops-synthese"><summary>Passation d’équipe · {resume.bloquees.length} blocage{resume.bloquees.length>1?'s':''} · {resume.avalider.length} à valider</summary>
@@ -11,7 +12,7 @@ export function PassationMissions({missions,maintenant,mode,onMode}) {
 }
 export function ListeReappro({consommables}) {
  const {lignes,inconnus}=reapprovisionnement(consommables);
- const exporter=()=>{const url=URL.createObjectURL(new Blob([csvReappro(lignes)],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='VRM-reapprovisionnement-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ const exporter=()=>{const url=URL.createObjectURL(new Blob([csvReappro(lignes)],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='VRM-reapprovisionnement-'+jourParis()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  return <details className="ops-synthese"><summary>Réapprovisionnement · {lignes.length} consommable{lignes.length>1?'s':''}</summary>
  <p className="ops-note">Quantité minimale pour dépasser le seuil, calculée sur tes comptages. Aucun achat ni mouvement de stock n’est créé.</p>
  {inconnus.length>0&&<p className="ops-note">{inconnus.length} stock{inconnus.length>1?'s':''} à initialiser : exclus du calcul.</p>}

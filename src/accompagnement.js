@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  L'ACCOMPAGNEMENT — LA RÈGLE (6 nov. 2026)
 //  Julien : « Je veux quelque chose de plus beau, simple et visuel ; peut-être un
@@ -175,7 +176,7 @@ export function normaliserMemoire(d) {
 
 // Le jour, à l'heure de Paris (« 2 par jour » = 2 par jour de Julien).
 const FMT_JOUR = (() => { try { return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }); } catch (_) { return null; } })();
-export const jourDe = (ts) => { const d = new Date(ts); return FMT_JOUR ? FMT_JOUR.format(d) : d.toISOString().slice(0, 10); };
+export const jourDe = (ts) => { const d = new Date(ts); return FMT_JOUR ? FMT_JOUR.format(d) : jourParis(d); };
 
 export const vusDuJour = (memoire, maintenant = Date.now()) => {
   const j = jourDe(maintenant);

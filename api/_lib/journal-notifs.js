@@ -31,6 +31,7 @@ import crypto from 'node:crypto';
 import { sbCle } from './cle.js';
 import { proprietaireCourant } from './owner.js';
 import { familleDe } from './notif-textes.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const ID_JOURNAL = 'push_journal';
 export const ID_LU = 'push_journal_lu';
@@ -164,7 +165,7 @@ async function lireLigne(id, select = 'data') {
   const o = proprietaireCourant();
   if (!o || !cle()) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner=eq.${encodeURIComponent(o)}&select=${select}`, { headers: { ...sbCle(cle()) } });
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner=eq.${encodeURIComponent(o)}&select=${select}`, { headers: { ...sbCle(cle()) } });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -201,7 +202,7 @@ async function modifierJournal(modifier, essais = 5) {
     const data = { ...res.journal, rev: nouvelleRev() };
     try {
       if (!l.existe) {
-        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+        const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
           method: 'POST', headers: { ...tete, Prefer: 'resolution=ignore-duplicates,return=representation' },
           body: JSON.stringify([{ owner: o, id: ID_JOURNAL, data }]),
         });
@@ -212,7 +213,7 @@ async function modifierJournal(modifier, essais = 5) {
         continue;
       }
       const cond = d && d.rev != null ? `data->>rev=eq.${encodeURIComponent(String(d.rev))}` : 'data->>rev=is.null';
-      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${ID_JOURNAL}&owner=eq.${encodeURIComponent(o)}&${cond}&select=id`, {
+      const w = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${ID_JOURNAL}&owner=eq.${encodeURIComponent(o)}&${cond}&select=id`, {
         method: 'PATCH', headers: { ...tete, Prefer: 'return=representation' }, body: JSON.stringify({ data }),
       });
       if (!w.ok) return null;

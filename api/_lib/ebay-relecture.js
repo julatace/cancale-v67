@@ -20,13 +20,14 @@
 import crypto from 'crypto';
 import { accessToken, modifierDonnee, lireComptes, comptesActifs, keysReady } from './ebay.js';
 import { fusionCommandesEbay } from './ebay-synchronisation.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const EBAY_API = 'https://api.ebay.com';
 export const URL_COMMANDES = `${EBAY_API}/sell/fulfillment/v1/order?limit=50`;
 
 async function ebayJson(url, token) {
   try {
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+    const r = await fetchAvecDelai(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (_) {}
     return { status: r.status, ok: r.ok, data: j };

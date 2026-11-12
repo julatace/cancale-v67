@@ -1,3 +1,4 @@
+import { jourParis } from './dateParis.js';
 // ══════════════════════════════════════════════════════════════════════════════
 //  « CLÔTURER L'ANNÉE » (11 nov., lot cloture-annee) — Argent → Déclarer
 // ══════════════════════════════════════════════════════════════════════════════
@@ -91,7 +92,7 @@ function etapePrix(joursBenef, annee, maintenant, R) {
 // ── 3. L'inventaire au 31/12 ──
 // VRM ne reconstitue pas le stock d'un jour passé (lot W) : il dit le jour de la
 // liste lue, et ce n'est « ✓ » que si elle a été lue LE 31 décembre.
-export const jourIso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const jourIso = (t) => jourParis(t);   // (11 nov.) jour de PARIS
 function etapeInventaire(inv, annee, maintenant) {
   const dernier = `${annee}-12-31`;
   const avant = jourIso(maintenant) < dernier;

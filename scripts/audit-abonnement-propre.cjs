@@ -37,10 +37,10 @@ const JETONS = {
 };
 
 // ── Le monde inventé ────────────────────────────────────────────────────────
-let abos, acces, lecture, stripe, codes, parr, reglages, essais, vinted, balance, sansStripeTable;
+let abos, acces, lecture, stripe, codes, parr, reglages, essais, vinted, balance, sansStripeTable, cartes, cartesMuettes;
 const reset = () => {
   abos = {}; acces = {}; lecture = undefined; stripe = []; codes = {}; parr = {}; reglages = { parrainage: '1' };
-  essais = []; vinted = {}; balance = {}; sansStripeTable = false;
+  essais = []; vinted = {}; balance = {}; sansStripeTable = false; cartes = {}; cartesMuettes = false;
 };
 const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } });
 const q = (u, k) => { const m = new RegExp('[?&]' + k + '=([^&]+)').exec(u); return m ? decodeURIComponent(m[1]) : null; };
@@ -103,6 +103,12 @@ global.fetch = async (url, opts = {}) => {
       if (m === 'GET') return rep({ object: 'list', data: balance[c] });
       const t = { id: 'cbtxn_' + balance[c].length, amount: Number(corps.get('amount')), metadata: { vrm_parrainage: corps.get('metadata[vrm_parrainage]') } };
       balance[c].push(t); return rep(t);
+    }
+    // (11 nov.) Les cartes d'un client : `card.fingerprint` (la même pour une même carte).
+    if (chemin === 'payment_methods') {
+      if (cartesMuettes) return rep({ error: { message: 'muet' } }, 500);
+      const c = corps.get('customer');
+      return rep({ object: 'list', data: (cartes[c] || []).map((f, i) => ({ id: 'pm_' + c + i, type: 'card', card: { fingerprint: f, last4: '4242' } })) });
     }
     if (chemin.startsWith('subscriptions/')) return rep({ id: chemin.split('/')[1], status: 'active', customer: 'cus_A', items: { data: [{ quantity: 1, price: { unit_amount: 1699, currency: 'eur', recurring: { interval: 'month' } } }] } });
     return rep({ error: { message: 'inconnu' } }, 404);
@@ -238,7 +244,7 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     const r2 = await get('aa.bb.A');
     dit(r2.corps.code === r.corps.code, '  le même code à chaque fois');
     dit(!JSON.stringify(r.corps).match(/[0-9a-f]{8}-[0-9a-f]{4}/), '  aucun identifiant de vendeur dans la réponse');
-    dit(E.lienParrainage(r.corps.code) === `https://vrm.center/?parrain=${r.corps.code}` && E.codeParrainDe('?parrain=' + r.corps.code.toLowerCase()) === r.corps.code && E.codeParrainDe('?parrain=x<script>') === '', '  le lien, et sa lecture (un code mal formé n’est pas gardé)');
+    dit(E.lienParrainage(r.corps.code) === `https://vrm.center/r/${r.corps.code}` && E.codeParrainDuChemin(`/r/${r.corps.code}`) === r.corps.code && E.codeParrainDuChemin(`/r/x<script>`) === "" && E.codeParrainDe('?parrain=' + r.corps.code.toLowerCase()) === r.corps.code && E.codeParrainDe('?parrain=x<script>') === '', '  le lien, et sa lecture (un code mal formé n’est pas gardé)');
     reset(); sansStripeTable = true;
     const r3 = await get('aa.bb.A');
     dit(r3.code === 200 && r3.corps.installe === false && !r3.corps.code, '  027 pas passée : « pas installé », aucun lien promis', JSON.stringify(r3.corps));
@@ -297,9 +303,39 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     const r = await webhook(facture('cus_N', 1699, 1));
     dit(r.code === 200 && !(balance.cus_N || []).length, 'programme éteint : rien n’est crédité, Stripe ne boucle pas (200)', `HTTP ${r.code}`);
   });
+  // (11 nov., agent2-argent-parrainage) PAS SOI-MÊME, PAR LA CARTE.
+  await essaie('même carte', async () => {
+    reset(); let code = (await get('aa.bb.A')).corps.code; await post('aa.bb.N', code);
+    abos[N] = { statut: 'active', client_stripe: 'cus_N' }; abos[A] = { statut: 'active', client_stripe: 'cus_A' };
+    cartes.cus_N = ['fp_meme']; cartes.cus_A = ['fp_autre', 'fp_meme'];
+    let r = await webhook(facture('cus_N', 1699, 1));
+    dit(r.code === 200 && !(balance.cus_N || []).length && !(balance.cus_A || []).length && parr[N].refus === 'meme-carte', 'même carte chez le filleul et le parrain : aucun mois offert, refus rangé', JSON.stringify({ p: parr[N], N: balance.cus_N, A: balance.cus_A }));
+    await webhook(facture('cus_N', 1699, 2));
+    dit(!(balance.cus_N || []).length && !(balance.cus_A || []).length, '  rejoué, mois suivant : toujours rien');
+    dit((await get('aa.bb.A')).corps.suivi.enAttente === 0, '  le parrain ne lit pas « en attente » pour un refus');
+    reset(); code = (await get('aa.bb.A')).corps.code; await post('aa.bb.N', code);
+    abos[N] = { statut: 'active', client_stripe: 'cus_N' }; abos[A] = { statut: 'active', client_stripe: 'cus_A' };
+    cartes.cus_N = ['fp_n']; cartes.cus_A = ['fp_a'];
+    r = await webhook(facture('cus_N', 1699, 1));
+    dit(r.code === 200 && (balance.cus_N || []).length === 1 && (balance.cus_A || []).length === 1 && !parr[N].refus, 'cartes différentes : un mois à chacun', JSON.stringify(parr[N]));
+    reset(); code = (await get('aa.bb.A')).corps.code; await post('aa.bb.N', code);
+    abos[N] = { statut: 'active', client_stripe: 'cus_N' }; abos[A] = { statut: 'active', client_stripe: 'cus_A' };
+    cartesMuettes = true;
+    r = await webhook(facture('cus_N', 1699, 1));
+    dit(r.code === 503 && !(balance.cus_N || []).length && !(balance.cus_A || []).length, 'cartes pas lues chez Stripe : 503 (Stripe rejoue), rien crédité', `HTTP ${r.code}`);
+    // Le parrain jamais abonné, qui s'abonne PLUS TARD avec la carte du filleul : son mois en attente n'est pas crédité.
+    reset(); code = (await get('aa.bb.A')).corps.code; await post('aa.bb.N', code);
+    abos[N] = { statut: 'active', client_stripe: 'cus_N' }; cartes.cus_N = ['fp_meme'];
+    await webhook(facture('cus_N', 1699, 1));
+    abos[A] = { statut: 'trialing', client_stripe: 'cus_A' }; cartes.cus_A = ['fp_meme'];
+    await webhook(facture('cus_A', 0, 2));
+    dit(!(balance.cus_A || []).length && parr[N].refus === 'meme-carte', '  parrain abonné plus tard avec la même carte : son mois en attente n’est pas crédité', JSON.stringify({ A: balance.cus_A, p: parr[N] }));
+    const g = (await get('aa.bb.A')).corps;
+    dit(g.modeTest === true, 'Stripe en clé de test : la route le dit (`modeTest`), l’écran l’écrit', JSON.stringify(g.modeTest));
+  });
   await essaie('textes légaux', async () => {
     const cgv = lire('public/legal/cgv.html');
-    dit(/Parrainage/.test(cgv) && /12 mois offerts/.test(cgv) && /se parrainer soi-même/.test(cgv), 'CGV : le parrainage et ses règles sont écrits');
+    dit(/Parrainage/.test(cgv) && /12 mois offerts/.test(cgv) && /se parrainer soi-même/.test(cgv) && /même carte de paiement/.test(cgv), 'CGV : le parrainage et ses règles sont écrits (dont « même carte de paiement », 11 nov.)');
     dit(/un aperçu de tes données/.test(cgv) && /conservé et masqué/.test(cgv) && /rien n’est supprimé/.test(cgv) && !/lecture seule/.test(cgv), 'CGV (Julien, 8 nov.) : sans abonnement, un aperçu ; le reste conservé et masqué ; rien supprimé');
     dit(/trois jours puis un jour avant la fin de l’essai/.test(cgv) && /Paramètres → Abonnement → Résilier, puis confirmer/.test(cgv), 'CGV : les rappels d’essai et le chemin de résiliation (deux gestes)');
   });

@@ -46,6 +46,7 @@ import crypto from 'crypto';
 import { PROPRIETAIRE_NEUTRE, normAdresse } from './proprietaire-email.js';
 import { idIndexJeton, memeJeton, ecrireIndexJeton } from './jeton-index.js';
 import { lireConfirmationTransfert, estConfirmationTransfert } from './transfert-gmail.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 export const ALPHABET_JETON = 'abcdefghjkmnpqrstuvwxyz23456789';
 export const LONGUEUR_JETON = 24;
@@ -118,7 +119,7 @@ const lireUne = async (fetcher, url, headers, requete) => {
 };
 
 // LE VENDEUR D'UN JETON (voir l'en-tête). Deux lectures par clé exacte.
-export async function vendeurDeJeton({ url, headers, fetcher = fetch, jeton }) {
+export async function vendeurDeJeton({ url, headers, fetcher = fetchAvecDelai, jeton }) {
   if (!jetonValide(jeton)) return { etat: 'absent' };
   const ix = await lireUne(fetcher, url, headers, `owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${idIndexJeton(GENRE, jeton)}&select=o:data->>owner,r:data->>remplaceeLe&limit=1`);
   if (ix === undefined) return undefined;
@@ -143,10 +144,10 @@ export const RAISON_QUARANTAINE = {
 };
 
 // L'index d'une adresse (le serveur seul l'écrit, sous le propriétaire neutre).
-export const ecrireIndexReception = ({ url, headers, fetcher = fetch, jeton, owner, maintenant }) =>
+export const ecrireIndexReception = ({ url, headers, fetcher = fetchAvecDelai, jeton, owner, maintenant }) =>
   ecrireIndexJeton({ url, headers, fetcher, genre: GENRE, jeton, owner, maintenant });
 // Une adresse remplacée : son index reste, mais ne désigne plus PERSONNE.
-export async function marquerRemplacee({ url, headers, fetcher = fetch, jeton, maintenant = Date.now() }) {
+export async function marquerRemplacee({ url, headers, fetcher = fetchAvecDelai, jeton, maintenant = Date.now() }) {
   if (!jetonValide(jeton)) return true;
   const at = new Date(maintenant).toISOString();
   try {

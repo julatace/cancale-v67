@@ -1,4 +1,6 @@
 import { PlateformesSetting } from '../App.jsx';
+import { fusion3 } from '../fusionNuage.js';
+import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 import { RappelsSetting } from '../App.jsx';
@@ -46,7 +48,7 @@ const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit
 import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { bilanThermique } from '../App.jsx';   // (11 nov., lot thermique) ce que l'aperçu a fait
-import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart } from '../App.jsx';
+import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart, seDeconnecter, ecrireCopieLocale } from '../App.jsx';
 
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
@@ -70,6 +72,8 @@ import HistoriqueVinted from '../ImportDepart.jsx';
 import HistoriqueSites from '../HistoriqueSites.jsx';   // (11 nov., lot import-historique-sites) Leboncoin, Vestiaire, eBay : la même carte (ext. 5.365)   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
 import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
 import SecuriteComptes from '../SecuriteComptes.jsx';   // (11 nov., lot securite-vinted) la sécurité des comptes Vinted et Vestiaire (ext. 5.366)
+import CopieAnnonces from '../CopieAnnonces.jsx';   // (12 nov., sécurité des comptes) un zip d'annonces par compte
+import CarteDoubleVerif from '../CarteDoubleVerif.jsx';   // (12 nov.) « Protège ton compte VRM »
 import { JaugesComptes } from '../JaugeActions.jsx';   // (10 nov., lot G) la jauge des 50 actions/h, compte par compte
 // ⟦→ ecrans/Ebay.jsx #3⟧
 import { etatExtensionAffichage, etatDerniereLecture } from '../etatConnexions.js';
@@ -113,6 +117,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
 import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
+import { SimulationCompte } from "../SimulationCompte.jsx";
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -441,8 +446,7 @@ const ImprimanteSetting = ({ nu = false }) => {
   const [erreurMode,setErreurMode]=React.useState('');
   const choisir = (v) => {
     const m=imprMode(v);touche.current=true;
-    try{localStorage.setItem('vrm_imprimante',JSON.stringify(m));}
-    catch(_){setErreurMode('Le format n’a pas pu être appliqué sur cet appareil. Réessaie après avoir libéré du stockage.');return;}
+    if(!ecrireCopieLocale('vrm_imprimante',m)){setErreurMode('Le format n’a pas pu être appliqué sur cet appareil. Réessaie après avoir libéré du stockage.');return;}
     setErreurMode('');setMode(m);save('vrm_imprimante',m);
   };
   // (11 nov., lot thermique) Le papier thermique, la marge, l'encre, le tampon, la fiche :
@@ -1548,15 +1552,16 @@ function PushPrefsSetting({ comptes, onMuets }) {
     setPrefs(next);
     // (5 nov.) Une écriture refusée (réseau, 4xx, 5xx) n'est JAMAIS montrée comme
     // faite : l'interrupteur revient à ce que la base a vraiment, et on le dit.
-    let ok = false;
+    // (12 nov., revue de robustesse, point 18) Plus jamais la ligne ENTIÈRE lue au
+    //    montage : seul CE réglage (de `avant` à `next`) est posé sur la ligne RELUE,
+    //    par comparer-et-échanger (src/ligneCas.js) — un réglage changé sur un autre
+    //    appareil, ou par Ma configuration, n'est plus effacé.
+    let ok = false, ecrite = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-        method: 'POST',
-        headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([withOwner({ id: 'push_prefs', data: next })]),
-      });
-      ok = !!(r && r.ok);
+      const res = await ecrireDifference({ base: SUPABASE_URL, id: 'push_prefs', entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner, avant, apres: next });
+      ok = !!(res && res.ok); if (ok && res.data && typeof res.data === 'object') ecrite = res.data;
     } catch (_) { ok = false; }
+    if (ok && ecrite) setPrefs(ecrite);
     if (!ok) { setPrefs(avant); toast(`${quoi} n’a pas été enregistré — réessaie quand tu as du réseau.`); }
     setBusy(false);
   };
@@ -1818,7 +1823,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const valider = async () => {
       setAcct(a => ({ ...a, busy:true, err:'' }));
       // Un temps pour que le message à l'extension parte avant le rechargement.
-      if (M === 'out') { authSignOut(); setTimeout(() => location.reload(), 300); return; }
+      if (M === 'out') { if (!(await seDeconnecter({ question: false }))) setAcct(a => (a ? { ...a, busy: false } : a)); return; }
       if (M === 'pw') {
         if (acct.val.length < 8) { setAcct(a=>({...a,busy:false,err:'8 caractères minimum.'})); return; }
         if (/^(\d+|[a-zA-Z]+)$/.test(acct.val)) { setAcct(a=>({...a,busy:false,err:'Mélange lettres et chiffres — ce mot de passe protège ta compta.'})); return; }
@@ -2051,6 +2056,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
       { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
+      // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
+      { id:'copieannonces', type:'panneau', ic:'save', lib:tr('reglages.copieannonces.lib'), desc:tr('reglages.copieannonces.desc'), data:{ 'data-reglage-copieannonces':'' }, el:<CopieAnnonces comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
     ]},
@@ -2188,6 +2195,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // voit l'entrée, et la route refuse tout autre compte (403).
       proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:tr('reglages.pilotage.lib'), desc:tr('reglages.pilotage.desc'), data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
+      proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>
       <details><summary>{tr('reglages.depannage.emails.q')}</summary><p>{tr('reglages.depannage.emails.r')}</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
@@ -2340,6 +2349,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {!ouvert && <>
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
+        {/* (12 nov., sécurité des comptes) Double vérification pas activée : UNE carte discrète, jamais forcée. */}
+        {voirReglages && AUTH.user && !rechercheReglage.trim() && <CarteDoubleVerif/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
         {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('reglages.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
@@ -3446,14 +3457,15 @@ function Parrainage() {
     try { await navigator.clipboard.writeText(lien); toast('✓ Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
   };
   return (
-    <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes}
-      pied={`Un mois offert à vous deux à son premier paiement (12 par an max).${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
+    <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-parrainage-test={p.modeTest ? '1' : undefined}
+      pied={`${p.modeTest ? 'Mode test : aucun vrai paiement pour l’instant. ' : ''}Un mois offert à vous deux à son premier paiement (12 par an max).${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
       <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }}>
         <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
         <div className="vrm-abo-actions" style={{ marginTop: 10 }}><button type="button" className="vrm-b vrm-b-secondaire" onClick={copier} data-copier-parrainage="">Partager mon lien</button></div>
       </div>
-      <RangeeIos titre="Amis inscrits" valeur={<span data-chiffre-inscrits="">{s.inscrits}</span>}/>
-      <RangeeIos titre="Ont payé leur premier mois" valeur={<span data-chiffre-payes="">{s.payes}</span>}/>
+      {/* (11 nov., agent2-argent-parrainage) Une phrase : « N personnes venues par toi · M abonnées » — des NOMBRES, jamais qui. */}
+      <RangeeIos titre={<span data-parrainage-phrase="">{s.inscrits} personne{s.inscrits > 1 ? 's' : ''} venue{s.inscrits > 1 ? 's' : ''} par toi · {s.payes} abonnée{s.payes > 1 ? 's' : ''}</span>}
+/>
       <RangeeIos titre="Mois offerts pour toi" detail={s.enAttente ? `${amis(s.enAttente)} : en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{s.moisOfferts}</span>}/>
     </GroupeIos>
   );
@@ -3988,7 +4000,7 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
     setP(n);
     // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
     // N° et la numérotation automatique la lisent dès le prochain rendu.
-    try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n));setErreurLocal(''); } catch (_) {setErreurLocal('Le format n’a pas pu être appliqué sur cet appareil. Aucun numéro existant n’est modifié.');setP(prefixeNumeros());setMode(prefixeNumeros()?'lettre':'chiffres');return;}
+    if (ecrireCopieLocale('vrm_num_prefixe', n)) setErreurLocal(''); else {setErreurLocal('Le format n’a pas pu être appliqué sur cet appareil. Aucun numéro existant n’est modifié.');setP(prefixeNumeros());setMode(prefixeNumeros()?'lettre':'chiffres');return;}
     save('vrm_num_prefixe', n);
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
   };
@@ -5031,16 +5043,23 @@ function EmailsSetting({onComptes}) {
     // ⚠️ Une écriture REFUSÉE (la base répond, mais non) s'affichait comme
     //    réussie : l'adresse semblait déclarée, ses emails continuaient de
     //    partir de côté. On remet la liste d'avant et on le dit.
-    let ok = false;
+    // ⚠️⚠️ (11 nov., robustesse des données, point 4) Plus jamais la liste ENTIÈRE
+    //    lue à l'ouverture de l'écran : une adresse ajoutée depuis un autre appareil
+    //    disparaissait (ses e-mails partaient en quarantaine). On relit la ligne, on
+    //    n'y pose que CE qui a changé ici (ajout, retrait), et on écrit par
+    //    comparer-et-échanger sur `data.rev` (src/ligneCas.js).
+    let ok = false, ecrite = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-        method: 'POST',
-        headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([withOwner({ id: 'vrm_email_owners', data: { adresses, updatedAt: new Date().toISOString() } })]),
-      });
-      ok = !!(r && r.ok);
+      const res = await modifierLigneCas({ base: SUPABASE_URL, id: 'vrm_email_owners', entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner,
+        modifier: (actuel) => {
+          const lues = actuel && actuel.adresses && typeof actuel.adresses === 'object' ? actuel.adresses : {};
+          const fus = fusion3(avant || {}, adresses || {}, lues) || {};
+          return { ...(actuel || {}), adresses: fus, updatedAt: new Date().toISOString() };
+        } });
+      ok = !!res.ok; if (ok) ecrite = (res.data && res.data.adresses) || adresses;
     } catch (_) { ok = false; }
     if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return false; }
+    setReg(ecrite);
     setVersionReception(v=>v+1);
     // Une adresse ajoutée (ou retirée) change ce qui t'est proposé en dessous :
     // on relit, sans attendre la prochaine ouverture de l'écran.

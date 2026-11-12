@@ -16,6 +16,7 @@ import { passageTransporteurs, transpALire, appliquerReponseBrute, ENVOI_MAX, MA
 import { corsExtension } from './_lib/cors-extension.js';
 import { etiquettesDuVendeur } from './_lib/etiquettes-vendeur.js';
 import { MAX_PDF_APP, BUDGET_PDF_APP_MS } from './_lib/transporteur-anciens.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 // ── (24 oct.) LE STATUT DES COLIS CHEZ LEUR TRANSPORTEUR (api/_lib/transporteurs*.js)
 // Trois modes, sans 13e fonction (le plan Hobby en permet 12) :
@@ -100,18 +101,39 @@ async function etiquettes(req, res) {
 
 const UA = { 'User-Agent': 'VRM/1.0 (points relais)' };
 
+// (11 nov., M42) Nominatim : 1 requête/s au plus (sa politique d'usage) et un
+// cache par ville (24 h) dans l'instance : un abus ne fait pas bannir l'adresse
+// de VRM. Délai de 8 s (fetch-delai).
+const NOMINATIM_ESPACE_MS = 1100;
+const CACHE_VILLE_MS = 24 * 3600 * 1000;
+const cacheVilles = new Map();
+let _prochainNominatim = 0;
+export async function freinNominatim(maintenant = Date.now()) {
+  const attente = Math.max(0, _prochainNominatim - maintenant);
+  if (attente > 3000) return false;   // file trop longue : « indisponible », jamais une attente sans fin
+  _prochainNominatim = Math.max(_prochainNominatim, maintenant) + NOMINATIM_ESPACE_MS;
+  if (attente) await new Promise((r) => setTimeout(r, attente));
+  return true;
+}
 async function geocodeCity(city) {
+  const cle = String(city).toLowerCase();
+  const c = cacheVilles.get(cle);
+  if (c && Date.now() - c.at < CACHE_VILLE_MS) return c.g;
+  if (!(await freinNominatim())) return null;
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fr&q=${encodeURIComponent(city)}`;
-  const r = await fetch(url, { headers: UA });
+  const r = await fetchAvecDelai(url, { headers: UA }, 8000);
   if (!r.ok) return null;
   const j = await r.json();
-  return (j && j[0]) ? j[0] : null;
+  const g = (j && j[0]) ? j[0] : null;
+  if (g) { if (cacheVilles.size > 500) cacheVilles.delete(cacheVilles.keys().next().value); cacheVilles.set(cle, { g, at: Date.now() }); }
+  return g;
 }
 
 // Position (lat/lon) → nom de ville, puis on géocode la ville pour sa bbox.
 async function cityFromLatLon(lat, lon) {
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12`, { headers: UA });
+    if (!(await freinNominatim())) return null;
+    const r = await fetchAvecDelai(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12`, { headers: UA });
     if (!r.ok) return null;
     const j = await r.json();
     const a = j && j.address;
@@ -126,13 +148,15 @@ async function overpass(query) {
     'https://overpass.kumi.systems/api/interpreter',
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ];
-  for (const m of mirrors) {
-    try {
-      const r = await fetch(m, { method: 'POST', headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(query) });
-      if (r.ok) { const j = await r.json(); if (j && j.elements) return j; }
-    } catch (_) {}
-  }
-  return null;
+  // (11 nov., M41) Les trois miroirs en COURSE (le premier qui répond gagne),
+  // 8 s chacun : jamais 3 × 25 s en série, au-delà du temps de la fonction.
+  const un = async (m) => {
+    const r = await fetchAvecDelai(m, { method: 'POST', headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(query) }, 8000);
+    if (!r.ok) throw new Error('overpass ' + r.status);
+    const j = await r.json(); if (j && j.elements) return j;
+    throw new Error('overpass vide');
+  };
+  try { return await Promise.any(mirrors.map(un)); } catch (_) { return null; }
 }
 
 const typeLabel = (t) => t.amenity === 'parcel_locker' ? 'Casier à colis'
@@ -162,7 +186,7 @@ export default async function handler(req, res) {
   if (mode === 'transp' || mode === 'transp-a-lire' || mode === 'transp-brut') { await transp(req, res, mode); return; }
   if (mode === 'etiquettes') { await etiquettes(req, res); return; }
   if (!(await vendeurExige(req, res))) return;
-  let city = (req.query && req.query.city ? String(req.query.city) : '').trim();
+  let city = (req.query && req.query.city ? String(req.query.city) : '').trim().slice(0, 80);   // (11 nov., B123) borné
   const lat = req.query && req.query.lat, lon = req.query && req.query.lon;
   try {
     // Depuis la position : on retrouve d'abord le nom de la ville.
@@ -214,6 +238,9 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'private, max-age=86400');
     res.status(200).json({ city, center: { lat: +g.lat, lon: +g.lon }, points });
   } catch (e) {
-    res.status(200).json({ city, points: [], error: String(e) });
+    // (11 nov., B124-125) une panne est un 502 au message fixe, jamais mise en cache.
+    console.warn('relais : points', e && e.name);
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(502).json({ city, points: [], error: 'points_indisponibles' });
   }
 }

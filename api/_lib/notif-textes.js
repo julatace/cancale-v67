@@ -68,6 +68,8 @@ export const FAMILLE_DE = {
   // (6 nov.) Leboncoin « Suppression de vos annonces » : ouvrir « Mes annonces »
   // (api/_lib/lbc-suppression.js), une fois par jour au plus.
   lbcsuppression: 'rappels',
+  // (11 nov., lot agent2-veille) Un chiffre qui a chuté d'un coup sans raison (src/veilleChiffres.js).
+  veille: 'rappels',
   // (11 nov.) « Me le rappeler » : un rappel que le vendeur a posé LUI-MÊME (api/_lib/rappels-perso.js).
   rappel: 'rappels',
   // (8 nov.) Un compte relié pour la première fois (api/_lib/compte-relie.js) : une fois par compte.
