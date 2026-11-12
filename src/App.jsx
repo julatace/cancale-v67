@@ -1235,7 +1235,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.364.0', lbcprix: '5.363.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
+const EXT_CAPACITES = { repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -25122,7 +25122,7 @@ function CarteColisVc({ v, imprime, fait }) {
             <span style={{ fontWeight: 600 }}>Vestiaire</span>
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
-            <span data-colis-dates="">{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}{v.date && joursAttente(v.date) != null ? <span className="vrm-colis-vendue" data-colis-attente={joursAttente(v.date)} title={`Vendue le ${dateCourteVc(v.date)}`}>{urg ? ' · ' : ''}{texteAttenteVente(joursAttente(v.date))}</span> : null}</span>
+            <span data-colis-dates="">{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}{v.date && joursAttente(v.date) != null ? <span className="vrm-colis-vendue" data-colis-attente={joursAttente(v.date)} title={`Vendue le ${dateCourteVc(v.date)}`}>{urg ? '\u00a0· ' : ''}{texteAttenteVente(joursAttente(v.date))}</span> : null}</span>
             {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · déposé</span> : null}
           </div>
           {/* Le transporteur est écrit UNE fois : la pastille à côté du bouton bordereau. */}
@@ -38912,6 +38912,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const takenK = new Set(takenCles);
     ajouterNumerosHorsEcran(taken, takenK);   // (2 nov.) les N° donnés aux annonces Vestiaire
     let changed = false;
+    // ⚠️ (12 nov., intégration) DEUX ÉCRANS MONTÉS ENSEMBLE (Ventes porte « À expédier » en tête depuis
+    //    revue-colis) : chacun a son état. Le second numérotait la MÊME annonce une 2e fois (N°7 puis N°8,
+    //    banc achats-sourcing) et réécrivait le pool sans le N°7. On reprend d'abord ce que l'APPAREIL a
+    //    déjà rangé : une annonce numérotée par l'autre écran garde SON numéro, et son N° reste au pool.
+    {
+      const ranges = load('vinted_annonce_numeros', {}) || {};
+      for (const it of items) {
+        const r = ranges[it.id], c = nextNum[it.id];
+        if (r && String(r.numero || '').trim() && !(c && String(c.numero || '').trim())) { nextNum[it.id] = { ...(c || {}), ...r }; changed = true; }
+      }
+      for (const x of (load('vinted_used_numeros', []) || [])) { const ep = entreePool(x); if (ep != null && !nextUsed.has(ep)) { nextUsed.add(ep); changed = true; } }
+    }
     // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
     // une annonce renumérotée automatiquement par erreur le retrouve).
     if (recreesEff) {
@@ -50911,7 +50923,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             <Icon name="mail" size={13}/></button> : null}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
                             {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(urgTxt)}</span>}
-                            {att != null ? <span data-colis-attente={att}>{urgTxt ? ' · ' : ''}{texteAttenteVente(att)}</span> : null}
+                            {att != null ? <span data-colis-attente={att}>{urgTxt ? '\u00a0· ' : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>

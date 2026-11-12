@@ -23,7 +23,7 @@
 //   P6  45 actions/h ⇒ refus ; 429 ⇒ pause, puis rien ne part.
 //   P7  l'onglet sur un autre compte ⇒ rien ne part.
 //   P8  2xx mais relu à un autre prix ⇒ « écart », jamais « fait ».
-//   P9  l'app : `EXT_CAPACITES.vcprix` = 5.364.0 ; règles de la feuille.
+//   P9  l'app : `EXT_CAPACITES.vcprix` = 5.368.0 ; règles de la feuille.
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_source-app.cjs').brancher();
@@ -292,7 +292,7 @@ async function p10() {
 async function p9() {
   const APP = fs.readFileSync(F.app, 'utf8');
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
-  dit(!!cap && /\bvcprix:\s*'5\.364\.0'/.test(cap[1]), 'P9 · `EXT_CAPACITES.vcprix` = 5.364.0');
+  dit(!!cap && /\bvcprix:\s*'5\.368\.0'/.test(cap[1]), 'P9 · `EXT_CAPACITES.vcprix` = 5.368.0 (la 5.365 publiée ne l’a pas)');
   const R = await import(pathToFileURL(F.regle).href);
   const B = await import(pathToFileURL(path.join(path.dirname(F.regle), 'baissePrix.js')).href);
   dit(R.etatRecettePrixVc({ appris: true }, 'ok').etat === 'pret' && R.etatRecettePrixVc({ appris: false, raison: 'x' }, 'ok').etat === 'pas-sur' && R.etatRecettePrixVc({}, 'ok').etat === 'pas-appris' && R.etatRecettePrixVc(null, 'ok').etat === 'passu' && R.etatRecettePrixVc({ appris: true }, 'retard').etat === 'ext-retard', 'P9 · « prêt » seulement appris ET extension à jour ; sinon dit (pas appris · pas sûr · pas su · extension)');

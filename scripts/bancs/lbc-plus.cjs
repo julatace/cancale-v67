@@ -83,7 +83,7 @@ const projette = (row, sel) => {
 const PONT = ({ mode }) => {
   window.__cmds = [];
   if (mode === 'absente') return;
-  const version = mode === 'vieille' ? '5.344.0' : '5.363.0';
+  const version = mode === 'vieille' ? '5.344.0' : '5.368.0';
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
