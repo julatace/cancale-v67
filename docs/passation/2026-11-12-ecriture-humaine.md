@@ -155,3 +155,13 @@ Vrai `git merge origin/main` (184f46c2f). Conflits résolus en gardant LES DEUX 
   `_fond-vm.cjs` et la fausse base répond en 3 ms. Dans un navigateur rien ne change
   (10/20 s réels). L'audit neutralise ce signal (il juge les pages) ; F1/F2 de
   `audit-robustesse-extension` jugent toujours le délai.
+
+## Audits du fond (76, `_fond-vm`) sur l'arbre fusionné
+
+Verts sauf 4, **tous déjà rouges sur la branche de départ** (`agent2-extension-moyennes`,
+5.362) et verts sur `main` — à regarder avec elle, pas causés par ce lot :
+`audit-extension-5186` (une carte bancaire : corps remplacé par « [retiré…] » mais la
+capture part quand même), `audit-favoris-ecritures` (2 : réserve 45/50),
+`audit-liaison-visite` (2), `audit-republier-plusieurs-chrome` (2).
+`audit-republier-question` : regex mise à la nouvelle forme (`versionsRefus.length`),
+même règle (le message de refus compté avant l'envoi, dit s'il ne part pas).
