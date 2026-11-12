@@ -9,10 +9,12 @@ import ModeAutoFavoris from './ModeAutoFavoris.jsx';
 import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import JaugeActions from './JaugeActions.jsx';   // (10 nov., lot G) les 50 actions/h de ce compte
 import {RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
-import {articlesFavoris,pseudoFavori,itemIdFavori} from './favorisEcran.js';
+import {pseudoFavori,itemIdFavori} from './favorisEcran.js';
+import {etatArticleFavori,listeFavorisCompte,selectionEnvoyable} from './favorisParCompte.js';   // (12 nov., ext. 5.372) par compte, une liste
+import {ListeFavoris,TeteCompte,FavorisAutreCompte} from './FavorisListeCompte.jsx';
 import Pourquoi from './composants/PourquoiReplie.jsx';
 import PageFavoris from './FavorisEtapes.jsx';
-import {annoncesQui,destinatairesChoisis,detailOffre,morceauxApercu,recapEnvoi,achatsApresMessage,dernierEnvoi,gardeMarge,ceQuiMarche,offresGroupees,prixLot} from './favorisParcours.js';
+import {detailOffre,morceauxApercu,recapEnvoi,achatsApresMessage,dernierEnvoi,gardeMarge,ceQuiMarche,offresGroupees,prixLot} from './favorisParcours.js';
 import {plancherVente} from './plancherOffre.js';
 import {useLignesActions} from './JaugeActions.jsx';
 import {jaugeDuCompte} from './jaugeActions.js';
@@ -36,8 +38,8 @@ function PhotoNotification({src, PhotoVinted}) {
 const ETAPES=[['choix','1. Choisir'],['message','2. Message'],['envoi','3. Envoi']];
 const ETAT_ENVOI={attente:'En attente',reserve:'En cours…',envoye:'Envoyé',ignore:'Conversation déjà commencée — rien envoyé',incertain:'À vérifier sur Vinted',annule:'Annulé — non envoyé',verifie:'Clôturé après vérification',refuse:'Interrompu'};
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,favorisVariantes=true,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU,extensionAuto=null,articleFavori=null,ventesFavoris=null}) {
-  const [choisis,setChoisis]=React.useState([]),[anciensAussi,setAnciensAussi]=React.useState(false),[confirmeMarge,setConfirmeMarge]=React.useState(false);
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',favorisPerso=false,favorisVariantes=true,verifierExtension,recupererPage,ouvrirFavori,chargementAutomatique=false,PhotoVinted=null,ecranActif=true,FermeAuRetour=null,articlesVendus=AUCUN_ARTICLE_VENDU,extensionAuto=null,articleFavori=null,ventesFavoris=null,uidOnglet='',autresComptes=[],listingsFavoris=null}) {
+  const [choisis,setChoisis]=React.useState([]),[confirmeMarge,setConfirmeMarge]=React.useState(false);
   const [vueAuto,setVueAuto]=React.useState(null),[periode,setPeriode]=React.useState('30'),[filtreChoisi,setFiltreArticles]=React.useState(null),[maxArticles,setMaxArticles]=React.useState(20),[detail,setDetail]=React.useState(null);
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[variantes,setVariantes]=React.useState([]),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   // L'offre (29 oct., comme Vintex) : aucune · diminuer (% ou €) · fixer à un prix ; arrondi à l'euro.
@@ -270,25 +272,35 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const journalAuto=(vueAuto?.auto||vueFile?.auto)?.journal||[];
   const ligneParId=new Map(lignes.map(x=>[x.id,x]));
   const lireArticle=id=>{try{return articleFavori?.(id)||null;}catch{return null;}};
-  const {cartes}=data?articlesFavoris({lignes,statut,journal:journalAuto,vendue,article:lireArticle,maintenant,periode:'tout'}):{cartes:[]};
+  // ── (12 nov., ext. 5.372) PAR COMPTE, UNE LISTE : du plus récent au plus ancien ─────────
+  // Julien : « par compte et pas par articles […] tu enlèves ceux qui sont liés à des articles
+  // vendus […] la possibilité à côté de chaque favori de cliquer dessus pour le sélectionner ».
+  // La règle : src/favorisParCompte.js. On n'écrit qu'au nom du compte de l'onglet vinted.fr.
   const jobsVue=vueFile?.jobs||[];
   const depuisEnvoi=dernierEnvoi(jobsVue);
-  const depuis=anciensAussi?null:depuisEnvoi;
-  const annonces=annoncesQui(cartes,id=>{const l=ligneParId.get(id);return !l||bloque(l);},{depuis});
-  const anciens=annonces.reduce((n,a)=>n+a.anciens,0);
-  const choix=destinatairesChoisis(annonces,choisis);
+  const journalParNotif=React.useMemo(()=>{const m=new Map();for(const x of journalAuto){if(!x||x.notificationId==null)continue;const k=String(x.notificationId);if(!m.has(k))m.set(k,[]);m.get(k).push(x);}for(const l of m.values())l.sort((a,b)=>(Number(b.at)||0)-(Number(a.at)||0));return m;},[journalAuto]);
+  const articleDe=(u,id)=>etatArticleFavori(id,u,{vendus,listings:listingsFavoris,maintenant});
+  const liste=data?listeFavorisCompte(lignes,{itemIdDe:itemIdFavori,etatDe:l=>etatFavori({job:statut(l),journal:journalParNotif.get(String(l.id))||[],vendue:vendue(l)}).code,articleDe:id=>articleDe(uid,id)}):{lignes:[],retires:0,sansDate:0};
+  const ongletSu=!!String(uidOnglet||'');
+  const selectionnable=ongletSu&&String(uidOnglet)===String(uid);
+  const idsChoisis=selectionEnvoyable(choisis,liste.lignes,{uid,uidOnglet});
+  const parId=new Map(liste.lignes.map(r=>[r.id,r]));
+  const parAnnonce=new Map();for(const id of idsChoisis){const r=parId.get(id);const k='item:'+r.itemId;parAnnonce.set(k,(parAnnonce.get(k)||0)+1);}
+  const choix={ids:idsChoisis,annonces:[...parAnnonce.keys()],parAnnonce};
   const cleChoix=choix.ids.join(',');
   React.useEffect(()=>{if(fileActive||preparation)return;setSelection(s=>s.join(',')===cleChoix?s:choix.ids);},[cleChoix,fileActive,preparation]);
-  // Arrivé depuis Ma journée (« Envoyer une offre ») : les annonces aux NOUVEAUX favoris sont choisies, rien ne part.
+  const annonceDe=itemId=>{const a=lireArticle(itemId)||{};const prix=Number(a.prix);return {cle:'item:'+itemId,itemId:String(itemId),titre:a.titre||'',numero:a.numero!=null&&a.numero!==''?String(a.numero):'',photo:a.photo||null,prix:Number.isFinite(prix)&&prix>0?prix:null};};
+  const infosLigne=id=>{const l=ligneParId.get(id);if(!l)return null;const it=itemIdFavori(l);const a=it?annonceDe(it):{};return {titre:a.titre||'',photo:a.photo||l.photo||null,pseudo:pseudoFavori(l),age:ageFavori(l.date,maintenant)};};
+  // Arrivé depuis Ma journée (« Envoyer une offre ») : les favoris arrivés depuis le dernier envoi sont cochés, rien ne part.
   const prepare=React.useRef(false);
   React.useEffect(()=>{if(prepare.current||!data||!uid)return;let v=null;try{v=JSON.parse(sessionStorage.getItem('vrm_favoris_prepare')||'null');}catch{}
-    if(v&&String(v.uid)===String(uid)&&Date.now()-Number(v.at)<600000){prepare.current=true;try{sessionStorage.removeItem('vrm_favoris_prepare');}catch{}setChoisis(annonces.filter(a=>a.choisissable).map(a=>a.cle));}},[data,uid]);
+    if(v&&String(v.uid)===String(uid)&&Date.now()-Number(v.at)<600000){prepare.current=true;try{sessionStorage.removeItem('vrm_favoris_prepare');}catch{}setChoisis(liste.lignes.filter(r=>r.parDefaut&&(depuisEnvoi==null||(r.date!=null&&r.date>depuisEnvoi))).map(r=>r.id));}},[data,uid]);
   const offreChoixClair=offreChoix==='fixer'?'prix':offreChoix==='diminuer'?typeDim:'aucune';
   const setOffreChoixClair=v=>{if(v==='aucune')setOffreChoix('aucune');else if(v==='prix')setOffreChoix('fixer');else{setOffreChoix('diminuer');setTypeDim(v);}change();};
-  const parCle=new Map(annonces.map(a=>[a.cle,a]));
-  const choisies=choix.annonces.map(k=>parCle.get(k)).filter(Boolean);
+  const choisies=choix.annonces.map(k=>annonceDe(k.slice(5)));
   const offrePour=a=>detailOffre(a?.prix,offreObjet,prixOffreFavori);
-  const exempleA=choisies[0]||annonces.find(a=>a.choisissable)||annonces[0]||null;
+  const premiere=liste.lignes.find(r=>r.itemId);
+  const exempleA=choisies[0]||(premiere?annonceDe(premiere.itemId):null);
   const exemple=exempleA?{...exempleA,offre:offrePour(exempleA)}:null;
   const messageAffiche=message.trim()||(offreChoix!=='aucune'?MESSAGE_PAR_DEFAUT:'');
   const morceaux=morceauxApercu(messageAffiche,personnaliserMessageFavori);
@@ -308,14 +320,33 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const ouvrirEnvoi=()=>{if(!data&&!etat.charge)charger();setEtape('envoi');setFeuille(true);};
   const ouvrirPersonne=id=>{const l=ligneParId.get(id);if(l)ouvrir(l);};
   const sansCompte=!uid||!owner;
+  const verrouListe=fileActive||preparation;
+  const cochables=liste.lignes.filter(r=>r.cochable);
+  const quiListe=<section className="vrm-fc-etape vrm-fu-blanc vrm-fpc" data-fc-etape="qui" aria-label={tr('favoris.liste.titre')}>
+    <div className="vrm-fc-etape-tete"><span className="vrm-fc-num" aria-hidden="true">1</span><h3>{tr('favoris.liste.titre')}</h3><span className="vrm-fc-resume" data-fc-choisis={choix.ids.length}>{tr('favoris.liste.choisis',{n:choix.ids.length})}</span></div>
+    <p className="vrm-fc-aide">{tr('favoris.liste.aide')}</p>
+    <div className="vrm-fpc-compte" data-fav-section={String(uid)}>
+      <TeteCompte uid={uid} nom={nomCompte} onglet={selectionnable} n={liste.lignes.length} nChoisis={choix.ids.length} nCochables={cochables.length} selectionnable={selectionnable} verrou={verrouListe}
+        raison={ongletSu?tr('favoris.liste.autreCompte'):tr('favoris.liste.pasSuOnglet')}
+        tout={()=>setChoisis(cochables.filter(r=>r.parDefaut).map(r=>r.id))} rien={()=>setChoisis([])}/>
+      {liste.lignes.length?<ListeFavoris uid={uid} rows={liste.lignes} infos={infosLigne} choisis={choix.ids} selectionnable={selectionnable} verrou={verrouListe} PhotoVinted={PhotoVinted}
+        basculer={id=>setChoisis(c=>{const l=selectionEnvoyable(c,liste.lignes,{uid,uidOnglet});return l.includes(id)?l.filter(x=>x!==id):[...l,id];})}/>
+        :<p className="vrm-fc-note" data-fc-rien>{tr('favoris.liste.vide')}</p>}
+      {liste.sansDate>0&&<p className="vrm-fc-aide" data-fav-sans-date={liste.sansDate}>{tr('favoris.liste.sansDate',{n:liste.sansDate})}</p>}
+      {liste.retires>0&&<p className="vrm-fc-aide" data-fav-retires={liste.retires}>{tr('favoris.liste.retires',{n:liste.retires})}</p>}
+    </div>
+    {(autresComptes||[]).filter(c=>String(c.uid)!==String(uid)).length>0&&<div className="vrm-fpc-autres" data-fav-autres="">
+      <span className="vrm-fc-sous-titre">{tr('favoris.liste.autres')}</span>
+      {(autresComptes||[]).filter(c=>String(c.uid)!==String(uid)).map(c=><FavorisAutreCompte key={c.uid} compte={c} owner={owner} ownerActuel={ownerActuel} base={base} headers={headers} articleDe={articleDe} articleInfos={id=>id?annonceDe(id):null} PhotoVinted={PhotoVinted} maintenant={maintenant}/>)}
+    </div>}
+  </section>;
   const alerteExtension=exigePerso&&!favorisPerso?tr('favoris.quoi.extension'):'';
   return <section className="vrm-fa vrm-fu-ecran" aria-label={tr('favoris.titre')} data-fav-ecran data-fav-clair>
     <PageFavoris nomCompte={nomCompte} PhotoVinted={PhotoVinted} FermeAuRetour={FermeAuRetour}
       sansCompte={sansCompte} lecture={!sansCompte&&etat.charge&&!data} absente={!!data&&data.reception==='absente'} aucun={!!data&&data.reception!=='absente'&&!lignes.length}
       lectureEnCours={!!etat.charge} actualiser={charger} ouvrirOutils={ouvrirFeuille} ouvrirEnvoi={ouvrirEnvoi} ouvrirPersonne={ouvrirFavori?ouvrirPersonne:null} ouverture={ouverture}
       alertes={!feuille?alertes:null}
-      annonces={annonces} choisis={choisis} choix={choix} basculer={k=>setChoisis(c=>c.includes(k)?c.filter(x=>x!==k):[...c,k])} toutChoisir={()=>setChoisis(annonces.filter(a=>a.choisissable).map(a=>a.cle))} aucune={()=>setChoisis([])}
-      anciens={anciens} anciensAussi={anciensAussi} setAnciensAussi={setAnciensAussi} depuisEnvoi={depuisEnvoi}
+      choix={choix} quiListe={quiListe}
       message={message} setMessage={v=>{setMessage(v);change();}} variantes={variantes} setVariantes={l=>{setVariantes(l);change();}} variantesOk={favorisVariantes} inserer={inserer} champMessage={champMessage}
       offreChoix={offreChoixClair} setOffreChoix={setOffreChoixClair} reduction={reduction} setReduction={v=>{setReduction(v);change();}} montantOffre={montantOffre} setMontantOffre={v=>{setMontantOffre(v);change();}} arrondi={arrondi} setArrondi={v=>{setArrondi(v);change();}}
       exemple={exemple} morceaux={morceaux} erreurMessage={apercu.erreur||(!messageAffiche?tr('favoris.quoi.ecrisMessage'):'')} alerteExtension={alerteExtension}
@@ -323,7 +354,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       auto={!sansCompte?<ModeAutoFavoris variante="carte" FermeAuRetour={FermeAuRetour} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} nomCompte={nomCompte} extensionAuto={extensionAuto} onVue={setVueAuto}/>:null}
       recap={recap} recapAnnonces={recapAnnonces} pourApp={jauge?.pourApp??45} bloquees={bloquees} confirmeMarge={confirmeMarge} setConfirmeMarge={setConfirmeMarge}
       envoyer={envoyer} occupe={preparation} fileActive={fileActive} reglagesPrets={!!reglages.prets} erreurLancer={erreurLancer||(!favorisDisponible&&favorisRaison?favorisRaison:'')}
-      historique={historiqueF} marche={marche} groupes={groupes} prixLot={prixLot} articleHisto={id=>{const a=lireArticle(id);const c=cartes.find(x=>x.itemId===String(id));return {titre:a?.titre||c?.titre||'',numero:a?.numero||'',photo:a?.photo||c?.photo||null,prix:a?.prix??c?.prix??null};}}/>
+      historique={historiqueF} marche={marche} groupes={groupes} prixLot={prixLot} articleHisto={id=>{const a=lireArticle(id);return {titre:a?.titre||'',numero:a?.numero||'',photo:a?.photo||null,prix:a?.prix??null};}}/>
     {uid&&owner&&(typeof document!=='undefined'?createPortal(contenuFeuille,document.body):contenuFeuille)}
     {!feuille&&assistance}
   </section>;

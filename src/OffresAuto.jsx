@@ -231,7 +231,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
           : !histo.length ? <p className="vrm-oa-vide">{tr('oa.histo.aucune')}</p>
           : histo.map((h) => { const f = h.item ? (numeros || {})[h.item] : null; return (
             <div key={`${h.uid}:${h.t}:${h.tx || ''}:${h.sorte}`} className="vrm-oa-histo" data-oa-histo={h.sorte} data-oa-histo-auto={h.auto ? '1' : '0'}>
-              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? tr('oa.histo.acceptee') : tr('oa.histo.refusee')}{h.auto ? ` ${tr('oa.histo.auto')}` : ''}{h.variante ? ` · version ${h.variante}` : ''}</span>
+              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? tr('oa.histo.acceptee') : tr('oa.histo.refusee')}{h.auto ? ` ${tr('oa.histo.auto')}` : ''}{h.variante ? ' · ' + tr('oa.histo.version', { n: h.variante }) : ''}</span>
               <span className="vrm-oa-nom">{f && f.numero ? <Numero n={f.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{(h.item && titreDe.get(h.item)) || (f && f.title) || (h.tx ? tr('oa.histo.commande', { tx: h.tx }) : '')}</span></span>
               <span className="vrm-oa-chiffres">{h.prix != null ? <b>{montant(h.prix)}</b> : '—'} · {quand(h.t)}{nomDe(h.uid) ? ` · ${nomDe(h.uid)}` : ''}</span>
             </div>

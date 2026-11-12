@@ -50,6 +50,7 @@ if (args.includes('--prouve')) {
   process.exit(rates ? 1 : 0);
 }
 let SRC = SRC0;
+const VCODE = (/const CODE_VERSION = '([^']+)'/.exec(fs.readFileSync(SRC0, 'utf8')) || [])[1];   // la version du code lu (5.372 : plus de numéro en dur)
 const mut = (args.find((a) => a.startsWith('--mutation=')) || '').slice(11);
 if (mut) {
   const [a, b] = MUTATIONS[mut];
@@ -175,7 +176,7 @@ function fond({ enLigne = true, servie = '9.0.0', manifeste = {}, ...o } = {}) {
     } });
     const r = await f.ctx.construireRapport();
     const txt = JSON.stringify(r);
-    dit(r && r.version === '5.371.0' && r.flux && r.flux.vinted && r.flux.vinted.koStatut === '503' && !r.flux.inconnu, 'D le rapport porte la version, la dernière lecture et son résultat', txt.slice(0, 300));
+    dit(r && r.version === VCODE && r.flux && r.flux.vinted && r.flux.vinted.koStatut === '503' && !r.flux.inconnu, 'D le rapport porte la version, la dernière lecture et son résultat', txt.slice(0, 300));
     dit(!/@|exemple|123456789|9876543210|12345678|45678901|Bonjour|Sophie|45,50|€/.test(txt) && /page_ok/.test(txt) && /ecriture_ratee_harvest_#/.test(txt), 'D aucun e-mail, pseudo, texte, montant ou n° long ne sort (tout ce qui est planté est tombé)', txt);
     dit(r && r.files && r.files.commandes && r.files.commandes.fait === 1, 'D les files sont comptées (jamais leur contenu)', JSON.stringify(r && r.files));
     let corps = null;
@@ -183,7 +184,7 @@ function fond({ enLigne = true, servie = '9.0.0', manifeste = {}, ...o } = {}) {
     const f0 = f.ctx.fetch;
     f.ctx.fetch = async (u, o) => { if (/mode=rapport-extension/.test(String(u))) { corps = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ ok: true }) }; } return f0(u, o); };
     const e = await f.ctx.envoyerRapport();
-    dit(e && e.ok && corps && corps.version === '5.371.0', 'D « Envoyer un rapport » poste à /api/compte?mode=rapport-extension avec la session', JSON.stringify(e));
+    dit(e && e.ok && corps && corps.version === VCODE, 'D « Envoyer un rapport » poste à /api/compte?mode=rapport-extension avec la session', JSON.stringify(e));
     const S = await import(path.join(__dirname, '..', 'api', '_lib', 'rapport-extension.js'));
     const n = S.normaliserRapportExt({ ...r, texte: 'Bonjour', pseudo: 'sophie_b', email: 'a@b.fr', flux: { vinted: { okAt: t, koStatut: 'tx 4455667788' } }, compteurs: { 'achat_12,50_€': 1 } }, t);
     const tn = JSON.stringify(n);
