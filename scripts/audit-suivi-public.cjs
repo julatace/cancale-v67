@@ -20,8 +20,13 @@ async function suite(lib, quiet) {
   ok(E({ evenements: ev(['12', 'En cours de livraison'], ['10', 'Livré']) }).etat === 'en_route', 'A7 le plus RÉCENT tranche (la date, pas l’ordre de la page)');
   const S = await import('file://' + path.join(R, 'api/_lib/suivi-colis.js'));
   const t = { ...E({ carrier: 'gls', suivi: '12345678901', evenements: ev(['11', 'Le colis a été livré']) }), lu: '2026-11-12T08:00:00Z' };
-  const f = S.fusionTransporteur({ suivi: '12345678901', carrier: 'gls', status: 'transit' }, t, Date.parse('2026-11-12T09:00:00Z'));
-  ok(f.status === 'delivered', 'B1 la ligne lue entre dans la règle commune : le transporteur tranche (retiré)', f.status);
+  // (12 nov., intégration #1140) Le transporteur TRANCHE une ligne en contradiction (`aVerifierTransporteur`) ;
+  // sans contradiction, la ligne garde son état et la sortie passe par la règle des fins (« Sortis de à retirer »,
+  // source transporteur — banc retraits-suivi R1).
+  const f = S.fusionTransporteur({ suivi: '12345678901', carrier: 'gls', status: 'transit', aVerifierTransporteur: 'Retiré puis « changé de plan »' }, t, Date.parse('2026-11-12T09:00:00Z'));
+  ok(f.status === 'delivered' && !f.aVerifierTransporteur, 'B1 la ligne lue entre dans la règle commune : le transporteur tranche (retiré) une contradiction', f.status);
+  const f0 = S.fusionTransporteur({ suivi: '12345678901', carrier: 'gls', status: 'transit' }, t, Date.parse('2026-11-12T09:00:00Z'));
+  ok(f0.status === 'transit', 'B1 sans contradiction, la ligne garde son état (la sortie est dite par les fins datées)', f0.status);
   return ko;
 }
 (async () => {
