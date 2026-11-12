@@ -441,7 +441,7 @@ function RaisonPublication({ n, place }) {
 // disparaît quand tu expédies ». Le colis « à envoyer » montre bordereau + QR ;
 // une fois posté il descend dans « Déjà postés » (le bordereau n'est plus en
 // avant). On rend ce qui est MESURÉ (label capté), jamais un colis inventé.
-function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
   // « Colis fait » comme sur Vinted (`vinted_ship_done`) : un colis coché quitte
   // la liste « à poster » et descend dans « Déjà postés », sans être perdu.
   const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
@@ -545,15 +545,19 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     );
   };
   return (
-    <div style={{ padding: 16 }}>
-      <ScreenHead icon="box" title="Colis Leboncoin" desc="Génère tes bordereaux, poste tes colis — comme sur Vinted" />
+    <div style={{ padding: enSection ? '0 16px 16px' : 16 }}>
+      {/* (12 nov., finitions) En section de Ventes, l'intertitre « À expédier » suffit : « Colis Leboncoin »
+          en grand juste dessous faisait deux titres l'un sur l'autre. */}
+      {enSection ? null : <ScreenHead icon="box" title="Colis Leboncoin" desc="Génère tes bordereaux, poste tes colis — comme sur Vinted" />}
       {colis.length === 0 ? (
         // (20 oct., revue) Jamais lu n'est pas « aucun colis » : Ventes dit « — »
         // tant que « Mes transactions » n'a pas été relue, Colis disait « Aucun
         // colis » sur la même absence de lecture (« rien lu » ne vaut pas « rien »).
         <Card><div data-lbc-colis-vide={lbcVentes.maj ? 'lu' : 'jamais'} style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{lbcVentes.maj
           ? <>Aucun colis Leboncoin à envoyer dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}).</>
-          : <>Pas encore lu : ouvre « Mes transactions » sur leboncoin.fr.</>}</div></Card>
+          // (12 nov., finitions) En section de Ventes, la carte « Tes ventes Leboncoin ne sont pas encore lues »
+          // juste dessous dit déjà le geste (« Ouvre « Mes transactions »… », avec son bouton) : une fois (§7).
+          : enSection ? <>Colis Leboncoin : pas encore lus.</> : <>Pas encore lu : ouvre « Mes transactions » sur leboncoin.fr.</>}</div></Card>
       ) : (<>
         {/* ── À GÉNÉRER : vendu, mais le bordereau n'existe pas encore ──────────
             Générer un bordereau Leboncoin est une action SUR leboncoin.fr (API de

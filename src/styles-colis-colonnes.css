@@ -313,3 +313,43 @@ html body .vrm-rpf .vrm-rpf-ordre { margin: 4px 0 8px; }
 html body .vrm-rpf .vrm-rpf-masques { display: block; min-height: 44px; margin: 6px 0; font-size: 13px; background: none; border: 0; color: var(--p-gris, #86868b); cursor: pointer; text-align: left; }
 /* (11 nov., retraits fiables) « vérifié par Chronopost à 14:05 » passe à la ligne au téléphone (jamais rogné). */
 html body .vrm-rpf-ligne .vrm-rpf-verifie { white-space: normal !important; }
+
+/* ── (12 nov., finitions) « … » D'UNE CARTE COLIS, DANS LA RANGÉE DU BORDEREAU ─────────────
+   Il était posé à part (`position: absolute`, `right: 64–72px`), calé pour un bouton rond de
+   44 px ; depuis que le bouton du bordereau porte son libellé (« Imprimer », « Générer le
+   bordereau sur Vinted »), il passait DESSOUS et ne se touchait plus (deux points visibles sur
+   « Imprimer »). Il vit maintenant dans la rangée, à gauche du bouton : la rangée le place,
+   quelle que soit la largeur du bouton. Cible 44 px, gris, sans fond (le bouton voisin garde
+   le sien). Spécificité au-dessus des règles de styles-premium / fusion / ventes-achats-visuel.
+   Dans la couche `vrm-premium` : ses `!important` passent avant tout `!important` hors couche,
+   c'est là que vivent les règles qu'il faut défaire (styles-premium.css). */
+@layer vrm-premium {
+:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord {
+  display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 4px !important;
+}
+:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord > button.vrm-fu-plus.vrm-fu-plus-carte {
+  all: unset; box-sizing: border-box !important; order: -1 !important;
+  position: static !important; right: auto !important; top: auto !important; bottom: auto !important; transform: none !important;
+  display: grid !important; place-items: center !important; flex: none !important;
+  width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important;
+  border-radius: 50% !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
+  color: var(--fu-gris, #6e6e73) !important; cursor: pointer !important;
+}
+:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord > button.vrm-fu-plus.vrm-fu-plus-carte:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3) !important; outline-offset: 2px !important; }
+:root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord > button.vrm-fu-plus.vrm-fu-plus-carte { color: #98989d !important; }
+/* La place du texte de la carte suit la rangée (« … » + bouton) : au téléphone 92 px (deux ronds), 136 px quand
+   le bouton est « Générer le bordereau » (avec « sur Vinted ↗ » dessous) ; à l'ordinateur, où le bouton porte son
+   libellé, 170 px (« Imprimer ») et 250 px (« Générer le bordereau »). Une rangée sur deux lignes (le bouton et
+   « sur Vinted ↗ ») ne sort plus de la carte : la carte prend sa hauteur. */
+@media (max-width: 1023px) {
+  :root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(.vrm-rangee-bord [data-bouton-bord]) > :first-child { padding-right: 136px !important; }
+}
+@media (min-width: 1024px) {
+  :root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child { padding-right: 170px !important; }
+  :root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(.vrm-rangee-bord [data-bouton-bord]) > :first-child { padding-right: 250px !important; }
+  /* « Générer le bordereau » garde son libellé à l'ordinateur (comme « Imprimer ») ; au téléphone, l'icône seule. */
+  :root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord [data-bouton-bord] > button .vrm-lib-court { display: inline !important; }
+  :root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord [data-bouton-bord] > button .vrm-lib-long { display: none !important; }
+}
+:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(.vrm-rangee-bord a[data-bord-vinted]) > :first-child { min-height: 100px !important; }
+} /* fin @layer vrm-premium (« … » dans la rangée) */

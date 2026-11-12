@@ -134,6 +134,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     dit(v.map((x) => x.nom).join() === 'ventes-filtre,commandes-recherche' && v[0].valeur === 'En transit' && v[1].valeur === '« nike »', 'Ventes dit son filtre et sa recherche retenus, en clair', v);
     dit(S.retenusAffiches(m, 'achats').map((x) => x.nom).join() === 'commandes-recherche', 'Achats : un filtre au défaut n’est pas dit, la recherche partagée l’est');
     dit(S.retenusAffiches(m, 'messages').length === 0, 'une recherche vide n’est pas dite');
+    // (12 nov., finitions) « Republier » est un filtre (même vue que le tri) ; un choix fait ICI n'est pas redit.
+    const fr = S.retenusAffiches([{ nom: 'annonces-tri', valeur: 'republier', initial: 'oldest' }], 'annonces');
+    dit(fr.length === 1 && fr[0].quoi === 'Filtre' && fr[0].valeur === 'Republier', '« Republier » revenu d’ailleurs : dit « Filtre : Republier » (pas « Tri »)', fr);
+    dit(S.retenusAffiches([{ nom: 'annonces-tri', valeur: 'republier', initial: 'oldest', touche: true }, { nom: 'ventes-filtre', valeur: 'transit', initial: 'all', touche: true }], 'annonces').length === 0, 'un choix fait ici, à l’instant, n’est pas redit par le bandeau (la pastille le montre)');
   });
   essaie('câblage', () => {
     const app = sansCommentaires(src.app);

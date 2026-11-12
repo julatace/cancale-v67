@@ -1719,5 +1719,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
 
 ## Déplacé tel quel de CLAUDE.md §9 (12 nov., intégration 12nov-a — fichier sous 59 000 octets)
+## Déplacé tel quel de CLAUDE.md §9 (12 nov., finitions 2e passe — fichier sous 59 000 octets)
 
 - **12 nov. · Restes (agent2-restes)** : points relais tous transporteurs (rue sans n°, repli extrait), « Voir l'e-mail », « Où vous livrer… » = en route, « livré ici » relu, SMS, bancs. `2026-11-12-restes.md`. Geste : aucun.
+- **12 nov. · Finitions (2 passes)** : défauts écran par écran, ligne unique d'« À retirer » (logo et nom du transporteur), cartes « À expédier », couleurs §7. `docs/passation/2026-11-12-finitions.md`. Geste : aucun.

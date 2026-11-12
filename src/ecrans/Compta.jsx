@@ -409,7 +409,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
             placeholder="Numéro... puis Entrée"
             style={{flex:1,minWidth:120}}/>
-          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
         </div>
         {['all','stock','vendu'].map(f=>(
@@ -419,8 +419,8 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         ))}
       </div>
       {oldStockCount>0&&(
-        <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:500}}>
-          ⚠️ {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
+        <div style={{background:C.card2||C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.muted,fontWeight:500}}>
+          {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -433,7 +433,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           <tbody>
             {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucun article</td></tr>}
             {list.map(p=>(
-              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
+              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return 'transparent';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:600,color:C.accentTexte,fontSize:15,minWidth:60}}>
                   <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
                 </td>
@@ -442,12 +442,12 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <span onClick={()=>toggleStatus(p.id)} style={{cursor:'pointer'}}>
-                    <Badge color={p.status==='stock'?C.accent:C.danger}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
+                    <Badge color={p.status==='stock'?C.accent:C.muted}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
                   </span>
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
                   <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
-                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:C.warn,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
+                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:11,color:C.muted,fontWeight:500,marginLeft:3}}>{days}j</span>;return null;})()}
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
@@ -494,7 +494,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} articles</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} articles</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
     </div>
@@ -673,7 +673,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
           placeholder="Article, date... puis Entrée"
           style={{maxWidth:280,flex:1,minWidth:160}}/>
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -690,7 +690,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
               ))}
             </tr></thead>
             <tbody>
-              {filtered.length===0&&<tr><td colSpan={9} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune vente</td></tr>}
+              {/* (12 nov., finitions) À gauche : centré dans ce tableau large, « Aucune vente » sortait de l'écran du téléphone. */}
+              {filtered.length===0&&<tr><td colSpan={9} data-ventes-vide="" style={{padding:20,textAlign:'left',color:C.muted}}>Aucune vente</td></tr>}
               {filtered.map(v=>{
                 const b=beneficeVenteManuelle(v);
                 const isSelected=selectedIds.has(v.id);
@@ -799,7 +800,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                 <td style={{padding:'6px 6px',color:previewBuy!==null&&previewSell!==null?C.text:C.muted,fontWeight:600,fontSize:12,whiteSpace:'nowrap'}}>
                   {previewBuy!==null&&previewSell!==null?fmt(previewSell-previewBuy):''}
                 </td>
-                <td style={{padding:'6px 6px',color:C.warn,fontSize:12}}>
+                <td style={{padding:'6px 6px',color:C.muted,fontSize:12}}>
                   {previewBuy&&previewBuy>0&&previewSell?`×${(previewSell/previewBuy).toFixed(2)}`:''}
                 </td>
                 <td style={{padding:'6px 6px'}}>
@@ -821,7 +822,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
       
@@ -1075,10 +1076,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
       </div>
-      {search&&<div style={{fontSize:12,color:C.warn}}>
+      {search&&<div style={{fontSize:12,color:C.muted}}>
         🔍 « {search} » : {fullList.length} résultat{fullList.length>1?'s':''} dans toutes les factures.
       </div>}
       
@@ -1097,29 +1098,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       </div>
       {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
           identique, faisait doublon.) */}
-      {search.trim()&&<div style={{fontSize:11,color:C.warn,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
+      {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
       
       {/* Tableau factures */}
       <Card style={{padding:0,overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
-          <thead>
-            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
-                développeur — « Aucune facture en attente » ne se rattrape
-                nulle part). D'où l'origine des lignes, et la porte : le même
-                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
-                constate le vide. */}
-            {list.length===0&&<tr><td colSpan={7} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
+        {/* (12 nov., finitions) Le vide se dit HORS du tableau : dans un tableau de 700 px, sur
+            téléphone, la phrase et « + Nouvelle facture » étaient coupés au bord de la carte. */}
+        {list.length===0 ? <div data-factures-vide={zone} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
               {search.trim()
                 ? <>Aucune facture trouvée pour « {search} ».</>
                 : zone==='attente'
@@ -1138,12 +1123,31 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   : <>Aucune facture comptabilisée.<br/>
                       <span style={{fontSize:12}}>Une facture arrive ici quand tu la marques comptabilisée.</span>
                     </>}
-            </td></tr>}
+
+        </div> :
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
+          <thead>
+            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
+                développeur — « Aucune facture en attente » ne se rattrape
+                nulle part). D'où l'origine des lignes, et la porte : le même
+                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
+                constate le vide. */}
             {list.map(inv=>{
               const isAccounted=accountedSet.has(String(inv.productId).trim());
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:'8px',color:C.warn,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
+                  <td style={{padding:'8px',color:C.text,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
                   <td style={{padding:'8px',color:C.accentTexte,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
@@ -1158,7 +1162,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               );
             })}
           </tbody>
-        </table>
+        </table>}
       </Card>
       
       {/* Pagination */}
@@ -1171,7 +1175,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} factures</span>
+        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} factures</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
       
@@ -1434,7 +1438,7 @@ async function generateFacturXPdf(inv, ent){
     a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
+  }catch(e){ try{toast('Facture électronique impossible : '+e.message);}catch(_){} }
 }
 // ⟦← App.jsx #24⟧
 const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
@@ -2402,7 +2406,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
-            ['Ce que VRM prépare', 'Une facture Factur-X par vente, le récap mensuel aux particuliers (e-reporting).'],
+            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récapitulatif du mois de tes ventes aux particuliers.'],
             ["Où l'envoyer", "Super PDP : connecte TON compte ci-dessous. Ailleurs : dépose-les toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
@@ -2448,7 +2452,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── RÉCAP E-REPORTING ── */}
         <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Déclaration des ventes à l’administration · {libelleYm(ym)}</div>
           {!recap ? (
             <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
               {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total plutôt qu'un faux zéro."}
@@ -2468,8 +2472,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             </div>}
             <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Toutes tes ventes du mois y sont : retire celles faites à une entreprise. <Pourquoi>VRM ne sait pas si un acheteur est une entreprise. Une vente à une entreprise demande une facture, pas ce récapitulatif.</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récap en tableur</button>
-              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, au format JSON (pour un logiciel de compta)"><Icon name="save" size={14} />Récap JSON</button>
+              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récapitulatif (tableur)</button>
+              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, en fichier pour un logiciel de compta"><Icon name="save" size={14} />Récapitulatif (fichier)</button>
             </div>
             {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas tout seul : dépose-le toi-même sur Super PDP. <Pourquoi>La forme de son envoi par l'API n'a pas pu être vérifiée dans la documentation officielle de Super PDP.</Pourquoi></div>}
           </div>)}
@@ -2477,7 +2481,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── FACTURES FACTUR-X ── */}
         <div style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures Factur-X · ventes de {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures électroniques · ventes de {libelleYm(ym)}</div>
           {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 13, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 12, padding: '10px 12px' }}>
             {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }}> {etat.geste}</span> : null}
           </div>}
