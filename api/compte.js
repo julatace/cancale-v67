@@ -43,6 +43,10 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 l'installation, 5/h/compte, notifié) ; GET la
 //                                 liste et POST {action:'traite'} au PROPRIÉTAIRE
 //                                 seul — voir api/_lib/signalement.js
+//   /api/compte?mode=rapport-extension (GET/POST, session) « ENVOYER UN RAPPORT » de
+//                                 l'extension (5.371) : POST l'état technique (liste
+//                                 blanche, 6/h, une ligne par vendeur) ; GET sa ligne,
+//                                 ou tous les vendeurs pour le PROPRIÉTAIRE — api/_lib/rapport-extension.js
 //   /api/compte?mode=commandes    (POST, session de l'extension) les ventes/achats
 //                                 envoyés LÉGERS, fusionnés dans la ligne
 //                                 `harvest_{uid}_orders_*` — api/_lib/commandes-leger.js
@@ -93,6 +97,7 @@ import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov.,
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+import { recevoirRapportExt, listerRapportsExt } from './_lib/rapport-extension.js';   // (12 nov., ext. 5.371) « Envoyer un rapport »
 import { routeAlertes } from './_lib/alertes-production.js';
 import { routePilotage } from './_lib/pilotage.js';
 import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
@@ -1722,6 +1727,19 @@ async function signalement(req, res) {
   return repondre(res, r.code, r.corps);
 }
 
+// ── « ENVOYER UN RAPPORT » DE L'EXTENSION (12 nov., ext. 5.371, api/_lib/rapport-extension.js) ──
+// POST : la session de l'extension ; l'état technique seulement (liste blanche
+// rejouée ici). GET : le vendeur sa ligne ; le PROPRIÉTAIRE tous les vendeurs.
+async function rapportExtension(req, res) {
+  const utilisateur = await vendeurExige(req, res);
+  if (!utilisateur) return;
+  if (req.method === 'GET') { const r = await listerRapportsExt({ utilisateur, de: (req.query && req.query.de) || null }); return repondre(res, r.code, r.corps); }
+  const corps = await lireCorpsJson(req);
+  if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
+  const r = await recevoirRapportExt({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
+  return repondre(res, r.code, r.corps);
+}
+
 // ── LES TEMPS RÉELS DES VENDEURS (6 nov., v36, api/_lib/mesures-terrain.js) ──
 // POST : un `sendBeacon` de l'app (corps en texte, jeton DANS le corps — un
 // beacon ne porte pas d'en-tête), au plus une fois par minute ; le jeton est
@@ -1831,6 +1849,7 @@ export default async function handler(req, res) {
   if (mode === 'supprimer' || mode === 'fermer') return m === 'POST' ? supprimerCompte(req, res) : (m === 'GET' && mode === 'supprimer') ? apercuSuppression(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'rapport-extension') return (m === 'GET' || m === 'POST') ? rapportExtension(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
   // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :
   // jeton vérifié d'abord, propriétaire seul (403 sinon), clé de service après.

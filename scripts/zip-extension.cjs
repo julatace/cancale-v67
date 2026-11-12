@@ -53,6 +53,7 @@ function manifesteFirefox(m) {
   const fond = f.background && f.background.service_worker;
   f.background = { scripts: [COMPAT, fond || 'background.js'] };
   delete f.externally_connectable;
+  delete f.minimum_chrome_version;   // 5.371 : clé de Chrome seulement (Firefox l'ignorerait avec un avertissement)
   f.browser_specific_settings = {
     gecko: {
       id: ID_FIREFOX,
@@ -92,6 +93,7 @@ function manifesteSafari(m) {
   const fond = f.background && f.background.service_worker;
   f.background = { scripts: [COMPAT, fond || 'background.js'], persistent: false };
   f.permissions = (f.permissions || []).filter((p) => p !== 'downloads');
+  delete f.minimum_chrome_version;
   f.browser_specific_settings = { safari: { strict_min_version: '16.4' } };
   for (const cs of f.content_scripts || []) {
     if (cs.world === 'MAIN') continue;
@@ -104,6 +106,7 @@ function manifesteSafari(m) {
 function manifesteOrion(m){
  const f=JSON.parse(JSON.stringify(m));
  f.manifest_version=2;
+ delete f.minimum_chrome_version; delete f.content_security_policy;   /* 5.371 : MV2 attend une chaîne ; la politique par défaut d'une MV2 suffit */
  f.background={scripts:['compat-orion.js',m.background.service_worker],persistent:false};
  f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads','contextMenus'].includes(p)),...(m.host_permissions||[])])];
  delete f.host_permissions;delete f.externally_connectable;

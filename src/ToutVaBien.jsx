@@ -28,6 +28,7 @@ import { AlertesProduction } from './composants/AlertesProduction.jsx';
 import { aVoirCapture } from './santeDonnees.js';
 import { LigneSante } from './SanteDonnees.jsx';
 import { useAlertesForme, LignesForme } from './AlerteFormeVinted.jsx';   // (11 nov., ext. 5.357) Vinted a changé une page
+import { BoutonRapportExtension, RapportsExtensionProprio } from './RapportExtension.jsx';   // (12 nov., ext. 5.371)
 import './styles-tout-va-bien.css';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
@@ -218,7 +219,10 @@ export function ToutVaBien({ onComptes }) {
       </GroupeIos>
       {/* (11 nov., lot sante-donnees) La ligne compacte : le nombre de choses à corriger dans tes données, et la porte. */}
       <LigneSante capture={etat}/>
+      {/* (12 nov., ext. 5.371) « Envoyer un rapport » : l'état technique de l'extension, sans tes données. */}
+      <BoutonRapportExtension/>
       {proprio ? <AlertesProduction entetes={enTeteSession}/> : null}
+      {proprio ? <RapportsExtensionProprio/> : null}
       {onComptes ? <div className="vrm-tvb-pied"><button type="button" className="vrm-lien-action" onClick={onComptes}>Gérer mes comptes liés</button></div> : null}
     </div>
   );
