@@ -550,7 +550,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
+- **12 nov. · Finitions écran par écran** : 8 défauts vus et corrigés (Factures vides, Catalogue, Stock Vinted, Colis Leboncoin, Numéros, « N à imprimer », lien Favoris) ; restes à décider : `docs/passation/2026-11-12-finitions.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
