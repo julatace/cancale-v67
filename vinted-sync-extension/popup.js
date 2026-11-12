@@ -84,7 +84,7 @@ async function reparerSiPerime() {
   //    PLUS (6 s sans rien) : on le relance — jamais si une republication a posé son
   //    témoin il y a moins de 10 min (elle serait coupée au milieu), une fois par
   //    10 min au plus (garde dans le stockage : aucune boucle possible).
-  if (code === undefined && FORCE) {
+  if (code === undefined && typeof FORCE !== 'undefined' && FORCE === true) {
     let g = {};
     try { g = await chrome.storage.local.get(['vrmRepubVivante', 'vrmReparationForcee']); } catch (_) { return 'stockage'; }
     const t = Date.now();
