@@ -216,6 +216,18 @@ const mesurer = (pg) => pg.evaluate(() => {
         dit(a && a.part >= 0.4, '3. « Désignation » prend au moins 40 % du tableau', a && `${Math.round(a.part * 100)} %`);
         dit(a && a.lignesDesignation <= 6, '3. la désignation tient en quelques lignes (pas une lettre par ligne)', a && `${a.lignesDesignation} lignes`);
         dit(a && a.chiffresUneLigne, '3. Qté, prix et total sur une ligne chacun');
+        // 3 bis. Le GABARIT lui-même, sans la miniature : la même facture posée dans 330 px
+        // (un petit écran, « Ma facture » au téléphone) garde une désignation lisible.
+        const etroit = await pg.evaluate(() => {
+          const src = document.querySelector('[data-fp-feuille-vente] [data-fp-apercu]'); if (!src) return null;
+          const hote = document.createElement('div'); hote.style.cssText = 'position:absolute;left:0;top:0;width:330px;visibility:hidden';
+          hote.appendChild(src.cloneNode(true)); document.body.appendChild(hote);
+          const ap = hote.firstChild, tab = ap.querySelector('.vrm-fp-a-table'), th = tab.querySelector('th'), td = tab.querySelector('tbody td');
+          const lh = parseFloat(getComputedStyle(td).lineHeight) || 16;
+          const r = { part: th.offsetWidth / tab.offsetWidth, lignes: Math.round(td.offsetHeight / lh), deborde: ap.scrollWidth > ap.clientWidth + 1 };
+          hote.remove(); return r;
+        });
+        dit(etroit && etroit.part >= 0.3 && etroit.lignes <= 10 && !etroit.deborde, '3. le gabarit seul, dans 330 px : désignation lisible, rien ne déborde', etroit && `${Math.round(etroit.part * 100)} % · ${etroit.lignes} lignes · déborde=${etroit.deborde}`);
         dit(a && /FACTURE \/ INVOICE/.test(a.texte) && /TVA non applicable, art\. 293 B du CGI/.test(a.texte) && /VAT not applicable, article 293 B/.test(a.texte) && /acquittée/.test(a.texte) && /1\s234,50\s€/.test(a.texte) && a.texte.includes(RELAIS),
           '4. bilingue intact : titre, 293 B puis sa traduction, acquittée, montant, e-mail de relais', a && a.texte.slice(0, 120));
 

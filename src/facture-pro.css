@@ -155,8 +155,8 @@ html body .vrm-fp-apercu .vrm-fp-a-table th, html body .vrm-fp-apercu .vrm-fp-a-
    lettre par ligne (« D é s i g n a t i o n ») et faire défiler la feuille de côté.
    Les montants ne se coupent jamais ; les en-têtes passent à la ligne (français, puis anglais). */
 html body .vrm-fp-apercu .vrm-fp-a-table { table-layout: fixed; width: 100%; }
-html body .vrm-fp-apercu .vrm-fp-a-table col.vrm-fp-a-col-qte { width: 3.4em; }
-html body .vrm-fp-apercu .vrm-fp-a-table col.vrm-fp-a-col-prix { width: 7.6em; }
+html body .vrm-fp-apercu .vrm-fp-a-table col.vrm-fp-a-col-qte { width: 2.8em; }
+html body .vrm-fp-apercu .vrm-fp-a-table col.vrm-fp-a-col-prix { width: 6.4em; }
 html body .vrm-fp-apercu .vrm-fp-a-table th:first-child, html body .vrm-fp-apercu .vrm-fp-a-table td:first-child { width: auto; overflow-wrap: break-word; word-break: normal; }
 html body .vrm-fp-apercu .vrm-fp-a-table th { white-space: normal; overflow-wrap: normal; word-break: normal; vertical-align: bottom; }
 html body .vrm-fp-apercu .vrm-fp-a-table td:nth-child(n+2) { white-space: nowrap; overflow-wrap: normal; }
