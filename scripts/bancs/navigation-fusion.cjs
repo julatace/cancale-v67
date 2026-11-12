@@ -167,7 +167,12 @@ const allerLien = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/${q
           return { entrees: [...zone.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), barre, groupes: [...zone.querySelectorAll('[data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe') + '=' + [...g.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')).join('+')), textes: zone.innerText };
         }, tel);
         await pg.screenshot({ path: nomF('navigation') });
-        dit(nav && nav.entrees.length >= 8, `C ${T} ${tel ? '« Plus »' : 'la colonne'} est rendue`, nav && nav.entrees.join(','));
+        // (12 nov., finitions) Au téléphone, « Plus » ne porte plus que Messages, Stock, E-mails, Argent et
+        // Communauté (GROUPES_PLUS) : Paramètres est passé au menu du profil (DJ6), « À trancher » dans Ma
+        // journée (DJ4), Republier et Favoris dans leurs écrans (AL) — décisions de Julien. « ≥ 8 » datait
+        // d'avant : la règle est désormais la liste voulue, entrée par entrée (aucune perdue), et rien d'autre.
+        const PLUS_VOULU = ['messages', 'garage', 'emails', 'compta', 'communaute'];
+        dit(nav && (tel ? PLUS_VOULU.every((k) => nav.entrees.includes(k)) && nav.entrees.length === PLUS_VOULU.length : nav.entrees.length >= 8), `C ${T} ${tel ? '« Plus » porte ses 5 entrées (Messages, Stock, E-mails, Argent, Communauté)' : 'la colonne est rendue'}`, nav && nav.entrees.join(','));
         dit(nav && !nav.entrees.some((e) => e === 'republier' || e === 'favoris') && !nav.barre.some((e) => e === 'republier' || e === 'favoris') && !/Republier|Favoris & offres/.test(nav.textes), `C ${T} ni « Republier » ni « Favoris & offres » dans la navigation`, nav && nav.entrees.join(','));
         dit(nav && (tel ? nav.barre : nav.entrees).includes('annonces') && nav.entrees.includes('messages'), `C ${T} Annonces et Messages, eux, y sont`, nav && nav.entrees.join(','));
         dit(nav && (tel ? nav.groupes.some((g) => g === 'Vendre=messages') : !nav.groupes.some((g) => /^Vendre=/.test(g))), `C ${T} le groupe « Vendre » : ${tel ? 'Messages seul au téléphone' : 'vide, donc absent de la colonne'}`, nav && nav.groupes.join(' | '));

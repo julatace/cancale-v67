@@ -208,6 +208,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'ReglagesStream :: STREAM_PHOTO_EXEMPLE': 'dessin d’exemple du mode stream : constante data:image/svg+xml écrite dans Reglages.jsx, aucune URL distante',
       'RecherchePhoto :: apercu': 'aperçu de SA photo choisie sur l’appareil : URL.createObjectURL(fichier) (blob: local, jamais envoyée), jamais une adresse Vinted',
       'Comptabilite :: qi': 'QR de retrait (transporteur)',
+      'QrRetraitImage :: local || src': 'QR de retrait (12 nov.) : la copie locale (data:image gardée après une lecture) ou `qrImage` (data:image du QR lu, ou l’adresse de QR du transporteur) — jamais une photo d’annonce',
       'Comptabilite :: qrView.img': 'QR de retrait (transporteur)',
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',
       'DoubleVerification :: cours.qr': 'QR de la double vérification : data:image/svg+xml rendu par GoTrue (qrEnSrc refuse toute autre forme)',
