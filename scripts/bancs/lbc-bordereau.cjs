@@ -118,19 +118,23 @@ async function rendre(b, version) {
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(0), cap: (r.data || {}).capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    // (intégration 11nov-g2) `id=in.(…)` : la coque lit ainsi quels sites ont des lignes (`sitesLus`) ; servi vide,
+    // Leboncoin passait « pas relié » et Ventes · Leboncoin (où vivent ses colis depuis DJ3) ne s'ouvrait pas (§6.3).
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  // (31 oct., soir) Les colis Leboncoin sont dans Colis, pastille
-  //  « Leboncoin » : l'ancien lien `plat_leboncoin&section=colis` y mène.
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin&section=colis`, { waitUntil: 'domcontentloaded' });
+  // (31 oct., soir) Les colis Leboncoin sont dans Colis, pastille « Leboncoin ».
+  // (intégration 11nov-g2, DJ3) Colis rangé dans Ventes : « À expédier » de Ventes · Leboncoin.
+  await pg.goto(`http://localhost:${PORT}/?tab=ventes&site=leboncoin`, { waitUntil: 'domcontentloaded' });
   // (31 oct.) Attendre l'espace MONTÉ (sa rangée de sections), puis la liste
   //  des colis, plutôt qu'un délai fixe : sur une machine chargée, 3 s ne
   //  suffisaient pas et le bouton « Imprimer » passait pour absent (§6.5).
   // (31 oct., soir, après fusion) Colis · Leboncoin = la pastille « Leboncoin » de la
   //  rangée de sites de Colis ; le lien y mène directement.
   await pg.waitForSelector('[data-colis-leboncoin]', { timeout: 30000 }).catch(() => {});
-  await pg.waitForSelector('[data-imprime-lbc]', { timeout: 15000 }).catch(() => {});
+  await pg.waitForSelector('[data-colis-leboncoin] [data-imprime-lbc]', { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(800);
   return { ctx, pg, errs, appels };
 }
@@ -145,7 +149,7 @@ async function rendre(b, version) {
       const onglets = [], telecharges = [];
       r.ctx.on('page', (p) => onglets.push(p));
       r.pg.on('download', (d) => telecharges.push(d.suggestedFilename()));
-      try { await r.pg.click('[data-imprime-lbc="A1"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton « Imprimer » du colis existe', String(e.message).slice(0, 80)); }
+      try { await r.pg.click('[data-colis-leboncoin] [data-imprime-lbc="A1"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton « Imprimer » du colis existe', String(e.message).slice(0, 80)); }
       // (3 nov.) Forme jamais vue : l'aperçu du tampon s'ouvre d'abord ; on garde le choix de VRM.
       if (await r.pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 8000 }).then(() => true, () => false)) await r.pg.click('[data-tampon-imprimer]').catch(() => {});
       await r.pg.waitForTimeout(2500);
