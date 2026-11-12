@@ -124,9 +124,9 @@ function UnAchat({ entree, preparer, ranger, onSuivant, onPlusTard, onPasARanger
         <div className="vrm-ra-lot" data-ranger-lot={n}>
           <span>{tr('ranger.combien')}</span>
           <span className="vrm-ra-pas">
-            <button type="button" aria-label="−" disabled={n <= 1 || prep === undefined} onClick={() => setN((x) => Math.max(1, x - 1))}>−</button>
+            <button type="button" aria-label={tr('ranger.moins')} disabled={n <= 1 || prep === undefined} onClick={() => setN((x) => Math.max(1, x - 1))}>−</button>
             <b data-ranger-lot-n={n}>{n}</b>
-            <button type="button" aria-label="+" disabled={n >= LOT_MAX || prep === undefined} onClick={() => setN((x) => Math.min(LOT_MAX, x + 1))}>+</button>
+            <button type="button" aria-label={tr('ranger.plus')} disabled={n >= LOT_MAX || prep === undefined} onClick={() => setN((x) => Math.min(LOT_MAX, x + 1))}>+</button>
           </span>
         </div>
       ) : null}

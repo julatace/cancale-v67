@@ -22,7 +22,7 @@
 .vrm-pel-textes { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-pel-titre { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-pel-sous { font-size: 13px; line-height: 1.35; color: var(--pel-gris); overflow-wrap: anywhere; }
-.vrm-pel-sous.is-rouge { color: var(--vrm-doublon, #D70015); font-weight: 600; }
+.vrm-pel-sous.is-double { color: var(--vrm-doublon); font-weight: 600; }   /* deux achats sous un même numéro : le seul rouge (§7) */
 .vrm-pel-ligne > .vrm-b { flex-shrink: 0; min-height: 44px; }
 .vrm-pel-confirmer { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--pel-trait); padding-top: 12px; }
 .vrm-pel-repli { display: flex; justify-content: space-between; align-items: center; min-height: 44px; border: none; background: transparent; padding: 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--pel-encre); cursor: pointer; text-align: left; }

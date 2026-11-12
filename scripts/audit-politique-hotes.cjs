@@ -90,6 +90,13 @@ const COUPLES = {
   'src/photoroomCle.js|www.photoroom.com': ['lien', LIEN + ' — les tarifs de Photoroom (même carte)'],
   'src/App.jsx|supabase.com': ['lien', LIEN],
   'src/agendaEcheances.js|calendar.google.com': ['lien', LIEN + ' — « Ajouter à Google Agenda » (le lien de SON calendrier)'],
+  // (intégration g1) liens ouverts d'un clic, nés des lots favoris-clair, livre-registre, retours-litiges.
+  'src/FavorisEtapes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (favoris, la cloche)'],
+  'src/RegistresVue.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (registres, geste à faire)'],
+  'src/RetoursLitiges.jsx|www.vinted.fr': ['lien', LIEN + ' — la transaction du retour sur vinted.fr'],
+  'src/registresConformes.js|www.legifrance.gouv.fr': ['lien', LIEN + ' — les textes cités sous les registres'],
+  'src/registresConformes.js|bofip.impots.gouv.fr': ['lien', LIEN + ' — le BOFiP cité sous les registres'],
+  'src/registresConformes.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la fiche F36018 citée sous les registres'],
   'src/LivrePoliceCarte.jsx|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la fiche officielle du livre de police'],
   'src/LivrePoliceCarte.jsx|www.legifrance.gouv.fr': ['lien', LIEN + ' — les articles R321-1 et suivants'],
   'src/communaute/formateur.js|vrm.center': ['vrm', 'VRM lui-même (adresse de la page publique du formateur)'],

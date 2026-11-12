@@ -125,7 +125,9 @@ async function verifier(srcModule, srcApp, bavard) {
   const iVue = app.indexOf('data-qr-plein=""'), fVue = app.indexOf('</SheetShell>', iVue);
   const vue = iVue > 0 && fVue > iVue ? app.slice(iVue, fVue) : '';
   dit(vue.length > 100 && !/#c53030|#ff3b30|#e53e3e|\bred\b|C\.danger/i.test(vue), 'E6 aucun rouge dans la vue en grand (§7 : rouge = deux paires sous un N°)');
-  dit(/data-colis-qr-absent=/.test(app) && /ouTrouverQr\(/.test(app), 'E7 un QR absent est dit sur la carte, avec où le trouver');
+  // (intégration g1) Julien, 11 nov. (« des QR codes dans tous les sens ») : la carte ne commente plus un QR
+  // absent ; la vue en grand dit où le trouver (`qrOu`, issu de `ouTrouverQr`).
+  dit(!/data-colis-qr-absent=/.test(app) && /ouTrouverQr\(/.test(app) && /data-qr-plein-absent=\{ck\}[\s\S]{0,120}qrView\.qrOu/.test(app), 'E7 un QR absent est dit dans la vue en grand, avec où le trouver (plus sur la carte, décision du 11 nov.)');
   dit(/<GardeEcranAllume\/>/.test(app) && /data-qr-plein-luminosite/.test(app), 'E8 l’écran reste allumé et la luminosité est expliquée');
   dit(/data-lbc-qr-depot/.test(app), 'E9 le QR de dépôt Leboncoin sur la carte du colis à envoyer');
   dit(/=== codeDuCompteMr\(trackingRetrait, suiviDeLigne\(t\)\) \? 'compte' : 'email'/.test(app) && /qrView\.code===qrView\.codeMr/.test(app), 'E10 « qui fait foi » se juge sur le code MONTRÉ (carte et vue en grand)');

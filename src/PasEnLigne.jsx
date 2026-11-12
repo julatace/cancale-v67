@@ -56,7 +56,7 @@ function Ligne({ c, Photo, photosHors, onOuvrir, Bouton }) {
         <span className="vrm-pel-sous">{infos}</span>
         {c.ou ? <span className="vrm-pel-sous" data-pel-ou="">{c.ou}</span> : null}
         {c.lot ? <span className="vrm-pel-sous" data-pel-lot="">{c.lot.n ? tr('pasEnLigne.lot', { n: c.lot.reste, total: c.lot.n }) : tr('pasEnLigne.lotSansNombre')}</span> : null}
-        {c.doublon ? <span className="vrm-pel-sous is-rouge" data-pel-doublon="">{tr('pasEnLigne.doublon')}</span> : null}
+        {c.doublon ? <span className="vrm-pel-sous is-double" data-pel-doublon="">{tr('pasEnLigne.doublon')}</span> : null}
       </span>
       <Bouton variante="secondaire" className="vrm-b-petit" data-pel-ouvrir={c.source} onClick={() => onOuvrir(c)}>
         {c.source === 'import' ? tr('pasEnLigne.ouvrirImport') : tr('pasEnLigne.ouvrirAchat')}
