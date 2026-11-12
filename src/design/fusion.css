@@ -1390,7 +1390,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-plus { flex: none; align-self: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-gris); padding: 0 6px; }
 .vrm-tip-pied { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 0 calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--fu-fond) 70%, transparent); }
 .vrm-tip-pied > .vrm-btn, .vrm-tip-pied > button:not(.vrm-tip-lien) { min-height: 44px; }
-.vrm-tip-lien { margin-right: auto; min-height: 44px; padding: 0 4px; border: 0; background: none; font: 600 14px/1 var(--vrm-police); color: var(--fu-bleu, #0071E3); cursor: pointer; }
+.vrm-tip-lien { margin-right: auto; min-height: 44px; padding: 0 4px; border: 0; background: none; font: 600 14px/1 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; }   /* (intégration g1) texte bleu = accentTexte (contraste ≥ 4,5:1, axe) */
 .vrm-tip-lien:disabled { color: var(--fu-gris); cursor: default; }
 .vrm-tip-grand { margin: 8px 0 0; font: 500 17px/1.35 var(--vrm-police); color: var(--fu-gris); text-align: center; }
 .vrm-tip-grand b { display: block; font: 800 44px/1.05 var(--vrm-police); letter-spacing: -.03em; color: var(--fu-encre); font-variant-numeric: tabular-nums; }
@@ -1401,7 +1401,7 @@ html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 .vrm-tip-pdf { display: flex; align-items: center; justify-content: center; margin: 0 auto; text-decoration: none; }
 .vrm-tip-outils { display: flex; gap: 16px; margin-top: -4px; }
 .vrm-tip-outils .vrm-tip-lien { margin-right: 0; font-size: 13px; }
-html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien { background: none !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; min-height: 44px; color: var(--fu-bleu, #0071E3) !important; font: 600 14px/1 var(--vrm-police) !important; }
+html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien { background: none !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; min-height: 44px; color: var(--vrm-accent-texte, #0066CC) !important; font: 600 14px/1 var(--vrm-police) !important; }
 html body .vrm-tip :is(.vrm-tip-outils, .vrm-tip-pied) button.vrm-tip-lien:disabled { color: var(--fu-gris) !important; }
 /* (11 nov., lot objectifs-mois) Le bilan du mois passé hors de la carte sombre (Argent). */
 .vrm-objectif-bilan-clair .vrm-fu-objectif-bilan { color: inherit; margin-top: 0; border-top-color: var(--fu-filet, rgba(0,0,0,.08)); }

@@ -121,16 +121,17 @@ async function tournee(nav, W) {
   await aller(o.pg, tel, 'ventes');
   e = await etat(o.pg);
   dit(e.ecran === 'ventes' && !e.garde.length && e.texteMain > 40, `${T} P4 de retour sur Ventes : l'écran est rendu (garde-fou remis à zéro)`, JSON.stringify(e));
-  // P4 bis — « Réessayer » remonte l'écran.
-  await plante(o.pg, 'cat_bord');
-  await aller(o.pg, tel, 'cat_bord');
+  // P4 bis — « Réessayer » remonte l'écran. (intégration g1) Depuis DJ3 Colis vit DANS Ventes (« À expédier ») :
+  // c'est cette section (`ventes:colis`) qui plante ; le reste de Ventes et la coque restent.
+  await plante(o.pg, 'ventes:colis');
+  await aller(o.pg, tel, 'ventes');
   e = await etat(o.pg);
-  dit(e.garde.includes('cat_bord'), `${T} P1 Colis planté : son garde-fou`, JSON.stringify(e));
+  dit(e.garde.includes('ventes:colis') && e.ecran === 'ventes' && e.entete && !e.dernierFilet, `${T} P1 Colis (Ventes · À expédier) planté : son garde-fou, Ventes et la coque restent`, JSON.stringify(e));
   await plante(o.pg, null);
-  await o.pg.locator('[data-garde-ecran="cat_bord"] [data-garde-reessayer]').first().click().catch(() => {});
+  await o.pg.locator('[data-garde-ecran="ventes:colis"] [data-garde-reessayer]').first().click().catch(() => {});
   await o.pg.waitForTimeout(1500);
   e = await etat(o.pg);
-  dit(!e.garde.length && e.ecran === 'cat_bord' && e.texteMain > 40, `${T} P4 « Réessayer » remonte Colis`, JSON.stringify(e));
+  dit(!e.garde.length && e.ecran === 'ventes' && e.texteMain > 40, `${T} P4 « Réessayer » remonte Colis (Ventes · À expédier)`, JSON.stringify(e));
   // P6 — une section de site plantée : le titre et le filtre des sites restent.
   await aller(o.pg, tel, 'ventes');
   const vinted = o.pg.locator('[data-filtre-site] button[data-site="vinted"]').first();
