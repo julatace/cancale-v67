@@ -5,6 +5,7 @@ import {
   creerGardeLectures,
   garderConversationsNonLues,
 } from "../../src/lecturesVinted.js";
+import { sansDoublons as convsSansDoublons, trierRecents, sansDate as convsSansDate } from "../../src/ordreConversations.js"; // (12 nov.) loadConvs dédoublonne et ordonne (agent2-messages)
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const s = fs.readFileSync(
@@ -38,6 +39,9 @@ function base() {
     putCache: () => {},
     messagesRetires: () => new Set(),
     garderConversationsNonLues,
+    convsSansDoublons,
+    trierRecents,
+    convsSansDate,
     owner: (v) => (owner = v),
   };
 }
