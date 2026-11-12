@@ -60,7 +60,7 @@ async function ouvrir(b, tel, tab, vue) {
     localStorage.setItem('vinted_nums_physiques', JSON.stringify({ nums: ['1', '2', '12', '31'], at: Date.now() }));
     if (vue) localStorage.setItem('vinted_garage_view', JSON.stringify(vue));
   } catch (_) {} }, [NUMEROS, MEUBLES, SLOTS, vue || null]);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));

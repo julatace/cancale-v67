@@ -98,7 +98,7 @@ async function ouvrir(b, { tel = false, pont = false, orion = false, safari = fa
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_astuce_numeros', 'false'); } catch (_) {} });
   if (orion) await pg.addInitScript(() => { window.KAGI = {}; });
   if (pont) await pg.addInitScript(PONT_MINI, { version: EXT_ATTENDUE, extId: 'abcdefghijklmnopabcdefghijklmnop' });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     lus.push(u);

@@ -135,7 +135,7 @@ const ouvrir = async (b, taille, url, ecran) => {
   await pg.clock.install({ time: maintenant });
   await pg.addInitScript(([d, s]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vinted_dark', JSON.stringify(d)); localStorage.setItem('vrm_visite_vue', JSON.stringify(true)); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } catch (_) {} }, [sombre, SESSION]);
   await pg.route(/^https?:\/\/[^/]*(vinted\.net|img\.test|ebayimg\.com|leboncoin\.fr\/api\/v1\/lbcpb)/i, (r) => { const u = r.request().url(); const m = /\/b(\d+)\/|\/[el](\d+)\.jpg/.exec(u); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1] || m[2]) : u.length) }); });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net|img\.test|[^/]*ebayimg\.com|img\.leboncoin\.fr)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net|img\.test|[^/]*ebayimg\.com|img\.leboncoin\.fr)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user, ...SESSION.user }) }));
   const L = LIGNES(ecran);
   await pg.route('**/rest/v1/**', (route) => {

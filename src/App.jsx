@@ -32223,6 +32223,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // géocodé (adresse exacte) et ENREGISTRÉ en permanence. La carte se construit
   // ainsi toute seule à partir de tes vrais points, même après retrait du colis.
   useEffect(() => { (async () => {
+    // (12 nov.) Mode exemple : des adresses FICTIVES ne partent pas chez un service de géocodage (rien
+    // rangé non plus) ; la carte de Colis les place par sa règle (code postal), comme sans réseau.
+    if (exempleActif()) return;
     // (revue adverse du 5 nov.) + les points relais des colis lus dans ses comptes Mondial Relay.
     const avail = (trackingRetrait || []).filter(isPickupActive);
     // Regroupe par NOM propre du point (plusieurs colis au même relais → 1 point)

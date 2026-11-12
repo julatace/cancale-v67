@@ -94,7 +94,7 @@ async function scenario(b, nom, vue, LIGNES) {
     const o = URL.createObjectURL.bind(URL);
     URL.createObjectURL = (blob) => { try { if (blob && blob.type === 'application/pdf') window.__pdfs.push(blob); } catch (_) {} return o(blob); };
   }, mainData);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
     const n = path.basename(new URL(r.request().url()).pathname);
     const f = path.join(PDFJS, 'build', n.replace(/\.js$/, '.mjs'));

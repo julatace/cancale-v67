@@ -84,7 +84,7 @@ async function scenario(b, scen, largeur, sombre) {
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, sombre);
   // La hauteur de la ligne, à chaque changement (elle ne doit pas changer : la page ne saute pas).
   await pg.addInitScript(() => { window.__hauteursLigne = []; const o = new MutationObserver(() => { const e = document.querySelector('[data-fraicheur-unique]'); if (e) { const h = Math.round(e.getBoundingClientRect().height); const k = e.getAttribute('data-fraicheur-unique') + ':' + h; if (window.__hauteursLigne[window.__hauteursLigne.length - 1] !== k) window.__hauteursLigne.push(k); } }); document.addEventListener('DOMContentLoaded', () => o.observe(document.body, { subtree: true, childList: true, attributes: true })); });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });

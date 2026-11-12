@@ -48,8 +48,8 @@ const qr=qrcode(0,'M');qr.addData(contenu);qr.make();
    const apres=Uint8Array.from(await page.evaluate(async bytes=>{const d=await PDFLib.PDFDocument.load(new Uint8Array(bytes));await tamponnerBordereau(PDFLib,d,{numero:'B123',titre:'Article fictif'});return Array.from(await d.save());},Array.from(await doc.save())));
    const texte=await page.evaluate(async bytes=>{const d=await pdfjsLib.getDocument({data:new Uint8Array(bytes),isEvalSupported:false}).promise;try{return (await (await d.getPage(1)).getTextContent()).items.map(i=>i.str).join(' ');}finally{await d.destroy();}},Array.from(apres));
    assert.match(texte,/B123/,'Le numéro doit vraiment figurer dans le PDF final');
-   if(cadre)assert.match(texte,/Créé par VRM/,'Étiquette encadrée, page blanche autour : la mention est posée');
-   if(w===283)assert.doesNotMatch(texte,/Créé par VRM/,'Page-étiquette 10×15 : jamais de mention');
+   if(cadre)assert.match(texte,/Créé par vrm\.center/,'Étiquette encadrée, page blanche autour : la mention est posée');
+   if(w===283)assert.doesNotMatch(texte,/Créé par vrm\.center/,'Page-étiquette 10×15 : jamais de mention');
    assert.equal(await lire(apres),contenu,'Le tampon ne doit pas casser la lecture du QR');
    
    if(w===283){const casse=await PL.PDFDocument.load(apres);casse.getPages()[0].drawRectangle({x:x-16,y:y-16,width:n*module+32,height:n*module+32,color:PL.rgb(0,0,0)});assert.equal(await lire(await casse.save()),null,'Le lecteur doit détecter un QR effectivement détruit');}
