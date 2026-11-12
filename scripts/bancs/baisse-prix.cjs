@@ -163,6 +163,8 @@ const ouvrirFeuille = async (pg, ids) => {
   await pg.locator('[data-qd-baisser]').click();
   await pg.waitForSelector('[data-baisse-serie]', { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(300);
+  await pg.locator('[data-bp-varier]').uncheck().catch(() => {});   // 5.370 : son choix exact
+  await pg.waitForTimeout(150);
 };
 const confirmer = async (pg) => { await pg.locator('[data-bp-lancer]').click(); await pg.waitForSelector('[data-bp-confirmer]', { timeout: 5000 }); await pg.locator('[data-bp-confirmer]').click(); };
 const attendreCmds = (pg, n) => pg.waitForFunction((k) => window.__cmds.length >= k, n, { timeout: 15000 }).catch(() => {});
@@ -188,6 +190,11 @@ const attendreCmds = (pg, n) => pg.waitForFunction((k) => window.__cmds.length >
           await pg.locator('[data-qd-baisser]').click();
           await pg.waitForSelector('[data-baisse-serie]', { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(400);
+          // (12 nov., ext. 5.370) « Varier un peu (± 20 %) » est allumé par défaut (src/discretion.js) :
+          // le banc juge ensuite SON choix exact, case décochée (son geste).
+          const varie = await pg.evaluate(() => { const c = document.querySelector('[data-bp-varier]'); return c ? { on: c.checked, vues: document.querySelectorAll('[data-bp-baisse-vue]').length } : null; });
+          dit(varie && varie.on && varie.vues >= 3, 'B0 « Varier un peu (± 20 %) » allumé par défaut, la baisse de chaque annonce montrée', JSON.stringify(varie));
+          await pg.locator('[data-bp-varier]').uncheck(); await pg.waitForTimeout(200);
           let s = await lireBP(pg);
           const L = s ? s.L : {};
           dit(s && L['900001'] && L['900001'].ancien === '80' && L['900001'].nouveau === '75' && L['900001'].coche === '1', 'B1 −5 € : 80 → 75, cochée', s && JSON.stringify(L['900001']));

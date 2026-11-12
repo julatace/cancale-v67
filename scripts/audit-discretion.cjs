@@ -320,6 +320,32 @@ const sansMain = (f) => { if (f.lignes.main === undefined) f.lignes.main = {}; }
     g.store.vrmCmdConnus = { [`${UID}_orders_sold`]: { complet: false, etats: f.store.vrmCmdConnus[`${UID}_orders_sold`].etats, at: Date.now() } };
     await g.ctx.rafraichirVentes(UID);
     dit(g.j.vinted.filter((x) => /my_orders/.test(x.chemin)).length === 8, 'pas capté en entier : rien n’est sauté (8 pages)');
+    // La moisson faite DANS la page (`pageActiveFetch`, 100 par page, 10 pages au plus) : la même règle.
+    const vPage = (e) => {
+      if (/users\/current/.test(e.chemin)) return { status: 200, body: { user: { id: 5 } } };
+      if (/wardrobe/.test(e.chemin)) return { status: 200, body: { items: [], pagination: { total_pages: 1 } } };
+      if (/my_orders\?type=purchased/.test(e.chemin)) return { status: 200, body: { my_orders: [], pagination: { total_pages: 1 } } };
+      if (/my_orders\?type=sold/.test(e.chemin)) return vinted(e);
+      return { status: 200, body: {} };
+    };
+    const h = fond({ vinted: vPage }); sansMain(h);
+    h.ctx.storeHarvestRow = async () => 'ecrit'; h.ctx.lastProfileId = async () => null;
+    await h.ctx.pageActiveFetch();
+    const p1 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length;
+    h.store.vrmImport = { [UID]: { sold: { fini: true }, purchased: { fini: true } } };
+    ventes = [{ transaction_id: 999998, status: 'Bordereau d’envoi commandé', transaction_user_status: 'needs_action' }].concat(ventes);
+    await h.ctx.pageActiveFetch();
+    const p2 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length - p1;
+    // (La vente EN COURS posée plus haut est maintenant 102e : la page 2 est relue pour elle.)
+    dit(p1 === 10 && p2 === 2, 'moisson dans la page : 10 pages avant ; une fois le compte capté, la page 1 + celle de la vente en cours connue (2)', `${p1} puis ${p2}`);
+    const enCours = String(ventes[101].transaction_id);
+    ventes[101] = { ...ventes[101], transaction_user_status: 'completed', status: 'Commande finalisée' };
+    await h.ctx.pageActiveFetch();
+    ventes = [{ transaction_id: 999997, status: 'Bordereau d’envoi commandé', transaction_user_status: 'needs_action' }].concat(ventes);
+    const avant3 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length;
+    await h.ctx.pageActiveFetch();
+    const p3 = h.j.vinted.filter((x) => /my_orders\?type=sold/.test(x.chemin)).length - avant3;
+    dit(p3 === 1 && /completed/.test(h.store.vrmCmdConnus[`${UID}_orders_sold`].etats[enCours]), 'moisson dans la page : la vente en cours finalisée (état appris), ensuite 1 seule requête', `${p3}`);
   });
 
   // ── 8. VARIABLES (copie identique, remplacement) ─────────────────────────
