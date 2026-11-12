@@ -325,6 +325,8 @@ export default {
   "reglages.onglet.abonnement": "Suscripción",
   "reglages.onglet.compte": "Mi cuenta",
   "reglages.onglet.reglages": "Ajustes",
+  "reglages.paiements.desc": "Lo que falta para que un cliente pueda pagar.",
+  "reglages.paiements.lib": "Abrir los pagos",
   "reglages.pilotage.desc": "Vendedores, suscriptores, ingresos, incidencias y satisfacción — en totales.",
   "reglages.pilotage.lib": "Tu empresa",
   "reglages.prixachat.desc": "Introdúcelos seguidos: sin ellos, el beneficio es solo un mínimo.",

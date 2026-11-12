@@ -109,6 +109,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportD
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
 import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
+import { OuvrirPaiements } from "../composants/OuvrirPaiements.jsx";   // (12 nov.) propriétaire seul
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -2067,6 +2068,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
       // voit l'entrée, et la route refuse tout autre compte (403).
       proprioInst && { id:'pilotage', type:'panneau', nu:true, ic:'euro', lib:tr('reglages.pilotage.lib'), desc:tr('reglages.pilotage.desc'), data:{ 'data-reglage-pilotage':'' }, el:<TableauProprietaire entetes={enTeteSession} PanneEl={EtatPanne}/> },
+      // (12 nov.) « Ouvrir les paiements » : chaque prérequis LU (src/ouverturePaiements.js), propriétaire seul.
+      proprioInst && { id:'paiements', type:'panneau', nu:true, ic:'euro', lib:tr('reglages.paiements.lib'), desc:tr('reglages.paiements.desc'), data:{ 'data-reglage-paiements':'' }, el:<OuvrirPaiements entetes={enTeteSession}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>

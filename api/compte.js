@@ -68,6 +68,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee, lireCommeVendeur } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
+import { etatOuverture, lireWebhooksStripe } from './_lib/ouverture-paiements.js';   // (12 nov.) « Ouvrir les paiements »
 import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
@@ -607,8 +608,23 @@ async function abonnement(req, res) {
   const essaiDispo = (!acc.proprietaire && !dejaAbo && stripePret())
     ? (await essaiDejaUtilise(u.email, await lireVintedIds(u.id))) === false
     : false;
+  // (12 nov.) « OUVRIR LES PAIEMENTS » : au PROPRIÉTAIRE seul, chaque prérequis
+  // LU (api/_lib/ouverture-paiements.js) — jamais à un vendeur.
+  let ouverture;
+  if (acc.proprietaire) {
+    const webhookLu = stripePret() ? await lireWebhooksStripe(stripeApi) : null;
+    ouverture = etatOuverture({
+      cle: stripePret(), modeTest: stripePret() ? stripeModeTest() : null,
+      secret: /^whsec_/.test(String(process.env.STRIPE_WEBHOOK_SECRET || '').trim()),
+      webhook: webhookLu, soloConforme: conforme, soloTexte: prix && conforme === false ? prixTexte(prix) : null,
+      pro, manque, contact: contactEmail(),
+      editeurEmail: lues && lues.editeur ? (typeof lues.editeur.email === 'string' ? lues.editeur.email : '') : null,
+      cleSolo: PRIX_CLE,
+    });
+  }
   return repondre(res, 200, {
     ok: true,
+    ouverture,
     essaiDispo,
     essaiJours: 7,
     mentionsCompletes: manque === null ? null : manque.length === 0,

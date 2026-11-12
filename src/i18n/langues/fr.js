@@ -330,6 +330,8 @@ export default {
   "reglages.onglet.abonnement": "Abonnement",
   "reglages.onglet.compte": "Mon compte",
   "reglages.onglet.reglages": "Réglages",
+  "reglages.paiements.desc": "Ce qui manque pour qu’un client puisse payer.",
+  "reglages.paiements.lib": "Ouvrir les paiements",
   "reglages.pilotage.desc": "Vendeurs, abonnés, revenus, incidents et satisfaction — en totaux.",
   "reglages.pilotage.lib": "Ton entreprise",
   "reglages.prixachat.desc": "Les saisir à la suite : sans eux, le bénéfice n’est qu’un minimum.",
