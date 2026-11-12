@@ -1,6 +1,8 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { problemesAnnonce } from '../verifAnnonce.js';
+import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
+import { motifDeLApercu } from '../antiArnaque.js';
 import { ordreRecent, quandVestiaire } from '../ordreRecent.js';
 import { STYLE_FLOU, vcFloute } from '../flouCompte.js';
 import { lienDe, vcReliable } from '../lienVestiaire.js';
@@ -896,7 +898,10 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   return (
     <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à un article VRM'} titre={titre || ''} compte="Vestiaire"/>
-      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}</div>
+      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {fil && fil.messages ? <AlerteArnaque site="vestiaire" lien={lien} messages={fil.messages}/> : null}
+        {corps}
+      </div>
       {pied}
     </CadreFil>
   );
@@ -960,10 +965,12 @@ function MessagesVestiaire() {
       const apercu = (f && f.ap) || v.apercu || '';
       const date = (f && f.da) || v.date || v.vuAt || '';
       const deMoi = f && f.ap ? f.dm === 'true' : v.apercuDeMoi === true;
+      // (11 nov., anti-arnaque) L'auteur de l'aperçu en TROIS états (pas su ⇒ null) : l'alerte ne lit que « false ».
+      const deMoiSu = f && f.ap ? (f.dm === 'true' ? true : f.dm === 'false' ? false : null) : (v.apercuDeMoi === true ? true : v.apercuDeMoi === false ? false : null);
       // (3 nov., 5.317) Le titre et la photo de l'ARTICLE lus par l'extension (fil des notifications
       // Vestiaire) quand la conversation n'est reliée à aucune fiche — affichage seul, jamais une identité.
       const it = (pid && d.items && d.items[pid]) || null;
-      return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '',
+      return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, deMoiSu, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '',
         titreArticle: String(v.titre || (it && it.titre) || ''), photoArticle: urlPhotoVc(v.photo || (it && it.photo) || '') };
     }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
     const choisie = liste.find((v) => v.id === ouvert) || null;
@@ -982,6 +989,7 @@ function MessagesVestiaire() {
           <div className="vrm-inbox-column">
             {liste.length ? <>
               <div style={{ ...style, marginBottom: 6 }}>{liste.length} conversation{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}</div>
+              <CompteurArnaque n={liste.filter((v) => motifDeLApercu(v.apercu, v.deMoiSu)).length}/>
               <div className="vrm-msg-list">
                 {liste.slice(0, 40).map((v) => {
                   const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
@@ -993,7 +1001,7 @@ function MessagesVestiaire() {
                         photo={(fv && fv.photo) || v.photoArticle} nom={(fv && fv.titre) || v.titreArticle || 'Article Vestiaire'} quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.text : C.muted}
                         titre={v.num || v.titreArticle ? '' : 'Pas reliée à un article VRM'} num={v.num}
                         extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
-                        apres={<>{offresEtat.etat === 'lu' && v.pid && offresEtat.parProduit[v.pid] ? <span className="vrm-of-tag" data-vc-conv-offre={offresEtat.parProduit[v.pid].id}>offre {euros(offresEtat.parProduit[v.pid].offre)}</span> : null}{v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}</>}
+                        apres={<>{offresEtat.etat === 'lu' && v.pid && offresEtat.parProduit[v.pid] ? <span className="vrm-of-tag" data-vc-conv-offre={offresEtat.parProduit[v.pid].id}>offre {euros(offresEtat.parProduit[v.pid].offre)}</span> : null}{v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}<PastilleArnaque motif={motifDeLApercu(v.apercu, v.deMoiSu)}/></>}
                         point={v.nonLu === true ? C.accent : null}/>
                     </div>
                   );

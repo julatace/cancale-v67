@@ -723,6 +723,10 @@ import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
+import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from "./AlerteArnaque.jsx";
+import { motifDeLApercu } from "./antiArnaque.js";
+// (11 nov., anti-arnaque) Un fil Vinted lu pour la règle : seuls les messages PROUVÉS de l'autre (`autre`) comptent.
+const messagesPourArnaque = (l) => (Array.isArray(l) ? l.filter((m) => m && m.kind === 'message').map((m) => ({ t: m.body || '', deMoi: m.mine === true ? true : m.autre === true ? false : null })) : []);
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
@@ -9891,7 +9895,7 @@ const normalizeConversationMessages = (conversation) => {
     // corps vide : le fil ne l'affiche pas.
     const lu = lireEntiteVinted(m.entity_type, e, oppId);
     if (lu.kind === 'message') {
-      return { kind: 'message', mine:!lu.vinted&&e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), vinted:!!lu.vinted, body: lu.texte, photos:Array.isArray(e.photos)?e.photos:[], ts, links };
+      return { kind: 'message', mine:!lu.vinted&&e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), autre:!lu.vinted&&e.user_id!=null && oppId!=null && String(e.user_id)===String(oppId), vinted:!!lu.vinted, body: lu.texte, photos:Array.isArray(e.photos)?e.photos:[], ts, links };
     }
     if (lu.kind === 'offer') {
       const statut=m.entity_type==='offer_request_message'?etatOffreVinted(e).libelle:'';
@@ -42848,6 +42852,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {pc.num && <Numero n={pc.num} className="vrm-chat-paire-numero"/>}
                 </div>
               ); })()}
+            {/* (11 nov., anti-arnaque) Les messages PROUVÉS de l'autre personne (`autre`) seulement : jamais les siens, jamais l'équipe Vinted. Aucune action. */}
+            {!openConv.loading && !openConv.error && <AlerteArnaque site="vinted" style={{margin:'8px 16px 0'}} lien={openConv.convId?`https://www.vinted.fr/inbox/${openConv.convId}`:''} messages={messagesPourArnaque(openConv.messages)}/>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div role="status" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Ouverture de la conversation…</div>}
               {/* (5 nov., chantier G) Plus jamais « Erreur : <code> » : la panne dite, son geste (relire ce fil). */}
@@ -48705,6 +48711,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return out;
           })();
           const jourCourt = (t)=> new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+          // (11 nov., anti-arnaque) Le dernier message d'une conversation, PROUVÉ de l'autre
+          // (fil capté, `de === 'eux'`) : un motif d'arnaque, ou null. Jamais l'aperçu de la boîte (auteur pas su).
+          const motifConv = (c) => { const p = paireDeConv(uidC(c), c.id, null); const ex = extraitConversation(c, p&&p.r, p&&p.titre, normTitle);
+            return ex.kind==='message' && ex.source==='fil' && !ex.vinted ? motifDeLApercu(ex.texte, ex.de==='eux' ? false : ex.de==='toi' ? true : null) : null; };
+          const nArnaque = liste.reduce((n,c)=>n+(motifConv(c)?1:0),0);
           return (
             <div data-messagerie style={{marginBottom:12}}>
               {/* (16 oct.) UNE barre : le filtre en contrôle segmenté, le nombre
@@ -48724,6 +48735,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* (5 nov., revue 3.8) Une boîte en panne a SON « Réessayer » : l'icône de relecture se tait à côté. */}
                 {!boitesKO.length && <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Mettre à jour les conversations" title="Mettre à jour les conversations"><Icon name="sync" size={17}/></button>}
               </div>
+              <CompteurArnaque n={nArnaque}/>
               {messageFilter.startsWith('repondre')&&<ChoixReponses mode={messageFilter} total={aRepondre.length} offres={offresARepondre} onChoix={v=>{setMessageFilter(v);setConvMax(40);}}/>}
               {messageFilter.startsWith('repondre')&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
@@ -48821,6 +48833,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
+                          <PastilleArnaque motif={ex.kind==='message'&&ex.source==='fil'&&!ex.vinted?motifDeLApercu(ex.texte, ex.de==='eux'?false:ex.de==='toi'?true:null):null}/>
                           {messageFilter.startsWith('repondre')&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}{offre && offreFacePlancher(offre.prix, plancherDeItem(offre.item, paire&&paire.devise))?.niveau==='sous' && <span data-offre-sous-plancher="" title="Sous ton prix d’achat et tes frais connus" style={{color:C.warn,fontSize:13,fontWeight:500,marginLeft:6,whiteSpace:'nowrap'}}>à perte</span>}
                           {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
                               marquée « Offre » avec son montant, à SA conversation — plus jamais un

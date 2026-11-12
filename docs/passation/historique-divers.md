@@ -1638,3 +1638,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé de CLAUDE.md §9 (11 nov., lot livre-registre)
 
 - **11 nov. · Livre des recettes et registre des achats complets (lot `livre-registre`)** : Argent → Déclarer → Registres → « Voir » : par mois, filtrable, client (facture Pro › pseudo › « Particulier »), fournisseur, nature, règlement (espèces à part), pièce (facture, ticket, reçu par SON n°, référence) ; manques nommés ; PDF · CSV · Excel horodatés ; sources (CGI 50-0, L./D. 123-205-1, BOFiP, F36018) **à vérifier** (pas ouvertes) (`src/registresConformes.js`). `docs/passation/2026-11-11-livre-registre.md`. Geste : relire les sources.
+## Ligne déplacée de CLAUDE.md §9 (11 nov., lot anti-arnaque)
+
+- **11 nov. · Alerte arnaque dans les messages (lot `anti-arnaque`)** : sans IA (`src/antiArnaque.js`, 8 motifs : code SMS, faux « paiement bloqué », faux site, lien raccourci, paiement hors plateforme, « envoie d'abord », « mon transporteur », WhatsApp/e-mail/06) ; seuls les messages PROUVÉS de l'autre ; bannière ambre + geste + « Signale-le sur… » dans les fils Vinted, Leboncoin, Vestiaire, eBay, Tous ; compteur discret ; aucune action. `docs/passation/2026-11-11-anti-arnaque.md`. Geste : aucun.
