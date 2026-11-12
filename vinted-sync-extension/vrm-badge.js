@@ -223,8 +223,10 @@
   @media (prefers-reduced-motion: reduce) { .carte.on, .question.on { animation: none; } .detail > summary::after { transition: none; } .btn.glisse { transform: none; } }
   @media (prefers-reduced-motion: reduce) { .b, .btn { transition: none; } }
   /* 5.371 : la carte en 4 lignes (compte · lu · jauge · état) — neutre, l'ambre seulement pour un geste. */
-  .q4 { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 0 0 2px; font-size: 13px; line-height: 1.4; }
-  .q4 .k { color: var(--doux); font-size: 12px; font-weight: 500; align-self: baseline; }
+  .q4 { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; margin: 0 0 2px; font-size: 13px; line-height: 1.4; }
+  .q4 .k { color: var(--doux); font-size: 11px; font-weight: 500; align-self: baseline; }
+  .q4 [data-q4="jauge"] { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .carte:has(.q4) { width: min(352px, calc(100vw - 32px)); }
   .q4 .v { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; align-self: baseline; }
   .q4 .v.nom { font-weight: 600; }
   .q4 .v.gris { color: var(--doux); }
@@ -538,7 +540,7 @@
       ? ['Touche « Télécharger ».', 'Orion → Extensions → + → ce fichier.', 'Recharge cette page.']
       : ['Ouvre le fichier téléchargé : il se dézippe.', 'Remplace l’ancien dossier VRM par le nouveau.', 'chrome://extensions → ⟳ sur VRM.'];
     return `<div class="maj" data-maj="${esc(m.servie)}"><div class="maj-t">Nouvelle version disponible · ${esc(m.servie)}</div>`
-      + `<a class="b" data-maj-telecharger href="${esc(m.lien)}" target="_blank" rel="noopener" download>Télécharger</a>`
+      + `<a class="b sec" data-maj-telecharger href="${esc(m.lien)}" target="_blank" rel="noopener" download>Télécharger</a>`
       + `<ol data-maj-etapes="${etapes.length}">${etapes.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>`;
   }
   // « Réparer » : seulement quand l'extension a MESURÉ un état cassé (session perdue,
