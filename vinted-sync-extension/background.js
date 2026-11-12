@@ -14469,7 +14469,7 @@ function prixOffreFavori(montant, offre) {
 // ══════════════════════════════════════════════════════════════════════════
 // « Un temps d'écriture avant chaque envoi […] puis l'envoie d'un coup » et
 // « Personne ne reçoit exactement la même phrase que le précédent. » Le bloc
-// <variantes-regle> est la COPIE EXACTE de src/variantesMessage.js
+// bloc « variantes-regle » ci-dessous est la COPIE EXACTE de src/variantesMessage.js
 // (`audit-ecriture-humaine.cjs` compare les deux).
 // ⚠️ AUCUNE touche simulée, aucun clic (CLAUDE.md §3) : on ATTEND, rien d'autre,
 //    puis la requête part d'un coup comme avant. L'attente se fait DANS la file
