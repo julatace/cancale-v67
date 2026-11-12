@@ -440,35 +440,9 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
-| `codes` | `capterRetraits` | **5.45.0** (27 août) | « l'extension va chercher les codes toute seule » |
-| `releve` | `capterReleves` | **5.52.0** (5 sept.) | « l'extension récupère le relevé à ta prochaine visite » |
-| `places` | `mpChoisi` | **5.54.0** (11 sept.) | « seules les annonces cochées partent sur Leboncoin » |
-| `ebay` | `buildEbayData` | **5.55.0** (12 sept.) | « l'extension prépare tes annonces sur eBay » |
-| `lbctitre` | `lbcTitre` | **5.55.4** (12 sept.) | « le titre exactement tel qu'il partira sur Leboncoin » |
-| `photoslbc` | `photosEnOctets` | **5.58.0** (13 sept.) | « photos attachées au formulaire Leboncoin, rien sur ton ordinateur » |
-| `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
-| ~~`repond`~~ | `repondreAuxMessages` | ⛔ n'existe plus dans l'extension ni dans `EXT_CAPACITES` (constaté le 2 nov.) | aucune promesse |
-| `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
-| `publication` | `publierDepuisApp` | **5.160.0** (le code fait foi ; arrivée 5.130.0 le 3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
-| `lbcdate` | `dateVenteLbc` | **5.131.0** (3 oct.) | « ouvre Mes transactions, l'extension relève la date de vente » |
-| `versement` | `capterDatesVersement` | **5.133.0** (3 oct.) | « l'extension va chercher la date de versement de tes ventes finalisées » |
-| `messagerie` | `executerPourApp` | **5.135.0** (3 oct.) | lire un fil, accepter/refuser/faire une offre depuis l'app |
-| `lbcpdf` | `pdfBordereauLbc` | **5.136.0** (3 oct.) | « 🖨 Imprimer le bordereau » Leboncoin, tamponné du titre et du N° |
-| `lbcmsg` | `storeLbcMessages` | **5.153.0** (4 oct.) | Leboncoin → Messages : « l'extension relève tes non-lus, compte par compte » |
-| `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
-| `vcmessages` | `rangerVcMessages` | **5.238.0** (27 oct.) | « elle relève le nombre de messages non lus Vestiaire en passant » |
-| `vcachats` | `rangerVcAchats` | **5.239.0** (27 oct.) | « elle lit tes achats Vestiaire en passant » |
-| ~~`detourage`~~ | `detourerPhotos` | ⛔ retiré de la table le 17 oct. (5.185) | Leboncoin/eBay ne détourent plus ; Vestiaire seul (`photosPourVestiaire`), sans réglage ni promesse |
-| `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
-| `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
-| `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
-| `relais` | `traiterRelais` | **5.183.0** (16 oct. — la 5.182 publiée par main, fiche Leboncoin, ne l'a pas) | « sur le téléphone : actions via ton ordinateur » (le relais lit le signe de vie, pas le pont) |
-| `lbcpack` | `noterPackPhoto` | **5.185.0** (17 oct.) | « l'extension voit si tu as un pack photo Leboncoin » (`lbc_pack_photo`) |
-| `vcpublier` | `publierVestiaire` | **5.235.0** (27 oct.) | « Préparer sur Vestiaire » depuis l'app |
-| `annulee` | `purgeBordereauxAnnules` | **5.185.0** (17 oct.) | « le bordereau d'une vente annulée part tout seul » |
-| `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
-| `etatcompte` | `noterEtatCompte` | **5.181.0** (16 oct.) | « compte actif / banni par Vinted » relevé par l'extension (`panel_comptes_etat`) |
-| `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
+| `favoriattente` | `attendreOffreMessage` | **5.372.0** (12 nov.) | favoris : après l'offre ACCEPTÉE, 8 à 20 s au hasard (jamais deux fois la même valeur) puis le temps d'écriture ; attente dans `chrome.storage.local` (`vrmFavoriAttente`), reprise par un worker neuf (`reprendreMessagesFavoris`) ; Tout arrêter, captcha, pause, autre compte, onglet fermé ⇒ le message ne part pas, dit |
+| `suivinumero` | `suiviDeTransaction` | **5.372.0** (12 nov.) | chaque achat en cours (payé, en attente de livraison, expédié, au point, livré sans n°) reçoit n° de suivi + transporteur + point de destination (détail de la transaction quand le suivi ne les porte pas), 6 lectures/h ; codes de retrait cherchés aussi quand Vinted demande son geste ou que le suivi dit « disponible » |
+| … | … | … | les capacités de la 5.45 à la `lbcfiche` : déplacées telles quelles dans `docs/passation/historique-vinted-extension.md` (12 nov.) — `EXT_CAPACITES` reste la vérité |
 | `confirmer` | `capterConfirmations` | **5.206.0** (le code fait foi ; arrivée 5.204.0 le 21 oct.) | « relever les colis à confirmer (« Tout est OK ») avant leur date limite » |
 | `retraitnotif` | `envoyerNotifsRetrait` | **5.206.0** (le code fait foi ; arrivée 5.204.0 le 21 oct.) | « te prévenir quand elle lit un code de retrait dans une conversation » |
 | `suivivinted` | `capterSuivisAchats` | **5.217.0** (24 oct. — ni la 5.214.0, ni la 5.215.0, ni la 5.216.0 publiées par `main` ne l'ont ; la table disait 5.216.0, le code dit 5.217.0) | « l'extension relève le suivi Vinted de tes achats » — seulement connectée à CE compte VRM, seule, au code à jour (revue du 24 oct.) |
@@ -556,6 +530,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **12 nov. · Favoris par compte + suivi des achats (ext. 5.372, `claude/agent2-favoris-compte`, CONTIENT `agent2-ext-boutique` + main 7c94382c4)** : favoris = une liste par compte (onglet d'abord), du plus récent au plus ancien, une case 44 px par favori, vendus / plus en ligne retirés, « à vérifier » si lecture ancienne, envoi au seul compte de l'onglet ; « Vintex » retiré de tout texte (« Rapide (6–10 s) », `audit-sans-vintex`) ; 8–20 s entre offre et message ; n° de suivi et codes de retrait de chaque achat en cours. `docs/passation/2026-11-12-favoris-compte.md`. Geste : installer 5.372.0.
 - **12 nov. · Boutique + carte du logo (ext. 5.371, `claude/agent2-ext-boutique`, CONTIENT `agent2-discretion`)** : « Nouvelle version disponible » (zip ⇒ Télécharger + 3 étapes ; boutique ⇒ rien), carte en 4 lignes, Réparer, rapport sans donnée (`mode=rapport-extension`), gestes hors ligne en file 24 h, logo jamais sur une barre fixe. `docs/passation/2026-11-12-ext-boutique.md`. Geste : publier (`2026-11-12-chrome-web-store.md`).
 - **12 nov. · Intégration 11nov-g2 (ext. 5.368.0)** : Leboncoin, Vestiaire, sécurité des comptes, Créer sur Vinted, republication programmée. Détail : `historique-divers.md` (déplacé tel quel) et `2026-11-12-integration-11nov-g2.md`. Geste : installer 5.368.0.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier

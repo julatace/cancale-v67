@@ -14709,15 +14709,22 @@ async function poserVerrouFiche(ficheId, v) {
 }
 // Le N° LIÉ à l'identifiant que Vinted a rendu pour le brouillon (la voie du N° « à côté de Publier »).
 async function lierNumeroFiche(draftId, numero, uid, ficheId) {
+  // (intégration 5.372) Écrit par COMPARER-ET-ÉCHANGER sur `data.rev` (5.356, `modifierLigneCas`) :
+  // la 5.367 de main réécrivait la ligne entière (`ecrireResa`, retiré par la 5.356) — deux Chrome
+  // pouvaient effacer la réservation de l'autre. Un N° déjà relié ailleurs ⇒ rien n'est écrit.
   return unResaALaFois(async () => {
-    const r = await lireResa();
-    if (r === null) { noterDiag('fiche_lien_lecture_ratee'); return { ok: false, raison: 'la base VRM n’a pas répondu' }; }
     const c = cleNum(numero);
-    const autre = Object.entries(r.items).find(([id, v]) => id !== String(draftId) && v && cleNum(v.numero) === c);
-    if (autre) { noterDiag('fiche_lien_numero_pris'); return { ok: false, raison: `le N°${numero} est déjà relié à une autre annonce` }; }
-    r.items[String(draftId)] = { numero: String(numero), at: new Date().toISOString(), uid: String(uid), fiche: String(ficheId) };
-    for (const n of Object.keys(r.attente)) if (cleNum(n) === c) delete r.attente[n];
-    if (!(await ecrireResa(r))) { noterDiag('fiche_lien_ecriture_ratee'); return { ok: false, raison: 'l’écriture dans la base VRM a échoué' }; }
+    let pris = false;
+    const ecrit = await modifierLigneCas(RESA_LIGNE, (d) => {
+      const r = resaPropre(d);
+      pris = !!Object.entries(r.items).find(([id, v]) => id !== String(draftId) && v && cleNum(v.numero) === c);
+      if (pris) return undefined;
+      r.items[String(draftId)] = { numero: String(numero), at: new Date().toISOString(), uid: String(uid), fiche: String(ficheId) };
+      for (const n of Object.keys(r.attente)) if (cleNum(n) === c) delete r.attente[n];
+      return corpsResa(r);
+    });
+    if (pris) { noterDiag('fiche_lien_numero_pris'); return { ok: false, raison: `le N°${numero} est déjà relié à une autre annonce` }; }
+    if (ecrit !== true) { noterDiag(ecrit === null ? 'fiche_lien_ecriture_ratee' : 'fiche_lien_rien'); return { ok: false, raison: 'la base VRM n’a pas répondu — rien n’est relié, réessaie' }; }
     _numsAffichage = null; noterDiag('fiche_liee');
     return { ok: true };
   });
