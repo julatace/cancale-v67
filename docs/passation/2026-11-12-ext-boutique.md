@@ -92,7 +92,7 @@ La place glissée reste rangée par site (`vrmBadgePos`, déjà là depuis la 5.
 - `extension-visuel` remis à la règle du 12 nov. (63/0) ; `badge` 138/0.
 - Verts : coherence, extension-zip, paquets-boutiques, extension-navigateurs (Chrome, Edge, Firefox, Orion…),
   variables, tdz, identite, icones, fonctions-api (12), discretion (82), icone-extension, regles-achat-extension ;
-  `npm run build` OK. Comparaison des ~150 audits qui lisent l'extension : voir plus bas.
+  `npm run build` OK. Les 152 audits qui lisent l’extension, lancés ici puis sur la branche de départ : un seul nouveau rouge (`audit-robustesse-extension`, `FORCE` hors de la fonction extraite) — corrigé ; bancs `carte-orion-sans-onglet`, `lbc-clair-carte`, `carte-resume-mois`, `badge` verts.
 
 ## Reste / à savoir
 - `public/extension-version.json` à monter à chaque version (contrôle 0 de `audit-ext-boutique`).
