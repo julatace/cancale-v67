@@ -176,7 +176,7 @@ const ouvrir = async (b, vp, sombre) => {
               marque: (l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp]') || { getAttribute: () => null }).getAttribute('data-colis-logo-transp'),
               fondMarque: (() => { const e = l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp] [data-marque]'); return e ? getComputedStyle(e).backgroundColor : null; })(),
               l3: (l.querySelector('.vrm-rpf-suivi-ligne') || {}).textContent || '',
-              verif: (() => { const v = l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]'); return v ? { txt: v.textContent.trim(), ambre: v.getAttribute('data-rp-delai-ambre'), couleur: getComputedStyle(v.querySelector('.vrm-rpf-delai-txt')).color } : null; })(),
+              verif: (() => { const v = l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]'); return v ? { txt: v.textContent.trim(), titre: (v.querySelector('[role="progressbar"]') || { getAttribute: () => '' }).getAttribute('aria-valuetext'), ambre: v.getAttribute('data-rp-delai-ambre'), couleur: getComputedStyle(v.querySelector('.vrm-rpf-delai-txt')).color } : null; })(),
             };
           });
           return { lignes, tete: tete ? tete.innerText : '', sansCode: tete && tete.querySelector('[data-relais-sans-code]') ? tete.querySelector('[data-relais-sans-code]').getAttribute('data-relais-sans-code') : null };
@@ -225,7 +225,7 @@ const ouvrir = async (b, vp, sombre) => {
         const chrono = L.find((l) => l.marque === 'chronopost');
         dit(!!chrono && chrono.fondMarque === 'rgb(255, 210, 0)', `${nom} : Chronopost Pickup sur le jaune Pickup (pas un cube noir sur blanc)`, chrono && chrono.fondMarque);
         const vt = L.filter((l) => l.verif);
-        dit(vt.length === 1 && /^Vérification chez Mondial Relay en cours$/.test(vt[0].verif.txt) && vt[0].verif.ambre === '0' && !/\?/.test(vt[0].verif.txt), `${nom} : le colis que VRM vérifie chez le transporteur le dit, neutre, à la place du délai (rien à faire)`, JSON.stringify(vt.map((l) => l.verif)));
+        dit(vt.length === 1 && /^Vérification en cours$/.test(vt[0].verif.txt) && /Mondial Relay/.test(vt[0].verif.titre) && vt[0].verif.ambre === '0' && !/\?/.test(vt[0].verif.txt), `${nom} : le colis que VRM vérifie chez le transporteur le dit, neutre, à la place du délai (rien à faire)`, JSON.stringify(vt.map((l) => l.verif)));
         const nike = L.find((l) => /Nike Dunk Low/.test(l.titre));
         dit(!!nike && /^Mondial Relay/.test(nike.l3), `${nom} : sous un article relié, le transporteur écrit en clair (« Mondial Relay »)`, nike && nike.l3);
         dit(L.every((l) => !l.sansSuiviDit), `${nom} : « sans n° de suivi » n'est répété sur aucune ligne`);

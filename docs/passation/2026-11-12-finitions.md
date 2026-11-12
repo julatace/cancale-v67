@@ -1,4 +1,33 @@
-# 12 nov. — Finitions : chaque écran passé comme un vendeur
+# 12 nov. — Finitions : chaque écran passé comme un vendeur (2 passes) et « À retirer » rendu simple
+
+## La règle d'« À retirer » (Julien : « fais quelque chose de simple et de parfait »)
+
+Propriétaire unique (données + affichage) : cette branche, depuis la fin de `claude/agent2-restes` (fusionnée,
+5a1f635f5).
+
+1. **Un colis = un n° de suivi** (son identité). Tout ce qui porte ce n° (e-mail transporteur, e-mail Vinted, SMS,
+   suivi lu chez le transporteur, et bientôt le panneau Détails Vinted lu par l'extension 5.372) se fond en UNE
+   ligne. Un achat Vinted sans n° reste une ligne à part jusqu'à ce que son n° soit connu — jamais relié par
+   ressemblance (§5 : au même point qu'un colis du transporteur, il est « peut-être le même », gardé à part, jamais
+   compté deux fois).
+2. **Le point** = celui écrit dans la source la plus récente (changement de point compris). Groupe = point.
+3. **Le code et le QR** = ceux de la source. Arrivé sans code : la ligne dit où il est — « Code sur Vinted » (le
+   dépli : « sur Vinted — l'extension le lira à ta prochaine visite ») ou « Code pas encore reçu » (le dépli :
+   « dans l'e-mail de {transporteur} — pas encore reçu »). Un QR qui ne charge pas : « QR pas chargé — Réessayer »,
+   jamais un rond vide (copie locale gardée dès qu'il a été lu).
+4. **L'état** = arrivé / en route / retiré ; la source la plus fraîche gagne, le transporteur tranche ; « changé de
+   plan » vérifié chez lui ⇒ « Vérification en cours », neutre.
+5. **Une seule forme de ligne** : vignette (photo de l'article relié, sinon le logo du transporteur) avec le logo
+   TOUJOURS au coin ; 1 · nom de l'article relié ou « Colis {transporteur} » (« Colis Chronopost Pickup », jamais un
+   n° de suivi) ; 2 · le code en gros ou où il est ; 3 · le n° de suivi (ou le nom du transporteur sous un article) ;
+   4 · la barre du délai toujours (« encore N j », « · estimée », « Date limite inconnue »). En-tête du point :
+   « N colis · K codes à venir » dès K > 0. Le dépli est une fiche étiquetée (Arrivé · À retirer avant · Code ·
+   Compte · Vérifié) et des gestes d'une seule forme (44 px). Aucune couleur si rien à faire. Chronopost Pickup sur
+   le jaune Pickup (le cube noir sur blanc était pris pour un logo générique).
+
+Bancs : `retirer-scene-julien.cjs` (la scène de production rejouée sur une base synthétique de même forme : Super U
+Accueil, Intermarché « changé de plan », « Où vous livrer… », Maison de la Presse, un retiré), `retirer-ligne-unique.cjs`,
+`colis-retirer-propre.cjs`, `retirer-carte-delai.cjs` (remis à la nouvelle règle sans être affaiblis).
 
 Branche `claude/agent2-finitions` (partie de `origin/main` + `claude/integration-11nov-g2`, puis
 `origin/main` refusionné : `main` contenait déjà g2). Aucune écriture en base, aucune donnée réelle.
@@ -66,3 +95,24 @@ Rien touché dans `vinted-sync-extension/`, `api/_lib/retrait-colis.js`, `api/_l
 bancs baisse-prix / republier / abonnement-propre / colis-envoi.
 
 Geste de Julien : aucun.
+
+## 2e passe (demande du coordinateur : les « à décider » relèvent des règles)
+
+| défaut | écran | état |
+|---|---|---|
+| « Prix d'achat 0/36 connus : bénéfice minimum » | Annonces | **corrigé** : « Bénéfice — » sans aucun prix connu, « Bénéfice au moins » avec la couverture sinon (`audit-onglets-d` D5, rouge sur l'avant) |
+| information en ambre / rouge (affichage complet, recherche active, ×, âge, Vendu, bénéfice) | Catalogue, Ventes ancien, Factures | **corrigé** (`audit-couleurs-anciens-ecrans`, 5 rouges sur l'avant) |
+| « Récap JSON », « e-reporting », « Factur-X » | Argent → Factures → Facturation électronique | **corrigé** en mots du quotidien, fichiers produits inchangés (banc finitions H) |
+| « Affiché avec · Tri : Republier » juste après l'avoir choisi | Annonces | **corrigé** : « Republier » est un Filtre ; un choix fait à l'instant n'est pas redit (`audit-reprise-synchro`, 2 rouges sur l'avant ; banc finitions I) |
+| « ouvre Mes transactions » deux fois | Ventes · Leboncoin | **corrigé** : une fois (`navigation-tache` L le juge) |
+| `navigation-fusion` C (« Plus » à 5 entrées) | menu Plus | **banc périmé** : la liste voulue (GROUPES_PLUS) a 5 entrées depuis DJ6/DJ4/AL — aucune perdue ; le contrôle exige maintenant ces 5 entrées, une par une |
+| « … » sous « Imprimer » / « Générer le bordereau » ; « Générer » coupé dans un rond (« rer le b ») ; « sur Vinted ↗ » hors de la carte | Ventes · À expédier | **corrigé** : « … » dans la rangée du bordereau (banc finitions J) |
+| cases Vinted sur Ventes · eBay | Ventes · eBay | **corrigé** : « À envoyer · N » et « N à imprimer » du site choisi ; bordereaux des e-mails Vinted seulement sur Vinted |
+| « Tout imprimer (15) » ⇒ « Imprimer (6) » | Ventes → Tout imprimer | **à vérifier** : la feuille travaille par transporteur ; pas modifié (même source `lignesLotTous`) |
+| À retirer « rien n'est cohérent » | Achats · À retirer | **refait** (la règle ci-dessus) |
+| `colis-qr` (16 rouges) | Achats · À retirer | **rouge avant comme après** : il exige « QR dans l'app Mondial Relay / QR pas reçu » (`data-colis-qr-absent`), retirés le 11 nov. (« un QR qu'on n'a pas ne se commente plus ») — à remettre à la règle actuelle |
+
+Preuves de la 2e passe : `retirer-scene-julien` 48/0, `retirer-ligne-unique` 88/0 (32 rouges sur l'avant),
+`colis-retirer-propre` 132/0 (11 rouges sur l'avant), `retirer-carte-delai` 0 rouge (15 sur l'avant),
+`finitions-12nov` A–J, `navigation-fusion` 45/0, `audit-onglets-d`, `audit-couleurs-anciens-ecrans`,
+`audit-reprise-synchro`.

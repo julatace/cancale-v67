@@ -174,7 +174,7 @@ const egalTous = (L, k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != 
           return { cle: l.getAttribute('data-cc-carte'), titre: t ? t.innerText.trim() : '', marque: (l.querySelector('.vrm-rpf-vignette [data-colis-logo-transp]') || { getAttribute: () => null }).getAttribute('data-colis-logo-transp'),
             vignette: vg && [n(vg.left - r0.left), n(vg.width)].join(','), logo: bd && vg ? [n(bd.left - vg.left), n(bd.top - vg.top)].join(',') : null,
             z2: c && rt ? n(c.top - rt.bottom) : null, z3: s3 && c ? n(s3.top - c.bottom) : null, z4: d && s3 ? n(d.top - s3.bottom) : null,
-            verif: (l.querySelector('[data-rp-verif-transporteur] .vrm-rpf-delai-txt') || {}).textContent || '', verifAmbre: (l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]') || { getAttribute: () => null }).getAttribute('data-rp-delai-ambre'),
+            verif: (l.querySelector('[data-rp-verif-transporteur] .vrm-rpf-delai-txt') || {}).textContent || '', verifNom: (l.querySelector('[data-rp-verif-transporteur] [role="progressbar"]') || { getAttribute: () => '' }).getAttribute('aria-valuetext') || '', verifAmbre: (l.querySelector('[data-rp-verif-transporteur] [data-rp-delai]') || { getAttribute: () => null }).getAttribute('data-rp-delai-ambre'),
             l3: (l.querySelector('.vrm-rpf-suivi-ligne') || {}).textContent || '', code: (l.querySelector('[data-code-retrait]') || { getAttribute: () => '' }).getAttribute('data-code-retrait') };
         }));
         // §5 (retraitPreuves) : un achat Vinted SANS n° au même point qu'un colis du transporteur est « peut-être le même » —
@@ -187,7 +187,7 @@ const egalTous = (L, k) => new Set(L.map((l) => l[k])).size === 1 && L[0][k] != 
         const chrono = L.filter((l) => /620738|723461/.test(l.code)), mr = L.filter((l) => /^5100|088943/.test(l.code));
         dit(chrono.length === 2 && chrono.every((l) => l.marque === 'chronopost' && /Colis Chronopost Pickup/.test(l.titre)) && mr.length === 4 && mr.every((l) => l.marque === 'mondialrelay' && /Colis Mondial Relay/.test(l.titre)), `${nom} : le bon logo et le nom écrit (Chronopost Pickup ≠ Mondial Relay)`, L.map((l) => `${l.titre}=${l.marque}`).join(' | '));
         const v = L.filter((l) => l.verif);
-        dit(v.length === 3 && v.every((l) => /^Vérification chez Mondial Relay en cours$/.test(l.verif) && l.verifAmbre === '0'), `${nom} : les 3 « changé de plan » : « Vérification chez Mondial Relay en cours », neutre`, JSON.stringify(v.map((l) => [l.code, l.verif, l.verifAmbre])));
+        dit(v.length === 3 && v.every((l) => /^Vérification en cours$/.test(l.verif) && /Vérification chez Mondial Relay en cours/.test(l.verifNom) && l.verifAmbre === '0'), `${nom} : les 3 « changé de plan » : « Vérification en cours » (le transporteur nommé pour le lecteur d'écran), neutre`, JSON.stringify(v.map((l) => [l.code, l.verif, l.verifAmbre])));
         const vinted = tous.filter((l) => /Chemise|Pull marin|Baskets cuir/.test(l.titre));
         dit(vinted.length === 3, `${nom} : les 3 achats Vinted sans n° gardent chacun leur ligne, au nom de l'article`, tous.map((l) => l.titre).join(' | '));
         const vSans = vinted.filter((l) => l.sansCode);

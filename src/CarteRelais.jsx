@@ -428,12 +428,12 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // transporteur : son code arrive dans l'e-mail du transporteur. La phrase entière est dans le dépli.
   const tSrc = (x.src && x.src.t) || null;
   const codeSurVinted = !tSrc || tSrc.source === 'vinted-commande';
-  const sansCodeCourt = x.horsCompte ? 'Code pas lu' : codeSurVinted ? 'Code sur Vinted' : 'Code pas encore reçu';
+  const sansCodeCourt = codeSurVinted ? 'Code sur Vinted' : x.horsCompte ? 'Code pas lu' : 'Code pas encore reçu';
   // (12 nov., finitions) Le serveur vérifie CE colis chez son transporteur (« retiré » puis « changé de plan »,
   // `aVerifierTransporteur`, api/_lib/suivi-colis.js) : rien à faire pour le vendeur ⇒ une mention NEUTRE à la
   // place du délai (jamais une question, jamais ambre), même place, même hauteur.
   const verifT = !!(x.src && x.src.t && x.src.t.aVerifierTransporteur);
-  const dl4 = verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours`, valeurTexte: 'Vérification en cours' } : dl;
+  const dl4 = verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: 'Vérification en cours', valeurTexte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours` } : dl;
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
   // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).

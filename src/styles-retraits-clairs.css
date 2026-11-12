@@ -98,3 +98,11 @@
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 0 !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-l { grid-template-columns: 104px minmax(0, 1fr) !important; }
 }
+/* La forme des gestes du dépli gagne aussi sur la couche `vrm-premium` (« Suivre ↗ » y était une pilule de 999 px). */
+@layer vrm-premium {
+  :root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { border-radius: 12px !important; height: 44px !important; min-height: 44px !important; padding: 0 14px !important; border: 0 !important; background: var(--d-remplir, rgba(118, 118, 128, .12)) !important; }
+  :root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { background: rgba(118, 118, 128, .24) !important; }
+}
+/* « Vérification chez … en cours » n'est pas un délai : pas de piste, le texte prend la ligne (il était rogné à 390 px). */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne [data-rp-delai="verif-transporteur"] .vrm-rpf-delai-piste { display: none !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne [data-rp-delai="verif-transporteur"] .vrm-rpf-delai-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
