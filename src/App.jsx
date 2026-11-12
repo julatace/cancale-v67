@@ -4506,6 +4506,10 @@ const save = (k,v,quand) => {
     delete _saveTimers[k];
     _rendreQuand(k, true);
     if (k === 'vinted_annonce_numeros' && !r.conflit) noterJournalNumeros(_lireJson(avantTxt), r.v);
+    // (12 nov., intégration) Plusieurs écrans montés ensemble (Ventes porte « À expédier » en tête) : chacun
+    // tient SES fiches. Les fiches et le pool rangés ici sont relus par les autres tout de suite — sinon un
+    // écran en retard numérotait une 2e fois une annonce déjà numérotée (banc achats-sourcing : N°7 puis N°8).
+    if (k === 'vinted_annonce_numeros' || k === 'vinted_used_numeros') { const s = _clesRelues.get(k); if (s) [...s].forEach((fn) => { try { fn(); } catch (_) {} }); }
     // (11 nov.) Hors ligne : le geste est noté dans la file des gestes (src/gestesHorsLigne.js),
     // sous-valeur par sous-valeur ; en ligne aussi quand il prolonge un geste encore en attente.
     if (owner && REGLES_GESTES[k] && !r.conflit && (horsLigneMaintenant() || gesteHLEnAttenteSur(k))) noterGesteHL(owner, k, _lireJson(avantTxt), r.v);
@@ -38916,13 +38920,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    revue-colis) : chacun a son état. Le second numérotait la MÊME annonce une 2e fois (N°7 puis N°8,
     //    banc achats-sourcing) et réécrivait le pool sans le N°7. On reprend d'abord ce que l'APPAREIL a
     //    déjà rangé : une annonce numérotée par l'autre écran garde SON numéro, et son N° reste au pool.
+    //    Rien n'est écrit pour ça seul (`changed` intact) : l'état de CET écran peut être en retard d'un geste.
     {
       const ranges = load('vinted_annonce_numeros', {}) || {};
       for (const it of items) {
         const r = ranges[it.id], c = nextNum[it.id];
-        if (r && String(r.numero || '').trim() && !(c && String(c.numero || '').trim())) { nextNum[it.id] = { ...(c || {}), ...r }; changed = true; }
+        if (r && String(r.numero || '').trim() && !(c && String(c.numero || '').trim())) nextNum[it.id] = { ...(c || {}), ...r };
       }
-      for (const x of (load('vinted_used_numeros', []) || [])) { const ep = entreePool(x); if (ep != null && !nextUsed.has(ep)) { nextUsed.add(ep); changed = true; } }
+      for (const x of (load('vinted_used_numeros', []) || [])) { const ep = entreePool(x); if (ep != null) nextUsed.add(ep); }
     }
     // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
     // une annonce renumérotée automatiquement par erreur le retrouve).
