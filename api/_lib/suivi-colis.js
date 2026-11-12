@@ -315,10 +315,12 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
   // contredisent (ex. « retiré » le 9 nov. puis « changé de plan » le 10) — jamais Julien à qui l'on demande.
   // « En route » ⇒ la ligne reste en route (ci-dessus pour une ligne disponible). Pas de réponse ⇒ rien de
   // changé : la contradiction reste dite (`aVerifierTransporteur`) et la lecture est retentée au passage suivant.
-  if (t.etat === 'retire' && st !== 'delivered' && luMs != null) {
+  // (12 nov., intégration) Seulement une ligne en CONTRADICTION (`aVerifierTransporteur`) : sans elle, la sortie
+  // lue chez le transporteur garde son chemin d'avant (« Sortis de à retirer », source transporteur — banc retraits-suivi R1).
+  if (t.etat === 'retire' && l.aVerifierTransporteur && st !== 'delivered' && luMs != null) {
     return { ...l, status: 'delivered', statusLabel: 'Retiré (lu chez le transporteur)', retireLe: t.etatAt || t.lu, relaisChange: false, viaTransporteur: true, transp: t, aVerifierTransporteur: null };
   }
-  if (t.etat === 'retour_expediteur' && st !== 'delivered' && st !== 'retour' && luMs != null) {
+  if (t.etat === 'retour_expediteur' && l.aVerifierTransporteur && st !== 'delivered' && st !== 'retour' && luMs != null) {
     return { ...l, status: 'retour', statusLabel: 'Reparti chez l’expéditeur (lu chez le transporteur)', relaisChange: false, viaTransporteur: true, transp: t, aVerifierTransporteur: null };
   }
   if (t.etat === 'en_route' && l.aVerifierTransporteur && luMs != null) return { ...l, transp: t, aVerifierTransporteur: null };
