@@ -11,7 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { suivi, suivreJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
-import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut } from '../../api/_lib/vestiaire-regle.js';
+import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut, fraisVc } from '../../api/_lib/vestiaire-regle.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis } from '../transporteursVisuels.js';
 import { texteBenefice, euros as eurosLigne } from '../beneficeLigne.js';
@@ -655,7 +655,10 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
   const nomLigne = v.num ? `N°${v.num} · ${titre}` : titre;
   // Comme Vinted : la date sur la ligne (et, à expédier, « à envoyer avant … » — le
   // « à poster avant » de la carte Colis) ; le transporteur à côté du bouton bordereau.
-  const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : ''].filter(Boolean).join(' · ');
+  // (11 nov. soir) Les frais que Vestiaire prend, LUS (prix affiché − versé, `fraisVc`) : sur la
+  // ligne seulement quand ils sont lus ; la fiche dit « frais pas lus » sinon (jamais 0).
+  const fv = vcVenteAnnulee(v) ? null : fraisVc(v);
+  const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : '', fv && fv.lu ? `Frais Vestiaire ${eurosRecap(fv.frais)} (${String(fv.pct).replace('.', ',')}\u00a0%)` : ''].filter(Boolean).join(' · ');
   const trV = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi });
   const benef = lb.etat === 'annulee' ? null : { etat: lb.etat, achatCentimes: lb.achat != null ? Math.round(lb.achat * 100) : null, benefCentimes: lb.benefice != null ? Math.round(lb.benefice * 100) : null,
     achatTxt: lb.achat != null ? `${eurosLigne(lb.achat)}\u00a0€` : (v.num ? 'à saisir' : '—'), benefTxt: texteBenefice(lb),
@@ -705,7 +708,11 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       <section className="vrm-recap-argent" aria-label="L'argent">
         <h3 className="vrm-recap-titre">L'argent</h3>
         <dl>
-          <div className="vrm-recap-ligne"><dt>Vestiaire te verse</dt><dd data-prix-vente={lb.verse != null ? Math.round(lb.verse * 100) : undefined}>{lb.verse != null ? eurosRecap(lb.verse) : '— pas sûr'}</dd></div>
+          {/* (11 nov. soir, Julien) « Prix · Frais Vestiaire (%) · Pour toi » : les frais LUS (`fraisVc`),
+              « frais pas lus » sinon — jamais 0, jamais devinés. */}
+          {fv ? <div className="vrm-recap-ligne" data-vc-prix={fv.lu ? fv.cPrix : ''}><dt>Prix</dt><dd><span className="vrm-recap-montant">{fv.lu ? eurosRecap(fv.prix) : '—'}</span></dd></div> : null}
+          {fv ? <div className="vrm-recap-ligne" data-vc-frais={fv.lu ? fv.cFrais : ''} data-vc-frais-etat={fv.lu ? 'lu' : 'passu'}><dt>Frais Vestiaire</dt><dd>{fv.lu ? <><span className="vrm-recap-montant">{eurosRecap(-fv.frais)}</span> <small data-vc-frais-pct={fv.pct}>({String(fv.pct).replace('.', ',')}{'\u00a0'}%)</small></> : <span className="vrm-recap-montant">— <small>frais pas lus</small></span>}</dd></div> : null}
+          <div className="vrm-recap-ligne"><dt>{fv ? 'Pour toi' : 'Vestiaire te verse'}</dt><dd data-prix-vente={lb.verse != null ? Math.round(lb.verse * 100) : undefined}>{lb.verse != null ? eurosRecap(lb.verse) : '— pas sûr'}</dd></div>
           {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap onSaisir={(p) => poserAchatVc(v.num, p)}/> : '—'}</dd></div> : null}
           {lb.etat !== 'annulee' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={lb.benefice != null ? lb.benefice.toFixed(2) : undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur"><span className="vrm-recap-montant">{lb.benefice == null ? '—' : eurosRecap(lb.benefice)}</span></span>{lb.etat === 'prix' ? <small> montant versé pas sûr</small> : null}</dd></div> : null}
           {/* (11 nov., lot vestiaire-plus) Le moment où l'argent arrive (versé ⇒ le mois du CA ; estimé ⇒ pas encore dans le CA). */}

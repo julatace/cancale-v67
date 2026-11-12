@@ -8,7 +8,7 @@ import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBr
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
-import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc } from '../../api/_lib/vestiaire-regle.js';
+import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc, fraisVc } from '../../api/_lib/vestiaire-regle.js';
 import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
@@ -674,7 +674,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine) : un lien, rien de recalculé ici. */}
       {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>Ma semaine <span aria-hidden="true">›</span></button> : null}
       <ComparerMoisCarte liveStats={liveStats} panelOff={panelOff}/>
-      <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
+      <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -2326,12 +2326,12 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
 // (`totalMarketplaceFee`), les packs et options de Comptabilité. La couverture
 // est dite là où le site a une commission à lire.
 const lireReleveFrais = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
-function FraisParSiteCarte({ periode, ebayCommandes }) {
+function FraisParSiteCarte({ periode, ebayCommandes, ventesVc }) {
   const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const excluAutre = useExcluAutre();
   const b = bornesPeriode(periode, Date.now());
-  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee } });
+  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee, fraisVc }, vestiaire: Array.isArray(ventesVc) ? ventesVc : null });   // (11 nov. soir) + les frais Vestiaire LUS
   if (!F.sites.length) return null;
   // (6 nov.) Aucun site lu : une ligne, pas trois rangées de « pas lu — — » (moins de cartes,
   // celles qui servent). Le geste qui la remplit est dit.

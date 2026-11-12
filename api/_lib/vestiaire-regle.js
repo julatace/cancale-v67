@@ -106,6 +106,25 @@ export function montantRecuVc(v) {
   if (String(m.devise || '').toUpperCase() !== 'EUR') return { eur: null, raison: m.devise ? 'autre devise' : 'devise non dite' };
   return { eur: Math.round(m.valeur * 100) / 100, raison: '' };
 }
+// (11 nov. soir, Julien : « sur Vestiaire Collective, je veux voir les frais que la plateforme
+// prend ») LES FRAIS VESTIAIRE D'UNE VENTE, LUS, jamais devinés : prix de vente affiché
+// (`prixVente`, clé `sellerPrice`, extension 5.340/5.364) − ce que Vestiaire te verse
+// (`montant`, clé `sellerEarning`, `montantRecuVc`). Les DEUX lus en euros, sous ces clés-là,
+// et prix ≥ versé ; sinon `{ lu:false, raison }` (« frais pas lus » à l'écran, jamais 0).
+// Centimes entiers : aucun arrondi flottant. Exécuté par scripts/audit-frais-vestiaire.cjs.
+export function fraisVc(v) {
+  const pv = v && objet(v.prixVente);
+  const m = v && objet(v.montant);
+  if (!pv || typeof pv.valeur !== 'number' || !isFinite(pv.valeur) || pv.valeur <= 0) return { lu: false, raison: 'prix de vente pas lu' };
+  if (String(pv.cle || '') !== 'sellerPrice' || String(pv.devise || '').toUpperCase() !== 'EUR') return { lu: false, raison: 'prix de vente pas sûr' };
+  const recu = montantRecuVc(v);
+  if (recu.eur == null) return { lu: false, raison: recu.raison };
+  if (!/earning/i.test(String((m && m.cle) || ''))) return { lu: false, raison: 'montant versé pas sûr' };
+  const cPrix = Math.round(pv.valeur * 100), cVerse = Math.round(recu.eur * 100);
+  if (cVerse > cPrix) return { lu: false, raison: 'versé plus haut que le prix' };
+  const cFrais = cPrix - cVerse;
+  return { lu: true, raison: '', cPrix, cVerse, cFrais, prix: cPrix / 100, verse: cVerse / 100, frais: cFrais / 100, pct: Math.round(cFrais * 1000 / cPrix) / 10 };
+}
 // La date de versement : seulement une clé qui la PORTE (jamais la date de la
 // vente, jamais l'heure de lecture). 0 = pas su.
 export const dateVersementVc = (v) => { const t = Date.parse((v && v.verseLe) || ''); return Number.isFinite(t) && t > 0 ? t : 0; };
