@@ -1723,3 +1723,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **12 nov. · Restes (agent2-restes)** : points relais tous transporteurs (rue sans n°, repli extrait), « Voir l'e-mail », « Où vous livrer… » = en route, « livré ici » relu, SMS, bancs. `2026-11-12-restes.md`. Geste : aucun.
 - **12 nov. · Finitions (2 passes)** : défauts écran par écran, ligne unique d'« À retirer » (logo et nom du transporteur), cartes « À expédier », couleurs §7. `docs/passation/2026-11-12-finitions.md`. Geste : aucun.
+
+- **12 nov. · Paquets G2 (ext. 5.368) et 12nov-a (ext. 5.369), mis en ligne par le second agent** : `2026-11-12-integration-11nov-g2.md`, `2026-11-12-integration-12nov-a.md`. Geste : installer 5.369.0 ; migration 042 (facultative).
