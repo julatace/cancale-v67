@@ -49536,6 +49536,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (8 nov., Julien : « une barre d'évolution avec le délai pour retirer ») LES DATES DE LA BARRE, des MÊMES
           // sources que le détail (`arriveeRetrait`) : l'arrivée LUE, la limite LUE (ou « vers le » du transporteur,
           // ou la garde de SON transporteur — dites « estimée »). Pas d'arrivée ⇒ pas de barre (src/delaiRetrait.js).
+          // (12 nov., finitions) Le QR d'un colis (Pickup Pass Chronopost, Vinted Go…) se TOUCHE depuis sa ligne : la même
+          // ouverture en grand que « En grand » du détail (`openQrView`), les mêmes sources. Pas de QR lu ⇒ rien.
+          const qrRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
+            const qi = t ? qrVivant(t) : ''; if (qi) return () => openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t);
+            const relV = !t && o ? relaisDe(o) : null; return relV && relV.qr ? () => openQrView(ligneRetraitVinted(o)) : null; };
           const delaiColisRetrait = (x) => { if (x.horsCompte) return null; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
             const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
@@ -49743,7 +49748,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}/>
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
                     caché est un colis perdu). Le transporteur, l'e-mail ou la commande Vinted ont dit retiré, livré ou

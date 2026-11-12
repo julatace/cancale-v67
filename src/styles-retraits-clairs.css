@@ -26,3 +26,34 @@
 }
 /* 44 px au doigt sans grandir la ligne : la zone de toucher déborde autour du mot. */
 .vrm-rpf-itineraire::after { content: ''; position: absolute; inset: -12px -8px; }
+
+/* ── (12 nov., finitions — Julien : « regarde comment rien n'est cohérent ») UNE FORME DE LIGNE ──────────
+   Chaque colis à retirer a les MÊMES zones, aux MÊMES places (src/CarteRelais.jsx, `LigneRetraitF`) :
+   vignette (photo de l'article relié, sinon le logo du transporteur en grand) et le logo au coin ;
+   1 · titre ; 2 · le code en gros OU « Code à venir », une ligne de même hauteur ; 3 · le n° de suivi,
+   ou une ligne vide de même hauteur ; 4 · la barre du délai, toujours. « J'ai retiré » centré sur la ligne. */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-quoi { display: flex !important; flex-direction: column !important; align-items: stretch !important; min-width: 0; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-comptoir { display: flex !important; align-items: center !important; min-height: 26px; height: 26px; margin-top: 4px; overflow: hidden; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-code-gros { line-height: 26px !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-code-venir { line-height: 26px !important; font-size: 15px !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-suivi-ligne { display: block !important; height: 18px; line-height: 18px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-quoi > .vrm-rpf-ligne-delai { display: block !important; padding: 0 !important; margin: 4px 0 0 !important; height: 16px; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-quoi > .vrm-rpf-ligne-delai .vrm-rpf-delai { margin: 0 !important; height: 16px; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-vignette { position: relative; flex: none; display: grid !important; place-items: center !important; align-self: flex-start !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-vignette-logo { display: grid; place-items: center; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-vignette > .vrm-colis-logo-transp { position: absolute !important; right: -4px !important; bottom: -4px !important; left: auto !important; top: auto !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-rang { align-items: center !important; }
+/* Le QR du colis, touchable depuis la ligne (44 px), à gauche de « J'ai retiré ». */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: 0 4px 0 0; padding: 0; border: 0; border-radius: 12px; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--p-encre, currentColor); cursor: pointer; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+/* À l'ordinateur, la rangée est une grille [ligne 1fr] [136 px] [J'ai retiré 136 px] (styles-premium, couche
+   vrm-premium) : le QR prend la colonne du milieu, jamais une rangée à lui. */
+@layer vrm-premium {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-qr { grid-column: 2 !important; justify-self: end !important; margin: 0 !important; }
+}
+/* Au téléphone, le QR se pose SOUS la vignette (place libre de la colonne de gauche) : le texte garde toute sa
+   largeur et « J'ai retiré » reste au même endroit que sur les autres lignes. */
+@media (max-width: 1023px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne > .vrm-rpf-rang { position: relative !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne > .vrm-rpf-rang > .vrm-rpf-qr { position: absolute !important; left: 0 !important; top: 60px !important; margin: 0 !important; z-index: 1; }
+}
