@@ -31,7 +31,7 @@
      "app_data?id=like.email_reception_*&select=id&limit=1|": 2,
      "app_data?id=like.harvest_*_listings&select=id,n:data->>nItems|": 2,
      "app_data?id=like.harvest_*_orders_*&select=id,n:data->>nItems|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -67,7 +67,7 @@
      "app_data?id=like.email_reception_*&select=id&limit=1|": 2,
      "app_data?id=like.harvest_*_listings&select=id,n:data->>nItems|": 2,
      "app_data?id=like.harvest_*_orders_*&select=id,n:data->>nItems|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
@@ -112,7 +112,7 @@
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
      "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -156,7 +156,7 @@
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
      "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
@@ -199,7 +199,7 @@
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
      "app_data?id=like.email_sale_*&select=data&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -239,7 +239,7 @@
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
      "app_data?id=like.email_sale_*&select=data&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
@@ -289,7 +289,7 @@
      "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "app_data?select=id,meta&id=like.restore_*&order=id|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -333,7 +333,7 @@
      "app_data?id=like.email_bord_*&select=id,uid:meta->>uid,type:meta->>type,suivi:meta->>suivi,modele:meta->>modele,numero:meta->>numero,taille:meta->>taille,account:meta->>account,article:meta->>article,filename:meta->>filename,posKnown:meta->>posKnown,dateLimite:meta->>dateLimite,receivedAt:meta->>receivedAt,transaction:meta->>transaction,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf,suiviPdf:meta->>suiviPdf,pdfLu:meta->>pdfLu&order=id.asc|0-999": 2,
      "app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee&order=id.asc|0-999": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
@@ -361,7 +361,7 @@
      "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
      "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 3,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -386,7 +386,7 @@
      "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
      "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
@@ -425,7 +425,7 @@
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
      "app_data?id=eq.ebay_orders&select=orders:data->orders,capturedAt:data->>capturedAt|": 3,
      "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
      "app_data?id=eq.lbc_ventes&select=data|": 2,
@@ -465,7 +465,7 @@
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
      "app_data?id=eq.ebay_orders&select=orders:data->orders,capturedAt:data->>capturedAt|": 3,
      "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
      "app_data?id=eq.lbc_ventes&select=data|": 2,
@@ -504,7 +504,7 @@
      "app_data?id=eq.vrm_pro_facture&select=data|": 2,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
      "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -530,7 +530,7 @@
      "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
      "app_data?id=eq.vrm_pro_facture&select=data|": 2,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {
@@ -558,7 +558,7 @@
      "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
      "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "neuf_mesure": {
@@ -583,7 +583,7 @@
      "app_data?id=eq.vc_ventes&select=ventes:data->ventes|": 2,
      "app_data?id=eq.vrm_blocked_accounts&select=data&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
-     "vinted_accounts?select=*&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
+     "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
    },
    "deuxieme_mesure": {

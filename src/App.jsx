@@ -196,7 +196,7 @@ import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
 import { requeteDeLaVoix, ficheDeLaVoix, ventesDuMois } from "./rechercheVocale.js";
 import { ventesAilleursPour, opsVenduAilleurs } from "./venteAilleurs.js";   // (11 nov., saisie rapide) « Vendu ailleurs »
-import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
+import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande, FENETRE_MS as FENETRE_PRIX_MS } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
 import { VenduAilleurs, FeuillePrixAchat, poserDemandesPrix, abonnerDemandesPrix, lireDemandesPrix } from "./SaisieRapide.jsx";
 import { VOIX, PHRASES_VOIX, ecouter, annulerVoix, arreterVoix, ecouteEnCours } from "./dicteeNavigateur.js";
 import { useEtatVoix, LigneVoix } from "./composants/voix.jsx";
@@ -28832,10 +28832,16 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
     // non terminal) : leur panne vaut « pas su » — jamais une demi-preuve.
     const juger = comptesAJuger(bords, preuvesParTransaction(rows).items, rows);
     const parCompte = {};
-    if (juger.length) {
-      const lignes = await ordres(juger);
+    // (12 nov., intégration) Les ventes DÉJÀ LUES par l'appelant (la coque : `ventesCoque`, par compte)
+    // servent telles quelles — la relecture des ventes de tous les comptes (≈ 650 Ko) ne part que pour
+    // ceux qu'il n'a pas.
+    const connues = opts.ventesConnues && typeof opts.ventesConnues === 'object' ? opts.ventesConnues : null;
+    const aLire = connues ? juger.filter((u) => !Array.isArray(connues[u])) : juger;
+    if (connues) for (const u of juger) if (Array.isArray(connues[u])) parCompte[u] = connues[u];
+    if (aLire.length) {
+      const lignes = await ordres(aLire);
       if (lignes === null) return null;
-      Object.assign(parCompte, ventesParCompteDe(lignes, juger));
+      Object.assign(parCompte, ventesParCompteDe(lignes, aLire));
     }
     const parTx = preuvesParTransaction(rows, parCompte);
     const vendus = new Set(parTx.items);
@@ -59034,12 +59040,27 @@ function AppCoeur() {
   },[]);
   // Les preuves : relues quand les ventes changent, et tous les quarts d'heure — jamais à
   // chaque fiche touchée (la lecture des transactions est la plus lourde).
+  // (12 nov., intégration) La lecture des transactions est lourde (≈ 650 Ko, budget-vitesse) : seulement quand une
+  // vente des 3 derniers jours (la fenêtre de `ventesSansPrix`) existe, et relue quand CES ventes changent — pas
+  // à chaque nouvelle liste des ventes. Aucune ⇒ rien à demander, sans lire.
+  const clePrixRecentes=useMemo(()=>{
+    if(!Array.isArray(ventesCoque)) return null;
+    const now=Date.now();
+    return ventesCoque.filter((o)=>{ if(!o||o.transaction_id==null||classifyOrderStatus(o.status)==='cancelled') return false; const t=Date.parse(o.date||''); return Number.isFinite(t)&&now-t<=FENETRE_PRIX_MS&&t-now<=86400000; })
+      .map((o)=>String(o.transaction_id)).sort().join(',');
+  },[ventesCoque]);
   useEffect(()=>{
-    if(!AUTH.user||!Array.isArray(ventesCoque)) return undefined;
+    if(!AUTH.user||clePrixRecentes===null) return undefined;
+    if(clePrixRecentes===''){ setPrixPreuves({ paires: [] }); return undefined; }
     let mort=false;
-    lirePreuvesVenteVinted().then((pv)=>{ if(!mort) setPrixPreuves(pv&&Array.isArray(pv.paires)?pv:null); }).catch(()=>{ if(!mort) setPrixPreuves(null); });
+    // Les ventes déjà lues par la coque, par compte (les comptes en échec n'y sont pas : relus).
+    const connues={}; const ko=new Set((ventesKO||[]).map(String));
+    for(const a of (vintedAccounts||[])){ const u=String((a&&a.vinted_user_id)||''); if(u&&!ko.has(u)) connues[u]=[]; }
+    for(const o of (Array.isArray(ventesCoque)?ventesCoque:[])){ const u=o&&o._acc?String(o._acc.vinted_user_id):''; if(u&&Array.isArray(connues[u])) connues[u].push(o); }
+    lirePreuvesVenteVinted({ ventesConnues: connues }).then((pv)=>{ if(!mort) setPrixPreuves(pv&&Array.isArray(pv.paires)?pv:null); }).catch(()=>{ if(!mort) setPrixPreuves(null); });
     return ()=>{ mort=true; };
-  },[ventesCoque,prixQuart]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[clePrixRecentes,prixQuart]);
   useEffect(()=>{
     if(prixPreuves===undefined||!Array.isArray(ventesCoque)) return;
     { const pv=prixPreuves;
