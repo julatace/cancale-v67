@@ -235,7 +235,7 @@ async function ouvrir(b, vp, panne, opts = {}) {
     window.__etatsAuto = [];
     setInterval(() => { const e = document.querySelector('[data-ebay-retrait-auto]'); const v = e && e.getAttribute('data-ebay-retrait-auto'); if (v && window.__etatsAuto[window.__etatsAuto.length - 1] !== v) window.__etatsAuto.push(v); }, 25);
   });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Le faux GoTrue, enregistré APRÈS le fourre-tout des hôtes externes (qui
   // laisse passer vers le vrai réseau) : Playwright prend la DERNIÈRE route en
   // premier (§6.6). Posé avant, il n'était jamais atteint — invisible tant que

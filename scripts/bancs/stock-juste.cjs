@@ -122,7 +122,7 @@ async function contexte(b, vp, theme) {
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, sel))); }
     return j([]);
   };
-  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await ctx.route('**/rest/v1/**', servir);
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await ctx.route('https://images.exemple.test/**', (r) => { const k = (/paire-(\d+)/.exec(r.request().url()) || [])[1] || '0'; return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: SVG(k) }); });

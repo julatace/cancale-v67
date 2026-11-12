@@ -111,7 +111,7 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
   // (6 nov.) Le détail des Statistiques vit dans deux volets repliés depuis le 2 nov. (RepliStats,
   // « Ventes enregistrées · aujourd'hui ») : le banc les ouvre comme Julien le ferait (stats-compta, stats-premium).
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); } catch (_) {} });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const L = lignes(versementsLisibles).map((r) => (opts.declare && r.id === 'harvest_111_orders_sold')
     ? { ...r, data: { ...r.data, payload: { my_orders: [...r.data.payload.my_orders, VENTE_DECL] } } } : r);
   if (opts.declare) L.push({ id: 'harvest_111_txn_' + VENTE_DECL.transaction_id, data: { capturedAt: maintenant.toISOString(), payload: { transaction: { id: VENTE_DECL.transaction_id, status: 450, status_updated_at: il(0).toISOString() } } } });

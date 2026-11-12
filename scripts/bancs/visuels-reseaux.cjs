@@ -102,7 +102,7 @@ async function page(b, T, photos, { refuse = new Set(), vue = 'vinted_annonces' 
       Object.defineProperty(navigator, 'share', { configurable: true, value: async (d) => { window.__partages.push({ title: d.title, files: (d.files || []).map((f) => ({ name: f.name, type: f.type, size: f.size })) }); } });
     } else { try { delete Navigator.prototype.share; delete Navigator.prototype.canShare; } catch (_) {} }
   } catch (_) {} }, { n: NUMEROS, tactile: !!T.hasTouch });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const cdn = { n: 0 };
   await pg.route(/^https:\/\/images1\.vinted\.net\//, (r) => { cdn.n++; const m = /\/(\d+)-(\d)\.jpeg/.exec(r.request().url()); const k = m && `${m[1]}-${m[2]}`; if (!k || !photos[k] || refuse.has(m[1])) return r.fulfill({ status: 404, body: '' }); return r.fulfill({ status: 200, contentType: 'image/jpeg', body: Buffer.from(photos[k], 'base64') }); });
   await pg.route('**/rest/v1/**', (route) => {

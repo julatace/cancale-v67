@@ -82,7 +82,7 @@ async function preparer(b, vp, { capIl = 2 * H, panne = false } = {}) {
     try { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (window.__cache ? 'hidden' : 'visible') }); } catch (_) {}
     try { Object.defineProperty(document, 'hidden', { configurable: true, get: () => !!window.__cache }); } catch (_) {}
   }, SESSION);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => {
     const chemin = new URL(r.request().url()).pathname.replace(/^.*\/auth\/v1\//, '');
     const corps = chemin === 'user' ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated' } : { ...SESSION, expires_in: 3600 };

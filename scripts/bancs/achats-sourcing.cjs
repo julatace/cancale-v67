@@ -78,7 +78,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(([s, sb]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); if (sb) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, [SESSION, sombre]);
 
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // GoTrue APRÈS le fourre-tout (Playwright prend la DERNIÈRE route en premier) ;
   // `GET /user` rend la fiche utilisateur (sans facteur), pas une session.
   await pg.route('**/auth/v1/**', (r) => {

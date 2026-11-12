@@ -136,7 +136,7 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
   const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.test' } };
   await pg.addInitScript((sess) => { try { if (sess) localStorage.setItem('vrm_session', JSON.stringify(sess)); else localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} }, session ? SESSION : null);
   await pg.addInitScript(PONTS, { ponts, connecte: '111', vrm });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // Le faux GoTrue APRÈS le fourre-tout des hôtes externes : Playwright prend la
   // DERNIÈRE route en premier (§6.6) — posé avant, il n'était jamais atteint, et
   // `PorteMfa` restait sur « pas su ». `GET /user` rend la fiche utilisateur (§6.3).
