@@ -149,9 +149,30 @@
 /* (6 nov.) L'aperçu garde SA taille de texte (la page blanche de la facture), quelle
    que soit la règle des tableaux de l'app ; les montants ne se coupent jamais. */
 html body .vrm-fp-apercu .vrm-fp-a-table th, html body .vrm-fp-apercu .vrm-fp-a-table td { font-size: 12px; line-height: 1.35; }
-html body .vrm-fp-apercu .vrm-fp-a-table th:nth-child(n+2), html body .vrm-fp-apercu .vrm-fp-a-table td:nth-child(n+2) { white-space: nowrap; }
-html body .vrm-fp-apercu .vrm-fp-a-table th:first-child, html body .vrm-fp-apercu .vrm-fp-a-table td:first-child { width: auto; }
-html body .vrm-fp-apercu .vrm-fp-a-table { table-layout: auto; }
+/* (12 nov., facture au téléphone) Le tableau pose SES largeurs : Qté, Prix, Total en largeur
+   fixe, « Désignation » prend le reste (`table-layout: fixed`). Avant, les en-têtes bilingues
+   en `nowrap` élargissaient les colonnes de chiffres jusqu'à écraser la désignation à une
+   lettre par ligne (« D é s i g n a t i o n ») et faire défiler la feuille de côté.
+   Les montants ne se coupent jamais ; les en-têtes passent à la ligne (français, puis anglais). */
+html body .vrm-fp-apercu .vrm-fp-a-table { table-layout: fixed; width: 100%; }
+html body .vrm-fp-apercu .vrm-fp-a-table col.vrm-fp-a-col-qte { width: 2.8em; }
+html body .vrm-fp-apercu .vrm-fp-a-table col.vrm-fp-a-col-prix { width: 6.4em; }
+html body .vrm-fp-apercu .vrm-fp-a-table th:first-child, html body .vrm-fp-apercu .vrm-fp-a-table td:first-child { width: auto; overflow-wrap: break-word; word-break: normal; }
+html body .vrm-fp-apercu .vrm-fp-a-table th { white-space: normal; overflow-wrap: normal; word-break: normal; vertical-align: bottom; }
+html body .vrm-fp-apercu .vrm-fp-a-table td:nth-child(n+2) { white-space: nowrap; overflow-wrap: normal; }
+.vrm-fp-a-en { font-weight: 600; }
+/* Les totaux : un montant ne passe jamais à la ligne (« 1 / 234,50 € ») ; le libellé bilingue, si. */
+html body .vrm-fp-apercu .vrm-fp-a-totaux { width: min(300px, 100%); }
+html body .vrm-fp-apercu .vrm-fp-a-totaux dd { white-space: nowrap; text-align: right; }
+html body .vrm-fp-apercu .vrm-fp-a-totaux dt { min-width: 0; }
+
+/* (12 nov.) L'aperçu dans une feuille : une MINIATURE, comme la première page d'un PDF — la
+   facture à sa vraie largeur (`LARGEUR_PAGE_FP`), réduite pour tenir ; jamais plus grande. Un
+   toucher l'ouvre en grand (le PDF, dans la visionneuse : pincer pour zoomer). */
+.vrm-fp-miniature { position: relative; display: block; width: 100%; min-width: 0; overflow: hidden; padding: 0; margin: 0; border: 0; background: transparent; text-align: left; font: inherit; color: inherit; cursor: zoom-in; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.vrm-fp-miniature > .vrm-fp-miniature-page { transform-origin: 0 0; }
+.vrm-fp-miniature:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+.vrm-fp-miniature-loupe { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: rgba(29,29,31,.72); color: #fff; font-size: 12px; font-weight: 600; pointer-events: none; }
 
 /* ════ (10 nov., lot Q) À envoyer · envoi automatique · registre — DA6 : groupes rayon 24,
    rangées entières qui s'ouvrent (chevron), pilules ; l'ambre seulement pour un geste à faire. ════ */
@@ -189,3 +210,5 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 .vrm-fp-compte b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .vrm-fp-compte small { font-size: 12px; color: var(--vrm-muted); }
 .vrm-fa-question { display: grid; gap: 8px; }
+/* (12 nov.) « Connecter ma boîte » dans la phrase du bas : un lien, cible de 44 px. */
+[data-fp-bloque] .vrm-lien-action { background: none; border: 0; padding: 0 2px; margin: 0; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; vertical-align: baseline; }
