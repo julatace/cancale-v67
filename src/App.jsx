@@ -6243,9 +6243,11 @@ const lireFamilleCopiee = async (famille, filtre, select) => {
 // appels simultanés ne provoquent qu'un seul aller-retour.
 const _rowCache = new Map();          // clé -> { at, promesse }
 const ROW_TTL_MS = 60 * 1000;
-const cachedRow = (cle, chercher) => {
+// (12 nov.) `ttl` : un lecteur qui SAIT qu'on oublie la ligne quand elle change (les commandes d'un compte :
+// signal de l'extension, sonde des ventes, « Synchroniser ») peut garder la lecture plus longtemps.
+const cachedRow = (cle, chercher, ttl = ROW_TTL_MS) => {
   const e = _rowCache.get(cle);
-  if (e && (Date.now() - e.at) < ROW_TTL_MS) return e.promesse;
+  if (e && (Date.now() - e.at) < ttl) return e.promesse;
   // ⚠️ Un « pas su » (`null`/`undefined` : la base n'a pas répondu) ne se garde
   //    PAS 60 s en cache comme une vraie réponse : la lecture suivante réessaie.
   //    Seul un rejet était retiré ; un échec qui RÉSOUT en `null` restait figé.
@@ -7914,7 +7916,7 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
   // (ventes + achats) de ce compte, donc deux appels différents partagent
   // le même aller-retour au lieu d'en faire deux.
   if (opts.force) _rowCache.delete(`o:${uid}`);
-  const rows = await cachedRow(`o:${uid}`, () => fetchHarvestOrdersBrut(uid));
+  const rows = await cachedRow(`o:${uid}`, () => fetchHarvestOrdersBrut(uid), opts.ttl || ROW_TTL_MS);
   // ⚠️ `undefined` = la base n'a PAS répondu ; `null` (plus bas) = la ligne
   //    n'existe pas. Les confondre envoyait un compte en panne de LECTURE
   //    interroger Vinted par le relais du serveur (jusqu'à 12 pages, jetons
@@ -58148,7 +58150,9 @@ function AppCoeur() {
   const [preuveTick, setPreuveTick] = useState(0);
   useEffect(() => {
     const signal = regrouperSignaux(() => setPreuveTick(t => t + 1), SIGNAL_MIN_MS, 1500);
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && ['preuves', 'label', 'ventes'].includes(d.quoi)) signal(); };
+    // (12 nov.) Une vente signalée : ses commandes sont oubliées ICI aussi (la cloche les garde 10 min), même
+    // quand aucun écran de ventes n'est monté — une fois par signal (`oublierCommandesCompte`).
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && ['preuves', 'label', 'ventes'].includes(d.quoi)) { if (d.quoi === 'ventes' && d.uid) oublierCommandesCompte(d.uid); signal(); } };
     window.addEventListener('vrm:ext', f);
     // (20 octobre) Et une relecture eBay faite sans geste (nouvelle vente eBay,
     // annonce terminée) : la cloche recompte aussi.
@@ -58240,7 +58244,10 @@ function AppCoeur() {
         .filter(a=>!offAcc.has(String(a.vinted_user_id)))
         .map(async a=>[String(a.vinted_user_id), await Promise.all([
           fetchHarvest(a.vinted_user_id,'inbox'),
-          fetchHarvestOrders(a.vinted_user_id,'sold'),
+          // (12 nov., vitesse) La cloche se recompte à CHAQUE vente signalée : ses commandes sont gardées 10 min
+          // (le compte qui a bougé est oublié par `relire`/la sonde) — avant, passé 60 s, les 7 comptes repartaient
+          // (~1,2 Mo) pour une vente sur un seul (banc ventes-relecture-compte).
+          fetchHarvestOrders(a.vinted_user_id,'sold',{ ttl: 10 * 60 * 1000 }),
           fetchHarvest(a.vinted_user_id,'listings'),
         ])])));
       for(const a of vintedAccounts){
