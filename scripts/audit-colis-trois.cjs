@@ -8,7 +8,8 @@
 //  2. src/lotTransporteurs.js — « Tout imprimer » suit l'ordre des GROUPES de l'écran.
 //  3. src/retoursStock.js — « Retour reçu ? » seulement pour un retour PROUVÉ et
 //     REVENU avec son N° ; la remise garde SON N° ; ce N° redevient présent ; et dans
-//     App.jsx : rien sans tap (un seul appelant, un clic), la vente retournée sort des
+//     App.jsx : rien sans tap (un seul appelant, un clic ; 13 nov., point 29 : un retour REMBOURSÉ
+//     revient en stock par la RÈGLE, jamais en appelant ce geste), la vente retournée sort des
 //     totaux par la règle existante (`PAS_UNE_VENTE`), la remise n'écrit que ses deux clés.
 //   node scripts/audit-colis-trois.cjs [--mutation=NOM | --prouve]
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
