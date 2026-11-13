@@ -324,6 +324,13 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
     return { ...l, status: 'retour', statusLabel: 'Reparti chez l’expéditeur (lu chez le transporteur)', relaisChange: false, viaTransporteur: true, transp: t, aVerifierTransporteur: null };
   }
   if (t.etat === 'en_route' && l.aVerifierTransporteur && luMs != null) return { ...l, transp: t, aVerifierTransporteur: null };
+  // (13 nov., capture de Julien : 42878264 « retiré » le 9 puis « changé de plan » le 10, que Mondial Relay dit
+  // DISPONIBLE) La contradiction est tranchée par le transporteur quelle que soit l'heure de sa lecture : le colis
+  // attend au point (celui du transporteur, sinon celui de l'e-mail du changement), avec le code déjà lu.
+  if (t.etat === 'disponible' && l.aVerifierTransporteur && st !== 'delivered' && st !== 'available' && luMs != null) {
+    return { ...l, status: 'available', statusLabel: 'Disponible (lu chez le transporteur)', lieu: lieuTransp(t) || l.lieu || null, relaisChange: false,
+      viaTransporteur: true, transp: t, aVerifierTransporteur: null, arriveLe: l.arriveLe || t.etatAt || null };
+  }
   if (t.etat !== 'disponible') return l;
   const em = dernierEmailMs(l);
   const recent = luMs != null && maintenant - luMs < DISPO_LEVE_GARDE_MS ? luMs : null;

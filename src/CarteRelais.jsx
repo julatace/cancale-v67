@@ -30,7 +30,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import LigneGlissable from './LigneGlissable.jsx';   // (11 nov., gestes-glisser) « Retiré » / « Le code » au glisser
-import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN, surLaCarte } from './relaisColis.js';
+import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN, surLaCarte, pointsARetirer } from './relaisColis.js';
 import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, selecteurVilles as selecteurVillesRegle, CLE_AUTRES, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
 import './styles-colis-colonnes.css';
 import './styles-retraits-clairs.css';   // (11 nov.) « À retirer » lisible : code, n° de suivi, titre sur 2 lignes
@@ -329,7 +329,7 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
   const surCarte = limiteSurCarte && !detail;
   const sousTitre = [avecLieu ? (x.lieuNom || '') : '', raison, surCarte && x.jours != null ? texteLimite(x.jours) : ''].filter(Boolean);
   const codeTxt = x.code ? x.code : x.qr ? 'QR code' : '';
-  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
+  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': x.redirige ? 'route' : 'retirer', 'data-rp-redirige': x.redirige ? '1' : undefined, 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
     // (2 nov.) Le transporteur LU de CE colis (src/transporteursVisuels.js) : la clé des statistiques.
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined };
@@ -434,7 +434,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const marquesVues = marques.filter((m) => !(parSource && m === parSource && !texteVerifie(x.verifieMs, Date.now(), x.verifiePar).startsWith('pas')));
   const verifie = texteVerifie(x.verifieMs, Date.now(), x.verifiePar);
   const ancien = !x.horsCompte && verifieAncien(x.verifieMs);
-  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
+  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': x.redirige ? 'route' : 'retirer', 'data-rp-redirige': x.redirige ? '1' : undefined, 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '',  // (lot AJ) l'arrivée lue qui range la ligne
     'data-rp-sources': marques.join(','), 'data-rp-verifie': Number.isFinite(x.verifieMs) ? String(x.verifieMs) : '', 'data-rp-code-sur': x.code && x.codeSur ? '1' : undefined, 'data-rp-codes-desaccord': desaccord ? desaccord.map((d) => d.source + ':' + d.code).join(',') : undefined };
@@ -459,7 +459,8 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // `aVerifierTransporteur`, api/_lib/suivi-colis.js) : rien à faire pour le vendeur ⇒ une mention NEUTRE à la
   // place du délai (jamais une question, jamais ambre), même place, même hauteur.
   const verifT = !!(x.src && x.src.t && x.src.t.aVerifierTransporteur);
-  const dl4 = verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: 'Vérification en cours', valeurTexte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours` } : dl;
+  // (13 nov.) Un colis REDIRIGÉ, encore en route : une mention neutre (rien à faire), à la place du délai.
+  const dl4 = x.redirige ? { code: 'point-change', pct: 0, ambre: false, texte: 'En route · point changé', valeurTexte: 'En route vers un nouveau point relais' } : verifT ? { code: 'verif-transporteur', pct: 0, ambre: false, texte: 'Vérification en cours', valeurTexte: `Vérification chez ${nomAffiche || 'le transporteur'} en cours` } : dl;
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
   // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).
@@ -616,7 +617,7 @@ const NOMS_RESEAU = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', v
 export const texteDeplace = (d) => { if (!d) return ''; const h = Number.isFinite(d.at) ? new Date(d.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : ''; return `déplacé · selon ${NOMS_RESEAU[d.carrier] || 'le transporteur'}${h ? ' à ' + h : ''}`; };
 const PREF_ORDRE = 'vrm_retirer_ordre';
 const PREF_MASQUES = 'vrm_retirer_points_masques';
-function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null }) {
+function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null, redirige = [] }) {
   const enLigne = useEnLigne();
   // (8 nov., Julien : « réaffiche la carte ») La carte est AUSSI au téléphone (en haut de la liste, ~200 px) ;
   // hors réseau, pas de carte.
@@ -684,7 +685,15 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
   }
   const attendus = connus.flatMap((p) => p.attendus.map((c) => ({ c, p })));
   const routeSans = vChoisie ? [] : (enRoute || []);
-  const nRoute = attendus.length + routeSans.length;
+  // (13 nov., Julien : « ici ça doit être dans les Mondial Relay » — « un colis = une fois ») LES COLIS REDIRIGÉS
+  // (« Votre colis a changé de plan », src/relaisChange.js `colisRelaisChange`) ne forment plus une carte à part :
+  // chacun est UNE ligne de la forme commune, sous SON nouveau point, dans « En route » tant qu'il n'est pas arrivé.
+  // Un n° déjà dans « À retirer » (arrivé, ou en vérification chez le transporteur) n'y est jamais redit.
+  const normSu = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const suivisIci = new Set(((vueTout && vueTout.points) || []).flatMap((p) => (p.arrives || []).map((c) => normSu(suiviDe ? suiviDe(c) : ''))).filter(Boolean));
+  const redir = (redirige || []).filter((r) => r && normSu(r.suivi) && !suivisIci.has(normSu(r.suivi)));
+  const pointsRedir = redir.length ? ((pointsARetirer({ colis: redir.map((r) => ({ ...r, id: r.cle, nom: r.nom || '', adresse: r.adresse || '' })) }) || {}).points || []) : [];
+  const nRoute = attendus.length + routeSans.length + redir.length;
   if (!points.length && !villes.length && !nRoute) return null;
   const premiere = new Set();   // le premier point rendu porte `data-relais-point` (les autres : `-suite`)
   // Une carte de point : en-tête (nom · adresse, transporteur commun lu, nombre) sur un fond légèrement différent.
@@ -785,7 +794,19 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
       {nRoute ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-route" data-rp-section="route" data-rp-section-n={nRoute} data-retirer-en-route-sans={routeSans.length}>
           <summary className="vrm-rpf-section-titre is-repli"><span>En route<span className="vrm-rpf-section-n">{nRoute}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
-          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste" data-en-route-liste={nRoute}>
+          <div className="vrm-rpf-section-corps">
+            {pointsRedir.map((p) => (
+              <section key={'rd:' + p.cle} className="vrm-rpf-point is-redirige" data-relais-redirige-point={p.inconnu ? 'pas-lu' : p.cle} data-relais-redirige-n={p.arrives.length}>
+                <header className="vrm-rpf-tete">
+                  <span className="vrm-rpf-ident">
+                    <b className="vrm-rpf-nom" data-relais-nom="">{p.inconnu ? 'Nouveau point pas encore lu' : (nomEnseigne(p.nom) || p.adresseCourte || 'Point relais')}</b>
+                    {!p.inconnu && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
+                  </span>
+                  <span className="vrm-rpf-meta"><span className="vrm-rpf-n" data-relais-compte={p.arrives.length}>{plur(p.arrives.length, 'colis', 'colis')}</span></span>
+                </header>
+                <div className="vrm-rpf-liste">{p.arrives.map((x) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={null} detail={null} echeance={null} statut={null} retirer={null} C={C} avecTransp={false} titreDe={titreDe} delai={delai} delaiEnTete={false} suiviDe={suiviDe} qrDe={null}/>)}</div>
+              </section>))}
+            {attendus.length + routeSans.length ? <section className="vrm-rpf-point"><div className="vrm-rpf-liste" data-en-route-liste={nRoute}>
             {attendus.map(({ c, p }) => (
               <div key={c.id} className="vrm-rpf-ligne is-attendu" data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''} data-en-route-achat={c.id}>
                 <div className="vrm-rpf-rang"><span className="vrm-rpf-vignette is-sans" aria-hidden="true"/><span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{c.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">{p.nom || 'Point relais'}</span>{c.estimee ? <span className="vrm-rpf-puce">vers le {jourFr(c.estimee)}</span> : null}</span></span></div>
@@ -795,14 +816,14 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
                 <span className={'vrm-rpf-vignette' + (a.photo && Photo ? '' : ' is-sans')} aria-hidden="true">{a.photo && Photo ? Photo(a.photo) : null}</span>
                 <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{a.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">en route</span></span></span>
               </div></div>))}
-          </div></section></div>
+          </div></section> : null}</div>
         </details>) : null}
     </div>
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, ordi = true, delai = null, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null }) {
-  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} ordi={ordi} delai={delai} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute} suiviDe={suiviDe} qrDe={qrDe}/>;
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, ordi = true, delai = null, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null, redirige = [] }) {
+  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} ordi={ordi} delai={delai} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute} suiviDe={suiviDe} qrDe={qrDe} redirige={redirige}/>;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;
