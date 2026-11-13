@@ -19,7 +19,7 @@
 'use strict';
 process.env.IPS = process.env.IPS || (process.env.BROUILLON ? '6' : '30');
 process.env.FILMS_ECHELLE = process.env.FILMS_ECHELLE || String(720 / 540);
-process.env.FILMS_DEBIT = process.env.FILMS_DEBIT || '360k';
+process.env.FILMS_DEBIT = process.env.FILMS_DEBIT || '420k';
 process.env.CRF = process.env.CRF || '30';
 const path = require('path'), fs = require('fs');
 const { execFileSync } = require('child_process');

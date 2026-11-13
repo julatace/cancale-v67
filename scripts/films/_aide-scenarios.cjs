@@ -134,14 +134,14 @@ const SCENARIOS = {
     await f.jouer(1.4); f.cle('plan');
     f.titre('Touche la flèche : ses détails.', { duree: 3.0 });
     await f.toucher('[aria-label^="Détails et gestes — N°16"]', { apres: 0.4, clic: true });
-    await f.attendreQue('[data-fiche-achat]', 2);
+    await f.attendreQue('[data-carte-annonce="7115"] [data-fiche-achat]', 2);
     f.repos_(0.8);
-    await f.defilerVers('[data-fiche-achat]', { marge: 260, dur: 0.9 });
+    await f.defilerVers('[data-carte-annonce="7115"] [data-fiche-achat]', { marge: 260, dur: 0.9 });
     f.titre('Prix d’achat, marge : ce que tu gagnes.', { sous: 'Le prix d’achat se change d’un toucher.', duree: 4.6 });
-    await f.viser('[data-fiche-achat]', { zoom: 1.38, dur: 1.0, dy: 60 });
+    await f.viser('[data-carte-annonce="7115"] [data-fiche-achat]', { zoom: 1.38, dur: 1.0, dy: 60 });
     await f.jouer(2.6); f.cle('fiche');
     f.titre('Et ses gestes : prix, stock, ailleurs.', { duree: 3.4 });
-    await f.viser('[data-fiche-gestes]', { zoom: 1.38, dur: 1.0 });
+    await f.viser('[data-carte-annonce="7115"] [data-fiche-gestes]', { zoom: 1.38, dur: 1.0 });
     await f.jouer(2.4); f.cle('gestes');
     await finir(f, 0.8);
   },
@@ -153,8 +153,8 @@ const SCENARIOS = {
     await f.toucher('[data-stock-recherche]', { avant: 0.3, apres: 0.2 });
     await f.taper('7', { cps: 4 });
     await f.jouer(0.6); f.cle('plan');
-    f.titre('Le N°7 : Couloir, rangée 2.', { duree: 3.4 });
-    f.repos_(0.8);
+    f.titre('N°7 : Couloir, rangée 2, colonne 3.', { duree: 3.4 });
+    await f.viser('texte:N°7 · Puma Suede rouge T42', { zoom: 1.38, dur: 0.9, dy: 40 });
     await f.jouer(2.6); f.cle('trouve');
     f.titre('Une paire à ranger ?', { sous: 'Touche-la, puis une case libre.', duree: 6.4 });
     // La croix vide la recherche : les meubles reviennent entiers.

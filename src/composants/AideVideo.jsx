@@ -35,7 +35,7 @@ export function AideVideo({ cle }) {
             <span><b>{v.titre}</b> · {v.geste}</span>
             <button type="button" className="vrm-lien-action" onClick={() => setLue(null)} data-aide-video-fermer="">Fermer la vidéo</button>
           </figcaption>
-          {panne ? <p className="vrm-aide-video-panne" role="status" data-aide-video-panne="">La vidéo n’a pas pu se charger (pas de réseau ?). Les gestes sont écrits juste dessous.</p> : null}
+          {panne ? <p className="vrm-aide-video-panne" role="status" data-aide-video-panne="">La vidéo n’a pas pu se lire ici (réseau ?). Les gestes sont écrits juste dessous.</p> : null}
         </figure>
       ) : null}
       <ul className="vrm-aide-groupe vrm-aide-video-liste">
