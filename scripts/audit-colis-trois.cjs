@@ -28,7 +28,9 @@ const MUTATIONS = {
   'retour-initie-carte': ['ret', "return l.etape === 'en-route' || l.etape === 'rembourse' || !!l.livreeSelonVinted;", 'return true;'],
   'retour-sans-num': ['ret', "if (!l.num || l.recu || l.ancien || l.remis) return false;", "if (l.recu || l.ancien || l.remis) return false;"],
   'remis-num-conflit': ['ret', "const n = l && l.remis && l.remis.num != null ? String(l.remis.num).trim() : '';", "const n = l && l.num ? String(l.num).trim() : '';"],
-  'retour-auto': ['app', "  useEffect(() => { const c = JSON.stringify(numsRemisEnStock(retoursSuivis));", "  useEffect(() => { try { for (const l of (retoursSuivis.lignes || [])) if (retourAReceptionner(l)) remettreDepuisCarte(l); } catch (_) {} const c = JSON.stringify(numsRemisEnStock(retoursSuivis));"],
+  // (13 nov., point 29) Le retour REVENU passe en stock par la RÈGLE (src/retoursStock.js, rien d'écrit) —
+  // jamais en appelant le geste du tap (qui écrit « reçu » et « remis ») depuis un effet.
+  'retour-auto': ['app', "  useEffect(() => {\n    const avant = () => { const p = load('vinted_nums_physiques', null);", "  useEffect(() => {\n    try { for (const l of (retoursSuivis.lignes || [])) if (retourAReceptionner(l)) remettreDepuisCarte(l); } catch (_) {}\n    const avant = () => { const p = load('vinted_nums_physiques', null);"],
   'retour-touche-vente': ['app', "    setRetoursRemis(prev => { const u = { ...prev, [k]: { at, num, archive", "    save('vinted_sale_overrides', { ...(load('vinted_sale_overrides', {}) || {}), [k]: { numero: num } });\n    setRetoursRemis(prev => { const u = { ...prev, [k]: { at, num, archive"],
 };
 const arg = process.argv.slice(2);
@@ -125,14 +127,15 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const numeros = { i1: { numero: '11' }, i2: { numero: '12' }, i3: { numero: '13' }, i4: { numero: '14' }, i5: { numero: '15' }, i6: { numero: '16' }, autre: { numero: '12', title: 'en ligne' } };
   const res = RS.retoursEnCours({ ventes, etats: (tx) => etats[tx] || null, txnItem, numeros, numeroVente: () => null, recus: {}, remis: {}, masques: {}, republiee: () => false, ebay: [] });
   const carte = res.lignes.filter(RS.retourAReceptionner).map((l) => l.tx).sort().join(',');
-  dit(carte === '2,3,4', '3a « Retour reçu ? » : retour PROUVÉ et REVENU avec son N° (déposé, livré, remboursé) — ni initié (1, 6), ni finalisée (5), ni sans N° (7)', carte);
+  // (13 nov., point 29) le remboursé (4) est revenu en stock TOUT SEUL (dans les remises) : plus de carte.
+  dit(carte === '2,3' && res.remises.some((l) => l.tx === '4' && l.remis.auto && l.remis.num === '14'), '3a « Retour en route » : retour PROUVÉ en route avec son N° (déposé, livré) — ni initié (1, 6), ni finalisée (5), ni sans N° (7) ; le remboursé (4) est déjà en stock sous SON N°', carte);
   const l2 = res.lignes.find((l) => l.tx === '2');
   const rem = RS.remiseEnStock({ ...l2, recu: true }, { numeros, presentes: new Set(['i2']), cleNum: (x) => String(x), estArchive: () => false });
   dit(rem.ok && rem.num === '12' && !rem.conflit, '3b la remise garde SON N° (12), jamais un nouveau', JSON.stringify(rem));
   const rem2 = RS.remiseEnStock({ ...l2, recu: true }, { numeros, presentes: new Set(['autre']), cleNum: (x) => String(x), estArchive: () => false });
   dit(rem2.ok && rem2.conflit && rem2.conflit.id === 'autre', '3c le N° porté par un autre article PRÉSENT ⇒ conflit (la carte demande)', JSON.stringify(rem2));
   const res2 = RS.retoursEnCours({ ventes, etats: (tx) => etats[tx] || null, txnItem, numeros, numeroVente: () => null, recus: { 2: 'x', 3: 'x' }, remis: { 2: { num: '12' }, 3: { num: null } }, masques: {}, republiee: () => false, ebay: [] });
-  dit(JSON.stringify(RS.numsRemisEnStock(res2)) === '["12"]', '3d remis ⇒ son N° redevient présent ; remis SANS N° (conflit) ⇒ aucun N°', JSON.stringify(RS.numsRemisEnStock(res2)));
+  dit(JSON.stringify(RS.numsRemisEnStock(res2)) === '["12","14"]', '3d remis ⇒ son N° redevient présent ; remis SANS N° (conflit) ⇒ aucun N° ; revenu tout seul (4) ⇒ SON N°', JSON.stringify(RS.numsRemisEnStock(res2)));
   dit(!res2.lignes.filter(RS.retourAReceptionner).some((l) => l.tx === '2' || l.tx === '3'), '3e une fois remis, plus de carte');
   // Les totaux : la vente retournée sort par la règle EXISTANTE (`PAS_UNE_VENTE`), jamais une règle neuve.
   const m = /const PAS_UNE_VENTE = (\/.*\/[a-z]*);/.exec(app);
@@ -149,7 +152,7 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   dit(appels === 3 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app)
     && /onRevenue=\{async \(\) => \{ if \(retour && !retour\.remis\) await remettreDepuisCarte\(retour\)/.test(app) && /onClick=\{faireRevenue\}/.test(rl),
     '3h rien sans tap : deux appelants, chacun un bouton (« Remettre en stock », « Paire revenue »)', String(appels));
-  dit(/for \(const n of JSON\.parse\(numsRemisCle \|\| '\[\]'\)\) if \(n\) vivants\.add/.test(app), '3i App : les N° remis entrent dans les paires présentes (`vinted_nums_physiques`)');
+  dit(/retoursStock = Array\.isArray\(rs\.articles\)/.test(app) && /for \(const a of retoursStock\) if \(a && a\.numero\) vivants\.add/.test(app) && /retoursPourStock\(retoursSuivis\)/.test(app), '3i App : les N° remis ou revenus entrent dans les paires présentes (`vinted_nums_physiques`)');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-colis-trois : ${n - ko}/${n}`);
   fs.rmSync(tmp, { recursive: true, force: true });

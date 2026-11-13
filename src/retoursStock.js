@@ -126,6 +126,9 @@ export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, r
   if (ebay === null) manques.push('tes retours eBay');
   const R = recus || {}, M = remis || {}, X = masques || {};
   const lignes = [], remises = [];
+  // (13 nov.) les retours revenus mais déjà remis en ligne : ni en cours, ni en stock — nommés pour
+  // que l'écran ne les redise pas comme des colis envoyés.
+  const dejaRepubliees = [];
   const vus = new Set();
   for (const o of ventes) {
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
@@ -152,7 +155,7 @@ export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, r
     // N° porté par un autre article PRÉSENT ⇒ rien n'est deviné : en stock SANS N° (dit).
     // Sans N° connu ⇒ « à numéroter » (il en recevra un à sa remise en ligne, §5 cas a).
     if (retourRevenuSeul(ligne)) {
-      if (republiee && republiee(ligne)) continue;
+      if (republiee && republiee(ligne)) { dejaRepubliees.push(tx); continue; }
       const r = remiseEnStock({ ...ligne, recu: true }, { numeros, presentes, cleNum, estArchive });
       const at = ligne.recuLe || su;
       const auto = r.ok
@@ -175,7 +178,7 @@ export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, r
   }
   const rang = (l) => (l.ancien ? 100 : 0) + (l.recu ? 0 : 1) * 10 + ETAPES_RETOUR.indexOf(l.etape);
   lignes.sort((a, b) => rang(a) - rang(b));
-  return { etat: 'lu', lignes, remises, manques };
+  return { etat: 'lu', lignes, remises, manques, dejaRepubliees };
 }
 
 // « Remise en stock », sur SON clic. Le N° est GARDÉ (§5 : un numéro n'est

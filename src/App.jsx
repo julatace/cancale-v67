@@ -31019,7 +31019,8 @@ const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.l
 // ── (3 nov., choix de Julien n° 3) LA CARTE « RETOUR REÇU ? » ────────────────────────────────
 // Un retour PROUVÉ dont le colis est revenu (`retourAReceptionner`, src/retoursStock.js) : la photo,
 // « N°x · titre », la question, UN geste « Remettre en stock » (son tap : reçu + remis, SON N°).
-// Aucune phrase d'explication. Rien ne se fait sans le tap.
+// (13 nov., point 29) Un retour REMBOURSÉ revient en stock tout seul (`retourRevenuSeul`) : la carte ne
+// reste que pendant le trajet (« Retour en route »), avec « Déjà reçu » pour le dire avant Vinted.
 function CartesRetourRecu({ res: resBrut, site = 'toutes', onRemettre }) {
   const res = retoursPourSite(resBrut, site);
   if (!res || res.etat !== 'lu') return null;
@@ -51494,6 +51495,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (3 nov., choix n° 3) Les retours : la carte « Retour reçu ? » (revenus, SON tap) puis le bloc
           // « Retours » (les autres étapes, les remis en stock) ; leurs ventes ne sont pas redites en dessous.
           const retoursTx = new Set(((retoursSuivis && retoursSuivis.etat === 'lu') ? [...retoursSuivis.lignes, ...retoursSuivis.remises] : []).filter((l) => l.plateforme === 'vinted').map((l) => String(l.tx)));
+          for (const tx of ((retoursSuivis && retoursSuivis.dejaRepubliees) || [])) retoursTx.add(String(tx));   // (13 nov.) revenue puis remise en ligne : pas un colis envoyé
           const retoursHaut = <>
             <CartesRetourRecu res={retoursSuivis} site={siteColis} onRemettre={remettreDepuisCarte}/>
             <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise} onRemettreEnLigne={remettreRetourEnLigne}/>
