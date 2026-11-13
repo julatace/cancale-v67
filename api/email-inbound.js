@@ -56,6 +56,7 @@ import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR, nouveauPointDansTexte, lieuGenerique } from './_lib/retrait-colis.js';
 import { horairesDepuisTexte } from './_lib/horaires-relais.js';
+import { completerParLignePrecedente } from './_lib/rappel-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
@@ -2645,26 +2646,11 @@ export async function traiterEmail(req, res) {
       {
         const emailAtNouveau = dateDeLEmail(corpsBrut);
         const plusAncien = !!(emailAtNouveau && prevLigne && Number.isFinite(Date.parse(prevLigne.emailAt || '')) && Date.parse(emailAtNouveau) < Date.parse(prevLigne.emailAt));
-        if (plusAncien && prevLigne.status === 'available' && track.status === 'available') {
-          if (prevLigne.code) { track.code = prevLigne.code; track.code2 = prevLigne.code2 || null; }
-          if (prevLigne.qrB64 || prevLigne.qrUrl) { qr.qrB64 = prevLigne.qrB64 || null; qr.qrType = prevLigne.qrType || null; qr.qrUrl = prevLigne.qrUrl || null; }
-          if (prevLigne.lieu) track.lieu = prevLigne.lieu;
-          if (prevLigne.limite) track.limite = prevLigne.limite;
-        }
-      }
-      if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
-        const prev = prevLigne;
-        prevLigne = prev || null;
-        if (prev) {
-          if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
-          if (!qr.qrUrl && prev.qrUrl) qr.qrUrl = prev.qrUrl;
-          if (!track.code && prev.code) track.code = prev.code;
-          if (!track.code2 && prev.code2) track.code2 = prev.code2;
-          if (!track.lieu && prev.lieu && !track.relaisChange) track.lieu = prev.lieu;   // (10 nov.) un colis redirigé ne garde pas l'ancien point
-          if (!track.limite && prev.limite) track.limite = prev.limite;
-          if (!track.consigne && prev.consigne) track.consigne = true;
-          if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
-        }
+        // (13 nov., rappels) LA règle vit dans api/_lib/rappel-colis.js : un e-mail suivant du MÊME colis (rappel,
+        // « toujours au point », rejeu) complète la ligne et n'efface jamais ce qu'elle sait (code, QR, point,
+        // date limite, horaires, titre) ; un plus ancien ne remplace rien.
+        const fus = completerParLignePrecedente(track, qr, prevLigne, { plusAncien });
+        Object.assign(track, fus.track); Object.assign(qr, fus.qr);
       }
       // (revue du 23 oct.) LA DATE DE L'E-MAIL (`sourceDate`, la date Gmail) : le
       // script traite sa boîte du plus récent au plus ancien, et un e-mail plus
