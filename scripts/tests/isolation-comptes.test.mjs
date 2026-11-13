@@ -31,7 +31,7 @@ test('extension : aucune lecture anonyme ni retour des comptes d’une session r
  const code=extraire(ext,'async function getStoredAccounts(opts)','// ── FETCH ACTIF');
  for(const mode of ['absente','bon','etranger','bascule']){
   let lectures=0;
-  const c=vm.createContext({authToken:async()=>mode==='absente'?null:{user_id:A,access_token:'token-a'},loadSession:async()=>({user_id:mode==='bascule'?B:A}),SUPABASE_URL:'https://base.test',SUPABASE_KEY:'anon',encodeURIComponent,fetch:async(url,{headers})=>{lectures++;assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);assert.equal(headers.Authorization,'Bearer token-a');return Response.json([{owner:mode==='etranger'?B:A}]);}});
+  const c=vm.createContext({authToken:async()=>mode==='absente'?null:{user_id:A,access_token:'token-a'},loadSession:async()=>({user_id:mode==='bascule'?B:A}),SUPABASE_URL:'https://base.test',SUPABASE_KEY:'anon',signalDelai:()=>undefined,SB_DELAI_LECTURE_MS:8000,encodeURIComponent,fetch:async(url,{headers})=>{lectures++;assert.equal(new URL(url).searchParams.get('owner'),'eq.'+A);assert.equal(headers.Authorization,'Bearer token-a');return Response.json([{owner:mode==='etranger'?B:A}]);}});
   vm.runInContext(code,c);const r=await c.getStoredAccounts({ouNull:true});assert.equal(mode==='bon'?r.length:r,mode==='bon'?1:null);if(mode==='absente')assert.equal(lectures,0);
  }
 });

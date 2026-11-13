@@ -15,9 +15,9 @@ const ext=fs.readFileSync(new URL('../../vinted-sync-extension/background.js',im
 
 test('la copie de l’extension est identique à celle de l’app',()=>{assert.equal(bloc(ext),bloc(app));});
 test('l’extension personnalise avec le pseudo du fil vérifié et utilise l’offre',()=>{
-  assert.match(ext,/personnaliserMessageFavori\(body\.message,String\(c\?\.opposite_user\?\.login\|\|''\)\)/);
+  assert.match(ext,/personnaliserMessageFavori\(version\.texte,String\(c\?\.opposite_user\?\.login\|\|''\),undefined,infosMsg\)/);
   assert.match(ext,/prixOffreFavori\(prixAnnonce,offre\)/);
-  assert.match(ext,/reply:\{body:texteFinal,/);
+  assert.match(ext,/corpsReponseVinted\(texteFinal\)/);
   const ctx={};vm.runInNewContext(bloc(ext),ctx);assert.equal(ctx.personnaliserMessageFavori('Salut {username}','bob'),'Salut bob');
 });
 test('variables : {username} et {a|b}, le reste refusé',()=>{

@@ -571,8 +571,8 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
     }
   });
   await essaie('visite', () => {
-    const corps = (/async function visiteVinted\(\) \{([\s\S]*?)\n\}\n/.exec(EXT) || [])[1] || '';
-    const i = corps.indexOf('await capterPreuvesVente(uid);'), j = corps.indexOf('await capterRetraits(uid);'), k = corps.indexOf('const r = await runActive();');
+    const corps = (/async function visiteVinted(?:UnPassage)?\(\) \{(?!\n  if \(_visite)([\s\S]*?)\n\}\n/.exec(EXT) || [])[1] || '';
+    const i = corps.indexOf('await capterPreuvesVente(uid);'), j = corps.lastIndexOf('await capterRetraits(uid);'), k = corps.indexOf('const r = await runActive();');   // 5.357 : le chemin « prudence » lit les codes plus haut, sans moisson
     dit(i > 0 && k > 0 && k < i && i < j, 'la visite lit les preuves APRÈS la moisson (les ventes viennent d\'être captées) et AVANT le reste');
     dit(/preuve: PREUVE_MAX_PAR_VISITE/.test(EXT), 'et leur place est gardée dans la réserve des lectures prioritaires (les photos ne la mangent pas)');
   });
@@ -657,6 +657,7 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
       const temps = horloge(e);
       await e.ctx.capterDatesVersement(A);
       temps(16 * 60000);
+      delete e.store.vrmPrudence;   // 5.357 : la prudence de 24 h (lectures de fond) a sa propre règle (audit-vinted-forme) ; ici, le MÉMO seul
       await e.ctx.capterDatesVersement(A);
       dit(datees(e) === 2, 'versement : un 429 ⇒ relue après la pause, pas dans 24 h', `${datees(e)} datée(s)`); }
   });

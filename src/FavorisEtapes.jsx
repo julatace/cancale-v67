@@ -2,10 +2,10 @@
 // MESSAGES AUX FAVORIS — LA PAGE EN TROIS TEMPS (11 nov., lot `favoris-clair`)
 // Julien : « les messages aux favoris, on peut faire en sorte que ce soit
 // BEAUCOUP plus beau et plus COMPRÉHENSIBLE ? »
-//   1. QUI   : les annonces qui ont des favoris, le NOMBRE de personnes (jamais
-//              qui) ; on touche une annonce pour la choisir ;
+//   1. QUI   : (12 nov.) par compte, la liste des favoris du plus récent au plus
+//              ancien, une case par favori (FavorisListeCompte.jsx) ;
 //   2. QUOI  : le message et l'offre, l'aperçu tel que l'acheteur le verra ;
-//   3. QUAND : maintenant, au rythme « comme Vintex » ou espacé ; le mode auto ;
+//   3. QUAND : maintenant, au rythme rapide (6–10 s) ou espacé ; le mode auto ;
 // puis le récapitulatif (« 10 messages · 3 annonces · environ 1 min · dans la
 // limite de 45 gestes par heure ») et « Envoyer » — SON clic. Le suivi en direct
 // est la feuille commune « VRM travaille » (SuiviTravail). L'historique dit qui
@@ -18,6 +18,7 @@ import { createPortal } from 'react-dom';
 import { tr, date } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './design/favoris-clair.css';
+import AutresVersions from './AutresVersions.jsx';   // (12 nov., ext. 5.369) les autres versions du message
 
 const eur = (x) => (x == null || !Number.isFinite(Number(x)) ? '—' : Number(x).toFixed(2).replace('.', ',').replace(/,00$/, '') + ' €');
 export function texteDuree(sec) {
@@ -46,33 +47,10 @@ function Segment({ label, options, value, onChange, disabled, attr }) {
   return <div className="vrm-fc-seg" role="group" aria-label={label}>{options.map(([v, l]) => <button key={v} type="button" aria-pressed={value === v} disabled={disabled} {...(attr ? { [attr]: v } : {})} onClick={() => onChange(v)}>{l}</button>)}</div>;
 }
 
-// Une ligne de QUI : jamais un pseudo, le NOMBRE de personnes.
-function LigneAnnonce({ a, choisie, onBasculer, PhotoVinted, verrou }) {
-  const etat = a.vendu ? tr('favoris.qui.vendu') : a.enCours ? tr('favoris.qui.enCours') : a.aEcrire.length ? tr('favoris.qui.aEcrire', { n: a.aEcrire.length }) : a.aVerifier ? tr('favoris.qui.aVerifier') : a.envoyes ? tr('favoris.qui.dejaEcrit') : tr('favoris.qui.rienAEcrire');
-  const corps = <>
-    {a.choisissable && <span className={'vrm-fc-coche' + (choisie ? ' is-on' : '')} aria-hidden="true">{choisie && <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.4 5.8 10 11 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>}
-    <Photo src={a.photo} PhotoVinted={PhotoVinted} />
-    <span className="vrm-fc-annonce-texte">
-      <span className="vrm-fc-titre">{a.titre || tr('favoris.qui.sansTitre')}</span>
-      <span className="vrm-fc-meta">{a.numero && <span className="vrm-fu-num">N°{a.numero}</span>}{a.prix != null && <span>{eur(a.prix)}</span>}</span>
-      <span className="vrm-fc-compte"><b data-fc-personnes={a.personnes}>{tr('favoris.qui.personnes', { n: a.personnes })}</b><span className={a.aVerifier && !a.aEcrire.length ? 'is-geste' : ''}>{etat}</span></span>
-    </span>
-  </>;
-  const attrs = { 'data-fc-annonce': a.itemId || a.cle, 'data-fc-aecrire': a.aEcrire.length, 'data-fc-choisie': choisie ? '1' : '0' };
-  return a.choisissable
-    ? <li><button type="button" role="checkbox" aria-checked={choisie} disabled={verrou} className={'vrm-fc-annonce' + (choisie ? ' is-choisie' : '')} onClick={() => onBasculer(a.cle)} {...attrs}>{corps}</button></li>
-    : <li><div className="vrm-fc-annonce is-fixe" {...attrs}>{corps}</div></li>;
-}
-
 export default function PageFavoris(p) {
   useLangue();
   const [recapOuvert, setRecapOuvert] = React.useState(false);
-  const { annonces = [], choisis, choix, recap, PhotoVinted } = p;
-  const choisissables = annonces.filter((a) => a.choisissable);
-  const autres = annonces.filter((a) => !a.choisissable);
-  const totalPersonnes = annonces.reduce((n, a) => n + a.personnes, 0);
-  const aVerifier = annonces.reduce((n, a) => n + a.aVerifier, 0);
-  const aOuvrir = annonces.flatMap((a) => a.aOuvrir);
+  const { choix, recap, PhotoVinted } = p;
   const verrou = p.fileActive || p.occupe;
   const peutOuvrir = choix.ids.length > 0 && !p.erreurMessage && !p.erreurRythme && !verrou && p.reglagesPrets;
   const peutEnvoyer = peutOuvrir && (!(p.bloquees || []).length || p.confirmeMarge);
@@ -105,29 +83,9 @@ export default function PageFavoris(p) {
     </div>
   </div>;
 
-  // ── 1. QUI ─────────────────────────────────────────────────────────────────
-  const qui = <section className="vrm-fc-etape vrm-fu-blanc" data-fc-etape="qui" aria-label={tr('favoris.qui.titre')}>
-    <Tete n="1" titre={tr('favoris.qui.titre')} resume={tr('favoris.qui.resume', { a: annonces.length, n: totalPersonnes })} />
-    <p className="vrm-fc-aide">{tr('favoris.qui.aide')}</p>
-    {aVerifier > 0 && <div className="vrm-fc-geste" data-fc-a-verifier={aVerifier}><span>{tr('favoris.qui.verifierTexte', { n: aVerifier })}</span><button type="button" className="vrm-fc-bouton is-ambre" onClick={p.ouvrirEnvoi}>{tr('favoris.qui.verifier')}</button></div>}
-    {aOuvrir.length > 0 && p.ouvrirPersonne && <div className="vrm-fc-geste" data-fc-a-ouvrir={aOuvrir.length}><span>{tr('favoris.qui.ouvrirTexte', { n: aOuvrir.length })}</span><button type="button" className="vrm-fc-bouton is-ambre" disabled={!!p.ouverture} onClick={() => p.ouvrirPersonne(aOuvrir[0])}>{p.ouverture ? '…' : tr('favoris.qui.ouvrir')}</button></div>}
-    {choisissables.length > 0 ? <>
-      <div className="vrm-fc-choix-barre">
-        <span data-fc-choisis={choix.ids.length}>{tr('favoris.qui.choisis', { n: choix.ids.length })}</span>
-        {choisis.length ? <button type="button" className="vrm-fc-lien" disabled={verrou} onClick={p.aucune}>{tr('favoris.qui.aucune')}</button>
-          : <button type="button" className="vrm-fc-lien" data-fc-tout disabled={verrou} onClick={p.toutChoisir}>{tr('favoris.qui.tout')}</button>}
-      </div>
-      {p.depuisEnvoi != null && (p.anciens > 0 || p.anciensAussi) && <div className="vrm-fc-choix-barre is-second" data-fc-nouveaux={p.anciensAussi ? 'tous' : 'nouveaux'} data-fc-anciens={p.anciens}>
-        <span className="vrm-fc-aide">{p.anciensAussi ? tr('favoris.qui.tousFavoris') : tr('favoris.qui.nouveauxDepuis', { date: jour(p.depuisEnvoi), n: p.anciens })}</span>
-        <button type="button" className="vrm-fc-lien" data-fc-anciens-bascule disabled={verrou} onClick={() => p.setAnciensAussi(!p.anciensAussi)}>{p.anciensAussi ? tr('favoris.qui.nouveauxSeuls') : tr('favoris.qui.inclureAnciens')}</button>
-      </div>}
-      <ul className="vrm-fc-annonces" data-fc-liste>{choisissables.map((a) => <LigneAnnonce key={a.cle} a={a} choisie={choisis.includes(a.cle)} onBasculer={p.basculer} PhotoVinted={PhotoVinted} verrou={verrou} />)}</ul>
-    </> : <p className="vrm-fc-note" data-fc-rien>{tr('favoris.qui.toutFait')}</p>}
-    {autres.length > 0 && <details className="vrm-fc-repli">
-      <summary>{tr('favoris.qui.autres', { n: autres.length })}</summary>
-      <ul className="vrm-fc-annonces">{autres.map((a) => <LigneAnnonce key={a.cle} a={a} choisie={false} PhotoVinted={PhotoVinted} />)}</ul>
-    </details>}
-  </section>;
+  // ── 1. QUI : (12 nov., ext. 5.372) par compte, une liste du plus récent au plus ancien,
+  //    une case par favori (FavorisVinted.jsx → FavorisListeCompte.jsx). ─────────────────
+  const qui = p.quiListe || null;
 
   // ── 2. QUOI ────────────────────────────────────────────────────────────────
   const ex = p.exemple;   // { titre, numero, photo, prix, offre:{…} }
@@ -143,6 +101,7 @@ export default function PageFavoris(p) {
       <button type="button" className="vrm-fc-pastille" data-favoris-variable="variante" disabled={verrou} onClick={() => p.inserer('{Bonjour|Salut}')}>+ {tr('favoris.quoi.motHasard')}</button>
     </div>
     <p className="vrm-fc-aide" data-fc-variables-aide>{tr('favoris.quoi.variablesAide')}</p>
+    {p.setVariantes && <AutresVersions nom="favoris" premier={p.message} variantes={p.variantes} desactive={verrou} extOk={p.variantesOk !== false} placeholder={tr('favoris.quoi.autreVersion')} onChange={p.setVariantes} />}
     <div className="vrm-fc-sous"><span className="vrm-fc-sous-titre">{tr('favoris.quoi.offre')}</span>
       <Segment label={tr('favoris.quoi.offre')} value={p.offreChoix} onChange={p.setOffreChoix} disabled={verrou} attr="data-fc-offre"
         options={[['aucune', tr('favoris.quoi.offreAucune')], ['pct', tr('favoris.quoi.offrePct')], ['euros', tr('favoris.quoi.offreEuros')], ['prix', tr('favoris.quoi.offrePrix')]]} />
@@ -209,7 +168,7 @@ export default function PageFavoris(p) {
   const limite = r.limite === 'dedans' ? tr('favoris.recap.dedans', { n: r.gestes, max: p.pourApp }) : r.limite === 'depasse' ? tr('favoris.recap.depasse', { n: r.gestes, libres: r.libres, m: r.attendront }) : tr('favoris.recap.passu', { n: r.gestes });
   const pied = <div className="vrm-fc-pied" data-fc-pied>
     <div className="vrm-fc-pied-texte">{p.fileActive ? <span data-fc-en-cours>{tr('favoris.recap.enCours')}</span> : r.messages ? <span data-fc-pied-ligne>{ligneRecap}</span> : <span>{tr('favoris.recap.rien')}</span>}</div>
-    <button type="button" className="vrm-fc-bouton is-principal" data-fc-verifier disabled={!peutOuvrir} onClick={() => setRecapOuvert(true)}>{tr('favoris.recap.verifier')}</button>
+    <button type="button" className="vrm-fc-bouton is-principal" data-fc-verifier data-fc-n={choix.ids.length} disabled={!peutOuvrir} onClick={() => setRecapOuvert(true)}>{choix.ids.length ? tr('favoris.recap.envoyer', { n: choix.ids.length }) : tr('favoris.recap.verifier')}</button>
   </div>;
   const FermeAuRetour = p.FermeAuRetour;
   const fermer = () => { if (!p.occupe) setRecapOuvert(false); };

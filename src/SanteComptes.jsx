@@ -14,6 +14,9 @@ import React from 'react';
 import { santeComptes, lireEnvois, EVT_ENVOIS, SEUILS, FENETRE_J } from './santeComptes.js';
 import { SUPABASE_URL, sbAuth, AUTH, load, onCloudReady, useVentesCoque, classifyOrderStatus } from './App.jsx';
 import { lireEtatsComptes } from './etatsComptesLecture.js';
+// (12 nov., ext. 5.370) Les freins de Vinted sur 7 jours (src/discretion.js, `carnetDuCompte`).
+import { useLignesActions } from './JaugeActions.jsx';
+import { carnetDuCompte } from './discretion.js';
 import { tr, nombre, dateRelative } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './styles-sante-comptes.css';
@@ -74,6 +77,7 @@ function comptesAffiches(liste) {
 export function useSanteComptes({ comptes: liste = null, actif = true } = {}) {
   const [tick, setTick] = React.useState(0);
   const { ventes, ko } = useVentesCoque();
+  const [rowsActions, maintenantA] = useLignesActions('', actif);
   React.useEffect(() => {
     if (!actif) return undefined;
     const f = () => setTick((t) => t + 1);
@@ -90,9 +94,10 @@ export function useSanteComptes({ comptes: liste = null, actif = true } = {}) {
     return santeComptes({
       comptes, profils: memo ? memo.profils : undefined, etats: memo ? memo.etats : undefined, moderation: memo ? memo.moderation : null,
       envois: lireEnvois(owner), ventes, ko, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
+      freins: rowsActions === undefined ? undefined : Object.fromEntries(comptes.map((c) => [c.uid, carnetDuCompte(rowsActions, c.uid, maintenantA)])),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actif, cle, tick, ventes, ko, owner]);   // `tick` : une relecture des sources, une publication des envois
+  }, [actif, cle, tick, ventes, ko, owner, rowsActions, maintenantA]);   // `tick` : une relecture des sources, une publication des envois
 }
 
 // ── LES TEXTES (tous par tr(), la règle ne rend que des nombres et des codes) ──
@@ -114,6 +119,7 @@ export function texteRaison(r) {
     case 'avisBas': return tr('sante.r.avisBas', { n: r.valeur });
     case 'note': return tr('sante.r.note', { note: virg(r.valeur) });
     case 'delai': return tr('sante.r.delai', { duree: duree(r.valeur) });
+    case 'freins': return r.captchas ? tr('sante.r.freinsVerif') : tr('sante.r.freins', { n: r.refus });
     default: return '';
   }
 }
@@ -130,6 +136,7 @@ function valeur(i) {
     case 'retards': return tr('sante.v.retards', { n: i.valeur, sur: i.sur }) + (i.enRetard ? ' · ' + tr('sante.v.enRetard', { n: i.enRetard }) : '');
     case 'annulees': return tr('sante.v.annulees', { n: i.valeur, total: i.n, taux: nombre(i.taux, { maximumFractionDigits: 1 }) });
     case 'moderation': return i.sorte === 'banni' ? tr('sante.r.banni') : i.sorte === 'restreint' ? tr('sante.r.restreint') : i.sorte === 'masquee' ? tr('sante.r.masquee', { n: i.masquees }) : tr('sante.v.moderationOk');
+    case 'freins': return i.valeur ? tr('sante.v.freins', { refus: i.refus, pauses: i.pauses, verif: i.captchas, prudences: i.prudences }) : tr('sante.v.freinsAucun');
     case 'fraicheur': {
       const h = i.valeur / 3600000;
       const q = h < 1 ? tr('sante.duree.moinsHPasse') : h < 48 ? dateRelative(-Math.round(h), 'hour') : dateRelative(-Math.round(h / 24), 'day');
@@ -159,6 +166,7 @@ function seuil(k) {
     case 'annulees': return tr('sante.s.annulees', { s: SEUILS.annulees, t: SEUILS.annuleesTaux, j: FENETRE_J });
     case 'moderation': return tr('sante.s.moderation');
     case 'fraicheur': return tr('sante.s.fraicheur', { h: SEUILS.fraicheH });
+    case 'freins': return tr('sante.s.freins', { s: SEUILS.freinsRefus });
     default: return '';
   }
 }
@@ -188,7 +196,7 @@ function Indicateur({ i }) {
 
 function Compte({ c }) {
   const [ouvert, setOuvert] = React.useState(false);
-  const lignes = ['note', 'avisBas', 'delai', 'retards', 'annulees', 'moderation', 'fraicheur'].map((k) => c.indicateurs[k]);
+  const lignes = ['note', 'avisBas', 'delai', 'retards', 'annulees', 'moderation', 'freins', 'fraicheur'].map((k) => c.indicateurs[k]).filter(Boolean);
   const autres = c.alertes.length - 1;
   return (
     <section className="vrm-sc-compte" data-sc-compte={c.uid} data-sc-etat={c.etat} data-sc-raison-k={c.raison ? c.raison.k : ''} data-sc-lus={c.lus} data-sc-alertes={c.alertes.join(' ')}>

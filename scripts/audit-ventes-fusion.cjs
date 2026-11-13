@@ -136,7 +136,7 @@ function fond(opts) {
     const { f } = fond({ lignes: { [ROW]: rangee(2 * H) }, vinted: vintedVentes(sansTx, 2162) });
     const r = await f.ctx.rafraichirVentes(UID);
     dit(ecritures(f) === 0 && r && r.ok === false && r.raison === 'forme-inconnue', 'aucune vente avec un n° de transaction ⇒ rien écrit, et pas « lu »', JSON.stringify(r));
-    dit(f.j.diags.includes('ignore_commandes_sans_identite_orders_sold'), 'et c’est DIT (diagnostic)');
+    dit(f.j.diags.includes('ignore_commandes_sans_identite_orders_sold') || f.j.diags.includes('forme_bloquee_orders_sold'), 'et c’est DIT (diagnostic)');   // 5.357 : la porte de forme le dit la première (transaction_id obligatoire)
   });
   await essaie('page profonde seule', async () => {
     const { f } = fond({ lignes: { [ROW]: rangee(2 * H) } });

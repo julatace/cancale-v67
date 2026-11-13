@@ -34,6 +34,7 @@ import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';
+import { notifierVerificationVinted } from './_lib/verification-vinted.js';
 import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
 import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
 
@@ -134,6 +135,13 @@ async function traiter(req, res) {
     if (body.action === 'avis') {
       const r = await notifierAvisBas({ uid: body.uid != null ? String(body.uid) : null });
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (12 nov., ext. 5.370) Vinted a demandé une VÉRIFICATION (captcha) sur un compte : l'extension
+    // a tout arrêté ; « 🛑 Vinted demande une vérification ». Relu ici, au nom de CE vendeur.
+    if (body.action === 'verification') {
+      const r = await notifierVerificationVinted(body.uid);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
     // (11 nov., lot agent2-veille) UN CHIFFRE QUI A CHUTÉ SANS RAISON : l'app a écrit une alerte

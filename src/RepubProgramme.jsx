@@ -219,7 +219,7 @@ export function ProgrammeRepubVeille() {
         try {
           if (d.quoi === 'manquee') { await noterPasPartie(p, [{ cle: 'ferme' }]); return; }
           const occ = suivi.lire(); const occupe = !!(occ && (occ.statut === 'cours' || occ.statut === 'pause'));
-          const [rows, jour] = await Promise.all([lireLignesActions(p.uid), ACTIONS_QUOTA.includes(p.action) ? lireRepubJour(p.uid) : Promise.resolve(0)]);
+          const [rows, jour] = await Promise.all([lireLignesActions(p.uid, { frais: true }), ACTIONS_QUOTA.includes(p.action) ? lireRepubJour(p.uid) : Promise.resolve(0)]);
           const jauge = jaugeDuCompte(rows, p.uid, Date.now());
           const c = conditionsDepart({ prog: p, ext: extPourDepart(), jauge, jour, occupe });
           if (!c.ok) { await noterPasPartie(p, c.manques); return; }

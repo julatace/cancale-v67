@@ -22,6 +22,7 @@
 // service worker (`authLogin`), jamais gardé, jamais dans une adresse.
 const CARTE = /[?&]mode=carte\b/.test(location.search);
 const REPARER = /[?&]mode=reparer\b/.test(location.search);
+const FORCE = REPARER && /[?&]force=1\b/.test(location.search);   // 5.371 : « Réparer » sur une extension muette
 if (CARTE) { document.body.classList.add('carte'); document.documentElement.classList.add('carte'); }
 // 5.351 (lot extension-visuel) : la teinte CHOISIE dans VRM (Réglages → Apparence,
 // recopiée par le pont de vrm.center dans `vrmApparence`) passe avant celle du
@@ -79,6 +80,26 @@ async function reparerSiPerime() {
     } catch (_) { clearTimeout(t); res(null); }
   });
   if (code === manif) return 'a-jour';
+  // 5.371 : « Réparer » touché sur la carte alors que le service worker NE RÉPOND
+  //    PLUS (6 s sans rien) : on le relance — jamais si une republication a posé son
+  //    témoin il y a moins de 10 min (elle serait coupée au milieu), une fois par
+  //    10 min au plus (garde dans le stockage : aucune boucle possible).
+  if (code === undefined && typeof FORCE !== 'undefined' && FORCE === true) {
+    let g = {};
+    try { g = await chrome.storage.local.get(['vrmRepubVivante', 'vrmReparationForcee']); } catch (_) { return 'stockage'; }
+    const t = Date.now();
+    if (Number(g.vrmRepubVivante) > 0 && t - Number(g.vrmRepubVivante) < 10 * 60000) return 'republication';
+    if (Number(g.vrmReparationForcee) > 0 && t - Number(g.vrmReparationForcee) < 10 * 60000) return 'deja';
+    try { await chrome.storage.local.set({ vrmReparationForcee: t }); } catch (_) { return 'stockage'; }
+    try { chrome.runtime.reload(); } catch (_) { return 'echec'; }
+    return 'recharge';
+  }
+  // ⚠️ 5.356 (revue de robustesse, haute 19) : un service worker LENT (réveil,
+  //    en pleine republication : coffre → suppression → brouillon) ne répondait
+  //    pas en 6 s ⇒ `undefined` ≠ manifeste ⇒ rechargement : l'opération était
+  //    coupée au milieu. On ne recharge plus que sur une version REÇUE et
+  //    différente — sans réponse, rien (« pas su » ne vaut pas « périmé »).
+  if (typeof code !== 'string' || !/^\d+\.\d+\.\d+$/.test(code)) return 'pas-su';
   let deja = null;
   try { deja = (await chrome.storage.local.get(REPARATION_STORE))[REPARATION_STORE] || null; } catch (_) { return 'stockage'; }
   if (deja && deja.cle === manif && Date.now() - Number(deja.at || 0) < 24 * 3600e3) return 'deja';
@@ -500,6 +521,55 @@ function lancerCadre() {
   s.src = 'vrm-badge.js';
   (document.head || document.documentElement).appendChild(s);
 }
-if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
+// ⚠️ 5.362 (revue, moyenne 68) — QUI PEUT M'ENCADRER. `popup.html` est accessible aux
+//    pages de vinted, leboncoin, ebay, vestiaire et vrm.center : n'importe quel cadre
+//    de ces sites (pub, script tiers) pouvait le poser en `?mode=carte` (formulaire de
+//    connexion encadré, sous un calque) ou `?mode=reparer`. Désormais la carte et la
+//    réparation ne s'affichent que posées par la PAGE PRINCIPALE (`parent === top`,
+//    un seul ancêtre) d'un de ces sites — sinon rien. Une page de l'extension
+//    elle-même (fenêtre classique) n'est pas concernée.
+const HOTES_CADRE = /^https:\/\/(?:vrm\.center|(?:[a-z0-9-]+\.)*(?:vinted\.(?:fr|com|it|de)|leboncoin\.fr|ebay\.(?:fr|com)|vestiairecollective\.com))$/;
+function cadreAutorise() {
+  try {
+    if (window.parent === window) return true;                 // pas encadré
+    if (window.parent !== window.top) return false;             // un cadre DANS un cadre
+    const anc = location.ancestorOrigins;
+    if (anc && typeof anc.length === 'number') return anc.length === 1 && HOTES_CADRE.test(String(anc[0]));
+    // Firefox : pas d'`ancestorOrigins` ; le référent dit qui nous a posés.
+    let o = ''; try { o = new URL(document.referrer).origin; } catch (_) { o = ''; }
+    return HOTES_CADRE.test(o);
+  } catch (_) { return false; }
+}
+if ((REPARER || CARTE) && !cadreAutorise()) { try { document.body.setAttribute('data-cadre', 'refuse'); document.body.replaceChildren(); } catch (_) {} }
+else if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
 else if (CARTE) lancerCadre();
-else chargerAuth();
+else { chargerAuth(); montrerMiseAJour(); }
+
+// ── 5.371 : « NOUVELLE VERSION DISPONIBLE » DANS LA FENÊTRE ───────────────────
+// La même règle que la carte du logo (le service worker compare la version
+// installée à celle que vrm.center sert) : installée À LA MAIN et plus ancienne ⇒
+// « Télécharger » + 3 étapes ; venue d'une BOUTIQUE ⇒ rien (elle se met à jour seule).
+const LIENS_PAQUET_FENETRE = ['https://vrm.center/VRM-extension.zip', 'https://vrm.center/VRM-Orion.xpi'];
+function montrerMiseAJour() {
+  try {
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'miseAJour' }, (m) => {
+      try { void chrome.runtime.lastError; } catch (_) {}
+      if (!m || !m.ok || m.nouvelle !== true || m.origine === 'boutique' || !LIENS_PAQUET_FENETRE.includes(String(m.lien || ''))) return;
+      const orion = m.moteur === 'firefox';
+      const bloc = document.createElement('section');
+      bloc.className = 'maj';
+      bloc.setAttribute('data-maj', String(m.servie || ''));
+      bloc.style.cssText = 'margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--remplir)';
+      const t = document.createElement('div'); t.style.fontWeight = '600'; t.textContent = 'Nouvelle version disponible · ' + String(m.servie || '');
+      const a = document.createElement('a');
+      a.href = m.lien; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('download', ''); a.setAttribute('data-maj-telecharger', '');
+      a.textContent = 'Télécharger';
+      a.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;text-decoration:none';
+      const ol = document.createElement('ol'); ol.style.cssText = 'margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--doux)';
+      for (const x of (orion ? ['Touche « Télécharger ».', 'Orion → Extensions → + → ce fichier.', 'Rouvre cette fenêtre.'] : ['Ouvre le fichier téléchargé : il se dézippe.', 'Remplace l’ancien dossier VRM par le nouveau.', 'chrome://extensions → ⟳ sur VRM.'])) { const li = document.createElement('li'); li.textContent = x; ol.appendChild(li); }
+      bloc.append(t, a, ol);
+      const tete = document.querySelector('.head');
+      if (tete && tete.parentNode) tete.parentNode.insertBefore(bloc, tete.nextSibling); else document.body.prepend(bloc);
+    });
+  } catch (_) {}
+}

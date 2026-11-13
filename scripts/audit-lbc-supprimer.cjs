@@ -69,16 +69,20 @@ const URL_PAUSE = `${API}/pintad/v1/public/manual/pause/ads`;
 const URL_SUPPR = `${API}/pintad/v1/public/manual/delete/ads`;
 
 // ── La page leboncoin.fr : le capteur (MAIN) et le relais (isolé) sur la MÊME fenêtre ──
+// 5.362 : un MessageChannel de banc (deux ports, messages copiés, livrés au tour suivant).
+class CanalBanc { constructor() { const a = {}, b = {}; const livre = (vers) => (m) => setTimeout(() => { if (typeof vers.onmessage === 'function') vers.onmessage({ data: JSON.parse(JSON.stringify(m)) }); }, 0); a.postMessage = livre(b); b.postMessage = livre(a); this.port1 = a; this.port2 = b; } }
+const manu = (x) => x.appels.filter((y) => y.url.indexOf('/manual/') > 0);
 function page({ reseau = () => null, top = true, hote = 'www.leboncoin.fr', fond = null } = {}) {
   const ecouteurs = [], posts = [], appels = [], envoyes = [], onMsg = [];
   const win = {};
-  win.postMessage = (m) => { const d = JSON.parse(JSON.stringify(m)); posts.push(d); setTimeout(() => { for (const f of ecouteurs.slice()) { try { f({ source: win, data: d }); } catch (_) {} } }, 0); };
+  // 5.362 : `postMessage(m, origine, [port])` comme un navigateur (le canal privé des ordres passe un port).
+  win.postMessage = (m, origine, transfert) => { const d = JSON.parse(JSON.stringify(m)); posts.push(d); setTimeout(() => { for (const f of ecouteurs.slice()) { try { f({ source: win, origin: 'https://' + hote, data: d, ports: transfert || [] }); } catch (_) {} } }, 0); };
   win.addEventListener = (t, f) => { if (t === 'message') ecouteurs.push(f); };
   win.fetch = async (u, init) => {
     const url = typeof u === 'string' ? u : u.url;
     appels.push({ url, methode: (init && init.method) || 'GET', corps: init && init.body, entetes: init && init.headers ? JSON.parse(JSON.stringify(init.headers)) : null, credentials: init && init.credentials });
     await attendre(3);
-    const r = reseau(url, init) || { status: 404, body: '{}' };
+    const r = (/\/api\/account\/v1\/members\/me\/account$/.test(url) ? { status: 200, body: { account: { account_id: MON, type: 'private' }, member: { account_id: MON, nickname: { value: 'Moi' } } } } : null) || reseau(url, init) || { status: 404, body: '{}' };
     const body = typeof r.body === 'string' ? r.body : JSON.stringify(r.body);
     const res = { ok: r.status >= 200 && r.status < 300, status: r.status, headers: { get: () => 'application/json' }, text: async () => body, json: async () => JSON.parse(body) };
     res.clone = () => res;
@@ -93,7 +97,7 @@ function page({ reseau = () => null, top = true, hote = 'www.leboncoin.fr', fond
     // page (`currentScript` présent), il ne se réinjecte pas.
     document: { currentScript: {}, readyState: 'complete', getElementById: () => null, addEventListener() {}, createElement: () => ({}), head: { appendChild() {} } },
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
-    URL, FormData: class {}, TextEncoder, console: silence, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
+    URL, MessageChannel: CanalBanc, FormData: class {}, TextEncoder, console: silence, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
     Headers: class { constructor(o) { this.o = o || {}; } entries() { return Object.entries(this.o); } },
   });
   const ctxI = commun(); vm.createContext(ctxI); vm.runInContext(INJ, ctxI, { filename: 'lbc-inject.js' });
@@ -102,7 +106,12 @@ function page({ reseau = () => null, top = true, hote = 'www.leboncoin.fr', fond
     onMessage: { addListener: (f) => onMsg.push(f) } } };
   const ctxR = Object.assign(commun(), { chrome: chromeR, crypto: win.crypto }); vm.createContext(ctxR); vm.runInContext(REL, ctxR, { filename: 'lbc-relay.js' });
   // Le fond envoie un ordre à CET onglet (chrome.tabs.sendMessage).
-  const ordre = (msg, sender = { id: 'ext' }) => new Promise((res) => {
+  // 5.362 (moyenne 58) : l'ordre porte le compte attendu ; la page doit l'avoir lu
+  // (la réponse `members/me/account` que le site charge lui-même) — MON par défaut.
+  let compteLu = false;
+  const lireCompte = async () => { if (compteLu) return; compteLu = true; await win.fetch('https://api.leboncoin.fr/api/account/v1/members/me/account', { method: 'GET' }); await attendre(10); };
+  const ordre = async (msg, sender = { id: 'ext' }) => { await lireCompte(); return ordreBrut(/^lbc(Pause|Supprime)Annonce$/.test(String(msg && msg.action)) && !('compte' in msg) ? Object.assign({ compte: MON }, msg) : msg, sender); };
+  const ordreBrut = (msg, sender = { id: 'ext' }) => new Promise((res) => {
     let garde = false;
     for (const f of onMsg) { try { if (f(msg, sender, (r) => res(r)) === true) garde = true; } catch (_) {} }
     if (!garde) setTimeout(() => res(undefined), 40);
@@ -205,7 +214,8 @@ function fond(seed, local0, opts = {}) {
     const p = page({ reseau: site(200, '{}') });
     p.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'supprime', id: '3290000104', jeton: 'abcdefgh-7', url: `${API}/autre/chose` });
     await attendre(60);
-    dit(p.appels.length === 1 && p.appels[0].url === URL_SUPPR, 'l’adresse d’un ordre est celle écrite en dur — jamais celle qu’il apporte', JSON.stringify(p.appels.map((x) => x.url)));
+    // 5.362 (moyenne 60) : un ordre posté par la PAGE sur `window` ne part plus du tout (canal privé seulement).
+    dit(manu(p).length === 0, 'un ordre posté par la page (adresse imposée) : rien ne part — seul le canal privé du relais porte un ordre', JSON.stringify(manu(p).map((x) => x.url)));
   });
   await essaie('ordres refusés', async () => {
     const p = page({ reseau: site(200, '{}') });
@@ -216,9 +226,9 @@ function fond(seed, local0, opts = {}) {
     const h = page({ reseau: site(200, '{}'), hote: 'www.exemple.fr' });
     h.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'supprime', id: '3290000104', jeton: 'abcdefgh-2' });
     await attendre(60);
-    dit(r1 && r1.ok === false && !p.appels.length, 'un identifiant illisible est refusé, rien ne part', JSON.stringify(r1));
+    dit(r1 && r1.ok === false && !manu(p).length, 'un identifiant illisible est refusé, rien ne part', JSON.stringify(r1));
     dit(r2 === undefined, 'un ordre qui ne vient pas de CETTE extension est ignoré', JSON.stringify(r2));
-    dit(!q.appels.length && !h.appels.length, 'un cadre secondaire, une page hors leboncoin.fr : rien ne part', `${q.appels.length} · ${h.appels.length}`);
+    dit(!manu(q).length && !manu(h).length, 'un cadre secondaire, une page hors leboncoin.fr : rien ne part', `${q.appels.length} · ${h.appels.length}`);
   });
 
   console.log('\n── 2. LE FOND : CONFIRMATION, COMPTE CONNECTÉ, UNE À LA FOIS, PLAFOND, RÉPONSE');
@@ -241,7 +251,7 @@ function fond(seed, local0, opts = {}) {
     const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
     await attendre(40);
     dit(r && r.accepte === true && r.etape === 'fait' && r.statut === 200, 'Leboncoin répond 200 ⇒ « fait », avec la réponse telle quelle', JSON.stringify(r));
-    dit(f.messagesOnglet.length === 1 && f.messagesOnglet[0].frameId === 0 && f.messagesOnglet[0].msg.action === 'lbcSupprimeAnnonce' && Object.keys(f.messagesOnglet[0].msg).sort().join() === 'action,from,id', 'un seul ordre, au cadre principal de l’onglet connecté, avec l’identifiant seul', JSON.stringify(f.messagesOnglet));
+    dit(f.messagesOnglet.length === 1 && f.messagesOnglet[0].frameId === 0 && f.messagesOnglet[0].msg.action === 'lbcSupprimeAnnonce' && Object.keys(f.messagesOnglet[0].msg).sort().join() === 'action,compte,from,id' && f.messagesOnglet[0].msg.compte === MON, 'un seul ordre, au cadre principal de l’onglet connecté, avec l’identifiant et le compte attendu (revérifié dans la page)', JSON.stringify(f.messagesOnglet));
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(it.status === 'deleted' && !!it.supprimeeAt && it.supprimeeStatut === 200 && it.statutLbc === 'active' && it.subject === 'Nike shox TL noir', 'l’annonce est notée supprimée (rien n’est effacé de la base : sa fiche reste)', JSON.stringify(it));
     dit((f.local.vrmLbcSuppressions || []).length === 1, 'la suppression compte dans le plafond horaire');

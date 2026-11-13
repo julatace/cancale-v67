@@ -1,6 +1,8 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { problemesLot } from '../verifAnnonce.js';
+// (12 nov., ext. 5.370 — discrétion, point 11) Republier par petits groupes étalés (src/discretion.js).
+import { planParGroupes, GROUPE_MIN, GROUPE_MAX, PAUSE_GROUPE_MIN_S, PAUSE_GROUPE_MAX_S } from '../discretion.js';
 import { motsVendeur } from '../profilVendeur.js';
 const CLES_VERIF_NEUVES = ['numeroLu', 'numeroEcrit', 'ou', 'dejaEnLigne', 'dejaEnLigneOu'];
 const pickVerif = (v) => { const o = {}; if (v && typeof v === 'object') for (const k of CLES_VERIF_NEUVES) if (v[k] !== undefined) o[k] = v[k]; return o; };
@@ -1388,11 +1390,15 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [espMode, setEspMode] = useState(espSrc.mode === 'aleatoire' || espSrc.mode === 'fixe' ? espSrc.mode : 'vintex');
   const [espMin, setEspMin] = useState(Number(espSrc.min) > 0 ? Number(espSrc.min) : 1);
   const [espMax, setEspMax] = useState(Number(espSrc.max) > 0 ? Number(espSrc.max) : 3);
+  // (12 nov., sa décision) Par petits groupes de 3 à 6, une pause de 15 à 45 min entre deux :
+  // allumé par défaut, il voit le plan (« Pause 27 min » sur la ligne) et peut l'éteindre ou le retirer.
+  const [groupes, setGroupes] = useState(espSrc.groupes !== false);
+  const [pauses, setPauses] = useState({});
   const [prochaine, setProchaine] = useState(null);  // { at, s } : la prochaine paire part à `at`
   const [, setTic] = useState(0);
   const minutesOk = (v) => { const n = Number(String(v).replace(',', '.')); return isFinite(n) && n > 0 ? Math.min(60, Math.round(n * 10) / 10) : 1; };
   const bornesAlea = () => { const a = fileClamp(minutesOk(espMin) * 60), b = fileClamp(minutesOk(espMax) * 60); return [Math.min(a, b), Math.max(a, b)]; };
-  React.useEffect(() => { if (!PR) save('vrm_republier_esp', { mode: espMode, min: espMin, max: espMax }); }, [espMode, espMin, espMax]);   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (!PR) save('vrm_republier_esp', { mode: espMode, min: espMin, max: espMax, groupes }); }, [espMode, espMin, espMax, groupes]);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { if (!prochaine) return undefined; const t = setInterval(() => setTic((n) => n + 1), 1000); return () => clearInterval(t); }, [prochaine]);
   const [ok, setOk] = useState(() => !!(programme && programmeMode === 'depart'));
   const [mode, setMode] = useState('idle');          // idle | run | pause | fini
@@ -1414,6 +1420,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (30 oct.) Vinted a dit « réessaie dans N min » : « Reprendre » attend jusque-là
   // (relancer tout de suite se ferait refuser à son tour). Le délai vient du message.
   const [arretJusqua, setArretJusqua] = useState(0);
+  // (12 nov., 5.370) La discrétion de l'extension a dit « attends » (autre compte, même série,
+  // ouverture de Vinted) : la MÊME paire repart à cette heure-là, rien n'est compté en échec.
+  const reportRef = React.useRef(null);   // { id, at }
   React.useEffect(() => { if (!(arretJusqua > Date.now())) return undefined; const t = setInterval(() => setTic((n) => n + 1), 15000); return () => clearInterval(t); }, [arretJusqua]);
   const [ordre, setOrdre] = useState(() => (PR && Array.isArray(PR.ordre) ? PR.ordre.map(String) : null));          // null = l'ordre de sa sélection
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
@@ -1551,11 +1560,11 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // d'autres temps » les refait. La première paire part tout de suite.
   const tirerTemps = () => { const [a, b] = espMode === 'vintex' ? REPUB_ESP_VINTEX : bornesAlea(); return a + Math.floor(Math.random() * (b - a + 1)); };
   const [plan, setPlan] = useState(() => (PR && PR.plan && typeof PR.plan === 'object' ? { ...PR.plan } : {}));
-  const clePlan = aFaire.map((a) => a.id).join(',') + '|' + espMode + '|' + espMin + '|' + espMax + '|' + esp;
+  const clePlan = aFaire.map((a) => a.id).join(',') + '|' + espMode + '|' + espMin + '|' + espMax + '|' + esp + '|' + (groupes ? 'g' : '');
   // (11 nov., lot republier-programme) Les temps tirés d'une programmation sont CEUX qu'il a vus : gardés
   // paire par paire tant que l'espacement n'a pas changé (une paire partie entre-temps ne décale rien).
   const espFige = !!(PR && PR.esp && PR.plan && espMode === PR.esp.mode && String(espMin) === String(PR.esp.min) && String(espMax) === String(PR.esp.max) && String(esp) === String(PR.esp.fixe));
-  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { const g = espFige ? Number(PR.plan[a.id]) : NaN; o[a.id] = i === 0 ? 0 : Number.isFinite(g) && g > 0 ? g : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
+  const refaitPlan = () => { const r = planParGroupes(aFaire.map((a) => a.id), { espace: () => (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)), groupes }); const o = { ...r.plan }; if (espFige) aFaire.forEach((a, i) => { const g = Number(PR.plan[a.id]); if (i > 0 && Number.isFinite(g) && g > 0) o[a.id] = g; }); setPlan(o); setPauses(r.pauses); };
   React.useEffect(() => { if (mode === 'idle') refaitPlan(); }, [clePlan]);   // eslint-disable-line react-hooks/exhaustive-deps
   const duree = (sec) => sec >= 60 ? `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s` : `${sec} s`;
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
@@ -1576,6 +1585,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     let annule = false;
     let delai = 0;
     if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }
+    if (reportRef.current && reportRef.current.id === suiv.id) delai = Math.max(premier ? 0 : delai, Math.ceil((reportRef.current.at - Date.now()) / 1000));
     setProchaine(delai > 0 ? { at: Date.now() + delai * 1000, s: delai } : null);
     const t = setTimeout(async () => {
       if (annule) return;
@@ -1585,6 +1595,12 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       const x = apercu(suiv);
       let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
+      if (r && r.code === 'discretion' && Number(r.attendreMs) > 0) {
+        reportRef.current = { id: suiv.id, at: Date.now() + Number(r.attendreMs) + 5000 };
+        setSt((p) => { const n = { ...p }; delete n[suiv.id]; return n; });
+        return;
+      }
+      if (reportRef.current && reportRef.current.id === suiv.id) reportRef.current = null;
       const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
       setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: questionRepubOk(r && r.question) ? r.question : null } }));
       // (30 oct.) Plus aucune paire à tenter : l'arrêt est l'état FINAL (rien à reprendre).
@@ -1593,7 +1609,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
       // (2 nov., 5.311) Le frein après un refus de Vinted vaut pour tout le compte : la file s'arrête.
-      if (r && (r.code === 'vinted-pause' || r.code === 'plafond' || r.code === 'frein-refus')) arreter(r.raison);
+      if (r && (r.code === 'vinted-pause' || r.code === 'plafond' || r.code === 'frein-refus' || r.code === 'plafond-jour' || r.code === 'verification' || r.code === 'tout-arrete')) arreter(r.raison);
       // (28 oct.) L'extension n'a pas répondu à temps : elle travaille peut-être
       // encore sur CETTE paire. Enchaîner empilerait la suivante derrière elle et
       // laisserait croire à un échec : la file s'arrête, la ligne dit « pas su ».
@@ -1848,7 +1864,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               <div style={{ fontSize: 13, color: pageOk ? C.text : C.muted, lineHeight: 1.45 }}>{brouillonOk
                 ? (viaBrouillon
                   ? (pageOk
-                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert {NAV.dans}, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente l’article suivant est déjà préparé (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 {motsVendeur().noms} par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
+                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Tout passe par l’onglet vinted.fr ouvert {NAV.dans}, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente l’article suivant est déjà préparé (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 {motsVendeur().noms} par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
                     : <>Mets l’extension VRM à jour en {EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr. <Pourquoi label="Pourquoi ?">L’extension installée ici fait encore l’ancienne republication, depuis son fond, avec des renvois automatiques.</Pourquoi></>)
                   : 'L’annonce est créée directement en ligne.')
                 : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
@@ -1924,7 +1940,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux articles</span>
                 <Segmente plein label="Temps entre deux articles" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
-                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const sec = Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} {motsVendeur().noms} : environ {txt} en tout.</div>; })()}
+                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const tousPlan = aFaire.every((a, i) => i === 0 || Number.isFinite(plan[a.id])); const sec = tousPlan ? Math.round(aFaire.reduce((t, a, i) => t + (i === 0 ? 0 : Number(plan[a.id]) || 0), 0)) : Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} {motsVendeur().noms} : environ {txt} en tout.</div>; })()}
+                {aFaire.length > GROUPE_MAX && <div data-republier-groupes={groupes ? 'on' : 'off'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, color: C.text }}>
+                  <label style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44, cursor: 'pointer', flex: '1 1 220px' }}>
+                    <input type="checkbox" data-republier-groupes-case checked={groupes} onChange={(ev) => setGroupes(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+                    <span>Par petits groupes ({GROUPE_MIN} à {GROUPE_MAX}), pause de {PAUSE_GROUPE_MIN_S / 60} à {PAUSE_GROUPE_MAX_S / 60} min entre deux</span>
+                  </label>
+                  {groupes && <Bouton variante="discret" data-republier-groupes-retirer onClick={refaitPlan}>Autres groupes</Bouton>}
+                </div>}
                 {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, flexWrap: 'wrap' }}>
@@ -1965,7 +1988,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
                     <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
                     <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                    {!s.etat && a.id !== idAnnoncee && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
+                    {!s.etat && a.id !== idAnnoncee && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : pauses[a.id] ? <span data-republier-pause-groupe={pauses[a.id]}>Pause {Math.round(pauses[a.id] / 60)} min</span> : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
                     {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
                       <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 17, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
                       <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 17, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>

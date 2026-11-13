@@ -160,7 +160,7 @@ function espionPosts(f) {
     const g = faireFond({ src: SRC, connecte: '111' });
     g.ctx.compteNonCapte = async () => false;
     await g.ctx.storeHarvest('www.vinted.fr', 'conversation', '42', JSON.stringify({ conversation: { id: 42, opposite_user: { id: 1 }, transaction: { id: 2 }, msgs: [] } }));
-    dit(g.j.diags.includes('forme_inconnue_champ_conversation'), 'une vraie conversation sans `messages` alerte toujours (la sentinelle reste)', '');
+    dit(g.j.diags.includes('forme_inconnue_champ_conversation') || g.j.diags.includes('forme_bloquee_conversation'),   /* 5.357 : la porte de forme l'arrête et le dit */ 'une vraie conversation sans `messages` alerte toujours (la sentinelle reste)', '');
   });
 
   console.log('— 3. La capture photo n\'efface pas ce qui est écrit pendant sa boucle —');

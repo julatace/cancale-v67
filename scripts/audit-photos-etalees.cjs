@@ -121,6 +121,14 @@ async function scenarioFrein(src, statut) {
   const frein = f.store.vrmPhotosFrein || null;
   refuse = false;                                  // Vinted répondrait de nouveau
   f.h.t = T0 + 16 * MIN;                           // la pause habituelle (15 min) est finie
+  // 5.357 (validé par Julien) : un refus de Vinted met aussi le COMPTE 24 h en prudence —
+  // les lectures de fond (versements compris) attendent. On la lève ensuite pour juger le
+  // frein des PHOTOS seul (sa propre règle de 24 h), puis les versements qui repartent.
+  const avP = f.j.vinted.filter((x) => /\/transactions\//.test(x.chemin)).length;
+  await f.ctx.capterDatesVersement(UID);
+  const versementsPrudence = f.j.vinted.filter((x) => /\/transactions\//.test(x.chemin)).length - avP;
+  const prudence = f.store.vrmPrudence || null;
+  delete f.store.vrmPrudence;                      // la prudence levée : reste le frein des photos
   const av1 = pages(f.j);
   for (let i = 0; i < 5; i++) { f.h.t += MIN; await f.ctx.tickPhotos(); }
   const pendantFrein = pages(f.j) - av1;
@@ -135,7 +143,7 @@ async function scenarioFrein(src, statut) {
   const av2 = pages(f.j);
   await f.ctx.tickPhotos();
   const apres24h = pages(f.j) - av2;
-  return { premier, pause, frein, pendantFrein, versements, clic, clicPages, apres24h, diags: f.j.diags };
+  return { premier, pause, frein, pendantFrein, versements, versementsPrudence, prudence, clic, clicPages, apres24h, diags: f.j.diags };
 }
 async function scenarioClicPendantNavigation(src) {
   const f = monter(src);
@@ -259,7 +267,8 @@ async function scenarioPageMuette(src) {
       dit(r.premier === 1 && r.pause && r.pause.statut === statut, `${statut} : la pause habituelle est posée (le reste de l’extension la suit)`, JSON.stringify(r.pause));
       dit(!!(r.frein && r.frein.statut === statut) && r.diags.includes(`photos_frein_${statut}`), `et le frein des photos est rangé dans chrome.storage.local, et dit au diagnostic`, JSON.stringify(r.frein));
       dit(r.pendantFrein === 0, 'pause finie : AUCUNE page photo de fond tant que les 24 h ne sont pas passées', `${r.pendantFrein} page(s)`);
-      dit(r.versements > 0, 'l’autre sens : les versements (le reste de l’extension) repartent dès la fin de la pause habituelle', `${r.versements} lecture(s)`);
+      dit(!!r.prudence && r.versementsPrudence === 0, 'le compte passe 24 h en prudence : les versements de fond attendent aussi (5.357)', `${r.versementsPrudence} lecture(s)`);
+      dit(r.versements > 0, 'l’autre sens : les versements (le reste de l’extension) repartent à la fin de la prudence', `${r.versements} lecture(s)`);
       dit(r.clic === true && r.clicPages === 1, 'le clic « Publier » reste prioritaire : il lit SA page malgré le frein des photos', `rendu=${r.clic} · ${r.clicPages} page`);
       dit(r.apres24h === 1, '24 h plus tard, la capture de fond reprend (une page)', `${r.apres24h}`);
     });

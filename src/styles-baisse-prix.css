@@ -63,3 +63,10 @@
 /* La case ajoute une colonne devant la photo (la grille de outils-stats.css en a trois). */
 .vrm-qd-ligne[data-qd-coche] { grid-template-columns: 44px 52px minmax(0, 1fr) auto; gap: 10px; }
 @media (max-width: 520px) { .vrm-qd-ligne[data-qd-coche] { grid-template-columns: 36px 44px minmax(0, 1fr) auto; gap: 8px; } .vrm-qd-ligne[data-qd-coche] .vrm-qd-coche-zone { min-width: 36px; } }
+
+/* (12 nov., ext. 5.370 — discrétion) « Varier un peu » et « Dans les 6 h / Maintenant ». */
+.vrm-bp-options { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 4px 12px; }
+.vrm-bp-option { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 15px; cursor: pointer; }
+.vrm-bp-option input { width: 22px; height: 22px; margin: 0; accent-color: var(--fu-bleu, #0071e3); }
+.vrm-bp-quand .vrm-bp-mode { font-size: 15px; font-weight: 600; }
+.vrm-bp-var { color: var(--fu-gris, #6e6e73); }

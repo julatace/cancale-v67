@@ -53,6 +53,7 @@ function manifesteFirefox(m) {
   const fond = f.background && f.background.service_worker;
   f.background = { scripts: [COMPAT, fond || 'background.js'] };
   delete f.externally_connectable;
+  delete f.minimum_chrome_version;   // 5.371 : clé de Chrome seulement (Firefox l'ignorerait avec un avertissement)
   f.browser_specific_settings = {
     gecko: {
       id: ID_FIREFOX,
@@ -92,6 +93,7 @@ function manifesteSafari(m) {
   const fond = f.background && f.background.service_worker;
   f.background = { scripts: [COMPAT, fond || 'background.js'], persistent: false };
   f.permissions = (f.permissions || []).filter((p) => p !== 'downloads');
+  delete f.minimum_chrome_version;
   f.browser_specific_settings = { safari: { strict_min_version: '16.4' } };
   for (const cs of f.content_scripts || []) {
     if (cs.world === 'MAIN') continue;
@@ -104,10 +106,11 @@ function manifesteSafari(m) {
 function manifesteOrion(m){
  const f=JSON.parse(JSON.stringify(m));
  f.manifest_version=2;
+ delete f.minimum_chrome_version; delete f.content_security_policy;   /* 5.371 : MV2 attend une chaîne ; la politique par défaut d'une MV2 suffit */
  f.background={scripts:['compat-orion.js',m.background.service_worker],persistent:false};
- f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads'].includes(p)),...(m.host_permissions||[])])];
+ f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads','contextMenus'].includes(p)),...(m.host_permissions||[])])];
  delete f.host_permissions;delete f.externally_connectable;
- f.browser_action=f.action;delete f.action;
+ f.browser_action=f.action;delete f.action;if(!f.browser_action.default_popup)f.browser_action.default_popup='popup.html';   /* 5.370 : Orion (pas de clic droit) garde la fenêtre de l'icône */
  // 31 oct. : Orion sur iPhone a refusé le paquet. On ne garde que ce qu'un
  // lecteur WebExtension ancien connaît : l'identifiant, sans
  // `data_collection_permissions` (clé de 2025 propre à addons.mozilla.org).
@@ -118,6 +121,16 @@ function manifesteOrion(m){
  });
  f.content_scripts.unshift({matches:['https://*.vinted.fr/*','https://*.vinted.com/*','https://*.vinted.it/*','https://*.vinted.de/*','https://*.leboncoin.fr/*','https://*.vestiairecollective.com/*'],js:['compat-orion.js','orion-main.js'],run_at:'document_start',all_frames:false});
  return f;
+}
+// 5.361 (canal privé sur Orion) : orion-main.js reçoit la source d'inject.js, à
+// poser EN LIGNE (exécutée à document_start, avant toute page). Le marqueur
+// manquant ⇒ erreur : un paquet Orion sans capteur en ligne retomberait en
+// silence sur le canal « douteux ».
+function sourcesEnLigne(fichierMain,dossier){
+ const t=fs.readFileSync(fichierMain,'utf8');const marque='null;/*__VRM_SOURCES_PAGE__*/';
+ if(!t.includes(marque))throw new Error('orion-main.js : marqueur des sources en ligne introuvable');
+ const sources={'inject.js':fs.readFileSync(path.join(dossier,'inject.js'),'utf8')};
+ fs.writeFileSync(fichierMain,t.replace(marque,()=>JSON.stringify(sources)+';'));
 }
 // La fenêtre de l'icône charge ses scripts elle-même : la compatibilité d'abord.
 function compatDansPopup(dossier) {
@@ -145,7 +158,7 @@ function preparerArchive(dossier) {
 // (8 nov.) Les fonctions de manifeste servent aussi `paquets-boutiques.cjs`
 // (paquets des boutiques, sans toucher public/) : on les exporte, et le zip
 // ne se fabrique que lorsque CE script est lancé.
-module.exports = { manifesteFirefox, manifesteSafari, compatDansPopup, preparerArchive, COMPAT, ID_FIREFOX };
+module.exports = { manifesteFirefox, manifesteSafari, compatDansPopup, preparerArchive, COMPAT, ID_FIREFOX, sourcesEnLigne };
 if (require.main === module) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-zip-'));
 try {
@@ -194,6 +207,8 @@ try {
   if(orion){
     const o=path.join(tmp,'orion');fs.cpSync(dossier,o,{recursive:true});fs.rmSync(path.join(o,'README.md'),{force:true});
     for(const nom of ['compat-orion.js','orion-main.js'])fs.copyFileSync(path.join(__dirname,'extension-orion',nom),path.join(o,nom));
+    // 5.361 : le capteur Vinted EN LIGNE (canal privé sûr sur Orion, voir orion-main.js).
+    sourcesEnLigne(path.join(o,'orion-main.js'),o);
     const m=JSON.parse(fs.readFileSync(path.join(o,'manifest.json'),'utf8'));
     fs.writeFileSync(path.join(o,'manifest.json'),JSON.stringify(manifesteOrion(m),null,2)+'\n');
     const ph=path.join(o,'popup.html');fs.writeFileSync(ph,fs.readFileSync(ph,'utf8').replace(/<script\b/i,'<script src="compat-orion.js"></script>\n<script'));

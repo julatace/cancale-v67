@@ -103,7 +103,9 @@ const lire = (pg) => pg.evaluate(() => {
   const rect = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom), w: Math.round(b.width), h: Math.round(b.height) }; };
   return {
     resume: res ? res.getAttribute('data-resume') : null,
-    resumeTexte: res ? res.innerText.trim() : '',
+    // 5.371 (décision du 12 nov.) : la carte en 4 lignes — l'état est SA ligne, le compte la sienne.
+    resumeTexte: q('[data-q4="etat"]') ? q('[data-q4="etat"]').innerText.trim() : (res ? res.innerText.trim() : ''),
+    compteTexte: q('[data-q4="compte"]') ? q('[data-q4="compte"]').innerText.trim() : (res ? res.innerText.trim() : ''),
     detail: det ? (det.open ? 'ouvert' : 'replie') : null,
     point: !!(q('.pt') && getComputedStyle(q('.pt')).display !== 'none'),
     carteVisible: !!(carte && getComputedStyle(carte).display !== 'none'),
@@ -136,7 +138,7 @@ const mots = (t) => String(t || '').replace(/[✓·:—]/g, ' ').trim().split(/\
       const { ctx, pg, erreurs } = await ouvrir(nav, ETATS.ok, { scheme });
       const l0 = await lire(pg); await survoler(pg, l0.btn); const l = await lire(pg);
       await cap(pg, `carte-ok-1512-${scheme}`);
-      dit(l.resume === 'ok' && /shop_x/.test(l.resumeTexte), `${scheme} : tout va bien ⇒ UNE ligne d’état qui nomme le compte`, JSON.stringify([l.resume, l.resumeTexte]));
+      dit(l.resume === 'ok' && /shop_x/.test(l.compteTexte), `${scheme} : tout va bien ⇒ UNE ligne d’état qui nomme le compte`, JSON.stringify([l.resume, l.resumeTexte]));
       dit(mots(l.resumeTexte) <= 12, `${scheme} : la ligne tient en 12 mots au plus`, l.resumeTexte);
       dit(l.detail === 'replie', `${scheme} : le détail est replié quand tout va bien`, l.detail);
       dit(!l.point, `${scheme} : aucun point ambre quand tout va bien (§7)`);

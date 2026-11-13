@@ -6,16 +6,23 @@
 //  déconnecté → la fenêtre de connexion revient (sinon on ne pourrait plus se
 //  connecter), et le clic ne fabrique pas d'onglet VRM à la place.
 // ════════════════════════════════════════════════════════════════════════════
+//  ⚠️ 5.370 (12 nov., Julien : « comme Vintex, quand on clique sur l'extension VRM, ça ouvre un
+//  onglet séparé ») : avec le menu du clic droit (Chrome, Edge, Firefox), le clic ouvre TOUJOURS un
+//  onglet — l'onglet VRM de CETTE fenêtre au premier plan, sinon un nouveau ; déconnecté ⇒ vrm.center
+//  (connexion, `lier-extension`) ; la fenêtre d'avant s'ouvre par le clic droit (« Connexion à VRM » /
+//  « État de l'extension »). Sans menu (Orion iPhone) : la fenêtre de connexion, comme avant.
+//  `SRC=<ancien background.js>` : sur la 5.369, les contrôles « 5.370 » sont rouges.
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+const src = fs.readFileSync(process.env.SRC ? path.resolve(process.env.SRC) : path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 let ko = 0, ok = 0;
 const dit = (bon, quoi, det) => { if (bon) { ok++; console.log(`✅ ${quoi}`); } else { ko++; console.log(`❌ ${quoi}${det ? ' — ' + det : ''}`); } };
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`❌ ${quoi} — a levé : ${e && e.message}`); return null; } };
 
 // Fabrique un contexte d'exécution du service worker, avec une session donnée.
-function faire({ session = null, urlActive = '' } = {}) {
-  const j = { setPopup: [], crees: [], majOnglet: [], openPopup: 0, focus: [] };
+function faire({ session = null, urlActive = '', menus = false, onglets = [] } = {}) {
+  const j = { setPopup: [], crees: [], majOnglet: [], openPopup: 0, focus: [], menus: [], requetes: [], actives: [] };
+  let menuClic = null;
   const store = session ? { vrmSession: session } : {};
   let clicHandler = null;
   const ctx = {
@@ -31,9 +38,9 @@ function faire({ session = null, urlActive = '' } = {}) {
       downloads: { onCreated: { addListener() {} } },
       tabs: {
         onUpdated: { addListener() {} },
-        query: (q, cb) => { const r = /vrm\.center/.test(JSON.stringify(q)) ? [] : []; cb && cb(r); },
+        query: (q, cb) => { j.requetes.push(q); const r = onglets.filter((t) => /vrm\.center/.test(t.url) && (q.windowId == null || t.windowId === q.windowId)); cb && cb(r); },
         create: (o, cb) => { j.crees.push(o.url); cb && cb({ id: 1 }); },
-        update: (id, o, cb) => { j.majOnglet.push(o.url); cb && cb(); },
+        update: (id, o, cb) => { if (o.url) j.majOnglet.push(o.url); if (o.active) j.actives.push(id); cb && cb(); },
       },
       windows: { update: (id, o) => j.focus.push(id) },
       action: {
@@ -49,13 +56,15 @@ function faire({ session = null, urlActive = '' } = {}) {
       } },
     },
   };
+  if (menus) ctx.chrome.contextMenus = { removeAll: (cb) => cb && cb(), create: (o, cb) => { j.menus.push(o); cb && cb(); }, onClicked: { addListener: (fn) => { menuClic = fn; } } };
+  ctx.chrome.runtime.getURL = (p) => 'chrome-extension://x/' + p;
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx);
   vm.runInContext(src, ctx, { filename: 'background.js' });
   // Une session vivante : on court-circuite le vrai réseau (authEtat lit authToken).
   ctx.authToken = async () => (session ? session : null);
   ctx.isCloisonne = async () => true;
-  return { ctx, j, clic: (tab) => clicHandler && clicHandler(tab) };
+  return { ctx, j, clic: (tab) => clicHandler && clicHandler(tab), menu: (id) => menuClic && menuClic({ menuItemId: id }) };
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -97,6 +106,37 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     await wait(30);
     const vrm = [...j.crees, ...j.majOnglet].filter((u) => /vrm\.center/.test(u || ''));
     dit(vrm.length === 0, 'déconnecté : le clic n\'ouvre pas VRM (il ramène la connexion)', 'ouvert : ' + vrm.join(','));
+  });
+
+  // ── 4. 5.370 : AVEC LE MENU DU CLIC DROIT (Chrome, Edge, Firefox) ───────────
+  await essaie('5.370 : déconnecté, le clic ouvre VRM (connexion)', async () => {
+    const { j, clic } = faire({ session: null, menus: true });
+    await wait(20);
+    dit(!j.setPopup.includes('popup.html'), '5.370 : plus de fenêtre à l’icône, même déconnecté', 'setPopup=' + JSON.stringify(j.setPopup));
+    await clic({ url: 'https://www.vinted.fr/', windowId: 7 });
+    await wait(30);
+    const vrm = [...j.crees, ...j.majOnglet].filter((u) => /vrm\.center/.test(u || ''));
+    dit(vrm.length === 1 && /lier-extension=x/.test(vrm[0]) && j.openPopup === 0, '5.370 : déconnecté ⇒ un onglet vrm.center pour se connecter (lier-extension), aucune fenêtre', vrm.join(','));
+  });
+  await essaie('5.370 : l’onglet VRM de cette fenêtre', async () => {
+    const s = { access_token: 'x', expires_at: Date.now() + 3600e3 };
+    const { j, clic } = faire({ session: s, menus: true, onglets: [{ id: 41, windowId: 9, url: 'https://vrm.center/?tab=journee' }, { id: 42, windowId: 7, url: 'https://vrm.center/?tab=ventes' }] });
+    await wait(20);
+    await clic({ url: 'https://www.vinted.fr/', windowId: 7 });
+    await wait(30);
+    dit(j.requetes.some((q) => q.windowId === 7) && j.crees.length === 0 && (j.actives.includes(42)), '5.370 : un onglet VRM déjà ouvert DANS CETTE FENÊTRE est mis au premier plan (pas de second onglet)', JSON.stringify(j));
+    const k = faire({ session: s, menus: true, onglets: [{ id: 41, windowId: 9, url: 'https://vrm.center/' }] });
+    await wait(20);
+    await k.clic({ url: 'https://www.vinted.fr/', windowId: 7 });
+    await wait(30);
+    dit(k.j.crees.length === 1 && !k.j.actives.includes(41), '5.370 : VRM ouvert dans une AUTRE fenêtre ⇒ un nouvel onglet dans celle-ci', JSON.stringify(k.j.crees));
+  });
+  await essaie('5.370 : clic droit', async () => {
+    const { j, menu } = faire({ session: null, menus: true });
+    await wait(20);
+    dit(j.menus.map((m) => m.id).join(',') === 'vrm-connexion,vrm-etat' && j.menus.every((m) => m.contexts.join() === 'action'), '5.370 : clic droit sur l’icône ⇒ « Connexion à VRM » et « État de l’extension »', JSON.stringify(j.menus));
+    menu('vrm-connexion');
+    dit(j.crees.some((u) => /^chrome-extension:\/\/x\/popup\.html/.test(u)), '5.370 : le menu ouvre la fenêtre d’avant (connexion, état, réparation) dans un onglet', j.crees.join(','));
   });
 
   console.log(`\n${ko ? '❌' : '✅'} icône : ${ok} vert${ok > 1 ? 's' : ''}, ${ko} rouge${ko > 1 ? 's' : ''}`);
