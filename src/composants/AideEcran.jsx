@@ -19,6 +19,7 @@ import { fichesPour, fichesEcran, chercherAide, pourVendeur, emmener, faqAide, F
 // (lot vocabulaire-article) d'abord la phrase « article » écrite en entier (PHRASES_ARTICLE), sinon pourVendeur.
 import { phraseVendeur } from '../profilVendeur.js';
 import { AideAnimation } from './AideAnimation.jsx';
+import { AideVideo } from './AideVideo.jsx';
 import './aide-ecran.css';
 
 export const NOMS_ECRANS_AIDE = {
@@ -71,6 +72,8 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
   const allerA = (f) => { onClose && onClose(); emmener(f); };
   return (
     <Feuille onClose={onClose} titre={NOMS_ECRANS_AIDE[cle] || 'Aide'} sousTitre={etapes.length ? 'En quelques gestes' : 'Questions fréquentes'} z={10400} maxWidth={520} data-aide-feuille={cle}>
+      {/* (13 nov., lot 49) LA vidéo de l'écran (30 s, la vraie app) : demandée seulement au toucher de « Regarder ». */}
+      <AideVideo cle={cle}/>
       {/* (11 nov.) L'animation de l'écran : une scène par geste, le geste en cours s'allume dessous. */}
       <AideAnimation cle={cle} onEtape={setEtape}/>
       {/* (10 nov., lot J) EN TÊTE : les 3 à 5 gestes de cet écran (sans vidéo), texte de scripts/aide-contenu.cjs. */}

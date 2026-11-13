@@ -3038,7 +3038,7 @@ function FermerCompte({ onExporter }) {
         style={{ display: 'flex', width: '100%', minHeight: 44, alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.danger }}>Supprimer mon compte</span>
-          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>30 jours pour changer d’avis, puis ton compte et tes données sont effacés.</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>30 jours pour changer d’avis, puis tout est effacé.</span>
         </span>
         <span aria-hidden="true" style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
       </button>
@@ -3108,7 +3108,7 @@ function FermerCompte({ onExporter }) {
                   ? 'Ton compte est vide (aucune donnée, aucun compte de revente) : il est supprimé tout de suite.'
                   : <>Rien n’est effacé tout de suite : la suppression a lieu dans <b style={{ color: C.text }}>{info.graceJours || 30} jours</b>. D’ici là, tu peux l’annuler ici, en un geste. Un e-mail te le confirme (si l’envoi est en place).</>}
               </div>
-              {info.prevueSu === false && <div data-supprimer-prevue="pas-su" style={{ ...txt, marginTop: 6, color: C.warn }}>Je n’ai pas pu lire si une suppression est déjà prévue : rien ne sera enregistré tant que ce n’est pas su.</div>}
+              {info.prevueSu === false && <div data-supprimer-prevue="pas-su" style={{ ...txt, marginTop: 6, color: C.warn }}>Suppression prévue ? Pas su : rien n’est enregistré pour l’instant.</div>}
 
               <div style={titreBloc}>5. Confirme que c’est toi</div>
               {recoErreur && <div role="alert" data-supprimer-reco-erreur="" style={{ ...txt, color: C.warn, marginTop: 4 }}>{recoErreur}</div>}

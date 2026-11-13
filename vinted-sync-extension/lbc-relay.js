@@ -34,7 +34,7 @@
   const importsEnAttente=new Map();    // 5.365 : jeton → réponse au fond (une page de l'historique)
   const envoisEnAttente=new Map();     // 5.318 : jeton → réponse au fond (répondre dans un fil)
   const prixEnAttente=new Map();       // 5.363 : jeton → réponse au fond (changer un prix)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.374.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.375.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;

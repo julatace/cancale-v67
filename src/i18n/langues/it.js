@@ -255,6 +255,8 @@ export default {
   "auth.confirmer.avant": "Dopo la registrazione, ",
   "auth.confirmer.gras": "conferma il tuo indirizzo",
   "auth.creerCompte": "Crea un account",
+  "auth.exemple": "Scopri con degli esempi",
+  "auth.exemple.note": "Ancora senza account? Guarda VRM pieno. Non si salva nulla.",
   "auth.deco.bordereau": "Etichetta stampata",
   "auth.deco.colis": "Pacco pronto",
   "auth.deco.retiree": "Tolto da Leboncoin",
