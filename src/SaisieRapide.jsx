@@ -97,7 +97,7 @@ export function FeuillePrixAchat({ ventes, onEnregistrer, onFermer, Feuille, Bou
     {l.length === 0 ? <p className="vrm-sr-note">Tout est saisi.</p> : null}
     {l.map((v, i) => (
       <label key={v.tx} className="vrm-sr-champ vrm-sr-achat" data-prix-achat-tx={v.tx} data-prix-achat-num={v.num}>
-        <span className="vrm-sr-qui"><b>N°{v.num}</b> · vendu {eur(v.eur)}</span>
+        <span className="vrm-sr-qui"><b>N°{v.num}</b> · {v.sous != null ? v.sous : `vendu ${eur(v.eur)}`}</span>
         <span className="vrm-sr-saisie">
           <input autoFocus={i === 0} inputMode="decimal" enterKeyHint={i === l.length - 1 ? 'done' : 'next'} autoComplete="off" placeholder="Payé"
             aria-label={`Prix d'achat du N°${v.num}`} aria-invalid={faux[v.tx] ? 'true' : undefined} value={vals[v.tx] || ''}

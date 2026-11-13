@@ -99,3 +99,13 @@
    une ligne, comme les autres cartes repliées (stats-vitrine.css). */
 html .vrm-stats-vitrine .vrm-cr.vrm-sv-repliee { padding: 12px 14px; gap: 2px 14px; }
 html .vrm-stats-vitrine .vrm-cr.vrm-sv-repliee .vrm-cr-vide { padding: 0; }
+
+/* (13 nov., point 15) UN geste proposé par paire qui dort, sous son texte (la pilule « Agir », sans couleur
+   de plus, §7) ; « … » ouvre le choix complet. Le bénéfice « si vendue » sur sa ligne ; achat pas saisi ⇒
+   « Prix d'achat ? », la porte du chiffre qui manque (§5). Tout à 44 px au doigt. */
+.vrm-qd-geste { align-self: flex-start; margin-top: 6px; min-height: 44px; max-width: 100%; padding: 0 16px; border-radius: 999px; border: 0; background: var(--fu-case); color: var(--fu-encre); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: var(--fu-chiffres); }
+.vrm-qd-geste[aria-disabled="true"] { opacity: .45; }
+.vrm-qd-geste:focus-visible, .vrm-qd-saisir:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
+.vrm-qd-plus { padding: 0; width: 44px; display: inline-flex; align-items: center; justify-content: center; align-self: start; }
+.vrm-qd-benef { color: var(--fu-encre); }
+.vrm-qd-saisir { all: unset; box-sizing: border-box; min-height: 44px; margin: -12px 0 -10px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); cursor: pointer; }
