@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ⚠️ LE MODE « GROS LOT » À L'ACHAT (11 nov., lot gros-lot)
 //
 // Ce contrôle EXÉCUTE la règle (src/grosLot.js) sur des lots INVENTÉS ici et prouve :

@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // Audit : L'ORDRE DES CONVERSATIONS (11 nov., Julien : « tu ne fais pas du plus récent au plus vieux »).
 // Juge la règle pure `src/ordreConversations.js` (appuyée sur `ordreRecent`) et que CHAQUE vue de
 // Messages la prend : Vinted (liste + lecture des boîtes), Leboncoin, Vestiaire, eBay (questions et tout).

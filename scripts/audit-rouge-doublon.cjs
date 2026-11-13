@@ -113,7 +113,7 @@ function juger(depot) {
         if (m[1] && MARQUES.includes(('#' + hex6(m[1]).map((x) => x.toString(16).padStart(2, '0')).join('')).toLowerCase())) continue;
         if (MARQUEUR.test(fenetre(lignes, i))) continue;
         // (8 nov., démarrage léger) src/ecrans/*.jsx est du code d'App.jsx déménagé : même dette, même plafond.
-        const cle = rel.startsWith('src/ecrans/') ? 'src/App.jsx' : rel;
+        const cle = (rel.startsWith('src/ecrans/') || rel.startsWith('src/coeur/')) ? 'src/App.jsx' : rel;   // (13 nov.) src/coeur/* : App.jsx découpé
         parDette[cle] = parDette[cle] || []; parDette[cle].push(`${cle === rel ? '' : rel.slice(4) + ':'}${i + 1}: ${m[0]}`);
       }
     });

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT : LOT B (9 nov.) — « Annuler » au lieu d'une confirmation + ⌘K qui agit
 //  Exécute le VRAI module (src/annulerCommandes.js) et lit le code de l'app.

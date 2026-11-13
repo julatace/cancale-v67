@@ -110,9 +110,14 @@ const imp = async (f) => { try { return await import('file://' + path.join(R, f)
   const textes = fichiers(path.join(R, 'src')).map((f) => [path.relative(R, f).split(path.sep).join('/'), sansCommentaires(fs.readFileSync(f, 'utf8'))]);
   for (const [nom, re] of Object.entries(MOTIFS)) {
     const trop = [];
+    // (13 nov., découpe d'App.jsx) src/coeur/* EST du code d'App.jsx (vues découpées) : compté sous App.jsx, même plafond.
+    const parFichier = new Map();
     for (const [rel, t] of textes) {
       if (rel === 'src/sommeConnue.js') continue;
-      const n = (t.match(re) || []).length;
+      const logique = /^src\/coeur\//.test(rel) ? 'src/App.jsx' : rel;
+      parFichier.set(logique, (parFichier.get(logique) || 0) + (t.match(re) || []).length);
+    }
+    for (const [rel, n] of parFichier) {
       const max = PLAFOND[nom][rel] || 0;
       if (n > max) trop.push(`${rel} ${n} > ${max}`);
     }

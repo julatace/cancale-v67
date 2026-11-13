@@ -19,6 +19,7 @@
 //   node scripts/audit-publier-partout.cjs --prouve        chaque mutation doit rougir
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');

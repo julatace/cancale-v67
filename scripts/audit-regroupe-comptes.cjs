@@ -1,3 +1,4 @@
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 // Audit : LES LISTES FLOUTÉES REGROUPÉES PAR COMPTE (11 nov., 22 h 10 — Julien : « les ventes ne sont pas
 // regroupées et donc ce n'est pas très lisible : peux-tu regrouper ça mieux »).
 //   R. la règle pure (src/regroupeComptes.js), sur des données INVENTÉES (3 comptes, 50 ventes mêlées) :

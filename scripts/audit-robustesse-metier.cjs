@@ -29,6 +29,7 @@
 //  Aucune donnée réelle : tout est inventé (dépôt public).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+if (!process.argv.includes('--prouve') && !process.env.MUT) require('./_source-app.cjs').brancher();   // (11 nov., découpe 2) lit l'app RECOLLÉE (scripts/brancher-audits.cjs)
 const fs = require('fs'), path = require('path');
 const { pathToFileURL } = require('url');
 const { prouver, sansCommentaires } = require('./_mutations-audit.cjs');

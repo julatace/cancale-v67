@@ -236,7 +236,8 @@ function couplesDuCode(fichiers) {
   for (const [rel, texte] of fichiers) {
     sansCommentaires(texte).split('\n').forEach((l, i) => {
       for (const m of l.matchAll(/https:\/\/([a-z0-9][a-z0-9.-]*\.[a-z]{2,})/gi)) {
-        const k = rel + '|' + m[1].toLowerCase();
+        // (13 nov., découpe 2) src/coeur/* est du code d'App.jsx DÉMÉNAGÉ sans changer : la liste fermée d'App.jsx vaut pour lui.
+        const k = (rel.startsWith('src/coeur/') ? 'src/App.jsx' : rel) + '|' + m[1].toLowerCase();
         if (!out.has(k)) out.set(k, []);
         out.get(k).push(i + 1);
       }
