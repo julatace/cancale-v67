@@ -212,7 +212,7 @@
 :root:root body .vrm-main .vrm-argent-w-n { font-weight: 700 !important; }
 /* L'AMBRE n'est jamais un encadré (règle 2 de la revue du 11 nov.) : les fonds et cadres
    ambre écrits en ligne (`${C.warn}14`, `${C.warn}44`) s'effacent ; le TEXTE reste ambre. */
-:root:root body :is(.vrm-main, .vrm-fs) :is([style*="background: rgba(178, 80, 0, 0.08)"], [style*="background: rgba(178, 80, 0, 0.07)"], [style*="background: rgba(178, 80, 0, 0.1)"], [style*="background: rgba(255, 179, 64, 0.08)"], [style*="background: rgba(255, 179, 64, 0.07)"], [style*="background: rgba(255, 179, 64, 0.1)"]):not(button) {
+:root:root body :is(.vrm-main, .vrm-fs) :is([style*="background: rgba(178, 80, 0, 0.08)"], [style*="background: rgba(178, 80, 0, 0.07)"], [style*="background: rgba(178, 80, 0, 0.1)"], [style*="background: rgba(255, 179, 64, 0.08)"], [style*="background: rgba(255, 179, 64, 0.07)"], [style*="background: rgba(255, 179, 64, 0.1)"]):not(button):not([data-colis-urgence]) {
   background: transparent !important; border-color: transparent !important; padding-left: 0 !important; padding-right: 0 !important;
 }
 :root:root body .vrm-main .vrm-surface:not(:is(.vrm-surface, .vrm-ios-groupe, .vrm-fu-panneau) .vrm-surface) {
@@ -325,6 +325,12 @@
 @media (hover: hover) and (pointer: fine) { :root:root body .vrm-main .vrm-inbox-row.vrm-inbox-row:not(.is-current):hover { background-color: color-mix(in srgb, var(--d-carte) 94%, #7F7F86) !important; } }
 /* Les tuiles d'icône des Réglages : neutres, rayon 8 (un tiers de 30 ≈ la courbe d'iOS). */
 :root:root body .vrm-main .vrm-ios-icone { border-radius: 8px !important; }
+
+/* Paramètres à l'ordinateur : la même colonne que les autres écrans (bord gauche), plus une
+   colonne centrée qui faisait sauter le titre de 200 px d'un écran à l'autre (revue, n° 23). */
+@media (min-width: 1024px) {
+  :root:root body .vrm-main .vrm-set { margin-left: 0 !important; margin-right: auto !important; padding-left: 0 !important; max-width: 760px !important; }
+}
 
 /* ── 2.7 LES FEUILLES ──────────────────────────────────────────────────────── */
 :root:root body .vrm-fs .vrm-fs-cadre { box-shadow: var(--d-ombre-flottant) !important; }
