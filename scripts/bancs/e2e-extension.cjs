@@ -219,6 +219,9 @@ async function baisserDepuisApp(pg, id, { lancer: go = true } = {}) {
   await attendre(600);
   const avant = await lireBP(pg);
   if (!go || !avant || !avant.lancer || avant.lancer.off) return { avant, apres: avant, lance: false };
+  // (13 nov.) Depuis 5.370 la feuille propose « Dans les N h » (étalé, programmé par l'extension) par
+  // défaut ; ce scénario juge l'envoi IMMÉDIAT, son clic « Maintenant ».
+  if (await pg.locator('[data-bp-quand="maintenant"]').count()) await pg.locator('[data-bp-quand="maintenant"]').click().catch(() => {});
   await pg.locator('[data-bp-lancer]').click().catch(() => {});
   await pg.waitForSelector('[data-bp-confirmer]', { timeout: 6000 }).catch(() => {});
   await pg.locator('[data-bp-confirmer]').click().catch(() => {});
@@ -338,6 +341,12 @@ const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(()
       dit(!!coffre, '4 : l’annonce est sauvegardée dans le coffre (filet avant tout geste)');
       await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/111-vendeur_a');      // l'onglet reste sur vinted.fr
       await attendre(1500);
+      // (13 nov.) Depuis 5.370, après une OUVERTURE de vinted.fr l'extension attend 2 à 5 min avant tout
+      // geste seul (porteDiscretion, `vrmOuverture`). Ce scénario juge la commande d'un vendeur dont
+      // Vinted est ouvert DEPUIS LONGTEMPS : on recule l'heure d'ouverture notée (le temps passé), on ne
+      // retire aucune porte ; l'attente elle-même est jugée par l'audit de la discrétion.
+      const recul = await dansSW(ctx, ID, async () => { const m = (await chrome.storage.local.get('vrmOuverture')).vrmOuverture || {}; for (const k of Object.keys(m)) { m[k].depuis = Date.now() - 3600000; m[k].vu = Date.now(); } await chrome.storage.local.set({ vrmOuverture: m }); return Object.keys(m); });
+      if (!Array.isArray(recul)) console.log('     (ouverture non reculée : ' + JSON.stringify(recul) + ')');
       const d0 = vinted().length;
       M.remiseEnVol();
       const r = await baisserDepuisApp(pg, 91010001);
