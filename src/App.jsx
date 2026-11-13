@@ -18506,6 +18506,8 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       const r = await fetch('/api/compte?mode=supprimer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation: 'SUPPRIMER' }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(j?.message || 'Le compte n’a pas pu être supprimé. Réessaie.'); setBusy(false); return; }
+      // (13 nov., lot 51) Un compte qui n'est PAS vide part dans 30 jours (le serveur décide) : la phrase du serveur, telle quelle.
+      if (j && j.prevue) { setErr(j.message || 'La suppression de ce compte est prévue dans 30 jours.'); setBusy(false); return; }
       setEtape('fait');
       setTimeout(() => { authSignOut(); }, 6000);
     } catch (_) { setErr('Le serveur ne répond pas. Rien n’a été supprimé, réessaie.'); setBusy(false); }
@@ -19301,6 +19303,45 @@ async function confirmerAdresseParLien() {
     : 'passu';
   poserConfAdr({ ...c, etat, adresse: (j && j.adresse) || '', message: (j && j.message) || '' });
   if (etat === 'ok' || etat === 'deja') { try { lireMisDeCote(); } catch (_) {} }
+}
+// ── (13 nov., lot 51) « TON COMPTE SERA SUPPRIMÉ LE … » ──────────────────────
+// La suppression demandée a 30 jours de grâce (api/_lib/suppression-differee.js) :
+// tant qu'elle est prévue, UNE ligne sur la coque le dit, avec « Annuler » en un
+// geste. L'état vient du serveur (`?mode=suppression-prevue`) ; pas su ⇒ rien.
+function BandeauSuppressionPrevue({ tab }) {
+  const [p, setP] = React.useState(null);
+  const [occupe, setOccupe] = React.useState(false);
+  const lire = React.useCallback(async () => {
+    if (!(AUTH.session && AUTH.session.access_token)) return;
+    try {
+      const r = await fetch('/api/compte?mode=suppression-prevue', { headers: { ...enTeteSession() }, cache: 'no-store' });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      if (j && j.ok) setP(j.prevue || null);
+    } catch (_) {}
+  }, []);
+  React.useEffect(() => {
+    lire();
+    window.addEventListener('vrm:suppression-prevue', lire);
+    return () => window.removeEventListener('vrm:suppression-prevue', lire);
+  }, [lire]);
+  // Dans Paramètres, le panneau « Supprimer mon compte » dit déjà la date : la coque se tait (§7).
+  if (!p || !p.effaceLe || tab === 'settings') return null;
+  const t = Date.parse(p.effaceLe);
+  const quand = Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long' }) : '';
+  const annuler = async () => {
+    if (occupe) return; setOccupe(true);
+    let j = null;
+    try { const r = await fetch('/api/compte?mode=supprimer-annuler', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' }); j = await r.json().catch(() => null); if (!r.ok && j) j.ok = false; } catch (_) { j = null; }
+    setOccupe(false);
+    toast((j && j.message) || "Pas de réponse : la suppression n'est pas annulée. Réessaie.");
+    if (j && j.ok) { setP(null); try { window.dispatchEvent(new Event('vrm:suppression-annulee')); } catch (_) {} }
+  };
+  return (
+    <div data-bandeau-suppression={p.effaceLe} role="status" className="vrm-bandeau-abo">
+      <span className="vrm-bandeau-abo-texte">Ton compte sera supprimé le {quand}. Rien n’est effacé d’ici là.</span>
+      <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={annuler} disabled={occupe} data-bandeau-suppression-annuler="">{occupe ? 'Annulation…' : 'Annuler la suppression'}</button>
+    </div>
+  );
 }
 function BandeauConfirmationAdresse({ onVoir }) {
   const [, force] = React.useReducer((n) => n + 1, 0);
@@ -60362,6 +60403,7 @@ function AppCoeur() {
             est tenue dès le premier rendu (repli de même hauteur) : rien ne saute à l'arrivée de la réponse. */}
         {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab}/></Suspense>}
         <BandeauAbonnement setTab={setTab}/>
+        {MULTI_USER && authState.user && <BandeauSuppressionPrevue tab={tab}/>}
         <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
           comptes={(vintedAccounts || []).filter((a) => a && a.vinted_user_id != null).map((a) => ({ uid: String(a.vinted_user_id), nom: (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)] || a.login || ('#' + a.vinted_user_id) }))}/>
         <ApercuSansAbonnement tab={tab} setTab={setTab}/>
