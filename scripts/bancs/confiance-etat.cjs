@@ -61,7 +61,9 @@ async function confiance(nav, theme, tel) {
   const api = []; ctx.on('request', (q) => { if (/\/api\//.test(q.url())) api.push(q.url()); });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  const rep = await pg.goto(`http://localhost:${PORT}/confiance`, { waitUntil: 'load' });
+  // Un banc ne meurt pas, il rapporte : une page absente (404) est un rouge, et la suite tourne.
+  const rep = await pg.goto(`http://localhost:${PORT}/confiance`, { waitUntil: 'load' }).catch((e) => ({ status: () => String(e.message || e).split('\n')[0] }));
+  if (!rep || rep.status() !== 200) { dit(false, `${T} — la page répond`, rep && rep.status()); await ctx.close(); return; }
   const l = await pg.evaluate(() => ({
     present: !!document.querySelector('main[data-confiance]'),
     titre: document.title, h1: (document.querySelector('h1') || {}).textContent || '',
