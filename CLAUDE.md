@@ -530,9 +530,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Un colis = une fois, rappels, horaires (second agent)** : plus de carte « N colis changent de point relais » (chaque redirigé = une ligne sous son point, En route) ; rappels des transporteurs = le même colis, rien d'effacé (`api/_lib/rappel-colis.js`) ; date limite Vinted Go en gras lue ; rappel de retrait la veille et le jour J au nom de l'article ; horaires des points (`api/_lib/horaires-relais.js`). `2026-11-13-horaires-relais.md`. Geste : aucun.
 - **13 nov. · Passation du second agent** : ce qui n'est pas fini (CI → traduction → découpe d'App.jsx ; colis : rappels, un colis une fois, rappels veille/jour J, horaires), décisions de Julien du 12-13 nov., gestes. `2026-11-13-passation-agent2.md`. Geste : extension 5.372, sauvegarde.
 - **13 nov. · CI (intégration, étape 1)** : sous WebKit le service worker échappait aux routes des bancs (la vraie base répondait) ⇒ bancs sans service worker ; Safari : toucher un onglet avec « Plus » ouvert y mène enfin (B5) ; e2e-extension 39/41. `2026-11-13-integration-ci.md`. Geste : aucun.
-- **13 nov. · Horaires des points relais (second agent)** : lus dans l'e-mail de retrait (`api/_lib/horaires-relais.js`, rangés `horaires` ; forme inconnue ou texte coupé ⇒ rien), relus pour l'ancien (Vinted Go) ; À retirer : « Ouvert lun.–sam. 9 h–19 h 30 · ouvert maintenant ». `2026-11-13-horaires-relais.md`. Geste : aucun.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

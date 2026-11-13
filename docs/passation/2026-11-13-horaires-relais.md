@@ -59,3 +59,65 @@ entière à la ligne. Horaires pas sus ⇒ rien.
 - Mondial Relay n'écrit pas ses horaires dans l'e-mail (un lien) : rien, sauf lecture chez le transporteur (pas fait).
 
 Geste de Julien : aucun.
+
+---
+
+# Suite du lot (demandes du coordinateur, même branche)
+
+## A. PRIORITÉ — « ici ça doit être dans les Mondial Relay » (capture de Julien, 08:39)
+- **Avant** : une carte à part « 5 colis changent de point relais → INTERMARCHE, LE PORTAIL… · En route · 5 colis, leurs
+  codes » (titre ambre), en plus des listes.
+- **Maintenant** : `AlerteRelaisChange` n'est plus rendue (la lecture `colisRelaisChange` reste). Chaque colis redirigé est
+  UNE ligne de la forme commune (`LigneRetraitF` : « Colis Mondial Relay », logo MR, code s'il est sûr) sous SON nouveau
+  point dans « En route » (`src/CarteRelais.jsx`, prop `redirige`), en-tête écrit comme les autres points
+  (« Intermarché · Le Portail, 35350 St Meloir des Ondes · Itinéraire » ; sans point lu : « Nouveau point pas encore
+  lu »), mention neutre « En route · point changé » à la place du délai. Un n° déjà dans « À retirer » n'y est jamais redit.
+- **« Retiré » puis « changé de plan », dit DISPONIBLE par le transporteur** (forme de 42878264) : `fusionTransporteur`
+  tranche (nouveau cas, `api/_lib/suivi-colis.js`) ⇒ à retirer, au point, avec le code déjà lu.
+- **Mesuré** (lecture seule) : 80459659 a reçu « Votre colis a changé de plan » le 13 nov. à 02:14, APRÈS « Où vous
+  livrer… » — c'est maintenant un vrai changement (vers Intermarché) ; 80380675 (« Où vous livrer… » seul) : nulle part.
+- **Preuves** : banc `retirer-points-changes` (390 tactile / 1512, clair / sombre) 40/0 ; **24 rouges sur le build
+  d'origin/main** ; mutation « n° déjà à retirer redit » 16 rouges. Captures regardées. `audit-relais-change` (9/9
+  mutations), `audit-retraits-irreprochables`, bancs `colis-propre-logos`, `retraits-fiables`, `retraits-irreprochables`
+  remis à la règle (restent F7 / R1 sur le libellé « vérifié par… », hors de ce lot).
+
+## B. Les rappels des transporteurs (« je veux que l'app sache simplement lire les rappels »)
+- **Mesuré depuis le 25 oct.** : 50 rappels — Vinted Go « Libère de la place… » 21, Mondial Relay « Le temps file… » 18,
+  Vinted Go « Rappel : récupère ton colis avant le… » 6, Chronopost « …vous attend toujours… » 5. Tous ceux dont le n° est
+  lisible sont sur la ligne de leur colis : **0 ligne à part** (11 lignes « info » à part datent de septembre, avant la
+  lecture du n° du sujet), **0 « retiré » réveillé**, aucun code/point/QR perdu. **Défaut trouvé** : la date limite Vinted
+  Go (« À retirer avant le » puis « *12/11/2026* » à la ligne, en gras) n'était **jamais** lue (19 lignes « Libère… » sans
+  limite) — corrigé (`limiteRetraitDepuisTexte`), et relue pour l'ancien dans le texte gardé (`src/lieuxRetrait.js`,
+  année lue, jamais devinée).
+- **La règle** (`api/_lib/rappel-colis.js`, utilisée par la route) : un e-mail suivant du même n° complète la ligne et
+  n'efface jamais code, QR, point, date limite, horaires, titre ; un plus ancien ne remplace rien ; la date limite du
+  rappel (sujet « avant le … ») gagne ; la clé de notification est celle de l'arrivée (pas de 2e notification).
+- **Preuve** : `audit-rappels-colis` (route EXÉCUTÉE sur une base en mémoire, fixtures inventées des 4 formes) 38/0,
+  **4 rouges sur origin/main** ; 6 mutations rouges (2e ligne, code effacé, retiré réveillé, horaires effacés, date en
+  gras ignorée, relecture muette).
+
+## C. Un colis = une fois (« le colis ne doit apparaître qu'une seule fois »)
+- **Mesuré** : en base, 7 n° ont deux lignes (`email_track_vinted_N` « info » + `email_track_chronopost_N`) — l'app les
+  fond par n° (`fusionLignesMemeSuivi`) ; aucun code de retrait sur deux n° au même point. La liste publiée
+  (`vrm_colis_retirer`) : 10 colis, aucun n° en double.
+- **Banc** `retirer-un-colis` : arrivée + 2 rappels + SMS + point changé (une ligne serveur, prouvé par l'audit B) + e-mail
+  Vinted du même n° + lecture transporteur + achat Vinted relié par n° + « Commande mise à jour » de sa conversation ⇒
+  **une ligne** au nom de l'article, avec son code ; un achat sans n° ni code au même point : une ligne à part (§5) ;
+  total publié = lignes comptées. 20/0 sur la branche **et sur origin/main** (aucun doublon d'affichage dans cette scène :
+  la règle existait) ; mutation « achat relié par identité plus écarté » ⇒ 8 rouges.
+
+## D. Rappels de retrait (« tu peux peut-être faire des rappels »)
+- **Mesuré** (`push_journal`, `colis_retrait_dedup`) : le « 📍 Dernier jour » part déjà au cron du matin (mémo : envois du
+  29 oct. au 7 nov., un par n°) ; aucun depuis le 7 nov. (aucune date limite lue tombant ce jour-là). La veille n'était
+  dite que dans le résumé du soir (groupée).
+- **Maintenant** : au cron du matin, **la veille** « 📍 Demain dernier jour · {article} » et le jour même « 📍 Dernier jour ·
+  {article} » (sinon « Colis {transporteur} »), corps « À retirer … · {point} · code X · {transporteur} n°… » ; une fois
+  par colis et par étape (clés `demain-{n°}` / `dernier-{n°}`, par identité) ; jamais pour un retiré, jamais sans date
+  limite LUE. Article : celui de l'e-mail de CE colis (`artTitle`, ajouté à `SELECT_SUIVI_META`).
+- **Preuve** : `audit-suivi-colis` (route `api/ship-reminders.js` EXÉCUTÉE) étendu — veille au nom de l'article, retiré et
+  sans date ⇒ rien ; mutations « veille muette », « veille d'un retiré ».
+
+## Reste
+- Le titre au nom de l'article quand le colis n'est relié à l'achat que par la commande Vinted (pas par l'e-mail) : le
+  cron ne lit pas les titres des commandes (lecture lourde) — « Colis {transporteur} » dans ce cas.
+- Le résumé du soir redit encore la veille (groupée) : à trancher (garder les deux, ou retirer la veille du résumé).
