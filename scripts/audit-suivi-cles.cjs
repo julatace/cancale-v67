@@ -190,7 +190,7 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     O = await importer('api/_lib/owner.js');
     dit(typeof T.lireReponseLaPoste === 'function' && typeof T.lireReponseUps === 'function' && typeof L.passageTransporteurs === 'function', 'les analyseurs La Poste et UPS existent (api/_lib/transporteurs.js)');
   });
-  if (!T || typeof T.lireReponseLaPoste !== 'function') { console.log(`\n❌ audit-suivi-cles : ${ko} rouge(s)`); process.exit(1); }
+  if (!T || !L || !RS || !O) { console.log(`\n❌ audit-suivi-cles : ${ko} rouge(s)`); process.exit(1); }
   const NOW = Date.now();
   const N_LP = '6A12345678901', N_UPS = '1Z999AA10123456784', N_UPS2 = '1Z999AA10123456791';
 
@@ -259,7 +259,7 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
 
   // ══ 3. LA FORME DU N° — et la porte de la clé ══════════════════════════════
   await essaie('la forme du n° et la porte de la clé', async () => {
-    T.noterLecturesServeur(null);
+    if (T.noterLecturesServeur) T.noterLecturesServeur(null);
     for (const k of CLES) delete process.env[k];
     dit(T.lectureServeurActive('colissimo') === false && T.lectureServeurActive('ups') === false && T.lectureServeurActive('chronopost') === true, 'C1 sans clé : Colissimo et UPS ne sont pas lus par le serveur (Chronopost l’est toujours)');
     dit(T.carrierLisible('colissimo', N_LP) === null && T.carrierLuDeLigne('vinted', N_LP) === null && T.carrierLisible('ups', N_UPS) === null, 'C2 sans clé : aucun n° Colissimo / UPS « lisible » (rien demandé, rien promis)', J([T.carrierLisible('colissimo', N_LP), T.carrierLuDeLigne('vinted', N_LP)]));
@@ -299,7 +299,7 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     base.clear(); appels.length = 0;
     if (typeof L._oublierPauseInstance === 'function') L._oublierPauseInstance();
     if (typeof L._oublierJetonUps === 'function') L._oublierJetonUps();
-    T.noterLecturesServeur(null);
+    if (T.noterLecturesServeur) T.noterLecturesServeur(null);
     for (const k of CLES) delete process.env[k];
     base.set(`${A}|main`, { vrm_colis_collected: [] });
     base.set(`${A}|email_track_colissimo_${N_LP}`, ligneLp());
