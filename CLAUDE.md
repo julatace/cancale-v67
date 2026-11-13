@@ -530,10 +530,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **13 nov. · Horaires des points relais (second agent)** : lus dans l'e-mail de retrait (`api/_lib/horaires-relais.js`, rangés `horaires` ; forme inconnue ou texte coupé ⇒ rien), relus pour l'ancien (Vinted Go) ; À retirer : « Ouvert lun.–sam. 9 h–19 h 30 · ouvert maintenant ». `2026-11-13-horaires-relais.md`. Geste : aucun.
+- **13 nov. · Un colis = une fois, rappels, horaires (second agent)** : plus de carte « N colis changent de point relais » (chaque redirigé = une ligne sous son point, En route) ; rappels des transporteurs = le même colis, rien d'effacé (`api/_lib/rappel-colis.js`) ; date limite Vinted Go en gras lue ; rappel de retrait la veille et le jour J au nom de l'article ; horaires des points (`api/_lib/horaires-relais.js`). `2026-11-13-horaires-relais.md`. Geste : aucun.
 - **13 nov. · Source unique (second agent)** : ventes, achats, suivis et dates de versement en UNE copie pour tous les `Comptabilite` montés (`src/magasinPartage.js`) ; chiffres 35/35, lectures en baisse (budget abaissé), lecture KO sans perte (banc `source-unique`) ; une date de versement lue ne redevient jamais vide (banc `versements-course`) ; pas de gain de vitesse prouvé, publieur pas fait. `2026-11-13-source-unique.md`. Geste : aucun.
 - **13 nov. · Moteur-compta (second agent)** : moins de calculs refaits, chiffres 35/35 ; < 2 s non atteint (2–3 `Comptabilite` par écran). `2026-11-13-moteur-compta.md`. Geste : aucun.
-- **12 nov. · G2 (5.368), 12nov-a (5.369), 12nov-b, vert-vitesse, vitesse-volume, extension 5.372 (discrétion, boutique, favoris par compte, une prudence par compte) en ligne** : `2026-11-12-*.md`. Geste : installer 5.372.0 ; migration 042 (facultative).
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
