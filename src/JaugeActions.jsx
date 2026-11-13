@@ -15,9 +15,24 @@ import './styles-jauge-journal.css';
 // (12 nov., ext. 5.370) « 112/200 aujourd’hui » et l'alerte « Vinted demande une vérification ».
 import { AlerteVerification } from './Discretion.jsx';
 
-export function lireLignesActions(uid) {
+// (13 nov., intégration 5.372) Plusieurs cartes de Ma journée lisent la même jauge (Discrétion,
+// « Tout va bien ? », la jauge) : une lecture EN COURS ou de moins de 3 s est partagée (budget-vitesse :
+// plus de lecture en double). Une lecture ratée n'est jamais gardée ; `frais` (la veille a vu la ligne
+// changer) relit toujours.
+const LECTURES_ACTIONS = new Map();
+const PARTAGE_ACTIONS_MS = 3000;
+export function lireLignesActions(uid, { frais = false } = {}) {
   const filtre = uid ? `${PREFIXE_ACTIONS}${uid}_*` : `${PREFIXE_ACTIONS}*`;
-  return lireTout(`id=like.${filtre}&select=${SELECT_ACTIONS}`).catch(() => null);
+  const deja = LECTURES_ACTIONS.get(filtre);
+  if (!frais && deja && (deja.enCours || Date.now() - deja.at < PARTAGE_ACTIONS_MS)) return deja.p;
+  const e = { at: Date.now(), enCours: true, p: null };
+  e.p = lireTout(`id=like.${filtre}&select=${SELECT_ACTIONS}`).catch(() => null).then((r) => {
+    e.enCours = false; e.at = Date.now();
+    if (r == null && LECTURES_ACTIONS.get(filtre) === e) LECTURES_ACTIONS.delete(filtre);
+    return r;
+  });
+  LECTURES_ACTIONS.set(filtre, e);
+  return e.p;
 }
 
 // undefined = on lit · null = lecture ratée · tableau = lu.
@@ -27,13 +42,13 @@ export function useLignesActions(uid, actif = true) {
   React.useEffect(() => {
     if (!actif) return undefined;
     let mort = false;
-    const lire = () => lireLignesActions(uid).then((r) => { if (!mort) { setRows(r); setMaintenant(Date.now()); } });
+    const lire = (frais = false) => lireLignesActions(uid, { frais }).then((r) => { if (!mort) { setRows(r); setMaintenant(Date.now()); } });
     lire();
     const minuteur = setInterval(lire, 60000);
     const auRetour = () => { if (document.visibilityState === 'visible') lire(); };
     document.addEventListener('visibilitychange', auRetour);
     // (11 nov., temps réel) La veille a vu la ligne de jauge de ce compte changer (src/tempsReel.js).
-    const neuf = (e) => { const d = e && e.detail; if (d && Array.isArray(d.quoi) && d.quoi.some((q) => q.quoi === 'jauge' && (!uid || String(q.uid) === String(uid)))) lire(); };
+    const neuf = (e) => { const d = e && e.detail; if (d && Array.isArray(d.quoi) && d.quoi.some((q) => q.quoi === 'jauge' && (!uid || String(q.uid) === String(uid)))) lire(true); };
     window.addEventListener('vrm:neuf', neuf);
     return () => { mort = true; clearInterval(minuteur); document.removeEventListener('visibilitychange', auRetour); window.removeEventListener('vrm:neuf', neuf); };
   }, [uid, actif]);
