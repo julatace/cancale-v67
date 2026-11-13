@@ -530,6 +530,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **13 nov. · Prévision lissée, « Tes comptes Vinted » (lot 36-27)** : du 1er au 4, rythme des 4 dernières semaines ; tableau par compte (30 j/90 j/année : ventes, jours, prix moyen, offres). `2026-11-13-lot3627.md`. Geste : aucun.
+
 - **13 nov. · Récap 1 page + URSSAF la veille** : « Récap de <mois> » → Imprimer (A4, noir et blanc, données du Rapport du mois) ; la veille « Demain : déclaration URSSAF · X € à déclarer » (règle de « Copier », une fois). `2026-11-13-lot1617.md`. Geste : aucun.
 
 - **13 nov. · Horaires Mondial Relay** : lus par le serveur dans le suivi du colis (n° de point), 7 j, même code postal, sans requête de plus. `2026-11-13-lot11-horaires-mr.md`. Geste : aucun.
