@@ -131,3 +131,32 @@ h. Version **5.374.0** partout (`CODE_VERSION`, manifeste, `EXT_ATTENDUE`, `lbc-
    « Articles à expédier »), attendre deux secondes. La vente apparaît dans VRM → Ventes · Vestiaire,
    datée du jour de la vente, avec ce que Vestiaire te verse et ses frais.
 3. Sur l'ordinateur (Chrome) : installer aussi la 5.374.0 (remplacer le dossier, ⟳).
+
+## 6. Résultats (13 nov., sur la branche)
+
+- `audit-vc-vente-orion` **37/37** ; `--prouve` **20/20** ; sur `origin/main` **27 rouges**.
+- Banc `vestiaire-vente-orion` : **33 verts, 0 rouge** (390 tactile / 1512, clair / sombre) ; captures
+  regardées (ligne « 13 nov. · à envoyer avant le 20 nov. · Frais Vestiaire 6,29 € (3 %) », fiche
+  Prix / Frais / Pour toi, « Vendue 13 nov. »). Le même banc avec l'extension d'`origin/main` :
+  **rouge** — la base ne reçoit aucune vente, l'écran dit « Pas encore lues : ouvre « Mes ventes »… ».
+- Verts : `audit-capture-vc-lbc`, `audit-vestiaire-partout`, `audit-frais-vestiaire`, `audit-vc-prix`,
+  `audit-vc-recon`, `audit-vc-messages`, `audit-vc-offres`, `audit-vc-conversations`,
+  `audit-numeros-vestiaire`, `audit-lbc-vc-lecture`, `audit-vc-publier` (sa vente inventée d'octobre,
+  forme « à expédier » avec `createdAt` : le JOUR en est gardé — jamais `soldDate`),
+  `audit-vestiaire-email`, `audit-familles-extension`, `audit-robustesse-extension`,
+  `audit-extension-navigateurs`, `audit-coherence`, `audit-extension-zip`, `audit-variables`,
+  `audit-tdz`, `audit-identite`, `audit-safari` (après `npm run build`), `audit-secrets`,
+  `audit-bilan-semaine`, `audit-marge-plateforme`, `audit-factures-autres`, `audit-traduction` ;
+  `tests/orion-base-validee.py`, `tests/orion-garde-regression.py` (13), `tests/orion-paquet` (135),
+  `tests/orion-injection` (8), `tests/orion-pont-canal`, `tests/orion-cors-reel` (23) ; bancs
+  `frais-vestiaire` (20) et `vestiaire-plus` (54) verts. `npm run build` vert.
+
+## 7. Reste (dit)
+
+- La forme d'une page Vestiaire MOBILE n'a jamais été vue d'ici : si elle porte un jour les ventes
+  dans `dehydratedState`, elles sont lues (partielles) ; sous une autre forme, `vc_ventes.forme`
+  (`inconnu-page-*`, `requete-page-*`) le dira — à relire après le geste de Julien.
+- La vente du 2 nov. garde sa date fausse (21:00:32) jusqu'à la prochaine lecture de « Mes ventes »
+  (alors remplacée par 14:17:41, `dateDe: 'ventes'`) — le jour, lui, est juste.
+- Si Vestiaire refuse aussi la relecture (rattrapage) sur l'iPhone : `vc_rattrapage_*` au diagnostic ;
+  passer par « Mes ventes » une seconde fois (changement d'onglet dans la page) suffit alors.
