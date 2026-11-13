@@ -1,0 +1,34 @@
+name: Sonde WebKit (temporaire)
+on:
+  push:
+    branches: [claude/sonde-webkit]
+permissions:
+  contents: read
+jobs:
+  sonde:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Installer WebKit et Chromium
+        run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
+          for essai in 1 2 3; do npx playwright install --with-deps webkit chromium && break; sleep 20; done
+          sudo mkdir -p /opt/pw-browsers
+          sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
+          echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"
+      - name: Sonde
+        env:
+          MOTEURS: webkit,chromium
+        run: node scripts/sonde-webkit.cjs || true
+      - name: connexion-claire sous WebKit
+        env:
+          NAVIGATEUR: webkit
+          BANC_GARDE_TRACE: '1'
+        run: node scripts/bancs/connexion-claire.cjs || true
