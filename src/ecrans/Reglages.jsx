@@ -3501,10 +3501,13 @@ function Parrainage() {
   React.useEffect(() => {
     if (!p || !racine.current) return;
     const amener = () => { try { racine.current && racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} };
-    if (prendreDemandeParrainage()) requestAnimationFrame(amener);
-    const f = () => { prendreDemandeParrainage(); amener(); };
+    // Ce qui est au-dessus (l'abonnement, les factures) finit parfois de se lire APRÈS : on ramène encore deux fois.
+    const minuteurs = [];
+    const plusieurs = () => { amener(); minuteurs.push(setTimeout(amener, 600), setTimeout(amener, 1500)); };
+    if (prendreDemandeParrainage()) requestAnimationFrame(plusieurs);
+    const f = () => { prendreDemandeParrainage(); plusieurs(); };
     window.addEventListener('vrm:voir-parrainage', f);
-    return () => window.removeEventListener('vrm:voir-parrainage', f);
+    return () => { window.removeEventListener('vrm:voir-parrainage', f); minuteurs.forEach(clearTimeout); };
   }, [p]);
   if (p === undefined) return null;
   if (p === null) return <GroupeIos titre="Parrainage" data-parrainage="pas-su"><RangeeIos titre="Parrainage pas lu" detail="Rouvre cet écran dans un instant."/></GroupeIos>;
@@ -3551,8 +3554,8 @@ function Parrainage() {
         {filleuls === null ? <RangeeIos titre="Liste pas lue" detail="Rouvre cet écran dans un instant."/>
           : !filleuls.length ? <RangeeIos titre="Personne pour l’instant" detail="Partage ton lien : chaque inscription apparaît ici."/>
           : filleuls.map((x) => { const t = texteEtatFilleul(x.etat); return (
-            <RangeeIos key={x.rang} data-filleul={x.etat} titre={`Filleul ${x.rang}${x.inscritLe ? ' · inscrit le ' + jourCourt(x.inscritLe) : ''}`} detail={t.detail}
-              valeur={t.libelle}/>
+            <RangeeIos key={x.rang} data-filleul={x.etat} titre={`Filleul ${x.rang}`} detail={`${x.inscritLe ? 'inscrit le ' + jourCourt(x.inscritLe) + ' · ' : ''}${t.detail}`}
+              valeur={t.court}/>
           ); })}
       </GroupeIos>
     </div>
