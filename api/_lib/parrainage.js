@@ -140,14 +140,15 @@ export function nomAffichable(brut, pseudosVinted = []) {
   const nom = String(brut == null ? '' : brut).normalize('NFC').replace(/\s+/g, ' ').trim();
   const non = (raison, message) => ({ ok: false, raison, message });
   if (nom.length < 2 || nom.length > 24) return non('longueur', 'Entre 2 et 24 signes.');
-  if (!/^[\p{L}\p{M}0-9][\p{L}\p{M}0-9 '’.-]*$/u.test(nom) || !/\p{L}/u.test(nom)) return non('signes', 'Des lettres, des chiffres, un espace, un tiret ou une apostrophe.');
-  if (/\d{3,}/.test(nom) || /\.[a-z]{2,}/i.test(nom) || /www|http/i.test(nom)) return non('signes', 'Pas de numéro, d’adresse ni de lien.');
+  // Son pseudo Vinted d'abord (le refus le plus utile à dire), à la ponctuation et aux accents près.
   const c = compact(nom);
-  if (NOM_MOTS_INTERDITS.some((m) => c.includes(m))) return non('reserve', 'Ce nom ressemble à celui d’un site ou d’un service : choisis ton prénom ou ton pseudo VRM.');
   for (const p of pseudosVinted || []) {
     const q = compact(p);
     if (q && (q === c || (q.length >= 4 && c.includes(q)))) return non('pseudo-vinted', 'C’est ton pseudo Vinted : choisis plutôt ton prénom ou un pseudo VRM.');
   }
+  if (!/^[\p{L}\p{M}0-9][\p{L}\p{M}0-9 '’.-]*$/u.test(nom) || !/\p{L}/u.test(nom)) return non('signes', 'Des lettres, des chiffres, un espace, un tiret ou une apostrophe.');
+  if (/\d{3,}/.test(nom) || /\.[a-z]{2,}/i.test(nom) || /www|http/i.test(nom)) return non('signes', 'Pas de numéro, d’adresse ni de lien.');
+  if (NOM_MOTS_INTERDITS.some((m) => c.includes(m))) return non('reserve', 'Ce nom ressemble à celui d’un site ou d’un service : choisis ton prénom ou ton pseudo VRM.');
   return { ok: true, nom };
 }
 // Les pseudos Vinted d'un vendeur · `undefined` pas su.
