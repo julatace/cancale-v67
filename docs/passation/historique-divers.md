@@ -1795,3 +1795,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **13 nov. · Un colis = une fois, rappels, horaires (second agent)** : plus de carte « N colis changent de point relais » (chaque redirigé = une ligne sous son point, En route) ; rappels des transporteurs = le même colis, rien d'effacé (`api/_lib/rappel-colis.js`) ; date limite Vinted Go en gras lue ; rappel de retrait la veille et le jour J au nom de l'article ; horaires des points (`api/_lib/horaires-relais.js`). `2026-11-13-horaires-relais.md`. Geste : aucun.
 
 - **13 nov. · Traduction lot 2 (intégration, étape 2)** : Ma journée, Ventes, Achats, Annonces, Stock, Argent, Statistiques, Messages, E-mails en 5 langues sur le main du jour (migration rejouée par `i18n-migrer`, 150 clés neuves) ; français identique mot pour mot (18 relevés). `2026-11-13-integration-traduction.md`. Geste : aucun.
+
+- **13 nov. · Horaires Mondial Relay** : lus par le serveur dans le suivi du colis (n° de point), 7 j, même code postal, sans requête de plus. `2026-11-13-lot11-horaires-mr.md`. Geste : aucun.
