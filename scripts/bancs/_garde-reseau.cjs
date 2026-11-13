@@ -30,21 +30,45 @@ const notes = [];
 const hote = (u) => { try { const x = new URL(u); return /^(https?|wss?):$/.test(x.protocol) ? x.hostname : ''; } catch (_) { return ''; } };
 const noter = (quoi, u) => { if (notes.length < 50) notes.push(`${quoi} ${String(u).slice(0, 160)}`); };
 
-function surveiller(ctx) {
+// (13 nov., integration-13nov-ci) UN BANC QUI SERT LUI-MÊME LES VRAIS NOMS (e2e-extension, session) :
+// Chromium lancé SANS proxy (`--no-proxy-server`) et avec ses propres `--host-resolver-rules` qui envoient
+// vrm.center / la base vers 127.0.0.1:PORT. Ces requêtes ne sortent pas de la machine : la garde ne les
+// refuse plus (elle cassait « App + vraie extension » : net::ERR_BLOCKED_BY_CLIENT sur vrm.center).
+// Elle reste stricte : une réponse d'un de ces noms qui ne vient PAS exactement de 127.0.0.1:PORT
+// (règle ignorée, proxy) est notée ; sans `--no-proxy-server`, aucun nom n'est tenu pour local.
+const LOOPBACK_IP = /^(127\.\d+\.\d+\.\d+|\[?::1\]?)$/;
+function cartesLocales(o) {
+  const args = (o && Array.isArray(o.args)) ? o.args.map(String) : [];
+  if (!args.includes('--no-proxy-server')) return [];
+  const r = args.find((a) => /^--host-resolver-rules=/.test(a));
+  if (!r) return [];
+  const out = [];
+  for (const regle of r.replace(/^--host-resolver-rules=/, '').split(',')) {
+    const m = regle.trim().match(/^MAP\s+(\S+)\s+(127\.\d+\.\d+\.\d+|localhost):(\d+)$/i);
+    if (!m) continue;
+    const motif = new RegExp('^' + m[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^]*') + '$', 'i');
+    out.push({ motif, port: Number(m[3]) });
+  }
+  return out;
+}
+const carteDe = (cartes, h) => (cartes || []).find((c) => c.motif.test(h)) || null;
+
+function surveiller(ctx, cartes) {
   if (!ctx || ctx.__vrmGardeReseau) return ctx;
   ctx.__vrmGardeReseau = true;
   try {
     // La production : refusée au niveau du contexte (une route du banc qui `fulfill` passe AVANT).
-    ctx.route((u) => PROD.test(u.hostname), (r) => { noter('production', r.request().url()); if (process.env.BANC_GARDE_TRACE) { const q = r.request(); let fr = ''; try { fr = q.frame().url(); } catch (_) { fr = 'sw?'; } console.log('GARDE', q.method(), q.resourceType(), fr, q.url().slice(0, 200)); } return r.abort('blockedbyclient'); }).catch(() => {});
+    ctx.route((u) => PROD.test(u.hostname) && !carteDe(cartes, u.hostname), (r) => { noter('production', r.request().url()); if (process.env.BANC_GARDE_TRACE) { const q = r.request(); let fr = ''; try { fr = q.frame().url(); } catch (_) { fr = 'sw?'; } console.log('GARDE', q.method(), q.resourceType(), fr, q.url().slice(0, 200)); } return r.abort('blockedbyclient'); }).catch(() => {});
   } catch (_) {}
   try {
     // Une requête vers la production qui a ÉCHOUÉ AU RÉSEAU (nom non résolu — la règle ci-dessus —, proxy, connexion) :
     // elle est partie. Un `route.abort()` du banc (failed, aborted, internetdisconnected…) ne compte pas : rien n'est sorti.
     const RESEAU = /ERR_NAME_NOT_RESOLVED|ERR_NAME_RESOLUTION_FAILED|ERR_TUNNEL_CONNECTION_FAILED|ERR_PROXY|ERR_CONNECTION_(REFUSED|RESET|CLOSED|TIMED_OUT)|ERR_CERT|ERR_SSL|ERR_TIMED_OUT|ERR_ADDRESS_UNREACHABLE/;
-    ctx.on('requestfailed', (q) => { const h = hote(q.url()); const f = (q.failure() || {}).errorText || ''; if (h && PROD.test(h) && RESEAU.test(f)) noter('production', q.url() + ' (' + f + ')'); });
+    ctx.on('requestfailed', (q) => { const h = hote(q.url()); const f = (q.failure() || {}).errorText || ''; if (h && PROD.test(h) && !carteDe(cartes, h) && RESEAU.test(f)) noter('production', q.url() + ' (' + f + ')'); });
     ctx.on('response', (rep) => {
       const h = hote(rep.url()); if (!h || LOCAL.test(h)) return;
-      Promise.resolve().then(() => rep.serverAddr()).then((a) => { if (a) noter((PROD.test(h) ? 'production' : 'hôte réel') + ` (réponse de ${a.ipAddress}:${a.port})`, rep.url()); }).catch(() => {});
+      const carte = carteDe(cartes, h);
+      Promise.resolve().then(() => rep.serverAddr()).then((a) => { if (a && carte && LOOPBACK_IP.test(String(a.ipAddress)) && Number(a.port) === carte.port) return; if (a) noter((PROD.test(h) ? 'production' : 'hôte réel') + ` (réponse de ${a.ipAddress}:${a.port})`, rep.url()); }).catch(() => {});
     });
   } catch (_) {}
   return ctx;
@@ -62,19 +86,28 @@ function argsAvecRegles(o) {
 // « Today · Listings · Sales ». Un contexte sans `locale` reçoit donc 'fr-FR' (celle de Julien) ; un banc
 // qui veut juger une autre langue la pose lui-même (`locale: 'en-US'`) et la garde.
 const avecLangue = (o) => (o && typeof o === 'object' && o.locale ? o : Object.assign({}, o || {}, { locale: 'fr-FR' }));
+// (13 nov., integration-13nov-ci) SOUS WEBKIT (et Firefox), AUCUN SERVICE WORKER. Mesuré en CI
+// (sonde, 13 nov.) : une fois `sw.js` de l'app installé, les requêtes de la page vers la base passent
+// par le service worker, que les routes de Playwright NE VOIENT PAS sous WebKit — ni celles du banc,
+// ni le refus de la garde : `connexion-claire` a reçu une réponse de la VRAIE base (172.64.x:443), et
+// le banc, lui, ne recevait rien (63 rouges « aucune donnée chargée »). Chromium, lui, route le trafic
+// du service worker. Aucun interrupteur : un contexte WebKit/Firefox de banc n'a jamais de service worker.
+const sansServiceWorker = (o) => Object.assign({}, o || {}, { serviceWorkers: 'block' });
 function poserSur(type, chromium) {
   if (!type || type.__vrmGardeReseau) return;
   type.__vrmGardeReseau = true;
+  const opts = (o) => avecLangue(chromium ? o : sansServiceWorker(o));
   const l0 = type.launch.bind(type);
   type.launch = async (o, ...r) => {
     const b = await l0(chromium ? argsAvecRegles(o) : o, ...r);
+    const cartes = chromium ? cartesLocales(o) : [];
     const nc = b.newContext.bind(b), np = b.newPage.bind(b);
-    b.newContext = async (o, ...x) => surveiller(await nc(avecLangue(o), ...x));
-    b.newPage = async (o, ...x) => { const p = await np(avecLangue(o), ...x); surveiller(p.context()); return p; };
+    b.newContext = async (o, ...x) => surveiller(await nc(opts(o), ...x), cartes);
+    b.newPage = async (o, ...x) => { const p = await np(opts(o), ...x); surveiller(p.context(), cartes); return p; };
     return b;
   };
   const p0 = type.launchPersistentContext.bind(type);
-  type.launchPersistentContext = async (d, o, ...r) => surveiller(await p0(d, avecLangue(chromium ? argsAvecRegles(o) : o), ...r));
+  type.launchPersistentContext = async (d, o, ...r) => surveiller(await p0(d, chromium ? avecLangue(argsAvecRegles(o)) : opts(o), ...r), chromium ? cartesLocales(o) : []);
 }
 function poserGarde(pw) {
   if (!pw) return;
@@ -94,4 +127,4 @@ function poserFin() {
 poserFin();
 try { poserGarde(require('playwright')); } catch (_) {}
 try { poserGarde(require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); } catch (_) {}
-module.exports = { poserGarde, notesGardeReseau: notes, avecLangue };
+module.exports = { poserGarde, notesGardeReseau: notes, avecLangue, cartesLocales, carteDe };
