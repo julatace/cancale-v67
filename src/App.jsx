@@ -501,7 +501,7 @@ import "./facture-pro.css";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
-import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted, etapeRetourVinted } from "./retoursStock.js";
+import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, retoursPourStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted, etapeRetourVinted } from "./retoursStock.js";
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE, GROUPES_LOUPE, IDENTITES_EXACTES, phraseNonLues } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
@@ -8315,7 +8315,7 @@ const fetchTxnItemIds = async () => {
     for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
     _txnItemConnu = map;   // (11 nov., saisie rapide) lu par `ventesAilleursDe`
     return map;
-  } catch (_) { return {}; }
+  } catch (_) { if (TXN_ETATS_LU !== true) TXN_ETATS_LU = false; return {}; }   // (13 nov.) une lecture qui lève est « pas su », jamais « en cours » pour toujours
 };
 // ── (11 nov., lot ventes-lot) LES ARTICLES DES VENTES EN LOT ──────────────────
 // Vinted titre la commande d'un lot « Lot 3 articles » (aucun champ de nombre sur la liste
@@ -31078,7 +31078,8 @@ const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.l
 // ── (3 nov., choix de Julien n° 3) LA CARTE « RETOUR REÇU ? » ────────────────────────────────
 // Un retour PROUVÉ dont le colis est revenu (`retourAReceptionner`, src/retoursStock.js) : la photo,
 // « N°x · titre », la question, UN geste « Remettre en stock » (son tap : reçu + remis, SON N°).
-// Aucune phrase d'explication. Rien ne se fait sans le tap.
+// (13 nov., point 29) Un retour REMBOURSÉ revient en stock tout seul (`retourRevenuSeul`) : la carte ne
+// reste que pendant le trajet (« Retour en route »), avec « Déjà reçu » pour le dire avant Vinted.
 function CartesRetourRecu({ res: resBrut, site = 'toutes', onRemettre }) {
   const res = retoursPourSite(resBrut, site);
   if (!res || res.etat !== 'lu') return null;
@@ -31094,15 +31095,15 @@ function CartesRetourRecu({ res: resBrut, site = 'toutes', onRemettre }) {
               {ph ? <PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
             </div>
             <div style={{flex:'1 1 150px',minWidth:0}}>
-              <span style={{display:'block',fontSize:17,fontWeight:700,color:C.text,lineHeight:1.25}}>Retour reçu ?</span>
+              <span style={{display:'block',fontSize:17,fontWeight:700,color:C.text,lineHeight:1.25}}>Retour en route</span>
               <span className="vrm-colis-titre" title={l.titre} style={{display:'block',marginTop:3,fontSize:15,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{l.num}{l.titre ? ` · ${l.titre}` : ''}</span>
             </div>
             <button type="button" className="vrm-colis-primaire" data-geste="remettre-en-stock" data-remettre-retour={l.cle} onClick={() => onRemettre(l)}
-              style={{flex:'0 0 auto',minHeight:44,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Remettre en stock</button>
+              style={{flex:'0 0 auto',minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 16px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Déjà reçu</button>
           </div>); })}
     </div>);
 }
-function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise }) {
+function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise, onRemettreEnLigne = null }) {
   const [ouvrirAnciens, setOuvrirAnciens] = React.useState(false);
   // (2 nov.) Le filtre de site de Colis vaut aussi ici (`retoursPourSite`).
   const res = retoursPourSite(resBrut, site);
@@ -31134,19 +31135,27 @@ function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieur
     const ph = l.vente ? orderPhoto(l.vente) : null;
     const compte = l.plateforme === 'ebay' ? (l.compte && l.compte !== 'principal' ? `eBay · ${l.compte.slice(0,6)}` : 'eBay') : (plusieursComptes && l.compte ? nomCompte(l.compte) : '');
     const etape = remise ? 'remis' : l.etape;
+    // (13 nov., point 29) Revenu tout seul (retour prouvé remboursé) : « Retour du <date lue> — à vérifier
+    // et remettre en ligne » ; sans N° connu : « à numéroter » (il en recevra un à sa remise en ligne).
+    const auto = !!(remise && l.remis && l.remis.auto);
+    const aNumeroter = !!(remise && l.remis && l.remis.aNumeroter);
+    const dateRetour = remise ? dateCourteFr(l.retourLe || (l.remis && l.remis.at) || '') : '';
+    const libelleRemise = auto ? `${dateRetour ? `Retour du ${dateRetour}` : 'Retour'} — à vérifier et remettre en ligne` : 'Remise en stock — à republier';
     return (
-      <div data-retour={l.cle} data-retour-etape={etape} data-retour-num={l.num || ''} data-retour-recu={l.recu ? '1' : '0'} data-retour-plateforme={l.plateforme}
+      <div data-retour={l.cle} data-retour-etape={etape} data-retour-num={(remise && l.remis && l.remis.num) || (!remise && l.num) || ''} data-retour-recu={l.recu ? '1' : '0'} data-retour-plateforme={l.plateforme}
+        data-retour-auto={auto ? '1' : undefined} data-retour-a-numeroter={aNumeroter ? '1' : undefined} data-retour-date={remise && l.retourLe ? String(l.retourLe).slice(0, 10) : undefined}
         style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,minWidth:0}}>
         <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:12,background:C.card2||C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{l.num ? `N°${l.num}` : '—'}</div>
         {ph && <div style={{width:34,height:34,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden'}}><PhotoVinted src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/></div>}
         <div style={{flex:'1 1 170px',minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.titre || (l.plateforme === 'ebay' ? 'Retour eBay' : 'Vente')}</div>
           <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:7,flexWrap:'wrap'}}>
-            <span data-retour-libelle style={{color:C.text,fontWeight:600}}>{remise ? 'Remise en stock — à republier' : LIBELLE_ETAPE[l.etape]}</span>
+            <span data-retour-libelle style={{color:C.text,fontWeight:600}}>{remise ? libelleRemise : (l.etape === 'en-route' ? 'Retour en route' : LIBELLE_ETAPE[l.etape])}</span>
+            {aNumeroter && <span data-retour-numeroter="">à numéroter : il recevra un N° à sa remise en ligne</span>}
             {!remise && l.recu && l.etape === 'rembourse' && <span>reçue chez toi</span>}
             {!remise && l.livreeSelonVinted && !l.recu && <span>{l.plateforme === 'ebay' ? 'eBay' : 'Vinted'} dit livrée — confirme quand tu l'as</span>}
             {l.origine === 'non-reclamee' && <span>non réclamée par l'acheteur</span>}
-            {!l.num && <span data-retour-sans-num>article pas relié à un N°</span>}
+            {!l.num && !aNumeroter && <span data-retour-sans-num>article pas relié à un N°</span>}
             {remise && l.remis && l.remis.num === null && l.num && <span>sans N° — le N°{l.num} est porté par un autre article</span>}
             {remise && l.remis && l.remis.archive && <span>ancien N° : numéro neuf à la republication</span>}
             {compte && <span>· {compte}</span>}
@@ -31154,8 +31163,14 @@ function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieur
         </div>
         <a href={lien(l)} target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>{l.plateforme === 'ebay' ? 'Sur eBay ↗' : 'Sur Vinted ↗'}</a>
         {remise ? <>
-          <a data-geste="republier" href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Republier ↗</a>
-          <button type="button" data-geste="annuler-remise" onClick={()=>onAnnulerRemise(l.cle)} style={{...btn,color:C.muted}}>Annuler la remise</button>
+          {/* (13 nov., point 29) « Remettre en ligne » : SON clic ouvre « Republier à la main » depuis le coffre
+              (le N° repris par la règle des republications) ; sans annonce reliée, le formulaire de Vinted. */}
+          {onRemettreEnLigne && l.plateforme === 'vinted' && l.itemId
+            ? <button type="button" data-geste="republier" data-remettre-en-ligne={l.cle} onClick={()=>onRemettreEnLigne(l)} style={{...btn,background:C.text,color:C.bg,border:`1px solid ${C.text}`}}>Remettre en ligne</button>
+            : <a data-geste="republier" href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>{auto ? 'Remettre en ligne ↗' : 'Republier ↗'}</a>}
+          {auto
+            ? <button type="button" className="vrm-icon-control" data-geste="masquer-retour" onClick={()=>onMasquer(l.cle)} title="Plus chez moi (déjà réglé)" aria-label="Plus chez moi" style={{...btn,minWidth:44,padding:0,color:C.muted}}><Icon name="close" size={15}/></button>
+            : <button type="button" data-geste="annuler-remise" onClick={()=>onAnnulerRemise(l.cle)} style={{...btn,color:C.muted}}>Annuler la remise</button>}
         </> : <>
           <button type="button" data-geste="recu" aria-pressed={l.recu} onClick={()=>onRecu(l.cle)} style={{...btn,color:l.recu?C.text:C.muted}}>{l.recu ? '✓ Reçu' : 'Reçu'}</button>
           {l.recu && l.num && <button type="button" data-geste="remise-en-stock" onClick={()=>onRemettre(l)} style={{...btn,background:C.text,color:C.bg,border:`1px solid ${C.text}`}}>Remise en stock</button>}
@@ -36329,7 +36344,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [sales.items, txnItem, numeros, lotsTx, lotLiens]);
   // (3 nov., choix n° 3) Les N° remis en stock après un retour (« Retour reçu ? » → « Remettre en
   // stock ») : posés par l'effet qui suit `retoursSuivis` (plus bas), lus par la publication ci-dessous.
-  const [numsRemisCle, setNumsRemisCle] = useState('[]');
+  // (13 nov., point 29) `null` = pas encore su (la publication attend : une lecture en cours ne
+  // retire jamais un article revenu des paires présentes) ; sinon `{ articles, aNumeroter }` en JSON.
+  const [numsRemisCle, setNumsRemisCle] = useState(null);
   useEffect(() => {
     // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
     // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
@@ -36342,6 +36359,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const presentes = annoncesPresentes;
     if (!presentes.length) return;   // rien de sûr à publier (Vinted pas encore lu : on ne publie pas eBay seul)
     if (!sales.items) return;
+    if (numsRemisCle === null) return;   // (13 nov.) les retours en stock pas encore sus : on attend
     const vivants = new Set();
     for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
     for (const o of (sales.items || [])) {
@@ -36349,7 +36367,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
     }
     // (3 nov.) Un article REMIS EN STOCK après un retour (son tap) est chez lui, avec SON N°.
-    try { for (const n of JSON.parse(numsRemisCle || '[]')) if (n) vivants.add(String(n)); } catch (_) {}
+    // (13 nov., point 29) …et un article REVENU tout seul (retour prouvé remboursé, `retourRevenuSeul`).
+    let retoursStock = [], retoursANumeroter = 0;
+    try { const rs = JSON.parse(numsRemisCle); retoursStock = Array.isArray(rs.articles) ? rs.articles : []; retoursANumeroter = Number(rs.aNumeroter) || 0; } catch (_) {}
+    for (const a of retoursStock) if (a && a.numero) vivants.add(String(a.numero));
     const clesVivants = new Set([...vivants].map(cleNum));
     const vendusPartis = new Set();
     for (const id of annoncesVendues) { const k = cleNum((numeros[id] || {}).numero); if (k && !clesVivants.has(k)) vendusPartis.add(k); }
@@ -36362,8 +36383,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const avant = load('vinted_nums_physiques', null);
       const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i])
-        && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero);
-      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, at: Date.now() });
+        && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero)
+        && JSON.stringify(avant.retours || []) === JSON.stringify(retoursStock) && (Number(avant.retoursANumeroter) || 0) === retoursANumeroter;
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, retours: retoursStock, retoursANumeroter, at: Date.now() });
     } catch (_) {}
   }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock, numsRemisCle, lotsTx, lotLiens]);
   const articlesVendusFavoris=useMemo(()=>{
@@ -37191,9 +37213,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     // Republiée : une annonce EN LIGNE porte son N° (s'il se redonne), ou c'est
     // l'annonce de la vente rouverte (identité), ou sa photo exacte.
+    // (13 nov., point 29) …ou « Remettre en ligne » a désigné la nouvelle annonce (`vrm_repub_main`), ou
+    // l'extension a noté une recréation de cette annonce (identité) : le retour est remis en ligne.
+    const recreeDe = new Set(Object.values(recreesNum || {}).map(String));
+    // Un N° n'est jamais réattribué (§5) : une AUTRE annonce vendue sous le même N° est cette paire,
+    // republiée puis revendue — elle n'est plus en stock.
+    const vendusParCle = new Map();
+    for (const id of annoncesVendues) { const k = cleNum((numeros[id] || {}).numero); if (k) { if (!vendusParCle.has(k)) vendusParCle.set(k, new Set()); vendusParCle.get(k).add(String(id)); } }
     const republiee = (l) => {
       if (l.num && numeroReprenable(l.num) && enLigneNums.has(cleNum(l.num))) return true;
       if (l.itemId && enLigneIds.has(String(l.itemId))) return true;
+      if (l.itemId && ((repubMain[String(l.itemId)] || {}).nouvelId || recreeDe.has(String(l.itemId)))) return true;
+      if (l.num) { const v = vendusParCle.get(cleNum(l.num)); if (v && [...v].some((id) => id !== String(l.itemId || ''))) return true; }
       const pk = l.vente ? photoKey(orderPhoto(l.vente)) : null; return !!pk && enLignePk.has(pk);
     };
     const ventes = sales.items === null ? undefined : (sales.items || []).filter(o => !isHidden(o));
@@ -37201,6 +37232,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ventes, etats: TXN_ETATS_LU === false ? null : etatTxn, txnItem, numeros,
       numeroVente: (tx) => { const v = saleOv[tx]; return v && String(v.numero || '').trim() ? String(v.numero).trim() : null; },
       recus: retoursRecus, remis: retoursRemis, masques: retoursDismissed, republiee, ebay: retoursEbayLus,
+      // (13 nov., point 29) un retour PROUVÉ revenu passe en stock tout seul, sous SON N° — un N°
+      // porté par un autre article présent n'est jamais repris (rien deviné).
+      presentes: presentesAnnonceIds, cleNum, estArchive: (n) => !numeroReprenable(n),
     });
     // Comptes dont les ventes n'ont pas pu être lues (hors comptes exclus) :
     // nommés — un retour de ce compte peut manquer (« pas su »).
@@ -37209,7 +37243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (ko.length) res.manques = [...res.manques, ...ko.map(n => `les ventes de ${n}`)];
     return res;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, txnItem, numeros, saleOv, retoursRecus, retoursRemis, retoursDismissed, retoursEbayLus, listings.items, onlineAnnonceIds, accounts]);
+  }, [sales.items, sales.failedUids, txnItem, numeros, saleOv, retoursRecus, retoursRemis, retoursDismissed, retoursEbayLus, listings.items, onlineAnnonceIds, accounts, presentesAnnonceIds, repubMain, recreesNum, annoncesVendues]);
   // ── (3 nov.) LITIGES, RETOURS ET RÉCLAMATIONS EN COURS (src/litiges.js) ──
   // Les e-mails Vinted « Action requise : problème avec la commande », « L'acheteur
   // souhaite annuler son achat », « Retourne ta commande d'ici le … » (gardés par le
@@ -37240,7 +37274,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.error, buys.items, buys.error, emailsLitiges, txnItem, numeros, saleOv, retoursEbayLus, accounts]);
-  useEffect(() => { const c = JSON.stringify(numsRemisEnStock(retoursSuivis)); setNumsRemisCle((v) => v === c ? v : c); }, [retoursSuivis]);
+  // (13 nov., point 29) Les articles en stock après un retour (remis à la main OU revenus tout seuls),
+  // publiés avec les paires présentes. Trois états : états des transactions lus ⇒ la règle ; lecture
+  // ratée (ou ventes illisibles) ⇒ la DERNIÈRE publication reste (une lecture ratée n'écrit rien) ;
+  // en cours ⇒ rien (la publication attend). Un compte dont les ventes n'ont pas pu être lues garde
+  // ses retours d'avant. Effet sans liste : il relit `TXN_ETATS_LU` (une variable de module).
+  useEffect(() => {
+    const avant = () => { const p = load('vinted_nums_physiques', null); return p && Array.isArray(p.retours) ? p : null; };
+    let v;
+    if (retoursSuivis.etat === 'lu' && TXN_ETATS_LU === true && (Object.keys(txnItem).length > 0 || TXN_ETATS.size === 0)) {
+      const r = retoursPourStock(retoursSuivis);
+      const ko = new Set((Array.isArray(sales.failedUids) ? sales.failedUids : []).map(String));
+      const p = ko.size ? avant() : null;
+      if (p) for (const a of p.retours) if (a && a.uid && ko.has(String(a.uid)) && !r.articles.some((x) => cleNum(x.numero) === cleNum(a.numero))) r.articles.push(a);
+      v = JSON.stringify(r);
+    } else if (TXN_ETATS_LU === false || retoursSuivis.etat === 'passu') {
+      const p = avant();
+      v = JSON.stringify({ articles: p ? p.retours : [], aNumeroter: p ? (Number(p.retoursANumeroter) || 0) : 0 });
+    } else return;
+    setNumsRemisCle((x) => x === v ? x : v);
+  });
   // ── (3 nov., choix de Julien n° 3) « RETOUR REÇU ? » → « Remettre en stock », UN tap ──────
   // Le tap dit les deux choses à la fois : le colis est revenu (`vinted_retours_recus`) et
   // l'article est remis en stock avec SON N° (`vinted_retours_remis`, la règle `remiseEnStock`).
@@ -41090,6 +41143,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // SON clic : « Republier à la main » accompagné, depuis le coffre (le moteur ne sait pas
   // recréer une annonce fermée sans la supprimer : VERDICT_REMISE).
   const remettreEnVente = (x) => { const p = paireARemettre(x, { reprenable: numeroReprenable }); if (p) setRepubMainOuvert(p); };
+  // (13 nov., point 29) « Remettre en ligne » un article revenu d'un retour : le MÊME accompagnement
+  // (coffre → « Republier à la main », SON clic ; le N° repris par identité, un N° d'archive jamais).
+  const remettreRetourEnLigne = (l) => {
+    if (!l || !l.itemId) return;
+    const o = l.vente || {}, acc = l.compte && typeof l.compte === 'object' ? l.compte : (o._acc || {});
+    const v = Number(o.price && typeof o.price === 'object' ? o.price.amount : o.price);
+    const num = String((l.remis && l.remis.num) || '').trim();
+    const p = paireARemettre({ item: String(l.itemId), uid: String(acc.vinted_user_id || ''), num, titre: l.titre || '', prix: Number.isFinite(v) && v > 0 ? v : null,
+      photo: orderPhoto(o) || '', domain: acc.domain || 'www.vinted.fr', tx: l.tx, archive: !!num && !numeroReprenable(num), sansNum: !num }, { reprenable: numeroReprenable });
+    if (p) setRepubMainOuvert({ ...p, retour: true });
+  };
   // ── (6 nov., vague 2 · point 4) LES ANNONCES NUMÉROTÉES SANS ACHAT RELIÉ ──
   // src/achatsARelier.js : en ligne (la liste de la grille), numérotées, ni achat relié
   // ni prix d'achat connu (`prixAchatDe`) ; « Plus tard » en fin de file et hors du nombre
@@ -42483,7 +42547,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // que ses retours n'ont pas été lus (rien n'est publié d'un compte partiel présenté complet).
       res: litigesSuivis, sites: only === 'litiges' ? (sitesPresents || null) : new Set(['vinted', 'ebay']),
       ebay: only === 'litiges' ? retoursEbayLus : (RETOURS_EBAY_CACHE.v === undefined ? undefined : RETOURS_EBAY_CACHE.v),
-      retourDe: (tx) => (retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.find((x) => x.tx === tx) || null : null),
+      retourDe: (tx) => (retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.find((x) => x.tx === tx) || (retoursSuivis.remises || []).find((x) => x.tx === tx) || null : null),   // (13 nov.) un retour revenu en stock garde son étape (« Remboursé »)
       preuves: (l) => {
         const o = l.commande; if (!o || o.transaction_id == null) return null;
         const tx = String(o.transaction_id);
@@ -51551,9 +51615,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (3 nov., choix n° 3) Les retours : la carte « Retour reçu ? » (revenus, SON tap) puis le bloc
           // « Retours » (les autres étapes, les remis en stock) ; leurs ventes ne sont pas redites en dessous.
           const retoursTx = new Set(((retoursSuivis && retoursSuivis.etat === 'lu') ? [...retoursSuivis.lignes, ...retoursSuivis.remises] : []).filter((l) => l.plateforme === 'vinted').map((l) => String(l.tx)));
+          for (const tx of ((retoursSuivis && retoursSuivis.dejaRepubliees) || [])) retoursTx.add(String(tx));   // (13 nov.) revenue puis remise en ligne : pas un colis envoyé
           const retoursHaut = <>
             <CartesRetourRecu res={retoursSuivis} site={siteColis} onRemettre={remettreDepuisCarte}/>
-            <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
+            <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise} onRemettreEnLigne={remettreRetourEnLigne}/>
           </>;
           const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
           if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis « Déposé » arrive ici.</span></div></>;
@@ -53327,7 +53392,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // annonce est fermée chez Vinted (rien à supprimer) ; `numAffiche` = le N° de la vente,
         // `numero` = celui qui se reprend (vide pour un N° d'archive : un neuf viendra).
         const paire = p.ancienId ? { id:String(p.ancienId), uid:String(p.uid||''), numero:String(p.num||''), titre:p.titre||'', compte:(()=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(p.uid)); return a?accNameOf(a):`compte ${p.uid}`; })(), domain:p.domain||'www.vinted.fr', prix:p.prix??null, photo:p.photo||'',
-          ...(p.annulee ? { annulee:true, tx:String(p.tx||''), numAffiche:String(p.numAffiche||''), archive:!!p.archive } : {}) } : p;
+          ...(p.annulee ? { annulee:true, tx:String(p.tx||''), numAffiche:String(p.numAffiche||''), archive:!!p.archive, ...(p.retour ? { retour:true } : {}) } : {}) } : p;
         const enLigneMap = (listings.items||[]).map(it=>{ const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.')); const e=numeros[it.id]||{};
           return { id:String(it.id), uid:String((it._acc&&it._acc.vinted_user_id)||''), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, photo:it.photo||'', createdTs:it.createdTs||null, numero:e.numero?String(e.numero):'' }; });
         const cands = candidatsNouvelle({ ancienId:paire.id, uid:paire.uid, enLigne:enLigneMap, numeros, suivis:repubMain, recrees:recreesNum||{}, debut: s && s.at ? Date.parse(s.at) : 0 });
