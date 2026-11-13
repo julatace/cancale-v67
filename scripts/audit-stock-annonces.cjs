@@ -66,6 +66,8 @@ const MUTATIONS = {
   // Le N° qu'IL a relié à Vinted (`vrm_vc_liens`, via `auto`) ignoré.
   'vc-lien-ignore': ["    const numero = numVcAnnonce(id, it, lst.liens, auto);", "    const numero = numVcAnnonce(id, it, lst.liens, null);"],
   // Une annonce Vestiaire sans N° ne met plus « au moins ».
+  // (13 nov., point 29) Le retour ignoré : la paire revenue passe « plus en ligne ».
+  'retour-ignore': ["    else if (retours && retours.has(k)) out[k] = 'retour';", ''],
   'vc-sans-num-tu': [" || sansNumero.vestiaire > 0", ''],
   // Une lecture Vestiaire de plus de 24 h lue comme « en ligne ».
   'vc-vieille-en-ligne': ["    const etat = e === 'a-confirmer' || vieille ? 'aconfirmer' : 'enligne';", "    const etat = e === 'a-confirmer' ? 'aconfirmer' : 'enligne';"],
@@ -167,7 +169,10 @@ if (arg.includes('--prouve')) {
     dit(r['9'] === 'passu', 'N°9 : une lecture qui pourrait la porter manque ⇒ « pas su », jamais « plus en ligne »');
     dit(r['10'] === 'gardee', 'N°10 : « Elle est encore là » ⇒ « gardée »');
     const z = R.classerRangees({ slots, actuelles: null, vendus: new Set(['7']), garder: {}, jugeable: () => true, cle });
-    dit(z['8'] === 'passu' && z['7'] === 'vendue', 'annonces pas lues (null) : rien n\'est « plus en ligne », la vendue reste allumée', JSON.stringify(z));
+    dit(z['8'] === 'passu' && z['7'] === 'vendue', 'annonces pas lues (null) : rien n\'est « plus en ligne », la vendue reste allumée', JSON.stringify(z));    // (13 nov., point 29) Un N° revenu d'un retour PROUVÉ : « retour » (chez lui, à remettre en ligne) — ni « plus en ligne »,
+    // ni « pas su » ; une vendue reste « vendue » ; une actuelle reste « actuelle ».
+    const rr = R.classerRangees({ slots, actuelles, vendus: new Set(['7']), garder: {}, jugeable: () => true, retours: new Set(['8', '7', '1']), cle });
+    dit(rr['8'] === 'retour' && rr['7'] === 'vendue' && rr['1'] === 'actuelle', 'N°8 revenu d\'un retour ⇒ « retour » (jamais « plus en ligne ») ; vendue et actuelle gardent leur état', JSON.stringify(rr));
   });
   // ── VESTIAIRE (5 nov.) : la VRAIE règle de Vestiaire, des données INVENTÉES ──
   const MAINT = Date.parse('2026-11-05T12:00:00Z');

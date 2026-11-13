@@ -40,7 +40,7 @@ const JETONS = {
 let abos, acces, lecture, stripe, codes, parr, reglages, essais, vinted, balance, sansStripeTable, cartes, cartesMuettes;
 const reset = () => {
   abos = {}; acces = {}; lecture = undefined; stripe = []; codes = {}; parr = {}; reglages = { parrainage: '1' };
-  essais = []; vinted = {}; balance = {}; sansStripeTable = false; cartes = {}; cartesMuettes = false;
+  essais = []; vinted = { [N]: ['555'] }; balance = {}; sansStripeTable = false; cartes = {}; cartesMuettes = false;   // (13 nov., lot 54) le filleul porte un compte Vinted neuf
 };
 const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } });
 const q = (u, k) => { const m = new RegExp('[?&]' + k + '=([^&]+)').exec(u); return m ? decodeURIComponent(m[1]) : null; };
@@ -48,6 +48,9 @@ global.fetch = async (url, opts = {}) => {
   const u = String(url), m = opts.method || 'GET', h = opts.headers || {};
   const jwt = String(h.Authorization || '').replace('Bearer ', '');
   const service = !jwt.startsWith('aa.bb.');
+  // (13 nov., lot 54) l'adresse d'un compte (pas soi-même par l'e-mail) ; les lectures `harvest_…` d'un autre compte.
+  if (u.includes('/auth/v1/admin/users/')) { const id = decodeURIComponent(u.split('/auth/v1/admin/users/')[1].split('?')[0]); const j = Object.values(JETONS).find((x) => x.id === id); return j ? rep({ id, email: j.email }) : rep({ msg: 'introuvable' }, 404); }
+  if (u.includes('/rest/v1/app_data')) return m === 'GET' ? rep([]) : rep('', 201);
   if (u.includes('/auth/v1/user')) return JETONS[jwt] ? rep(JETONS[jwt]) : rep({ msg: 'invalid' }, 401);
   if (u.includes('/rest/v1/rpc/vrm_acces')) {
     const qui = JETONS[jwt]; if (!qui) return rep({}, 401);

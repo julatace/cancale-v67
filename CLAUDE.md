@@ -530,11 +530,18 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **13 nov. · Logos des transporteurs** : Chronopost et Pickup = cube bleu sur blanc, jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre ; gabarit commun mesuré. `2026-11-13-logos-transporteurs.md`. Geste : aucun.
+- **13 nov. · Lot 56/58** : Solo + comptes Vinted vendeurs payés (`PRIX_COMPTE_SUP_CENTIMES` 3 € à confirmer, prix `vrm_compte_sup`, quantité bornée serveur, « Bientôt » sans prix) ; équipe : « pas encore activé sur ton installation », retrait en un geste. `2026-11-13-lot5658.md`. Geste : 016 (3 gestes), prix Stripe.
 
-- **13 nov. · /confiance + /etat** : page publique « ce que VRM fait et ne fait jamais » (preuves : `audit-confiance-publique`) ; /etat sans réponse ⇒ « État inconnu ». `docs/passation/2026-11-13-lot5052.md`. Geste : aucun.
+- **13 nov. · Parrainage (lot 54)** : lien copier/partager, mois gagnés, état par filleul, « Offert par <nom choisi> » à l'inscription, « Parrainer » dans Plus ; mois offert si compte Vinted jamais vu. `docs/passation/2026-11-13-lot54.md`. Geste : appliquer la 029.
 
-- **13 nov. · Lot 51 (données du compte)** : « Supprimer mon compte » = 30 jours de grâce (demande neutre `vrm_effacement_prevu_*`, abonnement résilié, « Annuler » en un geste, bandeau ; cron du matin efface par `effacerCompte` ; compte vide : tout de suite) ; export RGPD inchangé. `2026-11-13-lot51.md`. Geste : aucun.
+- **13 nov. · Bilan mensuel + support (lot 53/55)** : bilan activé par défaut si compte créé ≥ 13 nov., bénéfice sans « au moins », temps gagné si mesuré ; « Écrire au support » (5 faits techniques, rangé chez lui, scellé). `docs/passation/2026-11-13-lot5355.md`. Geste : `RELANCES_SMTP_*`.
+
+- **13 nov. · Retour → stock sans rien saisir (lot 29)** : un retour Vinted PROUVÉ (transaction 440 / non réclamée) puis REMBOURSÉ (ou noté reçu) revient en stock sous SON N° (n° de transaction → annonce → N°) : « Retour du <date lue> — à vérifier et remettre en ligne », « Remettre en ligne » (son clic, Republier à la main) ; en route ⇒ « Retour en route » ; sans N° ⇒ « à numéroter » ; N° déjà porté en ligne ⇒ rien ; ancien (> 45 j) et eBay inchangés (`retourRevenuSeul`). `docs/passation/2026-11-13-lot29.md`. Geste : aucun.
+
+- **13 nov. · Vente Vestiaire sur Orion (5.374)** : capteur en ligne + rattrapage, compte lu dans la page, date = `soldDate` de « Mes ventes » (Paris), jamais l'heure de lecture. `docs/passation/2026-11-13-vestiaire-vente-orion.md`. Geste : 5.374 dans Orion, ouvrir Mes ventes.
+
+
+
 
 
 

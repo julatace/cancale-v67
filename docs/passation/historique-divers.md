@@ -1811,3 +1811,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **13 nov. · Lot 45 : le Stock et l'Inventaire sans réseau (garage)** : hors réseau le Stock se dessine avec sa DERNIÈRE lecture gardée par vendeur (`src/stockHorsLigne.js`, `vrm_hl_stock_{uid}`, effacée à la déconnexion), « Hors connexion — dernier état du … », N°, case, photos déjà vues (service worker `/hl-photo`, réserve `vrm-hl-photos`, 120), recherche par N°, inventaire par la feuille du Stock ; changer un N° / publier dit une fois ; aucune lecture ni N° écrit hors réseau. `docs/passation/2026-11-13-lot45.md`. Geste : ouvrir le Stock une fois en ligne.
 
 - **13 nov. · Très aimées, pas vendues (lot 31)** : Favoris, par compte, ≥ N favoris lus, ≥ 14 j ; « Proposer » pré-remplit le flux (pas recontacté, −x %, jamais sous achat + 10 %). `2026-11-13-lot31.md`. Geste : aucun.
+
+- **13 nov. · Lot 51 (données du compte)** : « Supprimer mon compte » = 30 jours de grâce (demande neutre `vrm_effacement_prevu_*`, abonnement résilié, « Annuler » en un geste, bandeau ; cron du matin efface par `effacerCompte` ; compte vide : tout de suite) ; export RGPD inchangé. `2026-11-13-lot51.md`. Geste : aucun.
+
+- **13 nov. · /confiance + /etat** : page publique « ce que VRM fait et ne fait jamais » (preuves : `audit-confiance-publique`) ; /etat sans réponse ⇒ « État inconnu ». `docs/passation/2026-11-13-lot5052.md`. Geste : aucun.
+
+- **13 nov. · Logos des transporteurs** : Chronopost et Pickup = cube bleu sur blanc, jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre ; gabarit commun mesuré. `2026-11-13-logos-transporteurs.md`. Geste : aucun.

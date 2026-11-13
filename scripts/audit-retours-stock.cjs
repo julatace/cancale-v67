@@ -33,6 +33,22 @@ const MUTATIONS = {
   'site-ignore': ["    lignes: res.lignes.filter(l => l.plateforme === site),", "    lignes: res.lignes,"],
   // L'avertissement eBay gardé sous « Vinted ».
   'site-manques': ["    manques: res.manques.filter(m => (site === 'ebay') === estEbay(m)),", "    manques: res.manques,"],
+  // (13 nov., point 29) Un retour seulement EN ROUTE passe en stock (pas encore chez lui).
+  'auto-en-route': ["  return l.etape === 'rembourse' || !!l.recu;", "  return l.etape === 'rembourse' || l.etape === 'en-route' || !!l.recu;"],
+  // Un « ancien » (remboursé il y a plus de 45 j) revient tout seul (il a pu être republié depuis).
+  'auto-ancien': ["  if (l.ancien) return false;\n  return l.etape", "  return l.etape"],
+  // Un remboursement eBay (possible sans retour) pris pour une preuve.
+  'auto-ebay': ["  if (!l || l.plateforme !== 'vinted') return false;", "  if (!l) return false;"],
+  // Le N° porté par un autre article PRÉSENT repris quand même (deux paires sous un N°).
+  'auto-conflit': ["? { at, num: r.conflit ? null : r.num,", "? { at, num: r.num,"],
+  // Une date de retour inventée (« aujourd'hui ») quand Vinted n'en dit aucune.
+  'auto-date': ["      const at = ligne.recuLe || su;", "      const at = ligne.recuLe || su || new Date(now).toISOString();"],
+  // Revenue alors qu'elle est déjà republiée.
+  'auto-republiee': ["    if (retourRevenuSeul(ligne)) {\n      if (republiee && republiee(ligne)) { dejaRepubliees.push(tx); continue; }", "    if (retourRevenuSeul(ligne)) {"],
+  // Un retour sans N° connu disparaît au lieu d'être « à numéroter ».
+  'auto-sans-num': [": { at, num: null, archive: false, conflit: null, auto: true, aNumeroter: true };", ": null;\n      if (!auto) continue;"],
+  // Le Stock reçoit un article sans N° comme s'il avait le N° de la vente.
+  'stock-num-vente': ["    const n = l && l.remis && l.remis.num != null ? String(l.remis.num).trim() : '';\n    if (!n) { if", "    const n = l && l.num ? String(l.num).trim() : '';\n    if (!n) { if"],
 };
 
 const arg = process.argv.slice(2);
@@ -122,13 +138,16 @@ if (arg.includes('--prouve')) {
     const l5 = ligne(res, 't5');
     dit(l5 && l5.etape === 'rembourse' && l5.recu === false, 'remboursé, PAS noté reçu (Vinted disait « livrée ») ⇒ « remboursé », reçu = non', l5 && { e: l5.etape, r: l5.recu });
     dit(l5 && l5.ancien === true, 'remboursé il y a plus de 45 j, pas reçu ⇒ « ancien » (replié, jamais caché)');
-    const l8 = ligne(res, 't8');
+    // (13 nov., point 29) remboursée ⇒ revenue tout seule : elle est dans les remises, plus dans les lignes.
+    const l8 = res.remises.find(l => l.tx === 't8');
     dit(l8 && l8.origine === 'non-reclamee', 'non réclamée par l\'acheteur ⇒ la paire revient aussi', l8 && l8.origine);
     const res2 = R.retoursEnCours({ ...base, ventes: [ventes[0], { ...ventes[4], status: 'Commande livrée ! ', transaction_user_status: 'needs_action', date: iso(2) }] });
     const l = res2.lignes.find(x => x.tx === 't5');
     dit(l && l.etape === 'en-route' && l.livreeSelonVinted && !l.recu, '440 + « Commande livrée » ⇒ en route, « Vinted dit livrée » — jamais « reçu »', l && { e: l.etape, liv: l.livreeSelonVinted, r: l.recu });
+    // (13 nov., point 29) son clic « Reçu chez moi » ⇒ l'article est revenu : en stock, sous SON N°.
     const res3 = R.retoursEnCours({ ...base, recus: { t1: iso(0) } });
-    dit(ligne(res3, 't1').recu === true && res3.lignes[0].tx === 't1', 'son clic « Reçu chez moi » ⇒ reçu, en tête de liste', res3.lignes.map(x => x.tx));
+    const r1 = res3.remises.find(x => x.tx === 't1');
+    dit(!ligne(res3, 't1') && r1 && r1.recu === true && r1.remis.num === '40', 'son clic « Reçu chez moi » ⇒ reçu, en stock sous SON N° (40)', r1 && r1.remis);
   });
 
   console.log('\n3. TROIS ÉTATS, « PAS SU » DIT');
@@ -172,16 +191,18 @@ if (arg.includes('--prouve')) {
   essaie('remise', () => {
     const cleNum = (v) => String(v || '').toUpperCase().replace(/[\s-]/g, '').replace(/^0+(?=\d)/, '');
     const presentes = new Set(['autre50']);
-    const res = R.retoursEnCours({ ...base, recus: { t1: iso(0), t3: iso(0), t5: iso(0) } });
+    // La règle de remise jugée sur la ligne telle qu'elle était AVANT la remise (non reçue), puis reçue.
+    const res0 = R.retoursEnCours(base);
+    const res = { lignes: res0.lignes.map(l => ({ ...l, recu: true })) };
     dit(R.remiseEnStock({ ...ligne(res, 't1'), recu: false }, { numeros, presentes, cleNum }).raison === 'pas-recu', 'pas noté reçu ⇒ refusé (« reçu chez moi » d\'abord)');
-    dit(R.remiseEnStock({ ...ligne(R.retoursEnCours({ ...base, recus: { t4: 1 } }), 't4') }, { numeros, presentes, cleNum }).raison === 'sans-numero', 'sans identité ⇒ rien à garder, refusé');
+    dit(R.remiseEnStock({ ...ligne(res, 't4') }, { numeros, presentes, cleNum }).raison === 'sans-numero', 'sans identité ⇒ rien à garder, refusé');
     const a = R.remiseEnStock(ligne(res, 't1'), { numeros, presentes, cleNum });
     dit(a.ok && a.num === '40' && !a.conflit, 'la N°40 revient avec SON N°, aucun conflit', a);
     const b = R.remiseEnStock(ligne(res, 't3'), { numeros, presentes, cleNum });
     dit(b.ok && b.conflit && b.conflit.id === 'autre50', 'le N°50 porté par une autre paire PRÉSENTE ⇒ on demande (conflit nommé)', b);
     const c = R.remiseEnStock(ligne(res, 't3'), { numeros, presentes: new Set(), cleNum });
     dit(c.ok && !c.conflit, 'la même fiche, plus présente ⇒ aucun conflit (l\'historique ne bloque pas)', c);
-    const d = R.remiseEnStock(ligne(res, 't5'), { numeros, presentes, cleNum, estArchive: (n) => /^B/.test(n) });
+    const d = R.remiseEnStock({ ...ligne(res0, 't5'), recu: true }, { numeros, presentes, cleNum, estArchive: (n) => /^B/.test(n) });
     dit(d.ok && d.archive === true, 'ancien numéro (B60) ⇒ « numéro neuf à la republication »', d);
   });
 
@@ -199,6 +220,68 @@ if (arg.includes('--prouve')) {
     dit(R.retoursPourSite(lu, 'vestiaire') === null && R.retoursPourSite(lu, 'leboncoin') === null, 'Vestiaire / Leboncoin ⇒ pas de bloc (retours non suivis)');
     const passu = { etat: 'passu', lignes: [], remises: [], manques: ['tes ventes Vinted'] };
     dit(R.retoursPourSite(passu, 'ebay') === null && R.retoursPourSite(passu, 'vinted') === passu, 'ventes Vinted illisibles : dit sous Vinted, pas sous eBay');
+  });
+
+  console.log('\n8. (13 nov., point 29) UN RETOUR PROUVÉ REVIENT EN STOCK SOUS SON N°, SANS RIEN SAISIR');
+  essaie('revenu tout seul', () => {
+    const cleNum = (v) => String(v || '').toUpperCase().replace(/[\s-]/g, '').replace(/^0+(?=\d)/, '');
+    const NUM = { i40: { numero: '40', title: 'Samba blanche 42' }, i41: { numero: '41', title: 'Samba blanche 42' }, i50: { numero: '50', title: 'Dunk' }, autre50: { numero: '50', title: 'Une autre paire en ligne' },
+      i60: { numero: '60', title: 'Gazelle' }, i70: { numero: '70', title: 'Spezial' }, i80: { numero: 'B80', title: 'Air Max' } };
+    const TI = { r1: 'i40', r2: 'i41', r4: 'i50', r5: 'i60', r8: 'i70', r9: 'i41', r12: 'i80' };
+    const SU = iso(6);
+    const ET = { r1: { s: 440, ss: '', su: SU }, r2: { s: 440, ss: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", su: SU },
+      r3: { s: 440, ss: '', su: SU }, r4: { s: 440, ss: '', su: SU }, r5: { s: 440, ss: 'Commande livrée ! ', su: SU }, r7: { s: 500, ss: '' },
+      r8: { s: 440, ss: '', su: SU }, r9: { s: 440, ss: 'Commande livrée ! ', su: SU }, r11: { s: 440, ss: '' }, r12: { s: 440, ss: '', su: SU } };
+    const vt = (tx, status, tus, j) => ({ transaction_id: tx, title: 'Samba blanche 42', status, transaction_user_status: tus, date: iso(j) });
+    const V = [
+      vt('r1', 'Remboursement effectué', 'failed', 12),     // retour remboursé, identité → N°40
+      vt('r2', 'Commande livrée ! ', 'needs_action', 8),    // retour en route
+      vt('r3', 'Remboursement effectué', 'failed', 12),     // retour remboursé, AUCUNE identité (même titre que 40 et 41)
+      vt('r4', 'Remboursement effectué', 'failed', 12),     // N°50 porté par un autre article PRÉSENT
+      vt('r5', 'Remboursement effectué', 'failed', 60),     // remboursé il y a plus de 45 j : « ancien »
+      vt('r7', 'Remboursement effectué', 'failed', 10),     // annulation « article indisponible » remboursée : PAS un retour
+      vt('r8', 'Remboursement effectué', 'failed', 12),     // remboursé, mais déjà republié
+      vt('r9', 'Commande livrée ! ', 'needs_action', 8),    // 440 + « Vinted dit livrée », pas remboursé
+      vt('r10', 'Remboursement effectué', 'failed', 12),    // aucun état de transaction lu : rien n'est prouvé
+      vt('r11', 'Remboursement effectué', 'failed', 12),    // retour remboursé, date de transaction NON lue
+      vt('r12', 'Remboursement effectué', 'failed', 12),    // ancien N° (B80)
+    ];
+    const base8 = { ventes: V, etats: (tx) => ET[tx] || null, txnItem: TI, numeros: NUM, numeroVente: () => null, recus: {}, remis: {}, masques: {},
+      republiee: (l) => l.tx === 'r8', maintenant: now, presentes: new Set(['autre50']), cleNum, estArchive: (n) => /^B/.test(n) };
+    const res = R.retoursEnCours(base8);
+    const rem = (tx) => res.remises.find(l => l.tx === tx) || null;
+    const lig = (tx) => res.lignes.find(l => l.tx === tx) || null;
+    const r1 = rem('r1');
+    dit(r1 && r1.remis.auto === true && r1.remis.num === '40' && !lig('r1'), '8a retour REMBOURSÉ ⇒ en stock tout seul, sous SON N° (40 — pas le 41 au même titre)', r1 && r1.remis);
+    dit(r1 && r1.retourLe === SU && r1.remis.at === SU, '8b la date du retour est celle LUE sur la transaction', r1 && { le: r1.retourLe, at: r1.remis.at });
+    dit(lig('r2') && lig('r2').etape === 'en-route' && !rem('r2'), '8c retour EN ROUTE ⇒ « retour en route », pas encore en stock', lig('r2') && lig('r2').etape);
+    const r3 = rem('r3');
+    dit(r3 && r3.remis.num === null && r3.remis.aNumeroter === true, '8d sans N° connu ⇒ en stock « à numéroter », aucun N° deviné', r3 && r3.remis);
+    const r4 = rem('r4');
+    dit(r4 && r4.remis.num === null && r4.remis.conflit === 'autre50', '8e N° porté par un autre article PRÉSENT ⇒ pas repris (rien deviné), le conflit nommé', r4 && r4.remis);
+    dit(lig('r5') && lig('r5').ancien && !rem('r5'), '8f « ancien » (remboursé il y a plus de 45 j) ⇒ ne revient pas tout seul, garde son geste', lig('r5') && lig('r5').ancien);
+    dit(!lig('r7') && !rem('r7'), '8g une annulation remboursée (500) n\'est pas un retour ⇒ rien ne revient');
+    dit(!lig('r8') && !rem('r8') && (res.dejaRepubliees || []).includes('r8'), '8h déjà republiée ⇒ ne revient pas en stock (nommée, pour ne pas être redite en « envoyé »)', res.dejaRepubliees);
+    dit(lig('r9') && lig('r9').livreeSelonVinted && !rem('r9'), '8i « Vinted dit livrée » sans remboursement ⇒ jamais en stock tout seul', lig('r9') && lig('r9').etape);
+    dit(!lig('r10') && !rem('r10'), '8j aucun état de transaction lu ⇒ rien prouvé, rien ne revient (jamais déduit d\'une absence)');
+    const r11 = rem('r11');
+    dit(r11 && r11.retourLe === null && r11.remis.at === null, '8k date de transaction non lue ⇒ aucune date inventée', r11 && { le: r11.retourLe, at: r11.remis.at });
+    dit(rem('r12') && rem('r12').remis.num === 'B80' && rem('r12').remis.archive === true, '8l ancien N° (B80) : la paire revient sous SON N°, marqué archive (un neuf à la republication)', rem('r12') && rem('r12').remis);
+    const S = R.retoursPourStock(res);
+    const nums = S.articles.map(a => a.numero).sort().join(',');
+    dit(nums === '40,B80', '8m le Stock reçoit les N° revenus (40, B80) — ni le N° en conflit, ni un N° pour le sans-N°', nums);
+    dit(S.aNumeroter === 2, '8n les revenus sans N° connu (r3, r11) sont comptés « à numéroter » (le conflit à part)', S.aNumeroter);
+    dit(JSON.stringify(R.numsRemisEnStock(res).sort()) === '["40","B80"]', '8o les N° revenus redeviennent présents (`vinted_nums_physiques`)', JSON.stringify(R.numsRemisEnStock(res)));
+    const eb = R.retoursEnCours({ ...base8, ventes: [], ebay: [{ retour: { returnId: '9', orderId: 'o', itemId: '1', etat: 'CLOSED', rembourse: { value: '5' } }, compte: 'principal', num: '12' }] });
+    dit(eb.lignes.some(l => l.returnId === '9') && !eb.remises.length && !R.retourRevenuSeul({ ...eb.lignes[0] }) && !R.retourRevenuSeul({ plateforme: 'ebay', etape: 'rembourse', recu: true }), '8p un remboursement eBay (possible sans retour) ⇒ jamais en stock tout seul');
+    // 50 paires identiques (§2.4) : chaque retour remboursé revient sous SON N°, jamais celui d'une autre.
+    const N50 = {}, T50 = {}, E50 = {}, V50 = [];
+    for (let i = 1; i <= 50; i++) { N50['it' + i] = { numero: String(100 + i), title: 'Samba blanche 42' }; T50['x' + i] = 'it' + i; E50['x' + i] = { s: 440, ss: '', su: SU }; V50.push(vt('x' + i, 'Remboursement effectué', 'failed', 10)); }
+    V50.push(vt('x51', 'Remboursement effectué', 'failed', 10)); E50.x51 = { s: 440, ss: '', su: SU };
+    const r50 = R.retoursEnCours({ ...base8, ventes: V50, etats: (tx) => E50[tx] || null, txnItem: T50, numeros: N50, republiee: null, presentes: new Set() });
+    const bons = r50.remises.filter(l => l.tx !== 'x51' && l.remis.num === String(100 + Number(l.tx.slice(1)))).length;
+    const x51 = r50.remises.find(l => l.tx === 'x51');
+    dit(bons === 50 && x51 && x51.remis.num === null && x51.remis.aNumeroter, '8q 50 paires identiques : 50 N° justes, et la 51e sans identité « à numéroter » (aucun N° pris aux autres)', `${bons}/50 · ${x51 && x51.remis.num}`);
   });
 
   console.log(`\n${n - ko} vert(s), ${ko} rouge(s).${mut ? ' (mutation « ' + mut + ' »)' : ''}`);

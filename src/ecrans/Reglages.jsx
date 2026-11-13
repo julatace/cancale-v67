@@ -33,6 +33,7 @@ import { useReglageConseils } from '../Conseils.jsx';
 import { PHRASES_ECRAN } from '../phrasesEcran.js';
 import { APPARENCES, LIBELLES_APPARENCE, PHRASES_APPARENCE } from '../apparence.js';
 import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from '../composants/SignalerProbleme.jsx';
+import { DemandesAideRecues } from '../composants/EcrireSupport.jsx';   // (13 nov., lot 55) « Demandes d'aide » (propriétaire)
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
 import { PLATEFORMES_COMPTES, etatCompteLie, ageLecture, nomCompteLie, LIBELLE_ETAT } from '../comptesLies.js';
 import { contactEmail, CONTACT_A_VENIR } from '../contact.js';
@@ -48,13 +49,13 @@ const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit
 import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { bilanThermique } from '../App.jsx';   // (11 nov., lot thermique) ce que l'aperçu a fait
-import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart, seDeconnecter, ecrireCopieLocale } from '../App.jsx';
+import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart, seDeconnecter, ecrireCopieLocale } from '../App.jsx';
 
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
 import { installerExtensionIci, boutiqueOrion } from '../navigateurExtension.js';
 // (9 nov.) Solo et Pro : les deux offres côte à côte, le compte qui vend.
-import { OffresSoloPro, ouvrirQuelCompte, choixDe } from '../abonnement/PlansSoloPro.jsx';
+import { OffresSoloPro, ouvrirQuelCompte, choixDe, ouvrirCompteSup, supDe, texteSup, changerCompteSup } from '../abonnement/PlansSoloPro.jsx';
 import { PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO } from '../../api/_lib/plan-regle.js';
 import { PRIX_PRO_MOIS } from '../accueil-reglages.js';
 import { publierAbonnement, suivreAbonnement } from '../abonnement/etatAbonnement.js';
@@ -123,6 +124,7 @@ import { SimulationCompte } from "../SimulationCompte.jsx";
 import { OuvrirPaiements } from "../composants/OuvrirPaiements.jsx";   // (12 nov.) propriétaire seul
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
+import { PHRASE_PARRAINAGE, TEXTE_PARTAGE, texteEtatFilleul, jourCourt, moisGagnes, offertPar, prendreDemandeParrainage } from '../parrainage/parrainage.js';   // (13 nov., lot 54)
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
@@ -1450,9 +1452,11 @@ function RelancesEssaiSetting() {
 
 // ── LE BILAN DU MOIS PAR E-MAIL (8 nov., api/_lib/bilan-mois.js) ─────────────
 // Un résumé (ventes, vendu, reçu, bénéfice brut, sa plus belle vente) le 1er du
-// mois, à l'adresse de son compte. ÉTEINT par défaut : le choix est écrit par le
-// serveur (`?mode=bilan-mois`), jamais deviné. Trois états : allumé · éteint ·
-// « — » (pas su : aucun interrupteur qui mentirait).
+// mois, à l'adresse de son compte. (13 nov., lot 53) « Bilan mensuel par e-mail » :
+// ACTIVÉ par défaut pour un compte créé depuis le 13 nov., éteint avant — le
+// serveur le dit (`?mode=bilan-mois`, `choixEffectif`), jamais deviné ici. Trois
+// états : allumé · éteint · « — » (pas su : aucun interrupteur qui mentirait).
+// Envoi pas configuré (RELANCES_SMTP_*) ⇒ la ligne le dit : aucun bilan ne part.
 function BilanMoisSetting() {
   const [r, setR] = useState(undefined);
   const [busy, setBusy] = useState(false);
@@ -1472,21 +1476,21 @@ function BilanMoisSetting() {
     try {
       const x = await fetch('/api/compte?mode=bilan-mois', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ actif: !r.actif }) });
       const j = x.ok ? await x.json() : null;
-      if (j && j.ok) setR({ ...r, actif: j.actif }); else toast('Choix non enregistré — réessaie dans un instant.');
+      if (j && j.ok) setR({ ...r, actif: j.actif, defaut: false }); else toast('Choix non enregistré — réessaie dans un instant.');
     } catch (_) { toast('Choix non enregistré — réessaie quand tu as du réseau.'); }
     setBusy(false);
   };
   const etat = !r || r.actif === null ? 'passu' : r.actif ? 'on' : 'off';
   const dernier = r && r.envois ? Object.entries(r.envois).filter(([, e]) => e && e.issue === 'envoye').map(([k]) => k).sort().pop() : null;
   return (
-    <div data-bilan-mois={etat} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+    <div data-bilan-mois={etat} data-bilan-mois-configure={r ? (r.configure ? 'oui' : 'non') : 'passu'} data-bilan-mois-defaut={r && r.defaut ? '1' : '0'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
       <div className="vrm-np-ligne">
-        <span className="vrm-np-lib">Bilan du mois par e-mail<small>{!r ? 'Pas su pour l’instant — réessaie plus tard.'
-          : !r.configure ? 'L’envoi d’e-mails n’est pas encore configuré : aucun ne part.'
+        <span className="vrm-np-lib">Bilan mensuel par e-mail<small>{!r ? 'Pas su pour l’instant — réessaie plus tard.'
+          : !r.configure ? 'L’envoi d’e-mails n’est pas configuré sur ce serveur : aucun bilan ne part.'
           : dernier ? `Le 1er du mois : ventes, vendu, reçu, bénéfice. Dernier envoyé : ${dernier}.`
-          : 'Le 1er du mois : ventes, vendu, reçu, bénéfice, plus belle vente.'}</small></span>
+          : 'Le 1er du mois : ventes, vendu, reçu, bénéfice, et un lien vers le récap du mois.'}</small></span>
         {etat === 'passu' ? <span className="vrm-np-relance">—</span>
-          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={`Bilan du mois par e-mail : ${r.actif ? 'activé' : 'désactivé'}`}/>}
+          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={`Bilan mensuel par e-mail : ${r.actif ? 'activé' : 'désactivé'}`}/>}
       </div>
     </div>
   );
@@ -1920,6 +1924,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
   // (6 nov.) « Signaler un problème » : la feuille (src/composants/SignalerProbleme.jsx).
   const [signaler, setSignaler] = React.useState(false);
+  // (13 nov., lot 55) « Écrire au support » : la feuille (src/composants/EcrireSupport.jsx).
+  const [support, setSupport] = React.useState(false);
   // (6 nov.) Les conseils (src/Conseils.jsx) : l'interrupteur et « Revoir », sur SA ligne.
   const [conseilsOn, basculerConseils, revoirLesConseils] = useReglageConseils({ lire: lireLigneAccompagnement, ecrire: ecrireLigneAccompagnement });
   const racine = React.useRef(null);
@@ -2199,6 +2205,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'centre-aide', type:'action', ic:'search', lib:tr('reglages.centre-aide.lib'), desc:tr('reglages.centre-aide.desc'), onClick:()=>{ try { window.open('/aide', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-centre-aide':'' } },
       // (8 nov., confiance) La page publique de l'état de VRM (vrm.center/statut), dans un nouvel onglet.
       { id:'statut', type:'nav', ic:'cloud', lib:tr('reglages.statut.lib'), desc:tr('reglages.statut.desc'), onClick:()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }, data:{ 'data-reglage-statut':'' } },
+      // (13 nov., lot 55) La question au support : le texte et cinq faits techniques, rien d'autre (src/demandeAide.js).
+      { id:'support', type:'action', ic:'mail', lib:tr('reglages.support.lib'), desc:tr('reglages.support.desc'), onClick:()=>setSupport(true), data:{ 'data-reglage-support':'' } },
       { id:'signaler', type:'action', ic:'chat', lib:tr('reglages.signaler.lib'), desc:tr('reglages.signaler.desc'), onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
@@ -2208,6 +2216,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (12 nov.) « Ouvrir les paiements » : chaque prérequis LU (src/ouverturePaiements.js), propriétaire seul.
       proprioInst && { id:'paiements', type:'panneau', nu:true, ic:'cart', lib:tr('reglages.paiements.lib'), desc:tr('reglages.paiements.desc'), data:{ 'data-reglage-paiements':'' }, el:<OuvrirPaiements entetes={enTeteSession}/> },
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:tr('reglages.signalements.lib'), data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      // (13 nov., lot 55) Les demandes « Écrire au support » de tous les vendeurs : au PROPRIÉTAIRE seul (403 sinon).
+      proprioInst && { id:'demandes-aide', type:'panneau', nu:true, ic:'mail', lib:tr('reglages.demandesAide.lib'), desc:tr('reglages.demandesAide.desc'), data:{ 'data-reglage-demandes-aide':'' }, el:<DemandesAideRecues entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
       proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
@@ -2326,6 +2336,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
       {AcctSheet()}
       {signaler && <SignalerProblemeFeuille onClose={()=>setSignaler(false)}/>}
+      {support && <EcrireSupportFeuille depuis="reglages" onClose={()=>setSupport(false)}/>}
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
       {ouvert ? (
         // ── SOUS-ÉCRAN (téléphone) ──
@@ -3220,7 +3231,7 @@ function MonAbonnement() {
   // (9 nov., Solo par plateforme) Un choix fait dans la feuille « Quel compte vend ? »
   // (publié par elle) se relit ici tout de suite ; et les comptes des autres plateformes
   // (lus seulement en Solo) disent quelles rangées montrer.
-  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs } : p)); }), []);
+  React.useEffect(() => suivreAbonnement((x) => { if (x && typeof x === 'object' && x.ok !== false) setE((p) => (p ? { ...p, compteVendeur: x.compteVendeur !== undefined ? x.compteVendeur : p.compteVendeur, comptesVendeurs: x.comptesVendeurs !== undefined ? x.comptesVendeurs : p.comptesVendeurs, comptesSup: x.comptesSup !== undefined ? x.comptesSup : p.comptesSup } : p)); }), []);
   const [autresSolo] = useComptesAutresSites(!!(e && e.plan === 'solo'));
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
@@ -3274,6 +3285,29 @@ function MonAbonnement() {
           <RangeeIos titre={e.compteVendeur && e.compteVendeur.uid ? <span data-compte-vendeur={e.compteVendeur.uid}>Vinted · Compte n° {e.compteVendeur.uid}</span> : <span data-compte-vendeur="">Vinted · Pas encore choisi</span>}
             detail={e.compteVendeur && e.compteVendeur.uid ? 'Ses ventes, annonces, colis et sa compta comptent' : 'Tant que tu n’as pas choisi, tous tes comptes comptent'}
             onClick={() => ouvrirQuelCompte()} data-rangee-compte-vendeur=""/>
+          {/* (13 nov., lot 56) PLUSIEURS COMPTES VINTED DÈS SOLO : les comptes de plus (payés,
+              rendus par le serveur), puis « Ajouter » — « Bientôt » tant que le prix Stripe
+              `vrm_compte_sup` n'existe pas (rien d'achetable). La limite est celle du serveur. */}
+          {(() => {
+            const s = supDe(e);
+            if (!s) return null;
+            const retirer = async (uid) => {
+              const oui = await askConfirm({ title: 'Ce compte ne vend plus ?', desc: `Le compte n° ${uid} redevient un compte d'achat : ses ventes sortent de tes totaux, rien n'est supprimé. Stripe déduit le reste du mois de ta prochaine facture.`, ok: 'Il ne vend plus', cancel: 'Annuler' });
+              if (!oui) return;
+              setOccupe('sup'); setMsg('');
+              const r = await changerCompteSup('retirer-sup', uid, enTeteSession);
+              setOccupe('');
+              if (!r.ok) setMsg(r.message); else toast(`✓ Le compte n° ${uid} ne vend plus`);
+            };
+            const peutAjouter = !!(e.compteVendeur && e.compteVendeur.uid) && (s.ouvert || s.libres > 0) && s.liste.length < s.max;
+            return (<>
+              {s.liste.map((uid) => <RangeeIos key={uid} titre={<span data-compte-sup={uid}>Vinted · Compte n° {uid}</span>} detail={`Vend aussi · ${texteSup(s)}`} valeur="Retirer" onClick={() => retirer(uid)} data-rangee-compte-sup={uid}/>)}
+              <RangeeIos titre={<span data-sup-ajouter-rangee="">Un compte Vinted qui vend de plus</span>}
+                detail={peutAjouter ? (s.libres > 0 ? `${s.libres} place${s.libres > 1 ? 's' : ''} déjà payée${s.libres > 1 ? 's' : ''}` : `${texteSup(s)} par compte de plus`) : !(e.compteVendeur && e.compteVendeur.uid) ? 'Choisis d’abord le compte inclus' : `Bientôt · ${texteSup(s)} par compte de plus`}
+                valeur={peutAjouter ? 'Ajouter' : undefined}
+                onClick={peutAjouter ? () => ouvrirCompteSup() : undefined} data-rangee-sup-ajouter={peutAjouter ? 'ouvert' : 'bientot'}/>
+            </>);
+          })()}
           {/* (9 nov., Solo par plateforme) Un compte vendeur PAR plateforme : une rangée chacune, dès
               DEUX comptes (ou un choix déjà fait) ; le même geste, la même règle des 30 jours. */}
           {PLATEFORMES_SOLO.map((p) => {
@@ -3489,10 +3523,13 @@ function FacturesAbonnement({ fx }) {
   );
 }
 
-// ── PARRAINAGE (8 nov.) ──────────────────────────────────────────────────────
-// Un lien personnel ; un mois offert à chacun quand l'ami paie son premier
-// mois (règle et anti-abus : api/_lib/parrainage.js, CGV article 2 bis). Le
-// serveur rend des NOMBRES (« 2 amis inscrits, 1 a payé »), jamais qui.
+// ── PARRAINAGE (8 nov. ; clair et visible le 13 nov., lot 54) ────────────────
+// « Parraine un vendeur : 1 mois offert pour toi et pour lui. » Un lien
+// personnel (copier · partager, le partage natif sur téléphone), le total de
+// mois gagnés, l'état de CHAQUE filleul (« inscrit », « a payé son 1er mois »
+// ⇒ mois offert) SANS identité, et le nom qui s'affiche chez le filleul
+// (« Offert par … ») — choisi ici, jamais un pseudo Vinted (règle au serveur).
+// Règle et anti-abus : api/_lib/parrainage.js, CGV article 2 bis.
 // Trois états : `undefined` en cours · `null` pas su · l'objet lu. Pas installé
 // (027 pas passée) ou parrainage fermé : on le dit, sans lien à partager.
 async function lireParrainage() {
@@ -3503,10 +3540,60 @@ async function lireParrainage() {
     return j && j.ok ? j : null;
   } catch (_) { return null; }
 }
+function NomParrain({ nom, onChange }) {
+  // `nom` : le nom choisi · `null` rien de choisi · `undefined` pas su.
+  const [ouvert, setOuvert] = React.useState(false);
+  const [v, setV] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const [occupe, setOccupe] = React.useState(false);
+  const ouvrir = () => { setV(nom || String(load('vrm_prenom', '') || '').trim().slice(0, 24)); setMsg(''); setOuvert(true); };
+  const envoyer = async (valeur) => {
+    if (occupe) return;
+    setOccupe(true); setMsg('');
+    try {
+      const r = await fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'nom', nom: valeur }) });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j && j.ok) { onChange(j.nom || null); setOuvert(false); toast(j.nom ? 'Enregistré' : 'Retiré'); }
+      else setMsg((j && j.message) || 'Pas enregistré. Réessaie dans un instant.');
+    } catch (_) { setMsg('Pas enregistré. Réessaie dans un instant.'); }
+    setOccupe(false);
+  };
+  if (!ouvert) {
+    return <RangeeIos titre="Ton nom chez tes filleuls" detail={nom ? `Ils lisent « Offert par ${nom} »` : 'Ils lisent « Offert par un vendeur VRM »'}
+      valeur={<span data-parrainage-nom={nom || ''}>{nom === undefined ? '—' : (nom || 'Choisir')}</span>} onClick={ouvrir} data-parrainage-nom-ouvrir=""/>;
+  }
+  return (
+    <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }} data-parrainage-nom-form="">
+      <label htmlFor="vrm-parrain-nom" style={{ display: 'block', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Ton nom chez tes filleuls</label>
+      <input id="vrm-parrain-nom" className="vrm-set-champ" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, textAlign: 'left' }} value={v} maxLength={24}
+        onChange={(e) => { setV(e.target.value.slice(0, 24)); setMsg(''); }} placeholder="Ton prénom ou un pseudo VRM" autoComplete="given-name" disabled={occupe}/>
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Ton prénom ou un pseudo VRM, jamais ton pseudo Vinted. Rien d’autre ne se voit.</div>
+      {msg ? <div role="alert" data-parrainage-nom-refus="" style={{ fontSize: 13, color: C.text, marginTop: 6 }}>{msg}</div> : null}
+      <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
+        <button type="button" className="vrm-b vrm-b-primaire" disabled={occupe || !v.trim()} onClick={() => envoyer(v)} data-parrainage-nom-enregistrer="">{occupe ? 'Enregistrement…' : 'Enregistrer'}</button>
+        {nom ? <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => envoyer('')}>Ne plus montrer de nom</button> : null}
+        <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => setOuvert(false)}>Annuler</button>
+      </div>
+    </div>
+  );
+}
 function Parrainage() {
   const [p, setP] = React.useState(undefined);
   const proprio = useEstProprietaire();
+  const racine = React.useRef(null);
   React.useEffect(() => { let mort = false; lireParrainage().then((x) => { if (!mort) setP(x); }); return () => { mort = true; }; }, []);
+  // Venu du menu « Plus » (« Parrainer ») ou de `?tab=parrainage` : le groupe est amené à l'écran.
+  React.useEffect(() => {
+    if (!p || !racine.current) return;
+    const amener = () => { try { racine.current && racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} };
+    // Ce qui est au-dessus (l'abonnement, les factures) finit parfois de se lire APRÈS : on ramène encore deux fois.
+    const minuteurs = [];
+    const plusieurs = () => { amener(); minuteurs.push(setTimeout(amener, 600), setTimeout(amener, 1500)); };
+    if (prendreDemandeParrainage()) requestAnimationFrame(plusieurs);
+    const f = () => { prendreDemandeParrainage(); plusieurs(); };
+    window.addEventListener('vrm:voir-parrainage', f);
+    return () => { window.removeEventListener('vrm:voir-parrainage', f); minuteurs.forEach(clearTimeout); };
+  }, [p]);
   if (p === undefined) return null;
   if (p === null) return <GroupeIos titre="Parrainage" data-parrainage="pas-su"><RangeeIos titre="Parrainage pas lu" detail="Rouvre cet écran dans un instant."/></GroupeIos>;
   if (!p.installe || !p.ouvert) {
@@ -3516,23 +3603,47 @@ function Parrainage() {
   }
   const lien = lienParrainage(p.code);
   const s = p.suivi || { inscrits: 0, payes: 0, moisOfferts: 0, enAttente: 0 };
-  const amis = (n) => `${n} ami${n > 1 ? 's' : ''}`;
+  const gagnes = moisGagnes(p);
+  const filleuls = Array.isArray(p.filleuls) ? p.filleuls : null;
+  const f = p.filleul || null;
+  const peutPartager = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   const copier = async () => {
-    try { if (navigator.share && window.matchMedia('(pointer: coarse)').matches) { await navigator.share({ title: 'VRM', text: 'Essaie VRM : un mois offert à ton premier paiement.', url: lien }); return; } } catch (_) { return; }
-    try { await navigator.clipboard.writeText(lien); toast('✓ Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
+    try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
+  };
+  const partager = async () => {
+    try { await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
   };
   return (
-    <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-parrainage-test={p.modeTest ? '1' : undefined}
-      pied={`${p.modeTest ? 'Mode test : aucun vrai paiement pour l’instant. ' : ''}Un mois offert à vous deux à son premier paiement (12 par an max).${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
-      <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }}>
-        <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
-        <div className="vrm-abo-actions" style={{ marginTop: 10 }}><button type="button" className="vrm-b vrm-b-secondaire" onClick={copier} data-copier-parrainage="">Partager mon lien</button></div>
-      </div>
-      {/* (11 nov., agent2-argent-parrainage) Une phrase : « N personnes venues par toi · M abonnées » — des NOMBRES, jamais qui. */}
-      <RangeeIos titre={<span data-parrainage-phrase="">{s.inscrits} personne{s.inscrits > 1 ? 's' : ''} venue{s.inscrits > 1 ? 's' : ''} par toi · {s.payes} abonnée{s.payes > 1 ? 's' : ''}</span>}
-/>
-      <RangeeIos titre="Mois offerts pour toi" detail={s.enAttente ? `${amis(s.enAttente)} : en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{s.moisOfferts}</span>}/>
-    </GroupeIos>
+    <div ref={racine} data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-mois-gagnes={gagnes == null ? '' : gagnes} data-parrainage-test={p.modeTest ? '1' : undefined} style={{ scrollMarginTop: 72 }}>
+      <GroupeIos titre="Parrainage"
+        pied={`${p.modeTest ? 'Mode test : aucun vrai paiement pour l’instant. ' : ''}Ton ami s’inscrit avec ton lien. À son 1er paiement, chacun de vous deux reçoit un mois offert${Number.isFinite(p.moisCentimes) ? ' (' + (p.moisCentimes / 100).toFixed(2).replace('.', ',') + ' €)' : ''}, déduit de sa prochaine facture. Un nouveau compte VRM et un compte Vinted jamais vu dans VRM ; 12 mois offerts par an au plus.`}>
+        <div className="vrm-ios-rangee" style={{ padding: '12px 16px', display: 'block' }}>
+          <div data-parrainage-titre="" style={{ fontSize: 17, fontWeight: 600, color: C.text, lineHeight: 1.35, marginBottom: 10 }}>{PHRASE_PARRAINAGE}</div>
+          <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
+          <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
+            <button type="button" className="vrm-b vrm-b-primaire" onClick={copier} data-copier-parrainage="">Copier le lien</button>
+            {peutPartager ? <button type="button" className="vrm-b vrm-b-secondaire" onClick={partager} data-partager-parrainage="">Partager</button> : null}
+          </div>
+        </div>
+        <RangeeIos titre="Mois gagnés" detail={s.enAttente ? `${s.enAttente} en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{gagnes == null ? '—' : gagnes}</span>}/>
+        <NomParrain nom={p.nom} onChange={(nom) => setP((x) => ({ ...x, nom }))}/>
+      </GroupeIos>
+      {f && f.parraine ? (
+        <GroupeIos titre="Ton parrainage" data-parraine={f.moisOffert ? 'offert' : f.attendVinted ? 'attend-vinted' : 'en-cours'}>
+          <RangeeIos titre={`Offert par ${offertPar(f.offertPar) || 'un vendeur VRM'}`}
+            detail={f.moisOffert ? 'Ton mois offert est crédité.' : f.attendVinted ? 'Relie ton compte Vinted pour recevoir ton mois offert.' : 'Ton mois offert arrive avec ton 1er paiement.'}/>
+        </GroupeIos>
+      ) : null}
+      <GroupeIos titre="Tes filleuls" data-filleuls={filleuls ? filleuls.length : ''}
+        pied={<span data-parrainage-phrase="">{s.inscrits} personne{s.inscrits > 1 ? 's' : ''} venue{s.inscrits > 1 ? 's' : ''} par toi · {s.payes} abonnée{s.payes > 1 ? 's' : ''}</span>}>
+        {filleuls === null ? <RangeeIos titre="Liste pas lue" detail="Rouvre cet écran dans un instant."/>
+          : !filleuls.length ? <RangeeIos titre="Personne pour l’instant" detail="Partage ton lien : chaque inscription apparaît ici."/>
+          : filleuls.map((x) => { const t = texteEtatFilleul(x.etat); return (
+            <RangeeIos key={x.rang} data-filleul={x.etat} titre={`Filleul ${x.rang}`} detail={`${x.inscritLe ? 'inscrit le ' + jourCourt(x.inscritLe) + ' · ' : ''}${t.detail}`}
+              valeur={t.court}/>
+          ); })}
+      </GroupeIos>
+    </div>
   );
 }
 // ⟦← App.jsx #41⟧
@@ -3637,6 +3748,8 @@ function EquipeSetting() {
   const [occupe, setOccupe] = React.useState('');
   const [msg, setMsg] = React.useState('');
   const [montre, setMontre] = React.useState('');
+  // (13 nov., lot 58) La dernière personne retirée (pour « Réinviter » : une nouvelle invitation).
+  const [retiree, setRetiree] = React.useState('');
   const relire = React.useCallback(() => { lireEquipe().then(setLu); }, []);
   React.useEffect(() => { relire(); }, [relire]);
   const agir = async (cle, action, extra, ok) => {
@@ -3662,8 +3775,14 @@ function EquipeSetting() {
     <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
       <div>{EQUIPE_NON_INSTALLE_TXT}</div>
       <div data-equipe-attente-geste={proprio ? 'proprietaire' : 'vendeur'} style={{ color: C.muted, marginTop: 6 }}>
+        {/* (13 nov., lot 58) Au propriétaire : les TROIS gestes exacts (docs/passation/2026-11-13-lot5658.md). */}
         {proprio
-          ? <>S’active avec la mise à jour <b style={{ color: C.text }}>016</b> de la base.<br/>Supabase → SQL Editor → colle <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</>
+          ? <ol data-equipe-gestes="3" style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+              <li>Essai : SQL Editor → <b style={{ color: C.text }}>016-1-essai-annule.sql</b> → Run.</li>
+              <li>Active : <b style={{ color: C.text }}>016-equipe.sql</b> → Run.</li>
+              <li>Vérifie : <b style={{ color: C.text }}>016-3-verifier.sql</b> → Run.<br/>
+                Ou : <b style={{ color: C.text }}>essai-annule.cjs --verifier</b>.</li>
+            </ol>
           : <>Rien à faire : bientôt, tu inviteras ici ton aide par e-mail.</>}
       </div>
       <div data-equipe-ce-qui-viendra="" style={{ color: C.muted, marginTop: 8 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
@@ -3685,13 +3804,19 @@ function EquipeSetting() {
       </div>
       <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>VRM n'envoie aucun e-mail. Touche « Envoyer l'invitation ».</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
+      {retiree && <div data-equipe-retiree={retiree} role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10, color: C.text }}>
+        <span style={{ flex: '1 1 200px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{retiree}</b> ne voit plus tes colis, depuis maintenant.</span>
+        <button type="button" data-equipe-reinviter="" disabled={!!occupe} onClick={() => agir('inviter', 'inviter', { email: retiree }, () => { setRetiree(''); setMsg('Invitée à nouveau. Envoie-lui le message.'); })} className="vrm-b vrm-b-secondaire">Réinviter</button>
+      </div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée'}</span></span>
             <span style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
             {x.statut !== 'actif' && <button type="button" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }} className="vrm-b vrm-b-secondaire">Envoyer l'invitation</button>}
-            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} className="vrm-b vrm-b-discret">Retirer</button>
+            {/* (13 nov., lot 58) RÉVOCATION EN UN GESTE : un toucher, effet immédiat (la base coupe la lecture tout de suite).
+                Revenir en arrière = « Réinviter » (une NOUVELLE invitation, qu'il devra accepter) — jamais un accès rendu en silence. */}
+            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} aria-label={`Retirer l'accès de ${x.email}`} onClick={() => agir(x.id, 'revoquer', { id: x.id }, () => { setRetiree(x.email); setMsg(''); })} className="vrm-b vrm-b-discret">{occupe === x.id ? 'Retrait…' : 'Retirer'}</button>
             </span>
             {montre === x.id && <div data-equipe-message={x.id} style={{ flex: '1 1 100%', whiteSpace: 'pre-line', userSelect: 'text', WebkitUserSelect: 'text', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', color: C.text }}>{texteInvitationEquipe(x.email)}</div>}
           </div>
