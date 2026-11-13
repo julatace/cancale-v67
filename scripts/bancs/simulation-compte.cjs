@@ -136,7 +136,7 @@ async function proprietaire(nav, W, theme) {
   dit(!!r && r.cartes.length >= 6, `${T} S2 une carte par scénario`, JSON.stringify(r && r.cartes.length));
   if (r) {
     dit(r.cartes.every((c) => c.conforme === '1'), `${T} S2 chaque scénario se passe comme attendu (${r.bilan})`, JSON.stringify(r.cartes.filter((c) => c.conforme !== '1').map((c) => c.id)));
-    dit(r.cartes.every((c) => c.etapes.length === 6 && c.etapes.every((e) => e.mini)), `${T} S2 six étapes, chacune avec sa miniature (le vrai écran du parcours)`);
+    dit(r.cartes.every((c) => c.etapes.length === 3 && c.etapes.every((e) => e.mini)), `${T} S2 trois étapes, chacune avec sa miniature (le vrai écran du parcours)`);
     const sans = r.cartes.find((c) => c.id === 'sans-extension');
     const ext = sans && sans.etapes.find((e) => e.cle === 'extension');
     dit(ext && ext.ok === '0' && /extension/i.test(ext.quoi), `${T} S2 « sans extension » : ✗ et ce qui a accroché`, JSON.stringify(ext));

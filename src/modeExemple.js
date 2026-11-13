@@ -41,6 +41,14 @@ const AFFICHAGE = ['vinted_dark', 'vrm_apparence', 'vrm_zoom', 'vrm_densite'];
 let ETAT = null;
 
 export const exempleActif = () => !!(ETAT && ETAT.actif);
+// (13 nov., lot 48) Entré par le LIEN de la page d'accueil ou de la connexion (que seul
+// un visiteur sans session voit) : le bandeau propose « Créer mon compte » plutôt que
+// « Passer à mes vraies données ». La vraie session n'est jamais lue pour le savoir.
+const CLE_SANS_COMPTE = 'vrm_mode_exemple_sans_compte';
+export const exempleSansCompte = () => !!(ETAT && ETAT.actif && ETAT.sansCompte);
+// `?exemple` dans l'adresse : un VRAI lien (page d'accueil, connexion) qui demande
+// l'exemple à CET onglet — rien d'autre n'est lu ni écrit.
+const demandeParLien = (win) => { try { return /[?&]exemple(=1)?(&|$)/.test(String(win.location.search || '')); } catch (_) { return false; } };
 // Pour le banc et le diagnostic : ce que la porte a fait (jamais de contenu).
 export const bilanExemple = () => (ETAT ? { actif: ETAT.actif, reponduesSurPlace: ETAT.surPlace, ecrituresGardees: ETAT.ecritures, refusees: ETAT.refusees, messagesCoupes: ETAT.coupes } : { actif: false });
 
@@ -59,13 +67,13 @@ const demande = (ss) => { try { return !!ss && ss.getItem(CLE_EXEMPLE) === '1'; 
 // Entrer : poser la clé dans CET onglet, puis recharger (la porte s'installe
 // avant l'app). Rien d'autre n'est écrit.
 export function entrerModeExemple(win = window) {
-  try { (ETAT && ETAT.ssReel ? ETAT.ssReel : win.sessionStorage).setItem(CLE_EXEMPLE, '1'); } catch (_) { return false; }
+  try { const ss = ETAT && ETAT.ssReel ? ETAT.ssReel : win.sessionStorage; ss.setItem(CLE_EXEMPLE, '1'); ss.removeItem(CLE_SANS_COMPTE); } catch (_) { return false; }
   try { win.location.assign('/?tab=journee'); } catch (_) {}
   return true;
 }
 // Sortir : retirer la clé du VRAI stockage de l'onglet, puis recharger.
 export function sortirModeExemple(win = window, destination = '/?tab=journee') {
-  try { (ETAT && ETAT.ssReel ? ETAT.ssReel : win.sessionStorage).removeItem(CLE_EXEMPLE); } catch (_) {}
+  try { const ss = ETAT && ETAT.ssReel ? ETAT.ssReel : win.sessionStorage; ss.removeItem(CLE_EXEMPLE); ss.removeItem(CLE_SANS_COMPTE); } catch (_) {}
   try { win.location.assign(destination); } catch (_) {}
 }
 
@@ -129,10 +137,16 @@ export function installerModeExemple(win = typeof window !== 'undefined' ? windo
   if (!win || ETAT) return exempleActif();
   let ssReel = null, lsReel = null;
   try { ssReel = win.sessionStorage; lsReel = win.localStorage; } catch (_) { return false; }
+  if (demandeParLien(win)) {
+    try { ssReel.setItem(CLE_EXEMPLE, '1'); ssReel.setItem(CLE_SANS_COMPTE, '1'); } catch (_) {}
+    try { win.history.replaceState(win.history.state, '', '/?tab=journee'); } catch (_) {}
+  }
   if (!demande(ssReel)) return false;
+  let sansCompte = false;
+  try { sansCompte = ssReel.getItem(CLE_SANS_COMPTE) === '1'; } catch (_) {}
   // (11 nov.) Les captures de la page d'accueil posent un catalogue mélangé.
   const jeu = jeuExemple(Date.now(), { catalogue: win.__vrmExempleCatalogue });
-  ETAT = { actif: true, ssReel, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes }, autres: {}, surPlace: 0, ecritures: 0, refusees: 0, coupes: 0 };
+  ETAT = { actif: true, ssReel, sansCompte, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes }, autres: {}, surPlace: 0, ecritures: 0, refusees: 0, coupes: 0 };
 
   // 1. LE STOCKAGE : en mémoire. La session de l'exemple n'existe que là.
   const depart = {};

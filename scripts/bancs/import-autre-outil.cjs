@@ -225,7 +225,10 @@ async function main() {
 
         // ── L'étape facultative de « Démarrer avec VRM » ────────────────────────
         if (!sombre) await essaie(`${T} guide`, async () => {
-          const { ctx, pg, errs } = await preparer(b, vp, sombre);
+          // (13 nov., lot 46) Un compte Vinted déjà relié ne voit la carte que s'il a COMMENCÉ
+          // le démarrage (un vendeur installé n'est jamais interrompu) : la position est posée.
+          const commence = () => ROWS.map((r) => (r.id === 'main' ? { id: 'main', data: { ...r.data, vrm_parcours: { v: 1, etape: 'vinted', ouvert: false, fini: null, at: new Date(MAINTENANT).toISOString() } } } : r));
+          const { ctx, pg, errs } = await preparer(b, vp, sombre, commence);
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
           await pg.locator('[data-guide-importer-geste]').first().waitFor({ timeout: 20000 });
           const tot = await pg.evaluate(() => { const e = document.querySelector('[data-guide-progres]'); return e ? Number(e.getAttribute('data-guide-progres').split('/')[1]) : -1; });

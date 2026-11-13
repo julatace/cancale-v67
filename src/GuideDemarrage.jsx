@@ -188,14 +188,16 @@ export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, on
   );
 }
 
-export function BandeauExemple({ onBrancher, style }) {
+// (13 nov., lot 48) `sansCompte` : entré depuis la page d'accueil ou la connexion, sans
+// compte VRM ⇒ « Créer mon compte » (l'inscription) ; sinon « Passer à mes vraies données ».
+export function BandeauExemple({ onBrancher, style, sansCompte = false }) {
   return (
-    <div className="vrm-exemple-bandeau" role="region" aria-label="Mode exemple" data-exemple-bandeau="" style={style}>
+    <div className="vrm-exemple-bandeau" role="region" aria-label="Mode exemple" data-exemple-bandeau="" data-exemple-sans-compte={sansCompte ? '1' : '0'} style={style}>
       <div className="vrm-exemple-texte">
-        <b>Exemple — rien n’est à toi</b>
-        <span>Ces données sont inventées. Rien n’est enregistré, rien n’est envoyé.</span>
+        <b>Exemple — rien n’est enregistré</b>
+        <span>Ces données sont inventées. Rien n’est envoyé.</span>
       </div>
-      <button type="button" className="vrm-b vrm-b-primaire" data-exemple-brancher="" onClick={onBrancher}>Passer à mes vraies données</button>
+      <button type="button" className="vrm-b vrm-b-primaire" data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? 'Créer mon compte' : 'Passer à mes vraies données'}</button>
     </div>
   );
 }
