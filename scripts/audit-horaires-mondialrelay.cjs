@@ -46,7 +46,9 @@ if (ARG_PROUVE) {
   for (const [nom, [f, de, vers]] of choisies) {
     const t = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-hmr-'));
     for (const x of ['api', 'src', 'package.json']) fs.cpSync(path.join(R, x), path.join(t, x), { recursive: true });
-    fs.symlinkSync(fs.realpathSync(path.join(R, 'node_modules')), path.join(t, 'node_modules'));
+    // node_modules : celui de l'arbre, sinon le premier au-dessus (un worktree n'en a pas à lui).
+    let nm = null; for (let d = R; d && !nm; d = path.dirname(d) === d ? null : path.dirname(d)) if (fs.existsSync(path.join(d, 'node_modules'))) nm = fs.realpathSync(path.join(d, 'node_modules'));
+    if (nm) fs.symlinkSync(nm, path.join(t, 'node_modules'));
     const src = fs.readFileSync(path.join(t, f), 'utf8');
     if (src.split(de).length !== 2) { console.log(`❌ mutation ${nom} : ancre ${src.includes(de) ? 'pas unique' : 'introuvable'} dans ${f}`); fs.rmSync(t, { recursive: true, force: true }); continue; }
     fs.writeFileSync(path.join(t, f), src.replace(de, vers));
