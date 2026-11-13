@@ -7,7 +7,7 @@ permissions:
 jobs:
   sonde:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,19 +16,45 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Installer WebKit et Chromium
+      - name: Installer WebKit
         run: |
           echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
-          for essai in 1 2 3; do npx playwright install --with-deps webkit chromium && break; sleep 20; done
-          sudo mkdir -p /opt/pw-browsers
-          sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
-          echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"
-      - name: Sonde
-        env:
-          MOTEURS: webkit,chromium
-        run: node scripts/sonde-webkit.cjs || true
+          for essai in 1 2 3; do npx playwright install --with-deps webkit && break; sleep 20; done
       - name: connexion-claire sous WebKit
         env:
           NAVIGATEUR: webkit
-          BANC_GARDE_TRACE: '1'
         run: node scripts/bancs/connexion-claire.cjs || true
+      - name: iphone-reprise B, AVANT (x3)
+        env:
+          NAVIGATEUR: webkit
+          BANC_PARTIE: B
+          LARGEURS: '390'
+        run: for i in 1 2 3; do BANC_PORT=$((10100+i)) node scripts/bancs/iphone-reprise-avant.cjs 2>&1 | grep -E "B5|❌|garde" ; done || true
+      - name: iphone-reprise B, APRÈS (x3)
+        env:
+          NAVIGATEUR: webkit
+          BANC_PARTIE: B
+          LARGEURS: '390'
+        run: for i in 1 2 3; do BANC_PORT=$((10200+i)) node scripts/bancs/iphone-reprise.cjs 2>&1 | grep -E "B5|❌|garde|bilan|vert" ; done || true
+  lot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Installer WebKit
+        run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
+          for essai in 1 2 3; do npx playwright install --with-deps webkit && break; sleep 20; done
+      - name: Le lot WebKit de la CI
+        env:
+          NAVIGATEUR: webkit
+          BANCS_PORT_BASE: '10030'
+          BANCS_TIMEOUT_S: '1800'
+          LARGEURS: '390'
+        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur
