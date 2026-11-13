@@ -160,13 +160,15 @@ const lire = (pg) => pg.evaluate(() => {
         dit(mar && aj && re && new Set([mar.point, aj.point, re.point, a && a.point]).size === 4 && /13002/.test(mar.adr) && /20000/.test(aj.adr) && /97400/.test(re.adr), 'F1 Marseille, Ajaccio, Saint-Denis : chacun à SON point', J([mar, aj, re].map((x) => x && x.adr)));
         dit(l6 && l7 && l6.point && l7.point && l6.point !== l7.point && l6.pasLue && l7.pasLue && ![a, bb].some((x) => x && (x.point === l6.point || x.point === l7.point)), 'F2 casier « Super U » au nom seul : seul sur sa carte, « Adresse pas lue », jamais avec les Super U de Lille', J([l6, l7]));
         dit([['41100001', '510001'], ['XW511000003TS', '510003'], ['4110000400000', '510004'], ['41100006', '510006']].every(([k, c]) => { const x = L(k); return x && x.visible === c && x.texteCode === c; }), 'F3 le code se lit sur la ligne (sans toucher)', J(m.map((x) => [x.cle, x.texteCode])));
-        const al = await pg.evaluate(() => [...document.querySelectorAll('[data-relais-change-suivi]')].map((e) => ({ s: e.getAttribute('data-relais-change-suivi'), code: (e.querySelector('[data-relais-change-code]') || { getAttribute: () => null }).getAttribute('data-relais-change-code'), de: (e.querySelector('[data-relais-change-code-de]') || { getAttribute: () => null }).getAttribute('data-relais-change-code-de'), ancien: ((e.querySelector('[data-relais-change-ancien]') || {}).textContent || '') })));
+        // (13 nov.) Les colis « point changé » sont des lignes sous leur point (En route) : le code est sur la ligne.
+        await pg.evaluate(() => { document.querySelectorAll('.vrm-rpf details[data-rp-section="route"]').forEach((d) => { d.open = true; }); });
+        const al = await pg.evaluate(() => [...document.querySelectorAll('[data-rp-redirige="1"]')].map((e) => ({ s: String(e.getAttribute('data-cc-carte') || '').replace(/^r:rc:/, ''), code: (e.querySelector('[data-code-retrait]') || { getAttribute: () => null }).getAttribute('data-code-retrait'), de: e.getAttribute('data-rp-code-de') })));
         const c9 = al.find((x) => x.s === '41100009');
         // (arbitrage d, revue-colis) Le code d'un AUTRE e-mail du même n° n'est montré que s'il est daté APRÈS le changement de
         // point (il pourrait ne plus valoir) ; daté d'avant ⇒ « Code à confirmer », aucun code montré.
         const c10 = al.find((x) => x.s === '41100010');
-        dit(c10 && c10.code === '510010' && c10.de === 'autre-email' && /TABAC ANCIEN EXEMPLE/.test(c10.ancien), 'F4 « Point relais changé » : le code d’un autre e-mail du même n°, daté APRÈS le changement, et l’ancien point', J(al));
-        dit(c9 && !c9.code && c9.de === 'a-confirmer' && /TABAC ANCIEN EXEMPLE/.test(c9.ancien), 'F4 code d’un autre e-mail daté AVANT le changement ⇒ « Code à confirmer », jamais montré', J(c9));
+        dit(c10 && c10.code === '510010' && c10.de === 'autre-email', 'F4 « Point relais changé » : le code d’un autre e-mail du même n°, daté APRÈS le changement, sur la ligne', J(al));
+        dit(c9 && !c9.code && c9.de === 'a-confirmer', 'F4 code d’un autre e-mail daté AVANT le changement ⇒ aucun code montré', J(c9));
         const vieux = L('6A41100000801');
         dit(vieux && vieux.pasConfirme && /pas confirmé depuis le 8 nov/.test(vieux.verifie) && a && !a.pasConfirme, 'F5 vu il y a 4 jours, rien depuis ⇒ « pas confirmé depuis le 8 nov. » (ambre) ; un colis vu hier ne l’est pas', J([vieux, a && a.verifie]));
         // (intégration journee-perso — Julien : « des infos dans tous les sens ») Les sources et l'heure de la dernière
@@ -181,7 +183,7 @@ const lire = (pg) => pg.evaluate(() => {
         if (SHOTS) {
           await pg.evaluate(() => { const e = document.querySelector('.vrm-rpf-ligne[data-cc-carte]'); if (e) e.scrollIntoView({ block: 'start' }); window.scrollBy(0, -140); });
           await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `retraits-fiables-${nom}.png`) });
-          await pg.evaluate(() => { const e = document.querySelector('[data-relais-change-suivi]'); if (e) e.scrollIntoView({ block: 'center' }); });
+          await pg.evaluate(() => { const e = document.querySelector('[data-rp-redirige="1"]'); if (e) e.scrollIntoView({ block: 'center' }); });
           await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `retraits-fiables-change-${nom}.png`) });
         }
         // F6 masquer le point de Marseille : il part, sa trace reste, un toucher le rend

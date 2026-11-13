@@ -329,7 +329,7 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
   const surCarte = limiteSurCarte && !detail;
   const sousTitre = [avecLieu ? (x.lieuNom || '') : '', raison, surCarte && x.jours != null ? texteLimite(x.jours) : ''].filter(Boolean);
   const codeTxt = x.code ? x.code : x.qr ? 'QR code' : '';
-  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': x.redirige ? 'route' : 'retirer', 'data-rp-redirige': x.redirige ? '1' : undefined, 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
+  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': x.redirige ? 'route' : 'retirer', 'data-rp-redirige': x.redirige ? '1' : undefined, 'data-rp-code-de': x.redirige ? (x.codeDe || '') : undefined, 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
     // (2 nov.) Le transporteur LU de CE colis (src/transporteursVisuels.js) : la clé des statistiques.
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined };
@@ -434,7 +434,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   const marquesVues = marques.filter((m) => !(parSource && m === parSource && !texteVerifie(x.verifieMs, Date.now(), x.verifiePar).startsWith('pas')));
   const verifie = texteVerifie(x.verifieMs, Date.now(), x.verifiePar);
   const ancien = !x.horsCompte && verifieAncien(x.verifieMs);
-  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': x.redirige ? 'route' : 'retirer', 'data-rp-redirige': x.redirige ? '1' : undefined, 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
+  const attrs = { 'data-cc-carte': x.cle, 'data-cible': cibleRetrait(x.cle), 'data-cc-dans': x.redirige ? 'route' : 'retirer', 'data-rp-redirige': x.redirige ? '1' : undefined, 'data-rp-code-de': x.redirige ? (x.codeDe || '') : undefined, 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
     'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
     'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-ordre-t': x.arrivee != null ? String(x.arrivee) : '',  // (lot AJ) l'arrivée lue qui range la ligne
     'data-rp-sources': marques.join(','), 'data-rp-verifie': Number.isFinite(x.verifieMs) ? String(x.verifieMs) : '', 'data-rp-code-sur': x.code && x.codeSur ? '1' : undefined, 'data-rp-codes-desaccord': desaccord ? desaccord.map((d) => d.source + ':' + d.code).join(',') : undefined };
@@ -800,7 +800,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
                 <header className="vrm-rpf-tete">
                   <span className="vrm-rpf-ident">
                     <b className="vrm-rpf-nom" data-relais-nom="">{p.inconnu ? 'Nouveau point pas encore lu' : (nomEnseigne(p.nom) || p.adresseCourte || 'Point relais')}</b>
-                    {!p.inconnu && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
+                    {!p.inconnu && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}{p.nom && !p.adressePasLue ? <> · <a className="vrm-rpf-itineraire" href={lienItineraire([p.nom, p.adresse || p.adresseCourte].join(', '), appareilApple())} target="_blank" rel="noreferrer" data-relais-itineraire="" aria-label={`Itinéraire vers ${p.nom}`}>Itinéraire</a></> : null}</span> : null}
                   </span>
                   <span className="vrm-rpf-meta"><span className="vrm-rpf-n" data-relais-compte={p.arrives.length}>{plur(p.arrives.length, 'colis', 'colis')}</span></span>
                 </header>

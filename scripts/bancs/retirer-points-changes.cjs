@@ -146,7 +146,7 @@ const ouvrir = async (b, vp, sombre, quand) => {
         dit(red.length === 4 && red.every((l) => l.dans === 'route' && /^Colis Mondial Relay$/.test(l.titre) && l.marque === 'mondialrelay'), `${nom} : les 4 redirigés sont des lignes « Colis Mondial Relay » (logo MR) dans « En route »`, JSON.stringify(red.map((l) => [su(l), l.titre, l.marque, l.dans])));
         dit(red.length === 4 && red.every((l) => l.mention === 'En route · point changé' && !l.mentionAmbre), `${nom} : la mention « En route · point changé », neutre`, JSON.stringify(red.map((l) => [l.mention, l.mentionAmbre])));
         const d4 = red.find((l) => su(l) === '91000004'), sans = red.filter((l) => REDIR.includes(su(l)));
-        dit(!!d4 && d4.point === 'Intermarché | Le Portail, 35350 St Meloir des Ondes', `${nom} : sous son nouveau point, écrit « Intermarché · Le Portail, 35350 St Meloir des Ondes »`, d4 && d4.point);
+        dit(!!d4 && /^Intermarché \| Le Portail, 35350 St Meloir des Ondes( · Itinéraire)?$/.test(d4.point), `${nom} : sous son nouveau point, écrit « Intermarché · Le Portail, 35350 St Meloir des Ondes »`, d4 && d4.point);
         dit(sans.length === 3 && sans.every((l) => /^Nouveau point pas encore lu/.test(l.point)), `${nom} : sans point lu ⇒ sous « Nouveau point pas encore lu »`, JSON.stringify(sans.map((l) => l.point)));
         dit(!parSu['91000006'] && !parSu['91000007'], `${nom} : « Où vous livrer… » et le retiré ne sont nulle part`, JSON.stringify(parSu));
         const e5 = r.lignes.filter((l) => su(l) === '91000005');
