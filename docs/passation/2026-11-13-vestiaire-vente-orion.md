@@ -159,4 +159,4 @@ h. Version **5.374.0** partout (`CODE_VERSION`, manifeste, `EXT_ATTENDUE`, `lbc-
 - La vente du 2 nov. garde sa date fausse (21:00:32) jusqu'à la prochaine lecture de « Mes ventes »
   (alors remplacée par 14:17:41, `dateDe: 'ventes'`) — le jour, lui, est juste.
 - Si Vestiaire refuse aussi la relecture (rattrapage) sur l'iPhone : `vc_rattrapage_*` au diagnostic ;
-  passer par « Mes ventes » une seconde fois (changement d'onglet dans la page) suffit alors.
+  repasser par « Mes ventes » depuis un autre onglet de la page (requête au vol) devrait suffire — non prouvé sur l'appareil.
