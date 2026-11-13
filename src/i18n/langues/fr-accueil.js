@@ -101,6 +101,7 @@ export default {
   "accueil.note.telephone": "Le téléphone consulte ; les actions passent par l’ordinateur allumé, navigateur ouvert.",
   "accueil.offre.pro.phrase": "Comptes vendeurs illimités : tous tes comptes vendent, tout entre dans tes totaux.",
   "accueil.offre.solo.phrase": "Un compte vendeur par plateforme (un Vinted, un Leboncoin, un eBay, un Vestiaire) — ventes, annonces, colis à envoyer, offres et compta de ce compte — et autant de comptes d’achat que tu veux (leurs achats et leurs retraits).",
+  "accueil.offre.solo.supplement": "1 compte Vinted vendeur inclus · +{prix}/mois par compte de plus",
   "accueil.offres.bientot": " · bientôt",
   "accueil.offres.cgv": "conditions générales de vente",
   "accueil.offres.essai": ", une fois par e-mail et par compte Vinted. Sans engagement : tu résilies depuis l’app.",

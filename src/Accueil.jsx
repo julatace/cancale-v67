@@ -37,7 +37,7 @@ import ChoixLangue from './i18n/ChoixLangue.jsx';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, PRIX_PRO_MOIS, PRO_OUVERT, ESSAI_JOURS } from './accueil-reglages.js';
 // (9 nov.) Deux offres : Solo (un compte vendeur par plateforme + comptes d'achat) et Pro (les ventes de tous les comptes).
-import { OFFRES } from '../api/_lib/plan-regle.js';
+import { OFFRES, prixCompteSupTexte } from '../api/_lib/plan-regle.js';
 import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
 // (11 nov., lot temps-gagne) Le calculateur « le temps que VRM te fait gagner » : un morceau à
 // part, demandé à l'approche de sa section (le fichier d'entrée a un budget de poids).
@@ -514,6 +514,8 @@ export default function Accueil({ onEntrer }) {
                   {/* La phrase : en français CELLE du serveur (OFFRES) ; ailleurs sa traduction
                       (audit-traduction D9 : la clé française = la phrase du serveur). */}
                   <p data-offre-phrase={cle}>{langue === 'fr' ? OFFRES[cle].phrase : tr(`accueil.offre.${cle}.phrase`)}{ouvert ? '' : tr('accueil.offres.ouverture')}</p>
+                  {/* (13 nov., lot 56) Plusieurs comptes Vinted dès Solo : le supplément (une valeur, plan-regle.js). */}
+                  {cle === 'solo' && <p className="av-supplement" data-solo-supplement="">{langue === 'fr' ? OFFRES.solo.supplement : tr('accueil.offre.solo.supplement').replace('{prix}', prixCompteSupTexte())}</p>}
                 </article>
               ))}
             </div>

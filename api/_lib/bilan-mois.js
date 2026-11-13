@@ -7,10 +7,15 @@
 // Compta. Ce n'est PAS la « sauvegarde hebdomadaire envoyée chez lui » refusée
 // le 11 octobre (§3) : aucune donnée, aucun fichier — un résumé de chiffres.
 //
-// ⚠️ ÉTEINT PAR DÉFAUT. Le choix vit dans la ligne `bilan_mois_choix` du vendeur,
-//    écrite par le SERVEUR seul (api/compte.js `?mode=bilan-mois` : sa session
-//    depuis Réglages, ou le lien signé « ne plus recevoir » de l'e-mail). Ligne
-//    absente, illisible ou `actif !== true` ⇒ rien n'est lu, rien ne part.
+// ⚠️ LE DÉFAUT (13 nov., lot 53 — VRM s'ouvre à d'autres vendeurs) : ACTIVÉ pour
+//    les comptes CRÉÉS depuis le 13 novembre 2026 (`DEFAUT_ACTIF_DEPUIS`, date de
+//    création lue chez Supabase Auth), ÉTEINT pour les comptes d'avant (rien ne
+//    change pour qui n'a rien choisi). Le choix vit dans la ligne
+//    `bilan_mois_choix` du vendeur, écrite par le SERVEUR seul (api/compte.js
+//    `?mode=bilan-mois` : sa session depuis Réglages, ou le lien signé « ne plus
+//    recevoir » de l'e-mail) ; un choix posé gagne toujours sur le défaut.
+//    Ligne illisible, ou date de création pas sue ⇒ rien ne part (« pas su » ne
+//    vaut pas « oui ») ; éteint ⇒ aucune vente n'est lue.
 // ⚠️ LES RÈGLES NE SONT PAS ICI (§5, §11) :
 //    · vendu / reçu = `calculerBilan` (api/_lib/bilan-semaine.js), lui-même le
 //      miroir EXACT de `ventesFaites` / `ventesDeclarables` de l'app
@@ -20,8 +25,15 @@
 //      son propriétaire) cumulée par `beneficeDesJours`, recopiée de l'app par
 //      script (api/_lib/benefice-regle.js, `audit-bilan-mois.cjs --recopie`) :
 //      vente − prix d'achat, SEULEMENT sur les ventes au prix d'achat connu ;
-//      des prix manquent ⇒ « au moins … (N prix d'achat manquent) » ; aucun
-//      prix d'achat, ou jamais publié ⇒ « — » et la raison, jamais 0 € ;
+//      des prix manquent ⇒ le brut connu, sa couverture (« sur 4 ventes de 6 »)
+//      et le manque NOMMÉ — ⚠️ (13 nov.) jamais « au moins » devant un bénéfice
+//      (src/beneficeNoms.js : une vente au prix d'achat inconnu peut être à
+//      perte, ce n'est pas un plancher) ; aucun prix d'achat, ou jamais publié
+//      ⇒ « — » et la raison, jamais 0 € ;
+//    · temps gagné = SEULEMENT les gestes MESURÉS de la règle du calculateur
+//      (src/accueil/tempsGagne.js, `nature: 'mesurée'`) × le nombre de ventes
+//      du mois ; aucun geste mesuré (aujourd'hui) ou ventes pas sues ⇒ la ligne
+//      n'est PAS écrite (une estimation raisonnée n'est pas un temps gagné) ;
 //    · « pas su » ⇒ « — », jamais un 0 inventé.
 // ⚠️ LE CANAL EXISTANT : le même serveur SMTP que les e-mails de l'essai
 //    (`RELANCES_SMTP_*`, `RELANCES_EXPEDITEUR`), la même adresse — celle DU
@@ -41,6 +53,9 @@ import { beneficeDesJours } from './benefice-regle.js';
 import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
 import { sbCle } from './cle.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { lienNotif } from './lien-notif.js';
+// (13 nov., lot 53) La règle du temps gagné (page d'accueil) : un module pur, la MÊME.
+import { GESTES as GESTES_TEMPS } from '../../src/accueil/tempsGagne.js';
 
 export const SITE = 'https://vrm.center';
 export const ID_CHOIX = 'bilan_mois_choix';
@@ -48,6 +63,33 @@ export const ID_ENVOIS = 'bilan_mois_envois';
 export const JOUR_MAX = 7;                       // rattrapage du 2 au 7
 export const PART_MAX_BILAN = 150;               // au plus, par passage du matin
 export const PLAFOND_JOUR_DEFAUT = 300;          // Brevo gratuit : 300 / jour, tout VRM
+// (13 nov., lot 53) Les comptes créés depuis ce jour reçoivent le bilan par défaut.
+export const DEFAUT_ACTIF_DEPUIS = '2026-11-13T00:00:00+01:00';
+
+// Le choix EFFECTIF : true · false · null (pas su ⇒ rien ne part).
+// `choix` : objet (posé) · null (jamais choisi) · undefined (illisible).
+// `creeLe` : la date de création du compte (Supabase Auth) ; absente = pas sue.
+export function choixEffectif(choix, creeLe) {
+  if (choix === undefined) return null;
+  if (choix && typeof choix === 'object' && typeof choix.actif === 'boolean') return choix.actif;
+  const t = Date.parse(String(creeLe || ''));
+  if (!Number.isFinite(t)) return null;
+  return t >= Date.parse(DEFAUT_ACTIF_DEPUIS);
+}
+// L'adresse du récap du mois DANS l'app (Compta → Bilan du mois, CE mois-là), par
+// le contrat des notifications (api/_lib/lien-notif.js ⇔ src/cibleNotif.js).
+export const lienRecapMois = (ym) => SITE + lienNotif('compta', { cible: 'bilanmois', mois: /^\d{4}-\d{2}$/.test(String(ym || '')) ? ym : '' });
+
+// ── LE TEMPS GAGNÉ, SEULEMENT S'IL EST MESURÉ ───────────────────────────────
+// Les gestes « par vente » dont la durée est MESURÉE (chronométrée, datée) dans la
+// règle du calculateur ; × les ventes du mois (seulement si elles sont toutes lues).
+// `null` ⇒ la ligne n'existe pas. `gestes` : pour le banc (une règle mutée).
+export function tempsGagneMesure(vendu, gestes = GESTES_TEMPS) {
+  const mesures = (Array.isArray(gestes) ? gestes : []).filter((g) => g && g.nature === 'mesurée' && g.par === 'vente' && Number(g.sans) > Number(g.avec));
+  if (!mesures.length || !vendu || vendu.etat !== 'su' || !(Number(vendu.n) > 0)) return null;
+  const secondes = mesures.reduce((t, g) => t + Number(vendu.n) * (Number(g.sans) - Number(g.avec)), 0);
+  return { minutes: Math.round(secondes / 60), gestes: mesures.map((g) => g.id), n: Number(vendu.n) };
+}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
@@ -108,7 +150,7 @@ export function calculerBilanMois({ d, pub, mois, maintenant = Date.now() }) {
     }
     meilleure = { eur: best.eur, plateforme: best.plateforme, titre };
   }
-  return { mois: mois.ym, libelle: mois.libelle, vendu: b.vendu, recu: b.recu, benefice, meilleure };
+  return { mois: mois.ym, libelle: mois.libelle, vendu: b.vendu, recu: b.recu, benefice, meilleure, temps: tempsGagneMesure(b.vendu) };
 }
 export const bilanMoisAEnvoyer = (b) => !!b && (b.vendu.etat !== 'pas-su' || b.recu.etat !== 'pas-su');
 
@@ -125,7 +167,8 @@ const liste = (xs, max = 3) => (xs.length <= max ? xs.join(', ') : `${xs.slice(0
 // « sur 4 ventes de 6 » : les ventes dont le prix d'achat est connu, sur toutes.
 const couverture = (be) => (Number.isInteger(be.n) && Number.isInteger(be.nCout) && be.n > 0 ? `sur ${be.nCout} vente${be.nCout > 1 ? 's' : ''} de ${be.n}` : '');
 export const deMois = (libelle) => (/^[aeiouyàâéèêîôû]/i.test(String(libelle)) ? 'd’' : 'de ') + libelle;
-export function texteBilanMois(b, { lien = '' } = {}) {
+const duree = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, '0')}` : ''}`);
+export function texteBilanMois(b, { lien = '', parDefaut = false } = {}) {
   // « Au moins 0 » ne se dit jamais (§5) : un total partiel nul s'écrit « — ».
   const val = (etat, x, f) => (etat === 'pas-su' || (etat === 'partiel' && !(Math.abs(Number(x)) > 0)) ? '—' : `${etat === 'partiel' ? 'au moins ' : ''}${f(x)}`);
   const v = b.vendu, r = b.recu, be = b.benefice;
@@ -135,21 +178,26 @@ export function texteBilanMois(b, { lien = '' } = {}) {
     ['Reçu', val(r.etat, r.eur, euros), r.etat === 'pas-su' ? 'versements pas lus' : 'versé ce mois-ci'],
     // (8 nov.) La COUVERTURE à côté du chiffre (§5) : « sur 4 ventes de 6 » et le manque nommé ;
     // un partiel nul s'écrit « — » comme les autres (« au moins 0,00 € » ne se dit jamais).
-    ['Bénéfice brut', be.etat === 'pas-su' ? '—' : val(be.etat, be.brut, euros), be.etat === 'pas-su' ? be.raison
+    // (13 nov.) Jamais « au moins » devant un bénéfice (src/beneficeNoms.js) : le brut
+    // connu, sa couverture et le manque nommé ; un partiel nul s'écrit « — ».
+    ['Bénéfice brut', be.etat === 'pas-su' || (be.etat === 'partiel' && !(Math.abs(Number(be.brut)) > 0)) ? '—' : euros(be.brut), be.etat === 'pas-su' ? be.raison
       : be.etat === 'partiel' ? [couverture(be), ...be.manque].filter(Boolean).join(' · ') : `vente − prix d’achat${be.n ? `, sur ${be.n} vente${be.n > 1 ? 's' : ''}` : ''}`],
   ];
   if (b.meilleure) chiffres.push(['Ta plus belle vente', euros(b.meilleure.eur), [b.meilleure.titre, b.meilleure.plateforme].filter(Boolean).join(' · ')]);
+  // (13 nov., lot 53) Le temps gagné : seulement MESURÉ (sinon la ligne n'existe pas).
+  if (b.temps && b.temps.minutes > 0) chiffres.push(['Temps gagné', `≈ ${duree(b.temps.minutes)}`, `mesuré, sur ${b.temps.n} vente${b.temps.n > 1 ? 's' : ''}`]);
   const manque = [...new Set([...(v.etat === 'partiel' ? v.manque : []), ...(r.etat === 'partiel' ? r.manque : [])])];
   const suite = [];
   if (manque.length) suite.push(`« Au moins » : il manque ${liste(manque)}. Le détail est dans Compta.`);
+  if (be.etat === 'partiel') suite.push('Le bénéfice brut ne compte que les ventes dont tu as noté le prix d’achat : ce n’est pas un minimum (une vente au prix d’achat inconnu peut être à perte).');
   suite.push('Les chiffres suivent les règles de l’app : vendu au jour de la vente, reçu au jour du versement, bénéfice sur les ventes dont tu as noté le prix d’achat.');
   const titre = `Ton mois ${deMois(b.libelle)}`;
   // Le préentête : les deux chiffres qui comptent, tels qu'écrits dans le tableau.
   const preentete = `Vendu : ${chiffres[1][1]} · Reçu : ${chiffres[2][1]}`;
   const { texte, html } = gabaritEmail({
     titre, preentete, paras: [`Le résumé ${deMois(b.libelle)}, compté par VRM sur tous tes comptes.`], chiffres, suite, facultatif: true,
-    bouton: { mot: 'Ouvrir la Compta', url: `${SITE}/?tab=compta` },
-    pied: { texte: 'Tu reçois ce bilan parce que tu l’as activé dans VRM (Réglages → Notifications).', ...(lien ? { lien, motLien: 'ne plus recevoir ce bilan' } : {}) },
+    bouton: { mot: 'Voir le récap du mois', url: lienRecapMois(b.mois) },
+    pied: { texte: parDefaut ? 'Tu reçois ce bilan mensuel parce qu’il est activé dans VRM (Réglages → Notifications → Bilan mensuel par e-mail).' : 'Tu reçois ce bilan mensuel parce que tu l’as activé dans VRM (Réglages → Notifications).', ...(lien ? { lien, motLien: 'ne plus recevoir ce bilan' } : {}) },
   });
   return { sujet: `Ton bilan ${deMois(b.libelle)}`, texte, html };
 }
@@ -191,7 +239,14 @@ export async function bilanMoisVendeur({ owner, maintenant = Date.now(), lireCho
   if (mois.jour > JOUR_MAX) return null;                           // hors de la fenêtre : on ne lit RIEN
   const choix = await lireChoix();
   if (choix === undefined) return 'réglage illisible — rien';
-  if (!choix || choix.actif !== true) return 'éteint';            // le défaut : aucun envoi, aucune lecture
+  // (13 nov., lot 53) Jamais choisi ⇒ le défaut, selon la date de création du compte
+  // (lue avec son adresse, une seule lecture). Éteint ⇒ aucune vente n'est lue.
+  const pose = !!(choix && typeof choix === 'object' && typeof choix.actif === 'boolean');
+  let adr = null;
+  if (!pose) adr = await adresse();
+  const actif = choixEffectif(choix, adr && adr.creeLe);
+  if (actif === null) return 'défaut pas su — rien';
+  if (!actif) return 'éteint';
   if (!config || !config.pret) return 'envoi non configuré';
   const envois = await lireEnvois();
   if (envois === undefined) return 'mémo illisible — rien';
@@ -203,11 +258,11 @@ export async function bilanMoisVendeur({ owner, maintenant = Date.now(), lireCho
   const pub = await lirePub();
   const b = calculerBilanMois({ d, pub: pub === undefined ? null : pub, mois, maintenant });
   if (!bilanMoisAEnvoyer(b)) return 'données illisibles — réessai demain';
-  const adr = await adresse();
+  if (!adr) adr = await adresse();
   if (!adr || adr.etat !== 'ok') return `adresse ${adr ? adr.etat : 'pas su'}`;
   const lien = lienBilan(owner, service);
   if (!lien) return 'lien de désinscription impossible — rien';
-  const t = texteBilanMois(b, { lien });
+  const t = texteBilanMois(b, { lien, parDefaut: !pose });
   // Le plafond se prend AVANT tout envoi (les vendeurs passent 8 à la fois).
   if (compteur.reste <= 0) return 'plafond du jour — demain';
   compteur.reste -= 1;
@@ -222,11 +277,11 @@ export async function bilanMoisVendeur({ owner, maintenant = Date.now(), lireCho
   const fin = issue === 'refuse' ? base : { ...base, [mois.ym]: { at: new Date(maintenant).toISOString(), issue } };
   if (issue === 'refuse') compteur.reste += 1;
   await ecrireEnvois({ mois: fin });
-  return { mois: mois.ym, issue, vendu: b.vendu.etat, recu: b.recu.etat, benefice: b.benefice.etat };
+  return { mois: mois.ym, issue, vendu: b.vendu.etat, recu: b.recu.etat, benefice: b.benefice.etat, ...(pose ? {} : { parDefaut: true }) };
 }
 
 // ── LE CHOIX DU VENDEUR (écrit par le serveur seul : sa session, ou le lien signé) ──
-// Trois états à la lecture : objet · null (jamais choisi ⇒ ÉTEINT) · undefined (pas su).
+// Trois états à la lecture : objet · null (jamais choisi ⇒ le défaut, `choixEffectif`) · undefined (pas su).
 const URL_BASE = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 async function ligne(owner, id) {
   const service = process.env.SUPABASE_SERVICE_KEY || '';

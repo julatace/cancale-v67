@@ -7,7 +7,7 @@
 //     son état, et « Tout récupérer » pour le compte ouvert sur vinted.fr.
 // Une lecture projetée (jamais `select=data`), relue quand l'extension le dit
 // (`vrm:ext` quoi='import'), au retour sur l'écran, et chaque minute en cours.
-// 5.373 (13 nov., lot 47) — « Import de ton passé » : la tête dit
+// 5.375 (13 nov., lot 47) — « Import de ton passé » : la tête dit
 // « Import de ton passé · 340 / ~1 200 ventes · compte X », chaque type sa barre
 // (sur l'estimation) et « 4 pages sur ~12 », les annonces une ligne, le souci
 // ou la pause « suite dans 40 min ». Fini ⇒ « Ton passé est importé (12 mois) »
@@ -15,7 +15,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { typeEnTete, lireImportDepart, importsAMontrer, phraseImport, texteType, pctType, butType, pagesType, titreImport, texteAnnonces, marquerImportsVus, CLE_IMPORT_VU } from './importDepart.js';
-import { lireTout, load, save, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, extSait, Bouton } from './App.jsx';
+import { EXT_CAPACITES, lireTout, load, save, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, extSait, Bouton } from './App.jsx';
 import './styles-import-depart.css';
 
 function useImportDepart(uids) {
@@ -49,7 +49,7 @@ function useImportDepart(uids) {
   return [etats, () => setTour((t) => t + 1)];
 }
 
-// 5.373 : `dejaDit` — le chiffre est déjà dans la tête (« 340 / ~1 200 ventes ») : la ligne ne
+// 5.375 : `dejaDit` — le chiffre est déjà dans la tête (« 340 / ~1 200 ventes ») : la ligne ne
 // le redit pas (§7, un nombre une fois), elle dit les pages à sa place.
 function Barre({ t, nom, dejaDit = false }) {
   const pc = pctType(t);
@@ -74,7 +74,7 @@ function Barre({ t, nom, dejaDit = false }) {
   );
 }
 
-// 5.373 : les annonces (lecture complète du dressing, d'un trait).
+// 5.375 : les annonces (lecture complète du dressing, d'un trait).
 function LigneAnnonces({ a }) {
   if (!a) return null;
   return (
@@ -122,7 +122,7 @@ export default function ImportDepart({ comptes = [], variante = 'journee' }) {
   const [issue, setIssue] = React.useState(null);
   const labels = load('vinted_account_labels', {}) || {};
 
-  // 5.373 : ce qui était déjà VU à l'ouverture de l'écran (le message de fin reste
+  // 5.375 : ce qui était déjà VU à l'ouverture de l'écran (le message de fin reste
   // sous les yeux pendant cette visite, puis ne revient plus).
   const [vusOuverture] = React.useState(() => load(CLE_IMPORT_VU, {}) || {});
   const montres = variante === 'journee' ? importsAMontrer(etats, Date.now(), vusOuverture) : [];
@@ -163,7 +163,7 @@ export default function ImportDepart({ comptes = [], variante = 'journee' }) {
     <div className="vrm-imp vrm-imp-reglages" data-import-reglages={uids.length} data-import-sait={sait}>
       <p className="vrm-imp-note">Tes 12 derniers mois, lus une fois par l’extension. « Tout récupérer » lit plus ancien.</p>
       {rx ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext={rx.code || ''}>{rx.texte}</p> : null}
-      {!rx && extSait('importpasse') !== 'ok' ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext="passe">Mets l’extension à jour (5.373.0) pour les 12 mois et les annonces.</p> : null}
+      {!rx && extSait('importpasse') !== 'ok' ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext="passe">Mets l’extension à jour ({EXT_CAPACITES.importpasse}) pour les 12 mois et les annonces.</p> : null}
       {etats === null ? <p className="vrm-imp-note" role="status" data-import-passu="">Pas su pour l’instant : la base n’a pas répondu.</p> : null}
       {!uids.length ? <p className="vrm-imp-note">Aucun compte Vinted relié.</p> : null}
       {uids.map((uid) => {

@@ -39,7 +39,7 @@ const FINALISEE = "Commande finalisée - l'acheteur a validé la commande";
 const VENTES = Array.from({ length: N_VENTES }, (_, i) => ({ transaction_id: 500000 - i, title: 'Paire ' + i, status: FINALISEE, date: new Date(Date.UTC(2026, 9, 30) - i * 86400000 / 4).toISOString() }));
 const ACHATS = Array.from({ length: N_ACHATS }, (_, i) => ({ transaction_id: 900000 - i, title: 'Achat ' + i, status: FINALISEE, date: new Date(Date.UTC(2026, 9, 30) - i * 86400000).toISOString() }));
 const ANNONCES = Array.from({ length: 49 }, (_, i) => ({ id: 7000 + i, title: 'Annonce ' + i, price: { amount: '50.0', currency_code: 'EUR' } }));
-// 5.373 : un dressing déjà rangé EN ENTIER (compteur ≥ total) — l'import n'y lit rien.
+// 5.375 : un dressing déjà rangé EN ENTIER (compteur ≥ total) — l'import n'y lit rien.
 const LISTINGS_COMPLET = { nItems: 49, payload: { pagination: { total_entries: 49 }, items: ANNONCES } };
 const pageDe = (liste, page, per) => {
   const p = Math.max(1, Number(page) || 1), pp = Math.min(100, Number(per) || 20);
@@ -47,7 +47,7 @@ const pageDe = (liste, page, per) => {
 };
 const vintedAvec = (stat) => (r) => {
   const u = new URL('https://x' + r.chemin);
-  // 5.373 : les annonces (le dressing, lu d'un trait quand la base ne l'a pas en entier).
+  // 5.375 : les annonces (le dressing, lu d'un trait quand la base ne l'a pas en entier).
   if (/^\/api\/v2\/wardrobe\/[^/]+\/items$/.test(u.pathname)) { const pa = Number(u.searchParams.get('page')) || 1; return { status: 200, body: { items: ANNONCES.slice((pa - 1) * 100, pa * 100), pagination: { current_page: pa, total_entries: ANNONCES.length, total_pages: Math.ceil(ANNONCES.length / 100) } } }; }
   if (u.pathname !== '/api/v2/my_orders') return { status: 404, body: {} };
   const type = u.searchParams.get('type'), page = u.searchParams.get('page');
@@ -275,7 +275,7 @@ const MUTATIONS = [
     for (const [nom, de, vers, de2, vers2] of MUTATIONS) {
       if (!texte.includes(de) || (de2 && !texte.includes(de2))) { koMut++; console.log(`❌ mutation « ${nom} » : la ligne est introuvable — le contrôle ne prouve rien`); continue; }
       const f = path.join(dir, 'background.js');
-      let t2 = texte.replace(de, vers); if (de2) t2 = t2.split(de2).join(vers2);   // 5.373 : la 2e paire partout (plusieurs `rows.find(`)
+      let t2 = texte.replace(de, vers); if (de2) t2 = t2.split(de2).join(vers2);   // 5.375 : la 2e paire partout (plusieurs `rows.find(`)
       fs.writeFileSync(f, t2);
       const log = console.log; console.log = () => {};
       let m; try { m = await lancer(f); } finally { console.log = log; }

@@ -43,6 +43,10 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 l'installation, 5/h/compte, notifié) ; GET la
 //                                 liste et POST {action:'traite'} au PROPRIÉTAIRE
 //                                 seul — voir api/_lib/signalement.js
+//   /api/compte?mode=aide         (GET/POST, session) « ÉCRIRE AU SUPPORT » (13 nov.) :
+//                                 POST envoyer (rangé chez LUI, 5/h, scellé) ; GET la
+//                                 liste et POST {action:'traitee'} au PROPRIÉTAIRE seul —
+//                                 api/_lib/demande-aide.js, règle src/demandeAide.js
 //   /api/compte?mode=rapport-extension (GET/POST, session) « ENVOYER UN RAPPORT » de
 //                                 l'extension (5.371) : POST l'état technique (liste
 //                                 blanche, 6/h, une ligne par vendeur) ; GET sa ligne,
@@ -100,6 +104,8 @@ import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov.,
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
 import { envoyerSignalement, listerSignalements, marquerTraite, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+// (13 nov., lot 55) « Écrire au support » : la question, cinq faits techniques, rangée chez LUI (api/_lib/demande-aide.js).
+import { envoyerDemandeAide, listerDemandesAide, marquerDemandeTraitee } from './_lib/demande-aide.js';
 import { recevoirRapportExt, listerRapportsExt } from './_lib/rapport-extension.js';   // (12 nov., ext. 5.371) « Envoyer un rapport »
 import { routeAlertes } from './_lib/alertes-production.js';
 import { routePilotage } from './_lib/pilotage.js';
@@ -110,13 +116,13 @@ import { statutPourSante } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
-import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
+import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan, choixEffectif } from './_lib/bilan-mois.js';
 import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
-import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
+import { codeDe, suiviDe, parrainageOuvert, rattacher, factureFilleulPayee, apercuCode, poserNom, nomDe, filleulsDe, filleulDetail } from './_lib/parrainage.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
-import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur } from './_lib/plan-regle.js';
+import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur, PRIX_COMPTE_SUP_CENTIMES, CLE_PRIX_COMPTE_SUP, COMPTES_INCLUS_SOLO, META_COMPTES_SUP, MAX_COMPTES_SUP, estPrixCompteSup } from './_lib/plan-regle.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 import { empreinte } from './_lib/empreinte.js';   // (11 nov.) clé d'idempotence avec les paramètres
 
@@ -211,7 +217,9 @@ async function abonnementStripeDe(ligne) {
 }
 function prixDeLAbonnement(sub) {
   if (!sub) return null;
-  const articles = sub.items && Array.isArray(sub.items.data) ? sub.items.data : [];
+  // (13 nov., lot 56) L'article « comptes Vinted de plus » ne change pas le prix
+  // de l'OFFRE : il est dit à part (`comptesSup` de `mode=abonnement`).
+  const articles = (sub.items && Array.isArray(sub.items.data) ? sub.items.data : []).filter((x) => !(x && estPrixCompteSup(x.price || x.plan)));
   if (articles.length !== 1) return null;
   const a = articles[0], p = a && (a.price || a.plan);
   if (!p || (a.quantity != null && a.quantity !== 1)) return null;
@@ -271,6 +279,37 @@ async function offrePro() {
   if (!prixProConforme(p)) return { ouvert: false, raison: 'prix-different', texte: null, texteStripe: prixTexte(p) };
   return { ouvert: true, raison: null, texte: prixTexte(p), id: p.id };
 }
+// ── (13 nov., lot 56) LES COMPTES VINTED DE PLUS EN SOLO ────────────────────
+// Le prix Stripe de clé de recherche `vrm_compte_sup` (ou l'identifiant posé dans
+// `STRIPE_PRIX_COMPTE_SUP`). Le supplément ne s'achète QUE si Stripe dit exactement
+// `PRIX_COMPTE_SUP_CENTIMES` (api/_lib/plan-regle.js, la seule valeur) en euros, par
+// mois. Prix absent ⇒ « bientôt » : rien ne s'achète, rien n'est prélevé.
+export const PRIX_COMPTE_SUP_CGV = { centimes: PRIX_COMPTE_SUP_CENTIMES, devise: 'eur', intervalle: 'month' };
+const prixSupCle = () => String(process.env.STRIPE_PRIX_COMPTE_SUP || '').trim() || CLE_PRIX_COMPTE_SUP;
+export const prixSupConforme = (p) => !!(p
+  && p.centimes === PRIX_COMPTE_SUP_CGV.centimes
+  && String(p.devise || '').toLowerCase() === PRIX_COMPTE_SUP_CGV.devise
+  && p.intervalle === PRIX_COMPTE_SUP_CGV.intervalle
+  && (p.nIntervalles == null || p.nIntervalles === 1));
+async function lirePrixCompteSup() {
+  const cle = prixSupCle();
+  const r = /^price_/.test(cle)
+    ? await stripeApi('GET', `prices/${encodeURIComponent(cle)}`)
+    : await stripeApi('GET', 'prices', { 'lookup_keys[]': cle, active: 'true', limit: 1 });
+  const p = !r.ok || !r.data ? null : (Array.isArray(r.data.data) ? r.data.data[0] : r.data);
+  return p && p.id && p.active !== false && (p.lookup_key === CLE_PRIX_COMPTE_SUP || /^price_/.test(cle)) ? { id: p.id, lookup_key: p.lookup_key || null, ...lirePrixStripe(p) } : null;
+}
+// L'offre « compte de plus » : ouverte (prix lu, conforme) ou fermée, avec la raison
+// (le geste du propriétaire). `prixCentimes` : la valeur de VRM, toujours dite.
+async function offreCompteSup() {
+  const base = { prixCentimes: PRIX_COMPTE_SUP_CENTIMES, cle: CLE_PRIX_COMPTE_SUP };
+  if (!stripePret()) return { ...base, ouvert: false, raison: 'stripe', texte: null };
+  const p = await lirePrixCompteSup();
+  if (!p) return { ...base, ouvert: false, raison: 'sans-prix-stripe', texte: null };
+  if (!prixSupConforme(p)) return { ...base, ouvert: false, raison: 'prix-different', texte: null, texteStripe: prixTexte(p) };
+  return { ...base, ouvert: true, raison: null, texte: prixTexte(p), id: p.id };
+}
+
 // Les options de la règle : quel prix est Pro, quelle clé est Solo.
 const optsPlan = () => ({ prixPro: prixProCle(), cleSolo: PRIX_CLE || CLE_PRIX_SOLO });
 export const prixConforme = (p) => !!(p
@@ -545,10 +584,18 @@ async function vintedPris(req, res) {
   } catch (_) { return pasSu(); }
 }
 
-const comptesVendeursLigne = (autres) => {
+const comptesVendeursLigne = (autres, sup) => {
   const o = {};
   for (const p of PLATEFORMES_SOLO) if (autres && autres[p] && autres[p].id) o[p] = autres[p].id;
+  // (13 nov., lot 56) Les comptes Vinted vendeurs de plus (bornés à la quantité payée) :
+  // les bilans et notifications du serveur les lisent (`regleDuVendeur`).
+  if (sup && Array.isArray(sup.liste) && sup.liste.length) o.vinted_sup = sup.liste.slice();
   return o;
+};
+// Ce que l'app lit des comptes de plus : payés, liste, places libres.
+const comptesSupApp = (lu) => {
+  const s = (lu && lu.comptesSup) || { payes: 0, liste: [] };
+  return { inclus: COMPTES_INCLUS_SOLO, payes: s.payes, liste: s.liste.slice(), libres: Math.max(0, s.payes - s.liste.length), max: MAX_COMPTES_SUP };
 };
 // Ce que l'app lit : { plateforme: { id, le, prochainChangement } } (choisies seulement).
 const comptesVendeursApp = (autres) => {
@@ -565,7 +612,7 @@ const ligneDeLAbonnement = (sub, livemode) => ({
   // (9 nov., Solo par plateforme) Le compte vendeur de Leboncoin, eBay, Vestiaire
   // (migration 030, `jsonb`) : { leboncoin: id, ebay: ref, vestiaire: id }, seulement
   // les plateformes CHOISIES. Sans la 030 : l'écriture se refait sans cette colonne.
-  comptes_vendeurs: comptesVendeursLigne(planDeLAbonnement(sub, optsPlan()).autres),
+  comptes_vendeurs: comptesVendeursLigne(planDeLAbonnement(sub, optsPlan()).autres, planDeLAbonnement(sub, optsPlan()).comptesSup),
   statut: String(sub.status || 'incomplete'),
   client_stripe: typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || null,
   abonnement_stripe: sub.id || null,
@@ -638,7 +685,7 @@ async function abonnement(req, res) {
   if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
   // Le prix de l'OFFRE (clé `vrm_mensuel`) et celui de SON abonnement, lus
   // ensemble : ce ne sont pas les mêmes quand l'offre a changé depuis.
-  const [prix, sub, pro] = stripePret() ? await Promise.all([lirePrix(), abonnementStripeDe(ligne), offrePro()]) : [null, null, await offrePro()];
+  const [prix, sub, pro, sup] = stripePret() ? await Promise.all([lirePrix(), abonnementStripeDe(ligne), offrePro(), offreCompteSup()]) : [null, null, await offrePro(), await offreCompteSup()];
   const prixAbo = prixDeLAbonnement(sub);
   // (9 nov.) LE PLAN : lu du PRIX Stripe réel de son abonnement (jamais d'un
   // champ du navigateur). Propriétaire : Pro. Pas su ⇒ `null` (rien n'est bridé).
@@ -726,10 +773,16 @@ async function abonnement(req, res) {
       : null,
     // (9 nov., Solo par plateforme) Les comptes vendeurs Leboncoin / eBay / Vestiaire.
     comptesVendeurs: !acc.proprietaire && lu ? comptesVendeursApp(lu.autres) : {},
+    // (13 nov., lot 56) Les comptes Vinted vendeurs DE PLUS (Solo) : la quantité PAYÉE
+    // chez Stripe et la liste (déjà bornée à cette quantité par la règle). Pro : rien.
+    comptesSup: !acc.proprietaire && lu && lu.plan === PLAN_SOLO ? comptesSupApp(lu) : null,
     offres: {
       solo: { texte: prix && conforme ? prixTexte(prix) : null, ouvert: !!(prix && conforme) },
       // Le geste qui manque (`raison`) ne part qu'au propriétaire.
       pro: { ouvert: pro.ouvert, texte: pro.ouvert ? pro.texte : null, raison: acc.proprietaire ? pro.raison : undefined, texteStripe: acc.proprietaire ? (pro.texteStripe || null) : undefined },
+      // (13 nov., lot 56) Un compte Vinted vendeur de plus, en Solo. Fermé ⇒ « bientôt ».
+      compteSup: { ouvert: sup.ouvert, texte: sup.ouvert ? sup.texte : null, prixCentimes: sup.prixCentimes, inclus: COMPTES_INCLUS_SOLO, max: MAX_COMPTES_SUP,
+        raison: acc.proprietaire ? sup.raison : undefined, cle: acc.proprietaire ? sup.cle : undefined, texteStripe: acc.proprietaire ? (sup.texteStripe || null) : undefined },
     },
   });
 }
@@ -746,7 +799,8 @@ async function abonnement(req, res) {
 // 9 novembre : deux offres, Solo (un compte vendeur + comptes d'achat) et Pro
 //   (les ventes de tous les comptes, prix à venir) — `CGV_PLANS_DEPUIS`.
 // 10 novembre (20 h, décision de Julien) : Pro = tous les comptes vendeurs, sans limite.
-const CGV_VERSION = '2026-11-10';
+// 13 novembre (lot 56) : option Solo « compte Vinted vendeur de plus » (3 € / mois, à confirmer).
+const CGV_VERSION = '2026-11-13';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -934,10 +988,88 @@ async function compteVendeurAutre(req, res, u, corps) {
   if (!(relu.autres && relu.autres[plateforme] && relu.autres[plateforme].id === id)) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré ton choix : rien n'a changé. Réessaie dans un instant." });
   return repondre(res, 200, { ok: true, comptesVendeurs: comptesVendeursApp(relu.autres) });
 }
+// ── (13 nov., lot 56) SOLO : UN COMPTE VINTED VENDEUR DE PLUS, PAYÉ ──────────
+// POST { action: 'ajouter-sup', uid, cgv: true } : ce compte Vinted (à LUI) vend
+// aussi. Une place déjà payée et libre ⇒ seulement rangé ; sinon la quantité de
+// l'article `vrm_compte_sup` de SON abonnement monte de 1 (prorata, CGV cochées) —
+// et seulement si le prix existe chez Stripe et vaut `PRIX_COMPTE_SUP_CENTIMES`
+// (sinon « bientôt » : rien ne part, rien n'est prélevé).
+// POST { action: 'retirer-sup', uid } : il ne vend plus ; la quantité redescend au
+// nombre de comptes restants (prorata ; l'article part à 0).
+// ⚠️ LA LIMITE EST ICI ET DANS LA RÈGLE, JAMAIS SEULEMENT À L'ÉCRAN : la liste
+//    rangée ne dépasse jamais la quantité payée (`planDeLAbonnement` la borne aussi
+//    à la lecture) ; Pro : rien à ajouter (illimité) ; propriétaire : rien.
+async function vintedSiens(req) {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id`, { headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    const j = r.ok ? await r.json() : null;
+    return Array.isArray(j) ? new Set(j.map((x) => String(x && x.vinted_user_id))) : null;
+  } catch (_) { return null; }
+}
+const RIEN_CHANGE = "rien n'a changé, rien n'a été prélevé";
+async function compteVendeurSup(req, res, u, corps) {
+  const ajouter = corps.action === 'ajouter-sup';
+  const uid = String(corps.uid || '').trim();
+  if (!uidValide(uid)) return repondre(res, 400, { erreur: 'compte', message: 'Choisis un de tes comptes Vinted.' });
+  if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: `Le paiement n'est pas encore branché : ${RIEN_CHANGE}.` });
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu lire ton abonnement : ${RIEN_CHANGE}. Réessaie dans un instant.` });
+  if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est Pro : tous tes comptes vendent.' });
+  const siens = await vintedSiens(req);
+  if (siens === null) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu lire tes comptes : ${RIEN_CHANGE}. Réessaie dans un instant.` });
+  if (ajouter && !siens.has(uid)) return repondre(res, 403, { erreur: 'pas-a-toi', message: "Ce compte n'est pas relié à ton VRM." });
+  const sub = await abonnementStripeDe(ligne);
+  if (!sub) return repondre(res, 409, { erreur: 'aucun', message: `Je ne trouve pas ton abonnement chez Stripe : ${RIEN_CHANGE}.` });
+  const lu = planDeLAbonnement(sub, optsPlan());
+  if (lu.plan === PLAN_PRO) return repondre(res, 409, { erreur: 'pro', message: 'Tu es en Pro : tous tes comptes vendent, sans supplément.' });
+  if (lu.plan !== PLAN_SOLO) return repondre(res, 409, { erreur: 'plan', message: `Ton abonnement a une forme que je ne sais pas changer : ${RIEN_CHANGE}. Écris-nous.` });
+  if (!lu.vendeur) return repondre(res, 409, { erreur: 'sans-compte-inclus', message: 'Choisis d’abord le compte Vinted inclus dans Solo (« Quel compte vend ? »).' });
+  const s0 = lu.comptesSup;
+  const liste = s0.liste.slice();
+  const le = new Date().toISOString();
+  const cleIdem = (x) => `vrm-sup-${u.id}-${x}-${uid}-${Math.floor(Date.now() / 60000)}`;
+  if (ajouter) {
+    if (uid === lu.vendeur || liste.includes(uid)) return repondre(res, 200, { ok: true, inchange: true, comptesSup: comptesSupApp(lu) });
+    if (liste.length >= MAX_COMPTES_SUP) return repondre(res, 409, { erreur: 'max', message: `${MAX_COMPTES_SUP} comptes de plus au plus en Solo : passe à Pro (illimité).` });
+    const nouvelle = [...liste, uid];
+    const meta = { [META_COMPTES_SUP]: nouvelle.join(','), [META_COMPTES_SUP + '_le']: le };
+    let params;
+    if (liste.length < s0.payes) {
+      // Une place DÉJÀ PAYÉE et libre : rien à facturer, seulement le choix rangé.
+      params = { metadata: meta };
+    } else {
+      const offre = await offreCompteSup();
+      if (!offre.ouvert) return repondre(res, 503, { erreur: 'compte-sup-ferme', message: `Bientôt : un compte vendeur de plus ne s'achète pas encore. ${RIEN_CHANGE[0].toUpperCase() + RIEN_CHANGE.slice(1)}.` });
+      if (corps.cgv !== true) return repondre(res, 400, { erreur: 'cgv', message: "Coche « J'accepte les conditions générales de vente » avant d'ajouter un compte." });
+      const article = s0.articleId ? { id: s0.articleId, quantity: s0.payes + 1 } : { price: offre.id, quantity: 1 };
+      params = { items: [article], proration_behavior: 'create_prorations', metadata: { ...meta, cgv_version: CGV_VERSION, cgv_acceptees_le: le } };
+    }
+    const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(sub.id)}`, params, cleIdem('a'));
+    if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: `Stripe n'a pas enregistré ce compte : ${RIEN_CHANGE}. Réessaie dans un instant.` });
+    const relu = planDeLAbonnement(r.data, optsPlan());
+    if (!relu.comptesSup.liste.includes(uid)) return repondre(res, 502, { erreur: 'stripe', message: `Stripe n'a pas enregistré ce compte : ${RIEN_CHANGE}. Réessaie dans un instant.` });
+    return repondre(res, 200, { ok: true, comptesSup: comptesSupApp(relu) });
+  }
+  // Retirer : la liste sans lui, la quantité ramenée au nombre de comptes restants.
+  if (!liste.includes(uid)) return repondre(res, 200, { ok: true, inchange: true, comptesSup: comptesSupApp(lu) });
+  const reste = liste.filter((x) => x !== uid);
+  const params = { metadata: { [META_COMPTES_SUP]: reste.join(','), [META_COMPTES_SUP + '_le']: le } };
+  if (s0.articleId) {
+    params.items = [reste.length ? { id: s0.articleId, quantity: reste.length } : { id: s0.articleId, deleted: true }];
+    params.proration_behavior = 'create_prorations';
+  }
+  const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(sub.id)}`, params, cleIdem('r'));
+  if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré le retrait : rien n'a changé. Réessaie dans un instant." });
+  const relu = planDeLAbonnement(r.data, optsPlan());
+  if (relu.comptesSup.liste.includes(uid)) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas enregistré le retrait : rien n'a changé. Réessaie dans un instant." });
+  return repondre(res, 200, { ok: true, comptesSup: comptesSupApp(relu) });
+}
+
 async function compteVendeur(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
   const corps = await lireCorpsJson(req);
+  if (corps && (corps.action === 'ajouter-sup' || corps.action === 'retirer-sup')) return compteVendeurSup(req, res, u, corps);
   // (10 nov., 20 h) Pro = comptes vendeurs illimités : rien à choisir, rien n'est écrit.
   if (corps && corps.plateforme === 'pro') return repondre(res, 409, { erreur: 'pro-illimite', message: 'En Pro, tous tes comptes vendent : rien à choisir.' });
   if (corps && corps.plateforme != null && corps.plateforme !== 'vinted') {
@@ -1006,8 +1138,12 @@ async function changerPlan(req, res) {
   if (!lu.articleId) return repondre(res, 409, { erreur: 'article', message: "Ton abonnement a une forme que je ne sais pas changer : rien n'a changé. Écris-nous." });
   if (lu.prixId === prix.id) return repondre(res, 200, { ok: true, inchange: true, plan: cible });
   const le = new Date().toISOString();
+  // (13 nov., lot 56) Vers Pro (illimité) : l'article des comptes Vinted de plus part
+  // (prorata) — on ne paie jamais un supplément en Pro. Leur liste est gardée dans les
+  // métadonnées (revenir à Solo la retrouve, sans place payée : à racheter).
+  const supId = cible === PLAN_PRO && lu.comptesSup && lu.comptesSup.articleId;
   const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(sub.id)}`, {
-    items: [{ id: lu.articleId, price: prix.id, quantity: 1 }],
+    items: [{ id: lu.articleId, price: prix.id, quantity: 1 }, ...(supId ? [{ id: supId, deleted: true }] : [])],
     proration_behavior: 'create_prorations',
     metadata: { cgv_version: CGV_VERSION, cgv_acceptees_le: le, vrm_plan: cible, vrm_plan_change_le: le },
   }, `vrm-plan-${u.id}-${cible}-${Math.floor(Date.now() / 60000)}`);
@@ -1021,12 +1157,26 @@ async function changerPlan(req, res) {
 // POST { action: 'rattacher', code } : le vendeur connecté devient filleul du
 // code (règles dans api/_lib/parrainage.js). Tout ce qui le concerne vient de
 // SA session (jamais du corps, sauf le code lui-même).
+// (13 nov., lot 54) GET `?code=XXXXXXXX` SANS session : ce que voit la personne
+// qui ouvre le lien (« Offert par <nom choisi> ») — le nom seul, jamais un
+// identifiant, un e-mail ni un pseudo Vinted. POST { action: 'nom', nom } : le
+// parrain choisit ce nom (règle `nomAffichable`, revalidée à chaque lecture).
 async function parrainage(req, res) {
+  if (req.method === 'GET' && req.query && req.query.code != null) {
+    if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 200, { ok: true, ouvert: null, connu: false, nom: null });
+    const a = await apercuCode(String(req.query.code));
+    return repondre(res, a.ok ? 200 : 503, a.ok ? { ok: true, ouvert: a.ouvert, connu: a.connu, nom: a.nom } : { ok: false });
+  }
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
   if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 200, { ok: true, installe: false });
   if (req.method === 'POST') {
     const corps = await lireCorpsJson(req);
+    if (corps && corps.action === 'nom') {
+      if (typeof corps.nom !== 'string' || corps.nom.length > 200) return repondre(res, 400, { ok: false, raison: 'nom' });
+      const r = await poserNom(u.id, corps.nom);
+      return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, nom: r.ok ? r.nom : undefined, raison: r.raison, message: r.message });
+    }
     if (!corps || corps.action !== 'rattacher') return repondre(res, 400, { ok: false, raison: 'action' });
     const [ligne, idsVinted] = await Promise.all([ligneDe(req), lireVintedIds(u.id)]);
     if (idsVinted === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Parrainage pas vérifié. Réessaie dans un instant.' });   // (11 nov., M51)
@@ -1034,11 +1184,13 @@ async function parrainage(req, res) {
     const r = await rattacher(corps.code, { u, ligne, idsVinted, essaiDeja });
     return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message });
   }
-  const [ouvert, code, suivi, filleul] = await Promise.all([parrainageOuvert(), codeDe(u.id), suiviDe(u.id), filleulDe(u.id)]);
+  const [ouvert, code, suivi, filleul, ligne, nom] = await Promise.all([parrainageOuvert(), codeDe(u.id), suiviDe(u.id), filleulDetail(u.id), ligneDe(req), nomDe(u.id)]);
   // Tables absentes (027 pas passée) ou base muette : on ne promet rien.
   if (code === undefined || suivi === undefined) return repondre(res, 200, { ok: true, installe: false, ouvert });
+  // (13 nov., lot 54) L'état de CHAQUE filleul, sans identité (rang, jour d'inscription, état).
+  const filleuls = await filleulsDe(u.id, ligne === undefined ? null : !!(ligne && ligne.client_stripe));
   // (11 nov.) `modeTest` : Stripe en clé de test (ou pas encore branché) — l'écran le DIT.
-  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes, modeTest: !stripePret() || stripeModeTest() });
+  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleuls: filleuls || null, nom: nom === undefined ? undefined : nom, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes, modeTest: !stripePret() || stripeModeTest() });
 }
 
 // ── MES FACTURES ET MA CARTE (onglet « Mon compte », 4 octobre) ─────────────
@@ -1798,8 +1950,10 @@ async function relances(req, res) {
 //                          une page avec UN bouton (un antivirus ouvre les liens) ;
 //   POST ?d=<jeton>&page=1 ce bouton : éteint le bilan de CE compte ;
 //   POST ?d=<jeton>        le « un clic » du logiciel de messagerie (RFC 8058) ;
-//   GET  (session)         { actif: true|false|null, configure, envois } — Réglages ;
-//   POST (session) {actif} son choix depuis Réglages. ÉTEINT par défaut.
+//   GET  (session)         { actif: true|false|null, defaut, configure, envois } — Réglages ;
+//   POST (session) {actif} son choix depuis Réglages.
+// (13 nov., lot 53) Le défaut : ACTIVÉ pour un compte créé depuis le 13 nov.
+// (`choixEffectif`, la date de création de SA session), éteint avant.
 async function bilanMois(req, res) {
   const m = req.method;
   const d = String((req.query && req.query.d) || '');
@@ -1828,8 +1982,10 @@ async function bilanMois(req, res) {
   return repondre(res, 200, {
     ok: true,
     configure: configurationRelances().pret,
-    // Trois états : true allumé · false éteint (le défaut : jamais choisi) · null pas su.
-    actif: choix === undefined ? null : !!(choix && choix.actif === true),
+    // Trois états : true allumé · false éteint · null pas su — la MÊME règle que le cron
+    // (`choixEffectif`) ; `defaut` : il n'a rien choisi, c'est le défaut de son compte.
+    actif: choixEffectif(choix, u.created_at),
+    defaut: !(choix && typeof choix === 'object' && typeof choix.actif === 'boolean'),
     envois: envois && envois.mois && typeof envois.mois === 'object'
       ? Object.fromEntries(Object.entries(envois.mois).slice(-6).map(([k, v]) => [k, { at: v && v.at, issue: v && v.issue }]))
       : (envois === undefined ? null : {}),
@@ -1858,6 +2014,21 @@ async function signalement(req, res) {
   if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
   if (corps.action === 'traite') { const r = await marquerTraite({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
   const r = await envoyerSignalement({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
+  return repondre(res, r.code, r.corps);
+}
+
+// ── « ÉCRIRE AU SUPPORT » (13 nov., lot 55, api/_lib/demande-aide.js) ────────
+// POST (session) : envoyer — rangé chez LUI (owner = sa session), 5/h, scellé.
+// GET et POST {action:'traitee'} : le PROPRIÉTAIRE de l'installation seul (403).
+async function demandeAide(req, res) {
+  const utilisateur = await vendeurExige(req, res);
+  if (!utilisateur) return;
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'GET') { const r = await listerDemandesAide({ utilisateur }); return repondre(res, r.code, r.corps); }
+  const corps = await lireCorpsJson(req);
+  if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
+  if (corps.action === 'traitee') { const r = await marquerDemandeTraitee({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
+  const r = await envoyerDemandeAide({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
   return repondre(res, r.code, r.corps);
 }
 
@@ -1996,6 +2167,7 @@ export default async function handler(req, res) {
   if (mode === 'suppression-prevue') return m === 'GET' ? suppressionPrevue(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'mes-donnees') return m === 'GET' ? mesDonnees(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'aide') return (m === 'GET' || m === 'POST') ? demandeAide(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'rapport-extension') return (m === 'GET' || m === 'POST') ? rapportExtension(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
   // (9 nov.) Le tableau de bord du PROPRIÉTAIRE de l'installation (api/_lib/pilotage.js) :

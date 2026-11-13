@@ -440,14 +440,10 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
-| `importpasse` | `importerAnnonces` | **5.373.0** (13 nov.) | « Import de ton passé · 340 / ~1 200 ventes » : 12 mois (horizon par date), annonces d'un trait, état noté après chaque page, souci dit ; `import_vinted_{uid}` v 2 |
+| `importpasse` | `importerAnnonces` | **5.375.0** (13 nov.) | « Import de ton passé · 340 / ~1 200 ventes » : 12 mois (horizon par date), annonces d'un trait, état noté après chaque page, souci dit ; `import_vinted_{uid}` v 2 |
 | `favoriattente` | `attendreOffreMessage` | **5.372.0** (12 nov.) | favoris : après l'offre ACCEPTÉE, 8 à 20 s au hasard (jamais deux fois la même valeur) puis le temps d'écriture ; attente dans `chrome.storage.local` (`vrmFavoriAttente`), reprise par un worker neuf (`reprendreMessagesFavoris`) ; Tout arrêter, captcha, pause, autre compte, onglet fermé ⇒ le message ne part pas, dit |
 | `suivinumero` | `suiviDeTransaction` | **5.372.0** (12 nov.) | chaque achat en cours (payé, en attente de livraison, expédié, au point, livré sans n°) reçoit n° de suivi + transporteur + point de destination (détail de la transaction quand le suivi ne les porte pas), 6 lectures/h ; codes de retrait cherchés aussi quand Vinted demande son geste ou que le suivi dit « disponible » |
-| … | … | … | les capacités de la 5.45 à la `lbcfiche` : déplacées telles quelles dans `docs/passation/historique-vinted-extension.md` (12 nov.) — `EXT_CAPACITES` reste la vérité |
-| `lbcsupprime` | `supprimeLbcDepuisApp` | **5.291.0** (30 oct. — 5.288 était un numéro de branche) | « Supprimer de Leboncoin » depuis VRM, sur son clic et confirmé |
-| `lbcstats` | `noterStatsAnnonceLbc` | **5.291.0** (30 oct.) | « favoris, vues et messages relevés sur tes annonces Leboncoin » |
-| `favorisouvrir` | `ouvrirFavoriNatif` | **5.225.0** | (ajoutée à la table le 30 oct.) |
-| `favorisliste` | `lirePageFavoris` | **5.218.0** | (ajoutée à la table le 30 oct.) |
+| … | … | … | les capacités de la 5.45 à la `lbcfiche` (12 nov.), puis `confirmer` à `favorisliste` (13 nov.) : déplacées telles quelles dans `docs/passation/historique-vinted-extension.md` — `EXT_CAPACITES` reste la vérité |
 | `favoris` | `executerMessageFavori` | **5.217.0** | (ajoutée à la table le 30 oct.) |
 | `offresauto` | `autoAccepterOffres` | **5.234.0** | (ajoutée à la table le 30 oct.) |
 | `vcauto` | `rangerVcAnnonces` | **5.236.0** | (ajoutée à la table le 30 oct.) |
@@ -527,19 +523,21 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **13 nov. · Import de ton passé (lot 47, ext. 5.373.0)** : 12 derniers mois (ventes, achats ; annonces = dressing complet d'un trait), dans les 20 lectures/h étalées (« suite dans 40 min »), reprise page suivante, souci dit et reprise seule ; « Ton passé est importé (12 mois) » une fois (`vrm_import_passe_vu`). `docs/passation/2026-11-13-lot47.md`. Geste : installer 5.373.0.
-- **13 nov. · Logos des transporteurs** : Chronopost et Pickup = cube bleu sur blanc, jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre ; gabarit commun mesuré. `2026-11-13-logos-transporteurs.md`. Geste : aucun.
-- **13 nov. · /confiance + /etat** : page publique « ce que VRM fait et ne fait jamais » (preuves : `audit-confiance-publique`) ; /etat sans réponse ⇒ « État inconnu ». `docs/passation/2026-11-13-lot5052.md`. Geste : aucun.
-- **13 nov. · Lot 51 (données du compte)** : « Supprimer mon compte » = 30 jours de grâce (demande neutre `vrm_effacement_prevu_*`, abonnement résilié, « Annuler » en un geste, bandeau ; cron du matin efface par `effacerCompte` ; compte vide : tout de suite) ; export RGPD inchangé. `2026-11-13-lot51.md`. Geste : aucun.
+- **13 nov. · Import de ton passé (lot 47, ext. 5.375.0)** : 12 derniers mois (ventes, achats ; annonces = dressing complet d'un trait), dans les 20 lectures/h étalées (« suite dans 40 min »), reprise page suivante, souci dit et reprise seule ; « Ton passé est importé (12 mois) » une fois (`vrm_import_passe_vu`). `docs/passation/2026-11-13-lot47.md`. Geste : installer 5.375.0.
+- **13 nov. · Lot 56/58** : Solo + comptes Vinted vendeurs payés (`PRIX_COMPTE_SUP_CENTIMES` 3 € à confirmer, prix `vrm_compte_sup`, quantité bornée serveur, « Bientôt » sans prix) ; équipe : « pas encore activé sur ton installation », retrait en un geste. `2026-11-13-lot5658.md`. Geste : 016 (3 gestes), prix Stripe.
+- **13 nov. · Parrainage (lot 54)** : lien copier/partager, mois gagnés, état par filleul, « Offert par <nom choisi> » à l'inscription, « Parrainer » dans Plus ; mois offert si compte Vinted jamais vu. `docs/passation/2026-11-13-lot54.md`. Geste : appliquer la 029.
+- **13 nov. · Bilan mensuel + support (lot 53/55)** : bilan activé par défaut si compte créé ≥ 13 nov., bénéfice sans « au moins », temps gagné si mesuré ; « Écrire au support » (5 faits techniques, rangé chez lui, scellé). `docs/passation/2026-11-13-lot5355.md`. Geste : `RELANCES_SMTP_*`.
+- **13 nov. · Retour → stock sans rien saisir (lot 29)** : un retour Vinted PROUVÉ (transaction 440 / non réclamée) puis REMBOURSÉ (ou noté reçu) revient en stock sous SON N° (n° de transaction → annonce → N°) : « Retour du <date lue> — à vérifier et remettre en ligne », « Remettre en ligne » (son clic, Republier à la main) ; en route ⇒ « Retour en route » ; sans N° ⇒ « à numéroter » ; N° déjà porté en ligne ⇒ rien ; ancien (> 45 j) et eBay inchangés (`retourRevenuSeul`). `docs/passation/2026-11-13-lot29.md`. Geste : aucun.
+- **13 nov. · Vente Vestiaire sur Orion (5.374)** : capteur en ligne + rattrapage, compte lu dans la page, date = `soldDate` de « Mes ventes » (Paris), jamais l'heure de lecture. `docs/passation/2026-11-13-vestiaire-vente-orion.md`. Geste : 5.374 dans Orion, ouvrir Mes ventes.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.373.0** (13 nov., lot 47). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.375.0** (13 nov., lot 47). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.373.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.375.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la

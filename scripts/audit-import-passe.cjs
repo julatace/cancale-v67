@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  L'IMPORT DE TON PASSÉ — 12 MOIS, ANNONCES COMPRISES (extension 5.373, lot 47)
+//  L'IMPORT DE TON PASSÉ — 12 MOIS, ANNONCES COMPRISES (extension 5.375, lot 47)
 //
 //  Julien : « au premier jour, l'import des 12 derniers mois (ventes, achats,
 //  annonces) de chaque compte Vinted relié, avec une barre de progression ;

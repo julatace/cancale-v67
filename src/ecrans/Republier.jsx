@@ -1119,14 +1119,14 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         {/* (6 nov., vague 2 · point 1) Une vente annulée avant l'envoi : l'ancienne annonce est FERMÉE
             chez Vinted (vendue puis annulée, mesuré) — rien à supprimer, jamais deux fois en vente. */}
         {paire.annulee
-          ? <div className="vrm-rm-muet" data-main-annulee={paire.tx || ''}>L’ancienne annonce est fermée chez Vinted (vente annulée) : rien à supprimer.</div>
+          ? <div className="vrm-rm-muet" data-main-annulee={paire.tx || ''}>L’ancienne annonce est fermée chez Vinted ({paire.retour ? 'vente retournée' : 'vente annulée'}) : rien à supprimer.</div>
           : <div className="vrm-rm-note">Nouvelle en ligne : supprime l’ancienne sur Vinted, sinon double vente.</div>}
       </>)}
 
       {section('relier', <>
         {paire.numero && etatSuivi !== 'fait' ? <p className="vrm-rm-muet" data-main-but="">Le N°{paire.numero} passera sur la nouvelle annonce : le même rangement.</p> : null}
         {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire là où l’article est rangé.` : `${motsVendeur().Nom} pas relié${motsVendeur().e} : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.`}</div> : null}
-        {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
+        {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> Nouvelle annonce désignée : {paire.retour ? 'l’article revenu' : 'la vente annulée'} est remis{paire.retour ? '' : 'e'} en vente.</div>
           : !paire.numero && !paire.annulee ? <div className="vrm-rm-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
           : etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> La nouvelle annonce porte le N°{paire.numero}.</div>
           : etatSuivi === 'lie' ? <div className="vrm-rm-lie" data-main-lie={suivi.nouvelId}>

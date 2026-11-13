@@ -146,7 +146,11 @@ const veutLApp = () => {
   // d'abord la connexion), jamais la page d'accueil.
   // `?confirmer-adresse=` (22 oct.) : le lien de confirmation d'une adresse de
   // réception — droit dans l'app (connexion d'abord s'il le faut), jamais l'accueil.
-  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
+  // (13 nov., lot 54) Un lien de parrainage (`?parrain=CODE`, `/r/CODE`) ouvre l'INSCRIPTION (avec
+  // « Offert par … ») : la page d'accueil, puis « Créer mon compte », perdait le code (l'adresse changée
+  // en `/?inscription` avant que l'app ne le range).
+  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse|parrain)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h)
+    || /^\/r\/[A-Za-z0-9]{8}\/?$/.test(window.location.pathname || '');
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');

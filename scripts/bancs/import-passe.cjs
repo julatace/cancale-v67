@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// BANC : L'IMPORT DE TON PASSÉ (13 nov., lot 47, extension 5.373)
+// BANC : L'IMPORT DE TON PASSÉ (13 nov., lot 47, extension 5.375)
 //        npm run build && BANC_PORT=$((21500+RANDOM%500)) node -r ./scripts/bancs/_porte-banc.cjs scripts/bancs/import-passe.cjs
 // ═══════════════════════════════════════════════════════════════════════════
 // La VRAIE Ma journée et le VRAI Paramètres → Mon historique Vinted, sur une base
 // INVENTÉE : les lignes `import_vinted_{uid}` dans la forme v 2 de `publierImport`
-// (background.js 5.373 : horizonMois, estime, pagesEstimees, annonces, souci, enCours).
+// (background.js 5.375 : horizonMois, estime, pagesEstimees, annonces, souci, enCours).
 //   P1. en cours : la tête dit « Import de ton passé · 340 / ~1 200 ventes · compte X »,
 //       la barre est remplie sur l'ESTIMATION (≈ 28 %), « 4 pages sur ~12 » ;
 //   P2. pause du budget : « suite dans 40 min » (jamais une heure seule) ;
@@ -12,7 +12,7 @@
 //   P4. fini sur 12 mois : « Ton passé est importé (12 mois) » UNE fois — la 2e visite ne
 //       le montre plus ; la marque « vu » part dans `vrm_import_passe_vu` (synchronisée) ;
 //   P5. Paramètres : annonces « 49 ✓ », dressing trop gros « 1 000 sur 1 500 » dit ;
-//       extension 5.372 ⇒ « Mets l'extension à jour (5.373.0) pour les 12 mois… ».
+//       extension 5.374 (sans la capacité) ⇒ « Mets l'extension à jour (EXT_CAPACITES.importpasse)… ».
 // Les aides (fausse base, faux pont, lecture des écrans) sont celles de `import-depart.cjs`.
 // Jugé sur des data-* et des nombres. `BANC_CAPTURE=<dossier>` : captures 390 tactile et
 // 1512, clair et sombre. `BANC_DIST=<dossier>` : un autre build (preuve §6.1).
@@ -23,6 +23,8 @@ const fs = require('fs'), http = require('http');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 21731;
 const CAPT = process.env.BANC_CAPTURE || '';
+// La version qui apporte l'import de ton passé : celle de l'app (`EXT_CAPACITES.importpasse`), jamais recopiée.
+const VERSION_LOT = (/importpasse: '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '?';
 
 const auj = Date.now();
 const iso = (ms) => new Date(ms).toISOString();
@@ -30,8 +32,8 @@ const ACCS = [
   { id: 1, vinted_user_id: '111', login: 'atelier_test', domain: 'www.vinted.fr', updated_at: iso(auj), created_at: iso(auj - 2 * 86400e3), owner: null },
   { id: 2, vinted_user_id: '222', login: 'second_test', domain: 'www.vinted.fr', updated_at: iso(auj), created_at: iso(auj - 2 * 86400e3), owner: null },
 ];
-// La forme EXACTE de `publierImport` (background.js 5.373, `resumeImport` v 2).
-const ligne = (uid, o) => ({ id: `import_vinted_${uid}`, data: Object.assign({ v: 2, type: 'import', uid, code: '5.373.0', capturedAt: iso(auj), at: auj, debut: auj - 3600e3, demande: false, horizonMois: 12,
+// La forme EXACTE de `publierImport` (background.js 5.375, `resumeImport` v 2).
+const ligne = (uid, o) => ({ id: `import_vinted_${uid}`, data: Object.assign({ v: 2, type: 'import', uid, code: VERSION_LOT, capturedAt: iso(auj), at: auj, debut: auj - 3600e3, demande: false, horizonMois: 12,
   repriseA: null, cause: null, souci: null, souciA: null, fin: null, enCours: 'ventes', annonces: { lus: 0, total: null, fini: false, partiel: false } }, o) });
 const ty = (lus, total, estime, pages, pagesEstimees, fini = false, horizon = false) => ({ lus, total, estime, pages, pagesEstimees, fini, horizon });
 let ROWS = [];
@@ -79,7 +81,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
 const TAILLES = [{ nom: '390', vp: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, { nom: '1512', vp: { width: 1512, height: 950 } }]
   .filter((t) => !process.env.BANC_TAILLE || t.nom === process.env.BANC_TAILLE);
 
-async function page(b, T, { sombre = false, version = '5.373.0', onglet = '222' } = {}) {
+async function page(b, T, { sombre = false, version = VERSION_LOT, onglet = '222' } = {}) {
   const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = [], ecrits = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -157,7 +159,7 @@ const norm = (s) => String(s || '').replace(/\u202f|\u00a0/g, ' ');
         console.log(`\n══ ${T.nom} px${T.hasTouch ? ' (tactile)' : ''}${sombre ? ' · sombre' : ' · clair'}`);
         await essaie('P1' + suf, async () => {
           ROWS = [ENCOURS(), DECO()];
-          const { ctx, pg, errs } = await page(b, T, { sombre, version: '5.373.0' });
+          const { ctx, pg, errs } = await page(b, T, { sombre, version: VERSION_LOT });
           await ouvrirJournee(pg);
           const r = await pg.evaluate(() => { const c = document.querySelector('[data-import-compte="111"]'); if (!c) return null; const t = c.querySelector('[data-import-type="ventes"]'); const bar = t && t.querySelector('.vrm-imp-barre > i'), cadre = t && t.querySelector('.vrm-imp-barre');
             return { titre: (c.querySelector('[data-import-titre]') || {}).innerText || '', est: t && t.getAttribute('data-import-estime'), pages: (t && (t.querySelector('[data-import-pages-texte]') || {}).innerText) || '', pc: bar && cadre ? Math.round(bar.getBoundingClientRect().width / cadre.getBoundingClientRect().width * 100) : null, h: cadre ? cadre.getBoundingClientRect().height : null }; });
@@ -174,7 +176,7 @@ const norm = (s) => String(s || '').replace(/\u202f|\u00a0/g, ' ');
         });
         await essaie('P2' + suf, async () => {
           ROWS = [PAUSE()];
-          const { ctx, pg } = await page(b, T, { sombre, version: '5.373.0' });
+          const { ctx, pg } = await page(b, T, { sombre, version: VERSION_LOT });
           await ouvrirJournee(pg);
           const p = await pg.evaluate(() => { const c = document.querySelector('[data-import-compte="111"]'); return c ? { e: c.getAttribute('data-import-etat'), t: c.querySelector('.vrm-imp-phrase').innerText } : null; });
           dit(p && p.e === 'pause' && /suite dans 4[01] min/.test(p.t) && !/\d\d:\d\d/.test(p.t), 'P2 pause du budget : « suite dans 40 min » (pas une heure à deviner)', p && JSON.stringify(p));
@@ -183,7 +185,7 @@ const norm = (s) => String(s || '').replace(/\u202f|\u00a0/g, ' ');
         });
         await essaie('P4' + suf, async () => {
           ROWS = [FINI()]; MAIN = {};
-          const { ctx, pg, ecrits } = await page(b, T, { sombre, version: '5.373.0' });
+          const { ctx, pg, ecrits } = await page(b, T, { sombre, version: VERSION_LOT });
           await ouvrirJournee(pg);
           const j1 = await lireJ(pg);
           dit(j1 && /Ton passé est importé \(12 mois\)/.test(j1.texte) && /486 ✓/.test(norm(j1.texte)) && /49 ✓/.test(norm(j1.texte)), 'P4a fini : « Ton passé est importé (12 mois) » · 486 ventes · 49 annonces', j1 && norm(j1.texte).slice(0, 200));
@@ -202,7 +204,7 @@ const norm = (s) => String(s || '').replace(/\u202f|\u00a0/g, ' ');
         });
         await essaie('P5' + suf, async () => {
           ROWS = [FINI(), PARTIEL()];
-          const { ctx, pg } = await page(b, T, { sombre, version: '5.373.0', onglet: '111' });
+          const { ctx, pg } = await page(b, T, { sombre, version: VERSION_LOT, onglet: '111' });
           await ouvrirReglages(pg);
           await pg.waitForSelector('[data-import-type="annonces"]', { timeout: 15000 }).catch(() => {});
           const a = await pg.evaluate(() => [...document.querySelectorAll('[data-import-reglages] [data-import-type="annonces"]')].map((e) => ({ lus: e.getAttribute('data-import-lus'), tot: e.getAttribute('data-import-total'), partiel: e.getAttribute('data-import-partiel'), t: e.innerText.replace(/\s+/g, ' ') })));
@@ -212,10 +214,10 @@ const norm = (s) => String(s || '').replace(/\u202f|\u00a0/g, ' ');
           dit(s && s.L['111'] && /Ton passé est importé \(12 mois\)/.test(s.L['111'].texte), 'P5c Paramètres garde l’état « importé (12 mois) »', s && s.L['111'] && s.L['111'].texte.slice(0, 120));
           await capture(pg, `passe-reglages-${suf}`, '[data-import-reglages]');
           await ctx.close();
-          const v = await page(b, T, { sombre, version: '5.372.0', onglet: '111' });
+          const v = await page(b, T, { sombre, version: '5.374.0', onglet: '111' });
           await ouvrirReglages(v.pg);
           const n = await v.pg.evaluate(() => (document.querySelector('[data-import-ext="passe"]') || {}).innerText || '');
-          dit(/Mets l’extension à jour \(5\.373\.0\) pour les 12 mois et les annonces/.test(n), 'P5d extension 5.372 : « Mets l’extension à jour (5.373.0)… »', n);
+          dit(n.includes(`Mets l’extension à jour (${VERSION_LOT}) pour les 12 mois et les annonces`), `P5d extension 5.374 (sans l’import de ton passé) : « Mets l’extension à jour (${VERSION_LOT})… »`, n);
           await v.ctx.close();
         });
       }

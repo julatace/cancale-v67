@@ -18,7 +18,7 @@
 //     donné pour les deux, sinon null (« encore… »).
 // « Pas su » ne vaut jamais « fini » : une ligne absente rend null.
 //
-// 5.373 (13 nov., lot 47) — L'IMPORT DE TON PASSÉ (12 MOIS, ANNONCES COMPRISES) :
+// 5.375 (13 nov., lot 47) — L'IMPORT DE TON PASSÉ (12 MOIS, ANNONCES COMPRISES) :
 // la ligne v 2 porte `horizonMois` (12, ou null = « Tout récupérer »), par type
 // `estime` / `pagesEstimees` (« 340 / ~1 200 », « 4 pages sur ~12 »), `annonces`
 // (lus, total, fini, partiel), `enCours`, et `souci` (deconnecte · echec · base ·
@@ -29,7 +29,7 @@
 
 export const PREFIXE_LIGNE_IMPORT = 'import_vinted_';
 export const SELECT_IMPORT = 'id,e:data->>etat,ve:data->ventes,ac:data->achats,an:data->annonces,h:data->>horizonMois,so:data->>souci,sa:data->>souciA,ec:data->>enCours,r:data->>repriseA,c:data->>cause,m:data->>resteMin,f:data->>fin,at:data->>at,cap:data->>capturedAt';
-// 5.373 : « Ton passé est importé (12 mois) » vu : { [uid]: fin } (SYNC_KEYS de l'app).
+// 5.375 : « Ton passé est importé (12 mois) » vu : { [uid]: fin } (SYNC_KEYS de l'app).
 export const CLE_IMPORT_VU = 'vrm_import_passe_vu';
 // Le message de fin reste proposé au plus 7 jours après la fin (jamais un vieux « fini »).
 export const IMPORT_FINI_PROPOSE_MS = 7 * 24 * 3600000;
@@ -49,7 +49,7 @@ function typeLu(t) {
   return { lus, total: total !== null && total >= 0 ? total : null, pages: Math.max(0, nombre(t.pages) || 0), fini: t.fini === true,
     estime: estime !== null && estime > 0 ? Math.max(estime, lus) : null, pagesEstimees: pe !== null && pe > 0 ? pe : null, horizon: t.horizon === true };
 }
-// 5.373 : les annonces (lecture complète du dressing), ou null (ligne d'avant).
+// 5.375 : les annonces (lecture complète du dressing), ou null (ligne d'avant).
 function annoncesLues(a) {
   if (!a || typeof a !== 'object') return null;
   const total = nombre(a.total);
@@ -105,14 +105,14 @@ export function dureeImport(min) {
   if (!Number.isFinite(m) || m <= 0) return '';
   return m >= 60 ? `environ ${Math.ceil(m / 60)} h` : `environ ${Math.max(5, Math.round(m))} min`;
 }
-// Le pourcentage d'un type, ou null (total inconnu). 5.373 : sur l'estimation quand elle est là.
+// Le pourcentage d'un type, ou null (total inconnu). 5.375 : sur l'estimation quand elle est là.
 export const butType = (t) => (t && t.estime !== null && t.estime !== undefined && t.estime > 0 ? t.estime : (t && t.total !== null && t.total > 0 ? t.total : null));
 export function pctType(t) {
   const but = butType(t);
   if (!t || but === null) return t && t.fini ? 100 : null;
   return Math.max(0, Math.min(100, Math.round(t.lus / but * 100)));
 }
-// 5.373 : « 340 / ~1 200 » (estimation) — `null` sans estimation.
+// 5.375 : « 340 / ~1 200 » (estimation) — `null` sans estimation.
 export function chiffreEstime(t) {
   if (!t || t.fini || t.estime === null || t.estime === undefined) return null;
   return `${fr(Math.min(t.lus, t.estime))} / ~${fr(arrondiEstime(t.estime))}`;
@@ -144,7 +144,7 @@ export function typeEnTete(l) {
   const t = l[k];
   return t && (chiffreEstime(t) || (t.total !== null && t.total > 0)) ? k : null;
 }
-// 5.373 : la ligne de tête d'un compte — « Import de ton passé · 340 / ~1 200 ventes · compte X ».
+// 5.375 : la ligne de tête d'un compte — « Import de ton passé · 340 / ~1 200 ventes · compte X ».
 export function titreImport(l, nomCompte) {
   if (!l) return '';
   const bouts = ['Import de ton passé'];
@@ -178,7 +178,7 @@ export function phraseImport(l, maintenant = Date.now()) {
   const d = dureeImport(l.resteMin);
   return `${l.etat === 'encours' ? 'Lecture de ton historique' : 'Ton historique arrive'}${d ? ' · ' + d : ''}, Vinted ouvert.`;
 }
-// 5.373 : la phrase d'une ligne v 2 (≤ 12 mots par phrase). Le souci d'abord : il dit quoi faire.
+// 5.375 : la phrase d'une ligne v 2 (≤ 12 mots par phrase). Le souci d'abord : il dit quoi faire.
 export function phrasePasse(l, maintenant = Date.now()) {
   if (l.etat === 'fini') return l.horizonMois ? `Ton passé est importé (${l.horizonMois} mois) ✓` : 'Tout ton historique est importé ✓';
   if (l.souci === 'deconnecte') return 'Compte pas ouvert sur vinted.fr. L’import reprend seul dès qu’il l’est.';
@@ -193,7 +193,7 @@ export function phrasePasse(l, maintenant = Date.now()) {
   const d = dureeImport(l.resteMin);
   return `${l.etat === 'encours' ? 'Lecture en cours' : 'Ça commence'}${d ? ' · ' + d : ''}, Vinted ouvert.`;
 }
-// 5.373 : la partie droite des annonces.
+// 5.375 : la partie droite des annonces.
 export function texteAnnonces(a) {
   if (!a) return '—';
   if (a.fini && a.partiel) return a.total !== null ? `${fr(Math.min(a.lus, a.total))} sur ${fr(a.total)}` : `${fr(a.lus)}`;
@@ -202,7 +202,7 @@ export function texteAnnonces(a) {
 }
 // Ma journée : les comptes dont l'import se VOIT (en cours, en pause, arrêté,
 // ou fini depuis moins d'un jour). Le reste ne prend aucune place.
-// 5.373 : une ligne v 2 finie ne se voit qu'UNE fois (`vus` : { [uid]: fin }), au plus 7 jours après la fin.
+// 5.375 : une ligne v 2 finie ne se voit qu'UNE fois (`vus` : { [uid]: fin }), au plus 7 jours après la fin.
 export function importsAMontrer(etats, maintenant = Date.now(), vus = {}) {
   if (!etats || typeof etats !== 'object') return [];
   return Object.values(etats).filter((l) => {
@@ -213,7 +213,7 @@ export function importsAMontrer(etats, maintenant = Date.now(), vus = {}) {
     return maintenant - l.fin < IMPORT_FINI_VISIBLE_MS;
   });
 }
-// 5.373 : la marque « vu » des lignes finies montrées (rien à écrire ⇒ null).
+// 5.375 : la marque « vu » des lignes finies montrées (rien à écrire ⇒ null).
 export function marquerImportsVus(vus, montres) {
   const out = Object.assign({}, vus && typeof vus === 'object' ? vus : {});
   let change = false;

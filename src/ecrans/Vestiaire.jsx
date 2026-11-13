@@ -804,7 +804,8 @@ function VentesVestiaire({ comptes }) {
     }), quandVestiaire);
     const aExp = liste.filter((v) => v.aExpedier && !vcLoc.fait[v.id] && !v.departLu);
     const lue = d.lectures && d.lectures['a-expedier'];
-    const derniere = [d.lectures && d.lectures.ventes && d.lectures.ventes.at, lue && lue.at].filter(Boolean).sort().pop() || '';
+    // (5.374) une lecture PARTIELLE plus fraîche que la lecture entière gardée est datée à côté (`partielleAt`).
+    const derniere = [d.lectures && d.lectures.ventes && d.lectures.ventes.at, d.lectures && d.lectures.ventes && d.lectures.ventes.partielleAt, lue && lue.at, lue && lue.partielleAt].filter(Boolean).sort().pop() || '';
     if (!liste.length) corps = <div data-vc-ventes="vide" style={style}>Aucune vente Vestiaire à la dernière lecture{derniere ? ` (${ageCourtVc(derniere)})` : ''}. Après une vente, {geste} : elle apparaît ici.</div>;
     else corps = (
       <div data-vc-ventes="lu">

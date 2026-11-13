@@ -646,7 +646,7 @@
       const unType = (t, nom, attente) => {
         if (!t) return '';
         if (t.fini) return `<div class="imp" data-import-type="${nom}" data-import-lus="${Number(t.lus) || 0}"><div class="imp-l"><span>${nom === 'ventes' ? 'Ventes' : 'Achats'}</span><span>${nb(t.lus)} ✓</span></div></div>`;
-        // 5.373 : sur 12 mois, l'estimation (« 340 / ~1 200 ») ; sinon le total de Vinted.
+        // 5.375 : sur 12 mois, l'estimation (« 340 / ~1 200 ») ; sinon le total de Vinted.
         const est = im.horizonMois && Number(t.estime) > 0 ? Number(t.estime) : 0;
         const tot = est || Number(t.total) || 0;
         const pc = tot > 0 ? Math.max(2, Math.min(100, Math.round((Number(t.lus) || 0) / tot * 100))) : 0;
