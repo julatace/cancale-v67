@@ -115,7 +115,7 @@ import { statutPourSante } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
-import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan } from './_lib/bilan-mois.js';
+import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan, choixEffectif } from './_lib/bilan-mois.js';
 import { envoyerMailEssai } from './_lib/mail-essai.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
@@ -1735,8 +1735,10 @@ async function relances(req, res) {
 //                          une page avec UN bouton (un antivirus ouvre les liens) ;
 //   POST ?d=<jeton>&page=1 ce bouton : éteint le bilan de CE compte ;
 //   POST ?d=<jeton>        le « un clic » du logiciel de messagerie (RFC 8058) ;
-//   GET  (session)         { actif: true|false|null, configure, envois } — Réglages ;
-//   POST (session) {actif} son choix depuis Réglages. ÉTEINT par défaut.
+//   GET  (session)         { actif: true|false|null, defaut, configure, envois } — Réglages ;
+//   POST (session) {actif} son choix depuis Réglages.
+// (13 nov., lot 53) Le défaut : ACTIVÉ pour un compte créé depuis le 13 nov.
+// (`choixEffectif`, la date de création de SA session), éteint avant.
 async function bilanMois(req, res) {
   const m = req.method;
   const d = String((req.query && req.query.d) || '');
@@ -1765,8 +1767,10 @@ async function bilanMois(req, res) {
   return repondre(res, 200, {
     ok: true,
     configure: configurationRelances().pret,
-    // Trois états : true allumé · false éteint (le défaut : jamais choisi) · null pas su.
-    actif: choix === undefined ? null : !!(choix && choix.actif === true),
+    // Trois états : true allumé · false éteint · null pas su — la MÊME règle que le cron
+    // (`choixEffectif`) ; `defaut` : il n'a rien choisi, c'est le défaut de son compte.
+    actif: choixEffectif(choix, u.created_at),
+    defaut: !(choix && typeof choix === 'object' && typeof choix.actif === 'boolean'),
     envois: envois && envois.mois && typeof envois.mois === 'object'
       ? Object.fromEntries(Object.entries(envois.mois).slice(-6).map(([k, v]) => [k, { at: v && v.at, issue: v && v.issue }]))
       : (envois === undefined ? null : {}),

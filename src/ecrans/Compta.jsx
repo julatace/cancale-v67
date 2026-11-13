@@ -73,6 +73,7 @@ import { CHIFFRES as CHIFFRES_CARTE } from "../design/carteChiffres.js";
 // ⟦← App.jsx #7⟧
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "../recapMois.js";
 import { bilanDuMois, meilleurCompte, pdfBilanMois, nomFichierBilan, texteBilan } from "../bilanMois.js";
+import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov., lot 53) le mois demandé par l'e-mail du bilan mensuel
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "../depensesTicket.js";
@@ -3977,15 +3978,26 @@ const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, r
   const D = bilanDuMois({ ym, vendu, recu, depense: charges, benefice: CB, B: Bm, meilleur, maintenant, enCours });
   return { D, vendu, recu, Bm, CB, V, de, a, nomGroupe };
 };
+// (13 nov., lot 53) Le mois que demande le bouton de l'e-mail du bilan mensuel
+// (`?tab=compta&cible=bilanmois&mois=AAAA-MM`, src/cibleNotif.js) : « Mois dernier »
+// s'il l'est, « Ce mois-ci » s'il l'est ; un autre mois ⇒ rien n'est choisi à sa place
+// (la cible ne répond pas, la ligne de `phraseAbsente` le dit).
+const ymPrecedent = (ymA) => { const [y, m] = ymA.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const quelDemande = (ymA) => {
+  const d = DEMANDE_BILAN_MOIS;
+  if (!d.ym || Date.now() - d.at > 60000) return null;
+  return d.ym === ymA ? 'courant' : d.ym === ymPrecedent(ymA) ? 'precedent' : null;
+};
 function BilanMoisCarte({ liveStats, compta }) {
-  const [quel, setQuel] = React.useState('courant');
+  const [quel, setQuel] = React.useState(() => quelDemande(ymCourant(Date.now())) || 'courant');
+  React.useEffect(() => { const f = () => { const q = quelDemande(ymCourant(Date.now())); if (q) setQuel(q); }; window.addEventListener('vrm:bilan-mois', f); return () => window.removeEventListener('vrm:bilan-mois', f); }, []);
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const ligneUrssaf = useLigneUrssaf();
   const regime = useRegimeFiscal();
   const [envoi, setEnvoi] = React.useState(false);
   const maintenant = Date.now();
   const ymA = ymCourant(maintenant);
-  const ym = quel === 'courant' ? ymA : (() => { const [y, m] = ymA.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const ym = quel === 'courant' ? ymA : ymPrecedent(ymA);
   const enCours = quel === 'courant';
   const { D, vendu } = assembleBilanMois({ ym, enCours, liveStats, compta, pub, ligneUrssaf, regime, maintenant });
   const telecharger = async () => {
@@ -3996,7 +4008,7 @@ function BilanMoisCarte({ liveStats, compta }) {
     setEnvoi(false);
   };
   return (
-    <div className="vrm-bilan-mois" data-bilan-mois={ym} data-bilan-en-cours={enCours ? '1' : '0'}>
+    <div className="vrm-bilan-mois" data-bilan-mois={ym} data-bilan-en-cours={enCours ? '1' : '0'} data-cible={attrCible(['bilanmois', ym])}>
       <div className="vrm-bilan-tete">
         <Segmente label={tr('compta.moisBilan')} value={quel} onChange={setQuel}
           options={[{ v: 'courant', l: 'Ce mois-ci', data: { 'data-bilan-choix': 'courant' } }, { v: 'precedent', l: 'Mois dernier', data: { 'data-bilan-choix': 'precedent' } }]} />

@@ -642,7 +642,7 @@ import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeN
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
 import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
-import { lireCible, selecteursCible, phraseAbsente, attrCible } from "./cibleNotif.js";
+import { lireCible, selecteursCible, phraseAbsente, attrCible, DEMANDE_BILAN_MOIS } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition, texteProposition } from "./prixAchatPropose.js";
@@ -17488,6 +17488,8 @@ const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
   CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = ecranDeCible(tab || null, c) || null; CIBLE_NOTIF.at = Date.now();
   // (6 nov., vague 3) Une case du Stock est aussi SÉLECTIONNÉE par le Stock (pas seulement éclairée).
+  // (13 nov., lot 53) Le bilan d'UN mois (l'e-mail du bilan mensuel) : la carte le choisit à son montage.
+  if (c && c.type === 'bilanmois' && c.mois) { DEMANDE_BILAN_MOIS.ym = c.mois; DEMANDE_BILAN_MOIS.at = Date.now(); try { window.dispatchEvent(new Event('vrm:bilan-mois')); } catch (_) {} }
   if (c && c.type === 'case' && c.meuble && c.i !== '' && c.i != null) { DEMANDE_STOCK_CASE.m = String(c.meuble); DEMANDE_STOCK_CASE.i = Number(c.i); DEMANDE_STOCK_CASE.at = Date.now(); try { window.dispatchEvent(new Event('vrm:stock-case')); } catch (_) {} }
   try { window.dispatchEvent(new Event('vrm:cible-notif')); } catch (_) {}
 };
