@@ -59,9 +59,20 @@ const MIGRES = [
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
   ['src/RepubProgramme.jsx', ['*']],   // (11 nov., lot republier-programme)
   ['src/HistoriqueRepub.jsx', ['*']],
+  ['src/ecrans/Achats.jsx', ['*']],
+  ['src/ecrans/PrixMarche.jsx', ['*']],
+  ['src/CadreEmail.jsx', ['*']],
+  ['src/EspaceEmails.jsx', ['*']],
+  ['src/JournalEmails.jsx', ['*']],
+  ['src/ReceptionEmails.jsx', ['*']],
+  ['src/RecusEmail.jsx', ['*']],
+  ['src/ActionsClaires.jsx', ['*']],
+  ['src/composants/ChampRecherche.jsx', ['*']],
+  ['src/LitigesEnCours.jsx', ['*']],
+  ['src/LigneFraicheur.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
-const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;
+const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF|PDF|SIRET|SIREN|DAC7|ACRE|CFE)\b/g;
 const PERMIS = [/^[A-Z]{2}$/, /^[\s·—–…→←›✓✕×©+\-:;,.()0-9€%/]*$/];
 
 let ok = 0, ko = 0;
@@ -120,6 +131,19 @@ async function principal() {
       'D9 la phrase des offres en français est celle du serveur (OFFRES) : la copie ne peut pas diverger');
   } catch (e) { dit(false, 'D9 OFFRES se lit', e.message); }
 
+  // D10 (11 nov., lot 2) Les phrases d'écran : le français du dictionnaire est CELUI de src/phrasesEcran.js
+  // (le banc et l'audit des phrases jugent ce fichier) — une copie qui diverge rougit.
+  try {
+    const PE = await import(pathToFileURL(path.join(R, 'src', 'phrasesEcran.js')).href + '?v=' + Math.random());
+    const attendu = { ...Object.fromEntries(Object.entries(PE.PHRASES_ECRAN).map(([k, v]) => ['phrase.' + k, v])), ...Object.fromEntries(Object.entries(PE.PHRASES_ECRAN_ARTICLES).map(([k, v]) => ['phrase.' + k + '.articles', v])) };
+    // (13 nov., intégration) Depuis la fusion avec main, la phrase d'écran n'est plus copiée dans le dictionnaire
+    // (PhraseEcran de main la tire de phrasesEcran.js, mots du vendeur compris) : la copie de la branche était morte
+    // et retirée. La règle tient pour toute copie qui reviendrait : une clé `phrase.*` présente doit valoir la phrase.
+    const presentes = Object.keys(fr).some((k) => /^phrase\./.test(k));
+    const ecarts = (presentes ? Object.keys(attendu).filter((k) => fr[k] !== attendu[k]) : []).concat(Object.keys(fr).filter((k) => /^phrase\./.test(k) && !(k in attendu)));
+    dit(!ecarts.length, `D10 les ${Object.keys(attendu).length} phrases d'écran en français sont celles de src/phrasesEcran.js`, ecarts);
+  } catch (e) { dit(false, 'D10 src/phrasesEcran.js se lit', e.message); }
+
   // ── C. le code ──
   console.log('\n── C. les clés écrites dans le code');
   const fichiers = [];
@@ -129,7 +153,7 @@ async function principal() {
   for (const f of fichiers) {
     const src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
     if (!/from ['"][./]*(?:\.\.\/)*i18n\/index\.js['"]|from ['"]\.\/index\.js['"]/.test(src) && !/i18n[\\/]index\.js$/.test(f)) continue;
-    for (const m of src.matchAll(/\b(?:tr|t)\(\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) { nAppels++; if (!(m[1] in fr)) absentes.push(`${path.relative(R, f)} : ${m[1]}`); }
+    for (const m of src.matchAll(/\b(?:trj|tr|t)\(\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) { nAppels++; if (!(m[1] in fr)) absentes.push(`${path.relative(R, f)} : ${m[1]}`); }
     // tr(cond ? 'a' : 'b') : les deux branches
     for (const m of src.matchAll(/\btr\(\s*[^'()]*?\?\s*'([a-z][\w-]*(?:\.[\w-]+)+)'\s*:\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) for (const k of [m[1], m[2]]) { nAppels++; if (!(k in fr)) absentes.push(`${path.relative(R, f)} : ${k}`); }
   }

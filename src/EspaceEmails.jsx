@@ -1,6 +1,7 @@
 import React from "react";
 import "./espace-emails.css";
 import "./emails-apercu.css";
+import { tr } from './i18n/index.js';
 // (2 nov.) Julien : « beaucoup d'incompréhension quand je vais dans les emails ».
 // Quatre onglets NUS (plus d'explication à côté, plus de nombre : le nombre est
 // écrit UNE fois, dans l'Aperçu, avec sa phrase — §7). Le nom accessible garde le
@@ -40,7 +41,7 @@ export default function EspaceEmails({
     >
       {/* (5 nov., chantier G) Sous le choix « Boîte de réception · Relier ma boîte », le second niveau
           prend le dessin des filtres de l'app (`vrm-filtres`) : deux contrôles segmentés empilés se confondaient. */}
-      <nav className="vrm-emails-rubriques vrm-filtres" aria-label="Rubriques des e-mails">
+      <nav className="vrm-emails-rubriques vrm-filtres" aria-label={tr('emails.rubriquesEMails')}>
         {rubriques.map(([id, titre, nom]) => (
           <button
             key={id}

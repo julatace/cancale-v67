@@ -58,7 +58,7 @@ async function auditer() {
     dit(dep.length === 1 && dep[0].cle === 'a1' && dep[0].patch.buyFromId === null, '2 · « Déplacer ici » délie l’autre détenteur, jamais la cible', JSON.stringify(dep.map((x) => x.cle)));
   }
   // 3
-  const app = lire('src/App.jsx'), appS = sansCommentaires(app);
+  const app = require('./_source-app.cjs').enFrancais(lire('src/App.jsx'), RACINE), appS = sansCommentaires(app);   // (11 nov.) le texte français recollé (tr() ⇒ sa phrase)
   const ach = sansCommentaires(lire('src/ecrans/Achats.jsx'));
   const ar = (/function AchatsARelier\([\s\S]*?\n}\n/.exec(appS) || [''])[0];
   dit(/data-ar-autre=/.test(ar) && /onChoisir\(it, l\.sugg\.achat\)/.test(ar), '3 · « Sans achat relié » : « Autre achat » à côté de la suggestion');

@@ -84,6 +84,7 @@ import ClotureAnnee from '../ClotureAnnee.jsx';   // (11 nov.) « Clôturer l'an
 import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
+import { trj } from '../i18n/react.js';
 // ⟦← App.jsx #4⟧
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
@@ -248,7 +249,7 @@ function Cell({value, onChange, align="left", mono=false}) {
     />
   );
   return (
-    <span onClick={()=>{setVal(value);setEditing(true);}} title="Cliquer pour modifier"
+    <span onClick={()=>{setVal(value);setEditing(true);}} title={tr('annonces.cliquerModifier')}
       style={{cursor:'text',display:'block',padding:'3px 6px',borderRadius:12,minHeight:22,
         textAlign:align,fontFamily:mono?'monospace':'inherit'}}
       onMouseEnter={e=>e.currentTarget.style.background=C.bg}
@@ -327,7 +328,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
     setCatalog(u); save('vinted_catalog',u);
   };
   const remove=async (id)=>{
-    if(!await askConfirm(`Supprimer #${id} ?`)) return;
+    if(!await askConfirm(tr('compta.supprimer', { id: String(id) }))) return;
     const u=catalog.filter(p=>p.id!==id);
     setCatalog(u); save('vinted_catalog',u);
     if(onDeleteId) onDeleteId(id);
@@ -339,7 +340,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
   const addRow=()=>{
     const id=newRow.id.trim();
     if(!id||!newRow.buyPrice) return;
-    if(catalog.find(p=>p.id===id)){toast('Numéro déjà existant !');return;}
+    if(catalog.find(p=>p.id===id)){toast(tr('compta.numeroDejaExistant'));return;}
     const u=[...catalog,{id,buyPrice:+newRow.buyPrice,status:'stock',addedAt:tod()}];
     setCatalog(u); save('vinted_catalog',u);
     setLastAddedId(id);
@@ -387,10 +388,10 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
 
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="box" title={`Catalogue (${catalog.length})`}
+      <ScreenHead icon="box" title={tr('compta.catalogue', { catalogN: String(catalog.length) })}
         desc="Les articles de l'ancienne application. Ils comptent toujours dans les statistiques."
         right={<Btn small onClick={()=>{
-          if(fullList.length===0){toast('Aucun article à exporter');return;}
+          if(fullList.length===0){toast(tr('compta.aucunArticleExporter'));return;}
           const headers=['N° Article','Prix Achat (€)','Statut','Date ajout'];
           const rows=fullList.map(p=>[p.id||'',String(p.buyPrice||'').replace('.',','),p.status||'',p.addedAt||'']);
           const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
@@ -401,27 +402,25 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           a.download=`catalogue-${jourParis()}.csv`;
           document.body.appendChild(a);a.click();document.body.removeChild(a);
           URL.revokeObjectURL(url);
-        }} color={C.blue} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>}/>
+        }} color={C.blue} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>{tr('compta.exporterExcel')}</Btn>}/>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <div style={{display:'flex',gap:6,alignItems:'center',flex:1,minWidth:200}}>
           <Input value={searchInput}
             onChange={e=>setSearchInput(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-            placeholder="Numéro... puis Entrée"
+            placeholder={tr('compta.numeroPuisEntree')}
             style={{flex:1,minWidth:120}}/>
-          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
+          <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?tr('compta.tapeAbordDate'):undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>{tr('compta.chercher')}</Btn>
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
         </div>
         {['all','stock','vendu'].map(f=>(
           <Btn key={f} small onClick={()=>setFilter(f)} aria-pressed={filter===f} color={C.border} style={{color:filter===f?C.text:C.muted,fontWeight:filter===f?700:500,boxShadow:filter===f?`inset 0 0 0 2px ${C.accent}`:'none'}}>
-            {f==='all'?'Tous':f==='stock'?'Stock':'Vendus'}
+            {f==='all'?tr('compta.tous'):f==='stock'?tr('nav.garage'):tr('compta.vendus')}
           </Btn>
         ))}
       </div>
       {oldStockCount>0&&(
-        <div style={{background:C.card2||C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.muted,fontWeight:500}}>
-          {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
-        </div>
+        <div style={{background:C.card2||C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',fontSize:12,color:C.muted,fontWeight:500}}>{trj('compta.articlesStockDepuis', { n: oldStockCount })}</div>
       )}
       <Card style={{padding:0,overflow:'hidden'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -431,7 +430,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             ))}
           </tr></thead>
           <tbody>
-            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucun article</td></tr>}
+            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>{tr('compta.aucunArticle')}</td></tr>}
             {list.map(p=>(
               <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return 'transparent';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:600,color:C.accentTexte,fontSize:15,minWidth:60}}>
@@ -442,7 +441,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <span onClick={()=>toggleStatus(p.id)} style={{cursor:'pointer'}}>
-                    <Badge color={p.status==='stock'?C.accent:C.muted}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
+                    <Badge color={p.status==='stock'?C.accent:C.muted}>{p.status==='stock'?tr('nav.garage'):tr('stats.vendu2')}</Badge>
                   </span>
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
@@ -463,7 +462,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:60,fontFamily:'monospace',outline:'none'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
-                  <button type="button" onClick={fillNextId} title="Numéro suivant (dernier ajouté +1)"
+                  <button type="button" onClick={fillNextId} title={tr('compta.numeroSuivantDernier')}
                     style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:15,fontWeight:600,cursor:'pointer',lineHeight:1}}>
                     +1
                   </button>
@@ -471,14 +470,14 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
               </td>
               <td style={{padding:'6px 8px'}}>
                 <input ref={priceInputRef} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-                  type="number" placeholder="Prix achat&nbsp;€" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                  type="number" placeholder={tr('compta.prixAchat')} onKeyDown={e=>{if(e.key==='Enter')addRow();}}
                   style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:100,outline:'none',fontFamily:'inherit'}}
                   onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                 />
               </td>
-              <td colSpan={2} style={{padding:'6px 8px',color:C.muted,fontSize:11}}>← Entrée ou bouton pour ajouter</td>
+              <td colSpan={2} style={{padding:'6px 8px',color:C.muted,fontSize:11}}>{tr('compta.entreeBoutonAjouter')}</td>
               <td style={{padding:'6px 8px'}}>
-                <Btn small onClick={addRow} color={C.accent}>+ Ajouter</Btn>
+                <Btn small onClick={addRow} color={C.accent}>{tr('journee.ajouter')}</Btn>
               </td>
             </tr>}
           </tbody>
@@ -486,16 +485,16 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
       </Card>
       {/* Pagination Catalogue */}
       {!showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?totalPages-1:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>← Précédent</Btn>
+        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?totalPages-1:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>{tr('compta.precedent')}</Btn>
         <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
-          Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullList.length} résultats)</span>
+          {tr('compta.page')} <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>{trj('compta.resultats', { fullListN: fullList.length })}</span>
         </span>
-        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
+        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>{tr('compta.suivant')}</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>{tr('compta.voirTout')}</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} articles</span>
-        <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
+        <span style={{color:C.muted}}>{trj('compta.affichageCompletArticles', { fullListN: fullList.length })}</span>
+        <Btn small onClick={()=>setShowAll(false)} color={C.border}>{tr('compta.revenirPagination')}</Btn>
       </div>}
     </div>
   );
@@ -572,7 +571,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
   };
 
   const del=async (sid,pid)=>{
-    if(!await askConfirm('Supprimer cette vente ?')) return;
+    if(!await askConfirm(tr('compta.supprimerVente'))) return;
     const ns=sales.filter(s=>s.id!==sid); setSales(ns); save('vinted_sales',ns);
     const pids=String(pid||'').split('+').map(v=>v.trim()).filter(Boolean);
     const nc=catalog.map(p=>pids.includes(p.id)?{...p,status:'stock'}:p); setCatalog(nc); save('vinted_catalog',nc);
@@ -581,12 +580,12 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
   const addRow=()=>{
     setErr('');
     const rawPid=newRow.productId.trim();
-    if(!rawPid||!newRow.saleDate||!newRow.sellPrice){setErr('Article, date et prix vente obligatoires');return;}
+    if(!rawPid||!newRow.saleDate||!newRow.sellPrice){setErr(tr('compta.articleDatePrix'));return;}
     const pids=rawPid.split(/[+,;]+/).map(v=>v.trim()).filter(Boolean);
     const pid=pids.join('+');
     const foundItems=pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
     const alreadySold=pids.find(id=>{const cp=catalog.find(x=>x.id===id);return cp&&cp.status==='vendu';});
-    if(alreadySold){setErr(`#${alreadySold} déjà vendue`);return;}
+    if(alreadySold){setErr(tr('compta.dejaVendue', { alreadySold: String(alreadySold) }));return;}
     // (11 nov., revue robustesse) Un N° du lot introuvable, ou l'achat vide : `null`
     // (« pas su »), jamais 0 € — sinon bénéfice = prix de vente (src/venteManuelle.js).
     const buy=achatVenteManuelle(pids,catalog,newRow.buyPrice);
@@ -635,21 +634,19 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       {/* Bandeau mois en cours */}
       <div style={{display:'flex',flexWrap:'wrap',gap:14,background:C.card,
         border:`1px solid ${C.blue}44`,borderRadius:12,padding:'12px 16px'}}>
-        <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:500,width:'100%'}}>
-          📅 {moisVentes.nom} — mois en cours
-        </div>
-        <div><span style={{fontSize:11,color:C.muted}}>CA finalisé</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
-        <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div data-ventes-man-benef={moisVentes.profit==null?'':moisVentes.profit} style={{fontSize:20,fontWeight:600,color:C.text}}>{moisVentes.profit==null?'—':fmt(moisVentes.profit)}</div>{moisVentes.connus<moisVentes.count?<div style={{fontSize:11,color:C.muted}}>sur {moisVentes.connus} vente{moisVentes.connus>1?'s':''} sur {moisVentes.count}</div>:null}</div>
-        <div><span style={{fontSize:11,color:C.muted}}>Ventes</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
+        <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:500,width:'100%'}}>{trj('compta.moisCours', { nom: moisVentes.nom })}</div>
+        <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.caFinalise')}</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
+        <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.benefice')}</span><div data-ventes-man-benef={moisVentes.profit==null?'':moisVentes.profit} style={{fontSize:20,fontWeight:600,color:C.text}}>{moisVentes.profit==null?'—':fmt(moisVentes.profit)}</div>{moisVentes.connus<moisVentes.count?<div style={{fontSize:11,color:C.muted}}>{trj('compta.ventes2', { n: moisVentes.connus, x: moisVentes.count })}</div>:null}</div>
+        <div><span style={{fontSize:11,color:C.muted}}>{tr('historiqueSites.type.ventes')}</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
       </div>
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
-        <h2 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>Ventes ({sales.length})</h2>
+        <h2 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>{trj('compta.ventes', { salesN: sales.length })}</h2>
         <div style={{display:'flex',gap:12,fontSize:13,flexWrap:'wrap',alignItems:'center'}}>
-          <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
-          <span style={{color:C.muted}}>Bénéf. : <b data-ventes-man-total={totalProfit==null?'':totalProfit} style={{color:C.text}}>{totalProfit==null?'—':fmt(totalProfit)}</b>{totauxF.nConnus<totauxF.n?` sur ${totauxF.nConnus} vente${totauxF.nConnus>1?'s':''} sur ${totauxF.n}`:''}</span>
+          <span style={{color:C.muted}}>{tr('compta.caFiltre')} <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
+          <span style={{color:C.muted}}>{tr('compta.benef')} <b data-ventes-man-total={totalProfit==null?'':totalProfit} style={{color:C.text}}>{totalProfit==null?'—':fmt(totalProfit)}</b>{totauxF.nConnus<totauxF.n?tr('compta.ventes3', { n: String(totauxF.nConnus), x: String(totauxF.n) }):''}</span>
           <Btn small onClick={()=>{
-            if(fullFiltered.length===0){toast('Aucune vente à exporter');return;}
+            if(fullFiltered.length===0){toast(tr('compta.aucuneVenteExporter'));return;}
             const headers=['ID','N° Article','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
             const rows=fullFiltered.map(s=>[
               s.id||'',s.productId||'',s.saleDate||'',s.receiveDate||'',
@@ -664,16 +661,16 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             a.download=`ventes-${jourParis()}.csv`;
             document.body.appendChild(a);a.click();document.body.removeChild(a);
             URL.revokeObjectURL(url);
-          }} color={C.blue}>📤 Exporter Excel</Btn>
+          }} color={C.blue}>{tr('compta.exporterExcel2')}</Btn>
         </div>
       </div>
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
         <Input value={searchInput}
           onChange={e=>setSearchInput(e.target.value)}
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="Article, date... puis Entrée"
+          placeholder={tr('compta.articleDatePuis')}
           style={{maxWidth:280,flex:1,minWidth:160}}/>
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?tr('compta.tapeAbordDate'):undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>{tr('compta.chercher')}</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -691,7 +688,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             </tr></thead>
             <tbody>
               {/* (12 nov., finitions) À gauche : centré dans ce tableau large, « Aucune vente » sortait de l'écran du téléphone. */}
-              {filtered.length===0&&<tr><td colSpan={9} data-ventes-vide="" style={{padding:20,textAlign:'left',color:C.muted}}>Aucune vente</td></tr>}
+              {filtered.length===0&&<tr><td colSpan={9} data-ventes-vide="" style={{padding:20,textAlign:'left',color:C.muted}}>{tr('compta.aucuneVente')}</td></tr>}
               {filtered.map(v=>{
                 const b=beneficeVenteManuelle(v);
                 const isSelected=selectedIds.has(v.id);
@@ -738,7 +735,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
                         if(!inv) return <span style={{color:C.muted,fontSize:11}}>—</span>;
                         return <button type="button" onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings||{...ENTREPRISE_VIDE}))}
-                          title={`Voir la facture ${inv.number}`}
+                          title={tr('compta.voirFacture', { number: String(inv.number) })}
                           style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'monospace'}}>
                           📄 {inv.number}
                         </button>;
@@ -763,36 +760,36 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                       ...(inv?{saleDate:inv.saleDate||n.saleDate}:{}),
                     }));
                   }}
-                    placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                    placeholder={tr('compta.lot')} onKeyDown={e=>{if(e.key==='Enter')addRow();}}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:500}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.saleDate} onChange={e=>setNewRow(n=>({...n,saleDate:e.target.value}))}
-                    placeholder="jj/mm/aaaa"
+                    placeholder={tr('compta.jjMmAaaa')}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.receiveDate} onChange={e=>setNewRow(n=>({...n,receiveDate:e.target.value}))}
-                    placeholder="jj/mm/aaaa"
+                    placeholder={tr('compta.jjMmAaaa')}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{previewBuy==null?'—':fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
+                  {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{previewBuy==null?'—':fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>{tr('compta.lot2')}</span>:null}</span>:
                   <input value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-                    type="number" placeholder="Achat&nbsp;€"
+                    type="number" placeholder={tr('compta.achat')}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />}
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.sellPrice} onChange={e=>setNewRow(n=>({...n,sellPrice:e.target.value}))}
-                    type="number" placeholder="Vente&nbsp;€"
+                    type="number" placeholder={tr('compta.vente')}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
@@ -804,7 +801,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                   {previewBuy&&previewBuy>0&&previewSell?`×${(previewSell/previewBuy).toFixed(2)}`:''}
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  <Btn small onClick={addRow} color={C.accent}>+ Ajouter</Btn>
+                  <Btn small onClick={addRow} color={C.accent}>{tr('journee.ajouter')}</Btn>
                 </td>
               </tr>
               {err&&<tr><td colSpan={8} style={{padding:'6px 12px',color:C.danger,fontSize:12}}>⚠ {err}</td></tr>}
@@ -814,27 +811,27 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       </Card>
       {/* Pagination */}
       {!showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?totalPages-1:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>← Précédent</Btn>
+        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?totalPages-1:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>{tr('compta.precedent')}</Btn>
         <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
-          Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullFiltered.length} résultats)</span>
+          {tr('compta.page')} <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>{trj('compta.resultats2', { fullFilteredN: fullFiltered.length })}</span>
         </span>
-        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
+        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>{tr('compta.suivant')}</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>{tr('compta.voirTout')}</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.muted}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
-        <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
+        <span style={{color:C.muted}}>{trj('compta.affichageCompletVentes', { fullFilteredN: fullFiltered.length })}</span>
+        <Btn small onClick={()=>setShowAll(false)} color={C.border}>{tr('compta.revenirPagination')}</Btn>
       </div>}
       
       {/* Barre flottante en bas : bouton sélection + somme */}
       <div style={{position:'sticky',bottom:0,zIndex:20,padding:'8px 0',background:`linear-gradient(180deg, transparent 0%, ${C.bg} 30%)`}}>
         <Card style={{padding:'10px 14px',display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',background:selectMode?`${C.accent}15`:C.card,borderColor:selectMode?`${C.accent}66`:C.border}}>
           <Btn small onClick={()=>{setSelectMode(!selectMode);if(selectMode)setSelectedIds(new Set());}} aria-pressed={selectMode} color={C.border} style={{color:selectMode?C.text:C.muted,boxShadow:selectMode?`inset 0 0 0 2px ${C.accent}`:'none'}}>
-            {selectMode?'✓ Mode sélection actif':'☑️ Activer la sélection'}
+            {selectMode?tr('compta.modeSelectionActif'):tr('compta.activerSelection')}
           </Btn>
           {selectMode&&<>
             <span style={{fontSize:11,color:C.muted}}>
-              {selectedIds.size===0?'Clique ou glisse sur les lignes du tableau pour les sélectionner':`${selectedIds.size} vente${selectedIds.size>1?'s':''} sélectionnée${selectedIds.size>1?'s':''}`}
+              {selectedIds.size===0?tr('compta.cliqueGlisseLignes'):tr('compta.ventesSelectionnees', { n: String(selectedIds.size) })}
             </span>
             {selectedIds.size>0&&(()=>{
               const sel=fullFiltered.filter(v=>selectedIds.has(v.id));
@@ -843,8 +840,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
               const sumRecu=sel.filter(v=>v.receiveDate&&v.receiveDate.trim()!=='').reduce((s,v)=>s+ +v.sellPrice,0);
               return (<>
                 <span style={{fontSize:13,color:C.muted,marginLeft:'auto'}}>Σ : <b style={{color:C.text}}>{fmt(sumCA)}</b></span>
-                <span style={{fontSize:13,color:C.muted}}>💰 Reçu : <b style={{color:C.accentTexte}}>{fmt(sumRecu)}</b></span>
-                <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:C.text}}>{sumProfit==null?'—':fmt(sumProfit)}</b>{totSel.nConnus<totSel.n?` sur ${totSel.nConnus} sur ${totSel.n}`:''}</span>
+                <span style={{fontSize:13,color:C.muted}}>{tr('compta.recu')} <b style={{color:C.accentTexte}}>{fmt(sumRecu)}</b></span>
+                <span style={{fontSize:13,color:C.muted}}>{tr('compta.benef')} <b style={{color:C.text}}>{sumProfit==null?'—':fmt(sumProfit)}</b>{totSel.nConnus<totSel.n?tr('compta.texte10', { nConnus: String(totSel.nConnus), x: String(totSel.n) }):''}</span>
               </>);
             })()}
           </>}
@@ -872,7 +869,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const [showPro,setShowPro]=useState(false);
   const [fetching,setFetching]=useState(false);
   const [menuFac,setMenuFac]=useState(false);   // (11 nov., C4) la feuille « … » des factures au téléphone
-  const relireFacturesClic=async()=>{ setFetching(true); try{ const r=await import('../FacturePro.jsx').then((m)=>m.relireFactures(DEPS_FACTURE)).catch(()=>null); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } };
+  const relireFacturesClic=async()=>{ setFetching(true); try{ const r=await import('../FacturePro.jsx').then((m)=>m.relireFactures(DEPS_FACTURE)).catch(()=>null); if(r) toast(tr('compta.facturesRelues')); else toast(tr('compta.facturesOntPu')); } finally { setFetching(false); } };
   const PER_PAGE=50;
 
   // ⚠️⚠️ CHEMIN GOOGLE SHEETS RETIRÉ (9 septembre) — IL ÉTAIT MORT, MESURÉ.
@@ -982,7 +979,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       r=await reserverNumeroFacture({ factures: invoices, pris: load('vrm_factures_pris', {}), ent, annee: new Date().getFullYear(), appartient: invBelongsToActive, lire: acces.lire, ecrire: acces.ecrire });
     }catch(_){ r=null; }
     setReserveEnCours(false);
-    if(!r){ toast('⚠ Numéro de facture pas réservé (base injoignable) : aucune facture créée. Réessaie.'); return false; }
+    if(!r){ toast(tr('compta.numeroFactureReserve')); return false; }
     const newInvoice={
       id:'inv_'+Date.now(),
       entrepriseId:ent, // à quelle micro-entreprise cette facture appartient
@@ -998,7 +995,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   
   // Export CSV/Excel
   const exportExcel=()=>{
-    if(fullList.length===0){toast('Aucune facture à exporter');return;}
+    if(fullList.length===0){toast(tr('compta.aucuneFactureExporter'));return;}
     const multiEnt=Array.isArray(entreprises)&&entreprises.length>1;
     const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Article','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
     const rows=fullList.map(i=>{
@@ -1026,34 +1023,34 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
-        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:"Factures"} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
+        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:tr('compta.factures')} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
           right={<>
           {/* (11 nov., décision C4 — Julien : « tranche ») Au téléphone, les cinq boutons tassaient la
               ligne du titre : le geste principal reste visible, les quatre autres passent dans « … »
               (une feuille en portail, des lignes de 44 px). Sur ordinateur, rien ne change. */}
           <div className="vrm-fac-actions" data-fac-actions="large" style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-          <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
+          <Btn small primaire onClick={()=>setShowForm(true)}>{tr('compta.nouvelleFacture')}</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
               pouvait QUE échouer. Il relit maintenant les reçus arrivés par
               email — la source qui remplit vraiment cet écran. */}
           <Btn small outline color={C.muted} disabled={fetching} onClick={relireFacturesClic} style={{display:'inline-flex',alignItems:'center',gap:5}}>
-            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les factures'}
+            <Icon name="sync" size={13}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}
           </Btn>
-          <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Ma facture</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages des factures</Btn>
+          <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>{tr('compta.exporterExcel')}</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>{tr('compta.maFacture')}</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>{tr('compta.reglagesFactures')}</Btn>
           </div>
           <div className="vrm-fac-actions-tel" data-fac-actions="tel">
-            <Btn small primaire onClick={()=>setShowForm(true)} data-fac-principal="">+ Nouvelle facture</Btn>
-            <button type="button" className="vrm-icon-control vrm-fac-plus" data-fac-plus="" aria-haspopup="dialog" aria-expanded={menuFac} aria-label="Autres actions des factures" onClick={()=>setMenuFac(true)}><Icon name="more" size={20}/></button>
+            <Btn small primaire onClick={()=>setShowForm(true)} data-fac-principal="">{tr('compta.nouvelleFacture')}</Btn>
+            <button type="button" className="vrm-icon-control vrm-fac-plus" data-fac-plus="" aria-haspopup="dialog" aria-expanded={menuFac} aria-label={tr('compta.autresActionsFactures')} onClick={()=>setMenuFac(true)}><Icon name="more" size={20}/></button>
           </div>
         </>}/>
-        {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre="Factures" data-fac-menu="">
+        {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre={tr('compta.factures')} data-fac-menu="">
           <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(()=>setMenuFac(false), 0); }}>
-            <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?'Chargement…':'Relire les factures'}</button>
-            <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>Exporter Excel</button>
-            <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>Ma facture</button>
-            <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>Réglages des factures</button>
+            <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}</button>
+            <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>{tr('compta.exporterExcel')}</button>
+            <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>{tr('compta.maFacture')}</button>
+            <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>{tr('compta.reglagesFactures')}</button>
           </div>
         </SheetShell>}
         {/* (10 nov., Argent) Les segments SOUS la ligne du titre, pas dedans : cinq actions y
@@ -1072,22 +1069,20 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           value={searchInput}
           onChange={e=>setSearchInput(e.target.value)}
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="N° d’article ou date de vente... puis Entrée"
+          placeholder={tr('compta.articleDateVente')}
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?'Tape d’abord un N° ou une date':undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>Chercher</Btn>
-        {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?tr('compta.tapeAbordDate'):undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>{tr('compta.chercher')}</Btn>
+        {search&&<Btn small onClick={clearSearch} color={C.border}>{tr('compta.effacer')}</Btn>}
       </div>
-      {search&&<div style={{fontSize:12,color:C.muted}}>
-        🔍 « {search} » : {fullList.length} résultat{fullList.length>1?'s':''} dans toutes les factures.
-      </div>}
+      {search&&<div style={{fontSize:12,color:C.muted}}>{trj('compta.resultatsDansToutes', { n: fullList.length, search: search })}</div>}
       
       {/* Sous-onglets zones */}
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
-          {id:'attente',icon:'clock',label:'En attente',count:counters.attente},
-          {id:'comptabilisees',icon:'check',label:'Comptabilisées',count:counters.comptabilisees},
+          {id:'attente',icon:'clock',label:tr('compta.attente'),count:counters.attente},
+          {id:'comptabilisees',icon:'check',label:tr('compta.comptabilisees'),count:counters.comptabilisees},
         ].map(z=>(
           <button key={z.id} type="button" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
             style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
@@ -1098,7 +1093,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       </div>
       {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
           identique, faisait doublon.) */}
-      {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
+      {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>{tr('compta.rechercheActiveDans')}</div>}
       
       {/* Tableau factures */}
       <Card style={{padding:0,overflowX:'auto'}}>
@@ -1106,9 +1101,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
             téléphone, la phrase et « + Nouvelle facture » étaient coupés au bord de la carte. */}
         {list.length===0 ? <div data-factures-vide={zone} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
               {search.trim()
-                ? <>Aucune facture trouvée pour « {search} ».</>
+                ? <>{tr('compta.aucuneFactureTrouvee')} {search} ».</>
                 : zone==='attente'
-                  ? <>Aucune facture en attente.<br/>
+                  ? <>{tr('compta.aucuneFactureAttente')}<br/>
                       {/* ⚠️ Cette phrase parlait d'une « feuille Google » : le
                           pipeline Apps Script est mort (404, mesuré). Il aurait
                           attendu des factures qui ne pouvaient pas arriver. Ce
@@ -1117,24 +1112,24 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                       
                       <span style={{display:'inline-block',marginTop:10}}>
                         <Btn small color={C.accent} onClick={()=>setShowForm(true)}
-                          style={{display:'inline-flex',alignItems:'center',gap:5}}>+ Nouvelle facture</Btn>
+                          style={{display:'inline-flex',alignItems:'center',gap:5}}>{tr('compta.nouvelleFacture')}</Btn>
                       </span>
                     </>
-                  : <>Aucune facture comptabilisée.<br/>
-                      <span style={{fontSize:12}}>Une facture arrive ici quand tu la marques comptabilisée.</span>
+                  : <>{tr('compta.aucuneFactureComptabilisee')}<br/>
+                      <span style={{fontSize:12}}>{tr('compta.factureArriveIci')}</span>
                     </>}
 
         </div> :
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
           <thead>
             <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.article')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.facture')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.dateVente')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.designation')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('partout.part.prix')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.acheteur')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1154,8 +1149,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(valeurSue(inv.sellPrice))}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label="Imprimer la facture" title="Imprimer la facture"><Icon name="printer" size={15}/></Btn>
-                    <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Facture électronique Factur-X (PDF + XML EN16931 embarqué)">🧾</Btn>
+                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label={tr('compta.imprimerFacture')} title={tr('compta.imprimerFacture')}><Icon name="printer" size={15}/></Btn>
+                    <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title={tr('compta.factureElectroniqueFactur')}>🧾</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
                 </tr>
@@ -1167,16 +1162,16 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       
       {/* Pagination */}
       {!showAll&&totalPages>1&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?0:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>← Précédent</Btn>
+        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?0:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>{tr('compta.precedent')}</Btn>
         <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
-          Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullList.length} résultats)</span>
+          {tr('compta.page')} <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>{trj('compta.resultats', { fullListN: fullList.length })}</span>
         </span>
-        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?0:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>Voir tout</Btn>
+        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?0:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>{tr('compta.suivant')}</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>{tr('compta.voirTout')}</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.muted}}>📋 Affichage complet — {fullList.length} factures</span>
-        <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
+        <span style={{color:C.muted}}>{trj('compta.affichageCompletFactures', { fullListN: fullList.length })}</span>
+        <Btn small onClick={()=>setShowAll(false)} color={C.border}>{tr('compta.revenirPagination')}</Btn>
       </div>}
       
       {/* Modale création facture */}
@@ -1199,9 +1194,9 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
   
   const submit=()=>{
     setErr('');
-    if(!data.productId.trim()){setErr('Le numéro d’article est obligatoire');return;}
-    if(!data.sellPrice||+data.sellPrice<=0){setErr('Prix de vente invalide');return;}
-    if(!data.itemName.trim()){setErr('La désignation est obligatoire');return;}
+    if(!data.productId.trim()){setErr(tr('compta.numeroArticleObligatoire'));return;}
+    if(!data.sellPrice||+data.sellPrice<=0){setErr(tr('compta.prixVenteInvalide'));return;}
+    if(!data.itemName.trim()){setErr(tr('compta.designationObligatoire'));return;}
     onSave(data);
   };
   
@@ -1211,49 +1206,49 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-          <h3 style={{margin:0,color:C.accentTexte}}>Nouvelle facture</h3>
+          <h3 style={{margin:0,color:C.accentTexte}}>{tr('compta.nouvelleFacture2')}</h3>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
-        <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Numéro auto : <b style={{color:C.accentTexte}}>{nextNumber}</b></div>
+        <div style={{fontSize:11,color:C.muted,marginBottom:14}}>{tr('compta.numeroAuto')} <b style={{color:C.accentTexte}}>{nextNumber}</b></div>
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="N° article (étiquetage) *">
+          <Field label={tr('compta.articleEtiquetage')}>
             <Input type="number" value={data.productId} onChange={e=>{
               const id=e.target.value;
               const p=catalog.find(p=>p.id===id);
               setData(d=>({...d,productId:id, itemName:p?(d.itemName||''):d.itemName}));
-            }} placeholder="ex: 1280"/>
+            }} placeholder={tr('compta.ex1280')}/>
           </Field>
-          <Field label="Désignation *">
-            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder={vendActuel()==='sneakers' ? 'ex: Adidas Spezial bleu marine taille 365' : exemplesActuels().achat}/>
+          <Field label={tr('compta.designation2')}>
+            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder={vendActuel()==='sneakers' ? tr('compta.exAdidasSpezial') : exemplesActuels().achat}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-            <Field label="Prix de vente&nbsp;€ *">
+            <Field label={tr('compta.prixVente')}>
               <Input type="number" step="0.01" value={data.sellPrice} onChange={e=>setData(d=>({...d,sellPrice:e.target.value}))} placeholder="38.00"/>
             </Field>
-            <Field label="Date vente">
+            <Field label={tr('compta.dateVente')}>
               <Input type="date" value={data.saleDate} onChange={e=>setData(d=>({...d,saleDate:e.target.value}))}/>
             </Field>
           </div>
 
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:500}}>Acheteur</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:500}}>{tr('ventes.acheteur')}</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <Field label="Nom complet"><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder="Prénom Nom"/></Field>
-              <Field label="Email"><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder="prenom.nom@exemple.fr"/></Field>
-              <Field label="Adresse complète"><Input value={data.buyerAddress} onChange={e=>setData(d=>({...d,buyerAddress:e.target.value}))} placeholder="N° et rue, code postal, ville, pays"/></Field>
+              <Field label={tr('compta.nomComplet')}><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder={tr('compta.prenomNom')}/></Field>
+              <Field label={tr('auth.champ.emailPlaceholder')}><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder={tr('compta.prenomNomExemple')}/></Field>
+              <Field label={tr('compta.adresseComplete')}><Input value={data.buyerAddress} onChange={e=>setData(d=>({...d,buyerAddress:e.target.value}))} placeholder={tr('compta.rueCodePostal')}/></Field>
             </div>
           </div>
 
-          <Field label="N° transaction Vinted">
+          <Field label={tr('compta.transactionVinted')}>
             <Input value={data.vintedNumber} onChange={e=>setData(d=>({...d,vintedNumber:e.target.value}))} placeholder="19921523337"/>
           </Field>
 
           {err&&<div style={{color:C.danger,fontSize:12}}>⚠ {err}</div>}
 
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn primaire onClick={submit} style={{flex:1}}>Créer la facture</Btn>
-            <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
+            <Btn primaire onClick={submit} style={{flex:1}}>{tr('compta.creerFacture')}</Btn>
+            <Bouton variante="discret" onClick={onClose}>{tr('achats.annuler')}</Bouton>
           </div>
         </div>
       </div>
@@ -1283,35 +1278,35 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-          <h3 style={{margin:0,color:C.accentTexte}}>⚙ Réglages factures</h3>
+          <h3 style={{margin:0,color:C.accentTexte}}>{tr('compta.reglagesFactures2')}</h3>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
         {/* Sélecteur de micro-entreprise */}
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:5}}>Mes micro-entreprises</div>
+          <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:5}}>{tr('compta.mesMicroEntreprises')}</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
             {list.map(e=>(
               <button key={e.id} type="button" onClick={()=>pick(e.id)}
                 style={{border:`1px solid ${e.id===sel?C.accent:C.border}`,background:e.id===sel?`${C.accent}18`:'transparent',color:e.id===sel?C.accent:C.text,borderRadius:12,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                {e.id===activeEnt?'⭐ ':''}{e.companyName||'(sans nom)'}
+                {e.id===activeEnt?'⭐ ':''}{e.companyName||tr('compta.sansNom')}
               </button>
             ))}
-            <button type="button" onClick={addEnt} style={{border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
+            <button type="button" onClick={addEnt} style={{border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{tr('journee.ajouter')}</button>
           </div>
-          <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:5}}>⭐ = entité utilisée pour les nouvelles factures. Chaque entité a sa propre numérotation.</div>
+          <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:5}}>{tr('compta.entiteUtiliseeNouvelles')}</div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="Nom de l'entreprise"><Input value={data.companyName||''} onChange={e=>setData(d=>({...d,companyName:e.target.value}))}/></Field>
-          <Field label="Forme juridique"><Input value={data.companyType||''} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
-          <Field label="Adresse"><Input value={data.companyAddress||''} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
+          <Field label={tr('compta.nomEntreprise')}><Input value={data.companyName||''} onChange={e=>setData(d=>({...d,companyName:e.target.value}))}/></Field>
+          <Field label={tr('compta.formeJuridique')}><Input value={data.companyType||''} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
+          <Field label={tr('compta.adresse')}><Input value={data.companyAddress||''} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
           <Field label="SIRET"><Input value={data.siret||''} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
-          <Field label="Mention TVA (bas de facture)"><Input value={data.tvaMention!=null?data.tvaMention:'TVA non applicable, art. 293 B du CGI'} onChange={e=>setData(d=>({...d,tvaMention:e.target.value}))}/></Field>
-          <Field label="Message de bas de page"><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
-          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>Utiliser pour les nouvelles factures</Btn>}
+          <Field label={tr('compta.mentionTvaBas')}><Input value={data.tvaMention!=null?data.tvaMention:'TVA non applicable, art. 293 B du CGI'} onChange={e=>setData(d=>({...d,tvaMention:e.target.value}))}/></Field>
+          <Field label={tr('compta.messageBasPage')}><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
+          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>{tr('compta.utiliserNouvellesFactures')}</Btn>}
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn primaire onClick={saveCur} style={{flex:1}}>Enregistrer</Btn>
-            {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>🗑 Supprimer</Btn>}
-            <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
+            <Btn primaire onClick={saveCur} style={{flex:1}}>{tr('lbcplus.remise.enregistrer')}</Btn>
+            {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>{tr('compta.supprimer2')}</Btn>}
+            <Bouton variante="discret" onClick={onClose}>{tr('achats.annuler')}</Bouton>
           </div>
         </div>
       </div>
@@ -1487,12 +1482,12 @@ const luhnOk = (ch) => { let s = 0; for (let i = 0; i < ch.length; i++) { let n 
 const verifierSiren = (brut) => {
   const ch = String(brut || '').replace(/[\s.-]/g, '');
   if (!ch) return { etat: 'vide' };
-  if (!/^\d+$/.test(ch)) return { etat: 'invalide', raison: 'il ne doit contenir que des chiffres' };
-  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide', raison: `${ch.length} chiffre${ch.length > 1 ? 's' : ''} — un SIREN en a 9, un SIRET 14` };
+  if (!/^\d+$/.test(ch)) return { etat: 'invalide', raison: tr('compta.doitContenirChiffres') };
+  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide', raison: tr('compta.chiffresSiren9', { n: String(ch.length) }) };
   const type = ch.length === 9 ? 'SIREN' : 'SIRET';
   const siren = ch.slice(0, 9);
-  if (!luhnOk(siren)) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIREN ne correspond pas (faute de frappe ?)' };
-  if (type === 'SIRET' && !(siren === '356000000' ? ch.split('').reduce((s, c) => s + Number(c), 0) % 5 === 0 : luhnOk(ch))) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIRET ne correspond pas (faute de frappe ?)' };
+  if (!luhnOk(siren)) return { etat: 'invalide', type, raison: tr('compta.cleControleSiren') };
+  if (type === 'SIRET' && !(siren === '356000000' ? ch.split('').reduce((s, c) => s + Number(c), 0) % 5 === 0 : luhnOk(ch))) return { etat: 'invalide', type, raison: tr('compta.cleControleSiret') };
   return { etat: 'ok', type, siren };
 };
 // ⟦← App.jsx #27⟧
@@ -1547,17 +1542,17 @@ function DaterVentesLbc({ ventes, dates }) {
   const eur = (v) => v.price != null && isFinite(Number(v.price)) ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')}\u00a0€` : '—';
   return (
     <div data-dater-lbc={liste.length} style={{ padding: '10px 16px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
-      <div style={{ fontWeight: 600 }}>Dater tes ventes Leboncoin</div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>Recopie la date de « Mes transactions » : la vente entre dans son mois.</div>
+      <div style={{ fontWeight: 600 }}>{tr('compta.daterVentesLeboncoin')}</div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>{tr('compta.recopieDateMes')}</div>
       {liste.map((v) => {
         const tx = String(v.txId), cur = (dates || {})[tx] || '';
         const val = saisie[tx] != null ? saisie[tx] : cur;
         return (
           <div key={tx} data-dater-lbc-tx={tx} data-dater-lbc-date={cur} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
-            <span style={{ flex: '1 1 180px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || 'Vente Leboncoin'} · {eur(v)}</span>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || tr('compta.venteLeboncoin')} · {eur(v)}</span>
             <input type="date" aria-label={`Date de vente de ${v.title || 'cette vente'}`} max={max} min="2015-01-01" value={val} onChange={(e) => setSaisie((x) => ({ ...x, [tx]: e.target.value }))} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', fontSize: 17, minHeight: 44, background: C.bg, color: C.text, fontFamily: 'inherit' }}/>
-            <button type="button" data-dater-lbc-ok={tx} disabled={!val || val === cur} onClick={() => poser(tx, val)} style={{ border: 'none', borderRadius: 12, background: C.accent, color: C.onAccent || '#fff', padding: '8px 14px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!val || val === cur) ? 0.5 : 1, fontFamily: 'inherit' }}>Enregistrer</button>
-            {cur ? <button type="button" data-dater-lbc-retirer={tx} onClick={() => { setSaisie((x) => ({ ...x, [tx]: '' })); poser(tx, ''); }} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, padding: '8px 12px', minHeight: 44, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Retirer</button> : null}
+            <button type="button" data-dater-lbc-ok={tx} disabled={!val || val === cur} onClick={() => poser(tx, val)} style={{ border: 'none', borderRadius: 12, background: C.accent, color: C.onAccent || '#fff', padding: '8px 14px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!val || val === cur) ? 0.5 : 1, fontFamily: 'inherit' }}>{tr('lbcplus.remise.enregistrer')}</button>
+            {cur ? <button type="button" data-dater-lbc-retirer={tx} onClick={() => { setSaisie((x) => ({ ...x, [tx]: '' })); poser(tx, ''); }} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, padding: '8px 12px', minHeight: 44, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{tr('achats.retirer')}</button> : null}
             {msg && msg.tx === tx ? <div role="alert" style={{ flexBasis: '100%', fontSize: 12, color: C.warn }}>{msg.t}</div> : null}
           </div>);
       })}
@@ -1648,11 +1643,11 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
                 choix ne vaut que pour CETTE carte (le bénéfice a le sien).
                 (2 nov.) Dans « Le détail », le repli porte le titre. */}
             {!dansRepli && <div data-titre-carte-ca="" style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{TITRE_CARTE_CA}</div>}
-            <div data-ca-sa-periode="" style={{ fontSize: dansRepli ? 13 : 11, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{dansRepli ? <>Vendu : jour de la vente. Reçu : jour du versement (il se déclare).</> : 'Toutes plateformes · la période choisie ici ne vaut que pour cette carte.'}</div>
+            <div data-ca-sa-periode="" style={{ fontSize: dansRepli ? 13 : 11, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{dansRepli ? <>{tr('compta.venduJourVente')}</> : tr('compta.toutesPlateformesPeriode')}</div>
           </div>
           {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des
               sous-onglets de plateforme) : plus de segment rempli d'accent. */}
-          <nav role="group" aria-label="Période du chiffre d'affaires" className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, flex: '1 1 260px', maxWidth: 360, margin: 0 }}>
+          <nav role="group" aria-label={tr('stats.periodeChiffreAffaires')} className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, flex: '1 1 260px', maxWidth: 360, margin: 0 }}>
             {PERIODES_CA.map(([k, l]) => (
               <button key={k} type="button" onClick={() => choisir(k)} aria-pressed={periode === k} aria-current={periode === k ? 'page' : undefined} data-ca-choix={k} className="vrm-seg-btn">{l}</button>
             ))}
@@ -1660,14 +1655,14 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
         </div>
         {calc.etat !== 'lu' ? (
           <div style={{ padding: '16px', fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
-            {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre plutôt qu'un faux zéro."}
+            {calc.etat === 'encours' ? tr('stats.jeLisVentes') : tr('compta.jeAiPu')}
           </div>
         ) : (<>
           <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
             {COLS.map(([k, l, s], i) => (
               <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} data-ca-min={((partiel || (k === 'recu' && recuMin)) && cur[k] != null) ? '1' : undefined} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
                 <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>{l} · {cur.libelle}</div>
-                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: cur[k] == null || minNul(cur[k], k) ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{(partiel || (k === 'recu' && recuMin)) && cur[k] != null && !minNul(cur[k], k) ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{minNul(cur[k], k) ? '—' : montant(cur[k])}</div>
+                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: cur[k] == null || minNul(cur[k], k) ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{(partiel || (k === 'recu' && recuMin)) && cur[k] != null && !minNul(cur[k], k) ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>{tr('journee.moins')} </span> : null}{minNul(cur[k], k) ? '—' : montant(cur[k])}</div>
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{cur[k] == null ? s : `${nb(cur[k])} · ${s}`}</div>
               </div>
             ))}
@@ -1678,7 +1673,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
             <table data-ca-table className="vrm-ca-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ color: C.muted, textAlign: 'right' }}>
-                  <th style={{ textAlign: 'left', fontWeight: 600, padding: '9px 16px', fontSize: 11 }}>Période</th>
+                  <th style={{ textAlign: 'left', fontWeight: 600, padding: '9px 16px', fontSize: 11 }}>{tr('stats.periode')}</th>
                   {COLS.map(([k, l]) => <th key={k} style={{ fontWeight: 600, padding: '9px 16px 9px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>{l}</th>)}
                 </tr>
               </thead>
@@ -1686,7 +1681,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
                 {lignesPassees.map((r) => (
                   <tr key={r.cle} data-ca-ligne={r.libelle} style={{ borderTop: `1px solid ${C.border}` }}>
                     <td style={{ padding: '9px 16px', color: C.text, whiteSpace: 'nowrap' }}>{r.libelle}</td>
-                    {COLS.map(([k]) => <td key={k} data-ca-cellule={k} data-ca-min={((partiel || (k === 'recu' && recuMin)) && r[k] != null) ? '1' : undefined} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null || minNul(r[k], k) ? C.muted : C.text, whiteSpace: 'nowrap' }}>{(partiel || (k === 'recu' && recuMin)) && r[k] != null && !minNul(r[k], k) ? <span style={{ color: C.muted, fontSize: 12 }}>au moins </span> : null}{minNul(r[k], k) ? '—' : montant(r[k])}</td>)}
+                    {COLS.map(([k]) => <td key={k} data-ca-cellule={k} data-ca-min={((partiel || (k === 'recu' && recuMin)) && r[k] != null) ? '1' : undefined} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null || minNul(r[k], k) ? C.muted : C.text, whiteSpace: 'nowrap' }}>{(partiel || (k === 'recu' && recuMin)) && r[k] != null && !minNul(r[k], k) ? <span style={{ color: C.muted, fontSize: 12 }}>{tr('journee.moins')} </span> : null}{minNul(r[k], k) ? '—' : montant(r[k])}</td>)}
                   </tr>
                 ))}
               </tbody>
@@ -1694,15 +1689,15 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
           </div>}
           {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || calc.venduEbayEcartees > 0 || versements === null || calc.venduNonComptees.length > 0 || calc.recuNonComptees.length > 0) && (
             <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
-              {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
-              {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
-              {versements === null && <div>Dates de versement Vinted illisibles : « reçu » attend.</div>}
-              {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : hors « reçu » pour l'instant.</div>}
-              {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période — tu peux la dater ci-dessous.</div>}
+              {calc.manque.length > 0 && <div>{trj('compta.totauxPartielsSans', { x: calc.manque.join(', ') })}</div>}
+              {!calc.manque.length && calc.attente && <div>{tr('compta.leboncoinEbayLit')}</div>}
+              {versements === null && <div>{tr('compta.datesVersementVinted')}</div>}
+              {calc.aDater.length > 0 && <div>{trj('compta.ventesFinaliseesSans', { n: calc.aDater.length, fmt: fmt(aDaterEur) })}</div>}
+              {calc.venduSansDate > 0 && <div>{trj('compta.ventesLeboncoinSans', { n: calc.venduSansDate })}</div>}
               {/* (2 nov., audit des données G1) La commande eBay au montant pas lu est dans « non comptées » ci-dessous (une phrase, §7). */}
               {/* (1er nov., audits A2/A10) Des ventes faites dont l'argent ne se lit pas : dans AUCUNE colonne, dites (jamais 0 €). */}
-              {calc.venduNonComptees.length > 0 && <div data-ca-non-comptees={calc.venduNonComptees.length}>Pas dans « vendu » : {phraseNonComptees(calc.venduNonComptees)} — chaque montant est un minimum.</div>}
-              {calc.recuNonComptees.length > 0 && <div data-ca-recu-non-comptees={calc.recuNonComptees.length}>Pas dans « finalisé » ni « reçu » : {phraseNonComptees(calc.recuNonComptees)}.</div>}
+              {calc.venduNonComptees.length > 0 && <div data-ca-non-comptees={calc.venduNonComptees.length}>{trj('compta.dansVenduChaque', { phraseNonComptees: phraseNonComptees(calc.venduNonComptees) })}</div>}
+              {calc.recuNonComptees.length > 0 && <div data-ca-recu-non-comptees={calc.recuNonComptees.length}>{trj('compta.dansFinaliseNi', { phraseNonComptees: phraseNonComptees(calc.recuNonComptees) })}</div>}
             </div>
           )}
           {lbcCoqueLu === true ? <DaterVentesLbc ventes={(lbcVentes && lbcVentes.ventes) || []} dates={datesLbc}/> : null}
@@ -1723,7 +1718,7 @@ function ProfilFiscalCarte({ onNav }) {
   React.useEffect(() => { let mort = false; lireReglageMontage('vrm_pro_facture').then((d) => { if (!mort) { lue.current = d === null ? null : { ...(d || {}) }; setCfg(d === null ? null : { ...d }); } }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
   const ecrire = (next) => {
     if (!cfg) return;                                      // pas lu : on n'écrit rien
-    setCfg(next); setStatut('enregistrement…');
+    setCfg(next); setStatut(tr('compta.enregistrement'));
     try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: next })); } catch (_) {}
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
@@ -1733,8 +1728,8 @@ function ProfilFiscalCarte({ onNav }) {
       try {
         const res = await ecrireDifference({ base: SUPABASE_URL, id: 'vrm_pro_facture', entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner, avant: lue.current || {}, apres: next });
         if (res && res.ok && res.data && typeof res.data === 'object') { lue.current = { ...res.data }; setCfg((c) => fusion3(next, c || {}, res.data)); }   // ce qui vient d'ailleurs s'affiche ; une frappe faite depuis reste
-        setStatut(res && res.ok ? '✓ enregistré' : "⚠ pas enregistré — la base n'a pas répondu, réessaie");
-      } catch (_) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); }
+        setStatut(res && res.ok ? tr('compta.enregistre') : tr('compta.enregistreBaseRepondu'));
+      } catch (_) { setStatut(tr('compta.enregistreBaseRepondu')); }
     }, 600);
   };
   const regime = useRegimeFiscal();
@@ -1777,14 +1772,14 @@ function ProfilFiscalCarte({ onNav }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
           <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, background: C.card2 || C.bg, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Ton entreprise</div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : nom et adresse se remplissent.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{tr('reglages.pilotage.lib')}</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{tr('compta.siretSuffitNom')}</div>
           </div>
           {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
         </div>
         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {cfg === undefined && <div style={{ fontSize: 13, color: C.muted }}>Je lis ton entité…</div>}
-          {cfg === null && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>Base muette : rien à remplir pour ne rien écraser. Rouvre plus tard.</div>}
+          {cfg === undefined && <div style={{ fontSize: 13, color: C.muted }}>{tr('compta.jeLisEntite')}</div>}
+          {cfg === null && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>{tr('compta.baseMuetteRien')}</div>}
           {cfg && (<>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {PROFIL_CHAMPS.map(([k, ph, flex]) => (
@@ -1795,12 +1790,12 @@ function ProfilFiscalCarte({ onNav }) {
               ))}
             </div>
             <div data-siren={siren.etat} data-registre={registre ? registre.etat : undefined} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
-              {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres, avis INSEE) : le nom suit.'
-                : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Gardé tel quel : vérifie ton avis INSEE.`
-                : !registre || registre.etat === 'encours' ? `${siren.type} valide — je cherche ton entreprise au registre…`
-                : registre.etat === 'trouve' ? <>✓ Trouvée au registre des entreprises : <b className="vrm-sensible" data-stream-type="compte" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? ' — le registre la dit fermée, vérifie ton numéro.' : '.'}{cfg.nom && cfg.nom !== registre.nom ? ' Tu as gardé ton propre nom : VRM ne le remplace pas.' : ''}</>
-                : registre.etat === 'inconnu' ? `${siren.type} valide, mais aucune entreprise à ce numéro au registre public — tape le nom toi-même.`
-                : `${siren.type} valide. Registre muet : tape le nom, ou reviens plus tard.`}
+              {siren.etat === 'vide' ? tr('compta.tapeSiret14')
+                : siren.etat !== 'ok' ? tr('compta.numeroSembleValide', { raison: String(siren.raison) })
+                : !registre || registre.etat === 'encours' ? tr('compta.valideJeCherche', { type: String(siren.type) })
+                : registre.etat === 'trouve' ? <>{tr('compta.trouveeRegistreEntreprises')} <b className="vrm-sensible" data-stream-type="compte" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? tr('compta.registreDitFermee') : '.'}{cfg.nom && cfg.nom !== registre.nom ? tr('compta.asGardePropre') : ''}</>
+                : registre.etat === 'inconnu' ? tr('compta.valideMaisAucune', { type: String(siren.type) })
+                : tr('compta.valideRegistreMuet', { type: String(siren.type) })}
             </div>
           </>)}
           {/* (5 nov., chantier F, revue 2.27) Le statut ne se choisit plus ICI : un seul endroit,
@@ -1809,11 +1804,11 @@ function ProfilFiscalCarte({ onNav }) {
           {regime === 'micro' ? (
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
-                <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux aria-label="Taux de cotisations, en %"
+                <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{tr('compta.tauxCotisations')}</span>
+                <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux aria-label={tr('compta.tauxCotisations2')}
                   onBlur={() => { const v = parseFloat(String(taux).replace(',', '.')); const ok = (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT; setTaux(virgule(ok)); save('vinted_urssaf_taux', ok); }}
                   style={{ ...inp, width: 72, padding: '6px 9px', fontWeight: 600, minHeight: 44 }} />
-                <span style={{ fontSize: 13, color: C.muted }}>% du CA déclaré — celui que tu choisis, l'app ne le devine pas.</span>
+                <span style={{ fontSize: 13, color: C.muted }}>{tr('compta.caDeclareCelui')}</span>
               </div>
           </div>
           ) : null}
@@ -2016,12 +2011,12 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
         <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>{nom}</span>
         <span className="vrm-display" style={{ display: 'block', fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
           {R === undefined ? '…' : R === null ? '—' : `${R.n} · ${R.complet ? '' : 'au moins '}${fmt(R.total)}${R.type === 'achats' && R.nGros ? ` · dont ${R.nGros} achat${R.nGros > 1 ? 's' : ''} en gros` : ''}`}
-          {R && R.type === 'achats' && R.aVerifier ? <span data-registre-a-verifier-txt="" style={{ color: C.warn }}> · {R.aVerifier} à vérifier (N° aussi dans un achat en gros)</span> : null}
+          {R && R.type === 'achats' && R.aVerifier ? <span data-registre-a-verifier-txt="" style={{ color: C.warn }}>{trj('compta.verifierAussiDans', { aVerifier: R.aVerifier })}</span> : null}
         </span>
       </span>
       <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
-        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} aria-label={`Télécharger « ${nom} » en PDF`} title={`Télécharger « ${nom} » en PDF`} disabled={!R || !!enCours} onClick={() => exporter(type, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
-        <Bouton variante="secondaire" icone="save" data-registre-csv={type} aria-label={`Télécharger « ${nom} » en tableur`} title={`Télécharger « ${nom} » en tableur (Excel, Numbers)`} disabled={!R || !!enCours} onClick={() => exporter(type, 'csv')}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
+        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} aria-label={tr('compta.telechargerPdf', { nom: String(nom) })} title={tr('compta.telechargerPdf', { nom: String(nom) })} disabled={!R || !!enCours} onClick={() => exporter(type, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
+        <Bouton variante="secondaire" icone="save" data-registre-csv={type} aria-label={tr('compta.telechargerTableur', { nom: String(nom) })} title={tr('compta.telechargerTableurExcel', { nom: String(nom) })} disabled={!R || !!enCours} onClick={() => exporter(type, 'csv')}>{enCours === type + 'csv' ? '…' : tr('compta.tableur')}</Bouton>
         <Bouton variante="secondaire" data-registre-voir={type} disabled={R === undefined} onClick={() => setVue(type)}>{tr('registres.voir')}</Bouton>
       </span>
     </div>
@@ -2029,13 +2024,13 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
   return (
     <Card><div className="vrm-registres" data-registres={periode}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-        <span data-titre-section="" style={{ fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15, flex: '1 1 auto' }}>Registres</span>
-        <select aria-label="Période des registres" data-registres-periode="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
+        <span data-titre-section="" style={{ fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15, flex: '1 1 auto' }}>{tr('compta.registres')}</span>
+        <select aria-label={tr('compta.periodeRegistres')} data-registres-periode="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
           {periodes.map((p) => <option key={p} value={p}>{p.length === 4 ? p : libelleYm(p)}</option>)}
         </select>
       </div>
-      {ligne('recettes', 'Livre des recettes', recettes)}
-      {ligne('achats', 'Registre des achats', registreAchats)}
+      {ligne('recettes', tr('compta.livreRecettes'), recettes)}
+      {ligne('achats', tr('compta.registreAchats'), registreAchats)}
       {vue && <RegistresVue type={vue} setType={setVue} periode={periode} setPeriode={setPeriode} periodes={periodes} registres={complets}
         onClose={() => setVue(null)} exporter={(R, forme) => exporter(R.type, forme)} enCours={enCours} />}
     </div></Card>
@@ -2061,10 +2056,10 @@ function ExportComptableCarte(props) {
     <Card><div className="vrm-export-comptable" data-export-comptable={ouvert ? 'ouvert' : 'ferme'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>Pour mon comptable</div>
-          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>Un zip : tableur, récap PDF et factures.</div>
+          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>{tr('compta.monComptable')}</div>
+          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>{tr('compta.zipTableurRecap')}</div>
         </div>
-        {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>Préparer</Bouton>}
+        {!ouvert && <Bouton variante="secondaire" icone="doc" data-export-preparer="" onClick={() => setOuvert(true)}>{tr('compta.preparer')}</Bouton>}
       </div>
       {ouvert && <ExportComptableCorps key={periodeVoulue || 'x'} {...props} anneeVoulue={periodeVoulue} />}
     </div></Card>
@@ -2142,30 +2137,30 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
       data-export-ca={D ? cts(D.caDeclare) : ''} data-export-urssaf={D ? cts(D.urssaf) : ''} data-export-ventes-total={D ? cts(D.totalVentes) : ''}
       data-export-ventes-n={D && D.nVentes != null ? D.nVentes : ''} data-export-achats-n={D && D.nAchats != null ? D.nAchats : ''}
       data-export-sans-cout={D && D.sansCout != null ? D.sansCout : ''} data-export-adater={D && D.nADater != null ? D.nADater : ''}>
-      <Segmente label="Période de l’export" value={type} onChange={setType} options={TYPES_PERIODE.map(([v, l]) => ({ v, l, data: { 'data-export-type': v } }))} />
-      <select aria-label="Période" data-export-choix="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ marginTop: 10, width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
+      <Segmente label={tr('compta.periodeExport')} value={type} onChange={setType} options={TYPES_PERIODE.map(([v, l]) => ({ v, l, data: { 'data-export-type': v } }))} />
+      <select aria-label={tr('stats.periode')} data-export-choix="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ marginTop: 10, width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
         {choix.map((p) => <option key={p} value={p}>{libellePeriode(p)}</option>)}
       </select>
       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {D === undefined ? <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>Je lis tes ventes et tes achats…</div>
+        {D === undefined ? <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>{tr('compta.jeLisVentes')}</div>
           : resumeExport(D).map(([k, v, cle]) => (
             <div key={cle} data-export-ligne={cle} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, fontSize: 14 }}>
               <span style={{ color: C.muted }}>{k}</span><span className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{v}</span>
             </div>))}
       </div>
       {cv.length > 0 && <ul data-export-manque={cv.length} style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{cv.map((c) => <li key={c}>{c}</li>)}</ul>}
-      <Bouton variante="primaire" icone="archive" data-export-zip="" data-export-zip-voie={partageable ? 'partage' : 'telechargement'} disabled={!D || !!enCours} onClick={preparerZip} style={{ marginTop: 12, width: '100%' }} title="Tableur, récap PDF et factures dans un seul fichier">{enCours === 'zip' ? 'Je prépare le zip…' : partageable ? 'Partager le zip' : 'Télécharger le zip'}</Bouton>
+      <Bouton variante="primaire" icone="archive" data-export-zip="" data-export-zip-voie={partageable ? 'partage' : 'telechargement'} disabled={!D || !!enCours} onClick={preparerZip} style={{ marginTop: 12, width: '100%' }} title={tr('compta.tableurRecapPdf')}>{enCours === 'zip' ? tr('compta.jePrepareZip') : partageable ? tr('compta.partagerZip') : tr('compta.telechargerZip')}</Bouton>
       {retourZip && <p role="status" data-export-zip-fin={retourZip.fin} data-export-zip-manque={retourZip.manque ? retourZip.manque.length : ''} style={{ margin: '8px 0 0', fontSize: 13, color: retourZip.fin === 'ko' ? C.warn : C.muted, lineHeight: 1.5 }}>
-        {retourZip.fin === 'ko' ? `Zip pas créé : ${retourZip.raison}`
-          : retourZip.fin === 'annule' ? 'Partage annulé. Rien n’est parti.'
-          : <>{retourZip.fin === 'partage' ? 'Zip partagé' : 'Zip téléchargé'} : {retourZip.n} fichiers, dont {retourZip.ventes} facture{retourZip.ventes > 1 ? 's' : ''} de vente et {retourZip.achats} d’achat.
-            {retourZip.manque.length > 0 && <span data-export-zip-absents="" style={{ display: 'block', color: C.warn }}>Pas dedans : {retourZip.manque.join(' · ')}.</span>}</>}
+        {retourZip.fin === 'ko' ? tr('compta.zipCree', { raison: String(retourZip.raison) })
+          : retourZip.fin === 'annule' ? tr('compta.partageAnnuleRien')
+          : <>{retourZip.fin === 'partage' ? tr('compta.zipPartage') : tr('compta.zipTelecharge')} : {retourZip.n} {tr('compta.fichiersDont')} {retourZip.ventes} {tr('compta.facture2')}{retourZip.ventes > 1 ? 's' : ''} {tr('compta.vente2')} {retourZip.achats} {tr('compta.achat2')}
+            {retourZip.manque.length > 0 && <span data-export-zip-absents="" style={{ display: 'block', color: C.warn }}>{trj('compta.dedans', { x: retourZip.manque.join(' · ') })}</span>}</>}
       </p>}
       <details className="vrm-repli" data-export-a-part="" style={{ marginTop: 8 }}>
-        <summary style={{ fontSize: 13, color: C.muted }}>Un fichier seul</summary>
+        <summary style={{ fontSize: 13, color: C.muted }}>{tr('compta.fichierSeul')}</summary>
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          <Bouton variante="secondaire" icone="save" data-export-csv="" disabled={!D || !!enCours} onClick={() => telecharger('csv')} style={{ flex: '1 1 140px' }} title="Un fichier pour Excel ou Numbers">{enCours === 'csv' ? '…' : 'Tableur (CSV)'}</Bouton>
-          <Bouton variante="secondaire" icone="doc" data-export-pdf="" disabled={!D || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 140px' }}>{enCours === 'pdf' ? '…' : 'Récap PDF'}</Bouton>
+          <Bouton variante="secondaire" icone="save" data-export-csv="" disabled={!D || !!enCours} onClick={() => telecharger('csv')} style={{ flex: '1 1 140px' }} title={tr('compta.fichierExcelNumbers')}>{enCours === 'csv' ? '…' : tr('compta.tableurCsv')}</Bouton>
+          <Bouton variante="secondaire" icone="doc" data-export-pdf="" disabled={!D || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 140px' }}>{enCours === 'pdf' ? '…' : tr('compta.recapPdf')}</Bouton>
         </div>
       </details>
     </div>
@@ -2313,7 +2308,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     setSpMsg(''); setSpOccupe('deconnexion');
     const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'deconnecter' });
     setSpOccupe('');
-    if (code === 200 && j.ok) { setSpMsg('Compte Super PDP déconnecté : VRM a effacé tes identifiants.'); relireSpdp(); }
+    if (code === 200 && j.ok) { setSpMsg(tr('compta.compteSuperPdp')); relireSpdp(); }
     else setSpMsg(j.message || "Le serveur n'a pas répondu : la connexion est peut-être toujours rangée.");
   };
   const envoiDe = (num) => (spdp && spdp.envois && num && spdp.envois[num.numero]) || null;
@@ -2343,14 +2338,14 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const envoyerSpdp = async (l, relireSeulement) => {
     setMsg('');
     if (!etat.ok) { setMsg(etat.raison + ' ' + etat.geste); return; }
-    if (!nuage) { setMsg("Je relis d'abord les numéros de facture déjà donnés — réessaie dans un instant."); return; }
+    if (!nuage) { setMsg(tr('compta.jeRelisAbord')); return; }
     setEnCours(l.id);
     try {
       if (relireSeulement) {
         const numero = numeroDe(l.id) && numeroDe(l.id).numero;
         const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'relire', numero });
         if (j.envoi) noterEnvoiLocal(numero, j.envoi);
-        setMsg(code === 200 ? `Statut relu chez Super PDP pour ${numero}.` : (j.message || "Super PDP n'a pas répondu : statut pas relu."));
+        setMsg(code === 200 ? tr('compta.statutReluChez', { numero: String(numero) }) : (j.message || tr('compta.superPdpRepondu')));
         return;
       }
       const { f, octets } = await preparerFacture(l);
@@ -2359,8 +2354,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
       if (j.envoi) noterEnvoiLocal(f.numero, j.envoi);
       // La réponse n'est pas arrivée : INCERTAIN, jamais « refusé ».
       else if (code === 0) noterEnvoiLocal(f.numero, { etat: 'incertain' });
-      if (code === 200) setMsg(j.deja ? `Facture ${f.numero} : déjà chez Super PDP — rien n'a été renvoyé.` : `Facture ${f.numero} envoyée à Super PDP.`);
-      else setMsg(j.message || (code === 0 ? "La réponse du serveur n'est pas arrivée : je ne sais pas si la facture est partie. « Relire » la cherchera chez Super PDP." : "L'envoi a échoué."));
+      if (code === 200) setMsg(j.deja ? tr('compta.factureDejaChez', { numero: String(f.numero) }) : tr('compta.factureEnvoyeeSuper', { numero: String(f.numero) }));
+      else setMsg(j.message || (code === 0 ? tr('compta.reponseServeurArrivee') : tr('compta.envoiEchoue')));
       relireSpdp();
     } catch (e) { setMsg('La facture n’a pas pu être préparée : ' + String((e && e.message) || e).slice(0, 120)); }
     finally { setEnCours(''); }
@@ -2368,12 +2363,12 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const genererFacture = async (l) => {
     setMsg('');
     if (!etat.ok) { setMsg(etat.raison + ' ' + etat.geste); return; }
-    if (!nuage) { setMsg("Je relis d'abord les numéros de facture déjà donnés — réessaie dans un instant."); return; }
+    if (!nuage) { setMsg(tr('compta.jeRelisAbord')); return; }
     setEnCours(l.id);
     try {
       const { f, octets } = await preparerFacture(l);
       telechargerFichier(new Blob([octets], { type: 'application/pdf' }), nomFichierFacture(f.numero), 'application/pdf');
-      setMsg(`Facture ${f.numero} téléchargée — à déposer sur ta plateforme agréée.`);
+      setMsg(tr('compta.factureTelechargeeDeposer', { numero: String(f.numero) }));
     } catch (e) { setMsg('La facture n’a pas pu être préparée : ' + String((e && e.message) || e).slice(0, 120)); }
     finally { setEnCours(''); }
   };
@@ -2395,10 +2390,10 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
           {chip('doc')}
           <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Facturation électronique</div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Connecte Super PDP, ou dépose les fichiers toi-même.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{tr('compta.facturationElectronique')}</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{tr('compta.connecteSuperPdp')}</div>
           </div>
-          <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label="Mois" data-fe-mois
+          <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label={tr('achats.mois')} data-fe-mois
             style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
             {mois.map((m) => <option key={m} value={m}>{libelleYm(m)}</option>)}
           </select>
@@ -2419,32 +2414,32 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── SUPER PDP : SON compte ── */}
         <div data-spdp data-spdp-etat={spdp === undefined ? 'encours' : spdp === null ? 'passu' : spdp.connecte ? 'connecte' : spdp.illisible ? 'illisible' : 'deconnecte'} style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Plateforme agréée · Super PDP</div>
-          {spdp === undefined && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>Je lis ta connexion Super PDP…</div>}
-          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Connexion Super PDP pas lue : ni « connecté », ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{tr('compta.plateformeAgreeeSuper')}</div>
+          {spdp === undefined && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{tr('compta.jeLisConnexion')}</div>}
+          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>{tr('compta.connexionSuperPdp')} <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>{tr('ranger.reessayer')}</button></div>}
           {spdp && spdp.connecte && <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
             <div style={{ flex: '1 1 220px', fontSize: 13, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
-              <strong>Connecté à Super PDP</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? ' (rien ne part réellement aux impôts)' : ''}
-              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>Tes identifiants restent chiffrés sur le serveur. <Pourquoi label="L'environnement ?">Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement.</Pourquoi></div>
+              <strong>{tr('compta.connecteSuperPdp2')}</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? tr('compta.rienPartReellement') : ''}
+              <div className="vrm-aide" style={{ fontSize: 11, color: C.muted }}>{tr('compta.identifiantsRestentChiffres')} <Pourquoi label={tr('compta.environnement')}>{tr('compta.choixCeluiAs')}</Pourquoi></div>
             </div>
-            <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : 'Déconnecter'}</button>
+            <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : tr('annonces.deconnecter2')}</button>
           </div>}
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
-            {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
-            {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant et le secret de TON compte Super PDP. Il facture ses envois, pas VRM. <Pourquoi label="Où les trouver ?">Dans l'espace développeur de ton compte Super PDP. Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais.</Pourquoi></div>
-            <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>{tr('compta.connexionSuperPdp2')}</div>}
+            {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>{tr('compta.serveurCoffreConfigure')}</div>}
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{tr('compta.colleIdentifiantSecret')} <Pourquoi label={tr('compta.trouver')}>{tr('compta.dansEspaceDeveloppeur')}</Pourquoi></div>
+            <div role="radiogroup" aria-label={tr('compta.environnement2')} style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
                   style={{ ...btn2(true), borderColor: spEnv === k ? C.accent : C.border, color: spEnv === k ? C.accent : C.text }}>{t}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-              <input data-spdp-id value={spId} onChange={(e) => setSpId(e.target.value)} placeholder="Identifiant client (client_id)" autoComplete="off" spellCheck={false}
+              <input data-spdp-id value={spId} onChange={(e) => setSpId(e.target.value)} placeholder={tr('compta.identifiantClientClient')} autoComplete="off" spellCheck={false}
                 style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
-              <input data-spdp-secret type="password" value={spSecret} onChange={(e) => setSpSecret(e.target.value)} placeholder="Secret client (client_secret)" autoComplete="new-password" spellCheck={false}
+              <input data-spdp-secret type="password" value={spSecret} onChange={(e) => setSpSecret(e.target.value)} placeholder={tr('compta.secretClientClient')} autoComplete="new-password" spellCheck={false}
                 style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
-              <button type="button" data-spdp-connecter disabled={!!spOccupe || !spId.trim() || !spSecret.trim() || spdp.coffre === false} onClick={connecterSpdp} style={btn2(!spOccupe && !!spId.trim() && !!spSecret.trim() && spdp.coffre !== false)}>{spOccupe === 'connexion' ? 'Vérification…' : 'Connecter'}</button>
+              <button type="button" data-spdp-connecter disabled={!!spOccupe || !spId.trim() || !spSecret.trim() || spdp.coffre === false} onClick={connecterSpdp} style={btn2(!spOccupe && !!spId.trim() && !!spSecret.trim() && spdp.coffre !== false)}>{spOccupe === 'connexion' ? tr('compta.verification') : tr('compta.connecter')}</button>
             </div>
           </div>}
           {spMsg && <div data-spdp-msg role="status" style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{spMsg}</div>}
@@ -2452,41 +2447,39 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── RÉCAP E-REPORTING ── */}
         <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Déclaration des ventes à l’administration · {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{trj('compta.declarationVentesAdministration', { libelleYm: libelleYm(ym) })}</div>
           {!recap ? (
             <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
-              {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total plutôt qu'un faux zéro."}
+              {calc.etat === 'encours' ? tr('stats.jeLisVentes') : tr('compta.jeAiPu2')}
             </div>
           ) : (<div data-fe-recap data-recap-ym={ym} data-recap-total={eurDe(recap.centimes)} data-recap-n={recap.n} data-recap-partiel={recap.partiel ? '1' : '0'}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
               <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: -0.6 }}>
-                {recap.partiel && <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span>}{fmt(recap.centimes / 100)}
+                {recap.partiel && <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>{tr('journee.moins')} </span>}{fmt(recap.centimes / 100)}
               </div>
-              <div style={{ fontSize: 13, color: C.muted }}>{recap.n} vente{recap.n > 1 ? 's' : ''} · datées comme ton CA déclaré (au versement pour Vinted)</div>
+              <div style={{ fontSize: 13, color: C.muted }}>{trj('compta.ventesDateesComme', { n: recap.n })}</div>
             </div>
             {parPlat.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
               {parPlat.map(([p, x]) => <span key={p} data-recap-plateforme={p} style={{ fontSize: 11, color: C.text, border: `1px solid ${C.border}`, borderRadius: 999, padding: '3px 10px' }}>{p} · {fmt(x.centimes / 100)} · {x.n}</span>)}
             </div>}
-            {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>
-              Total partiel — il manque : {recap.manques.join(' ; ')}. Le fichier le dit aussi.
-            </div>}
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Toutes tes ventes du mois y sont : retire celles faites à une entreprise. <Pourquoi>VRM ne sait pas si un acheteur est une entreprise. Une vente à une entreprise demande une facture, pas ce récapitulatif.</Pourquoi></div>
+            {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>{trj('compta.totalPartielManque', { x: recap.manques.join(' ; ') })}</div>}
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>{tr('compta.toutesVentesMois')} <Pourquoi>{tr('compta.vrmSaitAcheteur')}</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title="Le récapitulatif des factures, pour Excel ou Numbers"><Icon name="save" size={14} />Récapitulatif (tableur)</button>
-              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title="Le même récapitulatif, en fichier pour un logiciel de compta"><Icon name="save" size={14} />Récapitulatif (fichier)</button>
+              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)} title={tr('compta.recapitulatifFacturesExcel')}><Icon name="save" size={14} />{tr('compta.recapitulatifTableur')}</button>
+              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)} title={tr('compta.memeRecapitulatifFichier')}><Icon name="save" size={14} />{tr('compta.recapitulatifFichier')}</button>
             </div>
-            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas tout seul : dépose-le toi-même sur Super PDP. <Pourquoi>La forme de son envoi par l'API n'a pas pu être vérifiée dans la documentation officielle de Super PDP.</Pourquoi></div>}
+            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>{tr('compta.recapitulatifPartTout')} <Pourquoi>{tr('compta.formeEnvoiApi')}</Pourquoi></div>}
           </div>)}
         </div>
 
         {/* ── FACTURES FACTUR-X ── */}
         <div style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures électroniques · ventes de {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{trj('compta.facturesElectroniquesVentes', { libelleYm: libelleYm(ym) })}</div>
           {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 13, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 12, padding: '10px 12px' }}>
             {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }}> {etat.geste}</span> : null}
           </div>}
-          {etat.ok && <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Vendeur : {etat.vendeur.nom} · SIREN {etat.vendeur.siren} · « {etat.vendeur.mention} ». Acheteur : le nom porté par la vente, sinon « Particulier ».</div>}
-          {recap && recap.lignes.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>Aucune vente datée sur ce mois{recap.partiel ? ' (avec ce qui a pu être lu)' : ''}.</div>}
+          {etat.ok && <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>{trj('compta.vendeurSirenAcheteur', { nom: etat.vendeur.nom, siren: etat.vendeur.siren, mention: etat.vendeur.mention })}</div>}
+          {recap && recap.lignes.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{tr('compta.aucuneVenteDatee')}{recap.partiel ? tr('compta.avecPuEtre') : ''}.</div>}
           {recap && recap.lignes.length > 0 && <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginTop: 10 }}>
             {recap.lignes.map((l, i) => {
               const num = numeroDe(l.id);
@@ -2497,24 +2490,24 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
                 <div key={l.id} data-fe-vente={l.id} data-spdp-ligne={env ? env.etat : ''} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: i ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre || 'Article'}</div>
-                    <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{l.plateforme} · {l.plateforme === 'Vinted' ? 'versée' : l.plateforme === 'eBay' ? 'payée' : 'vendue'} le {frJour(l.ts)}{num ? ` · ${num.numero}` : ''}</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{l.plateforme} · {l.plateforme === 'Vinted' ? tr('compta.versee') : l.plateforme === 'eBay' ? tr('compta.payee') : 'vendue'} {tr('compta.texte')} {frJour(l.ts)}{num ? ` · ${num.numero}` : ''}</div>
                     {lib && <div data-spdp-statut={env.etat} style={{ fontSize: 11, marginTop: 2, lineHeight: 1.45, color: lib.ton === 'attention' ? C.warn : C.muted, overflowWrap: 'anywhere' }}>{lib.texte}</div>}
                   </div>
                   <span className="vrm-display" style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(l.eur)}</span>
-                  <button type="button" data-fe-facture={l.id} disabled={!peutFacturer || enCours === l.id} title={raisonGrise || 'Télécharger la facture Factur-X (PDF + XML)'}
+                  <button type="button" data-fe-facture={l.id} disabled={!peutFacturer || enCours === l.id} title={raisonGrise || tr('compta.telechargerFactureFactur')}
                     onClick={() => genererFacture(l)} style={btn2(peutFacturer && enCours !== l.id)}>
-                    <Icon name="receipt" size={14} />{enCours === l.id ? '…' : 'Facture'}
+                    <Icon name="receipt" size={14} />{enCours === l.id ? '…' : tr('achats.facture')}
                   </button>
                   {spdp && spdp.connecte && (peutRelire
-                    ? <button type="button" data-spdp-relire={l.id} onClick={() => envoyerSpdp(l, true)} style={btn2(true)}>Relire</button>
-                    : <button type="button" data-spdp-envoyer={l.id} disabled={!peutEnvoyer} title={!peutFacturer ? raisonGrise : 'Envoyer la facture Factur-X à Super PDP'}
-                        onClick={() => envoyerSpdp(l, false)} style={btn2(peutEnvoyer)}>{enCours === l.id ? '…' : 'Envoyer à Super PDP'}</button>)}
+                    ? <button type="button" data-spdp-relire={l.id} onClick={() => envoyerSpdp(l, true)} style={btn2(true)}>{tr('compta.relire')}</button>
+                    : <button type="button" data-spdp-envoyer={l.id} disabled={!peutEnvoyer} title={!peutFacturer ? raisonGrise : tr('compta.envoyerFactureFactur')}
+                        onClick={() => envoyerSpdp(l, false)} style={btn2(peutEnvoyer)}>{enCours === l.id ? '…' : tr('compta.envoyerSuperPdp')}</button>)}
                 </div>
               );
             })}
           </div>}
           {msg && <div data-fe-msg role="status" style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{msg}</div>}
-          <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numéros FX-AAAA-0001, continus par année ; une vente garde le sien. <Pourquoi label="Fichier conforme ?">La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</Pourquoi></div>
+          <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>{tr('compta.numerosFxAaaa')} <Pourquoi label={tr('compta.fichierConforme')}>{tr('compta.conformiteFichierEte')}</Pourquoi></div>
         </div>
       </div>
     </Card>
@@ -2548,7 +2541,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   useEffect(() => { const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_taux') setTaux(tauxUrssaf()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   useEffect(() => onCloudReady(() => setTaux(tauxUrssaf())), []);
   const pf = useProfilFiscal();
-  if (regime === undefined) return partie === 'declarer' ? <div className="vrm-compta-carte"><p className="vrm-compta-phrase" style={{ margin: 0 }}>Je lis ton statut…</p></div> : null;
+  if (regime === undefined) return partie === 'declarer' ? <div className="vrm-compta-carte"><p className="vrm-compta-phrase" style={{ margin: 0 }}>{tr('compta.jeLisStatut')}</p></div> : null;
   const choisir = (k) => { save('vinted_regime', k); setChanger(false); };
   // (9 nov.) L'activité du micro-entrepreneur (achat-revente ou prestations) : SES taux.
   const activite = pf.activite === 'services' ? 'services' : 'vente';
@@ -2570,11 +2563,11 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   const carteChoix = (
     <Card style={{ padding: 18 }}>
       <div data-statut-carte={regime ? 'changer' : 'question'}>
-        <h3 className="vrm-titre-compta" style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: C.text }}>{regime ? 'Change ton statut' : 'Quel est ton statut ?'}</h3>
-        <p className="vrm-aide" style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>L'URSSAF n'apparaît qu'en micro-entreprise. Modifiable à tout moment.</p>
+        <h3 className="vrm-titre-compta" style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: C.text }}>{regime ? tr('compta.changeStatut') : tr('compta.quelStatut')}</h3>
+        <p className="vrm-aide" style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{tr('compta.urssafApparaitMicro')}</p>
         {choix}
         {!regime && pf.etat === 'inconnu' ? <AideStatutNeutre /> : null}
-        {regime && <button type="button" className="vrm-lien-action" onClick={() => setChanger(false)} style={{ marginTop: 10, border: 'none', background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Annuler</button>}
+        {regime && <button type="button" className="vrm-lien-action" onClick={() => setChanger(false)} style={{ marginTop: 10, border: 'none', background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>{tr('achats.annuler')}</button>}
       </div>
     </Card>
   );
@@ -2586,8 +2579,8 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
         <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15, margin: '0 16px 8px' }}>{L.statut}</h3>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           <div className="vrm-set-ligne">
-            <span className="vrm-set-lib" data-statut-actuel={regime}><b style={{ color: C.text }}>{libelleRegime(regime)}</b><small style={{ color: C.muted }}>VRM adapte ta comptabilité à ce statut.</small></span>
-            <button type="button" className="vrm-lien-action" data-statut-changer="" onClick={() => setChanger(true)} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 600, fontFamily: 'inherit', fontSize: 15, cursor: 'pointer', padding: '0 4px', minHeight: 44 }}>Changer</button>
+            <span className="vrm-set-lib" data-statut-actuel={regime}><b style={{ color: C.text }}>{libelleRegime(regime)}</b><small style={{ color: C.muted }}>{tr('compta.vrmAdapteComptabilite')}</small></span>
+            <button type="button" className="vrm-lien-action" data-statut-changer="" onClick={() => setChanger(true)} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 600, fontFamily: 'inherit', fontSize: 15, cursor: 'pointer', padding: '0 4px', minHeight: 44 }}>{tr('achats.changer')}</button>
           </div>
         </div>
       </div>
@@ -2596,7 +2589,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   if (partie === 'suivi') {
     if (regime !== 'micro') return null;
     return (<>
-      <ComptaRepli id="compta-suivi" titre="Tes déclarations URSSAF" resume="Ce que tu as déclaré et payé, période par période">
+      <ComptaRepli id="compta-suivi" titre={tr('compta.declarationsUrssaf')} resume="Ce que tu as déclaré et payé, période par période">
         <SuiviUrssaf onNav={onNav} sansTitre />
       </ComptaRepli>
       <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} activite={activite} />
@@ -2606,15 +2599,15 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   if (!regime) return carteChoix;
   if (regime !== 'micro') {
     const texte = regime === 'particulier'
-      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000&nbsp;€</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Argent → Déclarer → Ton statut).</>
+      ? <>{tr('compta.vendsPropresAffaires')} <b>{tr('compta.30Ventes2')}</b> {tr('compta.detailCompteCompte')}</>
       : regime === 'marge'
-        ? <>Régime de la marge : VRM calcule la TVA sur ta marge dans le rapport comptable (Ventes → Outils). Tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas — ton comptable s'en charge.</>
-        : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent sur cet écran, pour ton comptable.</>;
+        ? <>{tr('compta.regimeMargeVrm')}</>
+        : <>{tr('compta.societeImpotsCotisations')}</>;
     // (9 nov.) Société : la TVA qu'il a CHOISIE (jamais déduite), et le livre des recettes et
     // l'export comptable remontés juste en dessous (`pf.exportEnAvant`).
     const tvaTexte = { franchise: 'Franchise en base de TVA : tes factures portent « TVA non applicable ».', normale: 'TVA collectée : ton comptable la déclare à partir de ton export.', marge: 'TVA sur la marge.' };
     return <div className="vrm-compta-carte"><div data-statut-carte={regime} data-profil-fiscal={pf.etat || ''} style={{ fontSize: 15, color: C.text, lineHeight: 1.6 }}>{texte}
-      {pf.livre ? <div data-profil-tva={pf.tva || 'pasdit'} style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{pf.tva ? tvaTexte[pf.tva] : 'Ta TVA n’est pas dite : choisis-la dans Réglages → Ma configuration.'} Livre, registre et export : juste en dessous.</div> : null}
+      {pf.livre ? <div data-profil-tva={pf.tva || 'pasdit'} style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{pf.tva ? tvaTexte[pf.tva] : tr('compta.tvaDiteChoisis')} {tr('compta.livreRegistreExport')}</div> : null}
     </div></div>;
   }
   return <CarteUrssafMois liveStats={liveStats} onNav={onNav} />;
@@ -2730,23 +2723,23 @@ function Dac7Plateformes({ ligne, annee }) {
   return (
     <div data-dac7="" data-dac7-annee={annee} style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 4 }}>
-        <span style={{ fontWeight: 600, color: C.text }}>DAC7</span>
-        <span style={{ color: C.muted }}>30 ventes ou plus de 2 000&nbsp;€</span>
+        <span style={{ fontWeight: 600, color: C.text }}>{tr('compta.dac7')}</span>
+        <span style={{ color: C.muted }}>{tr('compta.30VentesPlus')}</span>
       </div>
       {D.plateformes.map((p) => {
         const pct = p.etat !== 'lu' ? 0 : Math.min(100, Math.max(p.n / 30, p.centimes / 200000) * 100);
         const droite = p.etat !== 'lu' ? '—'
-          : p.verdict === 'atteint' ? <b style={{ color: C.text }}>atteint</b>
-          : p.verdict === 'atteintSi' ? <>atteint si {p.nAd} à dater</>
+          : p.verdict === 'atteint' ? <b style={{ color: C.text }}>{tr('compta.atteint')}</b>
+          : p.verdict === 'atteintSi' ? <>{tr('compta.atteint2')} {p.nAd} {tr('compta.dater')}</>
           // (11 nov., restes) Aucune vente sur cette plateforme : le reste EST le seuil, déjà écrit dans
           // l'en-tête — le redire sur chaque ligne l'écrivait trois fois (§7). La jauge vide le dit.
-          : p.verdict === 'sous' ? (p.n === 0 && p.centimes === 0 ? null : <>encore {p.reste.n} vente{p.reste.n > 1 ? 's' : ''} ou {eur(p.reste.centimes)}</>)
-          : <>au moins</>;
+          : p.verdict === 'sous' ? (p.n === 0 && p.centimes === 0 ? null : <>{tr('compta.encore')} {p.reste.n} {tr('journee.vente')}{p.reste.n > 1 ? 's' : ''} {tr('annonces.texte5')} {eur(p.reste.centimes)}</>)
+          : <>{tr('journee.moins')}</>;
         return (
           <div key={p.plateforme} data-dac7-plateforme={p.plateforme} data-etat={p.etat} data-n={p.n == null ? '' : p.n} data-cts={p.centimes == null ? '' : p.centimes} data-verdict={p.verdict || ''} data-a-dater={p.nAd || ''} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', fontSize: 13 }}>
               <span style={{ color: C.text, fontWeight: 600 }}>{p.plateforme}</span>
-              <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{p.etat !== 'lu' ? '—' : <>{p.partiel ? 'au moins ' : ''}{p.n} vente{p.n > 1 ? 's' : ''} · {eur(p.centimes)}</>}</span>
+              <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{p.etat !== 'lu' ? '—' : <>{p.partiel ? tr('journee.moins3') : ''}{p.n} {tr('journee.vente')}{p.n > 1 ? 's' : ''} · {eur(p.centimes)}</>}</span>
             </div>
             {p.etat === 'lu' ? <div style={{ marginTop: 6 }}><JaugeBarre attr={{ 'data-dac7-jauge': p.plateforme }} pct={pct} etat="ok" /></div> : null}
             {droite == null ? null : <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{droite}</div>}
@@ -2789,35 +2782,35 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
   const profil = (
     <Card style={sCarte}>
       <div data-micro-profil={vl || 'passu'}>
-        <div style={{ ...sTitre, marginBottom: 6 }}>Ton profil URSSAF{' '}<Pourquoi titre="Ton profil URSSAF">VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</Pourquoi></div>
-        <LigneProfil titre="Tu déclares" attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
-          <Segmente label="Rythme de déclaration" value={freq} onChange={poserFreq}
+        <div style={{ ...sTitre, marginBottom: 6 }}>{tr('compta.profilUrssaf')}{' '}<Pourquoi titre={tr('compta.profilUrssaf')}>{tr('compta.vrmLitEspace')}</Pourquoi></div>
+        <LigneProfil titre={tr('compta.declares')} attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
+          <Segmente label={tr('compta.rythmeDeclaration')} value={freq} onChange={poserFreq}
             options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
         </LigneProfil>
-        <LigneProfil titre="Versement libératoire de l'impôt" attr={{ 'data-micro-vl': vl || 'passu' }}
+        <LigneProfil titre={tr('compta.versementLiberatoireImpot')} attr={{ 'data-micro-vl': vl || 'passu' }}
           aide={<>
-            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ` Ton taux actuel (${pctFr(taux)}) laisse penser que oui.` : ''}</div> : null}
-            {vl === 'oui' ? <>Ton impôt sur le revenu ({String(tauxLib).replace('.', ',')}&nbsp;%) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({String(tauxLib).replace('.', ',')}&nbsp;%), ou à part sur ta déclaration de revenus.</>}
-            <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({String(tauxLib).replace('.', ',')}&nbsp;% pour {activite === 'services' ? 'les prestations de services' : "l'achat-revente"}) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
+            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>{tr('compta.confirmerAsChoisi')}{vlTaux ? tr('compta.tauxActuelLaisse', { pctFr: String(pctFr(taux)) }) : ''}</div> : null}
+            {vl === 'oui' ? <>{tr('compta.impotRevenu')}{String(tauxLib).replace('.', ',')}{tr('compta.partAvecCotisations')} {freq === 'mensuel' ? tr('compta.chaqueMois') : tr('compta.chaqueTrimestre')}.</> : vl === 'non' ? <>{tr('compta.impotRevenuCalcule')}</> : <>{tr('compta.impotRevenuPaye')}{String(tauxLib).replace('.', ',')}{tr('compta.partDeclarationRevenus')}</>}
+            <Pourquoi label={tr('compta.commentSavoirJe')}>{tr('compta.autoentrepreneurUrssafFr')}{String(tauxLib).replace('.', ',')}{tr('compta.texte2')} {activite === 'services' ? tr('compta.prestationsServices') : tr('compta.achatRevente')}{tr('compta.payeMemeRythme')}{s ? <> {tr('compta.possibleRevenuFiscal')} {eurRond(s.rfrLiberatoire)} {tr('compta.personneSeuleDemande')}</> : null}</Pourquoi>
           </>}>
-          <Segmente label="Versement libératoire" value={vl} onChange={(v) => poserOptions({ liberatoire: v })}
+          <Segmente label={tr('compta.versementLiberatoire')} value={vl} onChange={(v) => poserOptions({ liberatoire: v })}
             options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'liberatoire' } }, { v: 'non', l: 'Non', data: { 'data-micro-vl-choix': 'non' } }]} />
         </LigneProfil>
-        <LigneProfil titre="ACRE (première année)" attr={{ 'data-micro-acre': acre === 'apres' ? 'apres' : acre ? 'oui' : 'non' }} aide="L'aide à la création réduit tes cotisations la première année. Elle dépend de ta date de début d'activité : moitié moins avant le 1er juillet 2026, un quart de moins ensuite.">
-          <Segmente label="ACRE" value={acre === 'apres' ? 'apres' : acre ? 'oui' : 'non'} onChange={(v) => poserOptions({ acre: v === 'apres' ? 'apres' : v === 'oui' })}
+        <LigneProfil titre={tr('compta.acrePremiereAnnee')} attr={{ 'data-micro-acre': acre === 'apres' ? 'apres' : acre ? 'oui' : 'non' }} aide="L'aide à la création réduit tes cotisations la première année. Elle dépend de ta date de début d'activité : moitié moins avant le 1er juillet 2026, un quart de moins ensuite.">
+          <Segmente label={tr('compta.acre')} value={acre === 'apres' ? 'apres' : acre ? 'oui' : 'non'} onChange={(v) => poserOptions({ acre: v === 'apres' ? 'apres' : v === 'oui' })}
             options={[{ v: 'non', l: 'Non' }, { v: 'oui', l: 'Avant juil. 2026', data: { 'data-taux-option': 'acre' } }, { v: 'apres', l: 'Depuis juil. 2026', data: { 'data-taux-option': 'acre2026' } }]} />
         </LigneProfil>
         <div data-statut-taux={String(taux)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 2 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton taux</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('compta.taux')}</span>
             <span className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{pctFr(taux)}</span>
           </div>
           {officiel ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 12px', marginTop: 8, fontSize: 13, color: C.muted }}>
               {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 12 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
             </div>
-          ) : <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Posé à la main dans « Ton entreprise » : VRM ne le change pas quand tu réponds ci-dessus.</div>}
-          <div data-micro-activite={activite} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 {activite === 'services' ? 'des prestations de services (BIC)' : "de l'achat-revente"}, à vérifier sur ton espace URSSAF. VRM ne remplace pas un comptable.</div>
+          ) : <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.poseMainDans')}</div>}
+          <div data-micro-activite={activite} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{tr('compta.tauxOfficiels2026')} {activite === 'services' ? tr('compta.prestationsServicesBic') : tr('compta.achatRevente2')}{tr('compta.verifierEspaceUrssaf')}</div>
         </div>
       </div>
     </Card>
@@ -2826,9 +2819,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
   const calendrier = (
     <Card style={sCarte}>
       <div data-micro-calendrier={freq}>
-        <div style={sTitre}>Ton calendrier{' '}<Pourquoi titre="Ton calendrier">
-          {freq === 'mensuel' ? 'Le chiffre d\'affaires d\'un mois se déclare et se paie le mois suivant.' : 'Le chiffre d\'affaires d\'un trimestre se déclare et se paie le mois qui suit le trimestre.'}
-          {vl === 'oui' ? ` Ton impôt (${String(tauxLib).replace('.', ',')}\u00a0%) part en même temps.` : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
+        <div style={sTitre}>{tr('compta.calendrier')}{' '}<Pourquoi titre={tr('compta.calendrier')}>
+          {freq === 'mensuel' ? tr('compta.chiffreAffairesMois') : tr('compta.chiffreAffairesTrimestre')}
+          {vl === 'oui' ? tr('compta.impotPartMeme', { replace: String(String(tauxLib).replace('.', ',')) }) : vl === 'non' ? tr('compta.impotRevenuPaie') : ''}
         </Pourquoi></div>
         <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {cal.map((p, i) => {
@@ -2841,9 +2834,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
                 <span style={{ fontSize: 13, fontWeight: 600, color: notee ? C.muted : presse ? C.warn : C.muted, whiteSpace: 'nowrap' }}>
                   {/* (29 oct., revue) « notée déclarée » est déjà dit par le suivi juste
                       au-dessus : ici, une coche (son nom reste pour un lecteur d'écran). */}
-                  {notee ? <span role="img" aria-label="notée déclarée">✓</span> : !p.ouverte ? 'à venir' : p.joursRestants <= 0 ? "dernier jour aujourd'hui" : `${p.joursRestants} j restants`}
+                  {notee ? <span role="img" aria-label={tr('compta.noteeDeclaree')}>✓</span> : !p.ouverte ? tr('compta.venir') : p.joursRestants <= 0 ? tr('compta.dernierJourAujourd') : tr('compta.restants', { joursRestants: String(p.joursRestants) })}
                 </span>
-                <span style={{ gridColumn: '1 / -1', fontSize: 13, color: C.muted }}>Déclarer et payer du {jour(p.ouvre)} au {jour(p.limite)}</span>
+                <span style={{ gridColumn: '1 / -1', fontSize: 13, color: C.muted }}>{trj('compta.declarerPayer', { jour: jour(p.ouvre), jour2: jour(p.limite) })}</span>
               </div>
             );
           })}
@@ -2855,49 +2848,49 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
   let seuils;
   if (!s) seuils = null;
   else if (!jauge) seuils = (
-    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>Tes seuils {now.getFullYear()}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>— pas encore calculé</div></div></Card>
+    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>{trj('compta.seuils', { getFullYear: now.getFullYear() })}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.encoreCalcule')}</div></div></Card>
   );
   else {
     const j = jauge, am = j.partiel ? 'au moins ' : '';
     const tvaTxt = {
-      due_depuis_janvier: <>Ton chiffre d'affaires {j.annee - 1} a dépassé {eurRond(j.seuils.tvaBase)} : la TVA est due depuis le 1er janvier {j.annee}. Vérifie avec ton service des impôts des entreprises.</>,
-      majore_depasse: <>Seuil majoré de {eurRond(j.seuils.tvaMajore)} dépassé : la TVA est due <b>depuis le jour du dépassement</b>. Contacte ton service des impôts des entreprises sans attendre.</>,
-      base_depasse: <>Seuil de {eurRond(j.seuils.tvaBase)} dépassé : tu restes sans TVA jusqu'au 31 décembre, puis tu factures la TVA dès le 1er janvier {j.annee + 1}. Attention, au-delà de {eurRond(j.seuils.tvaMajore)} (encore {eurMicro(j.tva.resteMajore)}), elle serait due tout de suite.</>,
-      proche: <>Plus que {eurMicro(j.tva.reste)} avant le seuil de {eurRond(j.seuils.tvaBase)}.</>,
-      ok: <>Encore {am ? 'au plus ' : ''}{eurMicro(j.tva.reste)} avant {eurRond(j.seuils.tvaBase)}. Au-delà, tu factures la TVA à partir du 1er janvier suivant.</>,
+      due_depuis_janvier: <>{tr('compta.chiffreAffaires')} {j.annee - 1} {tr('compta.depasse')} {eurRond(j.seuils.tvaBase)} {tr('compta.tvaDueDepuis')} {j.annee}{tr('compta.verifieAvecService')}</>,
+      majore_depasse: <>{tr('compta.seuilMajore')} {eurRond(j.seuils.tvaMajore)} {tr('compta.depasseTvaDue')} <b>{tr('compta.depuisJourDepassement')}</b>{tr('compta.contacteServiceImpots')}</>,
+      base_depasse: <>{tr('compta.seuil')} {eurRond(j.seuils.tvaBase)} {tr('compta.depasseRestesSans')} {j.annee + 1}{tr('compta.attentionDela')} {eurRond(j.seuils.tvaMajore)} {tr('compta.encore2')} {eurMicro(j.tva.resteMajore)}{tr('compta.seraitDueTout')}</>,
+      proche: <>{tr('compta.plus')} {eurMicro(j.tva.reste)} {tr('compta.avantSeuil')} {eurRond(j.seuils.tvaBase)}.</>,
+      ok: <>{tr('messages.encore')} {am ? tr('compta.plus2') : ''}{eurMicro(j.tva.reste)} {tr('compta.avant')} {eurRond(j.seuils.tvaBase)}{tr('compta.delaFacturesTva')}</>,
     }[j.tva.etat];
     const plafTxt = {
-      sortie: <>Plafond dépassé deux années de suite : sortie du régime micro au 1er janvier {j.annee + 1}. Parles-en à un comptable.</>,
-      depasse: <>Plafond dépassé cette année. Un dépassement isolé ne fait pas sortir du régime ; s'il se répète l'an prochain, tu en sors au 1er janvier suivant.</>,
-      proche: <>Plus que {eurMicro(j.plafond.reste)} avant le plafond.</>,
-      ok: <>Encore {am ? 'au plus ' : ''}{eurMicro(j.plafond.reste)} de marge.</>,
+      sortie: <>{tr('compta.plafondDepasseDeux')} {j.annee + 1}{tr('compta.parlesComptable')}</>,
+      depasse: <>{tr('compta.plafondDepasseAnnee')}</>,
+      proche: <>{tr('compta.plus')} {eurMicro(j.plafond.reste)} {tr('compta.avantPlafond')}</>,
+      ok: <>{tr('messages.encore')} {am ? tr('compta.plus2') : ''}{eurMicro(j.plafond.reste)} {tr('compta.marge')}</>,
     }[j.plafond.etat];
     seuils = (
       <Card style={sCarte}>
         <div data-micro-seuils="lu" data-micro-ca={String(j.ca)} data-micro-partiel={j.partiel ? '1' : ''} data-micro-tva={j.tva.etat} data-micro-plafond={j.plafond.etat} data-micro-projection={j.projection == null ? '' : String(j.projection)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={sTitre}>Tes seuils {j.annee}</span>
-            <span style={{ fontSize: 13, color: C.muted }}>Reçu en {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 17 }}>{am}{eurMicro(j.ca)}</b><SourceChiffre id="seuils-ca">La somme des mois de {j.annee} de ton chiffre d’affaires déclaré ({j.mois} mois portent des ventes), toutes plateformes, daté au jour du versement — la même ligne que « Déclarer »{j.aDaterSur ? <>, plus {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} pas encore datée{j.aDaterSur.n > 1 ? 's' : ''} ({eurMicro(j.aDaterSur.ca)})</> : null}.</SourceChiffre></span>
+            <span style={sTitre}>{trj('compta.seuils2', { annee: j.annee })}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>{tr('journee.recu')} {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 17 }}>{am}{eurMicro(j.ca)}</b><SourceChiffre id="seuils-ca">{tr('compta.sommeMois')} {j.annee} {tr('compta.chiffreAffairesDeclare')}{j.mois} {tr('compta.moisPortentVentes')}{j.aDaterSur ? <>{tr('compta.plus3')} {j.aDaterSur.n} {tr('journee.vente')}{j.aDaterSur.n > 1 ? 's' : ''} {tr('compta.vendue')}{j.aDaterSur.n > 1 ? 's' : ''} {tr('compta.texte3')} {j.annee} {tr('compta.encoreDatee')}{j.aDaterSur.n > 1 ? 's' : ''} ({eurMicro(j.aDaterSur.ca)})</> : null}.</SourceChiffre></span>
           </div>
-          {j.aDaterSur ? <div data-micro-adater-sur={String(j.aDaterSur.n)} style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Dont {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} sans date de versement ({eurMicro(j.aDaterSur.ca)}) : reçue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee}, dans aucun mois.</div> : null}
-          {j.partiel ? <div data-micro-partiel-texte="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>C'est un minimum : {j.raisons.join(' · ')}.</div> : null}
+          {j.aDaterSur ? <div data-micro-adater-sur={String(j.aDaterSur.n)} style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{trj('compta.dontVentesVendues', { n: j.aDaterSur.n, annee: j.annee, eurMicro: eurMicro(j.aDaterSur.ca) })}</div> : null}
+          {j.partiel ? <div data-micro-partiel-texte="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{trj('compta.minimum', { x: j.raisons.join(' · ') })}</div> : null}
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
-              <span style={{ fontWeight: 600, color: C.text }}>Franchise de TVA</span>
-              <span style={{ color: j.tva.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pctFr(Math.round(j.tva.pct))} de {eurRond(j.seuils.tvaBase)}</span>
+              <span style={{ fontWeight: 600, color: C.text }}>{tr('compta.franchiseTva')}</span>
+              <span style={{ color: j.tva.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{trj('compta.texte4', { pctFr: pctFr(Math.round(j.tva.pct)), eurRond: eurRond(j.seuils.tvaBase) })}</span>
             </div>
             <JaugeBarre attr={{ 'data-micro-jauge': 'tva' }} pct={j.ca / j.seuils.tvaMajore * 100} marques={[j.seuils.tvaBase / j.seuils.tvaMajore * 100]} etat={j.tva.etat} />
             <div style={{ position: 'relative', height: 16, fontSize: 11, color: C.muted, marginTop: 3 }}>
               <span style={{ position: 'absolute', left: 0 }}>0</span>
               <span style={{ position: 'absolute', right: `${100 - j.seuils.tvaBase / j.seuils.tvaMajore * 100}%`, transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>{eurRond(j.seuils.tvaBase)}</span>
             </div>
-            <div style={{ fontSize: 12, color: C.muted }}>Le trait : le seuil{' '}<Pourquoi titre="Franchise de TVA">Le trait marque le seuil ; la barre va jusqu'au seuil majoré ({eurRond(j.seuils.tvaMajore)}).</Pourquoi></div>
+            <div style={{ fontSize: 12, color: C.muted }}>{tr('compta.traitSeuil')}{' '}<Pourquoi titre={tr('compta.franchiseTva')}>{trj('compta.traitMarqueSeuil', { eurRond: eurRond(j.seuils.tvaMajore) })}</Pourquoi></div>
             <div data-micro-tva-texte="" style={{ fontSize: 13, color: j.tva.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{tvaTxt}</div>
           </div>
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
-              <span style={{ fontWeight: 600, color: C.text }}>Plafond de la micro-entreprise</span>
-              <span style={{ color: j.plafond.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pctFr(Math.round(j.plafond.pct))} de {eurRond(j.seuils.plafondVente)}</span>
+              <span style={{ fontWeight: 600, color: C.text }}>{tr('compta.plafondMicroEntreprise')}</span>
+              <span style={{ color: j.plafond.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{trj('compta.texte4', { pctFr: pctFr(Math.round(j.plafond.pct)), eurRond: eurRond(j.seuils.plafondVente) })}</span>
             </div>
             <JaugeBarre attr={{ 'data-micro-jauge': 'plafond' }} pct={j.plafond.pct} etat={j.plafond.etat} />
             <div data-micro-plafond-texte="" style={{ fontSize: 13, color: j.plafond.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{plafTxt}</div>
@@ -2915,15 +2908,15 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
               <div data-micro-projection-texte="" style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {at.map((x) => (
                   <div key={x.k} data-micro-atteinte={x.k} data-mois={x.r.mois} data-base={x.r.base} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
-                    <span style={{ color: C.text, fontWeight: 600, whiteSpace: 'nowrap' }}>{x.lib} vers {x.r.nom}</span>
-                    <span style={{ color: C.muted, whiteSpace: 'nowrap' }}>estimation</span>
+                    <span style={{ color: C.text, fontWeight: 600, whiteSpace: 'nowrap' }}>{trj('compta.vers', { lib: x.lib, nom: x.r.nom })}</span>
+                    <span style={{ color: C.muted, whiteSpace: 'nowrap' }}>{tr('compta.estimation')}</span>
                   </div>
                 ))}
               </div>
             ) : null;
           })()}
           <Dac7Plateformes ligne={ligne} annee={j.annee} />
-          <Pourquoi label="D'où viennent ces seuils">Seuils {j.annee} de la vente de marchandises, vérifiés le {j.seuils.verifie} : franchise de TVA {eurRond(j.seuils.tvaBase)} (seuil majoré {eurRond(j.seuils.tvaMajore)}), plafond du régime micro {eurRond(j.seuils.plafondVente)}. Le chiffre est ce que tes plateformes t'ont versé dans l'année (toutes plateformes), hors comptes que tu as retirés.</Pourquoi>
+          <Pourquoi label={tr('compta.viennentCesSeuils')}>{trj('compta.seuilsVenteMarchandises', { annee: j.annee, verifie: j.seuils.verifie, eurRond: eurRond(j.seuils.tvaBase), eurRond2: eurRond(j.seuils.tvaMajore), eurRond3: eurRond(j.seuils.plafondVente) })}</Pourquoi>
         </div>
       </Card>
     );
@@ -2934,23 +2927,23 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
   const impots = (
     <Card style={sCarte}>
       <div data-micro-impots={dr ? 'lu' : 'passu'} data-micro-impots-annee={dr ? String(dr.annee) : ''} data-micro-impots-ca={dr ? String(dr.ca) : ''} data-micro-impots-cases={dr ? dr.cases.join(',') : ''}>
-        <div style={sTitre}>Ta déclaration de revenus</div>
-        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>— pas encore calculé</div> : (<>
+        <div style={sTitre}>{tr('compta.declarationRevenus')}</div>
+        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.encoreCalcule')}</div> : (<>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
-            {dr.enCours ? <>Revenus {dr.annee}, à déclarer au printemps {dr.annee + 1} — pour l'instant :</> : <>Revenus {dr.annee}, à déclarer ce printemps (déclaration 2042-C-PRO) :</>}
+            {dr.enCours ? <>{tr('compta.revenus')} {dr.annee}{tr('compta.declarerPrintemps')} {dr.annee + 1} {tr('compta.instant')}</> : <>{tr('compta.revenus')} {dr.annee}{tr('compta.declarerPrintempsDeclaration')}</>}
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-            <b className="vrm-display" style={{ fontSize: 22, color: C.text }}>{dr.partiel ? 'au moins ' : ''}{eurMicro(dr.ca)}</b>
-            <span style={{ fontSize: 13, color: C.text }}>{dr.liberatoire ? <>case <b>{dr.cases[0]}</b></> : <>case <b>5KO</b> sans versement libératoire, <b>5TA</b> avec</>}</span>
+            <b className="vrm-display" style={{ fontSize: 22, color: C.text }}>{dr.partiel ? tr('journee.moins3') : ''}{eurMicro(dr.ca)}</b>
+            <span style={{ fontSize: 13, color: C.text }}>{dr.liberatoire ? <>{tr('compta.case')} <b>{dr.cases[0]}</b></> : <>{tr('compta.case')} <b>{tr('compta.5ko')}</b> {tr('compta.sansVersementLiberatoire')} <b>{tr('compta.5ta')}</b> {tr('compta.avec')}</>}</span>
           </div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
-            {dr.liberatoire === 'oui' ? <>Ton impôt est déjà payé avec tes cotisations : ce chiffre est déclaré pour information (il compte dans ton revenu fiscal de référence).</>
-              : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71&nbsp;% de la vente de marchandises.</>}
-            {dr.partiel ? <> C'est un minimum : {dr.raisons.join(' · ')}.</> : null}
-            {' '}Compare avec le total de tes déclarations URSSAF de l'année. <Pourquoi>VRM ne compte que ce qu'il a capté sur tes plateformes reliées.</Pourquoi>
+            {dr.liberatoire === 'oui' ? <>{tr('compta.impotDejaPaye')}</>
+              : <>{tr('compta.chiffreAffairesBrut')}</>}
+            {dr.partiel ? <> {tr('compta.minimum2')} {dr.raisons.join(' · ')}.</> : null}
+            {' '}{tr('compta.compareAvecTotal')} <Pourquoi>{tr('compta.vrmCompteCapte')}</Pourquoi>
           </div>
         </>)}
-        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, paie-le avant le <b>{cfe.limite}</b> sur impots.gouv.fr. <Pourquoi label="Pas d'avis ?">À payer dans ton espace professionnel. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000&nbsp;€.</Pourquoi></div> : null}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>{tr('compta.cfeAsRecu')} <b>{cfe.limite}</b> {tr('compta.impotsGouvFr')} <Pourquoi label={tr('compta.avis')}>{tr('compta.payerDansEspace')}</Pourquoi></div> : null}
       </div>
     </Card>
   );
@@ -2967,8 +2960,8 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
   return (<details className="vrm-repli vrm-micro-repli" data-micro-repli={microOuvert ? 'ouvert' : 'ferme'} data-micro-attention={besoin ? '1' : ''} open={microOuvert} onToggle={(e) => setMicroOuvert(e.currentTarget.open)} style={{ margin: '12px 0', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '4px 16px 12px' }}>
     <summary>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ta micro-entreprise</span>
-        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? '1 question à confirmer · ' : ''}{seuilAlerte ? 'un seuil approche · ' : ''}taux {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} · seuils et impôts</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('compta.microEntreprise')}</span>
+        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
       </span>
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
@@ -2988,9 +2981,9 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
   const ambre = C.warn || C.amber || '#B25000';
   // (2 nov.) Dans « Le détail », le repli porte déjà le titre : pas de redite.
-  const titre = sansTitre ? null : <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Suivi de tes déclarations URSSAF</div>;
-  if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Lecture de tes déclarations…</div></div></Card>;
-  if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
+  const titre = sansTitre ? null : <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{tr('compta.suiviDeclarationsUrssaf')}</div>;
+  if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.lectureDeclarations')}</div></div></Card>;
+  if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.jeAiPu3')}</div></div></Card>;
   const lignes = ouvert ? suivi.lignes : suivi.lignes.slice(0, 4);
   const a = suivi.annee;
   const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${jourParis()}.csv`, 'text/csv;charset=utf-8');
@@ -3008,23 +3001,21 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
       <div data-suivi-urssaf="lu" data-suivi-retard={String(suivi.enRetard)} data-suivi-regul={String(suivi.aRegulariser)}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {titre}
-          {suivi.lignes.length ? <button type="button" className="vrm-lien-action" data-suivi-export="" onClick={exporter} style={{ background: 'none', border: 'none', color: C.accentTexte, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Exporter (CSV)</button> : null}
+          {suivi.lignes.length ? <button type="button" className="vrm-lien-action" data-suivi-export="" onClick={exporter} style={{ background: 'none', border: 'none', color: C.accentTexte, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>{tr('compta.exporterCsv')}</button> : null}
         </div>
         <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
-          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « Noter ma déclaration » : VRM garde ce que tu as déclaré et payé.</>
-            : a.periodes === 1 ? <>{a.annee} : {freq === 'mensuel' ? '1 mois noté « déclaré »' : '1 période notée « déclarée »'} — son détail est juste en dessous.</>
-            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
+          {a.n === 0 ? <>{tr('compta.aucuneDeclarationNotee')} {a.annee}{tr('compta.apresChaqueDeclaration')}</>
+            : a.periodes === 1 ? <>{a.annee} : {freq === 'mensuel' ? tr('compta.1MoisNote') : tr('compta.1PeriodeNotee')} {tr('compta.detailJusteDessous')}</>
+            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> {tr('compta.declares2')} {a.n} {tr('compta.mois')} {a.paye != null ? <>{tr('compta.cotisationsPayees')} <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>{tr('compta.cotisations')} <b style={{ color: C.text }}>{eur(a.estime)}</b> {tr('compta.estimeesNoteAs')}</>}</>}
         </div>
-        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée »{(() => { const n = suivi.lignes.filter((l) => l.etat === 'a_declarer').length; return n ? <span data-suivi-a-declarer={n}> (et {n === 1 ? '1 autre est' : `${n} autres sont`} à déclarer maintenant)</span> : null; })()}.{suivi.enRetard > 1 ? " Si tu les as déjà déclarées sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-les vite" : " Si tu l'as déjà déclarée sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-la vite"} (une déclaration en retard peut coûter une pénalité).</div> : null}
+        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? tr('compta.1PeriodePassee') : tr('compta.periodesPasseesSont', { enRetard: String(suivi.enRetard) })} {tr('compta.notee')}{suivi.enRetard > 1 ? 's' : ''} {tr('compta.declaree')}{(() => { const n = suivi.lignes.filter((l) => l.etat === 'a_declarer').length; return n ? <span data-suivi-a-declarer={n}> {tr('compta.texte5')} {n === 1 ? tr('compta.1Autre') : tr('compta.autresSont', { x: String(n) })} {tr('compta.declarerMaintenant')}</span> : null; })()}.{suivi.enRetard > 1 ? tr('compta.asDejaDeclarees') : tr('compta.asDejaDeclaree')} {tr('compta.declarationRetardPeut')}</div> : null}
         {(() => {
           const aNoter = suivi.lignes.filter((l) => l.etat === 'en_retard' || l.etat === 'a_declarer').flatMap((l) => l.aNoter);
           return aNoter.length >= 2 ? (
-            <button type="button" data-suivi-serie={aNoter.length} onClick={() => demanderSerieDeclaration(aNoter, onNav)} style={{ ...btn, marginTop: 8, alignSelf: 'flex-start' }}>
-              Noter mes {aNoter.length} mois à la suite
-            </button>) : null;
+            <button type="button" data-suivi-serie={aNoter.length} onClick={() => demanderSerieDeclaration(aNoter, onNav)} style={{ ...btn, marginTop: 8, alignSelf: 'flex-start' }}>{trj('compta.noterMesMois', { aNoterN: aNoter.length })}</button>) : null;
         })()}
-        {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>À ajouter à ta prochaine déclaration : <b>{eur(suivi.aRegulariser)}</b> (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} de cotisations). <Pourquoi>Des ventes que VRM compte et qui ne sont dans aucune déclaration.</Pourquoi></div> : null}
-        {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>Rien à suivre sur les 12 derniers mois.</div> : (
+        {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{tr('compta.ajouterProchaineDeclaration')} <b>{eur(suivi.aRegulariser)}</b> (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} {tr('compta.cotisations2')} <Pourquoi>{tr('compta.ventesVrmCompte')}</Pourquoi></div> : null}
+        {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>{tr('compta.rienSuivre12')}</div> : (
           <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
             {lignes.map((l) => {
               const ambreEtat = l.etat === 'en_retard' || l.urgent;
@@ -3042,54 +3033,54 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
                   </div>
                   {l.etat === 'declaree' ? (
                     <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-                      Déclaré <b style={{ color: C.text }}>{eur(l.caDecl)}</b>{l.caTape ? '' : ' (chiffre de VRM quand tu l\'as notée)'}{l.regle === 'vente' ? ' · à la date de vente' : ''}
-                      {' · '}{l.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(l.paye)}</b></> : <>cotisations ≈ {eur(l.aPayerDecl)} <span>(pas notées)</span></>}
+                      {tr('compta.declare')} <b style={{ color: C.text }}>{eur(l.caDecl)}</b>{l.caTape ? '' : tr('compta.chiffreVrmQuand')}{l.regle === 'vente' ? tr('compta.dateVente2') : ''}
+                      {' · '}{l.paye != null ? <>{tr('compta.cotisationsPayees')} <b style={{ color: C.text }}>{eur(l.paye)}</b></> : <>{tr('compta.cotisations')} {eur(l.aPayerDecl)} <span>{tr('compta.notees')}</span></>}
                       {l.ecart ? <div data-suivi-ecart-texte="" style={{ marginTop: 2 }}>{l.ecart < 0
-                        ? <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(-l.ecart)}</b> de moins (des ventes déclarées ne sont plus dans VRM : compte retiré, vente annulée). Ta déclaration reste celle-là.</>
-                        : <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(l.ecart)}</b> de plus : des ventes de cette période ne sont dans aucune déclaration — à ajouter à la prochaine (≈ {eur(l.aPayerEcart)} de cotisations).</>}</div> : null}
-                      {l.partiel && l.caCalc != null ? <div style={{ marginTop: 2 }}>VRM compte au moins {eur(l.caCalc)} aujourd'hui (ventes sans date) : pas d'écart affirmé.</div> : null}
+                        ? <>{tr('compta.vrmCompteAujourd')} <b style={{ color: C.text }}>{eur(-l.ecart)}</b> {tr('compta.moinsVentesDeclarees')}</>
+                        : <>{tr('compta.vrmCompteAujourd')} <b style={{ color: C.text }}>{eur(l.ecart)}</b> {tr('compta.plusVentesPeriode')} {eur(l.aPayerEcart)} {tr('compta.cotisations2')}</>}</div> : null}
+                      {l.partiel && l.caCalc != null ? <div style={{ marginTop: 2 }}>{trj('compta.vrmCompteMoins', { eur: eur(l.caCalc) })}</div> : null}
                     </div>
                   ) : (
                     <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
                       {/* (29 oct., revue) Le mois EN COURS : son « à payer » est déjà dans
                           « Ta déclaration URSSAF » juste au-dessus (§7, une phrase une fois) ;
                           ici, seulement ce qui est reçu jusqu'ici. */}
-                      {l.caCalc == null ? '— pas encore calculé' : l.etat === 'en_cours' ? <>Reçu jusqu'ici {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b></> : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b></>}
-                      {l.yms.length > 1 && l.aNoter.length < l.yms.length ? <> · noté : {l.yms.length - l.aNoter.length} mois sur {l.yms.length}</> : null}
+                      {l.caCalc == null ? tr('compta.encoreCalcule') : l.etat === 'en_cours' ? <>{tr('compta.recuJusquIci')} {l.partiel ? tr('journee.moins3') : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b></> : <>{tr('stats.recu')} {l.partiel ? tr('journee.moins3') : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> {tr('compta.payer')} {l.partiel ? tr('journee.moins3') : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b></>}
+                      {l.yms.length > 1 && l.aNoter.length < l.yms.length ? <> {tr('compta.note')} {l.yms.length - l.aNoter.length} {tr('compta.mois2')} {l.yms.length}</> : null}
                     </div>
                   )}
                   {editeIci ? (
                     <div data-suivi-edit={edit.ym} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                       {l.yms.length > 1 ? <div style={{ fontSize: 13, color: C.text, fontWeight: 600, textTransform: 'capitalize' }}>{nomMois(edit.ym)}</div> : null}
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: C.muted }}>CA déclaré, tel que sur ton espace URSSAF
-                        <input data-suivi-edit-ca inputMode="decimal" value={edit.montant} onChange={(e) => setEdit((x) => ({ ...x, montant: e.target.value, erreur: null }))} placeholder="ex. 1 234,50" style={champ} /></label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: C.muted }}>Cotisations payées
-                        <input data-suivi-edit-paye inputMode="decimal" value={edit.paye} onChange={(e) => setEdit((x) => ({ ...x, paye: e.target.value, erreur: null }))} placeholder="ex. 153,20" style={champ} /></label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: C.muted }}>{tr('compta.caDeclareTel')}
+                        <input data-suivi-edit-ca inputMode="decimal" value={edit.montant} onChange={(e) => setEdit((x) => ({ ...x, montant: e.target.value, erreur: null }))} placeholder={tr('compta.ex1234')} style={champ} /></label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: C.muted }}>{tr('compta.cotisationsPayees2')}
+                        <input data-suivi-edit-paye inputMode="decimal" value={edit.paye} onChange={(e) => setEdit((x) => ({ ...x, paye: e.target.value, erreur: null }))} placeholder={tr('compta.ex15320')} style={champ} /></label>
                       {edit.erreur ? <div role="alert" style={{ fontSize: 13, color: ambre }}>{edit.erreur}</div> : null}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>Enregistrer</button>
-                        <button className="vrm-b vrm-b-discret" type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
+                        <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>{tr('lbcplus.remise.enregistrer')}</button>
+                        <button className="vrm-b vrm-b-discret" type="button" onClick={() => setEdit(null)} style={btn}>{tr('achats.annuler')}</button>
                       </div>
-                      <div style={{ fontSize: 12, color: C.muted }}>Seuls ces deux chiffres changent ; les ventes déclarées restent. Vide = pas noté.</div>
+                      <div style={{ fontSize: 12, color: C.muted }}>{tr('compta.seulsCesDeux')}</div>
                     </div>
                   ) : null}
                   {!editeIci && ((l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 || l.aCompleter.length > 0 || (l.etat === 'declaree')) ? (
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                       {(l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 ? (
                         <button type="button" data-suivi-noter={l.aNoter[0]} onClick={() => demanderDeclaration(l.aNoter[0], onNav)} style={btn}>
-                          {l.yms.length > 1 ? `Noter ma déclaration — ${nomMois(l.aNoter[0])}` : 'Noter ma déclaration'}
+                          {l.yms.length > 1 ? tr('compta.noterMaDeclaration', { nomMois: String(nomMois(l.aNoter[0])) }) : tr('compta.noterMaDeclaration2')}
                         </button>) : null}
                       {l.aCompleter.length > 0 ? (
                         <button type="button" data-suivi-completer={l.aCompleter[0]} onClick={() => ouvrirEdit(l.aCompleter[0])} style={btn}>
-                          {l.yms.length > 1 ? `Compléter ${nomMois(l.aCompleter[0])}` : 'Compléter'}
+                          {l.yms.length > 1 ? tr('compta.completer', { nomMois: String(nomMois(l.aCompleter[0])) }) : tr('journee.completer')}
                         </button>) : l.etat === 'declaree' ? (
-                        <button type="button" className="vrm-lien-action" data-suivi-corriger={l.yms[l.yms.length - 1]} onClick={() => ouvrirEdit(l.yms[l.yms.length - 1])} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 13, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>Corriger les montants</button>) : null}
+                        <button type="button" className="vrm-lien-action" data-suivi-corriger={l.yms[l.yms.length - 1]} onClick={() => ouvrirEdit(l.yms[l.yms.length - 1])} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 13, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>{tr('compta.corrigerMontants')}</button>) : null}
                     </div>
                   ) : null}
                 </div>
               );
             })}
-            {suivi.lignes.length > 4 ? <button type="button" className="vrm-lien-action" data-suivi-tout="" onClick={() => setOuvert((o) => !o)} style={{ background: 'none', border: 'none', color: C.accentTexte, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>{ouvert ? 'Moins' : `Voir les ${suivi.lignes.length} périodes`}</button> : null}
+            {suivi.lignes.length > 4 ? <button type="button" className="vrm-lien-action" data-suivi-tout="" onClick={() => setOuvert((o) => !o)} style={{ background: 'none', border: 'none', color: C.accentTexte, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>{ouvert ? tr('stock.moins') : tr('compta.voirPeriodes', { x: String(suivi.lignes.length) })}</button> : null}
           </div>
         )}
       </div>
@@ -3187,14 +3178,14 @@ function CarteUrssafMois({ liveStats, onNav }) {
           </div>
         );
         if (moisCourantCA!=null) {
-          if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<Puce key="d">dont {par.map(([k,v],i)=><React.Fragment key={k}>{i?' · ':''}{k} <Mt v={v.ca}/></React.Fragment>)}</Puce>);
-          if (pasSu.length) morceaux.push(<Puce key="p" warn>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</Puce>);
+          if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<Puce key="d">{tr('compta.dont')} {par.map(([k,v],i)=><React.Fragment key={k}>{i?' · ':''}{k} <Mt v={v.ca}/></React.Fragment>)}</Puce>);
+          if (pasSu.length) morceaux.push(<Puce key="p" warn>{pasSu.join(' et ')} {tr('compta.puLire')} {pasSu.length>1?'leurs':'ses'} {tr('compta.ventesSontDans')}</Puce>);
           // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas (prix
           // Vinted pas lu, montant Vestiaire pas sûr…) : comptées NULLE PART, dites
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
-          if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{phraseNonCompteesPar(ncInfo.par)} : dans aucun chiffre — ce total est un minimum</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>. VRM ne sait pas encore si le chiffre que Vestiaire écrit est le prix ou ce qu'il te verse : vérifie ces ventes sur Vestiaire avant de déclarer</> : null}</Puce>);
-          if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois — date{adL.n>1?'-les':'-la'} dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{trj('compta.dansAucunChiffre', { phraseNonCompteesPar: phraseNonCompteesPar(ncInfo.par) })}</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>{tr('compta.vrmSaitEncore')}</> : null}</Puce>);
+          if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} {tr('journee.vente')}{adV.n>1?'s':''} {tr('compta.vintedFinalisee')}{adV.n>1?'s':''} {tr('compta.sansDateVersement')}<Mt v={adV.ca}/>{tr('compta.dansAucunMois')}{extSait('versement')==='retard' && <span style={{color:C.warn}}>{trj('compta.metsExtensionJour', { versement: EXT_CAPACITES.versement })}</span>}</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} {tr('journee.vente')}{adL.n>1?'s':''} {tr('compta.leboncoinSansDate')}<Mt v={adL.ca}/>{tr('compta.dansAucunMois2')}{adL.n>1?tr('compta.texte6'):tr('compta.texte7')} {tr('compta.dans')} <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> {tr('compta.dansDetail')}{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}>{trj('compta.metsAbordExtension', { lbcdate: EXT_CAPACITES.lbcdate })}</span>}</Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         return (
@@ -3203,13 +3194,13 @@ function CarteUrssafMois({ liveStats, onNav }) {
             couleur ne vient QUE si l'échéance presse (≤ 14 j) ou est passée. */}
         <div data-compta-echeance="">
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
-            <span className="vrm-compta-libelle" style={{flex:1,margin:0}}>Prochaine déclaration</span>
-            {rythmeChoisi ? <span data-urssaf-rythme={urssafFreq} style={{fontSize:13,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span> : null}
+            <span className="vrm-compta-libelle" style={{flex:1,margin:0}}>{tr('compta.prochaineDeclaration')}</span>
+            {rythmeChoisi ? <span data-urssaf-rythme={urssafFreq} style={{fontSize:13,color:C.muted}}>{urssafFreq==='mensuel'?tr('compta.chaqueMois'):tr('compta.chaqueTrimestre')}</span> : null}
           </div>
           {prev.etat === 'rythme' ? (
             <div data-prevision-urssaf="rythme" style={{background:C.card2||C.bg,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px 12px',flexWrap:'wrap'}}>
               <span className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.muted}}>—</span>
-              <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+              <Segmente label={tr('compta.rythmeDeclaration')} value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
                 options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
             </div>
           ) : urssafDue ? (()=>{
@@ -3243,13 +3234,13 @@ function CarteUrssafMois({ liveStats, onNav }) {
                   {suivante ? (<>
                     <div data-echeance-suivante={suivante.label} style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
                       <span style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{suivante.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
-                      <span data-echeance-suivante-jours={suivante.daysLeft} style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>dans {suivante.daysLeft} j</span>
+                      <span data-echeance-suivante-jours={suivante.daysLeft} style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>{trj('compta.dans2', { daysLeft: suivante.daysLeft })}</span>
                     </div>
                     {/* (11 nov., restes) Plus de « À payer ≈ » ici : le montant de cette période est
                         celui de la carte « URSSAF » en tête de Déclarer (même `previsionUrssaf`) — §7, une fois. */}
-                    <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours</> : <>, la période en cours</>) : null}.</div>
+                    <div style={{marginTop:4}}>{tr('compta.texte8')} <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>{tr('compta.moisCours2')}</> : <>{tr('compta.periodeCours')}</>) : null}.</div>
                   </>) : null}
-                  <div style={{marginTop:suivante?6:0}}><span style={{textTransform:'capitalize'}}>{urssafDue.label}</span> : déclaration notée ✓</div>
+                  <div style={{marginTop:suivante?6:0}}><span style={{textTransform:'capitalize'}}>{urssafDue.label}</span> {tr('compta.declarationNotee')}</div>
                 </div>
               );
             }
@@ -3257,37 +3248,37 @@ function CarteUrssafMois({ liveStats, onNav }) {
               <div data-prevision-urssaf={prevIci ? prevIci.etat : 'avant'} data-prevision-label={urssafDue.label} data-prevision-ca={prevIci && prevIci.ca != null ? String(prevIci.ca) : ''} data-prevision-partiel={prevIci && prevIci.partiel ? '1' : ''} style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
                 <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
                   <span style={{fontSize:15,fontWeight:700,color:col,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
-                  <span style={{fontSize:13,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?tr('compta.retard', { x: String(-urssafDue.daysLeft) }):urssafDue.daysLeft===0?tr('compta.aujourdHui'):tr('compta.dans2', { daysLeft: String(urssafDue.daysLeft) })}</span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:13,color:C.muted}}>
-                  <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
+                  <span>{tr('stats.periode')}</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
                   {/* (revue du 19 oct.) Ce montant vient de la ligne publiée, datée au
                       VERSEMENT : c'est le « Reçu (versé) » du tableau juste au-dessus,
                       pas son « Finalisé ». Le libellé « CA finalisé » le contredisait
                       sur le même écran (septembre : 0,00 € ici, 4 224,77 € là). */}
-                  <span>À déclarer (argent reçu)</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={urssafPeriodCA}/></>}</span>
-                  <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
-                  {prevIci && prevIci.aDater > 0 ? <><span>À dater</span><span data-prevision-adater={prevIci.aDater} style={{color:C.text,textAlign:'right'}}>{prevIci.aDater} vente{prevIci.aDater>1?'s':''}</span></> : null}
-                  {prevIci && prevIci.declares.length > 0 ? <><span>Déjà déclaré</span><span data-prevision-declares={prevIci.declares.join(',')} style={{color:C.muted,textAlign:'right'}}>{prevIci.declares.map(ym=>new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('fr-FR',{month:'long'})).join(', ')}</span></> : null}
+                  <span>{tr('compta.declarerArgentRecu')}</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?tr('journee.moins3'):''}<Mt v={urssafPeriodCA}/></>}</span>
+                  <span>{tr('compta.payer2')}</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?tr('journee.moins3'):''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
+                  {prevIci && prevIci.aDater > 0 ? <><span>{tr('compta.dater2')}</span><span data-prevision-adater={prevIci.aDater} style={{color:C.text,textAlign:'right'}}>{trj('compta.ventes4', { n: prevIci.aDater })}</span></> : null}
+                  {prevIci && prevIci.declares.length > 0 ? <><span>{tr('compta.dejaDeclare')}</span><span data-prevision-declares={prevIci.declares.join(',')} style={{color:C.muted,textAlign:'right'}}>{prevIci.declares.map(ym=>new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('fr-FR',{month:'long'})).join(', ')}</span></> : null}
                 </div>
                 {(
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
-                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-declarer-urssaf="" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:12,padding:'8px 14px',textDecoration:'none',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Déclarer sur l'URSSAF →</a>
+                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-declarer-urssaf="" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:12,padding:'8px 14px',textDecoration:'none',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>{tr('compta.declarerUrssaf')}</a>
                   {finie && aNoter.length > 0 && (
                     <button type="button" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}
                       style={{fontSize:13,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>
-                      {ymsDue.length > 1 ? `Noter ma déclaration — ${nomYm(aNoter[0])}` : 'Noter ma déclaration'}
+                      {ymsDue.length > 1 ? tr('compta.noterMaDeclaration3', { nomYm: String(nomYm(aNoter[0])) }) : tr('compta.noterMaDeclaration2')}
                     </button>
                   )}
-                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')}&nbsp;%) — le chiffre officiel se saisit là‑bas.{finie && aNoter.length > 0 ? <> Une fois déclaré, note-le ici : ses ventes ne seront plus recomptées le mois suivant.</> : null}{finie && ymsDue.length > 1 && aNoter.length > 0 && aNoter.length < ymsDue.length ? <> {ymsDue.length - aNoter.length} mois sur {ymsDue.length} déjà noté{ymsDue.length - aNoter.length > 1 ? 's' : ''}.</> : null}</span>
+                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>{tr('compta.estimation2')}{String(tauxUrssaf()).replace('.',',')}{tr('compta.chiffreOfficielSaisit')}{finie && aNoter.length > 0 ? <> {tr('compta.foisDeclareNote')}</> : null}{finie && ymsDue.length > 1 && aNoter.length > 0 && aNoter.length < ymsDue.length ? <> {ymsDue.length - aNoter.length} {tr('compta.mois2')} {ymsDue.length} {tr('compta.dejaNote')}{ymsDue.length - aNoter.length > 1 ? 's' : ''}.</> : null}</span>
                 </div>
                 )}
               </div>
             );
-          })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
+          })() : <div style={{fontSize:13,color:C.muted}}>{tr('compta.aucuneEcheanceVenir')}</div>}
         </div>
         <div data-compta-mois="" style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
-          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours{montantEnHaut ? null : <> · à payer ({String(tauxUrssaf()).replace('.',',')}&nbsp;%)</>}</div>
+          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>{tr('compta.cours')}{montantEnHaut ? null : <> {tr('compta.payer3')}{String(tauxUrssaf()).replace('.',',')}&nbsp;%)</>}</div>
           <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} data-montant-en-haut={montantEnHaut ? '1' : undefined} hidden={montantEnHaut} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
           {/* (2 nov.) La phrase vient de la MÊME ligne publiée que le chiffre :
               le CA reçu du mois (`moisCourantCA`) et son nombre de ventes. « Net
@@ -3295,26 +3286,26 @@ function CarteUrssafMois({ liveStats, onNav }) {
               le premier redisait le bénéfice autrement, le second se lit ici. */}
           <p className="vrm-compta-phrase" data-compta-phrase="urssaf-mois">
             {moisCourantCA==null
-              ? <>— pas encore calculé</>
-              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté{montantEnHaut ? ' (le montant en haut)' : ''} : {String(tauxUrssaf()).replace('.',',')}&nbsp;% de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:'inherit',fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
-                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
+              ? <>{tr('compta.encoreCalcule')}</>
+              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>{tr('journee.mettreCote')}{montantEnHaut ? tr('compta.montantHaut') : ''} : {String(tauxUrssaf()).replace('.',',')}{tr('compta.argentRecu')} {moisCourant.nom}{tr('compta.toutesPlateformes')}{ncInfo && ncInfo.n > 0 ? tr('compta.moinsVoirCi') : ''} (<b style={{color:'inherit',fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} {tr('journee.vente')}{moisCourantN>1?'s':''}</> : null})
+                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>{tr('compta.hors')} {nA} {tr('journee.vente')}{nA>1?'s':''} (<Mt v={caA}/>{tr('compta.dejaDansDeclaration')}{ou ? <> {tr('annonces.texte7')} {ou}</> : null}</span>}
                 .
-                {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
+                {decl === 'pasSu' && <span style={{color:C.warn}}> {tr('compta.declarationsPasseesAi')} <b>{tr('historiqueSites.type.ventes')}</b> {tr('compta.mettreJour')}</span>}
               </span>}
           </p>
         {morceaux.length > 0 && <div data-urssaf-couverture style={{...sNote,marginTop:8,display:'flex',flexDirection:'column',gap:4}}>{morceaux}</div>}
         {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
             comment elle date chaque vente — replié, pas retiré. */}
         <details className="vrm-stats-calcul" style={{marginTop:10}}>
-          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0'}}>Comment c'est calculé</summary>
+          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0'}}>{tr('compta.commentCalcule')}</summary>
           <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
-            {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
-            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, là où elle est installée, qui va chercher ces dates</>}.</div>}
-            {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
-            {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
+            {moisCourantCA!=null && <div>{tr('compta.additionneVentes')} <b>{tr('compta.finalisees')}</b> {tr('compta.argentVerse')} {moisCourant.nom}, <b>{tr('compta.toutesPlateformes2')}</b>{tr('compta.ventesMasqueesComprises')}{nA > 0 && <> — {nA>1?tr('compta.ventesVersees'):tr('compta.venteVersee')} {tr('compta.moisCiMais')}{ou ? <> {tr('annonces.texte7')} {ou}</> : null} {nA>1?tr('compta.sontRecomptees'):tr('compta.recomptee')} {tr('compta.ici')}</>}{tr('compta.sommeVerserFin')}</div>}
+            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>{tr('compta.ventesVintedSans')} {extSait('versement')==='ok' ? <>{tr('compta.extensionVaChercher')}</> : <>{tr('compta.extensionInstalleeVa')}</>}.</div>}
+            {moisCourantCA!=null && adL && adL.n > 0 && <div>{tr('compta.ventesLeboncoinSans2')} {extSait('lbcdate')==='ok' ? <>{tr('compta.ouvreMesTransactions')}</> : extSait('lbcdate')==='retard' ? <>{tr('compta.foisExtensionJour')}</> : <>{tr('compta.depuisOrdinateurExtension')}</>}.</div>}
+            {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>{tr('compta.leboncoinDateJour')}</div>}
             {/* (2 nov., audit P7) eBay ne transmet pas la date de son versement : le dire. */}
-            {moisCourantCA!=null && (e.par||{}).eBay && <div data-ca-ebay-date="">eBay : daté au jour de la commande (eBay ne transmet pas la date de son versement).</div>}
-            <div>Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — VRM ne remplace pas un comptable.</div>
+            {moisCourantCA!=null && (e.par||{}).eBay && <div data-ca-ebay-date="">{tr('compta.ebayDateJour')}</div>}
+            <div>{tr('compta.cesVentesSont')} <b>{tr('compta.verseArgent')}</b> {tr('compta.commandeFinaliseeAcheteur')}</div>
           </div>
         </details>
         </div>
@@ -3388,23 +3379,23 @@ function RecapComptableMensuel() {
     <>
       <Card><div className="vrm-recap-mois" data-recap-mois={ymRecap}>
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-          <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,flex:'1 1 auto'}}>Récap de {libelleMois(ymRecap)}</span>
-          <select aria-label="Mois du récap" data-recap-mois-choix="" value={ymRecap} onChange={(e)=>setYmRecap(e.target.value)} style={{height:44,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:15,padding:'0 10px',fontFamily:'inherit'}}>
+          <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,flex:'1 1 auto'}}>{trj('compta.recap', { libelleMois: libelleMois(ymRecap) })}</span>
+          <select aria-label={tr('compta.moisRecap')} data-recap-mois-choix="" value={ymRecap} onChange={(e)=>setYmRecap(e.target.value)} style={{height:44,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:15,padding:'0 10px',fontFamily:'inherit'}}>
             {moisChoix.map((ym)=><option key={ym} value={ym}>{libelleMois(ym)}</option>)}
           </select>
         </div>
         <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-          <Bouton variante="primaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':'Télécharger en PDF'}</Bouton>
-          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title="Un fichier pour Excel ou Numbers">{recapEnCours==='csv'?'…':'Télécharger en tableur'}</Bouton>
+          <Bouton variante="primaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
+          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
         </div>
       </div></Card>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
         <Card><details className="vrm-repli" data-recap-repli="">
           <summary style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Récap comptable mensuel</span><span style={{fontSize:13,color:C.muted,fontWeight:500,marginLeft:'auto'}}>{moisRecap.length} mois</span>
+            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>{tr('compta.recapComptableMensuel')}</span><span style={{fontSize:13,color:C.muted,fontWeight:500,marginLeft:'auto'}}>{trj('compta.mois3', { moisRecapN: moisRecap.length })}</span>
           </summary>
-          <div style={{display:'flex',justifyContent:'flex-end',margin:'8px 0 10px'}}><Btn small outline onClick={exportCompta} style={{fontSize:13}}>Exporter (CSV)</Btn></div>
+          <div style={{display:'flex',justifyContent:'flex-end',margin:'8px 0 10px'}}><Btn small outline onClick={exportCompta} style={{fontSize:13}}>{tr('compta.exporterCsv')}</Btn></div>
 
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
@@ -3439,8 +3430,8 @@ function RecapComptableMensuel() {
               laquelle a produit les lignes. */}
           <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
             {urssafMois
-              ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
-              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')}&nbsp;% (taux réglable dans Argent → Déclarer → Ton entreprise). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+              ? <>{tr('historiqueSites.type.ventes')} <b>{tr('compta.finalisees')}</b>{tr('compta.toutesPlateformesComptees')}</>
+              : <>{tr('compta.ventesAncienneArchive')}</>} {tr('compta.beneficeLuiCelui')} {String(tauxUrssaf()).replace('.',',')}{tr('compta.tauxReglableDans')}
           </div>
         </details></Card>
       )}
@@ -3457,7 +3448,7 @@ function ComptaLigne({ gauche, droite, onDel, extra, attrs }) {
       <span className="vrm-set-lib">{gauche}</span>
       <span className="vrm-display" style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{droite}</span>
       {extra}
-      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" data-compta-supprimer="" style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0, minHeight: 44, minWidth: 44, marginRight: -10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={16} /></button>
+      <button type="button" onClick={onDel} title={tr('journee.supprimer')} aria-label={tr('journee.supprimer')} data-compta-supprimer="" style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0, minHeight: 44, minWidth: 44, marginRight: -10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={16} /></button>
     </div>
   );
 }
@@ -3474,7 +3465,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
         {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
-      {note && <div className="vrm-set-pied" style={{ color: C.muted }}><Pourquoi label="À quoi ça sert ?" ecrit>{note}</Pourquoi></div>}
+      {note && <div className="vrm-set-pied" style={{ color: C.muted }}><Pourquoi label={tr('compta.quoiCaSert')} ecrit>{note}</Pourquoi></div>}
     </section>
   );
 }
@@ -3482,7 +3473,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
 function ComptaAjout({ ouvert, onClick, libelle, data }) {
   return (
     <button type="button" className="vrm-set-ligne" onClick={onClick} aria-expanded={ouvert} {...data} style={{ color: C.accentTexte }}>
-      <span className="vrm-set-lib"><b style={{ color: C.accentTexte, fontWeight: 600 }}>{ouvert ? 'Fermer' : `+ ${libelle}`}</b></span>
+      <span className="vrm-set-lib"><b style={{ color: C.accentTexte, fontWeight: 600 }}>{ouvert ? tr('creerVinted.fermer') : `+ ${libelle}`}</b></span>
     </button>
   );
 }
@@ -3573,13 +3564,13 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   };
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
   return (
-    <section className="vrm-argent-q" aria-label="L’argent du mois" data-argent-questions="">
+    <section className="vrm-argent-q" aria-label={tr('compta.argentMois')} data-argent-questions="">
       {Q.map((q) => (
         <button key={q.id} type="button" className="vrm-argent-w" data-argent-q={q.id}
           data-argent-valeur={q.valeur == null ? '' : String(Math.round(q.valeur * 100))} data-argent-partiel={q.partiel ? '1' : undefined}
           data-argent-raison={q.raison || undefined} data-argent-echeance={q.echeance ? String(q.echeance) : undefined}
           aria-label={q.valeur == null && !q.texte
-            ? `${q.libelle} : ${q.note ? q.note + ', ' : ''}pas su — ${q.question}`
+            ? tr('compta.su', { libelle: String(q.libelle), x: String(q.note ? q.note + ', ' : ''), question: String(q.question) })
             : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`}
           onClick={() => aller(q)}>
           {/* (11 nov., lot accessibilité) Le nom commence par ce qui est ÉCRIT (libellé, chiffre, note —
@@ -3587,7 +3578,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
               les espaces séparent les morceaux pour le lecteur. */}
           <span className="vrm-argent-w-l">{q.libelle}</span>{' '}
           <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
-            {q.valeur != null ? <>{q.partiel ? <small>au moins </small> : null}{somme(q.valeur)}</> : (q.texte || '—')}
+            {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{somme(q.valeur)}</> : (q.texte || '—')}
           </b>
           {q.note ? <>{' '}<span className="vrm-argent-w-note">{q.note}</span></> : null}
           <span className="vrm-argent-w-chev" aria-hidden="true">›</span>
@@ -3610,38 +3601,38 @@ function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
       const comptes = Array.isArray(r.comptes) && r.comptes.length ? r.comptes : [{ uid: '', nom: '', n: r.n }];
       for (const c of comptes) lignes.push(
         <li key={'d' + c.uid} data-adater-raison="vinted-detail" data-adater-compte={c.uid || ''} data-n={c.n}>
-          <span><b>{nbAd(c.n)}</b> {c.nom ? <>sur <b>{c.nom}</b></> : 'sur Vinted'} : vente{plAd(c.n)} pas encore relue{plAd(c.n)}.</span>
-          <Bouton variante="discret" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-adater-geste="vinted">Ouvrir Vinted ↗</Bouton>
+          <span><b>{nbAd(c.n)}</b> {c.nom ? <>{tr('journee.texte2')} <b>{c.nom}</b></> : tr('compta.vinted')} {tr('compta.vente3')}{plAd(c.n)} {tr('compta.encoreRelue')}{plAd(c.n)}.</span>
+          <Bouton variante="discret" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-adater-geste="vinted">{tr('annonces.ouvrirVinted')}</Bouton>
         </li>);
     } else if (r.cle === 'leboncoin') lignes.push(
       <li key="lbc" data-adater-raison="leboncoin" data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> Leboncoin : date à recopier.</span>
-        <Bouton variante="discret" data-urssaf-dater="" data-adater-geste="main" onClick={onDater}>Dater à la main</Bouton>
+        <span><b>{nbAd(r.n)}</b> {tr('compta.leboncoinDateRecopier')}</span>
+        <Bouton variante="discret" data-urssaf-dater="" data-adater-geste="main" onClick={onDater}>{tr('compta.daterMain')}</Bouton>
       </li>);
     else if (r.cle === 'importee') lignes.push(
       <li key="imp" data-adater-raison="importee" data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> importée{plAd(r.n)} sans date de versement : ajoute-la dans ton fichier, puis réimporte.</span>
-        <Bouton variante="discret" data-adater-geste="importer" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} }}>Importer</Bouton>
+        <span><b>{nbAd(r.n)}</b> {tr('compta.importee')}{plAd(r.n)} {tr('compta.sansDateVersement2')}</span>
+        <Bouton variante="discret" data-adater-geste="importer" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} }}>{tr('reglages.importer.lib')}</Bouton>
       </li>);
     else if (r.cle === 'vestiaire') lignes.push(
       <li key="vc" data-adater-raison="vestiaire" data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> Vestiaire : versement pas encore lu.</span>
-        <Bouton variante="discret" href="https://fr.vestiairecollective.com/" target="_blank" rel="noopener noreferrer" data-adater-geste="vestiaire">Ouvrir Vestiaire ↗</Bouton>
+        <span><b>{nbAd(r.n)}</b> {tr('compta.vestiaireVersementEncore')}</span>
+        <Bouton variante="discret" href="https://fr.vestiairecollective.com/" target="_blank" rel="noopener noreferrer" data-adater-geste="vestiaire">{tr('compta.ouvrirVestiaire')}</Bouton>
       </li>);
     else lignes.push(
       <li key={r.cle} data-adater-raison={r.cle} data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> {r.cle === 'vinted-attente' ? 'Vinted : pas encore finalisée' + plAd(r.n) + ', relue' + plAd(r.n) + ' seule' + plAd(r.n) + '.' : r.cle === 'vinted-passu' ? 'Vinted : pas su (lecture ratée).' : 'eBay : commande sans date.'}</span>
+        <span><b>{nbAd(r.n)}</b> {r.cle === 'vinted-attente' ? 'Vinted : pas encore finalisée' + plAd(r.n) + ', relue' + plAd(r.n) + ' seule' + plAd(r.n) + '.' : r.cle === 'vinted-passu' ? tr('compta.vintedSuLecture') : tr('compta.ebayCommandeSans')}</span>
       </li>);
   }
   return (
     <div className="vrm-adater" data-adater-raisons="">
       <span>
-        {d ? <><b data-adater-datees={d.n}>{nbAd(d.n)} datée{plAd(d.n)} ✓</b>{d.releve > 0 ? <span data-adater-releve={d.releve}> dont {nbAd(d.releve)} par ton porte-monnaie</span> : null} · </> : null}
-        <b data-adater-sans={n}>{nbAd(n)} vente{plAd(n)} sans date</b> : pas dans ce montant.
-        {periodeAd ? <> Elles ont été <span data-urssaf-adater-periode="">{periodeAd}</span> ; une vente versée en {label} y manquerait.</> : null}
+        {d ? <><b data-adater-datees={d.n}>{trj('compta.datee', { nbAd: nbAd(d.n), plAd: plAd(d.n) })}</b>{d.releve > 0 ? <span data-adater-releve={d.releve}>{trj('compta.dontPorteMonnaie', { nbAd: nbAd(d.releve) })}</span> : null} · </> : null}
+        <b data-adater-sans={n}>{trj('compta.venteSansDate', { nbAd: nbAd(n), plAd: plAd(n) })}</b> {tr('compta.dansMontant')}
+        {periodeAd ? <> {tr('compta.ellesOntEte')} <span data-urssaf-adater-periode="">{periodeAd}</span> {tr('compta.venteVersee2')} {label} {tr('compta.manquerait')}</> : null}
       </span>
       <ul className="vrm-adater-liste">{lignes}</ul>
-      <Pourquoi ecrit>La date qui compte est celle où Vinted crédite ton porte-monnaie (« Commande finalisée »). Payer ensuite avec ton solde ne la change pas. VRM la lit dans le détail de chaque vente, quelques-unes à chaque visite sur Vinted. Elle n’est jamais devinée : sans elle, la vente n’est dans aucun mois.</Pourquoi>
+      <Pourquoi ecrit>{tr('compta.dateCompteCelle')}</Pourquoi>
     </div>
   );
 }
@@ -3658,24 +3649,24 @@ function PrevisionUrssafCarte({ onNav }) {
   const aNoter = ouverte && regPret ? (P.mois || []).filter((ym) => !moisDeclare(regLu, ym)) : [];
   const jour = P.daysLeft == null ? '' : P.daysLeft <= 0 ? 'aujourd’hui, dernier jour' : P.daysLeft === 1 ? 'demain' : `dans ${P.daysLeft} jours`;
   const urgent = ouverte && P.daysLeft != null && P.daysLeft <= 1;
-  const copier = async (k, v) => { const ok = await copierPresse(v); if (ok) { setCopie(k); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1800); } else toast('Copie impossible ici : sélectionne le montant et copie-le.'); };
+  const copier = async (k, v) => { const ok = await copierPresse(v); if (ok) { setCopie(k); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1800); } else toast(tr('compta.copieImpossibleIci')); };
   const vers = (id) => { try { ouvrirRepliCompta(id); } catch (_) {} };
   const attrs = { 'data-prevision-carte': P.etat, 'data-prevision-label': P.label || '', 'data-prevision-ca': P.ca == null ? '' : String(P.ca), 'data-prevision-apayer': P.apayer == null ? '' : String(P.apayer), 'data-prevision-partiel': P.partiel ? '1' : '', 'data-prevision-adater': P.aDater || '', 'data-prevision-encours': P.enCours ? '1' : '', 'data-urssaf-geste': ouverte ? 'recopier' : 'prevision' };
   if (P.etat === 'rythme') {
     return (
-      <section className="vrm-fu-declaration is-calme vrm-fu-prevision" {...attrs} aria-label="Prochaine échéance URSSAF">
-        <div><b className="vrm-fu-prevision-montant">—</b><span>URSSAF · choisis ton rythme de déclaration</span></div>
-        <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+      <section className="vrm-fu-declaration is-calme vrm-fu-prevision" {...attrs} aria-label={tr('compta.prochaineEcheanceUrssaf')}>
+        <div><b className="vrm-fu-prevision-montant">—</b><span>{tr('compta.urssafChoisisRythme')}</span></div>
+        <Segmente label={tr('compta.rythmeDeclaration')} value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
           options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
       </section>
     );
   }
   if (!ouverte) {
     return (
-      <section className="vrm-fu-declaration is-calme vrm-fu-prevision" {...attrs} aria-label="Prochaine échéance URSSAF">
+      <section className="vrm-fu-declaration is-calme vrm-fu-prevision" {...attrs} aria-label={tr('compta.prochaineEcheanceUrssaf')}>
         <div>
-          <b className="vrm-fu-prevision-montant">{P.etat === 'lu' ? <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</> : '—'}</b>
-          <span>URSSAF · {periode} · à déclarer avant le {date}{P.aDater > 0 ? ` · ${P.aDater} à dater` : ''}</span>
+          <b className="vrm-fu-prevision-montant">{P.etat === 'lu' ? <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.apayer)}</> : '—'}</b>
+          <span>URSSAF · {periode} {tr('compta.declarerAvant')} {date}{P.aDater > 0 ? tr('compta.dater3', { aDater: String(P.aDater) }) : ''}</span>
         </div>
       </section>
     );
@@ -3695,35 +3686,35 @@ function PrevisionUrssafCarte({ onNav }) {
   const periodeAd = P.aDater > 0 ? periodeADater(ligne && ligne.aDater) : '';
   const tauxTxt = String(tauxUrssaf()).replace('.', ',');
   return (
-    <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} data-urssaf-parcours="3" aria-label={`Déclaration URSSAF ${P.label}`}>
+    <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} data-urssaf-parcours="3" aria-label={tr('compta.declarationUrssaf', { label: String(P.label) })}>
       <div className="vrm-urssaf-geste-tete">
-        <h3>Déclarer {P.label}</h3>
-        <span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>avant le {date}{jour ? ` · ${jour}` : ''}</span>
+        <h3>{trj('compta.declarer', { label: P.label })}</h3>
+        <span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>{tr('compta.avant2')} {date}{jour ? ` · ${jour}` : ''}</span>
       </div>
-      <div className="vrm-urssaf-etape" data-urssaf-etape="1"><span className="vrm-urssaf-num" aria-hidden="true">1</span><b>Ce qui est sûr</b><small>à recopier sur l’URSSAF</small></div>
+      <div className="vrm-urssaf-etape" data-urssaf-etape="1"><span className="vrm-urssaf-num" aria-hidden="true">1</span><b>{tr('compta.texte9')}</b><small>{tr('compta.recopierUrssaf')}</small></div>
       <div className="vrm-urssaf-ligne" data-urssaf-ligne="ca" data-eur={P.ca == null ? '' : String(P.ca)}>
-        <span className="vrm-urssaf-lib"><b>Chiffre d’affaires <SourceChiffre id="ca">{P.ca == null ? <>Il se calcule dans l’écran Ventes, à partir de tes ventes lues : ouvre-le une fois.</> : <>La somme de {nP === 1 ? 'ta vente finalisée' : `tes ${nP} ventes finalisées`}{parTxt ? ` (${parTxt})` : ''} dont l’argent t’a été versé en {P.label} : Vinted au jour où la transaction passe « finalisée », Leboncoin au jour de la vente, eBay au jour de la commande payée. Seulement les comptes que tu as choisis ; une vente déjà déclarée reste dans le mois où tu l’as déclarée. Le même calcul que Ventes.</>}</SourceChiffre></b><small>ventes de marchandises · reçu sur la période</small></span>
-        <span className="vrm-urssaf-val">{P.ca == null ? '—' : <>{P.partiel ? <small>au moins </small> : null}{fmt(P.ca)}</>}</span>
-        {P.ca != null ? <button type="button" className="vrm-urssaf-copier" data-urssaf-copier="ca" data-urssaf-texte={caTxt} aria-label={`Copier ${caTxt}`} onClick={() => copier('ca', caTxt)}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</button> : <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>}
+        <span className="vrm-urssaf-lib"><b>{tr('compta.chiffreAffaires2')} <SourceChiffre id="ca">{P.ca == null ? <>{tr('compta.calculeDansEcran')}</> : <>{tr('compta.somme')} {nP === 1 ? tr('compta.venteFinalisee') : tr('compta.ventesFinalisees', { nP: String(nP) })}{parTxt ? ` (${parTxt})` : ''} {tr('compta.dontArgentT')} {P.label} {tr('compta.vintedJourTransaction')}</>}</SourceChiffre></b><small>{tr('compta.ventesMarchandisesRecu')}</small></span>
+        <span className="vrm-urssaf-val">{P.ca == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.ca)}</>}</span>
+        {P.ca != null ? <button type="button" className="vrm-urssaf-copier" data-urssaf-copier="ca" data-urssaf-texte={caTxt} aria-label={tr('compta.copier', { caTxt: String(caTxt) })} onClick={() => copier('ca', caTxt)}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</button> : <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>}
       </div>
       <div className="vrm-urssaf-ligne" data-urssaf-ligne="cotis" data-eur={P.apayer == null ? '' : String(P.apayer)}>
-        <span className="vrm-urssaf-lib"><b>Cotisations <SourceChiffre id="cotis">{P.apayer == null ? <>Elles se calculent sur le chiffre d’affaires, pas encore calculé.</> : <>{fmt(P.ca)} × {tauxTxt}&nbsp;% (ton taux : Ta micro-entreprise → Ton taux) = {fmt(P.apayer)}. Une estimation pour vérifier : le site de l’URSSAF fait foi.</>}</SourceChiffre></b><small>estimation VRM · {tauxTxt}&nbsp;% : à comparer avec le site</small></span>
-        <span className="vrm-urssaf-val">{P.apayer == null ? '—' : <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</>}</span>
+        <span className="vrm-urssaf-lib"><b>{tr('compta.cotisations3')} <SourceChiffre id="cotis">{P.apayer == null ? <>{tr('compta.ellesCalculentChiffre')}</> : <>{fmt(P.ca)} × {tauxTxt}{tr('compta.tauxMicroEntreprise')} {fmt(P.apayer)}{tr('compta.estimationVerifierSite')}</>}</SourceChiffre></b><small>{trj('compta.estimationVrmComparer', { tauxTxt: tauxTxt })}</small></span>
+        <span className="vrm-urssaf-val">{P.apayer == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.apayer)}</>}</span>
         <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>
       </div>
-      <div className="vrm-urssaf-etape" data-urssaf-etape="2"><span className="vrm-urssaf-num" aria-hidden="true">2</span><b>Ce qui manque</b></div>
+      <div className="vrm-urssaf-etape" data-urssaf-etape="2"><span className="vrm-urssaf-num" aria-hidden="true">2</span><b>{tr('compta.manque')}</b></div>
       {(P.ca == null || P.partiel || P.aDater > 0) ? (
         <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
-          {P.ca == null ? <><span>Pas encore calculé : ouvre l’écran Ventes une fois.</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>Ouvrir Ventes</Bouton> : null}</>
+          {P.ca == null ? <><span>{tr('stats.encoreCalculeOuvre')}</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton> : null}</>
             : P.aDater > 0 && ligne && ligne.aDater && Array.isArray(ligne.aDater.raisons) && ligne.aDater.raisons.length ? <ADaterRaisons ad={ligne.aDater} n={P.aDater} periodeAd={periodeAd} label={P.label} onDater={() => vers('compta-ca')}/>
-            : P.aDater > 0 ? <><span>{P.aDater} vente{P.aDater > 1 ? 's' : ''} sans date de versement : pas dans ce montant.{periodeAd ? <> Elles ont été <span data-urssaf-adater-periode="">{periodeAd}</span> ; une vente versée en {P.label} y manquerait : vérifie-les avant de déclarer.</> : null}</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? 'Les dater' : 'La dater'}</Bouton></>
-            : <>Il manque des ventes pas encore lues : ce montant est un minimum.</>}
+            : P.aDater > 0 ? <><span>{P.aDater} {tr('journee.vente')}{P.aDater > 1 ? 's' : ''} {tr('compta.sansDateVersement3')}{periodeAd ? <> {tr('compta.ellesOntEte')} <span data-urssaf-adater-periode="">{periodeAd}</span> {tr('compta.venteVersee2')} {P.label} {tr('compta.manqueraitVerifieAvant')}</> : null}</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? tr('compta.dater4') : tr('compta.dater5')}</Bouton></>
+            : <>{tr('compta.manqueVentesEncore')}</>}
         </div>
-      ) : <div className="vrm-urssaf-manque" data-urssaf-rien-manque="">Rien : toutes tes ventes finalisées sont datées et lues. Le montant est complet.</div>}
-      <div className="vrm-urssaf-etape" data-urssaf-etape="3"><span className="vrm-urssaf-num" aria-hidden="true">3</span><b>Déclarer</b><small>{aNoter.length ? 'recopie le montant sur le site, puis note-le ici' : 'déjà noté ici'}</small></div>
+      ) : <div className="vrm-urssaf-manque" data-urssaf-rien-manque="">{tr('compta.rienToutesVentes')}</div>}
+      <div className="vrm-urssaf-etape" data-urssaf-etape="3"><span className="vrm-urssaf-num" aria-hidden="true">3</span><b>{tr('compta.declarer2')}</b><small>{aNoter.length ? tr('compta.recopieMontantSite') : tr('compta.dejaNoteIci')}</small></div>
       <div className="vrm-urssaf-gestes">
-        <Bouton variante="secondaire" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">Ouvrir l’URSSAF ↗</Bouton>
-        {aNoter.length ? <Bouton variante="primaire" data-fu-geste="" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>J’ai déclaré</Bouton> : null}
+        <Bouton variante="secondaire" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</Bouton>
+        {aNoter.length ? <Bouton variante="primaire" data-fu-geste="" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>{tr('compta.aiDeclare')}</Bouton> : null}
       </div>
     </section>
   );
@@ -3735,7 +3726,7 @@ function PrevisionUrssafCarte({ onNav }) {
 function SourceChiffre({ id, children }) {
   const [ouvert, setOuvert] = React.useState(false);
   return <>
-    <button type="button" className="vrm-source-q" data-source-chiffre={id} aria-expanded={ouvert} aria-label="D’où vient ce chiffre ?" onClick={(e) => { e.stopPropagation(); setOuvert((v) => !v); }}>?</button>
+    <button type="button" className="vrm-source-q" data-source-chiffre={id} aria-expanded={ouvert} aria-label={tr('compta.vientChiffre')} onClick={(e) => { e.stopPropagation(); setOuvert((v) => !v); }}>?</button>
     {ouvert ? <span className="vrm-source-texte" role="note" data-source-texte={id}>{children}</span> : null}
   </>;
 }
@@ -3767,7 +3758,7 @@ function ComptaFusion({ compta, onNav }) {
     <div className="vrm-fu-compta vrm-fu-ecran vrm-fu-compta-grille" data-fu-compta="">
       {/* (5 nov., chantier F, revue 2.26) Pas d'anneau à dessiner ⇒ pas de panneau : plus de carte
           blanche vide. La raison (prix d'achat à saisir) est déjà dite, avec son geste, sur la carte du dessus. */}
-      {anneau ? <section className="vrm-fu-panneau" aria-label="Où passe l'argent vendu" data-fu-anneau={String(anneau.pct)}>
+      {anneau ? <section className="vrm-fu-panneau" aria-label={tr('compta.passeArgentVendu')} data-fu-anneau={String(anneau.pct)}>
         {anneau ? (
           <div className="vrm-fu-anneau">
             <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={`Il te reste ${anneau.pct}\u00a0% de ce que tu as vendu`}>
@@ -3784,17 +3775,17 @@ function ComptaFusion({ compta, onNav }) {
       </section> : null}
       {/* (5 nov., chantier F) Aucun mois au bénéfice brut connu : une ligne (la raison et le geste), plus six barres plates. */}
       {!mois6.some((m) => m.v != null && m.n > 0) ? (
-        <section className="vrm-fu-panneau vrm-fu-mois6-vide" aria-label="Bénéfice brut sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')} data-fu-mois6-vide="">
-          <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3><span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
-          <p className="vrm-fu-note">{mois6.some((m) => m.n > 0) ? <>Pas encore de prix d’achat sur tes ventes de ces six mois. <Bouton variante="discret" data-fu-mois6-porte="" onClick={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>Les saisir</Bouton></> : 'Aucune vente finalisée sur ces six mois.'}</p>
+        <section className="vrm-fu-panneau vrm-fu-mois6-vide" aria-label={tr('compta.beneficeBrutVentes')} data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')} data-fu-mois6-vide="">
+          <div className="vrm-fu-panneau-tete"><h3>{tr('compta.6DerniersMois')}</h3><span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
+          <p className="vrm-fu-note">{mois6.some((m) => m.n > 0) ? <>{tr('compta.encorePrixAchat')} <Bouton variante="discret" data-fu-mois6-porte="" onClick={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{tr('compta.saisir')}</Bouton></> : tr('compta.aucuneVenteFinalisee')}</p>
         </section>
       ) : (
-      <section className="vrm-fu-panneau" aria-label="Bénéfice brut sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
-        <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3>{/* (3 nov.) Ces barres sont le BRUT (ventes − prix d'achat) : elles portent son nom (src/beneficeNoms.js), jamais « bénéfice » seul. */}<span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
+      <section className="vrm-fu-panneau" aria-label={tr('compta.beneficeBrutVentes')} data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
+        <div className="vrm-fu-panneau-tete"><h3>{tr('compta.6DerniersMois')}</h3>{/* (3 nov.) Ces barres sont le BRUT (ventes − prix d'achat) : elles portent son nom (src/beneficeNoms.js), jamais « bénéfice » seul. */}<span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
         <div className="vrm-fu-barres">
           {mois6.map((m) => (
             <div key={m.cle} className="vrm-fu-barre" data-courant={m.courant ? '' : undefined} data-vide={m.v == null ? '' : undefined}
-              title={m.v == null ? `${m.long} : aucun prix d'achat connu (${m.n} vente${m.n > 1 ? 's' : ''})` : `${m.long} : ${fmt(m.v)}${m.nCout < m.n ? ` · ${m.nCout} vente${m.nCout > 1 ? 's' : ''} sur ${m.n} au prix d'achat connu` : ''}`}>
+              title={m.v == null ? tr('compta.aucunPrixAchat', { n: String(m.n), long: String(m.long) }) : `${m.long} : ${fmt(m.v)}${m.nCout < m.n ? ` · ${m.nCout} vente${m.nCout > 1 ? 's' : ''} sur ${m.n} au prix d'achat connu` : ''}`}>
               <div className="vrm-fu-barre-piste"><i style={{ height: m.v == null ? '24%' : `${Math.max(3, (Math.max(0, m.v) / max6) * 100)}%` }}/></div>
               <span>{m.l}</span>
             </div>
@@ -3819,7 +3810,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
   const regimeCarte = useRegimeFiscal();
   const declarerSansStatut = regimeCarte === null || regimeCarte === 'particulier';
   const locauxCarte = declarerSansStatut ? { declarer: { ...CHIFFRES_CARTE.declarer, valeur: null, raison: 'statut',
-    titre: regimeCarte === null ? 'À déclarer : choisis d’abord ton statut' : 'À déclarer : rien à l’URSSAF pour un particulier',
+    titre: regimeCarte === null ? tr('compta.declarerChoisisAbord') : tr('compta.declarerRienUrssaf'),
     // (chantier E1) La raison courte écrite sous le « — » de la case (`raisonCourte`, carteChiffres.js).
     raisonCourte: regimeCarte === null ? 'statut à choisir' : 'particulier',
     attrs: { 'data-declarer-sans-statut': regimeCarte === null ? 'pas-choisi' : 'particulier' } } } : null;
@@ -3832,7 +3823,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
       <span className="vrm-display" style={{ fontSize: fort ? 20 : 15, fontWeight: fort ? 700 : 600, color: val == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{val == null ? '—' : fmt(val)}</span>
     </div>
   );
-  const lienSaisie = <button type="button" onClick={versSaisiePrix} data-benef-porte="" className="vrm-lien-action" style={{ background: 'none', border: 0, padding: 0, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>;
+  const lienSaisie = <button type="button" onClick={versSaisiePrix} data-benef-porte="" className="vrm-lien-action" style={{ background: 'none', border: 0, padding: 0, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>{tr('reglages.prixachat.lib')}</button>;
   // (2 nov., « surtout comptabilité ») LA PREMIÈRE QUESTION : « Combien j'ai
   // gagné ? ». Un chiffre (le net de `beneficePeriode`, inchangé), une phrase
   // venue du MÊME calcul (sa raison, sa couverture), le geste qui le complète ;
@@ -3841,16 +3832,16 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
   // URSSAF et les dépenses du mois (§7 : un nombre, une fois).
   const titreNet = B && B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Ton bénéfice';
   const phrase = !B ? null
-    : B.raison === 'achats' ? <>Il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} sur {B.n} : sans lui, VRM ne peut pas calculer ce que tu as gagné.</>
-    : B.raison === 'frais' ? <>Des frais eBay ne sont pas encore connus : sans eux, VRM ne peut pas calculer ce que tu as gagné.</>
-    : B.raison === 'cotisations' ? <>En attente de ton chiffre d'affaires déclaré : ouvre l'écran Ventes une fois.</>
-    : B.raison === 'rien' ? <>Aucune vente finalisée ni dépense sur la période : rien à calculer.</>
-    : B.n === 0 ? <>Aucune vente finalisée sur la période{B.depenses === 'jamais' ? '' : ' : seules tes dépenses comptent'}.</>
-    : <>Ce qu'il te reste{B.depenses === 'jamais' ? ' avant tes dépenses' : ''} : tes ventes finalisées, moins le prix d'achat des {motsVendeur().noms}{B.fraisCouverts > 0 ? ', les frais de vente' : ''}{B.depenses === 'jamais' ? '' : ', tes dépenses'}{B.sansCotis ? '' : " et l'URSSAF"}.</>;
+    : B.raison === 'achats' ? <>{tr('compta.manquePrixAchat')} {sansAchat} {tr('journee.vente')}{sansAchat > 1 ? 's' : ''} {tr('journee.texte2')} {B.n} {tr('compta.sansLuiVrm')}</>
+    : B.raison === 'frais' ? <>{tr('compta.fraisEbaySont')}</>
+    : B.raison === 'cotisations' ? <>{tr('compta.attenteChiffreAffaires')}</>
+    : B.raison === 'rien' ? <>{tr('compta.aucuneVenteFinalisee2')}</>
+    : B.n === 0 ? <>{tr('compta.aucuneVenteFinalisee3')}{B.depenses === 'jamais' ? '' : tr('compta.seulesDepensesComptent')}.</>
+    : <>{tr('compta.reste')}{B.depenses === 'jamais' ? tr('compta.avantDepenses') : ''} {tr('compta.ventesFinaliseesMoins2')} {motsVendeur().noms}{B.fraisCouverts > 0 ? tr('compta.fraisVente') : ''}{B.depenses === 'jamais' ? '' : tr('compta.depenses')}{B.sansCotis ? '' : tr('compta.urssaf')}.</>;
   // La couverture n'est redite que si la phrase ne la dit pas déjà (raison « achats »).
   const couverture = !B || B.n === 0 || B.raison === 'achats' ? null
-    : B.nCout === B.n ? <>Prix d'achat {B.n === 1 ? 'connu pour 1 vente' : `connus pour les ${B.n} ventes`}.</>
-    : <span data-benef-manque="" style={{ color: C.warn }}>Prix d'achat {B.nCout > 1 ? 'connus' : 'connu'} pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n}.</span>;
+    : B.nCout === B.n ? <>{tr('annonces.prixAchat')} {B.n === 1 ? tr('compta.connu1Vente') : tr('compta.connusVentes', { x: String(B.n) })}.</>
+    : <span data-benef-manque="" style={{ color: C.warn }}>{trj('compta.prixAchatConnus', { n: B.nCout, x: B.n })}</span>;
   return (
     <section className="vrm-compta-q" data-compta-q="gagne" style={{ margin: 0 }}
       data-benef-etat={etat} data-benef-periode={periode}
@@ -3861,15 +3852,15 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
       data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}
       data-benef-depenses={B ? (nuagePret ? B.depenses : 'passu') : ''}>
       <div className="vrm-compta-q-tete">
-        <h2 className="vrm-compta-question" data-compta-question="gagne"><span className="vrm-compta-q-n" aria-hidden="true">1</span>Combien j'ai gagné ?</h2>
+        <h2 className="vrm-compta-question" data-compta-question="gagne"><span className="vrm-compta-q-n" aria-hidden="true">1</span>{tr('compta.combienAiGagne')}</h2>
         {/* (30 oct.) Sans bénéfice publié, changer de période ne changeait rien : le choix attend. */}
-        {B && <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} className="vrm-compta-periode"
+        {B && <Segmente label={tr('compta.periodeBenefice')} plein value={periode} onChange={choisir} className="vrm-compta-periode"
           options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />}
       </div>
       <div className="vrm-compta-carte" data-fu-carte="">
         {!B ? (
           <p className="vrm-compta-phrase" data-compta-phrase="gagne" style={{ margin: 0 }}>
-            {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
+            {etat === 'encours' ? tr('compta.jeLisBenefice') : sansCompte ? <span data-benefice-sans-compte="">{tr('compta.beneficeArriveraIci')}</span> : <>{tr('compta.beneficeCalculeDans')}{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>{tr('historiqueSites.type.ventes')}</a>)</> : null}{tr('compta.arriveraIci')}</>}
           </p>
         ) : (<>
           {/* (2 nov., 22 h, maquette FusionCompta « à l'identique ») « Ce que tu as gagné », le
@@ -3884,11 +3875,11 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
             // (5 nov., chantier F) La phrase sous la carte : seulement ce qu'elle a À DIRE (plus de
             // paragraphe vide), chaque morceau séparé par « · » sans jamais en commencer un.
             const morceaux = [];
-            if (B.n > 0) morceaux.push((B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? <span key="v">{B.libelle}</span> : <span key="v">sur {fmt(B.ca)} vendus</span>);
-            if (B.nCout < B.n) morceaux.push(<button key="p" type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{sansAchat} prix d'achat à saisir</button>);
-            if (B.raison === 'frais') morceaux.push(<span key="f">frais eBay pas connus</span>);
-            else if (B.raison === 'cotisations') morceaux.push(<span key="c">CA déclaré pas encore calculé</span>);
-            if (regimeCarte === null) morceaux.push(<span key="s" data-declarer-raison="">à déclarer : choisis ton statut, plus bas</span>);
+            if (B.n > 0) morceaux.push((B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? <span key="v">{B.libelle}</span> : <span key="v">{trj('compta.vendus2', { fmt: fmt(B.ca) })}</span>);
+            if (B.nCout < B.n) morceaux.push(<button key="p" type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{trj('compta.prixAchatSaisir', { sansAchat: sansAchat })}</button>);
+            if (B.raison === 'frais') morceaux.push(<span key="f">{tr('compta.fraisEbayConnus')}</span>);
+            else if (B.raison === 'cotisations') morceaux.push(<span key="c">{tr('compta.caDeclareEncore')}</span>);
+            if (regimeCarte === null) morceaux.push(<span key="s" data-declarer-raison="">{tr('compta.declarerChoisisStatut')}</span>);
             if (!morceaux.length) return null;
             return <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
               {morceaux.map((m, i) => <React.Fragment key={i}>{i ? ' · ' : ''}{m}</React.Fragment>)}
@@ -3897,11 +3888,11 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
             <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
           ) : onAjouterDepense && nuagePret ? (
-            <div className="vrm-compta-geste"><button type="button" className="vrm-lien-action" data-benef-ajouter-depense="" onClick={onAjouterDepense} style={{ background: 'none', border: 0, padding: 0, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Ajouter une dépense</button></div>
+            <div className="vrm-compta-geste"><button type="button" className="vrm-lien-action" data-benef-ajouter-depense="" onClick={onAjouterDepense} style={{ background: 'none', border: 0, padding: 0, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>{tr('compta.ajouterDepense')}</button></div>
           ) : null}
           {/* Le calcul, ligne par ligne : replié (il se lit une fois). */}
           <details className="vrm-repli vrm-compta-calcul" data-benef-calcul="">
-            <summary>Le détail du calcul</summary>
+            <summary>{tr('compta.detailCalcul')}</summary>
             <div className="vrm-set-liste vrm-compta-lignes" style={{ '--vrm-set-filet': C.border }}>
               <Ligne lib={NOM_BENEFICE_BRUT} val={chiffreBrut(B).valeur}
                 sous={B.n === 0 ? (B.toutes ? 'aucune vente finalisée sur la période' : 'aucune vente Vinted finalisée sur la période')
@@ -3912,14 +3903,14 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
               <Ligne lib="− tes dépenses" val={B.depenses === 'jamais' ? null : B.charges}
                 sous={B.depenses === 'jamais' ? 'aucune dépense notée' : B.depenses === 'aucune' ? 'aucune — tu as indiqué ne pas avoir de dépenses à noter' : 'abonnements, dépenses, packs et coûts fixes de la période'}
                 data={{ 'data-benef-ligne': 'charges' }} />
-              {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (« Combien je dois déclarer ? »)'}.</small></span></div> :
+              {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>{tr('compta.aucuneCotisationUrssaf')} {regimeFiscal() ? tr('compta.statut', { libelleRegime: String(libelleRegime(regimeFiscal())) }) : tr('compta.statutEncoreChoisi')}.</small></span></div> :
               <Ligne lib="− URSSAF" val={B.cotis}
                 sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')}\u00a0% des mêmes ventes (${fmt(B.ca)})`}
                 data={{ 'data-benef-ligne': 'cotis' }} />}
-              <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>le chiffre au-dessus</small></span></div>
+              <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>{tr('compta.chiffreDessus')}</small></span></div>
             </div>
             <small style={{ color: C.muted, lineHeight: 1.5, display: 'block', padding: '10px 2px 4px' }}>
-              {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à son article par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} L'URSSAF déduite est celle des ventes comptées ici (le taux × leur montant) ; celle à payer, datée au versement, se lit dans « Combien je dois déclarer ? ».{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
+              {B.toutes ? <>{tr('compta.ventesFinaliseesVinted')}{couvertureBenefice(B) ? tr('compta.prixAchatConnus2', { couvertureBenefice: String(couvertureBenefice(B)) }) : ''} {tr('compta.venteLeboncoinEbay')}</> : <>{tr('compta.ventesVintedFinalisees')}</>} {tr('compta.urssafDeduiteCelle')}{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
             </small>
           </details>
         </>)}
@@ -3980,7 +3971,7 @@ const assembleBilanMois = ({ ym, enCours, liveStats, compta, pub, ligneUrssaf, r
   const recu = recuAvecADater(recuPublieEntre(ligneUrssaf, { de, a, ym, complet: !enCours }, maintenant), ligneUrssaf);
   const charges = compta ? comptaChargesMois(compta, ym).total : null;
   const Bm = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, null);
-  const CB = Bm ? chiffreBenefice(Bm, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' };
+  const CB = Bm ? chiffreBenefice(Bm, 'lu') : { valeur: null, raison: pub ? tr('stats.moisCouvert') : 'publication' };
   const nomGroupe = (l) => (l.plateforme === 'Vinted' ? (l.compte || 'Vinted') : (l.compte ? `${l.compte} (${l.plateforme})` : l.plateforme));
   const meilleur = V ? meilleurCompte(V.filter((l) => l.ts >= de && l.ts < a), nomGroupe) : null;
   const D = bilanDuMois({ ym, vendu, recu, depense: charges, benefice: CB, B: Bm, meilleur, maintenant, enCours });
@@ -4001,13 +3992,13 @@ function BilanMoisCarte({ liveStats, compta }) {
     if (envoi) return;
     setEnvoi(true);
     try { telechargerFichier(new Blob([await pdfBilanMois(D, { fmt })], { type: 'application/pdf' }), nomFichierBilan(ym), 'application/pdf'); }
-    catch (_) { toast('Le PDF n’a pas pu être préparé — réessaie dans un moment.'); }
+    catch (_) { toast(tr('compta.pdfPuEtre')); }
     setEnvoi(false);
   };
   return (
     <div className="vrm-bilan-mois" data-bilan-mois={ym} data-bilan-en-cours={enCours ? '1' : '0'}>
       <div className="vrm-bilan-tete">
-        <Segmente label="Mois du bilan" value={quel} onChange={setQuel}
+        <Segmente label={tr('compta.moisBilan')} value={quel} onChange={setQuel}
           options={[{ v: 'courant', l: 'Ce mois-ci', data: { 'data-bilan-choix': 'courant' } }, { v: 'precedent', l: 'Mois dernier', data: { 'data-bilan-choix': 'precedent' } }]} />
       </div>
       {D.lignes.map((l) => (
@@ -4017,11 +4008,11 @@ function BilanMoisCarte({ liveStats, compta }) {
         </div>
       ))}
       <div className="vrm-bilan-ligne" data-bilan-ligne="meilleur" data-valeur={D.meilleur ? D.meilleur.nom : ''}>
-        <span><b>Meilleur compte</b><small>{D.meilleur ? `${D.meilleur.n} vente${D.meilleur.n > 1 ? 's' : ''} · ${fmt(D.meilleur.eur)} vendus` : (vendu && vendu.manque.length ? 'pas désigné : des ventes ne sont pas lues' : vendu && vendu.n ? 'égalité' : 'aucune vente sur le mois')}</small></span>
+        <span><b>{tr('compta.meilleurCompte')}</b><small>{D.meilleur ? tr('compta.ventesVendus', { n: String(D.meilleur.n), fmt: String(fmt(D.meilleur.eur)) }) : (vendu && vendu.manque.length ? tr('compta.designeVentesSont') : vendu && vendu.n ? tr('compta.egalite') : tr('compta.aucuneVenteMois'))}</small></span>
         <span className="vrm-bilan-val" data-vide={D.meilleur ? undefined : '1'}>{D.meilleur ? D.meilleur.nom : '—'}</span>
       </div>
       <div className="vrm-bilan-pied">
-        <Bouton variante="secondaire" icone="save" occupe={envoi} data-bilan-pdf="" onClick={telecharger}>Télécharger en PDF</Bouton>
+        <Bouton variante="secondaire" icone="save" occupe={envoi} data-bilan-pdf="" onClick={telecharger}>{tr('compta.telechargerPdf2')}</Bouton>
       </div>
     </div>
   );
@@ -4110,16 +4101,16 @@ function RapportMoisCarte({ liveStats, compta, panelOff, accounts }) {
   };
   return (
     <div className="vrm-rapport-mois" data-rapport-mois={ym} data-rapport-voie={partageable ? 'partage' : 'telechargement'}>
-      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Ventes, argent, stock, achats — et ce qui manque.</p>
-      <select aria-label="Mois du rapport" data-rapport-choix="" value={ym} onChange={(e) => setYm(e.target.value)} style={{ width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
-        {choix.map((p) => <option key={p} value={p}>{libelleMoisRapport(p)}{p === ymCourant() ? ' (en cours)' : ''}</option>)}
+      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{tr('compta.ventesArgentStock')}</p>
+      <select aria-label={tr('compta.moisRapport')} data-rapport-choix="" value={ym} onChange={(e) => setYm(e.target.value)} style={{ width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
+        {choix.map((p) => <option key={p} value={p}>{libelleMoisRapport(p)}{p === ymCourant() ? tr('stats.cours3') : ''}</option>)}
       </select>
       <Bouton variante="primaire" icone="doc" data-rapport-creer="" disabled={!pret || occupe} occupe={occupe} onClick={creer} style={{ marginTop: 10, width: '100%' }}>
-        {occupe ? 'Je prépare le rapport…' : partageable ? 'Partager le rapport (PDF)' : 'Télécharger le rapport (PDF)'}
+        {occupe ? tr('compta.jePrepareRapport') : partageable ? tr('compta.partagerRapportPdf') : tr('compta.telechargerRapportPdf')}
       </Bouton>
       {retour && <p role="status" data-rapport-fin={retour.fin} data-rapport-manques={retour.manques != null ? retour.manques : ''} style={{ margin: '8px 0 0', fontSize: 13, color: retour.fin === 'ko' ? C.warn : C.muted, lineHeight: 1.5 }}>
-        {retour.fin === 'ko' ? `Rapport pas créé : ${retour.raison}`
-          : retour.fin === 'annule' ? 'Partage annulé. Rien n’est parti.'
+        {retour.fin === 'ko' ? tr('compta.rapportCree', { raison: String(retour.raison) })
+          : retour.fin === 'annule' ? tr('compta.partageAnnuleRien')
           : `${retour.fin === 'partage' ? 'Rapport partagé' : 'Rapport téléchargé'}${retour.manques ? ` · ${retour.manques} point${retour.manques > 1 ? 's' : ''} à compléter, listé${retour.manques > 1 ? 's' : ''} à la fin` : ' · rien ne manque'}.`}
       </p>}
     </div>
@@ -4141,12 +4132,12 @@ function DelaiPaiementCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, ac
   }, [calc, ventesVcER]);
   if (R === undefined) return <p className="vrm-compta-phrase" data-delai-etat="encours" style={{ margin: 0 }}>{PAS_SU.enCours}</p>;
   if (R === null) return <EtatPanne quoi="Le délai de paiement" raison="Tes ventes n’ont pas pu être lues." compact />;
-  if (!R.sites.length) return <p className="vrm-compta-phrase" data-delai-etat="vide" style={{ margin: 0 }}>Aucune vente reçue pour l’instant : le délai se mesure au premier versement.</p>;
+  if (!R.sites.length) return <p className="vrm-compta-phrase" data-delai-etat="vide" style={{ margin: 0 }}>{tr('compta.aucuneVenteRecue')}</p>;
   return (
     <div className="vrm-delai-paiement" data-delai-etat="lu">
       {R.sites.map((x) => (
         <div key={x.plateforme} className="vrm-delai-ligne" data-delai-site={x.plateforme} data-delai-mediane={x.mediane == null ? '' : String(x.mediane)} data-delai-n={String(x.n)} data-delai-lu={x.lu ? '1' : '0'}>
-          <span><b>{x.plateforme}</b><small>{!x.lu ? 'date de versement pas lue sur ce site' : x.n ? `médiane sur ${x.n} vente${x.n > 1 ? 's' : ''} versée${x.n > 1 ? 's' : ''}${x.n > 1 && x.min != null && x.max > x.min ? ` · entre ${String(x.min).replace('.', ',')} et ${texteDelai(x.max)}` : ''}${x.nSans ? ` · ${x.nSans} sans date` : ''}` : `aucun versement daté${x.nSans ? ` · ${x.nSans} sans date` : ''}`}</small></span>
+          <span><b>{x.plateforme}</b><small>{!x.lu ? tr('compta.dateVersementLue') : x.n ? `médiane sur ${x.n} vente${x.n > 1 ? 's' : ''} versée${x.n > 1 ? 's' : ''}${x.n > 1 && x.min != null && x.max > x.min ? ` · entre ${String(x.min).replace('.', ',')} et ${texteDelai(x.max)}` : ''}${x.nSans ? ` · ${x.nSans} sans date` : ''}` : `aucun versement daté${x.nSans ? ` · ${x.nSans} sans date` : ''}`}</small></span>
           <span className="vrm-delai-val" data-vide={x.mediane == null ? '1' : undefined}>{texteDelai(x.mediane)}</span>
         </div>
       ))}
@@ -4335,7 +4326,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     ev.target.value = '';
     if (!f) return;
     const b64 = await compressImage(f, 1100, 0.7);
-    if (!b64) { setDErr("Cette photo n'a pas pu être lue — essaie une autre."); return; }
+    if (!b64) { setDErr(tr('compta.photoPuEtre')); return; }
     setDPhoto(b64); setDErr('');
     if (String(dMntRef.current || '').trim()) return;
     setDLu('lecture');
@@ -4346,38 +4337,38 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const ajouterDepense = async () => {
     if (dEnvoi) return;
     const m = parseMontant(dMnt);
-    if (!dLib.trim() && !dPhoto) { setDErr('Dis en deux mots ce que tu as payé (ex. « cartons »).'); return; }
-    if (!m) { setDErr('Le montant doit être un nombre en euros, par exemple 12,50.'); return; }
+    if (!dLib.trim() && !dPhoto) { setDErr(tr('compta.disDeuxMots')); return; }
+    if (!m) { setDErr(tr('compta.montantDoitEtre')); return; }
     setDErr('');
     const id = rCompId();
     let ticket = false;
     if (dPhoto) { setDEnvoi(true); ticket = await ecrireTicket(id, dPhoto); setDEnvoi(false); }
     const libelle = dLib.trim() || dCat;
     majFraiche((cur) => ({ ...cur, depenses: [{ id, date: dDate || auj, libelle, cat: dCat, montant: m, ...(ticket ? { ticket: true } : {}) }, ...((cur && cur.depenses) || [])] }));
-    if (dPhoto && !ticket) toast(`Dépense ajoutée : ${fmt(m)} — la photo n'a pas pu être envoyée`);
-    else toast(`✓ Dépense ajoutée : ${fmt(m)}`);
+    if (dPhoto && !ticket) toast(tr('compta.depenseAjouteePhoto', { fmt: String(fmt(m)) }));
+    else toast(tr('compta.depenseAjoutee', { fmt: String(fmt(m)) }));
     setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj); setDPhoto(null); setDLu(''); setOuvert('');
   };
   const voirTicket = async (d) => {
     const src = await lireTicket(d.id);
-    if (!src) { toast("Le ticket n'a pas pu être lu"); return; }
+    if (!src) { toast(tr('compta.ticketPuEtre')); return; }
     setTicketVu({ titre: d.libelle, src });
   };
   const ajouterPack = () => {
     const m = parseMontant(pMnt); if (!m) return;
     maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
-    toast(`✓ Pack ajouté : ${fmt(m)}`);
+    toast(tr('compta.packAjoute', { fmt: String(fmt(m)) }));
     setPCpt(''); setPMnt(''); setPDate(auj); setOuvert('');
   };
   // Un abonnement mal saisi n'est pas ajouté, et on DIT pourquoi (jamais en silence).
   const ajouterAbonnement = () => {
     const m = parseMontant(aMnt);
-    if (!aLib.trim()) { setAErr('Donne-lui un nom (ex. « VRM », « Canva »).'); return; }
-    if (!m) { setAErr('Le montant doit être un nombre en euros, par exemple 12,99.'); return; }
-    if (!ymCompta(aDeb)) { setAErr('Il faut une date de début.'); return; }
-    if (aFin && aFin < aDeb) { setAErr('La date de fin est avant la date de début.'); return; }
+    if (!aLib.trim()) { setAErr(tr('compta.donneLuiNom')); return; }
+    if (!m) { setAErr(tr('compta.montantDoitEtre2')); return; }
+    if (!ymCompta(aDeb)) { setAErr(tr('compta.fautDateDebut')); return; }
+    if (aFin && aFin < aDeb) { setAErr(tr('compta.dateFinAvant')); return; }
     maj({ ...data, abonnements: [{ id: rCompId(), libelle: aLib.trim(), montant: m, periode: aPer === 'an' ? 'an' : 'mois', debut: aDeb, fin: aFin || '' }, ...abonnements] });
-    toast(`✓ Abonnement ajouté : ${aLib.trim()}`);
+    toast(tr('compta.abonnementAjoute', { trim: String(aLib.trim()) }));
     setALib(''); setAMnt(''); setAPer('mois'); setADeb(auj); setAFin(''); setAErr(''); setOuvert('');
   };
   // (1er nov.) Le « × » d'une ligne supprimait la dépense d'un toucher, sans
@@ -4388,9 +4379,9 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const nomLigneCompta = (cle, x) => !x ? '' : cle === 'packs' ? `Pack ${x.plateforme || ''}`.trim() : String(x.libelle || '');
   const terminerAbonnement = async (id) => {
     const a = abonnements.find((x) => x.id === id);
-    if (!(await askConfirm({ title: `Arrêter « ${nomLigneCompta('abonnements', a)} » ?`, desc: 'Le mois en cours reste compté dans tes charges, les suivants non.', ok: 'Arrêter', cancel: 'Annuler' }))) return;
+    if (!(await askConfirm({ title: `Arrêter « ${nomLigneCompta('abonnements', a)} » ?`, desc: tr('compta.moisCoursReste'), ok: 'Arrêter', cancel: 'Annuler' }))) return;
     majFraiche((cur) => ({ ...cur, abonnements: (cur.abonnements || []).map(x => x.id === id ? { ...x, fin: auj } : x) }));
-    toast('✓ Abonnement arrêté ce mois-ci');
+    toast(tr('compta.abonnementArreteMois'));
   };
   // (10 nov., lot Y) Supprimer = à la corbeille 30 jours : la pilule dit « Mis à la corbeille » et offre
   // « Annuler » 5 s ; Paramètres → Corbeille la restaure ensuite. Le ticket n'est vidé qu'à la purge.
@@ -4456,11 +4447,11 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
             seulement quand la liste des comptes est LUE (pas su ≠ aucun). */}
         {comptesLus && Array.isArray(accounts) && accounts.length === 0 ? (<>
-          <span style={{ flex: '1 1 220px' }} data-compta-sans-compte="">Ce calcul part de tes ventes Vinted : aucun compte Vinted n’est encore relié.</span>
-          <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('vintedaccounts')}>Relier mon compte</Bouton>
+          <span style={{ flex: '1 1 220px' }} data-compta-sans-compte="">{tr('compta.calculPartVentes')}</span>
+          <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('vintedaccounts')}>{tr('compta.relierMonCompte')}</Bouton>
         </>) : (<>
-        <span style={{ flex: '1 1 220px' }}>Pas encore calculé</span>
-        <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>Ouvrir Ventes</Bouton>
+        <span style={{ flex: '1 1 220px' }}>{tr('stats.encoreCalcule')}</span>
+        <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton>
         </>)}
       </div>}
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
@@ -4470,11 +4461,11 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       <ComptaFusion compta={data} onNav={onNav}/>
         <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
           <div className="vrm-compta-q-tete">
-            <h2 className="vrm-compta-question" data-compta-question="detail">Le détail</h2>
+            <h2 className="vrm-compta-question" data-compta-question="detail">{tr('compta.detail')}</h2>
           </div>
           <div className="vrm-compta-replis">
             {/* (10 nov.) Le bénéfice ligne par ligne : son chiffre est en tête (widget « Bénéfice »), son calcul ici. */}
-            <ComptaRepli id="compta-benefice" titre="Ton bénéfice" resume="Le calcul, ligne par ligne">
+            <ComptaRepli id="compta-benefice" titre={tr('compta.benefice')} resume="Le calcul, ligne par ligne">
       <BeneficeCompta compta={data} onNav={onNav} sansCompte={comptesLus && Array.isArray(accounts) && accounts.length === 0}
         onSansDepenses={() => repondreSansDepenses(data, maj)}
         onAjouterDepense={() => { ouvrirRepliCompta('compta-charges'); setOuvert('dep'); setVersDepense((n) => n + 1); }} />
@@ -4483,21 +4474,21 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             <CaParPeriodeCarte dansRepli lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
           {/* (5 nov., chantier F) Le bilan du mois en une page, et le délai de paiement par site. */}
-          <ComptaRepli id="compta-bilan" titre="Bilan du mois" resume="Vendu, reçu, dépensé, bénéfice, meilleur compte — en PDF">
+          <ComptaRepli id="compta-bilan" titre={tr('compta.bilanMois')} resume="Vendu, reçu, dépensé, bénéfice, meilleur compte — en PDF">
             <BilanMoisCarte liveStats={liveStats} compta={data} />
           </ComptaRepli>
           {/* (11 nov., lot rapport-mois) Le rapport du mois en PDF, à partager. */}
-          <ComptaRepli id="compta-rapport" titre="Rapport du mois" resume="Un PDF de 2 à 4 pages, à partager">
+          <ComptaRepli id="compta-rapport" titre={tr('compta.rapportMois')} resume="Un PDF de 2 à 4 pages, à partager">
             <RapportMoisCarte liveStats={liveStats} compta={data} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
-          <ComptaRepli id="compta-delai" titre="Délai de paiement" resume="Combien de jours entre la vente et le versement, site par site">
+          <ComptaRepli id="compta-delai" titre={tr('compta.delaiPaiement')} resume="Combien de jours entre la vente et le versement, site par site">
             <DelaiPaiementCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
           {/* (4 nov.) Le porte-monnaie de chaque compte Vinted, LU par l'extension (jamais déduit des ventes). */}
-          <ComptaRepli id="compta-porte-monnaie" titre="Porte-monnaie" resume="Disponible et en attente, compte par compte">
+          <ComptaRepli id="compta-porte-monnaie" titre={tr('compta.porteMonnaie')} resume="Disponible et en attente, compte par compte">
             <PorteMonnaieCompta accounts={accounts} panelOff={panelOff}/>
           </ComptaRepli>
-          <ComptaRepli id="compta-charges" titre="Tes dépenses" resume={(depenses.length || abonnements.length || packs.length || fixes.length)
+          <ComptaRepli id="compta-charges" titre={tr('compta.depenses2')} resume={(depenses.length || abonnements.length || packs.length || fixes.length)
               ? [depenses.length ? `${depenses.length} dépense${depenses.length > 1 ? 's' : ''}` : null, abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : null, packs.length ? `${packs.length} pack${packs.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')
               : 'Cartons, abonnements, frais : rien de noté'}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -4517,7 +4508,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 ))}
                 {chargesAnnee > 0 && (
                   <button type="button" className="vrm-set-ligne" onClick={exporterCharges}>
-                    <span className="vrm-set-lib"><b style={{ color: C.accentTexte, fontWeight: 600 }}>Exporter mes dépenses {annee} (CSV)</b></span>
+                    <span className="vrm-set-lib"><b style={{ color: C.accentTexte, fontWeight: 600 }}>{trj('compta.exporterMesDepenses', { annee: annee })}</b></span>
                     <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted }}><Icon name="save" size={16} /></span>
                   </button>
                 )}
@@ -4525,53 +4516,53 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             </section>
         <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
           {/* DÉPENSES PONCTUELLES */}
-          <Section data="depenses" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={null}>
+          <Section data="depenses" titre={tr('compta.depenses3')} note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={null}>
             {depenses.length === 0 && ouvert !== 'dep'
-              ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
+              ? vide(tr('compta.notePremiereDepense'))
               : listeBox(depenses.map((d) => <Ligne key={d.id} attrs={{ 'data-depense': d.id, 'data-depense-ticket': d.ticket ? '1' : '' }} gauche={<><b style={{ color: C.text }}>{d.libelle}</b><small style={{ color: C.muted }}>{d.cat} · {dateFr(d.date)}</small></>} droite={fmt(d.montant)}
-                  extra={d.ticket ? <button type="button" data-depense-voir-ticket="" aria-label={`Voir le ticket de ${d.libelle}`} onClick={() => voirTicket(d)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="camera" size={18} /></button> : null}
+                  extra={d.ticket ? <button type="button" data-depense-voir-ticket="" aria-label={tr('compta.voirTicket', { libelle: String(d.libelle) })} onClick={() => voirTicket(d)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="camera" size={18} /></button> : null}
                   onDel={() => retirer('depenses', d.id)} />))}
             {ticketVu && createPortal(<div className="vrm-photo-viewer" data-ticket-vu="" onClick={() => setTicketVu(null)} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTicketVu(null); } }}>
               <FermeAuRetour fermer={() => setTicketVu(null)} />
-              <div role="dialog" aria-modal="true" aria-label={`Ticket de ${ticketVu.titre}`} className="vrm-photo-panel" onClick={(e) => e.stopPropagation()}>
-                <div><span>{ticketVu.titre}</span><button className="vrm-icon-control" type="button" aria-label="Fermer le ticket" onClick={() => setTicketVu(null)}><Icon name="close" size={22} /></button></div>
-                <img src={ticketVu.src} alt={`Ticket de ${ticketVu.titre}`} style={{ width: '100%', height: '100%', objectFit: 'contain', minHeight: 0 }} />
+              <div role="dialog" aria-modal="true" aria-label={tr('compta.ticket', { titre: String(ticketVu.titre) })} className="vrm-photo-panel" onClick={(e) => e.stopPropagation()}>
+                <div><span>{ticketVu.titre}</span><button className="vrm-icon-control" type="button" aria-label={tr('compta.fermerTicket')} onClick={() => setTicketVu(null)}><Icon name="close" size={22} /></button></div>
+                <img src={ticketVu.src} alt={tr('compta.ticket', { titre: String(ticketVu.titre) })} style={{ width: '100%', height: '100%', objectFit: 'contain', minHeight: 0 }} />
               </div>
             </div>, document.body)}
             <ComptaAjout ouvert={ouvert === 'dep'} onClick={() => basculer('dep')} libelle="Ajouter une dépense" data={{ 'data-dep-ouvrir': '' }} />
             {ouvert === 'dep' && <div style={formBox} data-dep-form>
               <div className="vrm-dep-ticket" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {dPhoto ? <img data-dep-ticket-apercu="" src={dPhoto} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}
-                <Bouton variante={dPhoto ? 'secondaire' : 'primaire'} icone="camera" data-dep-ticket="" onClick={() => ticketRef.current && ticketRef.current.click()} style={{ minHeight: 44 }}>{dPhoto ? 'Changer la photo' : 'Photo du ticket'}</Bouton>
-                {dPhoto ? <Bouton variante="discret" data-dep-ticket-retirer="" onClick={() => { setDPhoto(null); setDLu(''); }}>Retirer</Bouton> : null}
+                <Bouton variante={dPhoto ? 'secondaire' : 'primaire'} icone="camera" data-dep-ticket="" onClick={() => ticketRef.current && ticketRef.current.click()} style={{ minHeight: 44 }}>{dPhoto ? tr('achats.changerPhoto') : tr('achats.photoTicket')}</Bouton>
+                {dPhoto ? <Bouton variante="discret" data-dep-ticket-retirer="" onClick={() => { setDPhoto(null); setDLu(''); }}>{tr('achats.retirer')}</Bouton> : null}
                 <input ref={ticketRef} data-dep-ticket-fichier="" type="file" accept="image/*" capture="environment" onChange={choisirTicket} style={{ display: 'none' }} />
               </div>
-              <div style={{ fontSize: 13, color: C.muted }}>C'est pour quoi ?</div>
-              <div role="radiogroup" aria-label="Catégorie" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 13, color: C.muted }}>{tr('compta.quoi')}</div>
+              <div role="radiogroup" aria-label={tr('compta.categorie')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {DEPENSE_CATS.map((c) => <button key={c.k} type="button" role="radio" aria-checked={dCat === c.k} data-dep-cat={c.k} onClick={() => { setDCat(c.k); setDErr(''); }} style={pastille(dCat === c.k)}>{c.k}</button>)}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <label style={{ ...lab, flex: '2 1 180px' }}>Ce que tu as payé
-                  <input type="text" placeholder={`ex. ${(DEPENSE_CATS.find((c) => c.k === dCat) || DEPENSE_CATS[DEPENSE_CATS.length - 1]).ex}`} data-dep-libelle value={dLib} onChange={e => { setDLib(e.target.value); setDErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
+                <label style={{ ...lab, flex: '2 1 180px' }}>{tr('compta.asPaye')}
+                  <input type="text" placeholder={tr('compta.ex', { ex: String((DEPENSE_CATS.find((c) => c.k === dCat) || DEPENSE_CATS[DEPENSE_CATS.length - 1]).ex) })} data-dep-libelle value={dLib} onChange={e => { setDLib(e.target.value); setDErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
                 </label>
-                <label style={{ ...lab, flex: '0 1 110px' }}>Montant
+                <label style={{ ...lab, flex: '0 1 110px' }}>{tr('ventes.montant')}
                   <input type="text" inputMode="decimal" placeholder={dLu === 'lecture' ? '…' : '0,00\u00a0€'} data-dep-montant data-dep-montant-lu={dLu} value={dMnt} onChange={e => { setDMnt(e.target.value); setDErr(''); setDLu(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
                 </label>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <label style={lab}>Payé le
+                <label style={lab}>{tr('compta.paye')}
                   <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} data-dep-date style={{ ...inp, width: '100%' }} />
                 </label>
-                <button type="button" onClick={ajouterDepense} data-dep-ajouter disabled={dEnvoi} style={btnAdd}>{dEnvoi ? '…' : 'Ajouter'}</button>
+                <button type="button" onClick={ajouterDepense} data-dep-ajouter disabled={dEnvoi} style={btnAdd}>{dEnvoi ? '…' : tr('stock.ajouter')}</button>
               </div>
               {dErr && <div data-dep-erreur style={{ fontSize: 13, color: C.warn }}>{dErr}</div>}
             </div>}
           </Section>
 
           {/* ABONNEMENTS RÉCURRENTS */}
-          <Section data="abonnements" titre="Abonnements" note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance (une échéance compte dès le début de son mois), jamais dans ton CA."
+          <Section data="abonnements" titre={tr('compta.abonnements')} note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance (une échéance compte dès le début de son mois), jamais dans ton CA."
             total={null}>
-            {abonnements.length === 0 && ouvert !== 'abo' ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois.') : null}
+            {abonnements.length === 0 && ouvert !== 'abo' ? vide(tr('compta.abonnementVrmCanva')) : null}
             {abonnements.length > 0 && listeBox(abonnements.map((a) => {
                 const ech = echeancesAbonnement(a, moisCle);
                 const cumul = ech.length * (Number(a.montant) || 0);
@@ -4581,40 +4572,40 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                     <Ligne key={a.id} attrs={{ 'data-abo': a.libelle, 'data-abo-cumul': String(Math.round(cumul * 100) / 100), 'data-abo-echeances': ech.length }}
                       gauche={<><b style={{ color: C.text }}>{a.libelle}</b>
                         <small style={{ color: C.muted }}>
-                          {pasEncore ? `commence le ${dateFr(a.debut)}` : `depuis le ${dateFr(a.debut)}`}{a.fin ? ` · ${fini ? 'terminé' : 'jusqu’au'} ${dateFr(a.fin)}` : ''}
-                          {!pasEncore && ` · ${ech.length} échéance${ech.length > 1 ? 's' : ''}, ${fmt(cumul)} en tout`}
+                          {pasEncore ? tr('compta.commence', { dateFr: String(dateFr(a.debut)) }) : tr('compta.depuis', { dateFr: String(dateFr(a.debut)) })}{a.fin ? ` · ${fini ? 'terminé' : 'jusqu’au'} ${dateFr(a.fin)}` : ''}
+                          {!pasEncore && tr('compta.echeancesTout', { n: String(ech.length), fmt: String(fmt(cumul)) })}
                         </small></>}
                       droite={fmt(a.montant) + (a.periode === 'an' ? ' /an' : ' /mois')}
-                      extra={!a.fin && !pasEncore ? <Bouton variante="secondaire" taille="petit" data-abo-arreter="" onClick={() => terminerAbonnement(a.id)} title="Il s'arrête ce mois-ci (le mois en cours reste compté)" style={{ flexShrink: 0 }}>Arrêter</Bouton> : null}
+                      extra={!a.fin && !pasEncore ? <Bouton variante="secondaire" taille="petit" data-abo-arreter="" onClick={() => terminerAbonnement(a.id)} title={tr('compta.arreteMoisCi')} style={{ flexShrink: 0 }}>{tr('compta.arreter')}</Bouton> : null}
                       onDel={() => retirer('abonnements', a.id)} />
                 );
               }))}
             <ComptaAjout ouvert={ouvert === 'abo'} onClick={() => basculer('abo')} libelle="Ajouter un abonnement" data={{ 'data-abo-ouvrir': '' }} />
             {ouvert === 'abo' && <div style={formBox} data-abo-form>
-            <div style={{ fontSize: 13, color: C.muted }}>Les plus courants</div>
-            <div role="group" aria-label="Abonnements courants" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, color: C.muted }}>{tr('compta.plusCourants')}</div>
+            <div role="group" aria-label={tr('compta.abonnementsCourants')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {ABONNEMENTS_COURANTS.map((x) => <button key={x.nom} type="button" data-abo-courant={x.nom} aria-pressed={aLib === x.nom}
                 onClick={() => { setALib(x.nom); if (x.prix) setAMnt(x.prix()); setAPer('mois'); setAErr(''); }} style={pastille(aLib === x.nom)}>{x.nom}</button>)}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <label style={{ ...lab, flex: '2 1 170px' }}>Nom
-                <input type="text" placeholder="ex. Canva" data-abo-libelle value={aLib} onChange={e => { setALib(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: '100%' }} />
+              <label style={{ ...lab, flex: '2 1 170px' }}>{tr('stock.nom')}
+                <input type="text" placeholder={tr('compta.exCanva')} data-abo-libelle value={aLib} onChange={e => { setALib(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: '100%' }} />
               </label>
-              <label style={{ ...lab, flex: '0 1 110px' }}>Prix
+              <label style={{ ...lab, flex: '0 1 110px' }}>{tr('partout.part.prix')}
                 <input type="text" inputMode="decimal" placeholder="0,00&nbsp;€" data-abo-montant value={aMnt} onChange={e => { setAMnt(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: '100%' }} />
               </label>
-              <label style={{ ...lab, flex: '1 1 140px' }}>Revient
-                <select value={aPer} onChange={e => setAPer(e.target.value)} data-abo-periode style={{ ...inp, width: '100%' }}><option value="mois">tous les mois</option><option value="an">tous les ans</option></select>
+              <label style={{ ...lab, flex: '1 1 140px' }}>{tr('compta.revient')}
+                <select value={aPer} onChange={e => setAPer(e.target.value)} data-abo-periode style={{ ...inp, width: '100%' }}><option value="mois">{tr('compta.tousMois')}</option><option value="an">{tr('compta.tousAns')}</option></select>
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <label style={lab}>Depuis le
+              <label style={lab}>{tr('compta.depuis2')}
                 <input type="date" value={aDeb} onChange={e => { setADeb(e.target.value); setAErr(''); }} data-abo-debut style={{ ...inp, width: '100%' }} />
               </label>
-              <label style={lab}>Jusqu'au <span style={{ fontSize: 11 }}>(vide s'il continue)</span>
+              <label style={lab}>{tr('compta.jusqu')} <span style={{ fontSize: 11 }}>{tr('compta.videContinue')}</span>
                 <input type="date" value={aFin} onChange={e => { setAFin(e.target.value); setAErr(''); }} data-abo-fin style={{ ...inp, width: '100%' }} />
               </label>
-              <button type="button" onClick={ajouterAbonnement} data-abo-ajouter style={btnAdd}>Ajouter</button>
+              <button type="button" onClick={ajouterAbonnement} data-abo-ajouter style={btnAdd}>{tr('stock.ajouter')}</button>
             </div>
             {aErr && <div data-abo-erreur style={{ fontSize: 13, color: C.warn }}>{aErr}</div>}
             </div>}
@@ -4623,7 +4614,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         </div>
           </div>
           </ComptaRepli>
-            <ComptaRepli id="compta-packs" titre="Packs & options" resume="Facultatif : ce que tu paies aux plateformes">
+            <ComptaRepli id="compta-packs" titre={tr('compta.packsOptions')} resume="Facultatif : ce que tu paies aux plateformes">
           <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
             {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
                 en compte du bénéfice ». ⚠️ Mesuré le 16 octobre : AUCUNE plateforme ne
@@ -4631,24 +4622,24 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 Leboncoin : aucune ligne captée). Un montant deviné serait un faux :
                 seul ce qui est saisi ici compte. Les boosts Vinted, eux, se notent
                 par annonce (champ « boost ») et sortent de la marge dans Statistiques. */}
-            <Section data="packs" titre="Packs & options (facultatif)" note={<>Rien d'obligatoire : si tu as payé un pack de photos ou une option, note son prix ici pour qu'il soit déduit de ton résultat. Leboncoin et eBay ne transmettent pas à VRM ce que tu leur paies. Les boosts Vinted se notent par annonce et sortent de ta marge dans {lienBtn('Statistiques', 'dashboard')}.</>} total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
+            <Section data="packs" titre={tr('compta.packsOptionsFacultatif')} note={<>{tr('compta.rienObligatoireAs')} {lienBtn('Statistiques', 'dashboard')}.</>} total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
               {packLbc && <div className="vrm-set-ligne" data-pack-lbc={packLbc.actif ? 'actif' : 'aucun'}>
-                <span className="vrm-set-lib"><b style={{ color: C.text }}>Pack photo Leboncoin : {packLbc.actif ? 'pris' : 'aucun'}</b>
-                  <small style={{ color: C.muted }}>Détecté par l'extension{packLbc.at && !isNaN(Date.parse(packLbc.at)) ? ` le ${new Date(packLbc.at).toLocaleDateString('fr-FR')}` : ''}{packLbc.actif ? ' — son prix n’est pas transmis : ajoute-le ci-dessous si tu veux le déduire.' : ''}</small></span>
+                <span className="vrm-set-lib"><b style={{ color: C.text }}>{tr('compta.packPhotoLeboncoin')} {packLbc.actif ? 'pris' : 'aucun'}</b>
+                  <small style={{ color: C.muted }}>{tr('compta.detecteExtension')}{packLbc.at && !isNaN(Date.parse(packLbc.at)) ? ` le ${new Date(packLbc.at).toLocaleDateString('fr-FR')}` : ''}{packLbc.actif ? tr('compta.prixTransmisAjoute') : ''}</small></span>
               </div>}
               {packs.length === 0 && ouvert !== 'pack'
-                ? (packLbc ? null : vide('Tu as acheté un pack de photos ou une option ? Tu peux le noter ici — ce n’est pas obligatoire.'))
+                ? (packLbc ? null : vide(tr('compta.asAchetePack')))
                 : listeBox(packs.map((p) => <Ligne key={p.id} gauche={<><b style={{ color: C.text }}>{p.plateforme}</b><small style={{ color: C.muted }}>{p.compte ? `${p.compte} · ` : ''}{dateFr(p.date)}</small></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} />))}
               <ComptaAjout ouvert={ouvert === 'pack'} onClick={() => basculer('pack')} libelle="Ajouter un pack ou une option" data={{ 'data-pack-ouvrir': '' }} />
               {ouvert === 'pack' && <div style={formBox}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label="Plateforme" style={{ ...inp, flex: '1 1 130px' }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
-                  <input type="text" placeholder="Compte (facultatif)" aria-label="Compte" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
+                  <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label={tr('compta.plateforme')} style={{ ...inp, flex: '1 1 130px' }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+                  <input type="text" placeholder={tr('compta.compteFacultatif')} aria-label={tr('ventes.compte4')} value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label="Date" style={{ ...inp, flex: '1 1 150px' }} />
-                  <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 96 }} />
-                  <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
+                  <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label={tr('compta.date')} style={{ ...inp, flex: '1 1 150px' }} />
+                  <input type="text" inputMode="decimal" placeholder="€" aria-label={tr('ventes.montant')} value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 96 }} />
+                  <button type="button" onClick={ajouterPack} style={btnAdd}>{tr('stock.ajouter')}</button>
                 </div>
               </div>}
             </Section>
@@ -4657,7 +4648,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 reste, comptés comme avant ; on n'en ajoute plus — un abonnement daté
                 les remplace (rien n'est perdu, §4.11). */}
             {fixes.length > 0 && (
-              <Section data="fixes" titre="Coûts fixes (sans date)" note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
+              <Section data="fixes" titre={tr('compta.coutsFixesSans')} note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
                 {listeBox(fixes.map((f) => <Ligne key={f.id} gauche={<b style={{ color: C.text }}>{f.libelle}</b>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} />))}
               </Section>
             )}
@@ -4671,7 +4662,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       <div className="vrm-argent-partie" data-argent-vue="declarer" hidden={vue !== 'declarer'}>
       <section id="compta-urssaf" className="vrm-compta-q" data-compta-q="declarer" data-cible="urssaf" style={{ scrollMarginTop: 72 }}>
         <div className="vrm-compta-q-tete">
-          <h2 className="vrm-compta-question" data-compta-question="declarer">Combien je dois déclarer ?</h2>
+          <h2 className="vrm-compta-question" data-compta-question="declarer">{tr('compta.combienJeDois')}</h2>
         </div>
         {/* (11 nov.) « Clôturer l'année » : de décembre à mai, la liste guidée (src/clotureAnnee.js, lecture et liens). */}
         <ClotureAnnee portes={portesCloture({ onNav })} />
@@ -4686,12 +4677,12 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       </section>
           <StatutFiscal partie="suivi" liveStats={liveStats} onNav={onNav} />
           {/* (5 nov.) DAC7 compte par compte : ventes N/30, montant / 2 000 €, le rapport de la plateforme, l'export (src/dac7Comptes.js). */}
-          <ComptaRepli id="compta-dac7" titre="DAC7" resume="Ce que chaque plateforme transmet aux impôts, compte par compte">
+          <ComptaRepli id="compta-dac7" titre={tr('compta.dac7')} resume="Ce que chaque plateforme transmet aux impôts, compte par compte">
             <Dac7ComptesCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
         {/* (10 nov.) Ce qui part chez le comptable, à un seul endroit. */}
         <section className="vrm-compta-q" data-argent-groupe="comptable" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">Pour ton comptable</h2></div>
+          <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">{tr('compta.comptable')}</h2></div>
           {!exportDevant && <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
           {!exportDevant && <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
           <RecapComptableMensuel />
@@ -4702,46 +4693,46 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
               endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
           <Card id="compta-resultat" className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden', scrollMarginTop: 72 }}>
             <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)} data-compta-ca-etat={etatCa} data-compta-ca-at={caAt ? new Date(caAt).toISOString() : ''}>
-              <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>Résultat {annee} · CA déclaré − charges</div>
+              <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>{trj('compta.resultatCaDeclare', { annee: annee })}</div>
               {recettesAnnee == null ? (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
                     <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: C.muted, letterSpacing: -0.8 }}>—</div>
-                    <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
+                    <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{tr('compta.charges')} {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
                   </div>
                   <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
                     {etatCa === 'encours'
-                      ? 'Je lis ton CA déclaré…'
-                      : <>CA déclaré pas encore calculé : ouvre {lienBtn('Ventes', 'cat_ventes')} une fois.</>}
+                      ? tr('compta.jeLisCa')
+                      : <>{tr('compta.caDeclareEncore2')} {lienBtn('Ventes', 'cat_ventes')} {tr('compta.fois')}</>}
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -0.8, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{caPartiel ? <span style={{ fontSize: 15, fontWeight: 600, color: C.muted }}>au moins </span> : null}{fmt(resultatAnnee)}</div>
+                  <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -0.8, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{caPartiel ? <span style={{ fontSize: 15, fontWeight: 600, color: C.muted }}>{tr('journee.moins')} </span> : null}{fmt(resultatAnnee)}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
-                    <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{caPartiel ? 'au moins ' : ''}{fmt(recettesAnnee)}</span>
-                    <span>CA déclaré</span>
+                    <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{caPartiel ? tr('journee.moins3') : ''}{fmt(recettesAnnee)}</span>
+                    <span>{tr('compta.caDeclare')}</span>
                     <span style={{ color: C.border }}>—</span>
                     <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
-                    <span>de charges{charges.aboTotal > 0 ? ` (dont ${fmt(charges.aboTotal)} d'abonnements)` : ''}</span>
+                    <span>{tr('compta.charges2')}{charges.aboTotal > 0 ? tr('compta.dontAbonnements', { fmt: String(fmt(charges.aboTotal)) }) : ''}</span>
                   </div>
                   {couvertureCa && (caPartiel || couvertureCa.aDater) && (
                     <div data-compta-couverture={couvertureCa.pasSu.join(',')} data-compta-adater={couvertureCa.aDater ? String(couvertureCa.aDater.n) : '0'} style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>
-                      {caPartiel && <div>Sans {couvertureCa.pasSu.join(' ni ')} : {couvertureCa.pasSu.length > 1 ? 'leurs' : 'ses'} ventes n'ont pas pu être lues — ce CA est un minimum.</div>}
+                      {caPartiel && <div>{tr('compta.sans')} {couvertureCa.pasSu.join(' ni ')} : {couvertureCa.pasSu.length > 1 ? 'leurs' : 'ses'} {tr('compta.ventesOntPu')}</div>}
                       {/* (17 oct., revue) La carte URSSAF, juste en dessous sur le même écran,
                           écrit déjà « N ventes sans date de versement (X €) » avec le
                           geste : ici on y renvoie, sans redire les mêmes nombres (§7). */}
-                      {couvertureCa.aDater && <div>Des ventes finalisées attendent leur date de versement (détail dans « URSSAF »).</div>}
+                      {couvertureCa.aDater && <div>{tr('compta.ventesFinaliseesAttendent')}</div>}
                     </div>
                   )}
-                  <div style={{ marginTop: 10 }}><Pourquoi label="Ce que ce résultat compte">Le CA déclaré de l'année (toutes plateformes) moins tes charges. Il ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est dans « Ton bénéfice », dans le Résumé.</Pourquoi></div>
+                  <div style={{ marginTop: 10 }}><Pourquoi label={tr('compta.resultatCompte')}>{tr('compta.caDeclareAnnee')}</Pourquoi></div>
                 </div>
               )}
             </div>
           </Card>
         </section>
         <section id="compta-avance" className="vrm-compta-q" data-argent-groupe="statut" style={{ display: 'flex', flexDirection: 'column', gap: 16, scrollMarginTop: 72 }}>
-          <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">Ton statut</h2></div>
+          <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">{tr('compta.statut2')}</h2></div>
           <StatutFiscal partie="statut" liveStats={liveStats} onNav={onNav} />
           <ProfilFiscalCarte onNav={onNav} />
         </section>

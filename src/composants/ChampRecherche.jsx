@@ -21,6 +21,7 @@ import { IconeComposant } from './icones.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import { voixDisponible, VOIX, ecouter, ecouteEnCours, annulerVoix, effacerErreurVoix, PHRASES_VOIX } from '../dicteeNavigateur.js';
 import { useEtatVoix } from './voix.jsx';
+import { tr } from '../i18n/index.js';
 
 // (11 nov., parler à la loupe) Le moteur est commun (src/dicteeNavigateur.js) : la
 // transcription s'affiche EN DIRECT dans le champ, puis le texte final passe par
@@ -66,13 +67,13 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
         placeholder={placeholder} aria-label={nom} autoFocus={autoFocus}
         autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search"/>
       {valeur ? (
-        <button type="button" className="vrm-champ-recherche-bouton vrm-champ-recherche-effacer" data-champ-recherche-effacer="" aria-label="Effacer la recherche" onClick={effacer}>
+        <button type="button" className="vrm-champ-recherche-bouton vrm-champ-recherche-effacer" data-champ-recherche-effacer="" aria-label={tr('reglages.recherche.effacer')} onClick={effacer}>
           <span className="vrm-champ-recherche-rond"><IconeComposant nom="close" taille={11} trait={2.6}/></span>
         </button>
       ) : null}
       {avecMicro ? (
         <button type="button" className="vrm-champ-recherche-bouton vrm-champ-recherche-micro" data-champ-recherche-micro="" data-micro-ecoute={ecoute ? '1' : '0'}
-          aria-label={ecoute?"Arrêter la dictée":"Dicter la recherche"} aria-pressed={ecoute} title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : 'Dicter'} onClick={dicter}>
+          aria-label={ecoute?tr('commun.arreterDictee'):tr('commun.dicterRecherche')} aria-pressed={ecoute} title={ecoute ? tr('commun.ecouteParlePuis') : tr('commun.dicter')} onClick={dicter}>
           <IconeComposant nom="mic" taille={18}/>
         </button>
       ) : null}

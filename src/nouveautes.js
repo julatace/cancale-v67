@@ -26,6 +26,7 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  { id: 'traduction-ecrans', date: '2026-11-11', titre: 'VRM en anglais, espagnol, italien, allemand', phrase: 'Ma journée, ventes, achats, stock, argent : dans ta langue.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'publier-partout', date: '2026-11-11', titre: 'Publier partout depuis ton annonce Vinted', phrase: 'Leboncoin, Vestiaire, eBay : chaque réglage, par défaut ou par annonce.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'import-historique-sites', date: '2026-11-11', titre: 'Ton historique Leboncoin, Vestiaire et eBay aussi', phrase: 'Anciennes ventes et achats récupérés, site par site.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'favoris-clair', date: '2026-11-11', titre: 'Messages aux favoris : qui, quoi, quand', phrase: 'Choisis tes annonces, vois l’aperçu et l’offre, puis envoie.', tab: 'favoris', pour: 'tous', mode: 'tous' },

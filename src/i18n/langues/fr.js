@@ -4,7 +4,27 @@
 // absente d'une langue, une variable `{x}` qui n'est pas la même partout, ou un pluriel
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
+import ecran_journee from './fr/journee.js';
+import ecran_ventes from './fr/ventes.js';
+import ecran_commun from './fr/commun.js';
+import ecran_achats from './fr/achats.js';
+import ecran_annonces from './fr/annonces.js';
+import ecran_stock from './fr/stock.js';
+import ecran_messages from './fr/messages.js';
+import ecran_emails from './fr/emails.js';
+import ecran_stats from './fr/stats.js';
+import ecran_compta from './fr/compta.js';
 export default {
+  ...ecran_compta,
+  ...ecran_stats,
+  ...ecran_emails,
+  ...ecran_messages,
+  ...ecran_stock,
+  ...ecran_annonces,
+  ...ecran_achats,
+  ...ecran_commun,
+  ...ecran_ventes,
+  ...ecran_journee,
   // ── offres auto et prix mini manquants (11 nov., lot prix-mini)
   "oa.titre": "Offres automatiques",
   "oa.allumees": { one: "Allumées · {n} paire réglée", other: "Allumées · {n} paires réglées" },

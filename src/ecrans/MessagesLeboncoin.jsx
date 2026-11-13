@@ -13,6 +13,7 @@ import { trierRecents, sansDoublons } from '../ordreConversations.js';
 import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   // (12 nov.) l'envoi vu dans le fil
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
+import { tr } from '../i18n/index.js';
 
 
 // ⟦← App.jsx #1⟧
@@ -25,10 +26,10 @@ import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVo
 // (`lbc_envoi.appris`) ; sinon le pied mène à Leboncoin. Part de l'onglet
 // leboncoin.fr connecté sur le compte du fil, une à la fois, dans les 50 actions/h.
 const etiquetteResultatLbc = (r) => {
-  if (!r) return { ton: 'muet', texte: "L'extension n'a pas répondu — je ne sais pas si le message est parti. Regarde la conversation sur Leboncoin avant de renvoyer." };
-  if (r.accepte === true && r.etape === 'fait') return { ton: 'ok', texte: 'Envoyé sur Leboncoin.' };
-  if (r.accepte === true && r.etape === 'incertain') return { ton: 'muet', texte: r.raison || 'Je ne sais pas si le message est parti — regarde sur Leboncoin avant de renvoyer.' };
-  if (r.accepte === true && r.etape === 'refuse') return { ton: 'ko', texte: r.raison || "Leboncoin a refusé : le message n'est pas parti." };
+  if (!r) return { ton: 'muet', texte: tr('messages.extensionReponduJe') };
+  if (r.accepte === true && r.etape === 'fait') return { ton: 'ok', texte: tr('messages.envoyeLeboncoin') };
+  if (r.accepte === true && r.etape === 'incertain') return { ton: 'muet', texte: r.raison || tr('messages.jeSaisMessage') };
+  if (r.accepte === true && r.etape === 'refuse') return { ton: 'ko', texte: r.raison || tr('messages.leboncoinRefuseMessage') };
   return { ton: 'ko', texte: (r.raison ? r.raison.charAt(0).toUpperCase() + r.raison.slice(1) : "Rien n'est parti.") + (/[.!]$/.test(r.raison || '') ? '' : '.') };
 };
 function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
@@ -94,7 +95,7 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
     </div>
   );
   else pied = <PiedSansEnvoi attrs={{ 'data-lbc-repondre': cap !== 'ok' ? 'ext-' + cap : (envoi && envoi.appris ? 'sans-fil' : 'pas-appris') }} lien={lien} texteLien="Répondre sur Leboncoin ↗"
-    raison={cap === 'retard' ? <>Extension <b>{EXT_CAPACITES.lbcrepondre}</b></> : null}>{resultat}</PiedSansEnvoi>;
+    raison={cap === 'retard' ? <>{tr('messages.extension')} <b>{EXT_CAPACITES.lbcrepondre}</b></> : null}>{resultat}</PiedSansEnvoi>;
   return (
     <CadreFil etiquette="Conversation Leboncoin" onFermer={onFerme} attrs={{ 'data-lbc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={nom || 'Leboncoin'} titre="" compte="Leboncoin"/>
@@ -122,9 +123,9 @@ function MessagesLeboncoin() {
   const [zone, setZone] = useVueSession('leboncoin-messages-zone', 'conversations');
   return (
     <div data-messages-lbc-zone={zone}>
-      <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
-        <button type="button" aria-pressed={zone === 'conversations'} onClick={() => setZone('conversations')}><Icon name="chat" size={17}/>Conversations</button>
-        <button type="button" aria-pressed={zone === 'favoris'} onClick={() => setZone('favoris')} data-lbc-zone-favoris=""><Icon name="heart" size={17}/>Favoris reçus</button>
+      <div className="vrm-messages-sections" role="group" aria-label={tr('messages.choisirConversationsFavoris')}>
+        <button type="button" aria-pressed={zone === 'conversations'} onClick={() => setZone('conversations')}><Icon name="chat" size={17}/>{tr('messages.conversations')}</button>
+        <button type="button" aria-pressed={zone === 'favoris'} onClick={() => setZone('favoris')} data-lbc-zone-favoris=""><Icon name="heart" size={17}/>{tr('messages.favorisRecus')}</button>
       </div>
       {zone === 'favoris' ? <FavorisLeboncoin/> : <ConversationsLeboncoin/>}
     </div>
@@ -169,11 +170,11 @@ function ConversationsLeboncoin() {
   const typeDe = (id) => (((d && d.comptes[id]) || {}).pro || accDe(id).type === 'pro') ? 'pro' : accDe(id).type === 'particulier' ? 'particulier' : '';
   const age = (iso) => { const t = Date.parse(iso || ''); if (!t) return null; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
   // (5 nov., chantier G) Le geste principal de l'état « jamais relevé » : le bouton commun (`Bouton`), plus un aplat fait main.
-  const ouvrir = <Bouton variante="primaire" href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" style={{ marginTop: 10 }}>Ouvrir sur Leboncoin ↗</Bouton>;
+  const ouvrir = <Bouton variante="primaire" href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" style={{ marginTop: 10 }}>{tr('messages.ouvrirLeboncoin')}</Bouton>;
   if (d === undefined) return <div role="status" data-messages-lbc="charge" style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
   // (5 nov., chantier G, revue 1.10) La panne par `EtatPanne` : la raison, UN « Réessayer » ; le site reste à un lien.
   if (d === null) return <div data-messages-lbc="pas-su"><EtatPanne quoi="Tes messages Leboncoin" raison="Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={() => { setD(undefined); setTickLbc((t) => t + 1); }}/>
-    <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc">Ouvrir sur Leboncoin ↗</a></div>;
+    <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc">{tr('messages.ouvrirLeboncoin')}</a></div>;
   // UNE ligne par compte : l'identifiant de messagerie et la session privée sont
   // le même compte (jamais deux lignes pour un compte).
   const ids = [...new Set([...Object.keys(d.compteurs), ...Object.keys(d.comptes)].map(nu))];
@@ -186,11 +187,11 @@ function ConversationsLeboncoin() {
   if (!releves.length && !fils.length) {
     return (
       <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Pas encore de messages relevés</div>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>{tr('messages.encoreMessagesReleves')}</div>
         <div style={{ color: C.muted }}>
-          {cap === 'ok' ? <>Ouvre <b>leboncoin.fr</b> une fois, connecté : les non-lus arrivent.</>
-            : cap === 'retard' ? <>L'extension installée ne relève pas encore les messages : il lui faut la <b>{EXT_CAPACITES.lbcmsg}</b>. Mets-la à jour.</>
-            : <>L'extension les relève quand tu passes sur leboncoin.fr.</>}
+          {cap === 'ok' ? <>{tr('messages.ouvre')} <b>{tr('messages.leboncoinFr')}</b> {tr('messages.foisConnecteNon')}</>
+            : cap === 'retard' ? <>{tr('messages.extensionInstalleeReleve')} <b>{EXT_CAPACITES.lbcmsg}</b>{tr('messages.metsJour')}</>
+            : <>{tr('messages.extensionReleveQuand')}</>}
         </div>
         {ouvrir}
       </div>
@@ -207,7 +208,7 @@ function ConversationsLeboncoin() {
   return (
     <div data-messages-lbc={String(total)} data-messagerie-site="leboncoin">
       <div data-messages-lbc-total="" style={{ fontSize: 13, color: C.text, fontWeight: 600, marginBottom: 6 }}>
-        {total > 0 ? `${total} message${total > 1 ? 's' : ''} non lu${total > 1 ? 's' : ''}` : 'Aucun message non lu'}
+        {total > 0 ? tr('messages.messagesNonLus', { n: String(total) }) : tr('messages.aucunMessageNon')}
         {pasLus.length ? <span style={{ fontWeight: 400, color: C.muted }}>{` sur ${releves.length > 1 ? `${releves.length} comptes relevés` : 'le compte relevé'}`}</span> : null}
       </div>
       <div className="vrm-message-workspace">
@@ -224,7 +225,7 @@ function ConversationsLeboncoin() {
                   <LigneConv actif={ouvert === l.id} onClick={() => { setOuvertConv(''); setOuvert(l.id); }} ariaLabel={`${l.nom} : ${l.c ? nonLus(Number(l.c.unread) || 0) : 'pas encore lu'}`}
                     nom={l.nom} compte={l.type} quand={isFinite(t) ? t : null} couleurHeure={C.muted}
                     extrait={l.c ? nonLus(Number(l.c.unread) || 0) : '—'} couleurExtrait={l.c && l.c.unread > 0 ? C.text : C.muted}
-                    apres={vieux ? <span className="vrm-msg-etat" title="Ouvre leboncoin.fr sur ce compte pour le mettre à jour" style={{ color: C.muted, borderColor: C.border }}>à relire</span> : null}
+                    apres={vieux ? <span className="vrm-msg-etat" title={tr('messages.ouvreLeboncoinFr')} style={{ color: C.muted, borderColor: C.border }}>{tr('messages.relire')}</span> : null}
                     point={l.c && l.c.unread > 0 ? C.accent : null}/>
                 </div>
               );
@@ -232,7 +233,7 @@ function ConversationsLeboncoin() {
           </div>
           {/* Un compte « pas encore lu » : le geste est dit UNE fois, sous la liste
               (§7) — pas sur chaque ligne. */}
-          {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension.</div> : null}
+          {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? tr('messages.comptesOntEncore', { pasLusN: String(pasLus.length) }) : tr('messages.encoreEteLu', { nom: String(pasLus[0].nom) })} {tr('messages.connecteToiFois')} {pasLus.length > 1 ? tr('messages.chacun') : tr('messages.compte')} {tr('messages.leboncoinFrAvec')}</div> : null}
           {/* (3 nov., 5.318) Les conversations LUES par l'extension : texte, date, « de toi ». */}
           {fils.length ? <CompteurArnaque n={fils.filter((f) => motifDeLApercu(f.ap, deMoiMeta(f.dm))).length} style={{ marginTop: 10 }}/> : null}
           {fils.length ? (
@@ -250,7 +251,7 @@ function ConversationsLeboncoin() {
             </div>
           ) : null}
           {/* Sous la liste, le lien reste discret : le geste « Répondre sur Leboncoin » est dans le fil (§7, l'accent est rare). */}
-          <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc" style={{ marginTop: 6 }}>Ouvrir sur Leboncoin ↗</a>
+          <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc" style={{ marginTop: 6 }}>{tr('messages.ouvrirLeboncoin')}</a>
         </div>
         <div className="vrm-chat-column">{filChoisi ? (
           <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} envoi={d.envoi} annonce={!!filChoisi.ap || Number(filChoisi.n) > 0} onFerme={() => setOuvertConv('')}/>
@@ -260,13 +261,13 @@ function ConversationsLeboncoin() {
             <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div data-lbc-fil-texte="absent" style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '24px 8px' }}>
                 {/* Le nombre est sur la ligne du compte (une fois, §7) : ici, seulement ce que VRM ne sait pas. */}
-                {choisi.c ? 'Leboncoin donne le nombre de non-lus, jamais le texte : réponds là-bas.'
-                  : 'Pas encore lu. Leboncoin donne le nombre, jamais le texte.'}
+                {choisi.c ? tr('messages.leboncoinDonneNombre')
+                  : tr('messages.encoreLuLeboncoin')}
               </div>
             </div>
             <PiedSansEnvoi raison="Pour lire et répondre, ouvre ta messagerie Leboncoin." lien="https://www.leboncoin.fr/messages" texteLien="Répondre sur Leboncoin ↗"/>
           </CadreFil>
-        ) : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{fils.length ? 'Choisis une conversation' : 'Choisis un compte'}</span></div>}</div>
+        ) : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{fils.length ? tr('messages.choisisConversation') : tr('messages.choisisCompte')}</span></div>}</div>
         <FicheConvVolet site="leboncoin" etat={choisi || filChoisi ? 'non-reliee' : 'aucune'} raison={`Leboncoin ne dit pas à VRM de quelle annonce parle un message : VRM ne devine pas ${motsVendeur().le}.`}/>
       </div>
     </div>
@@ -307,17 +308,17 @@ function FavorisLeboncoin() {
   return (
     <div data-favoris-lbc={ads.length ? String(connus.length) : 'aucune'}>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
-        <span data-favoris-lbc-qui="jamais">Leboncoin donne le <b>nombre</b> de favoris, jamais <b>qui</b> : VRM n'écrit à personne.</span>{' '}
-        {capStats === 'ok' ? <>Ouvre les <b>statistiques</b> de l'annonce sur Leboncoin : le chiffre suit.</>
-          : capStats === 'retard' ? <>Pour relever ce chiffre, il faut l'extension <b>{EXT_CAPACITES.lbcstats}</b> : mets-la à jour depuis Paramètres → État des connexions, puis ouvre les <b>statistiques</b> de l'annonce sur Leboncoin.</>
-          : <>C'est l'extension, là où elle est installée, qui relève ce chiffre quand tu ouvres les <b>statistiques</b> d'une annonce sur Leboncoin.</>}
+        <span data-favoris-lbc-qui="jamais">{tr('messages.leboncoinDonne')} <b>{tr('messages.nombre')}</b> {tr('messages.favorisJamais')} <b>{tr('messages.texte')}</b> {tr('messages.vrmEcritPersonne')}</span>{' '}
+        {capStats === 'ok' ? <>{tr('messages.ouvre2')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoinChiffre')}</>
+          : capStats === 'retard' ? <>{tr('messages.releverChiffreFaut')} <b>{EXT_CAPACITES.lbcstats}</b> {tr('messages.metsJourDepuis')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin')}</>
+          : <>{tr('messages.extensionInstalleeReleve2')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin2')}</>}
       </div>
       {!ads.length ? (
-        <div data-favoris-lbc-vide="" style={{ fontSize: 13, color: C.muted }}>Aucune annonce Leboncoin en vente à toi pour l'instant.</div>
+        <div data-favoris-lbc-vide="" style={{ fontSize: 13, color: C.muted }}>{tr('messages.aucuneAnnonceLeboncoin')}</div>
       ) : (<>
         <div data-favoris-lbc-total="" style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>
-          {connus.length ? `${total} favori${total > 1 ? 's' : ''}` : 'Pas encore de chiffre relevé'}
-          <span style={{ fontWeight: 400, color: C.muted }}>{connus.length ? ` sur ${connus.length} annonce${connus.length > 1 ? 's' : ''} relevée${connus.length > 1 ? 's' : ''} (${ads.length} en vente)` : ` — ${ads.length} annonce${ads.length > 1 ? 's' : ''} en vente`}</span>
+          {connus.length ? tr('messages.favoris', { n: String(total) }) : tr('messages.encoreChiffreReleve')}
+          <span style={{ fontWeight: 400, color: C.muted }}>{connus.length ? tr('messages.annoncesReleveesVente', { n: String(connus.length), adsN: String(ads.length) }) : tr('messages.annoncesVente', { n: String(ads.length) })}</span>
         </div>
         {ads.map((ad) => {
           const f = fav(ad), st = ad.stats || {};
@@ -327,7 +328,7 @@ function FavorisLeboncoin() {
             <div key={ad.id} data-favoris-lbc-annonce={ad.id} data-favoris={f == null ? 'passu' : String(f)} data-flou={lbcFloute(lbcOuvert, ad.account || ad.lbcUser) ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.border}`, ...(lbcFloute(lbcOuvert, ad.account || ad.lbcUser) ? STYLE_FLOU : null) }}>
               <div style={{ width: 36, height: 48, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || 'Annonce'}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || tr('annonces.annonce2')}</div>
                 <div style={{ fontSize: 12, color: C.muted }}>
                   {f != null ? [
                     Number.isFinite(st.vues) ? `${st.vues} vue${st.vues > 1 ? 's' : ''}` : '',
@@ -335,14 +336,14 @@ function FavorisLeboncoin() {
                     // (29 oct., revue) Sans date de fin du relevé (`au`), l'heure où
                     // l'extension l'a pris (`at`) ; sans l'une ni l'autre, rien.
                     st.au ? `relevé le ${new Date(st.au + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : isFinite(Date.parse(st.at || '')) ? `relevé il y a ${ilYaBr(Date.parse(st.at))}` : '',
-                  ].filter(Boolean).join(' · ') : 'pas encore relevé'}
+                  ].filter(Boolean).join(' · ') : tr('messages.encoreReleve')}
                 </div>
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
                 <span style={{ fontSize: 17, fontWeight: 700, color: f ? C.text : C.muted, fontVariantNumeric: 'tabular-nums' }}>{f == null ? '—' : f}</span>
-                <span aria-label="favoris" style={{ color: C.muted, display: 'inline-flex', verticalAlign: '-2px', marginLeft: 4 }}><Icon name="heart" size={13}/></span>
+                <span aria-label={tr('messages.favoris2')} style={{ color: C.muted, display: 'inline-flex', verticalAlign: '-2px', marginLeft: 4 }}><Icon name="heart" size={13}/></span>
               </div>
-              {lien ? <a href={lien} target="_blank" rel="noreferrer" aria-label={`Ouvrir l'annonce sur Leboncoin : ${ad.subject || ad.id}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 44, minHeight: 44, color: C.muted, textDecoration: 'none', flexShrink: 0 }}>↗</a> : null}
+              {lien ? <a href={lien} target="_blank" rel="noreferrer" aria-label={tr('messages.ouvrirAnnonceLeboncoin', { x: String(ad.subject || ad.id) })} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 44, minHeight: 44, color: C.muted, textDecoration: 'none', flexShrink: 0 }}>↗</a> : null}
             </div>
           );
         })}

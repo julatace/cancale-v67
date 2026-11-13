@@ -31,7 +31,7 @@ const fonction = opt('fonction');
 const src = fs.readFileSync(path.resolve(fichier), 'utf8');
 const ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'] });
 let fr = {};
-try { const t = ['fr-accueil.js', 'fr.js'].map((n) => fs.readFileSync(path.join(R, 'src', 'i18n', 'langues', n), 'utf8')).join('\n'); for (const m of t.matchAll(/^\s*"([^"]+)": ("(?:[^"\\]|\\.)*")/gm)) fr[m[1]] = JSON.parse(m[2]); } catch (_) {}
+try { const dosFr = path.join(R, 'src', 'i18n', 'langues', 'fr'); const t = ['fr-accueil.js', 'fr.js', ...(fs.existsSync(dosFr) ? fs.readdirSync(dosFr).filter((f) => f.endsWith('.js')).map((f) => 'fr/' + f) : [])].map((n) => fs.readFileSync(path.join(R, 'src', 'i18n', 'langues', n), 'utf8')).join('\n'); for (const m of t.matchAll(/^\s*"([^"]+)": ("(?:[^"\\]|\\.)*")/gm)) fr[m[1]] = JSON.parse(m[2]); } catch (_) {}
 const parTexte = new Map(Object.entries(fr).map(([k, v]) => [v, k]));
 
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF)\b/g;

@@ -188,3 +188,88 @@ la clé brute s'afficherait avant l'app) ; rien d'autre n'y va.
 Aucun. (Plus tard, pour aller au bout : faire relire les traductions par un locuteur
 natif de chaque langue avant d'ouvrir VRM hors de France, et décider de la traduction
 des CGV/CGU — un texte juridique ne se traduit pas sans relecture.)
+
+---
+
+## Lot 2 (11 nov., soir) — les écrans métier, compta comprise
+
+### ÉTAT À LA REPRISE
+
+Branche `claude/traduction`, un commit poussé par écran. **Migrés** (le français à l'écran
+est inchangé mot pour mot ; les quatre autres langues suivent la langue choisie) :
+
+| écran | où | textes | clés |
+|---|---|---|---|
+| Ma journée | `Comptabilite#journee` + Frise, Performance, Bénéfice, Grille, Semaine, Quoi de neuf, Note, Hors ligne, Rappels, Capture (App.jsx) | 218 | 178 |
+| Ventes | `Comptabilite#ventes` + lignes, coût d'achat, bordereau, facture, retirer l'argent | 233 | 195 |
+| Achats | `Comptabilite#achats` (retraits compris) + `ecrans/Achats.jsx` + composants communs (`commun.*`) | 401 | 323 |
+| Annonces | `Comptabilite#annonces` + fraîcheur, choix, achats à relier, N° à barrer, fiches | 392 | 344 |
+| Stock | `ecrans/Stock.jsx` | 271 | 221 |
+| Messages | `Comptabilite#messages`, `FilsTous`, `MessagesLeboncoin`, bilan/synchronisation, offres auto, réponses, recherche | 192 | 165 |
+| E-mails | `EcranEmails`, boîte, cadre, journal, réception, reçus | 183 | 150 |
+| Statistiques | `ecrans/Stats.jsx`, `PrixMarche.jsx` | 333 | 270 |
+| Argent (compta) | `ecrans/Compta.jsx` : URSSAF, seuils, déclarations, factures, dépenses, export | 844 | 679 |
+| En-têtes partagés | titres des tâches, phrase d'écran (`phrase.*`, D10), date du jour, litiges, fraîcheur, argent à venir | 61 | 47 |
+
+≈ 3 100 textes, ≈ 2 570 clés × 5 langues. **Pas faits — à faire** :
+- **Colis** (`Comptabilite#bordereaux`, `revue-colis` en cours, pas fusionné) ; **eBay** (`ecrans/Ebay.jsx`,
+  `ebay-complet` pas fusionné) ; **Republier / Publier** (`ecrans/Republier.jsx`, `suivi-travail` et
+  `publier-partout` pas fusionnés) — vérifié par `git log origin/main` le 11 nov. au soir : aucun des quatre
+  n'est sur `main`, donc rien touché là (consigne).
+- **Leboncoin** (`ecrans/Leboncoin.jsx`, 310 textes) et **Vestiaire** (`ecrans/Vestiaire.jsx`, 201) : pas eu le temps.
+- Les **restes « à la main »** de chaque écran (listés par `i18n-migrer lister`) : gabarits qui portent du
+  texte (`${n} vente${…}` dans une phrase plus longue, `' sur '`…), mots seuls en minuscules dans un ternaire
+  (`'reparti'`), constantes au niveau du module (`TITRES`, cartes de `src/design/carteChiffres.js` :
+  « Ventes », « Bénéfice », « À envoyer » restent en français), la barre « À trancher ». Ce sont eux que
+  la capture `trad-de-390-ventes` montre encore en français. `Compta.jsx`, `Stock.jsx`, `Stats.jsx`,
+  `MessagesLeboncoin.jsx`, `BoiteEmails.jsx`, `BilanSynchronisation.jsx`, `SynchronisationVinted.jsx`
+  ne sont donc PAS encore dans `MIGRES` (14 restes au total) ; les 13 autres fichiers du lot y sont.
+- Les morceaux de phrase : là où le JSX coupait une phrase autour d'un élément (`<b>`), la migration
+  mécanique a fait des morceaux traduits à part (« Vendu en » / « Reçu en »…). Lisibles, mais à
+  relire : en allemand et en italien l'ordre des mots peut clocher.
+
+⚠️ **Relecture native requise avant l'ouverture hors de France** : toutes ces traductions sont de
+première main (vocabulaire du métier : listing, parcel, pickup point, label… ; tutoiement), le droit
+(URSSAF, micro-entreprise, TVA, 2042-C-PRO) reste français et le dit.
+
+### L'outil — `scripts/i18n-migrer.cjs` (la migration mécanique, vérifiée)
+
+```bash
+node scripts/i18n-migrer.cjs lister src/App.jsx src/X.jsx --zone 'Comptabilite#ventes' --zone Composant \
+     --zone Partage@commun --zone 'src/X.jsx::*' --prefixe ventes --sortie plan.json   # + plan.json.tsv
+# traduire : plan.json.tsv → trad.tsv  (clé ⇥ en ⇥ es ⇥ it ⇥ de ; pluriel « un ¦ plusieurs » ; \n)
+node scripts/i18n-migrer.cjs appliquer plan.json --traductions trad.tsv
+```
+
+- Zones : une fonction, `Fonction#sous` (la section `curSub==='sous' && …`), des lignes, `fichier::*` ;
+  `@prefixe` donne un autre préfixe (`commun`). Plusieurs fichiers dans un plan : les clés sont choisies ensemble.
+- **Une phrase entière** quand un élément ne contient que du texte et des `{valeurs}` : `trj('k', { quand })`
+  (`src/i18n/react.js`) rend chaque valeur comme React l'aurait rendue (un nombre tel quel — un N° ne prend
+  jamais d'espace de milliers —, rien pour null/false, un élément reste un élément).
+- **Pluriel** reconnu : `${n} vente${n > 1 ? 's' : ''}` ⇒ `{ one, other }` sur `n`.
+- Un gabarit ⇒ `tr('k', { x: String(expr) })` : String() garde le rendu français EXACT.
+- Jamais touché (listé « à la main ») : un texte comparé ailleurs (`=== 'Article'`), un mot-identifiant
+  (`'offresauto'`), un `detail` de `new CustomEvent`, un gabarit qui porte du texte, `tr` local, le niveau module.
+- `appliquer` vérifie que chaque texte est TOUJOURS à sa place avant d'écrire (sinon rien), que les
+  variables `{x}` sont les mêmes dans les cinq langues, et range les clés dans
+  **`src/i18n/langues/<l>/<écran>.js`** (un fichier par écran et par langue, étalé dans `<l>.js`) :
+  deux lots qui traduisent deux écrans n'écrivent jamais au même endroit (fini les conflits en bas de `fr.js`).
+
+### Les audits qui lisaient une phrase française dans le code
+
+Juger la règle, pas l'orthographe : **`scripts/_source-app.cjs` recolle le français** (`enFrancais`) dans le
+texte de l'app que lisent les ~250 audits branchés dessus : `>{tr('k')}<` ⇒ `>texte<`, `title={tr('k')}` ⇒
+`title="texte"`, `tr('k')` ⇒ `'texte'`, `tr('k', { x: String(e) })` ⇒ `` `… ${e} …` ``, `{trj('k', {a: e})}` ⇒
+`texte {e}` ; un pluriel reste un appel. La clé doit exister et sa phrase être celle attendue, là où elle
+est attendue : rien n'est affaibli (`VRM_SOURCE_BRUTE=1` rend le code tel quel). Portés à la main (lus hors
+de `sourceApp`, ou un pluriel) : `journee-perso` S6, `prix-numerotage` S13, `achats-relier` §3,
+`ligne-glissable`, `achat-ticket`, `actions-serie` B9, `composants` (charge la partie app du français, comme
+App.jsx), `dossier-vitesse-avis` D13, `vendeur-generaliste` (une phrase de dictionnaire est « gardée » quand
+CHAQUE appel de sa clé l'est — prouvé par mutation, 20/20). `audit-traduction` : C1 lit `trj()`, **D10** (les
+phrases d'écran en français = `src/phrasesEcran.js`, rouge sous mutation), F sur 13 fichiers de plus,
+`--prouve` 12/12.
+
+### Le banc
+
+`scripts/bancs/traduction.cjs` visite aussi Ma journée, Ventes, Achats, Annonces, Stock (`ECRANS=`) :
+au moins une phrase de SON dictionnaire dans la langue choisie, aucune clé brute, rien ne déborde.

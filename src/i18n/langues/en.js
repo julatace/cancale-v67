@@ -1,5 +1,25 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
+import ecran_journee from './en/journee.js';
+import ecran_ventes from './en/ventes.js';
+import ecran_commun from './en/commun.js';
+import ecran_achats from './en/achats.js';
+import ecran_annonces from './en/annonces.js';
+import ecran_stock from './en/stock.js';
+import ecran_messages from './en/messages.js';
+import ecran_emails from './en/emails.js';
+import ecran_stats from './en/stats.js';
+import ecran_compta from './en/compta.js';
 export default {
+  ...ecran_compta,
+  ...ecran_stats,
+  ...ecran_emails,
+  ...ecran_messages,
+  ...ecran_stock,
+  ...ecran_annonces,
+  ...ecran_achats,
+  ...ecran_commun,
+  ...ecran_ventes,
+  ...ecran_journee,
   // ── offres auto et prix mini manquants (11 nov., lot prix-mini)
   "oa.titre": "Automatic offers",
   "oa.allumees": { one: "On · {n} pair set", other: "On · {n} pairs set" },

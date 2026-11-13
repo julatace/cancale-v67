@@ -1,5 +1,25 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
+import ecran_journee from './it/journee.js';
+import ecran_ventes from './it/ventes.js';
+import ecran_commun from './it/commun.js';
+import ecran_achats from './it/achats.js';
+import ecran_annonces from './it/annonces.js';
+import ecran_stock from './it/stock.js';
+import ecran_messages from './it/messages.js';
+import ecran_emails from './it/emails.js';
+import ecran_stats from './it/stats.js';
+import ecran_compta from './it/compta.js';
 export default {
+  ...ecran_compta,
+  ...ecran_stats,
+  ...ecran_emails,
+  ...ecran_messages,
+  ...ecran_stock,
+  ...ecran_annonces,
+  ...ecran_achats,
+  ...ecran_commun,
+  ...ecran_ventes,
+  ...ecran_journee,
   // ── offres auto et prix mini manquants (11 nov., lot prix-mini)
   "oa.titre": "Offerte automatiche",
   "oa.allumees": { one: "Attive · {n} paio impostato", other: "Attive · {n} paia impostate" },

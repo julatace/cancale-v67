@@ -1,5 +1,25 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
+import ecran_journee from './es/journee.js';
+import ecran_ventes from './es/ventes.js';
+import ecran_commun from './es/commun.js';
+import ecran_achats from './es/achats.js';
+import ecran_annonces from './es/annonces.js';
+import ecran_stock from './es/stock.js';
+import ecran_messages from './es/messages.js';
+import ecran_emails from './es/emails.js';
+import ecran_stats from './es/stats.js';
+import ecran_compta from './es/compta.js';
 export default {
+  ...ecran_compta,
+  ...ecran_stats,
+  ...ecran_emails,
+  ...ecran_messages,
+  ...ecran_stock,
+  ...ecran_annonces,
+  ...ecran_achats,
+  ...ecran_commun,
+  ...ecran_ventes,
+  ...ecran_journee,
   // ── offres auto et prix mini manquants (11 nov., lot prix-mini)
   "oa.titre": "Ofertas automáticas",
   "oa.allumees": { one: "Activadas · {n} par configurado", other: "Activadas · {n} pares configurados" },

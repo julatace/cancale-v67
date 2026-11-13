@@ -1,5 +1,25 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
+import ecran_journee from './de/journee.js';
+import ecran_ventes from './de/ventes.js';
+import ecran_commun from './de/commun.js';
+import ecran_achats from './de/achats.js';
+import ecran_annonces from './de/annonces.js';
+import ecran_stock from './de/stock.js';
+import ecran_messages from './de/messages.js';
+import ecran_emails from './de/emails.js';
+import ecran_stats from './de/stats.js';
+import ecran_compta from './de/compta.js';
 export default {
+  ...ecran_compta,
+  ...ecran_stats,
+  ...ecran_emails,
+  ...ecran_messages,
+  ...ecran_stock,
+  ...ecran_annonces,
+  ...ecran_achats,
+  ...ecran_commun,
+  ...ecran_ventes,
+  ...ecran_journee,
   // ── offres auto et prix mini manquants (11 nov., lot prix-mini)
   "oa.titre": "Automatische Angebote",
   "oa.allumees": { one: "An · {n} Paar eingestellt", other: "An · {n} Paare eingestellt" },

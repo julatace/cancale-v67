@@ -141,7 +141,7 @@ function png(w = 16, h = 12) {
   const t3 = await texteDe(await D.pdfDossierLitige(C3, { PDFLib: PL }));
   dit(/Sans N°/.test(t3.tout) && /Suivi pas lu/.test(t3.tout) && /Aucun bordereau lu/.test(t3.tout) && /aucune rang[ée]e/.test(t3.tout), 'D11 sans N° ni frise ni bordereau : « Sans N° », « Suivi pas lu », « Aucun bordereau lu » (jamais inventés)', t3.tout);
   dit(D.nomFichierDossier({ num: 'B12' }, T0) === 'dossier-litige-B12-2026-11-01.pdf', 'D12 nom du fichier : N° et date', D.nomFichierDossier({ num: 'B12' }, T0));
-  const lit = sansCommentaires(lireOrig('LitigesEnCours.jsx'));
+  const lit = sansCommentaires(require('./_source-app.cjs').enFrancais(lireOrig('LitigesEnCours.jsx'), path.join(__dirname, '..')));   // (11 nov.) tr() ⇒ sa phrase française
   dit(/Dossier PDF/.test(lit) && /const \[avecB, setAvecB\] = React\.useState\(false\)/.test(lit) && /il porte l’adresse/.test(lit), 'D13 la carte : « Dossier PDF », case « Joindre le bordereau (il porte l’adresse) » décochée par défaut');
   const dos = sansCommentaires(lireOrig('dossierLitige.js'));
   dit(!/https?:\/\/|\/api\/|supabase|anthropic|openai|apikey/i.test(dos) && /import\('pdf-lib'\)/.test(dos), 'D14 aucun service ni clé : pdf-lib dans le navigateur');

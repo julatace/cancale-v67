@@ -60,7 +60,15 @@ const MARQUES_PERMIS_FICHIERS = ['src/vocabulaireVendeur.js', 'src/etiquetteNume
 const sansCom = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split('\n').map((l) => (/^\s*\/\//.test(l) ? '' : l.replace(/(^|[^:'"`\\])\/\/\s.*$/, '$1'))).join('\n');
 const fichiersSrc = (racine) => { const out = []; const w = (d) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) w(p); else if (/\.jsx?$/.test(f.name)) out.push(p); } }; w(path.join(racine, 'src')); return out; };
 
+
+// (11 nov., traduction) Une phrase déplacée dans un dictionnaire (src/i18n/langues/…) est GARDÉE
+// quand CHAQUE ligne de code qui l'appelle (`tr('clé'` / `trj('clé'`) l'est (« sneakers » sur la ligne).
+// Une clé jamais appelée n'est pas gardée.
+const GARDE_SNEAKERS = /(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|nom === 'paire'|\b(?:sn|snEx|sneakers) \?/;
+const gardesCles = (racine) => { const usages = new Map(); for (const f of fichiersSrc(racine)) { if (/[\\/]i18n[\\/]langues[\\/]/.test(f)) continue; sansCom(fs.readFileSync(f, 'utf8')).split('\n').forEach((l) => { for (const m of l.matchAll(/\btrj?\('([\w.-]+)'/g)) { const u = usages.get(m[1]) || []; u.push(GARDE_SNEAKERS.test(l)); usages.set(m[1], u); } }); } return (cle) => { const u = usages.get(cle); return !!(u && u.length && u.every(Boolean)); }; };
+const cleDeLigneDico = (rel, l) => (/^src\/i18n\/langues\//.test(rel) ? ((l.match(/^\s*"([\w.-]+)":/) || [])[1] || null) : null);
 async function verifier(racine, { muet = false } = {}) {
+  const cleGardee = gardesCles(racine);
   let ko = 0;
   const dit = (bon, quoi, det) => { if (!bon) ko++; if (!muet || !bon) console.log(`${bon ? 'OK  ' : 'KO  '}${quoi}${!bon && det !== undefined ? ' — ' + String(typeof det === 'string' ? det : JSON.stringify(det)).slice(0, 600) : ''}`); };
   const imp = (p) => import(pathToFileURL(path.join(racine, p)).href + '?v=' + Math.random());
@@ -128,6 +136,7 @@ async function verifier(racine, { muet = false } = {}) {
         if (/^['"`][a-z-]+['"`]$/.test(s)) continue;                    // une clé (« sneakers », « chaussures »), pas un texte
         if (/^['"`][a-z][\w-]*(?:\.[\w-]+)+['"`]$/.test(s)) continue;     // (11 nov.) une clé de traduction (« accueil.faq.baskets.q »), pas un texte
         if (/(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)/.test(l)) continue;   // gardé par ce qu'il vend
+        { const k = cleDeLigneDico(rel, l); if (k && cleGardee(k)) continue; }
         if (PERMIS.some(([fi, re, , parLigne]) => fi === rel && (parLigne ? re.test(l.trim()) : re.test(s)))) continue;
         hors.push(`${rel}:${i + 1} ${s.slice(0, 90)}`);
       }
@@ -147,6 +156,7 @@ async function verifier(racine, { muet = false } = {}) {
       for (const x of lits) {
         if (!MARQUES_BASKET.test(x) || !/\s/.test(x.trim().slice(1, -1))) continue;   // une phrase, pas un mot-clé
         if (/(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|nom === 'paire'|\b(?:sn|snEx|sneakers) \?/.test(l)) continue;
+        { const k = cleDeLigneDico(rel, l); if (k && cleGardee(k)) continue; }
         if (lits.length >= 4 && !/placeholder|titre=|title=|setErreur/.test(l)) continue;   // une liste de lecture (marques, modèles)
         if (rel === 'src/FacturePro.jsx' && /^'Nike Air Max 90 — taille 42 \(exemple\)'$/.test(x) && /deps\.vendActuel\(\) !== 'sneakers'/.test(l0(f))) continue;   // remplacé hors Sneakers
         marques.push(`${rel}:${i + 1} ${x.slice(0, 90)}`);
@@ -203,7 +213,7 @@ async function verifier(racine, { muet = false } = {}) {
     ['src/PreparerColis.jsx', '« vérifie sur son carton » remis', '`Le N°${n} est à vérifier là où l’article est rangé.`', '`Le N°${n} est à vérifier sur son carton.`'],
     ['src/ecrans/Stock.jsx', 'Stock : « Paires » pour tous', '<StatBox label={motsStock.noms.charAt(0).toUpperCase() + motsStock.noms.slice(1)} value={counts.all}/>', '<StatBox label="Paires" value={counts.all}/>'],
     ['src/ebayRecherche.jsx', 'eBay : « ex. salomon xt-6 » pour tous', "placeholder={sn ? 'ex. salomon xt-6' : (exemple || 'ex. lampe vintage').replace(/^ex : /, 'ex. ')}", 'placeholder="ex. salomon xt-6"'],
-    ['src/ecrans/Compta.jsx', 'facture : « Adidas Spezial » pour tous', "placeholder={vendActuel()==='sneakers' ? 'ex: Adidas Spezial bleu marine taille 365' : exemplesActuels().achat}", 'placeholder="ex: Adidas Spezial bleu marine taille 365"'],
+    ['src/ecrans/Compta.jsx', 'facture : « Adidas Spezial » pour tous', "placeholder={vendActuel()==='sneakers' ? tr('compta.exAdidasSpezial') : exemplesActuels().achat}", "placeholder={tr('compta.exAdidasSpezial')}"],
     ['src/composants/Illustration.jsx', 'la basket des états vides pour tous', "return n === 'basket' && vend !== 'sneakers' ? 'etiquette' : n;", 'return n;'],
     ['src/StockExplication.jsx', '« Air Max 90 » pour tous', "{sneakers ? 'Air Max 90' : 'Article'}", "{'Air Max 90'}"],
     ['src/EmballagesCarte.jsx', '« Boîte à chaussures » pour tous', 'placeholder={exemple} data-emb-champ="nom"', 'placeholder="Boîte à chaussures" data-emb-champ="nom"'],

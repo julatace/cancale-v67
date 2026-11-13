@@ -22,6 +22,8 @@ import { nomPlateforme } from './plateformes.js';
 import { estExclu } from '../api/_lib/comptes-exclus.js';
 import { horsLigneActif, suivreHorsLigne } from './porteHorsLigne.js';
 import { EXT_ATTENDUE, DEMANDE_REGLAGE_SOUS, useEtatEmailsComptes, useComptesExclus, fetchTranspLignes, relireTransporteursSiVieux } from './App.jsx';
+import { tr } from './i18n/index.js';
+import { trj } from './i18n/react.js';
 
 const RELECTURE_MS = 5 * 60 * 1000;   // la ligne se revérifie toutes les 5 min, page visible
 const DEPART_MS = 1800;               // jamais pendant l'ouverture (src/AttenteEcran : ~2,5 s)
@@ -103,10 +105,10 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
 
   const voirToutVaBien = () => { DEMANDE_REGLAGE_SOUS.id = 'toutvabien'; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} if (onNav) onNav('settings'); };
   const geste = (r) => {
-    if (r.action === 'relire-suivi') return { libelle: 'Relire', faire: () => { relireTransporteursSiVieux({ force: true }).then(() => lireTransp(true)); } };
-    if (r.vers === 'toutvabien') return { libelle: 'Voir', faire: voirToutVaBien };
-    if (r.vers === 'settings') return { libelle: 'Réglages', faire: () => onNav && onNav('settings') };
-    if (r.vers === 'vintedaccounts') return { libelle: 'Comptes', faire: () => onNav && onNav('vintedaccounts') };
+    if (r.action === 'relire-suivi') return { libelle: tr('compta.relire'), faire: () => { relireTransporteursSiVieux({ force: true }).then(() => lireTransp(true)); } };
+    if (r.vers === 'toutvabien') return { libelle: tr('ventes.voir'), faire: voirToutVaBien };
+    if (r.vers === 'settings') return { libelle: tr('reglages.onglet.reglages'), faire: () => onNav && onNav('settings') };
+    if (r.vers === 'vintedaccounts') return { libelle: tr('commun.comptes'), faire: () => onNav && onNav('vintedaccounts') };
     return null;
   };
   const premier = f.retards[0] || null;
@@ -119,11 +121,11 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
   const ton = f.etat === 'retard' ? 'geste' : f.etat === 'a-jour' ? 'ok' : 'passu';
   const quand = f.verifieAt ? quandReluCourt(f.verifieAt, maintenant) : '';
   const texte = f.etat === 'encours' ? 'Vérification de tes données…'
-    : f.etat === 'a-jour' ? <>Tout est à jour{quand ? <span className="vrm-fraicheur-quand"> · vérifié {quand}</span> : null}</>
-    : f.etat === 'passu' ? <>Pas pu tout vérifier : {f.passu.join(', ')} — rien n’est affirmé pour {f.passu.length > 1 ? 'eux' : 'ça'}.</>
+    : f.etat === 'a-jour' ? <>{tr('commun.toutJour')}{quand ? <span className="vrm-fraicheur-quand">{trj('commun.verifie', { quand: quand })}</span> : null}</>
+    : f.etat === 'passu' ? <>{tr('commun.puToutVerifier')} {f.passu.join(', ')} {tr('commun.rienAffirme')} {f.passu.length > 1 ? 'eux' : tr('commun.ca')}.</>
     // (10 nov., Julien : « je trouve ça moche ») La ligne ne porte plus de phrase d'instruction : le nom et
     // l'état court, ou « N choses à revoir » ; le geste vit dans le détail, rangée touchée.
-    : f.retards.length > 1 ? <><b>{f.retards.length} choses à revoir</b></>
+    : f.retards.length > 1 ? <><b>{trj('commun.chosesRevoir', { x: f.retards.length })}</b></>
     : <><b className={premier.plateforme ? 'vrm-sensible' : undefined}>{premier.nom}</b> <span className="vrm-fraicheur-site">{premier.texte}</span></>;
   const depliable = f.etat === 'retard' || (f.etat === 'passu');
   return (
@@ -143,7 +145,7 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
             </button>
           : <span className="vrm-bandeau-abo-texte vrm-fraicheur-texte"><span className="vrm-fraicheur-phrase">{texte}</span></span>}
         {g && autres === 0 ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-geste={premier.source} data-alerte-voir={panne ? '' : undefined} onClick={g.faire}>{g.libelle}</button> : null}
-        {f.etat === 'passu' ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-reessayer="" onClick={() => { relire(); lireTransp(true); }}>Réessayer</button> : null}
+        {f.etat === 'passu' ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-reessayer="" onClick={() => { relire(); lireTransp(true); }}>{tr('commun.reessayer')}</button> : null}
       </div>
       {ouvert && depliable ? (
         <div className="vrm-fraicheur-detail" data-fraicheur-detail={f.retards.length}>
@@ -159,8 +161,8 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav }) {
                 {gg ? <button type="button" className="vrm-lien-action vrm-fraicheur-rangee-bouton" onClick={gg.faire}>{gg.libelle}</button> : null}
               </div> : null}
             </div>); })}
-          {f.etat === 'retard' && f.passu.length ? <div className="vrm-fraicheur-rangee" data-fraicheur-rangee="passu"><div className="vrm-fraicheur-rangee-texte"><span>Pas pu vérifier : {f.passu.join(', ')} — rien n’est affirmé pour {f.passu.length > 1 ? 'eux' : 'ça'}.</span></div></div> : null}
-          {f.verifieAt ? <div className="vrm-fraicheur-pied">Vérifié {quandReluCourt(f.verifieAt, maintenant)}{f.passu.length ? '.' : ' · le reste est à jour.'}</div> : null}
+          {f.etat === 'retard' && f.passu.length ? <div className="vrm-fraicheur-rangee" data-fraicheur-rangee="passu"><div className="vrm-fraicheur-rangee-texte"><span>{trj('commun.puVerifierRien', { n: f.passu.length, x: f.passu.join(', ') })}</span></div></div> : null}
+          {f.verifieAt ? <div className="vrm-fraicheur-pied">{tr('commun.verifie2')} {quandReluCourt(f.verifieAt, maintenant)}{f.passu.length ? '.' : tr('commun.resteJour')}</div> : null}
         </div>
       ) : null}
     </div>

@@ -60,6 +60,8 @@ import './boite-emails.css';
 import {CompteEmailAVerifier} from './ActionsClaires.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from './composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie } from './selectionSerie.js';
+import { tr } from './i18n/index.js';
+import { trj } from './i18n/react.js';
 
 const PAR_PAGE = 50;
 const formeListe = (j) => j && j.ok === true && Array.isArray(j.emails) && j.compteurs && typeof j.compteurs.sur === 'number';
@@ -144,11 +146,11 @@ function PuceCode({ code, grande = false, onCopie }) {
   useEffect(() => { if (!copie) return undefined; const t = setTimeout(() => setCopie(false), 1600); return () => clearTimeout(t); }, [copie]);
   const brut = String(code).replace(/\s+/g, '');
   return <button type="button" className={'vrm-boite-puce-code' + (grande ? ' is-grande' : '')} data-boite-code-copier={brut} data-copie={copie ? '1' : undefined}
-    aria-label={copie ? `Code ${code} copié` : `Copier le code de retrait ${code}`}
+    aria-label={copie ? tr('emails.codeCopie', { code: String(code) }) : tr('emails.copierCodeRetrait', { code: String(code) })}
     onClick={async (ev) => { ev.stopPropagation(); const ok = await copier(brut); setCopie(ok); if (onCopie) onCopie(ok); }}>
     {grande ? null : <span className="vrm-boite-puce-chiffres vrm-sensible" data-stream-type="code">{code}</span>}
     <span className="vrm-boite-puce-ic" aria-hidden="true">{copie ? Ic.coche : Ic.copier}</span>
-    <span className="vrm-boite-sr" aria-live="polite">{copie ? 'Copié' : ''}</span>
+    <span className="vrm-boite-sr" aria-live="polite">{copie ? tr('emails.copie') : ''}</span>
   </button>;
 }
 
@@ -186,13 +188,13 @@ function Heros({ e, h, photo }) {
     </section>;
   }
   if (h.montant || h.article || photo) {
-    return <section className="vrm-boite-heros" data-boite-heros={h.genre} aria-label="Ce qu’il faut savoir">
+    return <section className="vrm-boite-heros" data-boite-heros={h.genre} aria-label={tr('emails.fautSavoir')}>
       {photo ? <PhotoPaire className="vrm-boite-heros-photo" src={photo} data={{ 'data-boite-photo': '' }}/> : null}
       <div className="vrm-boite-heros-txt">
         {h.montant ? <p className="vrm-boite-heros-montant" data-boite-montant={h.montant}><b>{h.montant}</b>{h.montantMot ? <span>{h.montantMot}</span> : null}</p> : null}
         {h.article ? <p className="vrm-boite-heros-article">{h.article}</p> : null}
         {h.num ? <p className="vrm-boite-heros-num" data-boite-num={h.num}>N°{h.num}</p> : null}
-        {h.limite ? <p className="vrm-boite-heros-limite" data-ambre={h.limite.proche ? '1' : undefined}>à envoyer avant le {h.limite.date}{h.limite.mot ? ` · ${h.limite.mot}` : ''}</p> : null}
+        {h.limite ? <p className="vrm-boite-heros-limite" data-ambre={h.limite.proche ? '1' : undefined}>{tr('emails.envoyerAvant')} {h.limite.date}{h.limite.mot ? ` · ${h.limite.mot}` : ''}</p> : null}
       </div>
     </section>;
   }
@@ -219,8 +221,8 @@ function Corps({ texte, coupe }) {
   });
   return <div className="vrm-boite-msg" data-boite-corps={coupe ? 'extrait' : 'lu'}>
     {blocs}
-    {coupe ? <p className="vrm-boite-doux" data-boite-extrait="">Extrait : VRM garde le début du message. La suite est dans ta messagerie.</p> : null}
-    {c.pied ? <details className="vrm-boite-msg-pied" data-boite-mentions=""><summary>Mentions de l’expéditeur</summary><p>{c.pied}</p></details> : null}
+    {coupe ? <p className="vrm-boite-doux" data-boite-extrait="">{tr('emails.extraitVrmGarde')}</p> : null}
+    {c.pied ? <details className="vrm-boite-msg-pied" data-boite-mentions=""><summary>{tr('emails.mentionsExpediteur')}</summary><p>{c.pied}</p></details> : null}
   </div>;
 }
 
@@ -237,8 +239,8 @@ function MessageOrigine({ e, stream }) {
   const o = e.origine;
   const texte = typeof e.texte === 'string' && e.texte.trim()
     ? <Corps texte={e.texte} coupe={!!e.texteCoupe}/>
-    : <p className="vrm-boite-doux" data-boite-corps="absent">Texte pas gardé dans VRM (rangé avant le 31 oct.) : il est dans ta messagerie.</p>;
-  if (stream) return <><p className="vrm-boite-doux" data-boite-origine="stream">Mise en page d’origine masquée en mode stream (elle contient noms et adresses).</p>{texte}</>;
+    : <p className="vrm-boite-doux" data-boite-corps="absent">{tr('emails.texteGardeDans')}</p>;
+  if (stream) return <><p className="vrm-boite-doux" data-boite-origine="stream">{tr('emails.misePageOrigine')}</p>{texte}</>;
   if (o && o.etat === 'garde' && typeof o.html === 'string') return <div data-boite-origine="html"><CadreEmail html={o.html} images={Number(o.images) || 0} sombreEmail={!!o.sombre} appSombre={appSombre()} titre={`Message d’origine : ${e.subject || 'e-mail sans objet'}`}/></div>;
   const [cle, note] = o === null ? ['pas-su', 'Mise en page d’origine pas lue cette fois : voici le texte.']
     : o && o.etat === 'trop' ? ['trop', `Mise en page trop lourde${o.octets ? ` (${poidsLisible(o.octets)})` : ''} : VRM n’en garde que le texte.`]
@@ -281,61 +283,61 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
   const pdfConnu = e && e.resume && e.resume.pdf === 1;
   const aller = (g) => (g.k === 'num' ? onNum && onNum(g.num) : onAller && onAller(g.url));
   const contenu = (
-    <article className="vrm-boite-lecture" data-boite-lecture={id} data-plein={plein ? '1' : '0'} aria-label="E-mail ouvert" aria-busy={m === undefined ? 'true' : undefined}>
+    <article className="vrm-boite-lecture" data-boite-lecture={id} data-plein={plein ? '1' : '0'} aria-label={tr('emails.eMailOuvert')} aria-busy={m === undefined ? 'true' : undefined}>
       <div className="vrm-boite-lecture-barre" data-boite-barre="">
-        <button type="button" className="vrm-boite-retour" data-boite-fermer="" onClick={onFermer}>{plein ? <><span className="vrm-boite-chevron" aria-hidden="true">‹</span>Boîte de réception</> : 'Fermer'}</button>
-        {e && lu !== null && <button type="button" className="vrm-boite-retour vrm-boite-basculer-lu" data-boite-basculer-lu={lu ? 'nonlu' : 'lu'} onClick={() => onLu(e, !lu)}>{lu ? 'Marquer non lu' : 'Marquer lu'}</button>}
+        <button type="button" className="vrm-boite-retour" data-boite-fermer="" onClick={onFermer}>{plein ? <><span className="vrm-boite-chevron" aria-hidden="true">‹</span>{tr('emails.boiteReception')}</> : tr('commun.fermer')}</button>
+        {e && lu !== null && <button type="button" className="vrm-boite-retour vrm-boite-basculer-lu" data-boite-basculer-lu={lu ? 'nonlu' : 'lu'} onClick={() => onLu(e, !lu)}>{lu ? tr('emails.marquerNonLu') : tr('emails.marquerLu')}</button>}
       </div>
-      {m === undefined && <div className="vrm-boite-lecture-attente" role="status"><span className="vrm-boite-sr">Ouverture de l’e-mail…</span><i/><i/><i/></div>}
+      {m === undefined && <div className="vrm-boite-lecture-attente" role="status"><span className="vrm-boite-sr">{tr('emails.ouvertureEMail')}</span><i/><i/><i/></div>}
       {m === null && <EtatPanne className="vrm-boite-panne" role="alert" data-boite-lecture-etat="pas-su" quoi="Cet e-mail" raison="La lecture n’a pas abouti. Rien n’est perdu : il reste rangé." onReessayer={() => setEssai((n) => n + 1)}/>}
-      {m && !e && <div className="vrm-boite-etat-bloc" data-boite-lecture-etat="absent"><p className="vrm-boite-etat-titre">Cet e-mail n’est plus dans ta boîte VRM.</p></div>}
+      {m && !e && <div className="vrm-boite-etat-bloc" data-boite-lecture-etat="absent"><p className="vrm-boite-etat-titre">{tr('emails.eMailPlus')}</p></div>}
       {e && <>
         <header className="vrm-boite-haut" data-boite-haut="" data-etat={lecture.etat}>
           <div className="vrm-boite-haut-tete">
             <Avatar from={e.from} grande/>
             <div className="vrm-boite-haut-txt">
               <h2 tabIndex={-1} ref={titre} className="vrm-boite-titre" data-boite-titre={t.titre}>{t.titre}</h2>
-              <p className="vrm-boite-haut-de">{expediteurLisible(e.from)}{e.compte ? <> · <span className="vrm-sensible" data-stream-type="compte">{e.compte.nom}</span></> : e.compteAmbigu ? ' · plusieurs comptes' : ''} · <time dateTime={dateEmail(e) || ''}>{heure(dateEmail(e))}</time></p>
+              <p className="vrm-boite-haut-de">{expediteurLisible(e.from)}{e.compte ? <> · <span className="vrm-sensible" data-stream-type="compte">{e.compte.nom}</span></> : e.compteAmbigu ? tr('emails.plusieursComptes') : ''} · <time dateTime={dateEmail(e) || ''}>{heure(dateEmail(e))}</time></p>
             </div>
           </div>
           {!e.compte&&(e.compteAmbigu||siteExpediteur(e.from)==='vinted')&&<CompteEmailAVerifier ambigu={e.compteAmbigu} onVerifier={onRelier}/> }
           <Heros e={e} h={h} photo={photo}/>
           {details.length > 0 && <p className="vrm-boite-details">{details.join(' · ')}</p>}
           {aVerifier && <div className="vrm-boite-averif" data-boite-averif="">
-            {lecture.raison && <p><b>À vérifier :</b> {lecture.raison}</p>}
-            {lecture.geste && <p><b>Que faire :</b> {lecture.geste}</p>}
+            {lecture.raison && <p><b>{tr('emails.verifier')}</b> {lecture.raison}</p>}
+            {lecture.geste && <p><b>{tr('emails.faire')}</b> {lecture.geste}</p>}
           </div>}
           {gestes.length > 0 && <div className="vrm-boite-gestes" data-boite-gestes={gestes.length}>
             {gestes.map((g) => <button key={g.k} type="button" className={g.principal ? 'vrm-boite-objet vrm-boite-principal' : 'vrm-boite-second'} data-boite-objet={g.principal ? g.k : undefined} data-boite-geste-id={g.k} data-boite-ident={g.ident || ''} onClick={() => aller(g)}>{g.mot}</button>)}
           </div>}
-          <p className="vrm-boite-fait" data-boite-fait="" data-boite-objet={gestes.some((g) => g.ident) ? undefined : 'aucun'}>Dans VRM : {lecture.fait}{gestes.some((g) => g.ident) ? '' : ' — relié à aucun colis, vente ou achat précis (aucun numéro lu dans l’e-mail).'}</p>
+          <p className="vrm-boite-fait" data-boite-fait="" data-boite-objet={gestes.some((g) => g.ident) ? undefined : 'aucun'}>{tr('emails.dansVrm')} {lecture.fait}{gestes.some((g) => g.ident) ? '' : tr('emails.relieAucunColis')}</p>
         </header>
-        <section className="vrm-boite-corps-bloc" aria-label="Message d’origine">
-          <p className="vrm-boite-sous">Message d’origine</p>
+        <section className="vrm-boite-corps-bloc" aria-label={tr('emails.messageOrigine')}>
+          <p className="vrm-boite-sous">{tr('emails.messageOrigine')}</p>
           <div className="vrm-boite-message">
-            <h3 className="vrm-boite-sujet" data-boite-sujet="">{e.subject || 'E-mail sans objet'}</h3>
+            <h3 className="vrm-boite-sujet" data-boite-sujet="">{e.subject || tr('emails.eMailSans')}</h3>
             <MessageOrigine e={e} stream={stream}/>
           </div>
         </section>
         <section className="vrm-boite-pieces" data-boite-pieces={e.pieces == null ? 'pas-su' : e.pieces.length}>
           {e.pieces == null
-            ? <><p className="vrm-boite-sous">Pièces jointes</p><p className="vrm-boite-doux">Liste non gardée : cet e-mail a été rangé avant le 5 nov.{pdfConnu ? ' Le PDF joint est gardé avec ' + (e.resume.t === 'achat' ? 'le reçu d’achat.' : 'le bordereau.') : ''}</p></>
-            : e.pieces.length === 0 ? <p className="vrm-boite-doux">Aucune pièce jointe.</p>
-            : <><p className="vrm-boite-sous">Pièces jointes</p><ul>{e.pieces.map((p, i) => <li key={i} data-boite-piece={p.n}><span className="vrm-boite-piece-ic" aria-hidden="true">{p.t === 'application/pdf' ? 'PDF' : Ic.trombone}</span><span className="vrm-boite-piece-nom">{p.n}</span><small>{[p.t === 'application/pdf' ? 'PDF' : p.t, poidsLisible(p.o)].filter(Boolean).join(' · ')}</small></li>)}</ul>
-              <p className="vrm-boite-doux">{gestes.some((g) => g.k === 'colis') ? 'Le bordereau s’imprime depuis sa carte, dans Colis.' : 'Pour imprimer un bordereau ou un reçu : Colis ou Achats.'}</p></>}
+            ? <><p className="vrm-boite-sous">{tr('emails.piecesJointes')}</p><p className="vrm-boite-doux">{tr('emails.listeNonGardee')}{pdfConnu ? ' Le PDF joint est gardé avec ' + (e.resume.t === 'achat' ? 'le reçu d’achat.' : 'le bordereau.') : ''}</p></>
+            : e.pieces.length === 0 ? <p className="vrm-boite-doux">{tr('emails.aucunePieceJointe')}</p>
+            : <><p className="vrm-boite-sous">{tr('emails.piecesJointes')}</p><ul>{e.pieces.map((p, i) => <li key={i} data-boite-piece={p.n}><span className="vrm-boite-piece-ic" aria-hidden="true">{p.t === 'application/pdf' ? 'PDF' : Ic.trombone}</span><span className="vrm-boite-piece-nom">{p.n}</span><small>{[p.t === 'application/pdf' ? 'PDF' : p.t, poidsLisible(p.o)].filter(Boolean).join(' · ')}</small></li>)}</ul>
+              <p className="vrm-boite-doux">{gestes.some((g) => g.k === 'colis') ? tr('emails.bordereauImprimeDepuis') : tr('emails.imprimerBordereauRecu')}</p></>}
         </section>
         <p className="vrm-boite-meta" data-boite-meta="">
-          <span data-boite-de="">De <b>{expediteurLisible(e.from)}</b>{adresseLisible(e.from) ? ` (${adresseLisible(e.from)})` : ''}</span>
+          <span data-boite-de="">{tr('emails.texte')} <b>{expediteurLisible(e.from)}</b>{adresseLisible(e.from) ? ` (${adresseLisible(e.from)})` : ''}</span>
           <span aria-hidden="true"> · </span>
-          <span data-boite-recu="">Reçu sur {e.adresses && e.adresses.length ? e.adresses.join(', ') : 'une adresse non lue'}{e.compte ? ` (${e.compte.nom})` : e.compteAmbigu ? ' (plusieurs comptes)' : ''}</span>
+          <span data-boite-recu="">{tr('emails.recu')} {e.adresses && e.adresses.length ? e.adresses.join(', ') : tr('emails.adresseNonLue')}{e.compte ? ` (${e.compte.nom})` : e.compteAmbigu ? tr('emails.plusieursComptes2') : ''}</span>
           <span aria-hidden="true"> · </span>
-          <span data-boite-date=""><time dateTime={dateEmail(e) || ''}>{e.sourceDate ? 'le ' : 'transmis à VRM le '}{quandLong(dateEmail(e))}</time></span>
+          <span data-boite-date=""><time dateTime={dateEmail(e) || ''}>{e.sourceDate ? tr('emails.texte2') : tr('emails.transmisVrm')}{quandLong(dateEmail(e))}</time></span>
         </p>
       </>}
     </article>
   );
   if (!plein) return contenu;
-  return createPortal(<div className="vrm-boite-feuille" data-boite-feuille="" role="dialog" aria-modal="true" aria-label="E-mail ouvert">{FermeAuRetour ? <FermeAuRetour fermer={onFermer}/> : null}{contenu}</div>, document.body);
+  return createPortal(<div className="vrm-boite-feuille" data-boite-feuille="" role="dialog" aria-modal="true" aria-label={tr('emails.eMailOuvert')}>{FermeAuRetour ? <FermeAuRetour fermer={onFermer}/> : null}{contenu}</div>, document.body);
 }
 
 // ── UNE LIGNE ────────────────────────────────────────────────────────────────
@@ -377,7 +379,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
   };
   return <li {...(attrsSerie || {})} className="vrm-boite-item" data-pas-lu={pasLu ? '1' : undefined}>
     {caseSerie}
-    {fondVu && lu !== null && <span ref={fond} className="vrm-boite-glisse-fond" aria-hidden="true" data-actif="0">{Ic.lu}<span>{pasLu ? 'Lu' : 'Non lu'}</span></span>}
+    {fondVu && lu !== null && <span ref={fond} className="vrm-boite-glisse-fond" aria-hidden="true" data-actif="0">{Ic.lu}<span>{pasLu ? tr('emails.lu') : tr('emails.nonLu')}</span></span>}
     <button ref={ref} type="button" className="vrm-boite-ligne" data-boite-email={e.id} data-rubrique={r} data-etat={e.etat} data-lu={lu === null ? undefined : lu ? '1' : '0'}
       data-boite-geste={g ? g.k : undefined} data-boite-proche={g && g.proche ? '1' : undefined} data-boite-rien={l.rien ? '1' : undefined} data-boite-a-code={code ? '1' : undefined} data-boite-a-photo={photo ? '1' : undefined}
       aria-current={ouvert ? 'true' : undefined}
@@ -408,7 +410,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
         <span className="vrm-boite-ligne-pied">
           {g && <span className="vrm-boite-geste" data-boite-geste-mot={g.k} data-ambre={gesteAmbre(g) ? '1' : '0'} data-passe={g.passe ? '1' : undefined} data-boite-averifier={g.k === 'verifier' ? '' : undefined}>{g.mot}</span>}
           {(l.rien || !site || e.compte || e.pj > 0) && <span className="vrm-boite-qui">
-            {l.rien && <span className="vrm-boite-rien">rien à faire</span>}
+            {l.rien && <span className="vrm-boite-rien">{tr('emails.rienFaire')}</span>}
             {!site && <span className="vrm-boite-exp" data-boite-exp="autre"><span className="vrm-boite-exp-nom">{expediteurLisible(e.from)}</span></span>}
             {e.compte && <span className="vrm-boite-compte-nom vrm-sensible" data-stream-type="compte">{e.compte.nom}</span>}
             {e.pj > 0 && <span className="vrm-boite-pj" data-boite-pj={e.pj}>{Ic.trombone}{e.pj}</span>}
@@ -435,10 +437,10 @@ function Pile({ p, rendre, deplie, onDeplier, lus, delies, maintenant }) {
       <span className="vrm-boite-ligne-txt">
         <span className="vrm-boite-ligne-haut">
           <span className="vrm-boite-quoi" data-boite-quoi={l.titre}>{l.titre}</span>
-          <time title={h0 && h0 !== h1 ? `de ${h0} à ${h1}` : undefined}>{h1}</time>
+          <time title={h0 && h0 !== h1 ? tr('emails.texte3', { h0: String(h0), h1: String(h1) }) : undefined}>{h1}</time>
         </span>
         <span className="vrm-boite-ligne-pied">
-          <span className="vrm-boite-pile-mot">{p.emails.length} e-mails{l.essentiel.length ? ` · ${l.essentiel.join(' · ')}` : ''}</span>
+          <span className="vrm-boite-pile-mot">{p.emails.length} {tr('emails.eMails')}{l.essentiel.length ? ` · ${l.essentiel.join(' · ')}` : ''}</span>
           {l.geste ? <span className="vrm-boite-geste" data-ambre={gesteAmbre(l.geste) ? '1' : '0'}>{l.geste.mot}</span> : null}
           <span className="vrm-boite-pile-chevron" aria-hidden="true">{Ic.chevron}</span>
         </span>
@@ -451,7 +453,7 @@ function Pile({ p, rendre, deplie, onDeplier, lus, delies, maintenant }) {
 // En attendant la liste : des lignes fantômes (après 150 ms ; figées en mouvement réduit).
 function Squelette() {
   return <div className="vrm-boite-squelette" data-boite-chargement="" role="status" aria-busy="true">
-    <span className="vrm-boite-sr">Lecture de ta boîte…</span>
+    <span className="vrm-boite-sr">{tr('emails.lectureBoite')}</span>
     {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="vrm-boite-sq-ligne" aria-hidden="true"><i className="vrm-boite-sq-rond"/><span><i style={{ width: `${46 + (i * 17) % 30}%` }}/><i style={{ width: `${70 - (i * 11) % 25}%` }}/></span></div>)}
   </div>;
 }
@@ -483,11 +485,11 @@ function ARelier({ comptes, onRelier }) {
   if (!Array.isArray(comptes) || !comptes.length) return null;
   const n = comptes.length;
   return <div className="vrm-boite-arelier" data-boite-a-relier={n} role="note">
-    <p className="vrm-boite-arelier-titre"><b>{n > 1 ? `${n} comptes n’envoient aucun e-mail à VRM` : 'Un compte n’envoie aucun e-mail à VRM'}</b> — {n > 1 ? 'leurs' : 'ses'} codes de retrait, bordereaux et messages n’arrivent pas.</p>
+    <p className="vrm-boite-arelier-titre"><b>{n > 1 ? tr('emails.comptesEnvoientAucun', { x: String(n) }) : tr('emails.compteEnvoieAucun')}</b> — {n > 1 ? 'leurs' : 'ses'} {tr('emails.codesRetraitBordereaux')}</p>
     <ul>
       {comptes.map((c) => <li key={c.uid} data-boite-a-relier-compte={c.uid}>
         <span className="vrm-boite-arelier-qui"><b>{c.login}</b> · {phraseARelier(c)}</span>
-        <button type="button" className="vrm-boite-principal" data-boite-relier-compte={c.uid} onClick={() => onRelier(c.uid)}>Relier la boîte de {c.login}</button>
+        <button type="button" className="vrm-boite-principal" data-boite-relier-compte={c.uid} onClick={() => onRelier(c.uid)}>{trj('emails.relierBoite', { login: c.login })}</button>
       </li>)}
     </ul>
   </div>;
@@ -572,7 +574,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   const poserLu = useCallback((liste, valeur, gestes) => {
     setLusLocaux((m) => { const n = new Map(m); for (const e of liste) n.set(e.id, valeur); return n; });
     if (!ecrire.current) return;
-    Promise.resolve(ecrire.current(gestes)).then((ok) => { if (!ok) setAvis('Pas enregistré sur tes autres appareils — réessaie dans un moment.'); }).catch(() => setAvis('Pas enregistré sur tes autres appareils — réessaie dans un moment.'));
+    Promise.resolve(ecrire.current(gestes)).then((ok) => { if (!ok) setAvis(tr('emails.enregistreAutresAppareils')); }).catch(() => setAvis(tr('emails.enregistreAutresAppareils')));
   }, []);
   const onLu = useCallback((e, valeur) => poserLu([e], valeur, [{ k: valeur ? 'lu' : 'nonlu', id: e.id, at: e.at }]), [poserLu]);
   const ouvrir = useCallback((e) => { setOuvert(e.id); if (luDe(e) === false) onLu(e, true); }, [luDe, onLu]);
@@ -675,7 +677,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   // de la ligne (`onLu` → `ecrireLus`, les mêmes gestes { k:'lu'|'nonlu', id, at }), en UNE écriture.
   const ordreSerie = useMemo(() => ((pages && pages.emails) || []).map((e) => String(e.id)), [pages]);
   const serie = useSelectionSerie(ordreSerie, { nom: 'emails' });
-  const actionsSerie = [true, false].map((valeur) => ({ k: valeur ? 'lu' : 'nonlu', libelle: valeur ? 'Lu' : 'Non lu', variante: valeur ? 'primaire' : 'secondaire', faire: (cles) => {
+  const actionsSerie = [true, false].map((valeur) => ({ k: valeur ? 'lu' : 'nonlu', libelle: valeur ? tr('emails.lu') : tr('emails.nonLu'), variante: valeur ? 'primaire' : 'secondaire', faire: (cles) => {
     const parId = new Map(((pages && pages.emails) || []).map((e) => [String(e.id), e]));
     const { ok, pasFaits } = trierSerie(cles.map((k) => parId.get(k)).filter(Boolean), (e) => luDe(e) === valeur ? (valeur ? 'déjà lu' : 'déjà non lu') : true);
     if (ok.length) poserLu(ok, valeur, ok.map((e) => ({ k: valeur ? 'lu' : 'nonlu', id: e.id, at: e.at })));
@@ -690,17 +692,17 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
         {tete}
         <div className="vrm-boite-filtres">
           <label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
-            <span className="vrm-boite-sr">Chercher un e-mail</span>
+            <span className="vrm-boite-sr">{tr('emails.chercherEMail')}</span>
             <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-            <input type="search" value={saisie} onChange={(ev) => { setSaisie(ev.target.value); setOuvert(''); }} placeholder="Article, code, n° de suivi…" aria-label="Chercher un e-mail" data-boite-cherche-champ="" aria-describedby={saisie.trim().length===1?aideRechercheId:undefined} enterKeyHint="search" autoComplete="off"/>
+            <input type="search" value={saisie} onChange={(ev) => { setSaisie(ev.target.value); setOuvert(''); }} placeholder={tr('emails.articleCodeSuivi')} aria-label={tr('emails.chercherEMail')} data-boite-cherche-champ="" aria-describedby={saisie.trim().length===1?aideRechercheId:undefined} enterKeyHint="search" autoComplete="off"/>
           </label>
-          {saisie.trim().length===1&&<p id={aideRechercheId} className="vrm-boite-aide-recherche" data-boite-aide-recherche="">Saisis au moins 2 caractères pour rechercher.</p>}
-          <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label="Trier les e-mails">
+          {saisie.trim().length===1&&<p id={aideRechercheId} className="vrm-boite-aide-recherche" data-boite-aide-recherche="">{tr('emails.saisisMoins2')}</p>}
+          <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label={tr('emails.trierEMails')}>
             <button type="button" aria-pressed={!rubrique && !nonLus && !aVerif} data-boite-rubrique="tout" onClick={(ev) => { setNonLus(false); setAVerif(false); choisir('', ev.currentTarget); }}>
-              <span>Tout</span>{!filtre && c && parR && !c.plus ? <span className="vrm-boite-n" data-boite-n={c.sur}>{c.sur}</span> : null}
+              <span>{tr('emails.tout')}</span>{!filtre && c && parR && !c.plus ? <span className="vrm-boite-n" data-boite-n={c.sur}>{c.sur}</span> : null}
             </button>
             {(lusSus || nonLus) && <button type="button" aria-pressed={nonLus} data-boite-rubrique="nonlus" className="vrm-boite-nonlus-pastille" onClick={() => { setNonLus((v) => !v); setOuvert(''); }}>
-              <span className="vrm-boite-nonlus-point" aria-hidden="true"/><span>Non lus</span>{nNonLus > 0 && !cherche && !aVerif ? <span className="vrm-boite-n" data-boite-n={nNonLus}>{nNonLus}{c && c.plus ? '+' : ''}</span> : null}
+              <span className="vrm-boite-nonlus-point" aria-hidden="true"/><span>{tr('emails.nonLus')}</span>{nNonLus > 0 && !cherche && !aVerif ? <span className="vrm-boite-n" data-boite-n={nNonLus}>{nNonLus}{c && c.plus ? '+' : ''}</span> : null}
             </button>}
             {PASTILLES.map((id) => {
               const n = nPastille(id);
@@ -710,38 +712,38 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
               </button>;
             })}
             {(aVerif || (c && c.aVerifier > 0)) && <button type="button" aria-pressed={aVerif} data-boite-rubrique="a-verifier" className="vrm-boite-averif-pastille" onClick={() => { setAVerif((v) => !v); setOuvert(''); }}>
-              <span>À vérifier</span>{!filtre && c && c.aVerifier > 0 ? <span className="vrm-boite-n" data-boite-n={c.aVerifier}>{c.aVerifier}{c.plus ? '+' : ''}</span> : null}
+              <span>{tr('journee.verifier')}</span>{!filtre && c && c.aVerifier > 0 ? <span className="vrm-boite-n" data-boite-n={c.aVerifier}>{c.aVerifier}{c.plus ? '+' : ''}</span> : null}
             </button>}
           </div>
           {(choixCompte || (vieille && pages !== null) || (lusSus && nNonLus > 0)) && <div className="vrm-boite-ligne-outils">
             {choixCompte && <label className="vrm-boite-compte">
-              <span className="vrm-boite-sr">Compte</span>
-              <select value={adresse} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); }} data-boite-adresse="" aria-label="Compte">
-                <option value="">Tous les comptes</option>
+              <span className="vrm-boite-sr">{tr('ventes.compte4')}</span>
+              <select value={adresse} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); }} data-boite-adresse="" aria-label={tr('ventes.compte4')}>
+                <option value="">{tr('achats.tousComptes')}</option>
                 {adresses.map((a) => <option key={a.adresse} value={a.adresse}>{libelleCompte(a)}</option>)}
               </select>
               <svg className="vrm-boite-compte-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </label>}
-            {lusSus && nNonLus > 0 && <button type="button" className="vrm-boite-lien" data-boite-tout-lu="" onClick={toutMarquerLu}>{filtreActif ? 'Marquer ceux-ci lus' : 'Tout marquer lu'}</button>}
-            {vieille && pages !== null && <button type="button" className="vrm-boite-actualiser" data-boite-actualiser="" onClick={() => charger(0)} disabled={lecture} title={luA ? `Lue à ${heure(new Date(luA).toISOString())}` : undefined}>
-              <span className={lecture ? 'vrm-boite-tourne' : undefined}>{Ic.actualiser}</span>{lecture ? 'Lecture…' : 'Actualiser'}
+            {lusSus && nNonLus > 0 && <button type="button" className="vrm-boite-lien" data-boite-tout-lu="" onClick={toutMarquerLu}>{filtreActif ? tr('emails.marquerCeuxCi') : tr('emails.toutMarquerLu')}</button>}
+            {vieille && pages !== null && <button type="button" className="vrm-boite-actualiser" data-boite-actualiser="" onClick={() => charger(0)} disabled={lecture} title={luA ? tr('emails.lue', { heure: String(heure(new Date(luA).toISOString())) }) : undefined}>
+              <span className={lecture ? 'vrm-boite-tourne' : undefined}>{Ic.actualiser}</span>{lecture ? tr('messages.lecture') : tr('emails.actualiser')}
             </button>}
           </div>}
-          {[rubrique,adresse,aVerif,nonLus,cherche].filter(Boolean).length>1&&<div className="vrm-boite-vue-filtree" data-boite-vue-filtree="" role="group" aria-label="Filtres actifs">
+          {[rubrique,adresse,aVerif,nonLus,cherche].filter(Boolean).length>1&&<div className="vrm-boite-vue-filtree" data-boite-vue-filtree="" role="group" aria-label={tr('ventes.filtresActifs')}>
             <span>{[rubrique&&motRubrique,adresse&&'Un compte',aVerif&&'À vérifier',nonLus&&'Non lus',cherche&&'Recherche'].filter(Boolean).join(' · ')}</span>
-            <button type="button" className="vrm-b vrm-b-secondaire" onClick={()=>{setRubrique('');setAdresse('');setAVerif(false);setNonLus(false);setSaisie('');setCherche('');setOuvert('');}}>Réinitialiser les filtres</button>
+            <button type="button" className="vrm-b vrm-b-secondaire" onClick={()=>{setRubrique('');setAdresse('');setAVerif(false);setNonLus(false);setSaisie('');setCherche('');setOuvert('');}}>{tr('emails.reinitialiserFiltres')}</button>
           </div>}
           {phrase && <p className="vrm-boite-couverture" data-boite-sur={c ? c.sur : undefined} data-boite-sur-adresse={(c && c.adresse) || ''}>{phrase}</p>}
         </div>
         {pages === undefined && <Squelette/>}
         {pages === null && <EtatPanne className="vrm-boite-panne" role="alert" data-boite-etat="panne" data-boite="pas-su" quoi="Ta boîte VRM" raison={`${panne || 'VRM n’a pas pu lire ta boîte.'} Rien n’est perdu : tes e-mails restent rangés.`} onReessayer={() => charger(0)}/>}
-        {vide && cherche && <Etat k="recherche-vide" dessin="recherche" titre={`Aucun e-mail pour « ${cherche} »`} texte="Essaie un autre mot : le nom de l’article, un code de retrait, un n° de suivi ou l’expéditeur." gestes={[{ k: 'effacer', mot: 'Effacer la recherche', f: () => { setSaisie(''); setCherche(''); } }]}/>}
-        {vide && !cherche && nonLus && <Etat k="nonlus-vide" dessin="lu" titre="Tout est lu" texte="Les nouveaux e-mails arriveront ici, avec un point bleu." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setNonLus(false) }]}/>}
-        {vide && !cherche && !nonLus && aVerif && <Etat k="rien-a-verifier" dessin="lu" titre="Rien à vérifier" texte="Tous les e-mails de cette vue sont rangés." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setAVerif(false) }]}/>}
+        {vide && cherche && <Etat k="recherche-vide" dessin="recherche" titre={tr('emails.aucunEMail', { cherche: String(cherche) })} texte="Essaie un autre mot : le nom de l’article, un code de retrait, un n° de suivi ou l’expéditeur." gestes={[{ k: 'effacer', mot: 'Effacer la recherche', f: () => { setSaisie(''); setCherche(''); } }]}/>}
+        {vide && !cherche && nonLus && <Etat k="nonlus-vide" dessin="lu" titre={tr('emails.toutLu')} texte="Les nouveaux e-mails arriveront ici, avec un point bleu." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setNonLus(false) }]}/>}
+        {vide && !cherche && !nonLus && aVerif && <Etat k="rien-a-verifier" dessin="lu" titre={tr('emails.rienVerifier')} texte="Tous les e-mails de cette vue sont rangés." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setAVerif(false) }]}/>}
         {vide && !filtre && adresse && <Etat k="compte-vide" dessin="relier" titre={`Aucun e-mail reçu sur ${nomCompte(adresse)}${rubrique ? ` dans « ${motRubrique} »` : ''}`} texte={rubrique ? 'Les autres rubriques en ont peut-être.' : `Rien n’est encore arrivé sur ${adresse}. Si tu attends des e-mails de ce compte, vérifie le transfert dans sa messagerie.`}
           gestes={[rubrique ? { k: 'tout', mot: 'Voir toutes les rubriques', f: () => setRubrique('') } : { k: 'relier', mot: 'Relier ma boîte', f: onRelier }, { k: 'comptes', mot: 'Tous les comptes', f: () => setAdresse('') }]}/>}
-        {vide && !filtre && !adresse && rubrique && <Etat k="rubrique-vide" titre={`Aucun e-mail dans « ${motRubrique} »`} texte="Ils arriveront ici dès que tes e-mails en parleront." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setRubrique('') }]}/>}
-        {vide && !filtre && !adresse && !rubrique && <Etat k="vide" dessin="relier" titre="Ta boîte VRM est vide" texte="Relie ta boîte : chaque e-mail de Vinted, des transporteurs ou des autres sites que tu transfères à VRM arrivera ici, déjà rangé." gestes={[{ k: 'relier', mot: 'Relier ma boîte', f: onRelier }]}/>}
+        {vide && !filtre && !adresse && rubrique && <Etat k="rubrique-vide" titre={tr('emails.aucunEMail2', { motRubrique: String(motRubrique) })} texte="Ils arriveront ici dès que tes e-mails en parleront." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setRubrique('') }]}/>}
+        {vide && !filtre && !adresse && !rubrique && <Etat k="vide" dessin="relier" titre={tr('emails.boiteVrmVide')} texte="Relie ta boîte : chaque e-mail de Vinted, des transporteurs ou des autres sites que tu transfères à VRM arrivera ici, déjà rangé." gestes={[{ k: 'relier', mot: 'Relier ma boîte', f: onRelier }]}/>}
         {groupes.length > 0 && ordreSerie.length > 1 && <div className="vrm-serie-entree" style={{ display: 'flex', justifyContent: 'flex-end' }}><OuvrirSerie serie={serie}/></div>}
         <BarreSerie serie={serie} actions={actionsSerie} unite={{ un: 'e-mail sélectionné', plusieurs: 'e-mails sélectionnés' }}/>
         {groupes.length > 0 && <div className="vrm-boite-liste" data-boite-liste="">
@@ -756,12 +758,12 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
         </div>}
         <div ref={sentinelle} className="vrm-boite-sentinelle" aria-hidden="true"/>
         {pages && pages.suiteKO && <EtatPanne compact className="vrm-boite-panne" role="alert" data-boite-suite="pas-su" quoi="La suite de ta boîte" raison="Les e-mails ci-dessus restent lus." onReessayer={() => charger((pages.page || 0) + 1)}/>}
-        {pages && pages.suite && !pages.suiteKO && <button type="button" className="vrm-boite-plus" data-boite-plus="" disabled={lecture} onClick={() => charger((pages.page || 0) + 1)}>{lecture ? 'Lecture…' : 'Voir plus'}</button>}
-        {pages && !pages.suite && pages.emails.length > 0 && <p className="vrm-boite-fin" data-boite-fin="">{pages.emails.length} e-mail{pages.emails.length > 1 ? 's' : ''}{filtre || rubrique || adresse ? ' dans cette vue' : ''} · c’est tout</p>}
+        {pages && pages.suite && !pages.suiteKO && <button type="button" className="vrm-boite-plus" data-boite-plus="" disabled={lecture} onClick={() => charger((pages.page || 0) + 1)}>{lecture ? tr('messages.lecture') : tr('achats.voirPlus')}</button>}
+        {pages && !pages.suite && pages.emails.length > 0 && <p className="vrm-boite-fin" data-boite-fin="">{pages.emails.length} {tr('emails.eMail')}{pages.emails.length > 1 ? 's' : ''}{filtre || rubrique || adresse ? tr('emails.dansVue') : ''} {tr('emails.tout2')}</p>}
       </div>
       {large && <div ref={lectureCol} className="vrm-boite-lecture-col">
         {ouvert ? <Lecture onRelier={onRelier} key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={onAller} onNum={onNum} plein={false} lu={(() => { const e = pages && pages.emails.find((x) => x.id === ouvert); return e ? luDe(e) : null; })()} onLu={onLu} photoDe={photoDe}/>
-          : <div className="vrm-boite-vide-lecture" data-boite-vide-lecture=""><Dessin k="vide"/><p>Choisis un e-mail pour le lire.</p></div>}
+          : <div className="vrm-boite-vide-lecture" data-boite-vide-lecture=""><Dessin k="vide"/><p>{tr('emails.choisisEMail')}</p></div>}
       </div>}
       {!large && ouvert && <Lecture onRelier={onRelier} key={ouvert} id={ouvert} entetes={entetes} delies={delies} onFermer={() => setOuvert('')} onAller={(u) => { setOuvert(''); onAller && onAller(u); }} onNum={(n) => { setOuvert(''); onNum && onNum(n); }} plein FermeAuRetour={FermeAuRetour}
         lu={(() => { const e = pages && pages.emails.find((x) => x.id === ouvert); return e ? luDe(e) : null; })()} onLu={onLu} photoDe={photoDe}/>}
@@ -813,7 +815,7 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
   return (
     <PhotoBoite.Provider value={Photo}>
     <section className="vrm-boite" data-boite-emails="" data-vue={vue}>
-      <div className="vrm-boite-vues" role="tablist" aria-label="E-mails">
+      <div className="vrm-boite-vues" role="tablist" aria-label={tr('nav.emails')}>
         {VUES.map(([k, mot]) => <button key={k} type="button" role="tab" aria-selected={vue === k} data-boite-vue={k} onClick={() => setVue(k)}>{mot}</button>)}
       </div>
       {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')} ecrireLus={ecrireLus} photoDe={photoDe}
@@ -826,8 +828,8 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
           <ParcoursAdresseVrm headers={headers} onBoite={() => setVue('boite')} comptes={aRelierListe} uid={compteOuvert} onChoisir={setCompte} boites={boites} lireDernier={lireDernier} onRelie={noterRelie} onPret={setPret}/>
         </div>
         {reglages ? <div ref={haut} className="vrm-boite-reglages" data-boite-reglages="">{reglages}</div> : null}
-        {pret === false && <section className="vrm-boite-guide" aria-label="Faire suivre tes e-mails, pas à pas" data-boite-guide="">
-          {reglages ? <h2 className="vrm-boite-guide-titre">Faire suivre tes e-mails, pas à pas</h2> : null}
+        {pret === false && <section className="vrm-boite-guide" aria-label={tr('emails.faireSuivreE')} data-boite-guide="">
+          {reglages ? <h2 className="vrm-boite-guide-titre">{tr('emails.faireSuivreE')}</h2> : null}
           <RelierBoite messagerieInitiale={(aRelierListe.find((c) => c.uid === compteOuvert) || {}).messagerie} onAdresses={onAdresses ? versAdresses : undefined}/>
         </section>}
       </div>}

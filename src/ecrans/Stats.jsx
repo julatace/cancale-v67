@@ -51,6 +51,8 @@ import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categ
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
+import { tr } from '../i18n/index.js';
+import { trj } from '../i18n/react.js';
 
 // ⟦← App.jsx #6⟧
 // « Annonces en ligne » : UNE règle d'écriture pour chaque écran qui la montre
@@ -153,8 +155,8 @@ function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, form
         {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
       </g>;})}
     </svg>
-    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{ecrire(lu)}</strong></div>}
-    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{ecrire(lu-1)}</strong></div>}
+    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?tr('stats.cours'):''}</span><strong>{ecrire(lu)}</strong></div>}
+    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>{tr('stats.precedent')} {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?tr('stats.moisComplet'):''}</span><strong>{ecrire(lu-1)}</strong></div>}
   </div>;
 }
 // ⟦← App.jsx #11⟧
@@ -178,12 +180,12 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
   return (
     <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <span style={{fontSize:13,fontWeight:600,color:C.text}}>{mois.nomComplet} — {ventes.length} vente{ventes.length>1?'s':''}</span>
+        <span style={{fontSize:13,fontWeight:600,color:C.text}}>{trj('stats.ventes', { n: ventes.length, nomComplet: mois.nomComplet })}</span>
         <span onClick={onClose} style={{cursor:'pointer',color:C.muted,fontSize:20,fontWeight:500,lineHeight:1}}>×</span>
       </div>
       <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12}}>
-        <span style={{color:C.text}}>CA : <b>{fmt(totalCA)}</b></span>
-        <span style={{color:C.accentTexte}} data-benefice-mois={totalProfit==null?'':Math.round(totalProfit*100)}>Bénéfice : <b>{totalProfit==null?'—':fmt(totalProfit)}</b>{totalProfit!=null&&tot.nConnus<tot.n?` sur ${tot.nConnus} vente${tot.nConnus>1?'s':''} sur ${tot.n}`:''}</span>
+        <span style={{color:C.text}}>{tr('stats.ca')} <b>{fmt(totalCA)}</b></span>
+        <span style={{color:C.accentTexte}} data-benefice-mois={totalProfit==null?'':Math.round(totalProfit*100)}>{tr('stats.benefice')} <b>{totalProfit==null?'—':fmt(totalProfit)}</b>{totalProfit!=null&&tot.nConnus<tot.n?tr('stats.ventes2', { n: String(tot.nConnus), x: String(tot.n) }):''}</span>
       </div>
       <div style={{maxHeight:260,overflowY:'auto'}}>
         {ventes.map((v,i)=>{
@@ -644,10 +646,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // cause est dite une fois par groupe, et le geste est le lien lui-même.
   const LignePrixAchat = ({ quoi, dans = false }) => (
     <button type="button" onClick={versSaisiePrix}
-      title="Ouvrir la saisie en série des prix d'achat"
+      title={tr('stats.ouvrirSaisieSerie')}
       style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:dans?0:'-4px 0 0',cursor:'pointer',
         fontFamily:'inherit',fontSize:13,fontWeight:500,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
-      {quoi} attendent tes prix d'achat — <span style={{color:C.accentTexte,fontWeight:600,whiteSpace:'nowrap'}}>les saisir →</span>
+      {quoi} {tr('stats.attendentPrixAchat')} <span style={{color:C.accentTexte,fontWeight:600,whiteSpace:'nowrap'}}>{tr('stats.saisir')}</span>
     </button>
   );
   // ── Typographie de l'écran (16 oct.) ─────────────────────────────────────
@@ -664,7 +666,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo}/>
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent. */}
@@ -675,21 +677,21 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           (`ventesFaites`), une semaine touchée = son détail. Sorti du volet replié (il n'y est plus redit). */}
       <VenduParSemaineSante liveStats={liveStats}/>
       {/* (10 nov., lot BC) L'écran « Ma semaine » (le bilan de la semaine) : un lien, rien de recalculé ici. */}
-      {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>Ma semaine <span aria-hidden="true">›</span></button> : null}
+      {onGo ? <button type="button" className="vrm-lien-action" data-ouvre-ma-semaine="" onClick={() => onGo('semaine')} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',border:0,background:'transparent',font:'inherit',fontSize:15,fontWeight:600,color:C.accentTexte||C.text,cursor:'pointer'}}>{tr('ecran.semaine')} <span aria-hidden="true">›</span></button> : null}
       <ComparerMoisCarte liveStats={liveStats} panelOff={panelOff}/>
       {/* (11 nov., agent2-argent-parrainage) « Frais par site » sur la période OU mois par mois, une vue à la fois (src/ArgentPlus.jsx). */}
       <CoutSitesCarte periode={periodeStats} ebayCommandes={ebayCommandes} parPeriode={<FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes} ventesVc={ventesVc}/>}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
-      <RepliStats id="argent" titre="L’argent depuis le début" phrase="Finalisé par plateforme et par compte, mois par mois, entre deux dates.">
+      <RepliStats id="argent" titre={tr('stats.argentDepuisDebut')} phrase="Finalisé par plateforme et par compte, mois par mois, entre deux dates.">
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
           celle publiée par Annonces (`vrm_valeur_stock`, paires présentes) · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div data-stats-carte="hero" data-notion="finalise-vinted" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
-        <div style={sLib}>Finalisé sur Vinted · depuis le début</div>
+        <div style={sLib}>{tr('stats.finaliseVintedDepuis')}</div>
         {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
             VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
             cette date). Le rapport comptable a été corrigé, ce titre-là était
@@ -703,12 +705,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         {/* (16 oct.) Le chiffre héros, seul, en très gros — plus de cellule
             noire, plus de filet vertical parasite à gauche de chaque texte
             (l'ombre « -1px » de StatBox compact). */}
-        <div className="vrm-display" data-finalise-vinted={liveStats&&liveStats.caEncaisse!=null?Math.round(liveStats.caEncaisse*100):undefined} data-finalise-prix-pas-lu={liveStats&&liveStats.prixPasLu>0?liveStats.prixPasLu:undefined} style={{...sHero,fontSize:28,marginTop:6}}>{liveStats&&liveStats.prixPasLu>0&&liveStats.caEncaisse!=null?<span style={{fontSize:15,fontWeight:600,color:C.muted,letterSpacing:0}}>au moins </span>:null}{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
-        {liveStats && liveStats.prixPasLu > 0 && liveStats.caEncaisse != null && <div style={{...sNote,marginTop:4}}>{liveStats.prixPasLu} vente{liveStats.prixPasLu>1?'s':''} finalisée{liveStats.prixPasLu>1?'s':''} au prix pas lu : pas dans ce montant.</div>}
-        <div style={{...sNote,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>Vinted seul · tous comptes · au jour de la vente <Pourquoi label="Et Leboncoin, eBay ?">Ce chiffre ne compte que les ventes finalisées sur Vinted. Leboncoin et eBay sont dans « Finalisé par plateforme », plus bas.</Pourquoi></div>
+        <div className="vrm-display" data-finalise-vinted={liveStats&&liveStats.caEncaisse!=null?Math.round(liveStats.caEncaisse*100):undefined} data-finalise-prix-pas-lu={liveStats&&liveStats.prixPasLu>0?liveStats.prixPasLu:undefined} style={{...sHero,fontSize:28,marginTop:6}}>{liveStats&&liveStats.prixPasLu>0&&liveStats.caEncaisse!=null?<span style={{fontSize:15,fontWeight:600,color:C.muted,letterSpacing:0}}>{tr('journee.moins')} </span>:null}{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
+        {liveStats && liveStats.prixPasLu > 0 && liveStats.caEncaisse != null && <div style={{...sNote,marginTop:4}}>{trj('stats.ventesFinaliseesPrix', { n: liveStats.prixPasLu })}</div>}
+        <div style={{...sNote,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>{tr('stats.vintedSeulTous')} <Pourquoi label={tr('stats.leboncoinEbay')}>{tr('stats.chiffreCompteVentes')}</Pourquoi></div>
         {liveStats && liveStats.nMasque > 0 && liveStats.caEncaisse != null && (
           <div data-finalise-masquees={liveStats.nMasque} data-finalise-masquees-eur={Math.round(liveStats.caMasque*100)} style={{...sNote,marginTop:4}}>
-            {liveStats.nMasque>1 ? `Sans tes ${liveStats.nMasque} ventes masquées (${fmt(liveStats.caMasque)}) — elles restent dans ton CA déclaré (Comptabilité).` : `Sans ta vente masquée (${fmt(liveStats.caMasque)}) — elle reste dans ton CA déclaré (Comptabilité).`}
+            {liveStats.nMasque>1 ? tr('stats.sansVentesMasquees', { nMasque: String(liveStats.nMasque), fmt: String(fmt(liveStats.caMasque)) }) : tr('stats.sansVenteMasquee', { fmt: String(fmt(liveStats.caMasque)) })}
           </div>
         )}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginTop:16,borderTop:`1px solid ${C.border}`}}>
@@ -735,10 +737,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {liveStats && <details className="vrm-finance-activity" style={{fontSize:13,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
         {/* (16 oct.) Chaque montant reste d'un bloc avec son libellé : « 2066,80 »
             ne se sépare plus de son « € » au retour à la ligne. */}
-        <summary style={{cursor:'pointer',padding:'10px 0',lineHeight:1.65}}>Ventes enregistrées · <span style={{whiteSpace:'nowrap'}} data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>aujourd’hui <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</b></span> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>ce mois <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</b></span></summary>
-        <p>Ventes faites, toutes plateformes, avant encaissement. Le CA finalisé et l’argent reçu restent distincts.</p>
-        {liveStats.venduPasSu && <p data-dash-vendu-pas-su="1">Les ventes n’ont pas pu être lues. Les montants restent inconnus.</p>}
-        {(liveStats.venduManque || []).length>0 && <p data-dash-vendu-manque={liveStats.venduManque.join(',')}>Total partiel, sans {liveStats.venduManque.join(', ')} : ventes non lues.</p>}
+        <summary style={{cursor:'pointer',padding:'10px 0',lineHeight:1.65}}>{tr('stats.ventesEnregistrees')} <span style={{whiteSpace:'nowrap'}} data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>{tr('stats.aujourdHui')} <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</b></span> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>{tr('stats.mois')} <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</b></span></summary>
+        <p>{tr('stats.ventesFaitesToutes')}</p>
+        {liveStats.venduPasSu && <p data-dash-vendu-pas-su="1">{tr('stats.ventesOntPu')}</p>}
+        {(liveStats.venduManque || []).length>0 && <p data-dash-vendu-manque={liveStats.venduManque.join(',')}>{trj('stats.totalPartielSans', { x: liveStats.venduManque.join(', ') })}</p>}
       </details>}
       {/* (16 oct.) « Annonces en ligne » avait disparu du tableau de bord avec
           la simplification du 13 octobre — et avec elle la ligne qui dit de
@@ -747,13 +749,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           sont à confirmer) ; la ligne de fraîcheur est la MÊME que celle de
           l'écran Annonces (`FraicheurAnnonces`, §11), et se tait quand tout
           est frais. */}
-      <details className="vrm-finance-stock"><summary>Stock et volume de ventes{/* (31 oct.) le nombre d'annonces en ligne vit dans la tuile « En ligne » du haut (écrit une fois, §7) */}</summary><div className="vrm-finance-stock-grid">
+      <details className="vrm-finance-stock"><summary>{tr('stats.stockVolumeVentes')}{/* (31 oct.) le nombre d'annonces en ligne vit dans la tuile « En ligne » du haut (écrit une fois, §7) */}</summary><div className="vrm-finance-stock-grid">
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
             légende disait. Un chiffre qu'on doit corriger avec sa légende est un
             chiffre faux : le titre dit maintenant ce qu'il compte. */}
-        <StatCard icon="📦" label="Articles en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
+        <StatCard icon="📦" label={tr('stats.articlesStock')} value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
         {/* ⚠️ « 0,00 € » N'EST PAS UN ZÉRO, C'EST UNE ABSENCE. Cette carte somme
             les PRIX D'ACHAT des annonces en ligne — or aucun n'est saisi, donc
             elle affichait un gros 0,00 € à côté d'un « 1581 € de valeur » sur
@@ -764,13 +766,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             src/coutVente.js — paires PRÉSENTES, prix d'achat SAISIS), avec sa couverture ;
             « N sans prix » ouvre la saisie en série. Jamais publiée ⇒ « — ». */}
         {(()=>{ const t = texteValeurStock(valeurStk, { partiel: !!(valeurStk && valeurStk.partiel) });
-          return <div style={{display:'contents'}} data-stats-valeur-stock={valeurStk ? (valeurStk.centimes == null ? 'passu' : String(valeurStk.centimes)) : 'jamais'} data-stats-valeur-sans={valeurStk ? valeurStk.nSans : undefined}><StatCard icon="💰" label="Valeur du stock"
+          return <div style={{display:'contents'}} data-stats-valeur-stock={valeurStk ? (valeurStk.centimes == null ? 'passu' : String(valeurStk.centimes)) : 'jamais'} data-stats-valeur-sans={valeurStk ? valeurStk.nSans : undefined}><StatCard icon="💰" label={tr('stats.valeurStock')}
             value={valeurStk && valeurStk.centimes != null ? t.montant : '—'} color={C.text}
             sub={valeurStk ? [t.auMoins && valeurStk.centimes != null ? 'au moins' : '', t.sur, t.sans].filter(Boolean).join(' · ') : 'annonces pas encore lues'}
-            onClick={valeurStk && valeurStk.nSans ? versSaisiePrix : null} title={valeurStk && valeurStk.nSans ? 'Saisir les prix d’achat qui manquent' : null}/></div>; })()}
+            onClick={valeurStk && valeurStk.nSans ? versSaisiePrix : null} title={valeurStk && valeurStk.nSans ? tr('stats.saisirPrixAchat') : null}/></div>; })()}
         {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
-        <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
+        <StatCard icon="✅" label={tr('stock.vendues')} value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
       </div></details>
       {liveStats && <FraicheurAnnonces attr="data-dash-fraicheur" lues={liveStats.annLues} enLigne={liveStats.annEnLigne} noms={liveStats.annNoms} supprimees={liveStats.annSuppr} aConfirmer={liveStats.annAConfirmer} numeros={numerosDash} activite={liveStats.annActivite} style={{marginTop:4,marginBottom:10}}/>}
       </div>
@@ -797,19 +799,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         // une valeur arrondie différemment (« 2 k ») à côté du vrai montant (§7).
         return (
           <div data-stats-carte="courbe" data-stats-courbe data-notion="vendu" style={{...sCarte,marginTop:4}}>
-            <div style={sLib}>Vendu · 12 derniers mois</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:4}}>Toutes plateformes · ventes en cours comprises <Pourquoi label="Pourquoi plus que le finalisé ?">Au jour de la vente, ventes en cours comprises : ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</Pourquoi></div>
+            <div style={sLib}>{tr('stats.vendu12Derniers')}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:4}}>{tr('stats.toutesPlateformesVentes')} <Pourquoi label={tr('stats.pourquoiPlusFinalise')}>{tr('stats.jourVenteVentes')}</Pourquoi></div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
             <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" presentation="ligne" legende={false}/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
-                <span style={{flex:1,minWidth:0}}>Meilleur mois · <span style={{color:C.text,fontWeight:500}}>{meilleur.long}</span></span>
+                <span style={{flex:1,minWidth:0}}>{tr('stats.meilleurMois')} <span style={{color:C.text,fontWeight:500}}>{meilleur.long}</span></span>
                 <b style={{color:C.text,fontWeight:600}}><Mt v={meilleur.eur}/></b>
               </div>
               {encours.cle !== meilleur.cle && <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,flexShrink:0,boxSizing:'border-box',border:`2px solid ${C.accent}`,background:C.card}}/>
-                <span style={{flex:1,minWidth:0}}>En cours · <span style={{color:C.text,fontWeight:500}}>{encours.long}</span></span>
+                <span style={{flex:1,minWidth:0}}>{tr('stats.cours2')} <span style={{color:C.text,fontWeight:500}}>{encours.long}</span></span>
                 <b style={{color:C.text,fontWeight:600}}><Mt v={encours.eur}/></b>
               </div>}
             </div>
@@ -878,19 +880,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         return (
           <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
-              <div style={{...sTitre,marginBottom:8}}>Finalisé par plateforme</div>
+              <div style={{...sTitre,marginBottom:8}}>{tr('stats.finalisePlateforme')}</div>
               {plateformes.map(p => <Ligne key={p.nom} label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
                   répète la seule ligne remplie. */}
-              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label="Total finalisé" val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
+              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label={tr('stats.totalFinalise')} val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
             </div>
             <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
-              <div style={{...sTitre,marginBottom:8}}>CA Vinted par compte</div>
+              <div style={{...sTitre,marginBottom:8}}>{tr('stats.caVintedCompte')}</div>
               {comptes.length
                 ? comptes.map(([lg,v,c]) => <div key={c ? c.uid : lg} data-stats-compte={c ? c.uid : lg} data-stats-compte-cents={v==null?'':String(Math.round(v*100))} data-stats-compte-encours={c&&c.lu?String(Math.round(c.enCours*100)):undefined} data-stats-compte-partiel={c&&c.nPrixPasLu?'1':undefined}><Ligne label={lg} val={v} note={noteCompte(c)} part={comptes.length>1 && totCpt>0 && v!=null ? v/totCpt : null}/></div>)
-                : <div style={{fontSize:13,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
+                : <div style={{fontSize:13,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>{tr('stats.detailCompteApparait')}</div>}
               {/* (30 oct.) Plus de « Total Vinted » : c'est « Finalisé sur Vinted · tous comptes »,
                   en tête du même écran (§7, un chiffre une fois). */}
             </div>
@@ -927,7 +929,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         ];
         return (
           <div data-stats-carte="details" style={sCarte}>
-            <div style={{...sTitre,marginBottom:4}}>Moyennes</div>
+            <div style={{...sTitre,marginBottom:4}}>{tr('stats.moyennes')}</div>
             <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:0}}>
               {cases.map(([l,v,sub,sourd])=>(
                 <div key={l} style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
@@ -944,18 +946,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* Records — seulement s'il y en a (un titre sans rien dessous n'apprend rien). */}
       {(bestDayCA||bestDayProfit) && <div data-stats-carte="records" style={sCarte}>
-        <div style={{...sTitre,marginBottom:4}}>Records</div>
+        <div style={{...sTitre,marginBottom:4}}>{tr('stats.records')}</div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:0}}>
           {bestDayCA&&(
             <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
-              <div style={sLib}>Meilleur jour</div>
+              <div style={sLib}>{tr('stats.meilleurJour')}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayCA[1].ca)}</div>
-              <div style={{...sNote,fontSize:11,marginTop:2}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
+              <div style={{...sNote,fontSize:11,marginTop:2}}>{trj('stats.ventes3', { n: bestDayCA[1].count, x: bestDayCA[0] })}</div>
             </div>
           )}
           {bestDayProfit&&(
             <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
-              <div style={sLib} data-benef-notion="brut">Meilleur jour · {NOM_BENEFICE_BRUT.toLowerCase()}</div>
+              <div style={sLib} data-benef-notion="brut">{trj('stats.meilleurJour2', { toLowerCase: NOM_BENEFICE_BRUT.toLowerCase() })}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayProfit[1].profit)}</div>
               <div style={{...sNote,fontSize:11,marginTop:2}}>{bestDayProfit[0]}</div>
             </div>
@@ -976,16 +978,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         return (
           <Card>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:6}}>
-              <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>Évolution — ventes finalisées</span>
-              <Segmente label="Montrer" value={caMode} onChange={setCaMode} options={[{v:'ca',l:'CA\u00a0€'},{v:'ventes',l:'Ventes'}]}/>
+              <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>{tr('stats.evolutionVentesFinalisees')}</span>
+              <Segmente label={tr('stats.montrer')} value={caMode} onChange={setCaMode} options={[{v:'ca',l:'CA\u00a0€'},{v:'ventes',l:'Ventes'}]}/>
             </div>
-            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {moisMoisson.length} mois · touche un point pour le détail
-            </div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>{trj('stats.moisTouchePoint', { moisMoissonN: moisMoisson.length })}</div>
             <CourbeMois mois={moisMoisson.map(h=>({cle:h.key,long:h.nomComplet,n:h.ventes,ca:h.ca,ventes:h.ventes,enCours:h.enCours}))} valeur={(m)=>caMode==='ca'?m.ca:m.ventes} format={(v)=>caMode==='ca'?`${Math.round(v).toLocaleString('fr-FR')}\u00a0€`:String(Math.round(v))} choisi={selMois} onChoisir={setSelMois} attr="data-courbe-finalise"/>
             {sel&&(
               <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:13,color:C.text}}>
-                <b>{sel.nomComplet}</b>{sel.enCours&&<span style={{color:C.muted,fontWeight:500}}> · en cours (se finalise ~2 semaines après la vente)</span>} — <b>{fmt(sel.ca)}</b> · {sel.ventes} vente{sel.ventes>1?'s':''}
+                <b>{sel.nomComplet}</b>{sel.enCours&&<span style={{color:C.muted,fontWeight:500}}> {tr('stats.coursFinalise2')}</span>} — <b>{fmt(sel.ca)}</b> · {sel.ventes} {tr('journee.vente')}{sel.ventes>1?'s':''}
               </div>
             )}
           </Card>
@@ -999,8 +999,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const sel=caHistory.find(h=>h.key===selMonthEnc);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA (ventes finalisées, 12 derniers mois)</div>
-            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{tr('stats.evolutionCaVentes')}</div>
+            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>{tr('stats.touchePointVoir')}</div>
             <CourbeMois mois={caHistory.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')}\u00a0€`} choisi={selMonthEnc} onChoisir={setSelMonthEnc} attr="data-courbe-encaisse"/>
             {sel&&<MonthDetail mois={sel} type="encaisse" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthEnc(null)}/>}
           </Card>
@@ -1009,10 +1009,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* CA SUR MESURE : d'une date à une autre (Julien, 28 sept.). */}
       <Card>
-        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>CA entre deux dates</div>
-        <div style={{fontSize:11,color:C.muted,marginBottom:10}}>Ventes finalisées, à leur date de vente</div>
+        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>{tr('stats.caEntreDeux')}</div>
+        <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{tr('stats.ventesFinaliseesLeur')}</div>
         {/* (29 oct.) Le même calendrier « comme Airbnb » que Ventes et Achats (§11). */}
-        <PeriodePicker titre="Période du chiffre d'affaires" vide="Choisir une période" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null,...(caLabel?{label:caLabel}:{})}:null}
+        <PeriodePicker titre={tr('stats.periodeChiffreAffaires')} vide="Choisir une période" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null,...(caLabel?{label:caLabel}:{})}:null}
           onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); setCaLabel(v&&v.label?String(v.label):''); }}/>
         {caRange ? (
           <div style={{marginTop:14}}>
@@ -1034,7 +1034,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (31 oct.) Rythme, marges par groupe, temps de vente, jours et heures,
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
       </RepliStats>
-      <RepliStats id="vente" titre="Ce qui se vend, ton rythme, le stock qui dort" phrase={`Marges par marque, temps de vente, jours et heures où tu vends, ${motsVendeur().noms} en ligne depuis longtemps, boost.`}>
+      <RepliStats id="vente" titre={tr('stats.vendRythmeStock')} phrase={`Marges par marque, temps de vente, jours et heures où tu vends, ${motsVendeur().noms} en ligne depuis longtemps, boost.`}>
       <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
@@ -1046,8 +1046,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const sel=caHistoryVente.find(h=>h.key===selMonthVente);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA par date de vente (12 derniers mois)</div>
-            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{tr('stats.evolutionCaDate')}</div>
+            <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>{tr('stats.touchePointVoir')}</div>
             <CourbeMois mois={caHistoryVente.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')}\u00a0€`} choisi={selMonthVente} onChoisir={setSelMonthVente} attr="data-courbe-vente"/>
             {sel&&<MonthDetail mois={sel} type="vente" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthVente(null)}/>}
           </Card>
@@ -1061,9 +1061,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const moyenne=(totalAjouts/ajoutsParJour.length);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Articles ajoutés par jour</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{tr('stats.articlesAjoutesJour')}</div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {totalAjouts} article{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
+              {totalAjouts} {tr('achats.article')}{totalAjouts>1?'s':''} {tr('journee.texte2')} {ajoutsParJour.length} {tr('ventes.jour')}{ajoutsParJour.length>1?'s':''} {tr('stats.activiteMoyenne')} {moyenne.toFixed(1)}{tr('stats.jour')}
             </div>
             <div style={{display:'flex',alignItems:'flex-end',gap:4,height:150,paddingTop:10,overflowX:'auto'}}>
               {ajoutsParJour.map((h,i)=>{
@@ -1086,17 +1086,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{trj('stats.semaineDerniere', { from: weeklyRecapData.from, to: weeklyRecapData.to })}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
-                <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
-                <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
+                <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>{trj('stats.ventes5', { n: weeklyRecapData.count })}</span></span>
+                <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>{tr('stats.vendu')}</span></span>
                 <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
-                <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct}\u00a0%)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
+                <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} {tr('stats.vsSemainePrecedente')}{pct!=null?` (${up?'+':''}${pct}\u00a0%)`:''} <span style={{color:C.muted,fontWeight:600}}>{trj('stats.vendus', { fmt: fmt(pc) })}</span></div>
               ); })()}
             </div>
-            <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{ecrireLocal('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
+            <button className="vrm-icon-control" aria-label={tr('stats.fermerBilanSemaine')} type="button" onClick={()=>{ecrireLocal('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -1108,14 +1108,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Récap {monthlyRecapData.nom}</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{trj('stats.recap', { nom: monthlyRecapData.nom })}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
-                <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
-                <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
+                <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>{trj('stats.ventes5', { n: monthlyRecapData.count })}</span></span>
+                <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>{tr('stats.vendu')}</span></span>
                 <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
             </div>
-            <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{ecrireLocal('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
+            <button className="vrm-icon-control" aria-label={tr('stats.fermerBilanMois')} type="button" onClick={()=>{ecrireLocal('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -1285,7 +1285,7 @@ function CarteStatsVitrine({ k, titre, droite, corps, attrs, cls }) {
     return (
       <section className={`vrm-sv-carte vrm-sv-repliee${cls ? ' ' + cls : ''}`} data-stats-carte={k} data-sv-repliee="" {...(attrs || {})}>
         <h2 className="vrm-sv-repliee-titre">{titre}</h2>
-        <span className="vrm-sv-repliee-raison" {...Object.fromEntries(Object.entries(corps.props).filter(([a]) => a.startsWith('data-') && a !== 'data-sv-vide-carte'))}>{raison === '…' ? 'Lecture en cours…' : raison}</span>
+        <span className="vrm-sv-repliee-raison" {...Object.fromEntries(Object.entries(corps.props).filter(([a]) => a.startsWith('data-') && a !== 'data-sv-vide-carte'))}>{raison === '…' ? tr('stats.lectureCours') : raison}</span>
       </section>
     );
   }
@@ -1324,10 +1324,10 @@ function AnnulationsEtNotes({ b, panelOff }) {
   // (5 nov., chantier F, revue 2.25) « Annulations » se dit UNE fois : le total d'en-tête
   // n'apparaît que s'il additionne PLUSIEURS comptes (avec un seul, il redisait la ligne).
   const annul = carte('sv-annulations', 'Annulations',
-    A.etat === 'lu' && A.n && A.comptes.length > 1 ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} sur {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
+    A.etat === 'lu' && A.n && A.comptes.length > 1 ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} {tr('journee.texte2')} {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
     A.etat === 'encours' ? vide('…', { 'data-sv-annul': 'encours' })
-      : A.etat !== 'lu' ? vide('Tes ventes Vinted n’ont pas pu être lues.', { 'data-sv-annul': 'passu' })
-        : !A.comptes.length ? vide('Aucune vente Vinted sur la période.', { 'data-sv-annul': 'lu' })
+      : A.etat !== 'lu' ? vide(tr('stats.ventesVintedOnt'), { 'data-sv-annul': 'passu' })
+        : !A.comptes.length ? vide(tr('stats.aucuneVenteVinted'), { 'data-sv-annul': 'lu' })
         : (<div className="vrm-sv-lignes" data-sv-annul="lu">
           {A.comptes.map((g) => (
             <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
@@ -1338,31 +1338,31 @@ function AnnulationsEtNotes({ b, panelOff }) {
               </summary>
               {g.liste.length ? g.liste.map((x) => (
                 <a key={x.id} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} href={x.lien || undefined} target="_blank" rel="noreferrer">
-                  <span className="vrm-sv-annul-titre">{x.titre || `Vente ${x.id}`}</span>
+                  <span className="vrm-sv-annul-titre">{x.titre || tr('stats.vente', { id: String(x.id) })}</span>
                   <span className="vrm-sv-chiffre">{jour(x.ts)}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
                   <span className="vrm-sv-annul-etat">{x.statut}</span>
                 </a>
-              )) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>Aucune annulation.</div>}
+              )) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>{tr('stats.aucuneAnnulation')}</div>}
             </details>
           ))}
           {(A.manquants.length > 0 || A.sansDate > 0) && <div className="vrm-sv-note" data-sv-annul-manque={A.manquants.join(',')} style={{ marginTop: 8 }}>
-            {A.manquants.length ? `${A.manquants.map(nomDe).join(', ')} : pas lu` : ''}{A.manquants.length && A.sansDate ? ' · ' : ''}{A.sansDate ? `${pl(A.sansDate, 'vente')} sans date` : ''}
+            {A.manquants.length ? tr('stats.lu', { x: String(A.manquants.map(nomDe).join(', ')) }) : ''}{A.manquants.length && A.sansDate ? ' · ' : ''}{A.sansDate ? `${pl(A.sansDate, 'vente')} sans date` : ''}
           </div>}
-          <div className="vrm-sv-note" data-sv-annul-non-couvertes={A.nonCouvertes.join(',')} style={{ marginTop: 4 }}>{A.nonCouvertes.join(', ')} : pas comptés</div>
+          <div className="vrm-sv-note" data-sv-annul-non-couvertes={A.nonCouvertes.join(',')} style={{ marginTop: 4 }}>{trj('stats.comptes', { x: A.nonCouvertes.join(', ') })}</div>
         </div>),
     { 'data-sv-carte': 'annulations', 'data-sv-etat': A.etat });
   // (5 nov., chantier F) Aucun compte lu : une ligne repliée, pas une liste de « pas lu — ».
   const aucuneNoteLue = N.etat !== 'encours' && N.etat !== 'passu' && Array.isArray(N.comptes) && !N.comptes.some((c) => c.etat === 'lu');
-  const notes = carte('sv-notes', 'Notes reçues',
-    N.etat === 'lu' && N.moyenne != null && N.comptes.length > 1 ? <span data-sv-notes-moyenne={N.moyenne} data-sv-notes-total={N.total}>{N.partiel ? 'au moins ' : ''}{pl(N.total, 'avis', 'avis')} · {note(N.moyenne)}/5</span> : null,
+  const notes = carte('sv-notes', tr('stats.notesRecues'),
+    N.etat === 'lu' && N.moyenne != null && N.comptes.length > 1 ? <span data-sv-notes-moyenne={N.moyenne} data-sv-notes-total={N.total}>{N.partiel ? tr('journee.moins3') : ''}{pl(N.total, 'avis', 'avis')} · {note(N.moyenne)}/5</span> : null,
     N.etat === 'encours' ? vide('…', { 'data-sv-notes': 'encours' })
-      : N.etat === 'passu' ? vide('Tes profils Vinted n’ont pas pu être lus.', { 'data-sv-notes': 'passu' })
-        : aucuneNoteLue ? vide('Pas encore lues : elles arrivent à ta prochaine visite sur Vinted.', { 'data-sv-notes': N.etat, 'data-sv-notes-aucune': '' })
+      : N.etat === 'passu' ? vide(tr('stats.profilsVintedOnt'), { 'data-sv-notes': 'passu' })
+        : aucuneNoteLue ? vide(tr('stats.encoreLuesElles'), { 'data-sv-notes': N.etat, 'data-sv-notes-aucune': '' })
         : (<div className="vrm-sv-lignes" data-sv-notes={N.etat}>
           {N.comptes.map((c) => (
             <div key={c.uid} className="vrm-sv-note-ligne" data-sv-notes-compte={c.uid} data-etat={c.etat} data-note={c.note == null ? '' : c.note} data-n={c.n == null ? '' : c.n} data-neg={c.neg == null ? '' : c.neg} data-vieux={c.vieux ? '1' : ''}>
               <span className="vrm-sv-nom" title={c.nom || undefined}>{c.nom}</span>
-              <span className="vrm-sv-chiffre vrm-sv-note-detail">{c.etat !== 'lu' ? 'pas lu' : <>{pl(c.n, 'avis', 'avis')}{c.neg > 0 ? ` · ${c.neg} négatif${c.neg > 1 ? 's' : ''}` : ''}{c.neu > 0 ? ` · ${c.neu} neutre${c.neu > 1 ? 's' : ''}` : ''}{c.vieux && c.at ? ` · lu le ${jour(c.at)}` : ''}</>}</span>
+              <span className="vrm-sv-chiffre vrm-sv-note-detail">{c.etat !== 'lu' ? tr('journee.lu') : <>{pl(c.n, 'avis', 'avis')}{c.neg > 0 ? tr('stats.negatifs', { n: String(c.neg) }) : ''}{c.neu > 0 ? tr('stats.neutres', { n: String(c.neu) }) : ''}{c.vieux && c.at ? tr('stats.lu2', { jour: String(jour(c.at)) }) : ''}</>}</span>
               <span className="vrm-display vrm-sv-note-val">{c.etat !== 'lu' ? '—' : note(c.note)}</span>
             </div>
           ))}
@@ -1435,27 +1435,27 @@ function ParCategorie({ vendu, lp, extras, stock, b }) {
   const maxN = Math.max(1, ...S.groupes.map((g) => g.n));
   return (
     <div ref={ref}>
-      <CarteStatsVitrine k="sv-categories" titre="Par catégorie" droite="ventes · vendu" attrs={{ 'data-sv-carte': 'categories', 'data-sv-etat': 'lu' }} corps={(
+      <CarteStatsVitrine k="sv-categories" titre={tr('stats.categorie')} droite="ventes · vendu" attrs={{ 'data-sv-carte': 'categories', 'data-sv-etat': 'lu' }} corps={(
         <div className="vrm-sv-lignes vrm-sv-cats" data-sv-etat="lu">
           {S.groupes.map((g) => (
             <div key={g.v} className="vrm-sv-ligne-cat" data-sv-cat={g.v} data-n={g.n} data-eur={Math.round(g.eur * 100)} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-couv={`${g.nCout}/${g.fin}`} data-mediane={g.mediane == null ? '' : g.mediane} data-stock={g.stock == null ? '' : g.stock}>
               <span className="vrm-sv-nom" title={g.titre || undefined}>{g.titre}</span>
               <span className="vrm-sv-piste"><span style={{ width: g.n ? `${Math.max(3, g.n / maxN * 100)}%` : 0 }}/></span>
-              <span className="vrm-sv-chiffre vrm-sv-cat-chiffre">{g.n ? `${pl(g.n, 'vente')} · ${fmt(g.eur)}` : 'aucune vente'}</span>
+              <span className="vrm-sv-chiffre vrm-sv-cat-chiffre">{g.n ? `${pl(g.n, 'vente')} · ${fmt(g.eur)}` : tr('stats.aucuneVente')}</span>
               <span className="vrm-sv-cat-detail">
-                {g.fin > 0 && <span data-benef-notion="brut" title={`${NOM_BENEFICE_BRUT} : ventes finalisées au prix d’achat connu`}>brut {g.brut == null ? '—' : fmt(g.brut)}{g.nCout < g.fin ? ` · ${pl(g.fin - g.nCout, 'sans prix d’achat', 'sans prix d’achat')}` : ''}</span>}
-                {g.mediane != null && <span title={`délai médian, sur ${pl(g.nDelai, 'vente datée', 'ventes datées')}`}>{jTxt(g.mediane)} pour vendre</span>}
-                {g.stock != null && <span>{g.stock} en ligne</span>}
+                {g.fin > 0 && <span data-benef-notion="brut" title={tr('stats.ventesFinaliseesPrix2', { NOM_BENEFICE_BRUT: String(NOM_BENEFICE_BRUT) })}>{tr('stats.brut')} {g.brut == null ? '—' : fmt(g.brut)}{g.nCout < g.fin ? ` · ${pl(g.fin - g.nCout, 'sans prix d’achat', 'sans prix d’achat')}` : ''}</span>}
+                {g.mediane != null && <span title={`délai médian, sur ${pl(g.nDelai, 'vente datée', 'ventes datées')}`}>{trj('stats.vendre', { jTxt: jTxt(g.mediane) })}</span>}
+                {g.stock != null && <span>{trj('stats.ligne', { stock: g.stock })}</span>}
               </span>
             </div>
           ))}
           {S.sans.n > 0 && (
             <div className="vrm-sv-cat-sans" data-sv-cat-sans={S.sans.n}>
-              <span>Sans catégorie ({S.sans.n}) · {fmt(S.sans.eur)}</span>
-              <Bouton variante="discret" data-sv-cat-poser="" onClick={() => setOuvert(true)}>Poser la catégorie</Bouton>
+              <span>{trj('stats.sansCategorie', { x: S.sans.n, fmt: fmt(S.sans.eur) })}</span>
+              <Bouton variante="discret" data-sv-cat-poser="" onClick={() => setOuvert(true)}>{tr('stats.poserCategorie')}</Bouton>
             </div>
           )}
-          {S.stockSans > 0 && <div className="vrm-sv-note" data-sv-cat-stock-sans={S.stockSans}>{pl(S.stockSans, 'annonce en ligne', 'annonces en ligne')} sans catégorie lue.</div>}
+          {S.stockSans > 0 && <div className="vrm-sv-note" data-sv-cat-stock-sans={S.stockSans}>{pl(S.stockSans, 'annonce en ligne', 'annonces en ligne')} {tr('stats.sansCategorieLue')}</div>}
         </div>
       )}/>
       {ouvert && <PoserCategories cles={S.sans.cles} titres={titres} vendu={vendu} main={main} onClose={() => setOuvert(false)}/>}
@@ -1479,12 +1479,12 @@ function PoserCategories({ cles, titres, vendu, main, onClose }) {
   };
   const date = (ts) => (ts ? new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '');
   return (
-    <SheetShell onClose={onClose} titre="Poser la catégorie" sousTitre="Coche des ventes, puis choisis." maxWidth={560} data-feuille-categories="">
+    <SheetShell onClose={onClose} titre={tr('stats.poserCategorie')} sousTitre={tr('stats.cocheVentesPuis')} maxWidth={560} data-feuille-categories="">
       <div className="vrm-cat-feuille">
         {restent.length === 0
-          ? <p className="vrm-cat-fini" data-cat-fini={fait}>Tout est rangé.</p>
+          ? <p className="vrm-cat-fini" data-cat-fini={fait}>{tr('stats.toutRange')}</p>
           : <>
-            {restent.length > 1 && <label className="vrm-cat-ligne vrm-cat-tout"><input type="checkbox" checked={tous} onChange={() => setCoche(tous ? new Set() : new Set(restent))}/> <span>Tout cocher ({restent.length})</span></label>}
+            {restent.length > 1 && <label className="vrm-cat-ligne vrm-cat-tout"><input type="checkbox" checked={tous} onChange={() => setCoche(tous ? new Set() : new Set(restent))}/> <span>{trj('stats.toutCocher', { restentN: restent.length })}</span></label>}
             <div className="vrm-cat-liste">
               {restent.map((k) => { const l = parCle[k] || {}; return (
                 <label key={k} className="vrm-cat-ligne" data-cat-vente={k}>
@@ -1494,7 +1494,7 @@ function PoserCategories({ cles, titres, vendu, main, onClose }) {
                 </label>); })}
             </div>
             <div className="vrm-cat-choix" data-cat-cochees={coche.size}>
-              <span className="vrm-cat-choix-lib">{coche.size ? `Ranger ${coche.size} dans :` : 'Coche au moins une vente.'}</span>
+              <span className="vrm-cat-choix-lib">{coche.size ? tr('stats.rangerDans', { size: String(coche.size) }) : tr('stats.cocheMoinsVente')}</span>
               <div className="vrm-cat-puces">
                 {FAMILLES_STATS.map((f) => <Bouton key={f.v} variante="discret" data-cat-choix={f.v} disabled={!coche.size} onClick={() => ranger(f.v)}>{f.titre}</Bouton>)}
               </div>
@@ -1526,9 +1526,9 @@ function GraphiqueVenduRecu({ VR, lib, titre }) {
   return (
     <div className="vrm-sp-vr" data-sp-vr={VR.barres.map((x) => `${x.vendu == null ? '' : Math.round(x.vendu * 100)}:${x.recu == null ? '' : Math.round(x.recu * 100)}`).join(',')}>
       <div className="vrm-sp-vr-lu" aria-live="polite" data-sp-vr-choisi={i0}>
-        <span className="vrm-sp-vr-quand">{x0 ? lib(x0) : ''}{x0 && x0.enCours ? ' (en cours)' : ''}</span>
-        <span className="vrm-sp-cle vrm-sp-cle-vendu">Vendu <b>{x0 && !x0.avenir ? val(x0.vendu, false) : '—'}</b></span>
-        <span className="vrm-sp-cle vrm-sp-cle-recu">Reçu <b>{x0 && !x0.avenir ? val(x0.recu, x0.recuPartiel) : '—'}</b></span>
+        <span className="vrm-sp-vr-quand">{x0 ? lib(x0) : ''}{x0 && x0.enCours ? tr('stats.cours3') : ''}</span>
+        <span className="vrm-sp-cle vrm-sp-cle-vendu">{tr('stats.vendu2')} <b>{x0 && !x0.avenir ? val(x0.vendu, false) : '—'}</b></span>
+        <span className="vrm-sp-cle vrm-sp-cle-recu">{tr('stats.recu')} <b>{x0 && !x0.avenir ? val(x0.recu, x0.recuPartiel) : '—'}</b></span>
       </div>
       <div className="vrm-sp-vr-barres" role="group" aria-label={titre}>
         {VR.barres.map((x, i) => {
@@ -1603,12 +1603,12 @@ function MesRecords({ vendu, releve, partiel, onGo }) {
       sous = x.titre || 'Sans titre';
       corps = (
         <dl className="vrm-sp-rec-detail" data-sp-record-detail={ouvert}>
-          <div><dt>Vendue le</dt><dd>{dateSP(x.ts)}</dd></div>
-          <div><dt>Où</dt><dd>{x.plateforme === 'Vinted' && x.compte ? `Vinted · ${x.compte}` : x.plateforme}</dd></div>
-          <div><dt>Prix de vente</dt><dd>{fmt(x.eur)}</dd></div>
-          {ouvert === 'vente' ? <><div><dt>Prix d’achat</dt><dd>{fmt(x.achat)}</dd></div><div><dt>{NOM_BENEFICE_BRUT}</dt><dd>{fmt(x.brut)}</dd></div></>
-            : <><div><dt>Mise en ligne</dt><dd>{dateSP(x.enLigne)}</dd></div><div><dt>Partie en</dt><dd>{delaiSP(x)}</dd></div></>}
-          {x.id ? <div><dt>N° de transaction</dt><dd>{String(x.id).replace(/^(lbc|ebay):/, '')}</dd></div> : null}
+          <div><dt>{tr('stats.vendue')}</dt><dd>{dateSP(x.ts)}</dd></div>
+          <div><dt>{tr('stats.texte')}</dt><dd>{x.plateforme === 'Vinted' && x.compte ? `Vinted · ${x.compte}` : x.plateforme}</dd></div>
+          <div><dt>{tr('ventes.prixVente')}</dt><dd>{fmt(x.eur)}</dd></div>
+          {ouvert === 'vente' ? <><div><dt>{tr('ventes.prixAchat')}</dt><dd>{fmt(x.achat)}</dd></div><div><dt>{NOM_BENEFICE_BRUT}</dt><dd>{fmt(x.brut)}</dd></div></>
+            : <><div><dt>{tr('stats.miseLigne')}</dt><dd>{dateSP(x.enLigne)}</dd></div><div><dt>{tr('stats.partie')}</dt><dd>{delaiSP(x)}</dd></div></>}
+          {x.id ? <div><dt>{tr('achats.transaction')}</dt><dd>{String(x.id).replace(/^(lbc|ebay):/, '')}</dd></div> : null}
         </dl>
       );
     }
@@ -1616,7 +1616,7 @@ function MesRecords({ vendu, releve, partiel, onGo }) {
       <SheetShell titre={titre} sousTitre={sous} onClose={fermer} z={20000} maxWidth={560} className="vrm-sp-rec-feuille" data-noswipe="" data-sp-record-feuille={ouvert}>
         <div className="vrm-sp-rec-feuille-corps">
           {corps}
-          {onGo ? <button type="button" className="vrm-lien-action vrm-sp-rec-aller" data-sp-record-aller="" onClick={() => { fermer(); onGo('cat_ventes'); }}>Voir mes ventes <span aria-hidden="true">›</span></button> : null}
+          {onGo ? <button type="button" className="vrm-lien-action vrm-sp-rec-aller" data-sp-record-aller="" onClick={() => { fermer(); onGo('cat_ventes'); }}>{tr('stats.voirMesVentes')} <span aria-hidden="true">›</span></button> : null}
         </div>
       </SheetShell>
     );
@@ -1624,10 +1624,10 @@ function MesRecords({ vendu, releve, partiel, onGo }) {
   return (
     <>
       <div className="vrm-sp-records" data-sp-records="">
-        {ligne('mois', 'Meilleur mois', M, M && !M.pasAssez ? fmt(M.eur) : '', M && !M.pasAssez ? `${nomMoisSP(M.k)} · ${plSP(M.n, 'vente')}${lu}` : M ? `pas assez de données (${plSP(M.nGroupes, 'mois', 'mois')} de ventes)` : '', M && !M.pasAssez ? { 'data-sp-record-k': M.k, 'data-sp-record-v': String(Math.round(M.eur * 100)) } : {})}
-        {ligne('semaine', 'Meilleure semaine', S, S && !S.pasAssez ? fmt(S.eur) : '', S && !S.pasAssez ? `du ${new Date(S.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} · ${plSP(S.n, 'vente')}${lu}` : S ? 'pas assez de données' : '', S && !S.pasAssez ? { 'data-sp-record-v': String(Math.round(S.eur * 100)) } : {})}
-        {ligne('vente', 'Meilleure vente', V, V && !V.pasAssez ? `+${fmt(V.brut)}` : '', V && !V.pasAssez ? `parmi les ventes au prix d’achat connu (${V.nCout} sur ${V.n}) · ${V.titre || 'Sans titre'}` : V ? `pas assez de données · prix d’achat connu ${V.nCout} sur ${V.n}` : '', V && !V.pasAssez ? { 'data-sp-record-v': String(Math.round(V.brut * 100)), 'data-sp-record-couv': `${V.nCout}/${V.n}` } : {})}
-        {ligne('rapide', 'Vente la plus rapide', Q, Q && !Q.pasAssez ? delaiSP(Q) : '', Q && !Q.pasAssez ? `parmi ${plSP(Q.nDelai, 'vente Vinted datée', 'ventes Vinted datées')} · ${Q.titre || 'Sans titre'}` : Q ? 'pas assez de ventes Vinted à la date de mise en ligne connue' : '', Q && !Q.pasAssez ? { 'data-sp-record-h': String(Q.heures) } : {})}
+        {ligne('mois', tr('stats.meilleurMois2'), M, M && !M.pasAssez ? fmt(M.eur) : '', M && !M.pasAssez ? `${nomMoisSP(M.k)} · ${plSP(M.n, 'vente')}${lu}` : M ? `pas assez de données (${plSP(M.nGroupes, 'mois', 'mois')} de ventes)` : '', M && !M.pasAssez ? { 'data-sp-record-k': M.k, 'data-sp-record-v': String(Math.round(M.eur * 100)) } : {})}
+        {ligne('semaine', tr('stats.meilleureSemaine'), S, S && !S.pasAssez ? fmt(S.eur) : '', S && !S.pasAssez ? `du ${new Date(S.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} · ${plSP(S.n, 'vente')}${lu}` : S ? 'pas assez de données' : '', S && !S.pasAssez ? { 'data-sp-record-v': String(Math.round(S.eur * 100)) } : {})}
+        {ligne('vente', tr('stats.meilleureVente'), V, V && !V.pasAssez ? `+${fmt(V.brut)}` : '', V && !V.pasAssez ? `parmi les ventes au prix d’achat connu (${V.nCout} sur ${V.n}) · ${V.titre || 'Sans titre'}` : V ? `pas assez de données · prix d’achat connu ${V.nCout} sur ${V.n}` : '', V && !V.pasAssez ? { 'data-sp-record-v': String(Math.round(V.brut * 100)), 'data-sp-record-couv': `${V.nCout}/${V.n}` } : {})}
+        {ligne('rapide', tr('stats.ventePlusRapide'), Q, Q && !Q.pasAssez ? delaiSP(Q) : '', Q && !Q.pasAssez ? `parmi ${plSP(Q.nDelai, 'vente Vinted datée', 'ventes Vinted datées')} · ${Q.titre || 'Sans titre'}` : Q ? 'pas assez de ventes Vinted à la date de mise en ligne connue' : '', Q && !Q.pasAssez ? { 'data-sp-record-h': String(Q.heures) } : {})}
       </div>
       {feuille()}
     </>
@@ -1654,7 +1654,7 @@ function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
   const choisir = (i, k) => { const n = [a, b]; n[i] = k; if (n[0] === n[1]) n[1 - i] = cles.find((x) => x !== k); setChoix(n); };
   const sel = (i, v) => (
     <label className="vrm-sp-cmp-choix">
-      <span className="vrm-sr-seul">{i === 0 ? 'Premier compte' : 'Second compte'}</span>
+      <span className="vrm-sr-seul">{i === 0 ? tr('stats.premierCompte') : tr('stats.secondCompte')}</span>
       <select value={v} data-sp-cmp-choix={i} onChange={(e) => choisir(i, e.target.value)}>
         {comptes.map((c) => <option key={c.k} value={c.k}>{nom(c)}</option>)}
       </select>
@@ -1672,9 +1672,9 @@ function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
   ];
   return (
     <div className="vrm-sp-cmp" data-sv-etat="lu" data-sp-cmp={`${a}~${b}`}>
-      <div className="vrm-sp-cmp-tete">{sel(0, a)}<span className="vrm-sp-cmp-vs" aria-hidden="true">et</span>{sel(1, b)}</div>
+      <div className="vrm-sp-cmp-tete">{sel(0, a)}<span className="vrm-sp-cmp-vs" aria-hidden="true">{tr('achats.texte2')}</span>{sel(1, b)}</div>
       <table className="vrm-sp-cmp-table">
-        <thead><tr><th scope="col"><span className="vrm-sr-seul">Chiffre</span></th><th scope="col">{A.nom}</th><th scope="col">{B.nom}</th></tr></thead>
+        <thead><tr><th scope="col"><span className="vrm-sr-seul">{tr('stats.chiffre')}</span></th><th scope="col">{A.nom}</th><th scope="col">{B.nom}</th></tr></thead>
         <tbody>
           {L.map(([k, lib, f]) => (
             <tr key={k} data-sp-cmp-ligne={k}>
@@ -1685,7 +1685,7 @@ function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
           ))}
         </tbody>
       </table>
-      <p className="vrm-sv-note">Sur la période, comptes sélectionnés&nbsp;· seuls les comptes avec au moins une vente&nbsp;· bénéfice : ventes finalisées au prix d’achat connu&nbsp;· temps pour vendre : médiane, Vinted seulement&nbsp;· taux : vendues ÷ (vendues + en ligne aujourd’hui), Vinted seulement&nbsp;· panier : à partir de {MIN_DONNEES} ventes.</p>
+      <p className="vrm-sv-note">{trj('stats.periodeComptesSelectionnes2', { MIN_DONNEES: MIN_DONNEES })}</p>
     </div>
   );
 }
@@ -1712,48 +1712,48 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     : R === null ? tuile('sp-ventes', 'Ventes', '—', 'ventes pas pu être lues', { 'data-sv-etat': 'passu' })
       : tuile('sp-ventes', 'Ventes', `${R.partiel ? 'au moins ' : ''}${R.n}`, R.ecartN != null && !R.partiel ? ecartTxt(R.ecartN, nomPrec) : R.nPrec != null ? `${nomPrec} : ${R.nPrec}` : '',
         { 'data-sv-etat': 'lu', 'data-sp-n': R.n, 'data-sp-ecart-n': R.ecartN == null ? '' : R.ecartN, 'data-sv-partiel': R.partiel ? '1' : '0' }, `Comparé à ${nomPrec}${memePoint}.`);
-  const tPanier = R === undefined ? tuile('sp-panier', 'Panier moyen', '—', 'je lis tes ventes…', { 'data-sv-etat': 'encours' })
-    : R === null ? tuile('sp-panier', 'Panier moyen', '—', 'ventes pas pu être lues', { 'data-sv-etat': 'passu' })
-      : R.partiel ? tuile('sp-panier', 'Panier moyen', '—', 'des ventes au montant pas lu : pas de moyenne', { 'data-sv-etat': 'partiel', 'data-sp-panier': '' })
-        : R.panier == null ? tuile('sp-panier', 'Panier moyen', '—', R.n === 0 ? 'aucune vente sur la période' : `pas assez de données (${plSP(R.n, 'vente')}, il en faut ${MIN_DONNEES})`, { 'data-sv-etat': 'pas-assez', 'data-sp-panier': '' })
-          : tuile('sp-panier', 'Panier moyen', fmt(R.panier), R.ecartPanier != null ? ecartTxt(R.ecartPanier, nomPrec) : `sur ${plSP(R.n, 'vente')}`,
-            { 'data-sv-etat': 'lu', 'data-sp-panier': String(Math.round(R.panier * 100)), 'data-sp-ecart-panier': R.ecartPanier == null ? '' : R.ecartPanier }, 'Le vendu de la période divisé par le nombre de ventes (la tuile « Vendu »).');
-  const tMarge = M === undefined || lp === undefined ? tuile('sp-marge', 'Marge connue', '—', 'je lis tes ventes…', { 'data-sv-etat': 'encours' })
-    : !M ? tuile('sp-marge', 'Marge connue', '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
-      : M.marge == null ? tuile('sp-marge', 'Marge connue', '—', M.n === 0 ? 'aucune vente finalisée' : `pas assez de données · prix d’achat connu ${M.nCout} sur ${M.n}`, { 'data-sv-etat': 'pas-assez', 'data-sp-marge': '', 'data-sp-couv': `${M.nCout}/${M.n}` })
-        : tuile('sp-marge', 'Marge connue', pct(M.marge), <>{fmt(M.moyen)} par vente{M.nCout < M.n ? ` · ${M.nCout} ventes sur ${M.n}` : ''}</>,
+  const tPanier = R === undefined ? tuile('sp-panier', tr('stats.panierMoyen'), '—', 'je lis tes ventes…', { 'data-sv-etat': 'encours' })
+    : R === null ? tuile('sp-panier', tr('stats.panierMoyen'), '—', 'ventes pas pu être lues', { 'data-sv-etat': 'passu' })
+      : R.partiel ? tuile('sp-panier', tr('stats.panierMoyen'), '—', 'des ventes au montant pas lu : pas de moyenne', { 'data-sv-etat': 'partiel', 'data-sp-panier': '' })
+        : R.panier == null ? tuile('sp-panier', tr('stats.panierMoyen'), '—', R.n === 0 ? 'aucune vente sur la période' : `pas assez de données (${plSP(R.n, 'vente')}, il en faut ${MIN_DONNEES})`, { 'data-sv-etat': 'pas-assez', 'data-sp-panier': '' })
+          : tuile('sp-panier', tr('stats.panierMoyen'), fmt(R.panier), R.ecartPanier != null ? ecartTxt(R.ecartPanier, nomPrec) : `sur ${plSP(R.n, 'vente')}`,
+            { 'data-sv-etat': 'lu', 'data-sp-panier': String(Math.round(R.panier * 100)), 'data-sp-ecart-panier': R.ecartPanier == null ? '' : R.ecartPanier }, tr('stats.venduPeriodeDivise'));
+  const tMarge = M === undefined || lp === undefined ? tuile('sp-marge', tr('stats.margeConnue'), '—', 'je lis tes ventes…', { 'data-sv-etat': 'encours' })
+    : !M ? tuile('sp-marge', tr('stats.margeConnue'), '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
+      : M.marge == null ? tuile('sp-marge', tr('stats.margeConnue'), '—', M.n === 0 ? 'aucune vente finalisée' : `pas assez de données · prix d’achat connu ${M.nCout} sur ${M.n}`, { 'data-sv-etat': 'pas-assez', 'data-sp-marge': '', 'data-sp-couv': `${M.nCout}/${M.n}` })
+        : tuile('sp-marge', tr('stats.margeConnue'), pct(M.marge), <>{fmt(M.moyen)} {tr('stats.vente2')}{M.nCout < M.n ? tr('stats.ventes4', { nCout: String(M.nCout), x: String(M.n) }) : ''}</>,
           { 'data-sv-etat': 'lu', 'data-sp-marge': String(M.marge), 'data-sp-moyen': String(Math.round(M.moyen * 100)), 'data-sp-couv': `${M.nCout}/${M.n}`, 'data-benef-notion': 'brut' },
           `${NOM_BENEFICE_BRUT} ÷ ventes, seulement les ventes finalisées au prix d’achat connu (sans frais, dépenses ni URSSAF).`);
   // ── Vendu et reçu ──
   const corpsVR = VR === undefined || VR == null ? vide(VR === null ? 'Tes ventes n’ont pas pu être lues.' : 'Je lis tes ventes…', { 'data-sv-etat': VR === null ? 'passu' : 'encours' })
     : (<>
-      <GraphiqueVenduRecu VR={VR} lib={lib} titre={`Vendu et reçu, ${noteBarres}`}/>
+      <GraphiqueVenduRecu VR={VR} lib={lib} titre={tr('stats.venduRecu', { noteBarres: String(noteBarres) })}/>
       <div className="vrm-sv-note" data-sp-vr-note={VR.raison || ''}>
-        Vendu : à la date de la vente · Reçu : au jour du versement (ce que tu déclares){!VR.recuLu ? ` · ${RAISON_RECU[VR.raison] || 'reçu pas lu'}` : !VR.recuComplet ? ' · reçu pas tout lu : un minimum' : ''}{aDater > 0 ? ` · ${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''}
+        {tr('stats.venduDateVente')}{!VR.recuLu ? ` · ${RAISON_RECU[VR.raison] || 'reçu pas lu'}` : !VR.recuComplet ? tr('stats.recuToutLu') : ''}{aDater > 0 ? ` · ${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''}
       </div>
     </>);
   // ── Les 10 meilleures ventes ──
-  const corpsTop = T === undefined ? vide('Je lis tes ventes…', { 'data-sv-etat': 'encours' })
-    : T === null ? vide('Pas encore calculé : ouvre l’écran Ventes une fois.', { 'data-sv-etat': 'passu' })
-      : T.n === 0 ? vide('Aucune vente finalisée sur la période.', { 'data-sv-etat': 'lu' })
+  const corpsTop = T === undefined ? vide(tr('stats.jeLisVentes'), { 'data-sv-etat': 'encours' })
+    : T === null ? vide(tr('stats.encoreCalculeOuvre'), { 'data-sv-etat': 'passu' })
+      : T.n === 0 ? vide(tr('stats.aucuneVenteFinalisee'), { 'data-sv-etat': 'lu' })
         : T.nCout === 0 ? vide(`Il manque le prix d’achat de tes ${plSP(T.n, 'vente finalisée', 'ventes finalisées')} : rien à classer.`, { 'data-sv-etat': 'lu', 'data-sp-top-couv': `0/${T.n}` })
           : (
             <ol className="vrm-sp-top" data-sv-etat="lu" data-sp-top={T.lignes.map((l) => Math.round(l.brut * 100)).join(',')} data-sp-top-couv={`${T.nCout}/${T.n}`}>
               {T.lignes.map((l, i) => (
                 <li key={`${l.id}-${i}`} className="vrm-sp-top-ligne" data-sp-top-brut={Math.round(l.brut * 100)}>
                   <span className="vrm-sp-top-rang" aria-hidden="true">{i + 1}</span>
-                  <span className="vrm-sp-top-nom"><span>{l.titre || 'Sans titre'}</span><small>{new Date(l.ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · {l.plateforme === 'Vinted' && l.compte ? l.compte : l.plateforme} · vendu {fmt(l.eur)}, acheté {fmt(l.achat)}</small></span>
+                  <span className="vrm-sp-top-nom"><span>{l.titre || tr('annonces.sansTitre')}</span><small>{new Date(l.ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · {l.plateforme === 'Vinted' && l.compte ? l.compte : l.plateforme} {tr('stats.vendu3')} {fmt(l.eur)}{tr('stats.achete')} {fmt(l.achat)}</small></span>
                   <span className="vrm-sv-chiffre vrm-sp-top-brut">{l.brut >= 0 ? '+' : '−'}{fmt(Math.abs(l.brut))}</span>
                 </li>
               ))}
-              {T.nCout < T.n || T.pasAssez ? <li className="vrm-sv-note vrm-sp-top-note">{T.pasAssez ? 'Peu de ventes classées : ' : ''}classées sur {T.nCout} ventes au prix d’achat connu (sur {T.n}).</li> : null}
+              {T.nCout < T.n || T.pasAssez ? <li className="vrm-sv-note vrm-sp-top-note">{T.pasAssez ? tr('stats.peuVentesClassees') : ''}{tr('stats.classees')} {T.nCout} {tr('stats.ventesPrixAchat')} {T.n}).</li> : null}
             </ol>
           );
   // ── L'âge du stock (aujourd'hui, quelle que soit la période) ──
   const maxA = A && A.tranches ? Math.max(1, ...A.tranches.map((t) => t.n)) : 1;
-  const corpsAge = A === undefined ? vide('Ouvre l’écran Annonces une fois : il compte l’âge de tes annonces.', { 'data-sv-etat': 'passu' })
-    : A === null ? vide('L’âge de tes annonces n’a pas pu être lu.', { 'data-sv-etat': 'passu' })
-      : A.total === 0 ? vide('Aucune annonce en ligne.', { 'data-sv-etat': 'lu' })
+  const corpsAge = A === undefined ? vide(tr('stats.ouvreEcranAnnonces'), { 'data-sv-etat': 'passu' })
+    : A === null ? vide(tr('stats.ageAnnoncesPu'), { 'data-sv-etat': 'passu' })
+      : A.total === 0 ? vide(tr('stats.aucuneAnnonceLigne'), { 'data-sv-etat': 'lu' })
         : (
           <div className="vrm-sv-lignes" data-sv-etat="lu" data-sp-age={A.tranches.map((t) => t.n).join(',')} data-sp-age-sans={A.sansDate}>
             {A.tranches.map((t) => (
@@ -1763,23 +1763,23 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
                 <span className="vrm-sv-chiffre">{plSP(t.n, 'annonce')}</span>
               </div>
             ))}
-            {A.sansDate > 0 ? <div className="vrm-sv-note">{plSP(A.sansDate, 'annonce')} sans date de mise en ligne : pas rangée{A.sansDate > 1 ? 's' : ''}.</div> : null}
+            {A.sansDate > 0 ? <div className="vrm-sv-note">{plSP(A.sansDate, 'annonce')} {tr('stats.sansDateMise')}{A.sansDate > 1 ? 's' : ''}.</div> : null}
           </div>
         );
   return (
     <>
       <div className="vrm-sv-tuiles vrm-sp-tuiles" data-sp-en-bref="">{tVentes}{tPanier}{tMarge}</div>
-      <RepliStats id="plus" titre="Plus de chiffres" ouvertDefaut>
+      <RepliStats id="plus" titre={tr('stats.plusChiffres')} ouvertDefaut>
         <div className="vrm-sp-corps">
           <div className="vrm-sv-rangee vrm-sv-rangee-2">
-            {carte('sp-vr', 'Vendu et reçu', `${titreBarres.replace('Vendu par ', 'par ')} · ${noteBarres}`, corpsVR, { 'data-sv-carte': 'vendu-recu' }, 'vrm-sv-large')}
-            {carte('sp-age', 'L’âge de ton stock', A && A.total ? `aujourd’hui · ${plSP(A.datesConnues, 'annonce datée', 'annonces datées')}` : 'aujourd’hui', corpsAge, { 'data-sv-carte': 'age-stock' })}
+            {carte('sp-vr', tr('stats.venduRecu2'), `${titreBarres.replace('Vendu par ', 'par ')} · ${noteBarres}`, corpsVR, { 'data-sv-carte': 'vendu-recu' }, 'vrm-sv-large')}
+            {carte('sp-age', tr('stats.ageStock'), A && A.total ? `aujourd’hui · ${plSP(A.datesConnues, 'annonce datée', 'annonces datées')}` : 'aujourd’hui', corpsAge, { 'data-sv-carte': 'age-stock' })}
           </div>
-          {carte('sp-records', 'Mes records', 'depuis le début', <MesRecords vendu={venduTout} releve={releveTout} partiel={partielTout} onGo={onGo}/>, { 'data-sv-carte': 'records' })}
+          {carte('sp-records', tr('stats.mesRecords'), 'depuis le début', <MesRecords vendu={venduTout} releve={releveTout} partiel={partielTout} onGo={onGo}/>, { 'data-sv-carte': 'records' })}
           {Array.isArray(comptes) && comptes.length >= 2
-            ? carte('sp-comptes', 'Comparer deux comptes', null, <ComparerComptes comptes={comptes} brutComptes={brutComptes} enLigneDe={enLigneDe}/>, { 'data-sv-carte': 'comparer-comptes' })
-            : carte('sp-comptes', 'Comparer deux comptes', null, vide(comptes === null ? 'Tes ventes n’ont pas pu être lues.' : comptes === undefined ? 'Je lis tes ventes…' : 'Il faut deux comptes avec au moins une vente sur la période.', { 'data-sv-etat': comptes == null ? 'passu' : 'pas-assez' }), { 'data-sv-carte': 'comparer-comptes' })}
-          {carte('sp-top', 'Tes 10 meilleures ventes', T && T.nCout ? `bénéfice brut · ${T.nCout} sur ${T.n}` : null, corpsTop, { 'data-sv-carte': 'meilleures' })}
+            ? carte('sp-comptes', tr('stats.comparerDeuxComptes'), null, <ComparerComptes comptes={comptes} brutComptes={brutComptes} enLigneDe={enLigneDe}/>, { 'data-sv-carte': 'comparer-comptes' })
+            : carte('sp-comptes', tr('stats.comparerDeuxComptes'), null, vide(comptes === null ? 'Tes ventes n’ont pas pu être lues.' : comptes === undefined ? 'Je lis tes ventes…' : 'Il faut deux comptes avec au moins une vente sur la période.', { 'data-sv-etat': comptes == null ? 'passu' : 'pas-assez' }), { 'data-sv-carte': 'comparer-comptes' })}
+          {carte('sp-top', tr('stats.10MeilleuresVentes'), T && T.nCout ? `bénéfice brut · ${T.nCout} sur ${T.n}` : null, corpsTop, { 'data-sv-carte': 'meilleures' })}
         </div>
       </RepliStats>
     </>
@@ -1919,22 +1919,22 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   const tVendu = V == null
     ? tuile('vendu', 'Vendu', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
     : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
-      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart}\u00a0% par rapport à ${nomPrec}`}</span> : null}{manque.length ? ` · sans ${manque.join(', ')}` : ''}{ncPeriode.length ? ` · ${ncPeriode.length} non comptée${ncPeriode.length > 1 ? 's' : ''}` : ''}</>,
+      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{tr('stats.rapport', { x: String(V.ecart > 0 ? '+' : ''), ecart: String(V.ecart), nomPrec: String(nomPrec) })}</span> : null}{manque.length ? tr('stats.sans', { x: String(manque.join(', ')) }) : ''}{ncPeriode.length ? tr('stats.nonComptees', { n: String(ncPeriode.length) }) : ''}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0', 'data-sv-non-comptees': ncPeriode.length || undefined }, ncPeriode.length ? `Pas dans ce montant : ${phraseNonComptees(ncPeriode)}` : undefined);
   // (7 nov., demande de Julien) LE CA DEPUIS LE DÉBUT : la MÊME source que « Vendu »
   // (`ventesFaites`, date de vente, toutes plateformes, comptes sélectionnés), sans borne
   // de date. Un site pas lu ou une vente dont l'argent ne se lit pas ⇒ « au moins » (§5) ;
   // pas lu ⇒ « — ». La date de la première vente lue dit d'où part le total.
   const tTotal = (() => {
-    if (vendu == null) return tuile('total', 'CA depuis le début', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' });
+    if (vendu == null) return tuile('total', tr('stats.caDepuisDebut'), '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' });
     let n = 0, c = 0, premier = null;
     for (const l of vendu) { if (!l || !isFinite(l.ts) || !(l.ts > 0) || !isFinite(Number(l.eur))) continue; n += 1; c += Math.round(Number(l.eur) * 100); if (premier == null || l.ts < premier) premier = l.ts; }
     const ncTout = nonCompteesDe(liveStats && liveStats.venduNonComptees, 0, Infinity);
     const partiel = manque.length > 0 || ncTout.length > 0;
     const depuis = premier != null ? ` · depuis le ${new Date(premier).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : '';
-    return tuile('total', 'CA depuis le début', n === 0 && !partiel ? '0,00 €' : `${partiel ? 'au moins ' : ''}${fmt(c / 100)}`, n === 0 ? 'aucune vente lue pour l’instant' : <>{pl(n, 'vente')}{depuis}</>,
+    return tuile('total', tr('stats.caDepuisDebut'), n === 0 && !partiel ? '0,00 €' : `${partiel ? 'au moins ' : ''}${fmt(c / 100)}`, n === 0 ? 'aucune vente lue pour l’instant' : <>{pl(n, 'vente')}{depuis}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': n, 'data-sv-eur': String(c), 'data-sv-partiel': partiel ? '1' : '0' },
-      'Toutes tes ventes, toutes plateformes, à la date de la vente (comme « Vendu »), depuis la première que VRM a lue.');
+      tr('stats.toutesVentesToutes'));
   })();
   const tBenef = (() => {
     if (b.type === 'semaine') {
@@ -1946,7 +1946,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
         : `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`;
       return tuile('benefice', NOM_BENEFICE_BRUT, R.valeur == null ? '—' : fmt(R.valeur), sous,
         { 'data-sv-etat': B ? 'lu' : 'passu', 'data-sv-n': B ? B.n : undefined, 'data-sv-ncout': B ? B.nCout : undefined, 'data-sv-brut': R.valeur == null ? '' : cents(R.valeur), ...R.attrs },
-        'Bénéfice brut : vente − prix d’achat, ventes finalisées de la semaine, sur les seules ventes au prix d’achat connu. Dépenses et URSSAF se comptent au mois.');
+        tr('stats.beneficeBrutVente'));
     }
     const CB = chiffreBenefice(BP, etatBP);
     const manquent = BP ? BP.n - BP.nCout : 0;
@@ -1962,18 +1962,18 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       `Bénéfice : tes ventes finalisées moins le prix d’achat des ${motsVendeur().noms}, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.`);
   })();
   const tDelai = !releve
-    ? tuile('delai', 'Temps pour vendre', '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
-    : extras === undefined ? tuile('delai', 'Temps pour vendre', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
-      : datesPasSu ? tuile('delai', 'Temps pour vendre', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
-        : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Temps pour vendre', '—', Dl && Dl.n ? (Dl.n === 1 ? 'ta vente Vinted n’a pas de date de mise en ligne' : `aucune de tes ${Dl.n} ventes Vinted n’a de date de mise en ligne`) : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
-          : tuile('delai', 'Temps pour vendre', joursLong(Dl.mediane), `la moitié de tes articles partent plus vite${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai} ventes datées sur ${Dl.n}` : ''}`,
-            { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, 'Vinted seulement : Leboncoin et eBay ne donnent pas la date de mise en ligne.');
+    ? tuile('delai', tr('stats.tempsVendre'), '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
+    : extras === undefined ? tuile('delai', tr('stats.tempsVendre'), '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
+      : datesPasSu ? tuile('delai', tr('stats.tempsVendre'), '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
+        : !Dl || Dl.nDelai === 0 ? tuile('delai', tr('stats.tempsVendre'), '—', Dl && Dl.n ? (Dl.n === 1 ? 'ta vente Vinted n’a pas de date de mise en ligne' : `aucune de tes ${Dl.n} ventes Vinted n’a de date de mise en ligne`) : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
+          : tuile('delai', tr('stats.tempsVendre'), joursLong(Dl.mediane), `la moitié de tes articles partent plus vite${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai} ventes datées sur ${Dl.n}` : ''}`,
+            { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, tr('stats.vintedSeulementLeboncoin'));
   const enLigneTxt = texteEnLigne(liveStats);
   const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
-  const tEnLigne = tuile('enligne', 'En ligne',
-    <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> annonce{enLigneTxt === '1' ? '' : 's'}</>}</span>,
+  const tEnLigne = tuile('enligne', tr('stock.ligne'),
+    <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> {tr('annonces.annonce')}{enLigneTxt === '1' ? '' : 's'}</>}</span>,
     dort == null ? 'aujourd’hui' : dort === 0 ? 'aucune depuis 30 jours ou plus' : `dont ${dort} depuis 30 jours ou plus`,
-    { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, 'Aujourd’hui, quelle que soit la période choisie.');
+    { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, tr('stats.aujourdHuiQuelle'));
 
   // ── Les barres ──
   const maxB = barres ? Math.max(1, ...barres.map((x) => x.eur)) : 1;
@@ -1992,7 +1992,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
 
   return (
     <div className="vrm-stats-vitrine" data-sv-periode={b.type} data-sv-de={b.de} data-sv-a={b.a}>
-      <div className="vrm-sv-sous-titre" data-sv-sous-titre="">{titrePeriodeStats(b)}{auMemePoint ? <span className="vrm-sv-note"> · au même jour</span> : null}</div>
+      <div className="vrm-sv-sous-titre" data-sv-sous-titre="">{titrePeriodeStats(b)}{auMemePoint ? <span className="vrm-sv-note"> {tr('stats.memeJour')}</span> : null}</div>
       <div className="vrm-sv-tuiles">{tVendu}{tBenef}{tDelai}{tEnLigne}{tTotal}</div>
       {/* (11 nov., lot stats-plus) En bref (ventes, panier moyen, marge connue), puis « Plus de chiffres ». */}
       <StatsPlus b={b} V={vendu === undefined ? undefined : V} partielVendu={partielVendu} lp={lignes === null ? null : lp} stock={stockPlus} barres={barres} ligneUrssaf={ligneUrssafPlus}
@@ -2016,14 +2016,14 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
               ))}
             </div>
           ), { 'data-sv-carte': 'barres' }, 'vrm-sv-large')}
-        {carte('sv-rapides', 'Ce qui part vite', rapidesC && (rapides.length || rapidesC.peu.length) ? 'jours pour vendre' : null, !lignes
-          ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
-          : extras === undefined ? vide('Je lis les dates de mise en ligne…', { 'data-sv-etat': 'encours' })
-            : datesPasSu ? vide('Tes annonces n’ont pas pu être lues : aucun délai.', { 'data-sv-etat': 'passu' })
-              : !rapides.length && !rapidesC.peu.length ? vide('Aucune vente Vinted à la date de mise en ligne connue sur la période.', { 'data-sv-etat': 'lu' })
+        {carte('sv-rapides', tr('stats.partVite'), rapidesC && (rapides.length || rapidesC.peu.length) ? 'jours pour vendre' : null, !lignes
+          ? vide(tr('stats.encoreCalcule'), { 'data-sv-etat': 'passu' })
+          : extras === undefined ? vide(tr('stats.jeLisDates'), { 'data-sv-etat': 'encours' })
+            : datesPasSu ? vide(tr('stats.annoncesOntPu'), { 'data-sv-etat': 'passu' })
+              : !rapides.length && !rapidesC.peu.length ? vide(tr('stats.aucuneVenteVinted2'), { 'data-sv-etat': 'lu' })
                 : (
                   <div className="vrm-sv-lignes" data-sv-etat="lu" data-sv-axe-vite={axeVite} data-sv-peu={rapidesC.peu.length} data-sv-n-peu={rapidesC.nPeu}>
-                    <Segmente label="Par" className="vrm-sv-axes-vite" value={axeVite} onChange={setAxeVite} options={Object.entries(AXES_VITE).map(([v, l]) => ({ v, l, data: { 'data-sv-axe-choix': v } }))}/>
+                    <Segmente label={tr('stats.texte2')} className="vrm-sv-axes-vite" value={axeVite} onChange={setAxeVite} options={Object.entries(AXES_VITE).map(([v, l]) => ({ v, l, data: { 'data-sv-axe-choix': v } }))}/>
                     {rapides.map((g) => (
                       <div key={g.k} className="vrm-sv-ligne-rapide" data-sv-rapide={g.k} data-mediane={g.mediane} data-ndelai={g.nDelai} title={`${g.k} : médiane ${jours(g.mediane)}, sur ${pl(g.nDelai, 'vente datée', 'ventes datées')}`}>
                         <span className="vrm-sv-nom">{g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())}</span>
@@ -2033,19 +2033,19 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
                     ))}
                     {rapidesC.peu.length > 0 && (
                       <div className="vrm-sv-note" data-sv-pas-conclu={rapidesC.peu.length}>
-                        {rapides.length ? 'Pas encore classés' : 'Rien de classé'} : {pl(rapidesC.peu.length, 'groupe')} à moins de {SEUIL_CONCLUSION} ventes datées ({rapidesC.peu.slice(0, 4).map((g) => `${g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())} ${g.nDelai}`).join(', ')}{rapidesC.peu.length > 4 ? '…' : ''}) — pas assez pour conclure.
+                        {rapides.length ? tr('stats.encoreClasses') : tr('stats.rienClasse')} : {pl(rapidesC.peu.length, 'groupe')} {tr('stats.moins')} {SEUIL_CONCLUSION} {tr('stats.ventesDatees')}{rapidesC.peu.slice(0, 4).map((g) => `${g.k.replace(/(^|\s)(\p{Ll})/gu, (m, e, c) => e + c.toUpperCase())} ${g.nDelai}`).join(', ')}{rapidesC.peu.length > 4 ? '…' : ''}{tr('stats.assezConclure')}
                       </div>
                     )}
                   </div>
                 ), { 'data-sv-carte': 'rapides' })}
-        {carte('sv-comptes', 'Quel compte vend le mieux', comptes && comptes.length ? 'ventes · jours pour vendre' : null, !comptes
+        {carte('sv-comptes', tr('stats.quelCompteVend'), comptes && comptes.length ? 'ventes · jours pour vendre' : null, !comptes
           ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues.' : 'Je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
-          : !comptes.length ? vide('Aucune vente sur la période.', { 'data-sv-etat': 'lu' })
+          : !comptes.length ? vide(tr('stats.aucuneVentePeriode'), { 'data-sv-etat': 'lu' })
             : (
               <div className="vrm-sv-lignes vrm-sv-comptes" data-sv-etat="lu">
                 {(() => { const m = meilleurCompte ? comptes.find((c) => c.k === meilleurCompte) : null;
-                  if (m) return <p className="vrm-sv-phrase" data-sv-meilleur={m.k}>{m.nom}{m.site && m.site !== m.nom ? ` (${m.site})` : ''} vend le plus</p>;
-                  return comptes.length > 1 ? <p className="vrm-sv-note" data-sv-pas-conclu-compte="">Moins de {SEUIL_CONCLUSION} ventes ou égalité : pas de « meilleur compte ».</p> : null; })()}
+                  if (m) return <p className="vrm-sv-phrase" data-sv-meilleur={m.k}>{m.nom}{m.site && m.site !== m.nom ? ` (${m.site})` : ''} {tr('stats.vendPlus')}</p>;
+                  return comptes.length > 1 ? <p className="vrm-sv-note" data-sv-pas-conclu-compte="">{trj('stats.moinsVentesEgalite', { SEUIL_CONCLUSION: SEUIL_CONCLUSION })}</p> : null; })()}
                 {comptes.slice(0, 6).map((c) => (
                   <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
                     <span className="vrm-sv-nom" title={c.nom || undefined}>{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
@@ -2055,8 +2055,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
                       if (!brutComptes || (c.plat !== 'Vinted' && comptes.filter((x) => x.plat === c.plat).length > 1)) return null;
                       const bc = brutComptes[cleBrutCompte(c.plat, c.k.split('|').slice(1).join('|'))];
                       const v = bc && bc.brut != null ? bc.brut : null;
-                      return <span className="vrm-sv-brut-compte" data-benef-notion="brut" data-benef-valeur={v == null ? '' : String(Math.round(v * 100))} data-sv-brut-couv={bc ? `${bc.nCout}/${bc.n}` : '0/0'} title={bc ? `${NOM_BENEFICE_BRUT} : ventes finalisées au prix d’achat connu, ${bc.nCout} sur ${bc.n}` : 'aucune vente finalisée sur la période'}>brut {v == null ? '—' : fmt(v)}{bc && bc.n && bc.nCout < bc.n ? ` · ${bc.nCout} sur ${bc.n}` : ''}</span>; })()}</span>
-                    <span className="vrm-sv-chiffre" title={c.plat === 'Vinted' ? (c.mediane == null ? 'aucune vente datée' : `délai médian, sur ${pl(c.nDelai, 'vente datée', 'ventes datées')}`) : 'pas de date de mise en ligne sur cette plateforme'}>{jours(c.mediane)}</span>
+                      return <span className="vrm-sv-brut-compte" data-benef-notion="brut" data-benef-valeur={v == null ? '' : String(Math.round(v * 100))} data-sv-brut-couv={bc ? `${bc.nCout}/${bc.n}` : '0/0'} title={bc ? tr('stats.ventesFinaliseesPrix3', { NOM_BENEFICE_BRUT: String(NOM_BENEFICE_BRUT), nCout: String(bc.nCout), x: String(bc.n) }) : tr('stats.aucuneVenteFinalisee2')}>{tr('stats.brut')} {v == null ? '—' : fmt(v)}{bc && bc.n && bc.nCout < bc.n ? tr('stats.texte3', { nCout: String(bc.nCout), x: String(bc.n) }) : ''}</span>; })()}</span>
+                    <span className="vrm-sv-chiffre" title={c.plat === 'Vinted' ? (c.mediane == null ? tr('stats.aucuneVenteDatee') : `délai médian, sur ${pl(c.nDelai, 'vente datée', 'ventes datées')}`) : tr('stats.dateMiseLigne')}>{jours(c.mediane)}</span>
                   </div>
                 ))}
                 {comptes.length > 6 && <div className="vrm-sv-note">+ {pl(comptes.length - 6, 'autre compte', 'autres comptes')}</div>}
@@ -2080,9 +2080,9 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
       <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
-        {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
-          ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
-          : !tailles ? vide('Je lis tes annonces…', { 'data-sv-etat': 'encours' })
+        {carte('sv-tailles', tr('stats.taillesVendent'), tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
+          ? vide(tr('stats.encoreCalcule'), { 'data-sv-etat': 'passu' })
+          : !tailles ? vide(tr('stats.jeLisAnnonces'), { 'data-sv-etat': 'encours' })
             : !tailles.groupes.length ? vide(tailles.n ? `Aucune taille connue sur ${pl(tailles.n, 'vente finalisée', 'ventes finalisées')}.` : 'Aucune vente finalisée sur la période.', { 'data-sv-etat': 'lu' })
               : (
                 <div className="vrm-sv-lignes" data-sv-etat="lu" data-sv-plus={tailles.plus}>
@@ -2093,7 +2093,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
                       <span className="vrm-sv-chiffre">{pl(g.n, 'vente')} · {jours(g.mediane)}</span>
                     </div>
                   ))}
-                  {tailles.sansTaille > 0 && <div className="vrm-sv-note">{pl(tailles.sansTaille, 'vente')} sans taille connue.</div>}
+                  {tailles.sansTaille > 0 && <div className="vrm-sv-note">{pl(tailles.sansTaille, 'vente')} {tr('stats.sansTailleConnue')}</div>}
                 </div>
               ), { 'data-sv-carte': 'tailles' })}
         {(() => {
@@ -2112,28 +2112,28 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
             </div>
           );
           const corps = etat === 'encours' ? vide('…')
-            : etat === 'passu' ? vide('Tes annonces ou tes ventes ne sont pas encore lues.', { 'data-sv-boost-passu': '' })
+            : etat === 'passu' ? vide(tr('stats.annoncesVentesSont'), { 'data-sv-boost-passu': '' })
               : etat === 'pas-assez' ? vide(`Pas assez de données · ${boost.comparables.b}/${SEUIL_BOOST} boostés`, { 'data-sv-boost-pas-assez': String(boost.comparables.b) })
                 : (<>
                   <div className="vrm-sv-boost-table">
                     <span/>
-                    <span className="vrm-sv-tuile-lib vrm-sv-boost-col">Boostés</span>
-                    <span className="vrm-sv-tuile-lib vrm-sv-boost-col">Autres</span>
+                    <span className="vrm-sv-tuile-lib vrm-sv-boost-col">{tr('stats.boostes')}</span>
+                    <span className="vrm-sv-tuile-lib vrm-sv-boost-col">{tr('stats.autres')}</span>
                     {ligneB('vendues', 'Vendus', `${boost.vendues.b}/${boost.vendues.nB} · ${pct(boost.vendues.tb)}`, `${boost.vendues.nb}/${boost.vendues.nN} · ${pct(boost.vendues.tnb)}`, `${boost.vendues.b}/${boost.vendues.nB}|${boost.vendues.nb}/${boost.vendues.nN}`)}
-                    {ligneB('delai', 'Délai médian', jours(boost.delai.b), jours(boost.delai.nb), `${boost.delai.b == null ? '' : j10(boost.delai.b)}|${boost.delai.nb == null ? '' : j10(boost.delai.nb)}`)}
-                    {ligneB('prix', 'Prix médian, boost déduit', boost.prix.b == null ? '—' : fmt(boost.prix.b), boost.prix.nb == null ? '—' : fmt(boost.prix.nb), `${cents(boost.prix.b)}|${cents(boost.prix.nb)}`)}
+                    {ligneB('delai', tr('stats.delaiMedian'), jours(boost.delai.b), jours(boost.delai.nb), `${boost.delai.b == null ? '' : j10(boost.delai.b)}|${boost.delai.nb == null ? '' : j10(boost.delai.nb)}`)}
+                    {ligneB('prix', tr('stats.prixMedianBoost'), boost.prix.b == null ? '—' : fmt(boost.prix.b), boost.prix.nb == null ? '—' : fmt(boost.prix.nb), `${cents(boost.prix.b)}|${cents(boost.prix.nb)}`)}
                   </div>
                   <div className="vrm-sv-note vrm-sv-boost-note" data-sv-boost="cout" data-v={cents(boost.cout)} data-couv={`${boost.avecMontant}/${boost.comparables.b}`}>
-                    Coût des boosts : {boost.cout == null ? '—' : `${boost.avecMontant < boost.comparables.b ? 'au moins ' : ''}${fmt(boost.cout)}`} · montant saisi {boost.avecMontant}/{boost.comparables.b}
+                    {tr('stats.coutBoosts')} {boost.cout == null ? '—' : `${boost.avecMontant < boost.comparables.b ? 'au moins ' : ''}${fmt(boost.cout)}`} {tr('stats.montantSaisi')} {boost.avecMontant}/{boost.comparables.b}
                   </div>
                 </>);
-          return carte('sv-boost', 'Boost rentable ?', droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
+          return carte('sv-boost', tr('stats.boostRentable'), droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
         })()}
       </div>
       <AnnulationsEtNotes b={b} panelOff={panelOff}/>
       <div className="vrm-sv-note vrm-sv-pied">
         {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}
-        {liveStats && liveStats.venduSansDate ? `${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{`${liveStats.venduSansDate ? ' · ' : ''}Pas dans « vendu » : ${phraseNonComptees(liveStats.venduNonComptees)}`}</span> : null}
+        {liveStats && liveStats.venduSansDate ? `${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{tr('stats.dansVendu', { x: String(liveStats.venduSansDate ? ' · ' : ''), phraseNonComptees: String(phraseNonComptees(liveStats.venduNonComptees)) })}</span> : null}
       </div>
     </div>
   );
@@ -2255,7 +2255,7 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
     ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
   const K = comparerDeuxMois({ ymA: choix.a, ymB: choix.b, maintenant, vendu,
     recuDe: (b) => recuAvecADater(recuPublieEntre(ligneUrssaf, b, maintenant), ligneUrssaf),
-    beneficeDe: ({ ym, jusqua }) => { const B = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, jusqua); return B ? chiffreBenefice(B, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' }; },
+    beneficeDe: ({ ym, jusqua }) => { const B = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, jusqua); return B ? chiffreBenefice(B, 'lu') : { valeur: null, raison: pub ? tr('stats.moisCouvert') : 'publication' }; },
     achatsDe: ({ ym }) => (achatsLus === undefined ? undefined : achatsLus === null ? null : achatsLus.registre({ achats: achatsLus.achats, recus: [], periode: ym, panelOff })),
     nombreDe, R: { bilanLignes } });
   const colA = K ? nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant) : '', colB = K ? nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant) : '';
@@ -2277,22 +2277,22 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
     return { cle: Lg.cle, nom: nomLigne(Lg), txt };
   }).filter(Boolean) : [];
   const select = (k, v) => (
-    <select className="vrm-cm-mois" aria-label={k === 'a' ? 'Premier mois' : 'Mois comparé'} data-comparer-mois={k} value={v} onChange={(e) => setChoix(k, e.target.value)}>
+    <select className="vrm-cm-mois" aria-label={k === 'a' ? tr('stats.premierMois') : tr('stats.moisCompare')} data-comparer-mois={k} value={v} onChange={(e) => setChoix(k, e.target.value)}>
       {choixListe.map((m) => <option key={m} value={m}>{libelleMoisCourt(m, maintenant)}</option>)}
     </select>
   );
   return (
     <section className="vrm-cm" data-comparer={K ? K.mode : 'aucun'} data-comparer-a={choix.a} data-comparer-b={choix.b} data-comparer-meme-point={K && K.memePoint ? '1' : '0'}>
       <div className="vrm-cm-tete">
-        <h2 className="vrm-display vrm-cm-titre" data-titre-section="">Comparer</h2>
-        <div className="vrm-cm-choix">{select('a', choix.a)}<span className="vrm-cm-vs" aria-hidden="true">et</span>{select('b', choix.b)}</div>
+        <h2 className="vrm-display vrm-cm-titre" data-titre-section="">{tr('stats.comparer')}</h2>
+        <div className="vrm-cm-choix">{select('a', choix.a)}<span className="vrm-cm-vs" aria-hidden="true">{tr('achats.texte2')}</span>{select('b', choix.b)}</div>
       </div>
       {K ? <>
         <div className="vrm-cm-grille vrm-cm-cols" aria-hidden="true">
           <span/>
           <span data-comparer-col="a">{colA}</span>
           <span data-comparer-col="b">{colB}</span>
-          <span>Écart</span>
+          <span>{tr('stats.ecart')}</span>
         </div>
         {K.lignes.map((Lg) => (
           <div key={Lg.cle} className="vrm-cm-grille vrm-cm-ligne" data-comparer-ligne={Lg.cle} data-a={cents(Lg.a.valeur, Lg.type)} data-b={cents(Lg.b.valeur, Lg.type)} data-ecart={cents(Lg.ecart, Lg.type)} data-pct={Lg.pct == null ? '' : String(Lg.pct)} data-sens={Lg.sens || ''}
@@ -2301,13 +2301,13 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
             data-a-achats={Lg.cle === 'paires' && Lg.a.achats != null ? String(Lg.a.achats) : undefined} data-b-achats={Lg.cle === 'paires' && Lg.b.achats != null ? String(Lg.b.achats) : undefined}>
             <span className="vrm-cm-nom">{nomLigne(Lg)}</span>
             {[Lg.a, Lg.b].map((x, i) => (
-              <span key={i} className={'vrm-cm-v' + (i === 0 ? ' is-a' : '') + (x.valeur == null ? ' is-vide' : '')} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? raisonComparer(x) : undefined}>
+              <span key={i} className={'vrm-cm-v' + (i === 0 ? ' is-a' : '') + (x.valeur == null ? ' is-vide' : '')} title={x.partiel ? tr('journee.moinsSans', { x: String(x.manque.join(', ')) }) : x.valeur == null ? raisonComparer(x) : undefined}>
                 <b>{val(x, Lg.type)}</b>
                 {sous(x, Lg) ? <small>{sous(x, Lg)}</small> : null}
               </span>
             ))}
             <span className={'vrm-cm-ecart' + (Lg.sens ? '' : ' is-vide')}>
-              {Lg.sens ? <b><FlecheComparer sens={Lg.sens}/>{Lg.type === 'eur' ? signeEur(Lg.ecart) : (Lg.ecart > 0 ? '+' : Lg.ecart < 0 ? '−' : '') + Math.abs(Lg.ecart)}</b> : <b aria-label="pas comparable">—</b>}
+              {Lg.sens ? <b><FlecheComparer sens={Lg.sens}/>{Lg.type === 'eur' ? signeEur(Lg.ecart) : (Lg.ecart > 0 ? '+' : Lg.ecart < 0 ? '−' : '') + Math.abs(Lg.ecart)}</b> : <b aria-label={tr('stats.comparable')}>—</b>}
               {Lg.pct != null ? <small>{signePct(Lg.pct)}</small> : null}
             </span>
           </div>
@@ -2317,7 +2317,7 @@ function ComparerMoisCarte({ liveStats, panelOff = null }) {
             {pourquoi.map((p) => <div key={p.cle} data-comparer-pourquoi-ligne={p.cle}><b>{p.nom} —</b> {p.txt}</div>)}
           </div>
         ) : null}
-      </> : <p className="vrm-cm-vide" data-comparer-futur="">Un mois à venir ne se compare pas.</p>}
+      </> : <p className="vrm-cm-vide" data-comparer-futur="">{tr('stats.moisVenirCompare')}</p>}
     </section>
   );
 }
@@ -2352,8 +2352,8 @@ function FraisParSiteCarte({ periode, ebayCommandes, ventesVc }) {
   // celles qui servent). Le geste qui la remplit est dit.
   if (F.sites.every((x) => x.passu)) return (
     <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-tous-passu="" style={{ padding: '14px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px' }}>
-      <h2 className="vrm-display" data-titre-section="" style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-.01em', color: C.text }}>Frais par site</h2>
-      <span style={{ fontSize: 13, color: C.muted }}>Pas encore calculés : ouvre l’écran Ventes une fois.</span>
+      <h2 className="vrm-display" data-titre-section="" style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-.01em', color: C.text }}>{tr('stats.fraisSite')}</h2>
+      <span style={{ fontSize: 13, color: C.muted }}>{tr('stats.encoreCalculesOuvre')}</span>
     </section>
   );
   const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,96px) minmax(0,64px)', columnGap: 10, alignItems: 'center' };
@@ -2361,19 +2361,19 @@ function FraisParSiteCarte({ periode, ebayCommandes, ventesVc }) {
     <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-total={String(Math.round(F.total * 100))} data-frais-partiel={F.partiel ? '1' : undefined}
       style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-        <h2 className="vrm-display" data-titre-section="" style={{ flex: 1, margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Frais par site</h2>
-        <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, width: 64, textAlign: 'right' }}>% vendu</span>
+        <h2 className="vrm-display" data-titre-section="" style={{ flex: 1, margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>{tr('stats.fraisSite')}</h2>
+        <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, width: 64, textAlign: 'right' }}>{tr('stats.vendu4')}</span>
       </div>
       {F.sites.map((x) => {
         const cov = texteCouverture(x);
         return (
           <div key={x.plateforme} role="row" data-frais-site={x.plateforme} data-frais-eur={x.frais == null ? '' : String(Math.round(x.frais * 100))} data-frais-pct={x.pct == null ? '' : String(x.pct)}
             data-frais-lus={x.couverture ? `${x.couverture.lus}/${x.couverture.n}` : ''} data-frais-options={String(Math.round(x.options * 100))}
-            title={x.options > 0 ? `dont ${fmt(x.options)} d’options et packs (${x.nOptions})` : undefined}
+            title={x.options > 0 ? tr('stats.dontOptionsPacks', { fmt: String(fmt(x.options)), nOptions: String(x.nOptions) }) : undefined}
             style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: 'block', fontSize: 15, fontWeight: 500, color: C.text }}>{x.plateforme}</span>
-              <span style={{ display: 'block', fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.passu ? 'pas lu' : `${x.n} vente${x.n > 1 ? 's' : ''}${cov ? ` · ${cov}` : ''}`}</span>
+              <span style={{ display: 'block', fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.passu ? tr('journee.lu') : `${x.n} vente${x.n > 1 ? 's' : ''}${cov ? ` · ${cov}` : ''}`}</span>
             </span>
             <span style={{ textAlign: 'right', fontSize: 15, fontWeight: 600, color: x.frais == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.frais == null ? '—' : fmt(x.frais)}</span>
             <span style={{ textAlign: 'right', fontSize: 13, color: C.muted, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.pct == null ? '—' : `${String(x.pct).replace('.', ',')}\u00a0%`}</span>
@@ -2394,8 +2394,8 @@ function VenduParSemaineSante({ liveStats }) {
   const manque = (liveStats && liveStats.venduManque) || [];
   if (!R) return (
     <section className="vrm-sante vrm-sante-vide" data-stats-carte="semaines-sante" data-sante-etat={vendu === null || (liveStats && liveStats.venduPasSu) ? 'passu' : 'encours'}>
-      <div className="vrm-sante-haut"><h2 className="vrm-sante-titre">Vendu par semaine</h2></div>
-      <p className="vrm-sante-note">{vendu === null || (liveStats && liveStats.venduPasSu) ? 'Tes ventes n’ont pas pu être lues : rien n’est dessiné.' : 'Je lis tes ventes…'}</p>
+      <div className="vrm-sante-haut"><h2 className="vrm-sante-titre">{tr('stats.venduSemaine')}</h2></div>
+      <p className="vrm-sante-note">{vendu === null || (liveStats && liveStats.venduPasSu) ? tr('stats.ventesOntPu2') : tr('stats.jeLisVentes')}</p>
     </section>
   );
   return <GraphiqueSemaines semaines={R.semaines} partiel={manque.length > 0} manque={manque} fmt={fmt}/>;
@@ -2473,31 +2473,31 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   return (<>
     {/* ── 1. LE RYTHME ─────────────────────────────────────────────────── */}
     <section data-stats-carte="rythme" data-stats-rythme={R ? 'lu' : vendu === null ? 'passu' : 'encours'} style={sCarte}>
-      <div style={sTitre}>Ton rythme de vente</div>
-      {!R ? <div style={{ ...sNote, marginTop: 8 }}>{vendu === null ? "Tes ventes n'ont pas pu être lues : le rythme n'est pas calculé." : 'Je lis tes ventes…'}</div> : (<>
+      <div style={sTitre}>{tr('stats.rythmeVente')}</div>
+      {!R ? <div style={{ ...sNote, marginTop: 8 }}>{vendu === null ? tr('stats.ventesOntPu3') : tr('stats.jeLisVentes')}</div> : (<>
         <div style={grille}>
-          {fig("Aujourd'hui", fmt(R.jour.eur), R.moyenne ? <>{pl(R.jour.n, 'vente')} · moyenne {mt(R.moyenne.eur)}/j{R.moyenne.depuisPremiere ? ` (sur ${R.moyenne.jours} j)` : ''}{ecartPct(R.jour.eur, R.moyenne.eur) != null ? ` · ${pctStat(ecartPct(R.jour.eur, R.moyenne.eur))}` : ''}</> : `${pl(R.jour.n, 'vente')} · pas encore de moyenne`, { 'data-stat-jour': Math.round(R.jour.eur * 100), 'data-stat-moyenne': R.moyenne ? Math.round(R.moyenne.eur * 100) : '' })}
-          {fig('7 derniers jours', fmt(R.j7.eur), <>{pl(R.j7.n, 'vente')} · les 7 d'avant {mt(R.j7av.eur)}{ecartPct(R.j7.eur, R.j7av.eur) != null ? ` · ${pctStat(ecartPct(R.j7.eur, R.j7av.eur))}` : ''}</>, { 'data-stat-j7': Math.round(R.j7.eur * 100), 'data-stat-j7av': Math.round(R.j7av.eur * 100) })}
-          {fig('Panier moyen', eurStat(R.panier30.moyen), R.panier30.n ? `sur ${pl(R.panier30.n, 'vente')} en 30 jours` : 'aucune vente en 30 jours', { 'data-stat-panier': R.panier30.moyen == null ? '' : Math.round(R.panier30.moyen * 100) })}
-          {fig('Ventes par jour', R.panier30.n ? String(Math.round(R.panier30.n / 30 * 10) / 10).replace('.', ',') : '—', 'moyenne des 30 derniers jours')}
+          {fig("Aujourd'hui", fmt(R.jour.eur), R.moyenne ? <>{pl(R.jour.n, 'vente')} {tr('stats.moyenne')} {mt(R.moyenne.eur)}/j{R.moyenne.depuisPremiere ? tr('stats.texte4', { jours: String(R.moyenne.jours) }) : ''}{ecartPct(R.jour.eur, R.moyenne.eur) != null ? ` · ${pctStat(ecartPct(R.jour.eur, R.moyenne.eur))}` : ''}</> : `${pl(R.jour.n, 'vente')} · pas encore de moyenne`, { 'data-stat-jour': Math.round(R.jour.eur * 100), 'data-stat-moyenne': R.moyenne ? Math.round(R.moyenne.eur * 100) : '' })}
+          {fig('7 derniers jours', fmt(R.j7.eur), <>{pl(R.j7.n, 'vente')} {tr('stats.7Avant')} {mt(R.j7av.eur)}{ecartPct(R.j7.eur, R.j7av.eur) != null ? ` · ${pctStat(ecartPct(R.j7.eur, R.j7av.eur))}` : ''}</>, { 'data-stat-j7': Math.round(R.j7.eur * 100), 'data-stat-j7av': Math.round(R.j7av.eur * 100) })}
+          {fig(tr('stats.panierMoyen'), eurStat(R.panier30.moyen), R.panier30.n ? `sur ${pl(R.panier30.n, 'vente')} en 30 jours` : 'aucune vente en 30 jours', { 'data-stat-panier': R.panier30.moyen == null ? '' : Math.round(R.panier30.moyen * 100) })}
+          {fig(tr('ventes.ventesJour'), R.panier30.n ? String(Math.round(R.panier30.n / 30 * 10) / 10).replace('.', ',') : '—', 'moyenne des 30 derniers jours')}
         </div>
         {/* (8 nov., « beauté ») Les 12 semaines sont en tête de l'écran (« Vendu par semaine », façon Santé). */}
-        <div style={{ ...sNote, marginTop: 10 }}>{manque.length ? `Sans ${manque.join(', ')} : au moins` : ''}{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune semaine.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? ` Pas comptées (l'argent ne se lit pas) : ${phraseNonComptees(liveStats.venduNonComptees)}.` : ''}</div>
+        <div style={{ ...sNote, marginTop: 10 }}>{manque.length ? tr('stats.sansMoins', { x: String(manque.join(', ')) }) : ''}{liveStats && liveStats.venduSansDate ? ` ${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date : dans aucune semaine.` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? tr('stats.compteesArgentLit', { phraseNonComptees: String(phraseNonComptees(liveStats.venduNonComptees)) }) : ''}</div>
       </>)}
     </section>
 
     {/* ── 2. BÉNÉFICE ET MARGE PAR GROUPE ──────────────────────────────── */}
     <section data-stats-carte="marges" data-stats-marges={M ? 'lu' : 'passu'} data-stats-marges-n={M ? M.n : ''} data-stats-marges-ncout={M ? M.nCout : ''} style={sCarte}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div style={sTitre}>{NOM_BENEFICE_BRUT} et marge</div>
-        {M && <span style={{ fontSize: 13, color: C.muted }} data-stats-marges-couverture={`${M.nCout}/${M.n}`}>sur {pl(M.nCout, 'vente')} avec prix d'achat (sur {M.n})</span>}
+        <div style={sTitre}>{trj('stats.marge', { NOM_BENEFICE_BRUT: NOM_BENEFICE_BRUT })}</div>
+        {M && <span style={{ fontSize: 13, color: C.muted }} data-stats-marges-couverture={`${M.nCout}/${M.n}`}>{tr('journee.texte2')} {pl(M.nCout, 'vente')} {tr('stats.avecPrixAchat')} {M.n})</span>}
       </div>
-      {!M ? <div style={{ ...sNote, marginTop: 8 }}>Relevé de tes ventes pas encore ici : ouvre l’écran Ventes. <Pourquoi>Il se calcule quand Ma journée ou Ventes a lu toutes tes ventes (Vinted, Leboncoin, eBay).</Pourquoi></div> : (<>
-        <Segmente label={`${NOM_BENEFICE_BRUT} par`} value={axeMarge} onChange={setAxeMarge} options={Object.entries(AXES_MARGE).map(([v, l]) => ({ v, l, data: { 'data-stats-marge-axe': v } }))} style={{ marginTop: 12 }}/>
-        {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>Aucune vente finalisée à répartir.</div> : (
-          <div role="table" aria-label={`${NOM_BENEFICE_BRUT} par ${AXES_MARGE[axeMarge].toLowerCase()}`} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
+      {!M ? <div style={{ ...sNote, marginTop: 8 }}>{tr('stats.releveVentesEncore')} <Pourquoi>{tr('stats.calculeQuandMa')}</Pourquoi></div> : (<>
+        <Segmente label={tr('stats.texte5', { NOM_BENEFICE_BRUT: String(NOM_BENEFICE_BRUT) })} value={axeMarge} onChange={setAxeMarge} options={Object.entries(AXES_MARGE).map(([v, l]) => ({ v, l, data: { 'data-stats-marge-axe': v } }))} style={{ marginTop: 12 }}/>
+        {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>{tr('stats.aucuneVenteFinalisee3')}</div> : (
+          <div role="table" aria-label={tr('stats.texte6', { NOM_BENEFICE_BRUT: String(NOM_BENEFICE_BRUT), toLowerCase: String(AXES_MARGE[axeMarge].toLowerCase()) })} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
             <div role="row" style={{ ...ligneTab, fontSize: 11, color: C.muted, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>Ventes</span><span role="columnheader" style={{ textAlign: 'right' }}>Brut</span><span role="columnheader" style={{ textAlign: 'right' }}>Marge</span><span role="columnheader" style={{ textAlign: 'right' }}>Par article</span>
+              <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('historiqueSites.type.ventes')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('stats.brut2')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('annonces.marge')}</span><span role="columnheader" style={{ textAlign: 'right' }}>{tr('stats.article')}</span>
             </div>
             {M.groupes.slice(0, 8).map((g) => (
               <div role="row" key={g.k} data-stats-marge-ligne={g.k} data-n={g.n} data-ncout={g.nCout} data-brut={g.brut == null ? '' : Math.round(g.brut * 100)} data-marge={g.marge == null ? '' : g.marge}
@@ -2513,21 +2513,21 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
           </div>
         )}
         <div style={{ ...sNote, marginTop: 10 }}>
-          « 3/5 » : prix d'achat connu pour 3 ventes sur 5.{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? ` Relevé du ${quand(releve.at)}.` : ''} <Pourquoi>Ventes finalisées, au jour de la vente — les mêmes que « Ton bénéfice » de Comptabilité. Bénéfice brut = vente − prix d'achat, sur les seules ventes au prix d'achat connu ; « — » quand aucun n'est connu. Frais, boosts et charges : dans Comptabilité.</Pourquoi>
+          {tr('stats.35Prix')}{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? tr('stats.releve', { quand: String(quand(releve.at)) }) : ''} <Pourquoi>{tr('stats.ventesFinaliseesJour')}</Pourquoi>
         </div>
       </>)}
     </section>
 
     {/* ── 3. LE TEMPS DE VENTE ─────────────────────────────────────────── */}
     <section data-stats-carte="delais" data-stats-delais={Dl && Dl !== 'passu' ? 'lu' : Dl === 'passu' ? 'passu' : 'encours'} data-stats-delai-n={Dl && Dl !== 'passu' ? `${Dl.nDelai}/${Dl.n}` : ''} style={sCarte}>
-      <div style={sTitre}>Temps de vente</div>
-      {!Dl ? <div style={{ ...sNote, marginTop: 8 }}>{!releve ? 'Pas encore calculé' : 'Lecture…'}</div>
-        : Dl === 'passu' ? <div style={{ ...sNote, marginTop: 8 }}>Tes annonces n'ont pas pu être lues : le temps de vente n'est pas calculé.</div> : (<>
+      <div style={sTitre}>{tr('ventes.tempsVente')}</div>
+      {!Dl ? <div style={{ ...sNote, marginTop: 8 }}>{!releve ? tr('stats.encoreCalcule') : tr('messages.lecture')}</div>
+        : Dl === 'passu' ? <div style={{ ...sNote, marginTop: 8 }}>{tr('stats.annoncesOntPu2')}</div> : (<>
         <div style={grille}>
-          {fig('La moitié part en', jFmt(Dl.mediane), `médiane, sur ${pl(Dl.nDelai, 'vente datée', 'ventes datées')} (sur ${Dl.n})`, { 'data-stat-delai-mediane': Dl.mediane == null ? '' : Dl.mediane })}
-          {fig('En moyenne', jFmt(Dl.moyenne), 'de la mise en ligne à la vente')}
+          {fig(tr('stats.moitiePart'), jFmt(Dl.mediane), `médiane, sur ${pl(Dl.nDelai, 'vente datée', 'ventes datées')} (sur ${Dl.n})`, { 'data-stat-delai-mediane': Dl.mediane == null ? '' : Dl.mediane })}
+          {fig(tr('stats.moyenne2'), jFmt(Dl.moyenne), 'de la mise en ligne à la vente')}
         </div>
-        <Segmente label="Temps de vente par" value={axeDelai} onChange={setAxeDelai} options={Object.entries(AXES_DELAI).map(([v, l]) => ({ v, l, data: { 'data-stats-delai-axe': v } }))} style={{ marginTop: 14 }}/>
+        <Segmente label={tr('stats.tempsVente')} value={axeDelai} onChange={setAxeDelai} options={Object.entries(AXES_DELAI).map(([v, l]) => ({ v, l, data: { 'data-stats-delai-axe': v } }))} style={{ marginTop: 14 }}/>
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(axeDelai === 'prix' ? TRANCHES_PRIX.map(([, , k]) => Dl.groupes.find((g) => g.k === k)).filter(Boolean) : Dl.groupes.slice(0, 8)).map((g) => {
             const maxJ = Math.max(1, ...Dl.groupes.map((x) => x.mediane || 0));
@@ -2540,54 +2540,54 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
             );
           })}
         </div>
-        <div style={{ ...sNote, marginTop: 10 }}>Vinted seulement. Médiane ; « 4/6 » = 4 ventes datées sur 6. <Pourquoi>Leboncoin et eBay ne donnent pas la date de mise en ligne. Une annonce republiée après la vente n'est pas comptée.</Pourquoi></div>
+        <div style={{ ...sNote, marginTop: 10 }}>{tr('stats.vintedSeulementMediane')} <Pourquoi>{tr('stats.leboncoinEbayDonnent')}</Pourquoi></div>
       </>)}
     </section>
 
     {/* ── 4. QUAND TU VENDS ────────────────────────────────────────────── */}
     {Q && Q.n > 0 && (
       <section data-stats-carte="quand" data-stats-jours={Q.jours.map((j) => j.n).join(',')} data-stats-heures-n={Q.avecHeure} style={sCarte}>
-        <div style={sTitre}>Quand tu vends</div>
-        <div style={{ ...sLib, marginTop: 12 }}>Par jour de la semaine</div>
+        <div style={sTitre}>{tr('stats.quandVends')}</div>
+        <div style={{ ...sLib, marginTop: 12 }}>{tr('stats.jourSemaine')}</div>
         <div style={{ marginTop: 8 }}>
           <BarresStats valeurs={Q.jours.map((j) => j.n)} hauteur={72} titres={Q.jours.map((j, i) => `${JOURS_C[i]} : ${pl(j.n, 'vente')} · ${fmt(j.eur)}`)} data={{ 'aria-label': 'Ventes par jour de la semaine' }}/>
           <LegendeBarres libelles={JOURS_C}/>
         </div>
         {Q.avecHeure > 0 && <>
-          <div style={{ ...sLib, marginTop: 16 }}>Par heure</div>
+          <div style={{ ...sLib, marginTop: 16 }}>{tr('stats.heure')}</div>
           <div style={{ marginTop: 8 }}>
             <BarresStats valeurs={Q.heures.map((h) => h.n)} hauteur={60} titres={Q.heures.map((h) => `${h.h} h : ${pl(h.n, 'vente')}`)} data={{ 'aria-label': 'Ventes par heure' }}/>
             <LegendeBarres libelles={Q.heures.map((h) => h.h % 6 === 0 ? `${h.h} h` : '')}/>
           </div>
         </>}
-        <div style={{ ...sNote, marginTop: 10 }}>Sur {pl(Q.n, 'vente')} des 12 derniers mois, toutes plateformes{Q.sansHeure ? ` · l'heure est connue pour ${Q.avecHeure} sur ${Q.n} (une date sans heure n'est dans aucune heure)` : ''}.</div>
+        <div style={{ ...sNote, marginTop: 10 }}>{tr('ventes.texte3')} {pl(Q.n, 'vente')} {tr('stats.12DerniersMois')}{Q.sansHeure ? tr('stats.heureConnueDate', { avecHeure: String(Q.avecHeure), x: String(Q.n) }) : ''}.</div>
       </section>
     )}
 
     {/* ── 5. LE STOCK ──────────────────────────────────────────────────── */}
     <section data-stats-carte="dort" data-stats-dort={stock ? 'lu' : 'passu'} style={sCarte}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div style={sTitre}>Les articles qui dorment</div>
-        {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} Vinted en ligne</span>}
+        <div style={sTitre}>{tr('stats.articlesDorment')}</div>
+        {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} {tr('stats.vintedLigne')}</span>}
         {/* (3 nov.) La LISTE, avec un geste par article : l'écran Annonces (« Articles qui dorment »). */}
-        {onVoirDorment && stock && (stock.dort.seuils[30] || {}).n > 0 && <button type="button" className="vrm-lien-action" data-stats-voir-dorment="" onClick={onVoirDorment} style={{ minHeight: 44 }}>Voir la liste</button>}
+        {onVoirDorment && stock && (stock.dort.seuils[30] || {}).n > 0 && <button type="button" className="vrm-lien-action" data-stats-voir-dorment="" onClick={onVoirDorment} style={{ minHeight: 44 }}>{tr('stats.voirListe')}</button>}
       </div>
-      {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé : ouvre l’écran Annonces une fois.</div> : (<>
+      {!stock ? <div style={{ ...sNote, marginTop: 8 }}>{tr('stats.encoreCalculeOuvre2')}</div> : (<>
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column' }}>
           {SEUILS_DORT.map((s) => { const b = stock.dort.seuils[s] || { n: 0, valeur: 0, nCout: 0, cout: 0 }; return (
             <div key={s} data-stats-dort-seuil={s} data-n={b.n} data-valeur={Math.round(b.valeur * 100)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.4fr)', gap: 8, padding: '9px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontVariantNumeric: 'tabular-nums', alignItems: 'baseline' }}>
-              <span style={{ color: C.text }}>En ligne depuis {s} j et plus</span>
+              <span style={{ color: C.text }}>{trj('stats.ligneDepuisPlus', { s: s })}</span>
               <span style={{ textAlign: 'right', color: C.text, fontWeight: 600 }}>{pl(b.n, 'article')}</span>
-              <span style={{ textAlign: 'right', color: C.muted }}>{mt(b.valeur)} affichés{b.n ? <> · achat {b.nCout ? <>{b.nCout < b.n ? 'au moins ' : ''}{mt(b.cout)}</> : '—'}{b.nCout < b.n ? ` (${b.nCout}/${b.n})` : ''}</> : null}</span>
+              <span style={{ textAlign: 'right', color: C.muted }}>{mt(b.valeur)} {tr('journee.affiches')}{b.n ? <> {tr('stats.achat')} {b.nCout ? <>{b.nCout < b.n ? tr('journee.moins3') : ''}{mt(b.cout)}</> : '—'}{b.nCout < b.n ? ` (${b.nCout}/${b.n})` : ''}</> : null}</span>
             </div>
           ); })}
         </div>
         <div style={grille}>
           {fig('Rotation', rot == null ? '—' : `${rot} j`, vint30 ? `au rythme de ${pl(vint30, 'vente')} Vinted en 30 jours — un repère, pas une prévision` : 'aucune vente Vinted en 30 jours', { 'data-stat-rotation': rot == null ? '' : rot })}
-          {fig('Taux de vente du mois', tauxV == null ? '—' : `${tauxV}\u00a0%`, vintMois != null && enLigne != null ? `${vintMois} vendue${vintMois > 1 ? 's' : ''} ce mois sur ${vintMois + enLigne} (vendues + encore en ligne), Vinted` : 'ventes pas lues', { 'data-stat-taux-vente': tauxV == null ? '' : tauxV })}
+          {fig(tr('stats.tauxVenteMois'), tauxV == null ? '—' : `${tauxV}\u00a0%`, vintMois != null && enLigne != null ? `${vintMois} vendue${vintMois > 1 ? 's' : ''} ce mois sur ${vintMois + enLigne} (vendues + encore en ligne), Vinted` : 'ventes pas lues', { 'data-stat-taux-vente': tauxV == null ? '' : tauxV })}
           {fig('Annulations', annul && annul.taux != null ? `${String(annul.taux).replace('.', ',')}\u00a0%` : '—', annul ? `${annul.annulees} sur ${pl(annul.n, 'commande')} Vinted lue${annul.n > 1 ? 's' : ''}` : 'ventes pas lues', { 'data-stat-annulation': annul && annul.taux != null ? annul.taux : '' })}
         </div>
-        <div style={{ ...sNote, marginTop: 10 }}>Âge connu pour {stock.dort.datesConnues} sur {stock.dort.total}{stock.dort.datesConnues < stock.dort.total ? ' — les autres ne sont dans aucune ligne' : ''}. Calculé le {quand(stock.at)}. <Pourquoi>Âge = date de mise en ligne lue sur l'annonce. Valeur = prix affichés ; coût = prix d'achat connus seulement.</Pourquoi></div>
+        <div style={{ ...sNote, marginTop: 10 }}>{tr('stats.ageConnu')} {stock.dort.datesConnues} {tr('journee.texte2')} {stock.dort.total}{stock.dort.datesConnues < stock.dort.total ? tr('stats.autresSontDans') : ''}{tr('stats.calcule')} {quand(stock.at)}. <Pourquoi>{tr('stats.ageDateMise')}</Pourquoi></div>
       </>)}
     </section>
   </>);
@@ -2595,8 +2595,8 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
 function AnalysesStatistiques({panelOff}) {
  const [detail,setDetail]=React.useState(false);
  return <section className="vrm-stats-analyses" data-stats-carte="repartitions" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:18}}>
-  <h3>Répartition des ventes</h3><RepartitionsVentes panelOff={panelOff} apercu/>
-  <details onToggle={e=>setDetail(e.currentTarget.open)}><summary>Tailles, modèles et délais de vente</summary>{detail&&<RepartitionsVentes panelOff={panelOff}/>}</details>
+  <h3>{tr('stats.repartitionVentes')}</h3><RepartitionsVentes panelOff={panelOff} apercu/>
+  <details onToggle={e=>setDetail(e.currentTarget.open)}><summary>{tr('stats.taillesModelesDelais')}</summary>{detail&&<RepartitionsVentes panelOff={panelOff}/>}</details>
  </section>;
 }
 // ⟦← App.jsx #19⟧
@@ -2635,36 +2635,36 @@ function ObjectifDuMois({ liveStats }) {
   return (
     <div data-objectif-bloc={obj ? obj.type : ''}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: prog && !edit ? 8 : 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{prog && !edit ? tete : 'Objectif du mois'}</div>
-        <Bouton variante={edit ? 'discret' : 'secondaire'} className="vrm-b-petit" data-objectif-modifier="" onClick={() => { setType(obj ? obj.type : 'ca'); setSaisie(obj ? String(obj.valeur).replace('.', ',') : ''); setEdit((e) => !e); }}>{edit ? 'Annuler' : (obj ? 'Modifier' : 'Fixer')}</Bouton>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{prog && !edit ? tete : tr('reglages.objectif-mois.lib')}</div>
+        <Bouton variante={edit ? 'discret' : 'secondaire'} className="vrm-b-petit" data-objectif-modifier="" onClick={() => { setType(obj ? obj.type : 'ca'); setSaisie(obj ? String(obj.valeur).replace('.', ',') : ''); setEdit((e) => !e); }}>{edit ? tr('achats.annuler') : (obj ? tr('stats.modifier') : tr('stats.fixer'))}</Bouton>
       </div>
       {edit ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-          <Segmente label="Type d’objectif" value={type} onChange={setType} options={Object.entries(TYPES_OBJECTIF).map(([v, d]) => ({ v, l: d.nom, data: { 'data-objectif-type': v } }))}/>
+          <Segmente label={tr('stats.typeObjectif')} value={type} onChange={setType} options={Object.entries(TYPES_OBJECTIF).map(([v, d]) => ({ v, l: d.nom, data: { 'data-objectif-type': v } }))}/>
           <PropositionObjectif type={type} sources={sources} regles={REGLES_CARTE} onViser={poserValeur}/>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input aria-label={eurT ? 'Objectif en euros' : 'Objectif en nombre de ventes'} type="text" inputMode={eurT ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={eurT ? '2 000' : '40'} data-objectif-saisie=""
+            <input aria-label={eurT ? tr('stats.objectifEuros') : tr('stats.objectifNombreVentes')} type="text" inputMode={eurT ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={eurT ? '2 000' : '40'} data-objectif-saisie=""
               style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '11px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}/>
             <span style={{ fontSize: 13, color: C.muted }}>{eurT ? '€' : 'ventes'}</span>
             <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { if (lu != null) poserValeur(lu); }}>OK</Bouton>
           </div>
-          {type === 'benefice' ? <div style={{ fontSize: 13, color: C.muted }}>Seules les ventes au prix d’achat connu comptent.</div> : null}
-          {obj ? <Bouton variante="discret" data-objectif-retirer="" onClick={() => { poser(objectifAEnregistrer(brut, null)); setEdit(false); }} style={{ alignSelf: 'flex-start' }}>Retirer</Bouton> : null}
+          {type === 'benefice' ? <div style={{ fontSize: 13, color: C.muted }}>{tr('stats.seulesVentesPrix')}</div> : null}
+          {obj ? <Bouton variante="discret" data-objectif-retirer="" onClick={() => { poser(objectifAEnregistrer(brut, null)); setEdit(false); }} style={{ alignSelf: 'flex-start' }}>{tr('achats.retirer')}</Bouton> : null}
         </div>
       ) : prog ? (
         <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined} data-objectif-rythme={ry ? ry.etat : undefined}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontSize: 13, color: C.muted }}>{prog.partiel ? 'Au moins' : 'Tu en es à'}</span>
-            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? (prog.couverture ? `Prix d’achat connu pour ${prog.couverture} ventes` : `${prog.manque.join(', ')} pas lu`) : undefined}>{prog.valeur == null ? '—' : montreCourt(prog.valeur)}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>{prog.partiel ? tr('stats.moins2') : tr('stats.es')}</span>
+            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? (prog.couverture ? tr('stats.prixAchatConnu', { couverture: String(prog.couverture) }) : tr('stats.lu3', { x: String(prog.manque.join(', ')) })) : undefined}>{prog.valeur == null ? '—' : montreCourt(prog.valeur)}</span>
           </div>
-          <div role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 4, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
+          <div role="progressbar" aria-label={tr('reglages.objectif-mois.lib')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 4, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
             {prog.pct ? <div style={{ width: `${prog.pct}%`, height: '100%', background: C.accent, borderRadius: 999, transition: 'width .3s ease' }}/> : null}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '2px 12px', marginTop: 8, fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
             <span data-objectif-detail-reste="">{phraseResteObjectif(prog, montreCourt)}</span>
             {ry ? <span data-objectif-detail-rythme={ry.etat} style={{ color: ry.etat === 'avance' ? C.text : C.muted }}>{phraseRythme(ry, prog.type, montreCourt)}</span> : null}
           </div>
-          {prog.couverture ? <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }} data-objectif-couverture={prog.couverture}>Prix d’achat connu pour {prog.couverture} ventes.</div> : null}
+          {prog.couverture ? <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }} data-objectif-couverture={prog.couverture}>{trj('stats.prixAchatConnu2', { couverture: prog.couverture })}</div> : null}
           {passes.length ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }} data-objectif-passes="">
               {passes.map((m) => {
@@ -2673,7 +2673,7 @@ function ObjectifDuMois({ liveStats }) {
                   <div key={m.ym} data-objectif-passe={m.ym} data-objectif-passe-valeur={v == null ? '' : (eur ? String(Math.round(v * 100)) : String(v))} data-objectif-passe-atteint={m.atteint ? '1' : undefined} style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: C.muted }}>{NOMS_MOIS_OBJ[Number(m.ym.slice(5)) - 1]}</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{v == null ? '—' : <>{m.x.partiel ? <span style={{ fontSize: 11, fontWeight: 500, color: C.muted }}>≥ </span> : null}{montreCourt(v)}</>}{m.atteint ? ' ✓' : ''}</div>
-                    <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v == null ? (m.x && !m.x.couvert ? 'avant l’historique' : 'pas su') : m.visait != null ? `visé ${montreCourt(m.visait)}` : 'sans objectif'}</div>
+                    <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v == null ? (m.x && !m.x.couvert ? tr('stats.avantHistorique') : tr('stats.su')) : m.visait != null ? tr('stats.vise', { montreCourt: String(montreCourt(m.visait)) }) : tr('stats.sansObjectif')}</div>
                   </div>
                 );
               })}
